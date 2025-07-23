@@ -1004,7 +1004,7 @@ const DownloadCard = ({ game, onStop, onRetry, onOpenFolder, isStopping, onDelet
           </div>
         ) : (
           <>
-            {isDownloading && !isWaiting && (
+            {isDownloading && !isWaiting && !isExtracting && (
               <div className="space-y-3 duration-200 animate-in fade-in slide-in-from-top-1">
                 <div className="flex items-center space-x-3">
                   <span className="min-w-[45px] text-sm font-medium text-muted-foreground">
