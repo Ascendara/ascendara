@@ -313,12 +313,17 @@ const GameCard = memo(function GameCard({ game, compact }) {
           const downloadLinks = game.download_links || {};
           const allHosts = Object.keys(downloadLinks);
 
-          const host =
-            allHosts.find(h =>
-              prioritizedTorbox
-                ? ["gofile", "buzzheavier", "datanodes", ...torboxHosts].includes(h)
-                : seamlessHosts.concat(torboxHosts).includes(h)
-            ) || allHosts[0];
+          let host;
+          if (allHosts.includes("buzzheavier")) {
+            host = "buzzheavier";
+          } else {
+            host =
+              allHosts.find(h =>
+                prioritizedTorbox
+                  ? ["gofile", "datanodes", ...torboxHosts].includes(h)
+                  : seamlessHosts.concat(torboxHosts).includes(h)
+              ) || allHosts[0];
+          }
 
           let provider = "default";
           if (
