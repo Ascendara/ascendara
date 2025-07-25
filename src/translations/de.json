@@ -100,6 +100,7 @@
     "prev": "Vorherige",
     "profile": "Profil",
     "redownload": "Zurückgeladen",
+    "refresh": "Aktualisieren",
     "refreshed": "Erfrischt",
     "remove": "Entfernen",
     "reportDialog": {
@@ -610,7 +611,7 @@
     "removeFolder": "Ordner entfernen",
     "removeFromFavorites": "Favoriten entfernen",
     "removeFromFolder": "Aus dem Ordner nehmen",
-    "removeGameFromLibrary": "Aus der Bibliothek entfernen",
+    "removeGameFromLibrary": "Aus der Bibliothek nehmen",
     "renameFolderDesc": "Geben Sie einen neuen Namen für diesen Ordner ein.",
     "renameFolderTitle": "Ordner umbenennen",
     "running": "Läuft",

@@ -100,6 +100,7 @@
     "prev": "Anterior",
     "profile": "Perfil",
     "redownload": "RedOwnload",
+    "refresh": "Atualizar",
     "refreshed": "Atualizado",
     "remove": "Remover",
     "reportDialog": {
@@ -936,7 +937,7 @@
       "usernameError": "Falhou em salvar o nome de usuário"
     },
     "viewComponentsPage": "Veja a página de componentes",
-    "warningDescription": "Ascendara é projetada como uma plataforma de teste para videogames, permitindo que os usuários avaliem a jogabilidade, o desempenho e a compatibilidade antes de tomar uma decisão de compra. Ascendara incentiva fortemente os usuários a apoiar os desenvolvedores de jogos comprando jogos que eles gostam.",
+    "warningDescription": "Ascendara foi projetada como uma plataforma de teste para videogames, permitindo que os usuários avaliem a jogabilidade, o desempenho e a compatibilidade antes de tomar uma decisão de compra. Ascendara incentiva fortemente os usuários a apoiar os desenvolvedores de jogos comprando jogos que eles gostam.",
     "warningSupportDevelopers": "Os desenvolvedores de jogos investem tempo, recursos e criatividade significativos na criação das experiências que todos gostamos. Sua compra suporta diretamente a capacidade deles de continuar fazendo ótimos jogos e sustenta a indústria de jogos.",
     "warningSupportDevelopersCallToAction": "Apoie os desenvolvedores comprando jogos que você gosta.",
     "warningTitle": "Olá, por favor, leia isso!"

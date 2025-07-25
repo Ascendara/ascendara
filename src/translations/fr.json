@@ -53,7 +53,7 @@
       "donate": "Soutenir le développement",
       "feedback": "Donner des commentaires",
       "message": "Je sais que je n'ai dit pas d'annonces mais est-ce vraiment une annonce? Vous commencez à utiliser Ascendara et j'aimerais que vous le notiez ou me donnez des commentaires. Vous ne reverrez plus jamais ce message.",
-      "note": "J'ai passé tellement de temps à créer Ascendara comme projet passionné. Chaque fonctionnalité, chaque ligne de code est fabriquée avec soin. Votre soutien signifie tout pour moi et m'aide à continuer à rendre Ascendara encore mieux.",
+      "note": "J'ai passé tellement de temps à créer Ascendara comme projet passionné. Chaque fonctionnalité, chaque ligne de code est fabriquée avec soin. Votre soutien signifie tout pour moi et m'aide à continuer à rendre Ascendara encore meilleur.",
       "title": "Faites-moi savoir comment vous l'aimez"
     },
     "toasts": {
@@ -100,6 +100,7 @@
     "prev": "Précédent",
     "profile": "Profil",
     "redownload": "Téléchargement rafraîchissant",
+    "refresh": "Rafraîchir",
     "refreshed": "Rafraîchi",
     "remove": "Retirer",
     "reportDialog": {
@@ -309,7 +310,7 @@
     "topCriticScore": "Top Score de Critic",
     "understand": "Je comprends, continue",
     "update": {
-      "description": "Cela réinstallera le jeu dans le même répertoire. Bien que la plupart des jeux enregistrent des données dans des emplacements séparés, il est recommandé de sauvegarder tout fichier de sauvegarde ou de contenu personnalisé important avant de procéder à la mise à jour.",
+      "description": "Cela réinstallera le jeu dans le même répertoire. Bien que la plupart des jeux enregistrent des données dans des emplacements distincts, il est recommandé de sauvegarder tout fichier de sauvegarde ou de contenu personnalisé important avant de procéder à la mise à jour.",
       "title": "Prêt à mettre à jour {{game}}?"
     },
     "viewCriticReviews": "Voir les critiques des critiques",
@@ -1068,7 +1069,7 @@
     "continue": "Continuer",
     "continueWithoutSharing": "Continuer sans partager",
     "darkThemes": "Thèmes sombres",
-    "dependenciesDesc": "Si vous jouez sur un nouveau PC ou que vous avez récemment installé Windows, Ascendara peut vous aider à installer ces composants essentiels pour assurer la meilleure expérience",
+    "dependenciesDesc": "Si vous jouez sur un nouveau PC ou avez récemment installé Windows, Ascendara peut vous aider à installer ces composants essentiels pour assurer la meilleure expérience",
     "downloadGamesFaster": "Télécharger les jeux plus rapidement",
     "enableAutoUpdates": "Activer les mises à jour automatique",
     "errorInstallingDependencies": "Erreur d'installation des dépendances",

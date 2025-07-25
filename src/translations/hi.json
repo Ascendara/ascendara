@@ -100,6 +100,7 @@
     "prev": "पहले का",
     "profile": "प्रोफ़ाइल",
     "redownload": "फिर से लोड",
+    "refresh": "ताज़ा करना",
     "refreshed": "ताज़ा किया",
     "remove": "निकालना",
     "reportDialog": {
@@ -1102,7 +1103,7 @@
     "lightningFastTitle": "तेज",
     "makeSureYouHaveEnoughDiskSpaceInTheSelectedLocation": "सुनिश्चित करें कि आपके पास चयनित स्थान में पर्याप्त डिस्क स्थान है",
     "manualUpdates": "मैनुअल अपडेट",
-    "neverAutomaticallyUpdate": "कभी भी स्वचालित रूप से अपडेट न करें",
+    "neverAutomaticallyUpdate": "स्वचालित रूप से कभी अपडेट नहीं करें",
     "next": "अगला",
     "notEnoughSpaceWarning": "वाह! आपके पास चयनित ड्राइव पर 40 जीबी से कम खाली स्थान है। कुछ स्थान को साफ करने या एक अलग ड्राइव का चयन करने पर विचार करें।",
     "okay": "ठीक है",

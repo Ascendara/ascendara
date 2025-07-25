@@ -100,6 +100,7 @@
     "prev": "以前的",
     "profile": "轮廓",
     "redownload": "重新负载",
+    "refresh": "刷新",
     "refreshed": "刷新",
     "remove": "消除",
     "reportDialog": {
@@ -1102,8 +1103,8 @@
     "next": "下一个",
     "notEnoughSpaceWarning": "哇！所选驱动器上的空间不到40 GB。考虑清除一些空间或选择其他驱动器。",
     "okay": "好的",
-    "optOutOfSharing": "选择退出共享匿名用法数据。如果您改变主意，则始终可以在以后的设置中启用此功能。",
-    "optOutOfSharingAnonymousUsageData": "选择退出共享匿名用法数据。如果您改变主意，则始终可以在以后的设置中启用此功能。",
+    "optOutOfSharing": "选择退出共享匿名用法数据。如果您改变主意，可以随时在以后的设置中启用此功能。",
+    "optOutOfSharingAnonymousUsageData": "选择退出共享匿名用法数据。如果您改变主意，可以随时在以后的设置中启用此功能。",
     "personalizeYourExperience": "个性化您的体验，以适合您的风格的主题",
     "pleaseWaitAndRespondToAdminPrompts": "请等待并回复出现的任何管理员提示。请勿关闭应用程序。",
     "privacyPolicy": "隐私政策",

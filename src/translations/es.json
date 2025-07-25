@@ -100,6 +100,7 @@
     "prev": "Anterior",
     "profile": "Perfil",
     "redownload": "Renovado",
+    "refresh": "Refrescar",
     "refreshed": "Renovado",
     "remove": "Eliminar",
     "reportDialog": {
@@ -1139,7 +1140,7 @@
     "stayUpToDate": "Mantenga a Ascendara al día",
     "takeTour": "Hacer el recorrido",
     "termsOfService": "Términos de servicio",
-    "theExtensionBlocksKnownProviders": "La extensión escucha las descargas de proveedores conocidos y los detiene antes de que comiencen en su navegador, luego enviándolo a Ascendara para descargar",
+    "theExtensionBlocksKnownProviders": "La extensión escucha descargas de proveedores conocidos y los detiene antes de comenzar en su navegador, luego enviándolas a Ascendara para descargar",
     "thisIsWhereAllYourDownloadedGamesWillBeStored": "Aquí es donde se almacenarán todos sus juegos descargados",
     "welcomeTo": "Bienvenido",
     "welcomeToAscendaraDescription": "Estás casi listo para comenzar a usar Ascendara. Revisaremos el proceso de incorporación juntos para ordenar algunas configuraciones básicas, pero primero lea los términos de servicio y política de privacidad.",
