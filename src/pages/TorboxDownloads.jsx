@@ -37,6 +37,7 @@ import {
   RefreshCw,
   Coffee,
   AlertTriangle,
+  Loader,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -476,7 +477,7 @@ const TorboxDownloads = () => {
                           <div className="flex items-center gap-2">
                             <Badge
                               variant={userInfo.plan > 0 ? "default" : "outline"}
-                              className="mt-0.5"
+                              className="mt-0.5 text-secondary"
                             >
                               {userInfo.plan === 0
                                 ? t("torbox.plan_free")
@@ -545,17 +546,19 @@ const TorboxDownloads = () => {
               variant="outline"
               size="sm"
               className="ml-auto"
-              onClick={() => {
-                fetchTorboxDownloads();
-                fetchUserInfo();
-                toast({
-                  title: t("common.refreshed"),
-                  description: t("torbox.data_refreshed"),
-                });
+              onClick={async () => {
+                try {
+                  await fetchTorboxDownloads();
+                  await fetchUserInfo();
+                  toast(t("torbox.data_refreshed"));
+                } catch (err) {
+                  console.error("Error in refresh handler:", err);
+                  if (toast.error) toast.error("Refresh failed");
+                }
               }}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
+              {t("common.refresh")}
             </Button>
           </div>
         </CardContent>
@@ -738,22 +741,36 @@ const TorboxDownloads = () => {
                   confirmStop?.files?.[0]?.short_name ||
                   t("torbox.this_file"),
               })}
+              &nbsp;
               {t("common.action_cannot_be_undone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                toast.success(
-                  t("torbox.download_stopped_desc", {
-                    name:
-                      confirmStop?.displayName ||
-                      confirmStop?.name ||
-                      confirmStop?.files?.[0]?.short_name ||
-                      t("common.file"),
-                  })
-                );
+              onClick={async () => {
+                try {
+                  await controlWebDownload(settings.torboxApiKey, {
+                    webdl_id: confirmStop.id,
+                    operation: "stop",
+                  });
+
+                  toast.success(
+                    t("torbox.download_stopped_desc", {
+                      name:
+                        confirmStop?.displayName ||
+                        confirmStop?.name ||
+                        confirmStop?.files?.[0]?.short_name ||
+                        t("common.file"),
+                    })
+                  );
+
+                  // Refresh downloads to show updated status
+                  fetchTorboxDownloads();
+                } catch (error) {
+                  console.error("Error stopping download:", error);
+                  toast.error(t("torbox.error_stopping_download"));
+                }
                 setConfirmStop(null);
               }}
             >
@@ -879,23 +896,6 @@ const TorboxDownloadCard = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
   }
 
-  // Get status badge color
-  const getStatusColor = status => {
-    switch (status?.toLowerCase()) {
-      case "completed":
-      case "cached":
-        return "bg-success text-success-foreground";
-      case "downloading":
-        return "bg-primary text-primary-foreground";
-      case "paused":
-        return "bg-warning text-warning-foreground";
-      case "error":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-secondary text-secondary-foreground";
-    }
-  };
-
   // State for confirmation dialog when re-downloading
   const [confirmRedownload, setConfirmRedownload] = useState(false);
 
@@ -919,9 +919,12 @@ const TorboxDownloadCard = ({
       <CardContent className="p-4">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge className={cn("capitalize", getStatusColor(status))}>
-              {status || t("common.unknown")}
-            </Badge>
+            {status?.toLowerCase() === "downloading" && (
+              <div className="flex items-center gap-1 text-primary">
+                <Loader className="h-3 w-3 animate-spin" />
+                <span className="text-xs font-medium">{t("torbox.downloading")}</span>
+              </div>
+            )}
             {isCompleted && !isDownloadedToPc && (
               <Badge variant="outline" className="border-primary text-primary">
                 {t("torbox.ready_to_download")}
@@ -989,7 +992,11 @@ const TorboxDownloadCard = ({
         </div>
 
         {isCompleted && onDownloadToPC && (
-          <Button className="mt-3 w-full" size="sm" onClick={onDownloadToPC}>
+          <Button
+            className="mt-3 w-full text-secondary"
+            size="sm"
+            onClick={onDownloadToPC}
+          >
             <Download className="mr-2 h-4 w-4" />
             {t("torbox.download_to_pc")}
           </Button>
