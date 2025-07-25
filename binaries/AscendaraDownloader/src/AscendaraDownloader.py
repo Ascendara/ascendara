@@ -162,10 +162,16 @@ def handleerror(game_info, game_info_path, e):
     game_info['isRunning'] = False
     game_info['version'] = ""
     game_info['executable'] = ""
-    game_info['downloadingData'] = {
-        "error": True,
-        "message": str(e)
-    }
+    if 'downloadingData' in game_info:
+        game_info['downloadingData'] = {
+            "error": True,
+            "message": str(e)
+        }
+    else:
+        import logging
+        logging.error(f"[handleerror] Called but 'downloadingData' is already missing. Exception: {e}")
+    safe_write_json(game_info_path, game_info)
+
     safe_write_json(game_info_path, game_info)
 
 # Downloader class for managing downloads and extraction
@@ -229,11 +235,13 @@ class SmartDLDownloader:
                             "Download Complete",
                             f"Successfully downloaded from buzzheavier: {self.game_info['game']}"
                         )
-                    self.game_info["downloadingData"]["downloading"] = False
-                    self.game_info["downloadingData"]["progressCompleted"] = "100.00"
-                    self.game_info["downloadingData"]["progressDownloadSpeeds"] = "0.00 KB/s"
-                    self.game_info["downloadingData"]["timeUntilComplete"] = "0s"
-                    safe_write_json(self.game_info_path, self.game_info)
+                    # Only update downloadingData if it still exists (i.e., download did not fully complete and trigger deletion)
+                    if "downloadingData" in self.game_info:
+                        self.game_info["downloadingData"]["downloading"] = False
+                        self.game_info["downloadingData"]["progressCompleted"] = "100.00"
+                        self.game_info["downloadingData"]["progressDownloadSpeeds"] = "0.00 KB/s"
+                        self.game_info["downloadingData"]["timeUntilComplete"] = "0s"
+                        safe_write_json(self.game_info_path, self.game_info)
                 except Exception as e:
                     logging.error(f"[AscendaraDownloader] Buzzheavier download failed: {e}")
                     handleerror(self.game_info, self.game_info_path, e)
@@ -563,77 +571,156 @@ class SmartDLDownloader:
             return 'unknown', sig.hex()
 
     def _extract_files(self, _archive_path=None):
-        logging.info(f"[AscendaraDownloader] Scanning for archives to extract in: {self.download_dir}")
         self.game_info["downloadingData"]["extracting"] = True
         safe_write_json(self.game_info_path, self.game_info)
         watching_path = os.path.join(self.download_dir, "filemap.ascendara.json")
         watching_data = {}
         archive_exts = {'.rar', '.zip'}
         extracted = False
-        for root, _, files in os.walk(self.download_dir):
-            for file in files:
-                ext = os.path.splitext(file)[1].lower()
-                if ext in archive_exts:
-                    archive_path = os.path.join(root, file)
-                    logging.info(f"[AscendaraDownloader] Extracting {archive_path}")
+        
+        # If a specific archive path is provided, use it directly
+        if _archive_path and os.path.exists(_archive_path):
+            archives_to_process = [_archive_path]
+            logging.info(f"[AscendaraDownloader] Extracting specific archive: {_archive_path}")
+        else:
+            # Otherwise, scan the directory for archives
+            logging.info(f"[AscendaraDownloader] Scanning for archives to extract in: {self.download_dir}")
+            archives_to_process = []
+            for root, _, files in os.walk(self.download_dir):
+                for file in files:
+                    ext = os.path.splitext(file)[1].lower()
+                    if ext in archive_exts:
+                        archives_to_process.append(os.path.join(root, file))
+        
+        # Keep processing archives until no more are found (handles nested archives)
+        processed_archives = set()
+        
+        while archives_to_process:
+            current_archive = archives_to_process.pop(0)
+            
+            # Skip if we've already processed this archive
+            if current_archive in processed_archives:
+                continue
+                
+            processed_archives.add(current_archive)
+            ext = os.path.splitext(current_archive)[1].lower()
+            logging.info(f"[AscendaraDownloader] Extracting {current_archive}")
+            try:
+                if ext == '.zip':
+                    # First validate the ZIP file
                     try:
-                        if ext == '.zip':
-                            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                                for zip_info in zip_ref.infolist():
-                                    if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename:
-                                        extracted_path = os.path.join(self.download_dir, zip_info.filename)
-                                        zip_ref.extract(zip_info, self.download_dir)
-                                        key = f"{os.path.relpath(extracted_path, self.download_dir)}"
-                                        watching_data[key] = {"size": zip_info.file_size}
-                            # Delete the original .zip file after successful extraction
-                            try:
-                                os.remove(archive_path)
-                                logging.info(f"[AscendaraDownloader] Deleted archive after extraction: {archive_path}")
-                            except Exception as e:
-                                logging.warning(f"[AscendaraDownloader] Could not delete archive {archive_path}: {e}")
-                        elif ext == '.rar':
-                            try:
-                                from unrar import rarfile
-                            except ImportError:
-                                logging.error("[AscendaraDownloader] Python module 'unrar' is not installed. Please install it with 'pip install unrar' to extract .rar files.")
-                                continue
-                            try:
-                                with rarfile.RarFile(archive_path) as rar_ref:
-                                    rar_ref.extractall(self.download_dir)
-                                    for rar_info in rar_ref.infolist():
-                                        if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:
-                                            extracted_path = os.path.join(self.download_dir, rar_info.filename)
-                                            key = f"{os.path.relpath(extracted_path, self.download_dir)}"
-                                            watching_data[key] = {"size": rar_info.file_size}
-                                # Delete the original .rar file after successful extraction
-                                try:
-                                    os.remove(archive_path)
-                                    logging.info(f"[AscendaraDownloader] Deleted archive after extraction: {archive_path}")
-                                except Exception as e:
-                                    logging.warning(f"[AscendaraDownloader] Could not delete archive {archive_path}: {e}")
-                            except Exception as e:
-                                logging.error(f"[AscendaraDownloader] unrar extraction failed: {e}")
-                                continue
-                        extracted = True
-                    except Exception as e:
-                        logging.error(f"[AscendaraDownloader] Extraction failed: {archive_path}. Error: {e}")
+                        with zipfile.ZipFile(current_archive, 'r') as test_zip:
+                            test_zip.testzip()
+                        logging.info(f"[AscendaraDownloader] ZIP file validation passed: {current_archive}")
+                    except zipfile.BadZipFile as e:
+                        logging.error(f"[AscendaraDownloader] Invalid ZIP file: {current_archive} - {e}")
                         continue
-        nested_dir = os.path.join(self.download_dir, sanitize_folder_name(self.game))
-
+                    except Exception as e:
+                        logging.error(f"[AscendaraDownloader] ZIP validation error: {current_archive} - {e}")
+                        continue
+                    
+                    with zipfile.ZipFile(current_archive, 'r') as zip_ref:
+                        zip_contents = zip_ref.infolist()
+                        logging.info(f"[AscendaraDownloader] ZIP contains {len(zip_contents)} files")
+                        extracted_count = 0
+                        for zip_info in zip_contents:
+                            if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename:
+                                extracted_path = os.path.join(self.download_dir, zip_info.filename)
+                                logging.info(f"[AscendaraDownloader] Extracting file: {zip_info.filename} -> {extracted_path}")
+                                try:
+                                    zip_ref.extract(zip_info, self.download_dir)
+                                    if os.path.exists(extracted_path):
+                                        actual_size = os.path.getsize(extracted_path)
+                                        logging.info(f"[AscendaraDownloader] Successfully extracted: {zip_info.filename} (size: {actual_size} bytes)")
+                                        extracted_count += 1
+                                    else:
+                                        logging.error(f"[AscendaraDownloader] File not found after extraction: {extracted_path}")
+                                    key = f"{os.path.relpath(extracted_path, self.download_dir)}"
+                                    watching_data[key] = {"size": zip_info.file_size}
+                                except Exception as extract_error:
+                                    logging.error(f"[AscendaraDownloader] Failed to extract {zip_info.filename}: {extract_error}")
+                            else:
+                                logging.info(f"[AscendaraDownloader] Skipping file: {zip_info.filename}")
+                        logging.info(f"[AscendaraDownloader] Extraction complete: {extracted_count} files extracted")
+                    # Delete the original .zip file after successful extraction
+                    try:
+                        os.remove(current_archive)
+                        logging.info(f"[AscendaraDownloader] Deleted archive after extraction: {current_archive}")
+                    except Exception as e:
+                        logging.warning(f"[AscendaraDownloader] Could not delete archive {current_archive}: {e}")
+                elif ext == '.rar':
+                    try:
+                        from unrar import rarfile
+                    except ImportError:
+                        logging.error("[AscendaraDownloader] Python module 'unrar' is not installed. Please install it with 'pip install unrar' to extract .rar files.")
+                        continue
+                    try:
+                        with rarfile.RarFile(current_archive) as rar_ref:
+                            rar_ref.extractall(self.download_dir)
+                            for rar_info in rar_ref.infolist():
+                                if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:
+                                    extracted_path = os.path.join(self.download_dir, rar_info.filename)
+                                    key = f"{os.path.relpath(extracted_path, self.download_dir)}"
+                                    watching_data[key] = {"size": rar_info.file_size}
+                        # Delete the original .rar file after successful extraction
+                        try:
+                            os.remove(current_archive)
+                            logging.info(f"[AscendaraDownloader] Deleted archive after extraction: {current_archive}")
+                        except Exception as e:
+                            logging.warning(f"[AscendaraDownloader] Could not delete archive {current_archive}: {e}")
+                    except Exception as e:
+                        logging.error(f"[AscendaraDownloader] unrar extraction failed: {e}")
+                        continue
+                extracted = True
+            except Exception as e:
+                logging.error(f"[AscendaraDownloader] Extraction failed: {current_archive}. Error: {e}")
+                continue
+            
+            # After extracting, scan for any new archives that were extracted
+            for root, _, files in os.walk(self.download_dir):
+                for file in files:
+                    ext = os.path.splitext(file)[1].lower()
+                    if ext in archive_exts:
+                        new_archive = os.path.join(root, file)
+                        if new_archive not in processed_archives and new_archive not in archives_to_process:
+                            archives_to_process.append(new_archive)
+                            logging.info(f"[AscendaraDownloader] Found new archive to extract: {new_archive}")
+        # Check for nested directories that should be flattened
+        nested_dirs_to_check = []
+        
+        # First check for directory named after the game
+        game_named_dir = os.path.join(self.download_dir, sanitize_folder_name(self.game))
+        if os.path.isdir(game_named_dir):
+            nested_dirs_to_check.append(game_named_dir)
+        
+        # Also check for any single subdirectory that might contain the main content
+        # (excluding json files and other metadata)
+        subdirs = []
+        for item in os.listdir(self.download_dir):
+            item_path = os.path.join(self.download_dir, item)
+            if os.path.isdir(item_path) and not item.endswith('.ascendara') and item != '_CommonRedist':
+                subdirs.append(item_path)
+        
+        # If there's only one subdirectory and it's not already in our list, add it
+        if len(subdirs) == 1 and subdirs[0] not in nested_dirs_to_check:
+            nested_dirs_to_check.append(subdirs[0])
+            logging.info(f"[AscendaraDownloader] Found single subdirectory to potentially flatten: {subdirs[0]}")
+        
         moved = False
-        if os.path.isdir(nested_dir):
-            for item in os.listdir(nested_dir):
-                src = os.path.join(nested_dir, item)
-                dst = os.path.join(self.download_dir, item)
-                if os.path.exists(dst):
-                    if os.path.isdir(dst):
-                        shutil.rmtree(dst, ignore_errors=True)
-                    else:
-                        os.remove(dst)
-                shutil.move(src, dst)
-            shutil.rmtree(nested_dir, ignore_errors=True)
-            print(f"[AscendaraDownloader] Moved files from nested '{nested_dir}' to '{self.download_dir}'.")
-            moved = True
+        for nested_dir in nested_dirs_to_check:
+            if os.path.isdir(nested_dir):
+                for item in os.listdir(nested_dir):
+                    src = os.path.join(nested_dir, item)
+                    dst = os.path.join(self.download_dir, item)
+                    if os.path.exists(dst):
+                        if os.path.isdir(dst):
+                            shutil.rmtree(dst, ignore_errors=True)
+                        else:
+                            os.remove(dst)
+                    shutil.move(src, dst)
+                shutil.rmtree(nested_dir, ignore_errors=True)
+                logging.info(f"[AscendaraDownloader] Moved files from nested '{nested_dir}' to '{self.download_dir}'.")
+                moved = True
             # Rebuild filemap after flattening
             watching_data = {}
             for dirpath, _, filenames in os.walk(self.download_dir):
@@ -700,14 +787,12 @@ class SmartDLDownloader:
             self.game_info["downloadingData"]["verifying"] = False
             self.game_info["downloadingData"]["verifyError"] = verify_errors
             safe_write_json(self.game_info_path, self.game_info)
-            # Remove downloadingData from JSON after verification completes
-            if "downloadingData" in self.game_info:
-                del self.game_info["downloadingData"]
-                safe_write_json(self.game_info_path, self.game_info)
-                
-            # Check if there were no verification errors before proceeding with post-download behavior
+            # Only delete downloadingData after all processing is complete
             if not verify_errors:
                 self._handle_post_download_behavior()
+                if "downloadingData" in self.game_info:
+                    del self.game_info["downloadingData"]
+                    safe_write_json(self.game_info_path, self.game_info)
         except Exception as e:
             handleerror(self.game_info, self.game_info_path, e)
 
