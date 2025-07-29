@@ -67,6 +67,7 @@ const AppRoutes = () => {
   const [showWelcome, setShowWelcome] = useState(null);
   const [isNewInstall, setIsNewInstall] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitialRedirect, setHasInitialRedirect] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [iconData, setIconData] = useState("");
@@ -377,6 +378,28 @@ const AppRoutes = () => {
       welcomeData,
     });
   }, [isLoading, showWelcome, isNewInstall, welcomeData]);
+
+  useEffect(() => {
+    if (
+      !isLoading &&
+      location.pathname === "/" &&
+      !showWelcome &&
+      settings?.defaultOpenPage &&
+      settings.defaultOpenPage !== "home" &&
+      !hasInitialRedirect
+    ) {
+      console.log(`Redirecting to default landing page: ${settings.defaultOpenPage}`);
+      setHasInitialRedirect(true);
+      navigate(`/${settings.defaultOpenPage}`, { replace: true });
+    }
+  }, [
+    isLoading,
+    location.pathname,
+    showWelcome,
+    settings?.defaultOpenPage,
+    hasInitialRedirect,
+    navigate,
+  ]);
   console.log("AppRoutes render - Current state:", {
     showWelcome,
     location: location?.pathname,
@@ -505,16 +528,6 @@ const AppRoutes = () => {
   if (location.pathname === "/" && showWelcome) {
     console.log("Redirecting from home to welcome");
     return <Navigate to="/welcome" replace />;
-  }
-
-  if (
-    location.pathname === "/" &&
-    !showWelcome &&
-    settings?.defaultOpenPage &&
-    settings.defaultOpenPage !== "home"
-  ) {
-    console.log(`Redirecting to default landing page: ${settings.defaultOpenPage}`);
-    return <Navigate to={`/${settings.defaultOpenPage}`} replace />;
   }
 
   console.log("Rendering main routes with location:", location.pathname);
