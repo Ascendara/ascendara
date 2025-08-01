@@ -215,6 +215,10 @@ These languages come with the app by default:
     <td><strong>Achievement Watcher</strong></td>
     <td>Achievement tracking and viewing with Achievement Watcher by xan105.</td>
   </tr>
+  <tr>
+    <td><strong>Torbox</strong></td>
+    <td>Download games at high speeds with premium debrid services.</td>
+  </tr>
 </table>
 
 ## 🖼️ Preview App Pages
@@ -278,7 +282,6 @@ Contributing to Ascendara is the best way to get your desired features, bug fixe
 The Ascendara project is organized into the following main directories:
 
 - **src/**: Core application logic and UI implementation
-
   - **components/**: Core UI components
   - **context/**: React context providers for state management
   - **hooks/**: Custom hooks for efficient image loading and caching
@@ -290,7 +293,6 @@ The Ascendara project is organized into the following main directories:
   - **translations/**: Internationalization files
 
 - **binaries/**: Prebuilt binaries for core application functionality
-
   - **AscendaraCrashReporter/**: Crash reporting functionality
   - **AscendaraDownloader/**: Game download managers to handle most files
   - **AscendaraGameHandler/**: Game execution and management
