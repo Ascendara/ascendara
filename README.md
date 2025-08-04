@@ -268,14 +268,18 @@ The latest version of Ascendara will always be installed through the tool, but y
 versions directly from the [releases page](https://github.com/Ascendara/ascendara/releases). It is [open source](https://github.com/Ascendara/installer),
 and its file size is smaller than the app's NSIS installer for convenience—making it quicker to download
 and easier to distribute.
-
-| File                                                                             | SHA-256                                                          | VirusTotal Results                                                                                                      |
+x
+| File | SHA-256 | VirusTotal Results |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | 6a7c5bc0dcac7b793156d012741c1d2be1b0a595d820d7182ac4eae4de06ef0f | [4/72 Detections](https://www.virustotal.com/gui/file/6a7c5bc0dcac7b793156d012741c1d2be1b0a595d820d7182ac4eae4de06ef0f) |
+| [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | ae7a4fd508d96cbe29ace93d41a7a7228fbd5e0bb0cc93f3e39602023df1e648 | [1/72 Detections](https://www.virustotal.com/gui/file/ae7a4fd508d96cbe29ace93d41a7a7228fbd5e0bb0cc93f3e39602023df1e648) |
 
 ## 🤝 Contributing
 
 Contributing to Ascendara is the best way to get your desired features, bug fixes, or improvements into the official build! When your contribution is accepted, your changes will be prominently featured in the Ascendara changelogs, giving you recognition for your valuable input to the project. Learn how to contribute to Ascendara [here](https://ascendara.app/docs/getting-started/contributing).
+
+## 🗺️ Development Roadmap
+
+Ascendara's development roadmap can be found [here](https://ascendara.app/roadmap).
 
 ## 📂 Project Structure
 
@@ -293,6 +297,7 @@ The Ascendara project is organized into the following main directories:
   - **translations/**: Internationalization files
 
 - **binaries/**: Prebuilt binaries for core application functionality
+  - **AscendaraAchievementWatcher/**: Game achievement tracking functionality
   - **AscendaraCrashReporter/**: Crash reporting functionality
   - **AscendaraDownloader/**: Game download managers to handle most files
   - **AscendaraGameHandler/**: Game execution and management
@@ -363,51 +368,6 @@ yarn
 
 To build the source code into an executable, read the [Developer Docs](https://ascendara.app/docs/developer/build-from-source).
 
-## 🗺️ Development Roadmap
-
-### Current Goals
-
-- [ ] Add semi-support for Linux, and macOS with Wine and Winetricks
-- [ ] Revamp game info scraping logic/API (Dynamic game indexing)
-- [ ] Improved download management (pausing, resuming)
-
-### Future Goals
-
-> Want to suggest a feature you don't see here? [Contribute](https://ascendara.app/docs/getting-started/contributing) to Ascendara or [submit feedback](https://ascendara.app/feedback)!
-
-- [ ] Ascendara approved additional sources
-- [ ] Debrid support for downloads
-- [ ] Community driven path finding tool
-- [ ] Cloud data support
-- [ ] Endpoint for known games that have weird installation paths, issues, etc.
-- [ ] Break up code into files for better Organizations
-- [ ] Retry Download & Extract functionality
-
-### Completed Features
-
-- [x] Complete UI overhaul (V7)
-- [x] Legacy game version support (Ascendara Timemachine)
-- [x] Enhanced antivirus operation checks (File Verification)
-- [x] Game updating logic to be able to save time played and other metrics while updating the game
-- [x] Game ratings and reliability system
-- [x] Import games from Steam into library
-- [x] Steam workshop downloading page
-- [x] FitGirl and torrenting support
-- [x] Notification handling for desktop
-- [x] Automatic shortcut creation
-- [x] Enhanced search algorithms
-- [x] Theme customization
-- [x] Game dependencies reinstallation option
-- [x] Advanced filtering options
-- [x] Comprehensive tooltips
-- [x] Page population
-- [x] Welcome screens
-- [x] Improved tab navigation
-- [x] Separate library, downloads, and browse sections
-- [x] Custom game addition support
-- [x] Public API creation
-- [x] Popularity-based sorting
-
 ## 📝 License & Contact
 
 Licensed under [CC BY-NC 1.0 Universal](./LICENSE) - 2025 tagoWorks
@@ -416,7 +376,7 @@ Licensed under [CC BY-NC 1.0 Universal](./LICENSE) - 2025 tagoWorks
 
 - Email: [santiago@tago.works](mailto:santiago@tago.works)
 - Website: [tago.works](https://tago.works)
-- Discord: [Join our community](https://ascendara.app/discord)
+- Discord: [Join the community](https://ascendara.app/discord)
 
 ---
 
