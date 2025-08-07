@@ -268,18 +268,14 @@ The latest version of Ascendara will always be installed through the tool, but y
 versions directly from the [releases page](https://github.com/Ascendara/ascendara/releases). It is [open source](https://github.com/Ascendara/installer),
 and its file size is smaller than the app's NSIS installer for convenience—making it quicker to download
 and easier to distribute.
-x
-| File | SHA-256 | VirusTotal Results |
+
+| File                                                                             | SHA-256                                                          | VirusTotal Results                                                                                                      |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | ae7a4fd508d96cbe29ace93d41a7a7228fbd5e0bb0cc93f3e39602023df1e648 | [1/72 Detections](https://www.virustotal.com/gui/file/ae7a4fd508d96cbe29ace93d41a7a7228fbd5e0bb0cc93f3e39602023df1e648) |
 
 ## 🤝 Contributing
 
 Contributing to Ascendara is the best way to get your desired features, bug fixes, or improvements into the official build! When your contribution is accepted, your changes will be prominently featured in the Ascendara changelogs, giving you recognition for your valuable input to the project. Learn how to contribute to Ascendara [here](https://ascendara.app/docs/getting-started/contributing).
-
-## 🗺️ Development Roadmap
-
-Ascendara's development roadmap can be found [here](https://ascendara.app/roadmap).
 
 ## 📂 Project Structure
 
@@ -368,6 +364,10 @@ yarn
 
 To build the source code into an executable, read the [Developer Docs](https://ascendara.app/docs/developer/build-from-source).
 
+## 🗺️ Development Roadmap
+
+Ascendara's development roadmap can be found [here](https://ascendara.app/roadmap).
+
 ## 📝 License & Contact
 
 Licensed under [CC BY-NC 1.0 Universal](./LICENSE) - 2025 tagoWorks
@@ -381,5 +381,5 @@ Licensed under [CC BY-NC 1.0 Universal](./LICENSE) - 2025 tagoWorks
 ---
 
 <div align="center">
-    <sub>Built with 💖 by <a href="https://tago.works">tago</a></sub>
+    <sub>Built with ❤️ by <a href="https://tago.works">tago</a></sub>
 </div>
