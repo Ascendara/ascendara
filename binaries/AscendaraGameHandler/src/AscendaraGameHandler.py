@@ -17,6 +17,7 @@
 
 import os
 import sys
+import atexit
 import time
 import json
 import logging
@@ -160,7 +161,7 @@ def update_play_time(file_path, is_custom_game, game_entry=None):
     logging.info(f"[ENTRY] update_play_time(file_path={file_path}, is_custom_game={is_custom_game})")
     try:
         logging.debug(f"Updating play time for {'custom' if is_custom_game else 'regular'} game at {file_path}")
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding='utf-8') as f:
             data = json.load(f)
         if is_custom_game:
             for game in data["games"]:
@@ -175,7 +176,7 @@ def update_play_time(file_path, is_custom_game, game_entry=None):
                 data["playTime"] = 0
             data["playTime"] += 1
             logging.info(f"Updated play time for game: {data['playTime']} minutes")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding='utf-8') as f:
             json.dump(data, f, indent=4)
         logging.debug("Play time update saved successfully")
         logging.info(f"[EXIT] update_play_time() - Success")
@@ -321,7 +322,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         exe_path = game_path
         user_data_dir = os.path.join(os.environ['APPDATA'], 'ascendara')
         settings_file = os.path.join(user_data_dir, 'ascendarasettings.json')
-        with open(settings_file, 'r') as f:
+        with open(settings_file, 'r', encoding='utf-8') as f:
             settings = json.load(f)
         download_dir = settings.get('downloadDirectory')
         if not download_dir:
@@ -329,7 +330,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             logging.info("[EXIT] execute due to missing download_dir for custom game")
             return
         games_json_path = os.path.join(download_dir, 'games.json')
-        with open(games_json_path, 'r') as f:
+        with open(games_json_path, 'r', encoding='utf-8') as f:
             games_data = json.load(f)
         game_entry = next((game for game in games_data['games'] if game['executable'] == exe_path), None)
         if game_entry is None:
@@ -344,10 +345,10 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         logging.error(f"Executable file does not exist: {exe_path}")
         error = "The exe file does not exist"
         if not is_custom_game:
-            with open(json_file_path, "r") as f:
+            with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             data["runError"] = error
-            with open(json_file_path, "w") as f:
+            with open(json_file_path, "w", encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
         else:
             logging.error(error)
@@ -356,13 +357,13 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
     def update_launch_count(file_path, increment=True):
         logging.debug(f"update_launch_count called for {file_path}, increment={increment}")
         try:
-            with open(file_path, "r") as f:
+            with open(file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             if "launchCount" not in data:
                 data["launchCount"] = 0
             data["launchCount"] += 1 if increment else -1
             data["launchCount"] = max(0, data["launchCount"])
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
         except Exception as e:
             logging.error(f"Error updating launch count for {file_path}: {e}", exc_info=True)
@@ -370,13 +371,13 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
     if not is_custom_game:
         update_launch_count(json_file_path)
         logging.info(f"Incremented launch count and set isRunning for {json_file_path}")
-        with open(json_file_path, "r") as f:
+        with open(json_file_path, "r", encoding='utf-8') as f:
             game_data = json.load(f)
         game_data["isRunning"] = True
-        with open(json_file_path, "w") as f:
+        with open(json_file_path, "w", encoding='utf-8') as f:
             json.dump(game_data, f, indent=4)
     else:
-        with open(games_json_path, "r") as f:
+        with open(games_json_path, "r", encoding='utf-8') as f:
             games_data = json.load(f)
         for game in games_data["games"]:
             if game["executable"] == exe_path:
@@ -386,7 +387,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 game["isRunning"] = True
                 logging.info(f"Incremented launch count and set isRunning for custom game: {exe_path}")
                 break
-        with open(games_json_path, "w") as f:
+        with open(games_json_path, "w", encoding='utf-8') as f:
             json.dump(games_data, f, indent=4)
 
     try:
@@ -496,13 +497,13 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         logging.info(f"Game process exited with return code: {return_code}")
 
         try:
-            with open(settings_file, 'r') as f:
+            with open(settings_file, 'r', encoding='utf-8') as f:
                 settings_data = json.load(f)
             if 'runningGames' in settings_data:
                 if game_name in settings_data['runningGames']:
                     del settings_data['runningGames'][game_name]
                     logging.info(f"Removed {game_name} from runningGames in {settings_file}")
-            with open(settings_file, 'w') as f:
+            with open(settings_file, 'w', encoding='utf-8') as f:
                 json.dump(settings_data, f, indent=4)
         except Exception as e:
             logging.error(f"Error updating settings.json on exit: {e}", exc_info=True)
@@ -517,7 +518,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 logging.error(f"Ludusavi backup failed for {game_name}")
 
         if is_custom_game and games_json_path:
-            with open(games_json_path, "r") as f:
+            with open(games_json_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             for game in data["games"]:
                 if game["executable"] == exe_path:
@@ -527,17 +528,17 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     game["isRunning"] = False
                     logging.info(f"Set isRunning=False for custom game {game_name}")
                     break
-            with open(games_json_path, "w") as f:
+            with open(games_json_path, "w", encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
         elif json_file_path:
-            with open(json_file_path, "r") as f:
+            with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             if last_play_time < 1:
                 data["playTime"] = max(0, data["playTime"] - 1)
                 logging.info(f"Play time for game {game_name} was less than 1 minute; decremented playTime")
             data["isRunning"] = False
             logging.info(f"Set isRunning=False for game {game_name}")
-            with open(json_file_path, "w") as f:
+            with open(json_file_path, "w", encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
 
         if is_shortcut and rpc:
@@ -549,22 +550,22 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         logging.error(f"Exception occurred during game execution: {e}", exc_info=True)
         if is_custom_game and games_json_path:
             update_launch_count(games_json_path, False)
-            with open(games_json_path, "r") as f:
+            with open(games_json_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             for game in data["games"]:
                 if game["executable"] == exe_path:
                     game["isRunning"] = False
                     logging.info(f"Set isRunning=False for custom game {exe_path} due to exception")
                     break
-            with open(games_json_path, "w") as f:
+            with open(games_json_path, "w", encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
         elif json_file_path:
             update_launch_count(json_file_path, False)
-            with open(json_file_path, "r") as f:
+            with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             data["isRunning"] = False
             logging.info(f"Set isRunning=False for game {exe_path} due to exception")
-            with open(json_file_path, "w") as f:
+            with open(json_file_path, "w", encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
         atexit.register(launch_crash_reporter, 1, str(e))
         logging.info(f"[EXIT] execute due to exception for game: {exe_path}")
