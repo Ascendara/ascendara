@@ -466,9 +466,37 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     logging.error(f"Failed to launch with admin privileges: {e}", exc_info=True)
                     # Fall back to regular launch
                     logging.info("Falling back to regular launch")
-                    process = subprocess.Popen(exe_path)
+                    try:
+                        process = subprocess.Popen(exe_path)
+                    except OSError as e:
+                        if getattr(e, "winerror", None) == 740:
+                            logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")
+                            try:
+                                os.startfile(exe_path, "runas")
+                                logging.info("Game launched with elevation via UAC. No process handle will be tracked.")
+                                time.sleep(3)
+                                return
+                            except Exception as elev_err:
+                                logging.error(f"Failed to launch with elevation: {elev_err}")
+                                raise
+                        else:
+                            raise
             else:
-                process = subprocess.Popen(exe_path)
+                try:
+                    process = subprocess.Popen(exe_path)
+                except OSError as e:
+                    if getattr(e, "winerror", None) == 740:
+                        logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")
+                        try:
+                            os.startfile(exe_path, "runas")
+                            logging.info("Game launched with elevation via UAC. No process handle will be tracked.")
+                            time.sleep(3)
+                            return
+                        except Exception as elev_err:
+                            logging.error(f"Failed to launch with elevation: {elev_err}")
+                            raise
+                    else:
+                        raise
 
         start_time = time.time()
         last_update = start_time
