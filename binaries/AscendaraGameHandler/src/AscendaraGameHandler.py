@@ -27,10 +27,8 @@ from datetime import datetime
 import ctypes
 import atexit
 from pypresence import Presence
-import argparse
 import psutil
-import asyncio
-from datetime import datetime
+
 
 if sys.platform == 'darwin':
     ascendara_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
