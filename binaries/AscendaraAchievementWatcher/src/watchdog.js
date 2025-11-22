@@ -494,7 +494,7 @@ async function updateAchievementsJsonForRunningGame(game, achievedCache) {
   // 4. Write achievements data
   const now = new Date().toISOString();
   if (found.jsonPath && found.jsonPath.endsWith("games.json")) {
-    // Custom game: update achievementWater key in games.json
+    // Custom game: update achievementWatcher key in games.json
     try {
       const gamesData = await fsPromises.readFile(found.jsonPath, "utf8");
       const gamesObj = JSON.parse(gamesData);
@@ -515,7 +515,7 @@ async function updateAchievementsJsonForRunningGame(game, achievedCache) {
           g => normalizePath(g.executable) === targetExe
         );
         if (matchIdx !== -1) {
-          gamesObj.games[matchIdx].achievementWater = {
+          gamesObj.games[matchIdx].achievementWatcher = {
             achievements: achievementsJson,
             lastUpdated: now,
           };
@@ -541,7 +541,7 @@ async function updateAchievementsJsonForRunningGame(game, achievedCache) {
         throw new Error("games.json does not contain a games array");
       }
     } catch (e) {
-      throw new Error("Failed to update achievementWater in games.json: " + e);
+      throw new Error("Failed to update achievementWatcher in games.json: " + e);
     }
   } else {
     // Standard game: write to achievements.ascendara.json as before

@@ -1198,8 +1198,8 @@ ipcMain.handle("read-game-achievements", async (event, game, isCustom = false) =
       const gameInfo = gamesData.games.find(g => g.game === game);
 
       if (gameInfo) {
-        if (gameInfo.achievementWater) {
-          return gameInfo.achievementWater;
+        if (gameInfo.achievementWatcher) {
+          return gameInfo.achievementWatcher;
         }
         // Fallback: try to read achievements.ascendara.json from executable directory
         if (gameInfo.executable) {
