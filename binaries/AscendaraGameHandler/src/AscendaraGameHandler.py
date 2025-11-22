@@ -24,6 +24,7 @@ import platform
 import subprocess
 from datetime import datetime
 import ctypes
+import atexit
 from pypresence import Presence
 import argparse
 import psutil
