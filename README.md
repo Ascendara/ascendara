@@ -23,7 +23,7 @@ Ascendara simplifies your game management experience by providing a seamless way
 
 ### 👥 Community
 
-- [Join the Discord](https://discord.gg/ascendara) for discussions and support
+- [Join the Discord](https://ascendara.app/discord) for discussions and support
 - [Submit feedback for Ascendara](https://ascendara.app/feedback)
 - [Read the latest changelog](https://ascendara.app/changelog)
 - [Check latest releases on Github](https://github.com/tagoWorks/ascendara/releases)
