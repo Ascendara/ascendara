@@ -597,9 +597,16 @@ function Settings() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="space-y-4 text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="container mx-auto">
+        <div className="mx-auto flex min-h-[85vh] max-w-md flex-col items-center justify-center text-center">
+          <div className="space-y-6">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <div className="space-y-2">
+              <h3 className="text-2xl font-semibold tracking-tight">
+                {t("settings.loadingSettings")}
+              </h3>
+            </div>
+          </div>
         </div>
       </div>
     );
