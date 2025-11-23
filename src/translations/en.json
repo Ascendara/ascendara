@@ -760,7 +760,7 @@
     "ascendaraUpdatesDescription": "Automatically download new versions of Ascendara and ask you to install them when ready.",
     "ascendaraWorkshopDownloader": "Workshop Downloader",
     "ascendaraWorkshopDownloaderDescription": "The Workshop Downloader allows you to download items from the Steam Workshop without needing to have an account.",
-    "ascendaraWorkshopDownloaderEnable": "Add to Navigation Bar",
+    "ascendaraWorkshopDownloaderEnable": "Show in Navigation Bar",
     "autoCreateShortcuts": "Automatically Create Shortcuts",
     "autoCreateShortcutsDescription": "Automatically create shortcuts on desktop for games that run successfully for the first time.",
     "behaviorAfterDownload": "Behavior After Download",
