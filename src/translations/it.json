@@ -347,6 +347,7 @@
     "noDownloads": "Beh, è ​​rilassante...",
     "noDownloadsMessage": "Non stai scaricando nulla in questo momento, avvia un download per monitorarne l'avanzamento qui.",
     "noFilesError": "Il downloader non è riuscito a trovare alcun file da scaricare. Ciò molto probabilmente significa che il file è stato rimosso dall'origine.",
+    "retryDataNotAvailable": "Riprova dati non disponibili. Il download verrà eliminato e dovrai riavviarlo manualmente.",
     "retryDownload": "Nuovo tentativo di download",
     "retryDownloadDescription": "Il nuovo tentativo automatico di download non è attualmente implementato. Per ritentare il download, annulla ed elimina il download non riuscito qui, quindi cerca nuovamente il gioco e scaricalo di nuovo.",
     "speedHistory": "Scarica velocità",
@@ -1112,6 +1113,14 @@
     "neverAutomaticallyUpdate": "Non aggiornare mai automaticamente",
     "next": "Prossimo",
     "notEnoughSpaceWarning": "Woah! Hai meno di 40 GB di spazio libero sull'unità selezionata. Prendi in considerazione l'idea di liberare spazio o selezionare un'unità diversa.",
+    "noticeAppIsFree": {
+      "point1": "Non dovresti mai pagare per nulla relativo ad Ascendara o qualsiasi gioco disponibile per il test",
+      "point2": "Non sarà mai necessario creare un account per utilizzare Ascendara",
+      "point3": "Ascendara non chiederà mai alcun dato personale",
+      "point4": "I dati anonimi vengono condivisi solo se accetti e puoi modificare questa impostazione in qualsiasi momento nelle Impostazioni",
+      "subtitle": "Se pagavi per Ascendara eri truffato. Contatta immediatamente la tua banca.",
+      "title": "Ascendara è completamente gratuito"
+    },
     "okay": "Va bene",
     "optOutOfSharing": "Disattivare la condivisione dei dati di utilizzo anonimi. Puoi sempre abilitarlo in un secondo momento nelle impostazioni se cambi idea.",
     "optOutOfSharingAnonymousUsageData": "Disattivare la condivisione dei dati di utilizzo anonimi. Puoi sempre abilitarlo in un secondo momento nelle impostazioni se cambi idea.",

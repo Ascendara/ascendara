@@ -347,6 +347,7 @@
     "noDownloads": "Bueno, eso es relajante...",
     "noDownloadsMessage": "No estás descargando nada en este momento, inicia una descarga para seguir su progreso aquí.",
     "noFilesError": "El programa de descarga no pudo encontrar ningún archivo para descargar. Lo más probable es que esto signifique que el archivo se eliminó de la fuente.",
+    "retryDataNotAvailable": "Reintentar datos no disponibles. La descarga se eliminará y tendrás que reiniciarla manualmente.",
     "retryDownload": "Reintentar descargas",
     "retryDownloadDescription": "Actualmente no está implementado el reintento automático de descargas. Para volver a intentar la descarga, cancele y elimine la descarga fallida aquí, luego busque el juego nuevamente y descárguelo nuevamente.",
     "speedHistory": "Velocidades de descarga",
@@ -1112,6 +1113,14 @@
     "neverAutomaticallyUpdate": "Nunca actualizar automáticamente",
     "next": "Próximo",
     "notEnoughSpaceWarning": "¡Guau! Tienes menos de 40 GB de espacio libre en la unidad seleccionada. Considere liberar algo de espacio o seleccionar una unidad diferente.",
+    "noticeAppIsFree": {
+      "point1": "Nunca debes pagar por nada relacionado con Ascendara o cualquier juego disponible para prueba.",
+      "point2": "Nunca será necesario crear una cuenta para utilizar Ascendara",
+      "point3": "Ascendara nunca te pedirá ningún dato personal",
+      "point4": "Los datos anónimos solo se comparten si usted acepta y puede cambiar esto en cualquier momento en Configuración",
+      "subtitle": "Si pagaste por Ascendara, fuiste estafado. Por favor contacte a su banco inmediatamente.",
+      "title": "Ascendara es de uso completamente gratuito"
+    },
     "okay": "Bueno",
     "optOutOfSharing": "Opte por no compartir datos de uso anónimos. Siempre puedes habilitar esto más tarde en la configuración si cambias de opinión.",
     "optOutOfSharingAnonymousUsageData": "Opte por no compartir datos de uso anónimos. Siempre puedes habilitar esto más tarde en la configuración si cambias de opinión.",

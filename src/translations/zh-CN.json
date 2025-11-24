@@ -347,6 +347,7 @@
     "noDownloads": "嗯，这样很放松...",
     "noDownloadsMessage": "您现在没有下载任何内容，请在此处开始下载以跟踪其进度。",
     "noFilesError": "下载器找不到任何要下载的文件。这很可能意味着该文件已从源中删除。",
+    "retryDataNotAvailable": "重试数据不可用。下载将被删除，您必须手动重新启动下载。",
     "retryDownload": "重试下载",
     "retryDownloadDescription": "目前尚未实现自动重试下载。要重试下载，请在此处取消并删除失败的下载，然后再次搜索该游戏并重新下载。",
     "speedHistory": "下载速度",
@@ -1109,6 +1110,14 @@
     "neverAutomaticallyUpdate": "从不自动更新",
     "next": "下一个",
     "notEnoughSpaceWarning": "哇哦！您所选驱动器上的可用空间少于 40 GB。考虑清理一些空间或选择不同的驱动器。",
+    "noticeAppIsFree": {
+      "point1": "您永远不应该为与 Ascendara 或任何可供测试的游戏相关的任何内容付费",
+      "point2": "无需创建帐户即可使用 Ascendara",
+      "point3": "Ascendara 绝不会询问任何个人详细信息",
+      "point4": "仅当您选择加入时才会共享匿名数据，并且您可以随时在“设置”中更改此设置",
+      "subtitle": "如果您为 Ascendara 付费，那么您就被骗了。请立即联系您的银行。",
+      "title": "Ascendara 完全免费使用"
+    },
     "okay": "好的",
     "optOutOfSharing": "选择不共享匿名使用数据。如果您改变主意，您可以随时在设置中启用此功能。",
     "optOutOfSharingAnonymousUsageData": "选择不共享匿名使用数据。如果您改变主意，您可以随时在设置中启用此功能。",

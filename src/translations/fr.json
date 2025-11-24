@@ -347,6 +347,7 @@
     "noDownloads": "Eh bien, c'est relaxant...",
     "noDownloadsMessage": "Vous ne téléchargez rien pour le moment, démarrez un téléchargement pour suivre sa progression ici.",
     "noFilesError": "Le téléchargeur n'a trouvé aucun fichier à télécharger. Cela signifie très probablement que le fichier a été supprimé de la source.",
+    "retryDataNotAvailable": "Données de nouvelle tentative non disponibles. Le téléchargement sera supprimé et vous devrez redémarrer manuellement le téléchargement.",
     "retryDownload": "Nouvelle tentative de téléchargement",
     "retryDownloadDescription": "La nouvelle tentative automatique de téléchargement n’est actuellement pas implémentée. Pour réessayer le téléchargement, annulez et supprimez le téléchargement ayant échoué ici, puis recherchez à nouveau le jeu et téléchargez-le à nouveau.",
     "speedHistory": "Vitesses de téléchargement",
@@ -1112,6 +1113,14 @@
     "neverAutomaticallyUpdate": "Ne jamais mettre à jour automatiquement",
     "next": "Suivant",
     "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d'espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
+    "noticeAppIsFree": {
+      "point1": "Vous ne devriez jamais payer pour quoi que ce soit lié à Ascendara ou à tout jeu disponible pour les tests.",
+      "point2": "Aucun compte ne devra jamais être créé pour utiliser Ascendara",
+      "point3": "Ascendara ne demandera jamais de données personnelles",
+      "point4": "Les données anonymes ne sont partagées que si vous vous inscrivez, et vous pouvez modifier cela à tout moment dans les paramètres",
+      "subtitle": "Si vous avez payé pour Ascendara, vous avez été victime d’une arnaque. Veuillez contacter votre banque immédiatement.",
+      "title": "Ascendara est totalement gratuit"
+    },
     "okay": "D'accord",
     "optOutOfSharing": "Désactivez le partage de données d'utilisation anonymes. Vous pouvez toujours l'activer plus tard dans les paramètres si vous changez d'avis.",
     "optOutOfSharingAnonymousUsageData": "Désactivez le partage de données d'utilisation anonymes. Vous pouvez toujours l'activer plus tard dans les paramètres si vous changez d'avis.",
