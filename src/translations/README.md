@@ -18,7 +18,7 @@ Built-in translated languages:
 - German (de)
 - French (fr)
 
-Ascendara also supports 105 extra languages. These are not included by
+Ascendara also supports 93 extra languages. These are not included by
 default. Instead when you select a language in the app, Ascendara will
 translate it locally on your computer using the same script and Google Translate.
 You can read more about how that works here: https://ascendara.app/docs/binary-tool/language-translator
