@@ -332,22 +332,78 @@ class SmartDLDownloader:
                 max_speed = 0
                 threads = None
 
-            obj = SmartDL(url, dest, progress_bar=True)
-            if max_speed and max_speed > 0:
-                obj.set_speed(max_speed)
-            if threads and threads > 0:
-                obj.threads = threads
-            obj.start(blocking=False)
-            while not obj.isFinished():
-                progress = obj.get_progress() * 100
-                speed = obj.get_speed(human=True)
-                eta = obj.get_eta(human=True)
-                self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
-                self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed
-                self.game_info["downloadingData"]["timeUntilComplete"] = eta
-                safe_write_json(self.game_info_path, self.game_info)
-                time.sleep(0.5)
-            if obj.isSuccessful():
+            # Configure request arguments for better connection handling
+            # Longer timeouts help prevent IncompleteRead errors on large files
+            request_args = {
+                'timeout': (30, 300),  # (connect timeout, read timeout) in seconds
+                'headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': '*/*',
+                    'Accept-Encoding': 'identity',  # Disable compression for large files
+                    'Connection': 'keep-alive',
+                }
+            }
+
+            # Retry logic for handling IncompleteRead and connection errors
+            max_retries = 5
+            retry_delay = 10  # seconds between retries
+            download_successful = False
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    if attempt > 0:
+                        logging.info(f"[AscendaraDownloader] Retry attempt {attempt}/{max_retries-1} after {retry_delay}s delay...")
+                        time.sleep(retry_delay)
+                        retry_delay = min(retry_delay * 1.5, 60)  # Exponential backoff, max 60s
+
+                    obj = SmartDL(url, dest, progress_bar=True, request_args=request_args)
+                    if max_speed and max_speed > 0:
+                        obj.set_speed(max_speed)
+                    if threads and threads > 0:
+                        obj.threads = threads
+                    obj.start(blocking=False)
+
+                    while not obj.isFinished():
+                        progress = obj.get_progress() * 100
+                        speed = obj.get_speed(human=True)
+                        eta = obj.get_eta(human=True)
+                        self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
+                        self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed
+                        self.game_info["downloadingData"]["timeUntilComplete"] = eta
+                        if attempt > 0:
+                            self.game_info["downloadingData"]["retryAttempt"] = attempt
+                        safe_write_json(self.game_info_path, self.game_info)
+                        time.sleep(0.5)
+
+                    if obj.isSuccessful():
+                        download_successful = True
+                        break
+                    else:
+                        errors = obj.get_errors()
+                        last_error = str(errors)
+                        # Check if this is a retryable error
+                        if any(err_type in last_error for err_type in ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 'timeout', 'Timeout', 'ChunkedEncodingError']):
+                            logging.warning(f"[AscendaraDownloader] Retryable error on attempt {attempt+1}: {last_error}")
+                            continue
+                        else:
+                            # Non-retryable error, fail immediately
+                            logging.error(f"[AscendaraDownloader] Non-retryable error: {last_error}")
+                            break
+
+                except Exception as retry_exc:
+                    last_error = str(retry_exc)
+                    if any(err_type in last_error for err_type in ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 'timeout', 'Timeout', 'ChunkedEncodingError']):
+                        logging.warning(f"[AscendaraDownloader] Retryable exception on attempt {attempt+1}: {retry_exc}")
+                        continue
+                    else:
+                        raise  # Re-raise non-retryable exceptions
+
+            # Clean up retry attempt from status
+            if 'retryAttempt' in self.game_info.get('downloadingData', {}):
+                del self.game_info['downloadingData']['retryAttempt']
+
+            if download_successful:
                 logging.info(f"[AscendaraDownloader] Download completed successfully.")
                 if withNotification:
                     _launch_notification(
@@ -389,14 +445,14 @@ class SmartDLDownloader:
 
                 self._extract_files(dest)
             else:
-                logging.error(f"[AscendaraDownloader] Download failed: {obj.get_errors()}")
+                logging.error(f"[AscendaraDownloader] Download failed after {max_retries} attempts: {last_error}")
                 if withNotification:
                     _launch_notification(
                         withNotification,
                         "Download Error",
-                        f"Error downloading {self.game_info['game']}: {obj.get_errors()}"
+                        f"Error downloading {self.game_info['game']}: {last_error}"
                     )
-                raise Exception(str(obj.get_errors()))
+                raise Exception(str(last_error))
         except Exception as e:
             # Detect SSL version error and set provider_blocked_error
             err_str = str(e)
