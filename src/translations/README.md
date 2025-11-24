@@ -1,9 +1,10 @@
-`en.json` is the orginial language file. All other language files are
-based on this file and have been translated with Google Translate.
-json-translator is used to mass translate the orginial language file to All
-other languages. View it at https://github.com/mololab/json-translator
+`en.json` is the original language file. All other built-in languages
+in Ascendara were generated from this file using Google Translate.
+json-translator is used to mass-translate the English file into the
+main languages listed below. You can check it out here:
+https://github.com/mololab/json-translator
 
-Here is a list of the languages that have been translated:
+Built-in translated languages:
 
 - Spanish (es)
 - Chinese (Simplified) (zh-CN)
@@ -17,11 +18,12 @@ Here is a list of the languages that have been translated:
 - German (de)
 - French (fr)
 
-For the 93 additional languages, you must choose in the app which one you want to translate.
+Ascendara also supports 105 extra languages. These are not included by
+default. Instead when you select a language in the app, Ascendara will
+translate it locally on your computer using the same script and Google Translate.
+You can read more about how that works here: https://ascendara.app/docs/binary-tool/language-translator
 
-See the full list of languages in the '/pages/ExtraLanguages.jsx' file.
-
-Text may not be 100% accurate.
-
-If there is an error in a translation, please open an issue
-on GitHub (https://github.com/tagoWorks/ascendara).
+Since every translation is based on the English file, accuracy isn’t perfect.
+And because translations are regenerated whenever new UI text is added, manual
+fixes would get overwritten so patching individual translation issues is not possible.
+If you still want to report something, you can always open an issue on GitHub: https://github.com/tagoWorks/ascendara
