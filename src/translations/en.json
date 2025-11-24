@@ -347,6 +347,7 @@
     "noDownloads": "Well that's relaxing...",
     "noDownloadsMessage": "You're not downloading anything right now, start a download to track its progress here.",
     "noFilesError": "The downloader could not find any files to download. This most likely means the file was removed from the source.",
+    "retryDataNotAvailable": "Retry data not available. The download will be deleted and you will have to manually restart the download.",
     "retryDownload": "Retrying Downloads",
     "retryDownloadDescription": "Automatically retrying downloads is currently not implemented. To retry the download, cancel and delete the failed download here then search for the game again and download it again.",
     "speedHistory": "Download Speeds",

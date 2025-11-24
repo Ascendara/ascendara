@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  getCachedDownloadData,
+  clearCachedDownloadData,
+} from "@/services/retryGameDownloadService";
 
 // Background Speed Animation Component
 const BackgroundSpeedAnimation = () => {
@@ -171,6 +176,8 @@ const isHighSpeed = speedString => {
 };
 
 const Downloads = () => {
+  const navigate = useNavigate();
+
   useEffect(() => {
     window.electron.switchRPC("downloading");
     return () => {
@@ -184,8 +191,6 @@ const Downloads = () => {
   useEffect(() => {
     downloadingGamesRef.current = downloadingGames;
   }, [downloadingGames]);
-  const [retryModalOpen, setRetryModalOpen] = useState(false);
-  const [retryLink, setRetryLink] = useState("");
   const [selectedGame, setSelectedGame] = useState(null);
   const [totalSpeed, setTotalSpeed] = useState("0.00 MB/s");
   const [activeDownloads, setActiveDownloads] = useState(0);
@@ -340,6 +345,8 @@ const Downloads = () => {
       });
       // Optimistically remove the game from the downloads list if deleteContents is true
       if (deleteContents) {
+        // Clear the cached download data since the download is being deleted
+        clearCachedDownloadData(game.game);
         setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
       }
       setStopModalOpen(false);
@@ -347,17 +354,25 @@ const Downloads = () => {
     }
   };
 
-  const handleRetryDownload = game => {
-    setSelectedGame(game);
-    setRetryModalOpen(true);
-  };
+  const handleRetryDownload = async game => {
+    // Try to get cached download data for this game
+    const cachedData = getCachedDownloadData(game.game);
 
-  const handleRetryConfirm = async () => {
-    if (selectedGame) {
-      await window.electron.retryDownload(retryLink);
-      setRetryModalOpen(false);
-      setRetryLink("");
-      setSelectedGame(null);
+    if (cachedData) {
+      await window.electron.deleteGameDirectory(game.game);
+      clearCachedDownloadData(game.game);
+
+      setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
+
+      navigate("/download", {
+        state: {
+          gameData: cachedData,
+        },
+      });
+    } else {
+      toast.error(t("downloads.retryDataNotAvailable"));
+      await window.electron.deleteGameDirectory(game.game);
+      setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
     }
   };
 
@@ -408,6 +423,7 @@ const Downloads = () => {
                   // Optimistically remove from UI
                   setDownloadingGames(prev => prev.filter(g => g.id !== deletedGame.id));
                 }}
+                onClearCache={clearCachedDownloadData}
               />
             ))}
           </div>
@@ -539,29 +555,19 @@ const Downloads = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <AlertDialog open={retryModalOpen} onOpenChange={setRetryModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("downloads.retryDownload")}
-            </AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogDescription className="text-muted-foreground">
-            {t("downloads.retryDownloadDescription")}
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">
-              {t("common.ok")}
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
 
-const DownloadCard = ({ game, onStop, onRetry, onOpenFolder, isStopping, onDelete }) => {
+const DownloadCard = ({
+  game,
+  onStop,
+  onRetry,
+  onOpenFolder,
+  isStopping,
+  onDelete,
+  onClearCache,
+}) => {
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const { t } = useLanguage();
@@ -611,6 +617,8 @@ const DownloadCard = ({ game, onStop, onRetry, onOpenFolder, isStopping, onDelet
 
   const handleRemoveDownload = async game => {
     setIsDeleting(true);
+    // Clear the cached download data since the download is being deleted
+    if (onClearCache) onClearCache(game.game);
     await window.electron.deleteGameDirectory(game.game);
     setIsDeleting(false);
     // Immediately notify parent to refresh downloads list

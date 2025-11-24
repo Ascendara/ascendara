@@ -33,6 +33,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import imageCacheService from "@/services/imageCacheService";
 import openCriticService from "@/services/openCriticService";
+import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import {
   BadgeCheckIcon,
   CheckIcon,
@@ -331,6 +332,9 @@ export default function DownloadPage() {
 
         setIsStartingDownload(true);
 
+        // Cache the download page data for retry functionality
+        cacheDownloadData(sanitizedGameName, gameData);
+
         try {
           await window.electron.downloadFile(
             torrentLink,
@@ -568,6 +572,9 @@ export default function DownloadPage() {
     console.log("Starting download with URL:", urlToUse);
 
     setIsStartingDownload(true);
+
+    // Cache the download page data for retry functionality
+    cacheDownloadData(sanitizedGameName, gameData);
 
     try {
       const isVrGame = gameData.category?.includes("Virtual Reality");
