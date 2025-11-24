@@ -1115,6 +1115,14 @@
     "neverAutomaticallyUpdate": "Never Automatically Update",
     "next": "Next",
     "notEnoughSpaceWarning": "Woah! You have less than 40 GB of free space on the selected drive. Consider clearing some space or selecting a different drive.",
+    "noticeAppIsFree": {
+      "point1": "You should never pay for anything related to Ascendara or any games available for testing",
+      "point2": "No account will ever need to be created to use Ascendara",
+      "point3": "Ascendara will never ask for any personal details",
+      "point4": "Anonymous data is only shared if you opt in, and you can change this anytime in Settings",
+      "subtitle": "If you paid for Ascendara, you were scammed. Please contact your bank immediately.",
+      "title": "Ascendara is completely free to use"
+    },
     "okay": "Okay",
     "optOutOfSharing": "Opt out of sharing anonymous usage data. You can always enable this later in settings if you change your mind.",
     "optOutOfSharingAnonymousUsageData": "Opt out of sharing anonymous usage data. You can always enable this later in settings if you change your mind.",

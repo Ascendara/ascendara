@@ -420,6 +420,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
     if (step === "language") {
       setStep("welcome");
     } else if (step === "welcome") {
+      setStep("noticeAppIsFree");
+    } else if (step === "noticeAppIsFree") {
       setStep("directory");
     } else if (step === "directory") {
       setStep("extension");
@@ -1177,6 +1179,58 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   <ArrowRight className="ml-1 inline-block h-3 w-3" />
                 </a>
               </motion.p>
+            </motion.div>
+          )}
+
+          {step === "noticeAppIsFree" && (
+            <motion.div
+              key="noticeAppIsFree"
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <h2 className="mb-2 text-3xl font-bold text-primary">
+                  {t("welcome.noticeAppIsFree.title")}
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                  {t("welcome.noticeAppIsFree.subtitle")}
+                </p>
+              </motion.div>
+
+              <motion.div
+                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6"
+                variants={itemVariants}
+              >
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                  <p className="text-md">{t("welcome.noticeAppIsFree.point1")}</p>
+                </div>
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                  <p>{t("welcome.noticeAppIsFree.point2")}</p>
+                </div>
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                  <p>{t("welcome.noticeAppIsFree.point3")}</p>
+                </div>
+                <div className="flex items-start space-x-3 text-left">
+                  <Shield className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                  <p className="text-md">{t("welcome.noticeAppIsFree.point4")}</p>
+                </div>
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <Button
+                  size="lg"
+                  onClick={handleNext}
+                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                >
+                  {t("welcome.okay")}
+                </Button>
+              </motion.div>
             </motion.div>
           )}
 
