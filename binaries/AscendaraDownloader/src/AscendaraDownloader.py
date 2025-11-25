@@ -332,17 +332,15 @@ class SmartDLDownloader:
                 max_speed = 0
                 threads = None
 
-            # Configure request arguments for better connection handling
-            # Longer timeouts help prevent IncompleteRead errors on large files
             request_args = {
-                'timeout': (30, 300),  # (connect timeout, read timeout) in seconds
                 'headers': {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': '*/*',
-                    'Accept-Encoding': 'identity',  # Disable compression for large files
+                    'Accept-Encoding': 'identity',
                     'Connection': 'keep-alive',
                 }
             }
+            download_timeout = 300  # seconds - longer timeout for large files
 
             # Retry logic for handling IncompleteRead and connection errors
             max_retries = 5
@@ -357,7 +355,7 @@ class SmartDLDownloader:
                         time.sleep(retry_delay)
                         retry_delay = min(retry_delay * 1.5, 60)  # Exponential backoff, max 60s
 
-                    obj = SmartDL(url, dest, progress_bar=True, request_args=request_args)
+                    obj = SmartDL(url, dest, progress_bar=True, timeout=download_timeout, request_args=request_args)
                     if max_speed and max_speed > 0:
                         obj.set_speed(max_speed)
                     if threads and threads > 0:
