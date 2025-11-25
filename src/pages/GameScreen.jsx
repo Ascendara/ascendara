@@ -35,6 +35,7 @@ import {
   BookX,
   LockIcon,
   ImageUp,
+  Bolt,
 } from "lucide-react";
 import gameUpdateService from "@/services/gameUpdateService";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
@@ -43,6 +44,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useIgdbConfig } from "@/services/gameInfoConfig";
 import { useAudioPlayer, killAudioAndMiniplayer } from "@/services/audioPlayerService";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { analytics } from "@/services/analyticsService";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -249,6 +251,8 @@ export default function GameScreen() {
   const [igdbLoading, setIgdbLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
+  const [launchOptionsDialogOpen, setLaunchOptionsDialogOpen] = useState(false);
+  const [launchCommand, setLaunchCommand] = useState("");
   const { setTrack, play } = useAudioPlayer();
 
   // Achievements state
@@ -1057,6 +1061,22 @@ export default function GameScreen() {
                       {t("library.verifyGameFiles")}
                     </Button>
                   )}
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={async () => {
+                      const commands = await window.electron.getLaunchCommands(
+                        game.game || game.name,
+                        game.isCustom
+                      );
+                      setLaunchCommand(commands || "");
+                      setLaunchOptionsDialogOpen(true);
+                    }}
+                  >
+                    <Bolt className="h-4 w-4" />
+                    {t("gameScreen.launchOptions")}
+                  </Button>
 
                   <Button
                     variant="outline"
@@ -1901,6 +1921,55 @@ export default function GameScreen() {
         onClose={() => setShowSteamNotRunningWarning(false)}
         t={t}
       />
+
+      {/* Launch Options Dialog */}
+      <AlertDialog
+        open={launchOptionsDialogOpen}
+        onOpenChange={setLaunchOptionsDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("gameScreen.launchOptions")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("gameScreen.launchOptionsDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={launchCommand}
+            className="text-foreground"
+            onChange={e => setLaunchCommand(e.target.value)}
+            placeholder={t("gameScreen.launchCommandPlaceholder")}
+          />
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => setLaunchOptionsDialogOpen(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              className="text-secondary"
+              onClick={async () => {
+                const success = await window.electron.saveLaunchCommands(
+                  game.game || game.name,
+                  launchCommand,
+                  game.isCustom
+                );
+                if (success) {
+                  setGame({ ...game, launchCommands: launchCommand });
+                  toast.success(t("gameScreen.launchOptionsSaved"));
+                } else {
+                  toast.error(t("common.error"));
+                }
+                setLaunchOptionsDialogOpen(false);
+              }}
+            >
+              {t("common.save")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

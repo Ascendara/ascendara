@@ -201,6 +201,10 @@ contextBridge.exposeInMainWorld("electron", {
   getProfileImage: () => ipcRenderer.invoke("get-profile-image"),
   modifyGameExecutable: (game, executable) =>
     ipcRenderer.invoke("modify-game-executable", game, executable),
+  saveLaunchCommands: (game, launchCommands, isCustom) =>
+    ipcRenderer.invoke("save-launch-commands", game, launchCommands, isCustom),
+  getLaunchCommands: (game, isCustom) =>
+    ipcRenderer.invoke("get-launch-commands", game, isCustom),
   getAssetPath: filename => ipcRenderer.invoke("get-asset-path", filename),
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   isDev: () => ipcRenderer.invoke("is-dev"),

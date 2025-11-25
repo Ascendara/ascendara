@@ -3439,7 +3439,7 @@ ipcMain.handle("update-ascendara", async () => {
 });
 
 ipcMain.handle("check-for-updates", async () => {
-  if (isDev || experiment) return true;
+  if (isDev) return true;
   try {
     await checkReferenceLanguage();
     return await checkVersionAndUpdate();
@@ -4264,6 +4264,111 @@ ipcMain.handle("is-steam-running", () => {
   }
 });
 
+ipcMain.handle("get-launch-commands", (event, game, isCustom = false) => {
+  const settings = settingsManager.getSettings();
+  try {
+    if (!settings.downloadDirectory || !settings.additionalDirectories) {
+      console.error("Download directories not properly configured");
+      return null;
+    }
+
+    if (isCustom) {
+      const gamesPath = path.join(settings.downloadDirectory, "games.json");
+      if (!fs.existsSync(gamesPath)) {
+        return null;
+      }
+
+      const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+      const gameInfo = gamesData.games.find(g => g.game === game);
+      return gameInfo?.launchCommands || null;
+    }
+
+    const allDirectories = [
+      settings.downloadDirectory,
+      ...settings.additionalDirectories,
+    ];
+
+    const sanitizedGame = sanitizeText(game);
+
+    for (const directory of allDirectories) {
+      const gameDirectory = path.join(directory, sanitizedGame);
+      const gameInfoPath = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+
+      if (fs.existsSync(gameInfoPath)) {
+        const gameInfoData = fs.readFileSync(gameInfoPath, "utf8");
+        const gameInfo = JSON.parse(gameInfoData);
+        return gameInfo.launchCommands || null;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error getting launch commands:", error);
+    return null;
+  }
+});
+
+ipcMain.handle(
+  "save-launch-commands",
+  (event, game, launchCommands, isCustom = false) => {
+    const settings = settingsManager.getSettings();
+    try {
+      if (!settings.downloadDirectory || !settings.additionalDirectories) {
+        console.error("Download directories not properly configured");
+        return false;
+      }
+
+      if (isCustom) {
+        // Handle custom games - stored in games.json
+        const gamesPath = path.join(settings.downloadDirectory, "games.json");
+        if (!fs.existsSync(gamesPath)) {
+          console.error("Custom games file not found");
+          return false;
+        }
+
+        const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+        const gameIndex = gamesData.games.findIndex(g => g.game === game);
+
+        if (gameIndex === -1) {
+          console.error(`Custom game ${game} not found in games.json`);
+          return false;
+        }
+
+        gamesData.games[gameIndex].launchCommands = launchCommands;
+        fs.writeFileSync(gamesPath, JSON.stringify(gamesData, null, 2));
+        return true;
+      }
+
+      // Handle regular games - stored in .ascendara.json
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...settings.additionalDirectories,
+      ];
+
+      const sanitizedGame = sanitizeText(game);
+
+      for (const directory of allDirectories) {
+        const gameDirectory = path.join(directory, sanitizedGame);
+        const gameInfoPath = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+
+        if (fs.existsSync(gameInfoPath)) {
+          const gameInfoData = fs.readFileSync(gameInfoPath, "utf8");
+          const gameInfo = JSON.parse(gameInfoData);
+          gameInfo.launchCommands = launchCommands;
+          fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 2));
+          return true;
+        }
+      }
+
+      console.error(`Game ${game} not found in any configured directory`);
+      return false;
+    } catch (error) {
+      console.error("Error saving launch commands:", error);
+      return false;
+    }
+  }
+);
+
 ipcMain.handle(
   "play-game",
   async (
@@ -4285,6 +4390,8 @@ ipcMain.handle(
         settings.downloadDirectory,
         ...settings.additionalDirectories,
       ];
+
+      let launchCommands = null;
 
       if (!isCustom) {
         const sanitizedGame = sanitizeText(game);
@@ -4316,6 +4423,10 @@ ipcMain.handle(
           throw new Error("Executable path not found in game info");
         }
 
+        if (gameInfo.launchCommands) {
+          launchCommands = gameInfo.launchCommands;
+        }
+
         // Check if the executable path is already absolute
         executable = path.isAbsolute(gameInfo.executable)
           ? gameInfo.executable
@@ -4333,7 +4444,12 @@ ipcMain.handle(
           throw new Error(`Game not found in games.json: ${game}`);
         }
 
+        if (gameInfo.launchCommands) {
+          launchCommands = gameInfo.launchCommands;
+        }
+
         executable = gameInfo.executable; // Custom games should already have absolute paths
+
         gameDirectory = path.dirname(executable);
       }
 
@@ -4381,6 +4497,7 @@ ipcMain.handle(
             isCustom.toString(),
             launchWithAdmin.toString(),
             ...(backupOnClose ? ["--ludusavi"] : []),
+            ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
           ]
         : [
             handlerScript,
@@ -4388,6 +4505,7 @@ ipcMain.handle(
             isCustom.toString(),
             launchWithAdmin.toString(),
             ...(backupOnClose ? ["--ludusavi"] : []),
+            ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
           ];
 
       const runGame = spawn(executablePath, spawnArgs, {
