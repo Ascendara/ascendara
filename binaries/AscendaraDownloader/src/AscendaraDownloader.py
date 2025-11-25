@@ -340,32 +340,73 @@ class SmartDLDownloader:
                     'Connection': 'keep-alive',
                 }
             }
-            download_timeout = 300  # seconds - longer timeout for large files
+            download_timeout = 600  # seconds - longer timeout for large files
 
             # Retry logic for handling IncompleteRead and connection errors
-            max_retries = 5
-            retry_delay = 10  # seconds between retries
+            max_retries = 10  # Increased retries for large files
+            retry_delay = 5  # seconds between retries (start lower)
             download_successful = False
             last_error = None
+            
+            # Track consecutive failures to detect persistent issues
+            consecutive_failures = 0
+            max_consecutive_failures = 3
 
             for attempt in range(max_retries):
                 try:
                     if attempt > 0:
+                        # Clean up any partial SmartDL temp files before retry
+                        try:
+                            for f in os.listdir(self.download_dir):
+                                if f.endswith('.000') or f.endswith('.001') or '.rar.0' in f or '.zip.0' in f:
+                                    partial_path = os.path.join(self.download_dir, f)
+                                    logging.info(f"[AscendaraDownloader] Cleaning up partial file: {partial_path}")
+                                    os.remove(partial_path)
+                        except Exception as cleanup_err:
+                            logging.warning(f"[AscendaraDownloader] Could not clean up partial files: {cleanup_err}")
+                        
                         logging.info(f"[AscendaraDownloader] Retry attempt {attempt}/{max_retries-1} after {retry_delay}s delay...")
                         time.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 1.5, 60)  # Exponential backoff, max 60s
+                        retry_delay = min(retry_delay * 1.5, 120)  # Exponential backoff, max 120s
 
+                    # Create SmartDL with resume support
                     obj = SmartDL(url, dest, progress_bar=True, timeout=download_timeout, request_args=request_args)
                     if max_speed and max_speed > 0:
                         obj.set_speed(max_speed)
                     if threads and threads > 0:
                         obj.threads = threads
+                    
+                    # Reduce threads on retry to improve stability
+                    if attempt > 0 and obj.threads and obj.threads > 1:
+                        obj.threads = max(1, obj.threads // 2)
+                        logging.info(f"[AscendaraDownloader] Reduced threads to {obj.threads} for retry stability")
+                    
                     obj.start(blocking=False)
+                    
+                    # Track progress to detect stalls
+                    last_progress = 0
+                    stall_count = 0
+                    max_stalls = 60  # 30 seconds of no progress (0.5s * 60)
 
                     while not obj.isFinished():
                         progress = obj.get_progress() * 100
                         speed = obj.get_speed(human=True)
                         eta = obj.get_eta(human=True)
+                        
+                        # Detect stalls
+                        if progress == last_progress and progress < 99.9:
+                            stall_count += 1
+                            if stall_count >= max_stalls:
+                                logging.warning(f"[AscendaraDownloader] Download stalled at {progress:.2f}%, forcing retry")
+                                try:
+                                    obj.stop()
+                                except:
+                                    pass
+                                raise Exception("Download stalled - no progress for 30 seconds")
+                        else:
+                            stall_count = 0
+                            last_progress = progress
+                        
                         self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
                         self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed
                         self.game_info["downloadingData"]["timeUntilComplete"] = eta
@@ -376,13 +417,25 @@ class SmartDLDownloader:
 
                     if obj.isSuccessful():
                         download_successful = True
+                        consecutive_failures = 0
                         break
                     else:
                         errors = obj.get_errors()
                         last_error = str(errors)
+                        consecutive_failures += 1
+                        
                         # Check if this is a retryable error
-                        if any(err_type in last_error for err_type in ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 'timeout', 'Timeout', 'ChunkedEncodingError']):
+                        retryable_errors = ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 
+                                          'timeout', 'Timeout', 'ChunkedEncodingError', 'RemoteDisconnected',
+                                          'ConnectionError', 'ReadTimeoutError', 'ProtocolError']
+                        if any(err_type in last_error for err_type in retryable_errors):
                             logging.warning(f"[AscendaraDownloader] Retryable error on attempt {attempt+1}: {last_error}")
+                            
+                            # If we keep failing at the same point, try with single thread
+                            if consecutive_failures >= max_consecutive_failures:
+                                logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures, switching to single-thread mode")
+                                threads = 1
+                                consecutive_failures = 0
                             continue
                         else:
                             # Non-retryable error, fail immediately
@@ -391,8 +444,18 @@ class SmartDLDownloader:
 
                 except Exception as retry_exc:
                     last_error = str(retry_exc)
-                    if any(err_type in last_error for err_type in ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 'timeout', 'Timeout', 'ChunkedEncodingError']):
+                    consecutive_failures += 1
+                    retryable_errors = ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 
+                                      'timeout', 'Timeout', 'ChunkedEncodingError', 'RemoteDisconnected',
+                                      'ConnectionError', 'ReadTimeoutError', 'ProtocolError', 'stalled']
+                    if any(err_type in last_error for err_type in retryable_errors):
                         logging.warning(f"[AscendaraDownloader] Retryable exception on attempt {attempt+1}: {retry_exc}")
+                        
+                        # If we keep failing, try with single thread
+                        if consecutive_failures >= max_consecutive_failures:
+                            logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures, switching to single-thread mode")
+                            threads = 1
+                            consecutive_failures = 0
                         continue
                     else:
                         raise  # Re-raise non-retryable exceptions
