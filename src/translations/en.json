@@ -128,6 +128,7 @@
     "reporting": "Reporting...",
     "retry": "Try Again",
     "save": "Save",
+    "saving": "Saving...",
     "search": "Search",
     "stop": "Stop",
     "submit": "Submit",
@@ -512,7 +513,7 @@
     "cannotRunDev": "Cannot run games in developer mode",
     "cannotVerifyFiles": "Cannot verify game files",
     "changeCoverImage": "Change Cover Image",
-    "changeExecutable": "Change Executable",
+    "changeExecutable": "Change or Add Executable",
     "chooseDirectory": "Choose Directory",
     "chooseExecutableFile": "Choose executable file...",
     "chooseOrUploadCoverImage": "Choose or Upload Cover Image for this game",
@@ -535,7 +536,24 @@
     "emptyFolderTitle": "This Folder is Empty",
     "enterMoreChars": "Image results will appear here as you type",
     "executable": "Executable",
+    "executableManager": {
+      "addExecutable": "Add Executable",
+      "atLeastOne": "At least one executable is required",
+      "change": "Change executable",
+      "description": "Manage the executable files for this game. The primary executable will be launched when you click Play.",
+      "makePrimary": "Make primary",
+      "noFile": "No file selected",
+      "primary": "Primary",
+      "remove": "Remove executable",
+      "saveFailed": "Failed to save executables",
+      "saved": "Executables saved successfully",
+      "title": "Manage Executables"
+    },
     "executableNotFound": "Game executable not found",
+    "executableSelect": {
+      "description": "This game has multiple executables set. Which one do you want to run?",
+      "title": "Select Executable"
+    },
     "filters": {
       "favorites": "Favorites",
       "onlineGames": "Online Games",

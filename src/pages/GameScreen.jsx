@@ -36,6 +36,9 @@ import {
   LockIcon,
   ImageUp,
   Bolt,
+  Plus,
+  GripVertical,
+  X,
 } from "lucide-react";
 import gameUpdateService from "@/services/gameUpdateService";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
@@ -70,7 +73,252 @@ import igdbService from "@/services/gameInfoService";
 import GameRate from "@/components/GameRate";
 import EditCoverDialog from "@/components/EditCoverDialog";
 
-const ErrorDialog = ({ open, onClose, errorGame, errorMessage, t }) => (
+const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t }) => {
+  const [executables, setExecutables] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && gameName) {
+      setLoading(true);
+      gameUpdateService.getGameExecutables(gameName, isCustom).then(exes => {
+        setExecutables(exes.length > 0 ? exes : [""]);
+        setLoading(false);
+      });
+    }
+  }, [open, gameName, isCustom]);
+
+  const handleAddExecutable = async () => {
+    // Open dialog in the same directory as the first executable
+    const startPath = executables.length > 0 && executables[0] ? executables[0] : null;
+    const exePath = await window.electron.openFileDialog(startPath);
+    if (exePath) {
+      setExecutables(prev => [...prev, exePath]);
+    }
+  };
+
+  const handleChangeExecutable = async index => {
+    // Pass current executable path to open dialog in that directory
+    const currentExe = executables[index];
+    const exePath = await window.electron.openFileDialog(currentExe || null);
+    if (exePath) {
+      setExecutables(prev => {
+        const updated = [...prev];
+        updated[index] = exePath;
+        return updated;
+      });
+    }
+  };
+
+  const handleRemoveExecutable = index => {
+    if (executables.length <= 1) return;
+    setExecutables(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMakePrimary = index => {
+    if (index === 0) return;
+    setExecutables(prev => {
+      const updated = [...prev];
+      const [item] = updated.splice(index, 1);
+      updated.unshift(item);
+      return updated;
+    });
+  };
+
+  const handleSave = async () => {
+    const validExecutables = executables.filter(exe => exe && exe.trim() !== "");
+    if (validExecutables.length === 0) {
+      toast.error(t("library.executableManager.atLeastOne"));
+      return;
+    }
+    setSaving(true);
+    const success = await gameUpdateService.updateGameExecutables(
+      gameName,
+      validExecutables,
+      isCustom
+    );
+    setSaving(false);
+    if (success) {
+      toast.success(t("library.executableManager.saved"));
+      onClose();
+    } else {
+      toast.error(t("library.executableManager.saveFailed"));
+    }
+  };
+
+  const getFileName = path => {
+    if (!path) return "";
+    return path.split(/[/\\]/).pop();
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-lg">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            {t("library.executableManager.title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            {t("library.executableManager.description")}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="my-4 max-h-64 space-y-2 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            executables.map((exe, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
+              >
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    {index === 0 && (
+                      <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
+                        {t("library.executableManager.primary")}
+                      </span>
+                    )}
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {getFileName(exe) || t("library.executableManager.noFile")}
+                    </span>
+                  </div>
+                  <span className="truncate text-xs text-muted-foreground">{exe}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {index !== 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleMakePrimary(index)}
+                      title={t("library.executableManager.makePrimary")}
+                    >
+                      <GripVertical className="h-4 w-4 text-primary" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleChangeExecutable(index)}
+                    title={t("library.executableManager.change")}
+                  >
+                    <Pencil className="h-4 w-4 text-primary" />
+                  </Button>
+                  {executables.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive h-8 w-8"
+                      onClick={() => handleRemoveExecutable(index)}
+                      title={t("library.executableManager.remove")}
+                    >
+                      <X className="h-4 w-4 text-primary" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          className="w-full text-primary"
+          onClick={handleAddExecutable}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t("library.executableManager.addExecutable")}
+        </Button>
+
+        <AlertDialogFooter className="mt-4 flex gap-2">
+          <Button variant="outline" className="text-primary" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            className="bg-primary text-secondary"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                {t("common.saving")}
+              </>
+            ) : (
+              t("common.save")
+            )}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+const ExecutableSelectDialog = ({ open, onClose, executables, onSelect, t }) => {
+  const getFileName = path => {
+    if (!path) return "";
+    return path.split(/[/\\]/).pop();
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            {t("library.executableSelect.title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            {t("library.executableSelect.description")}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="my-4 max-h-64 space-y-2 overflow-y-auto">
+          {executables.map((exe, index) => (
+            <button
+              key={index}
+              onClick={() => onSelect(exe)}
+              className="flex w-full items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent"
+            >
+              <Play className="h-5 w-5 shrink-0 text-primary" />
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <div className="flex items-center gap-2">
+                  {index === 0 && (
+                    <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
+                      {t("library.executableManager.primary")}
+                    </span>
+                  )}
+                  <span className="truncate text-sm font-medium text-foreground">
+                    {getFileName(exe)}
+                  </span>
+                </div>
+                <span className="truncate text-xs text-muted-foreground">{exe}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <AlertDialogFooter>
+          <Button variant="outline" className="text-primary" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+const ErrorDialog = ({
+  open,
+  onClose,
+  errorGame,
+  errorMessage,
+  t,
+  onManageExecutables,
+}) => (
   <AlertDialog open={open} onOpenChange={onClose}>
     <AlertDialogContent>
       <AlertDialogHeader>
@@ -100,12 +348,9 @@ const ErrorDialog = ({ open, onClose, errorGame, errorMessage, t }) => (
         </Button>
         <Button
           className="bg-primary text-secondary"
-          onClick={async () => {
-            const exePath = await window.electron.openFileDialog();
-            if (exePath) {
-              await gameUpdateService.updateGameExecutable(errorGame, exePath);
-            }
+          onClick={() => {
             onClose();
+            onManageExecutables();
           }}
         >
           {t("library.changeExecutable")}
@@ -247,6 +492,10 @@ export default function GameScreen() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorGame, setErrorGame] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showExecutableManager, setShowExecutableManager] = useState(false);
+  const [showExecutableSelect, setShowExecutableSelect] = useState(false);
+  const [availableExecutables, setAvailableExecutables] = useState([]);
+  const [pendingLaunchOptions, setPendingLaunchOptions] = useState(null);
   const [igdbData, setIgdbData] = useState(null);
   const [igdbLoading, setIgdbLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -575,7 +824,7 @@ export default function GameScreen() {
   };
 
   // Handle play game
-  const handlePlayGame = async (forcePlay = false) => {
+  const handlePlayGame = async (forcePlay = false, specificExecutable = null) => {
     const gameName = game.game || game.name;
     setIsLaunching(true);
 
@@ -624,6 +873,25 @@ export default function GameScreen() {
         }
       }
 
+      // Check for multiple executables if no specific one was provided
+      if (!specificExecutable) {
+        const executables = await gameUpdateService.getGameExecutables(
+          gameName,
+          game.isCustom
+        );
+        if (executables.length > 1) {
+          // Store launch options and show selection dialog
+          setPendingLaunchOptions({
+            forcePlay,
+            adminLaunch: isShiftKeyPressed,
+          });
+          setAvailableExecutables(executables);
+          setShowExecutableSelect(true);
+          setIsLaunching(false);
+          return;
+        }
+      }
+
       console.log("Launching game: ", gameName);
       // Launch the game
       killAudioAndMiniplayer();
@@ -635,7 +903,8 @@ export default function GameScreen() {
         gameName,
         game.isCustom,
         game.backups ?? false,
-        isShiftKeyPressed
+        isShiftKeyPressed,
+        specificExecutable
       );
 
       // Get and cache the game image before saving to recently played
@@ -664,6 +933,16 @@ export default function GameScreen() {
       console.error("Error launching game:", error);
       setIsLaunching(false);
     }
+  };
+
+  // Handle executable selection from dialog
+  const handleExecutableSelect = async selectedExecutable => {
+    setShowExecutableSelect(false);
+    if (selectedExecutable && pendingLaunchOptions) {
+      await handlePlayGame(pendingLaunchOptions.forcePlay, selectedExecutable);
+    }
+    setPendingLaunchOptions(null);
+    setAvailableExecutables([]);
   };
 
   // Handle open directory
@@ -1094,34 +1373,20 @@ export default function GameScreen() {
                     {t("library.createShortcut")}
                   </Button>
 
-                  {!game.isCustom && (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2"
-                      onClick={async () => {
-                        const exePath = await window.electron.openFileDialog(
-                          game.executable
-                        );
-                        if (exePath) {
-                          await gameUpdateService.updateGameExecutable(
-                            game.game || game.name,
-                            exePath
-                          );
-                          const exists = await window.electron.checkFileExists(exePath);
-                          setExecutableExists(exists);
-                        }
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                      {t("library.changeExecutable")}
-                      {!executableExists && (
-                        <AlertTriangle
-                          className="h-4 w-4 text-yellow-500"
-                          title={t("library.executableNotFound")}
-                        />
-                      )}
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => setShowExecutableManager(true)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    {t("library.changeExecutable")}
+                    {!executableExists && (
+                      <AlertTriangle
+                        className="h-4 w-4 text-yellow-500"
+                        title={t("library.executableNotFound")}
+                      />
+                    )}
+                  </Button>
 
                   <Button
                     variant="outline"
@@ -1879,6 +2144,27 @@ export default function GameScreen() {
         onClose={() => setShowErrorDialog(false)}
         errorGame={errorGame}
         errorMessage={errorMessage}
+        t={t}
+        onManageExecutables={() => setShowExecutableManager(true)}
+      />
+
+      <ExecutableManagerDialog
+        open={showExecutableManager}
+        onClose={() => setShowExecutableManager(false)}
+        gameName={game?.game || game?.name}
+        isCustom={game?.isCustom}
+        t={t}
+      />
+
+      <ExecutableSelectDialog
+        open={showExecutableSelect}
+        onClose={() => {
+          setShowExecutableSelect(false);
+          setPendingLaunchOptions(null);
+          setAvailableExecutables([]);
+        }}
+        executables={availableExecutables}
+        onSelect={handleExecutableSelect}
         t={t}
       />
 

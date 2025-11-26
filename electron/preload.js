@@ -93,8 +93,15 @@ contextBridge.exposeInMainWorld("electron", {
   },
 
   // Game Execution
-  playGame: (game, isCustom, backupOnClose, launchWithAdmin) =>
-    ipcRenderer.invoke("play-game", game, isCustom, backupOnClose, launchWithAdmin),
+  playGame: (game, isCustom, backupOnClose, launchWithAdmin, specificExecutable) =>
+    ipcRenderer.invoke(
+      "play-game",
+      game,
+      isCustom,
+      backupOnClose,
+      launchWithAdmin,
+      specificExecutable
+    ),
   isGameRunning: game => ipcRenderer.invoke("is-game-running", game),
   startSteam: () => ipcRenderer.invoke("start-steam"),
 
@@ -202,6 +209,10 @@ contextBridge.exposeInMainWorld("electron", {
   getProfileImage: () => ipcRenderer.invoke("get-profile-image"),
   modifyGameExecutable: (game, executable) =>
     ipcRenderer.invoke("modify-game-executable", game, executable),
+  getGameExecutables: (game, isCustom) =>
+    ipcRenderer.invoke("get-game-executables", game, isCustom),
+  setGameExecutables: (game, executables, isCustom) =>
+    ipcRenderer.invoke("set-game-executables", game, executables, isCustom),
   saveLaunchCommands: (game, launchCommands, isCustom) =>
     ipcRenderer.invoke("save-launch-commands", game, launchCommands, isCustom),
   getLaunchCommands: (game, isCustom) =>

@@ -3795,6 +3795,126 @@ ipcMain.handle("folder-exclusion", async (event, boolean) => {
   }
 });
 
+// Get all executables for a game (returns array)
+ipcMain.handle("get-game-executables", (event, game, isCustom = false) => {
+  const settings = settingsManager.getSettings();
+  try {
+    if (!settings.downloadDirectory) {
+      console.error("Download directory not properly configured");
+      return [];
+    }
+
+    // Handle custom games (stored in games.json)
+    if (isCustom) {
+      const gamesPath = path.join(settings.downloadDirectory, "games.json");
+      if (!fs.existsSync(gamesPath)) {
+        return [];
+      }
+      const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+      const gameInfo = gamesData.games.find(g => g.game === game);
+      if (!gameInfo) {
+        return [];
+      }
+      if (gameInfo.executables && Array.isArray(gameInfo.executables)) {
+        return gameInfo.executables;
+      } else if (gameInfo.executable) {
+        return [gameInfo.executable];
+      }
+      return [];
+    }
+
+    // Handle regular games (stored in .ascendara.json files)
+    const allDirectories = [
+      settings.downloadDirectory,
+      ...(settings.additionalDirectories || []),
+    ];
+
+    for (const directory of allDirectories) {
+      const gameDirectory = path.join(directory, game);
+      const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
+
+      if (fs.existsSync(gameInfoPath)) {
+        const gameInfoData = fs.readFileSync(gameInfoPath, "utf8");
+        const gameInfo = JSON.parse(gameInfoData);
+        // Return executables array if exists, otherwise wrap single executable in array
+        if (gameInfo.executables && Array.isArray(gameInfo.executables)) {
+          return gameInfo.executables;
+        } else if (gameInfo.executable) {
+          return [gameInfo.executable];
+        }
+        return [];
+      }
+    }
+
+    console.error(`Game ${game} not found in any configured directory`);
+    return [];
+  } catch (error) {
+    console.error("Error getting game executables:", error);
+    return [];
+  }
+});
+
+// Set all executables for a game (accepts array, first one is primary)
+ipcMain.handle("set-game-executables", (event, game, executables, isCustom = false) => {
+  const settings = settingsManager.getSettings();
+  try {
+    if (!settings.downloadDirectory) {
+      console.error("Download directory not properly configured");
+      return false;
+    }
+
+    if (!Array.isArray(executables) || executables.length === 0) {
+      console.error("Executables must be a non-empty array");
+      return false;
+    }
+
+    // Handle custom games (stored in games.json)
+    if (isCustom) {
+      const gamesPath = path.join(settings.downloadDirectory, "games.json");
+      if (!fs.existsSync(gamesPath)) {
+        return false;
+      }
+      const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+      const gameIndex = gamesData.games.findIndex(g => g.game === game);
+      if (gameIndex === -1) {
+        return false;
+      }
+      // Store both for backwards compatibility
+      gamesData.games[gameIndex].executable = executables[0];
+      gamesData.games[gameIndex].executables = executables;
+      fs.writeFileSync(gamesPath, JSON.stringify(gamesData, null, 2));
+      return true;
+    }
+
+    // Handle regular games (stored in .ascendara.json files)
+    const allDirectories = [
+      settings.downloadDirectory,
+      ...(settings.additionalDirectories || []),
+    ];
+
+    for (const directory of allDirectories) {
+      const gameDirectory = path.join(directory, game);
+      const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
+
+      if (fs.existsSync(gameInfoPath)) {
+        const gameInfoData = fs.readFileSync(gameInfoPath, "utf8");
+        const gameInfo = JSON.parse(gameInfoData);
+        // Store both for backwards compatibility
+        gameInfo.executable = executables[0]; // Primary executable
+        gameInfo.executables = executables; // All executables
+        fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 2));
+        return true;
+      }
+    }
+
+    console.error(`Game ${game} not found in any configured directory`);
+    return false;
+  } catch (error) {
+    console.error("Error setting game executables:", error);
+    return false;
+  }
+});
+
 ipcMain.handle("fetch-system-specs", async () => {
   const os = require("os");
   const { exec } = require("child_process");
@@ -4452,7 +4572,8 @@ ipcMain.handle(
     game,
     isCustom = false,
     backupOnClose = false,
-    launchWithAdmin = false
+    launchWithAdmin = false,
+    specificExecutable = null
   ) => {
     try {
       const settings = settingsManager.getSettings();
@@ -4503,10 +4624,13 @@ ipcMain.handle(
           launchCommands = gameInfo.launchCommands;
         }
 
+        // Use specific executable if provided, otherwise use default
+        const executableToUse = specificExecutable || gameInfo.executable;
+
         // Check if the executable path is already absolute
-        executable = path.isAbsolute(gameInfo.executable)
-          ? gameInfo.executable
-          : path.join(gameDirectory, gameInfo.executable);
+        executable = path.isAbsolute(executableToUse)
+          ? executableToUse
+          : path.join(gameDirectory, executableToUse);
       } else {
         const gamesPath = path.join(settings.downloadDirectory, "games.json");
         if (!fs.existsSync(gamesPath)) {
@@ -4524,7 +4648,8 @@ ipcMain.handle(
           launchCommands = gameInfo.launchCommands;
         }
 
-        executable = gameInfo.executable; // Custom games should already have absolute paths
+        // Use specific executable if provided, otherwise use default
+        executable = specificExecutable || gameInfo.executable; // Custom games should already have absolute paths
 
         gameDirectory = path.dirname(executable);
       }
