@@ -1876,35 +1876,53 @@ ipcMain.handle("stop-download", async (event, game, deleteContents = false) => {
       ];
 
       for (const exe of downloaderExes) {
-        const findProcess = spawn("wmic", [
-          "process",
-          "where",
-          `name='${exe}' and commandline like '%${sanitizedGame}%'`,
-          "get",
-          "processid",
-        ]);
+        try {
+          const psCommand = `Get-CimInstance Win32_Process | Where-Object { $_.Name -eq '${exe}' -and $_.CommandLine -like '*${sanitizedGame}*' } | Select-Object -ExpandProperty ProcessId`;
+          const findProcess = spawn("powershell", [
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            psCommand,
+          ]);
 
-        const pids = await new Promise(resolve => {
-          let output = "";
-          findProcess.stdout.on("data", data => (output += data.toString()));
-          findProcess.on("close", () => {
-            const pids = output
-              .split("\n")
-              .map(line => line.trim())
-              .filter(line => /^\d+$/.test(line));
-            resolve(pids);
+          const pids = await new Promise(resolve => {
+            let output = "";
+            let errorOutput = "";
+            findProcess.stdout.on("data", data => (output += data.toString()));
+            findProcess.stderr.on("data", data => (errorOutput += data.toString()));
+            findProcess.on("error", err => {
+              console.error(`Failed to spawn powershell for ${exe}:`, err);
+              resolve([]);
+            });
+            findProcess.on("close", code => {
+              if (code !== 0 && errorOutput) {
+                console.error(`PowerShell error for ${exe}:`, errorOutput);
+              }
+              const pids = output
+                .split("\n")
+                .map(line => line.trim())
+                .filter(line => /^\d+$/.test(line));
+              resolve(pids);
+            });
           });
-        });
 
-        // Kill each matching process
-        for (const pid of pids) {
-          try {
-            console.log(`Attempting to kill ${exe} process with PID: ${pid}`);
-            const killProcess = spawn("taskkill", ["/F", "/T", "/PID", pid]);
-            await new Promise(resolve => killProcess.on("close", resolve));
-          } catch (err) {
-            console.error(`Failed to kill process ${pid}:`, err);
+          for (const pid of pids) {
+            try {
+              console.log(`Attempting to kill ${exe} process with PID: ${pid}`);
+              const killProcess = spawn("taskkill", ["/F", "/T", "/PID", pid]);
+              await new Promise(resolve => {
+                killProcess.on("error", err => {
+                  console.error(`Failed to spawn taskkill for PID ${pid}:`, err);
+                  resolve();
+                });
+                killProcess.on("close", resolve);
+              });
+            } catch (err) {
+              console.error(`Failed to kill process ${pid}:`, err);
+            }
           }
+        } catch (err) {
+          console.error(`Error finding/killing ${exe} processes:`, err);
         }
       }
 
@@ -1920,7 +1938,16 @@ ipcMain.handle("stop-download", async (event, game, deleteContents = false) => {
             "/PID",
             downloadProcess.pid.toString(),
           ]);
-          await new Promise(resolve => killProcess.on("close", resolve));
+          await new Promise(resolve => {
+            killProcess.on("error", err => {
+              console.error(
+                `Failed to spawn taskkill for specific download process:`,
+                err
+              );
+              resolve();
+            });
+            killProcess.on("close", resolve);
+          });
         } catch (err) {
           console.error(`Failed to kill specific download process:`, err);
         }
@@ -1934,20 +1961,34 @@ ipcMain.handle("stop-download", async (event, game, deleteContents = false) => {
       ];
 
       for (const script of pythonScripts) {
-        const findProcess = spawn("pgrep", ["-f", `${script}.*${sanitizedGame}`]);
-        const pids = await new Promise(resolve => {
-          let output = "";
-          findProcess.stdout.on("data", data => (output += data));
-          findProcess.on("close", () =>
-            resolve(output.trim().split("\n").filter(Boolean))
-          );
-        });
+        try {
+          const findProcess = spawn("pgrep", ["-f", `${script}.*${sanitizedGame}`]);
+          const pids = await new Promise(resolve => {
+            let output = "";
+            findProcess.stdout.on("data", data => (output += data));
+            findProcess.on("error", err => {
+              console.error(`Failed to spawn pgrep for ${script}:`, err);
+              resolve([]);
+            });
+            findProcess.on("close", () =>
+              resolve(output.trim().split("\n").filter(Boolean))
+            );
+          });
 
-        for (const pid of pids) {
-          if (pid) {
-            const killProcess = spawn("kill", ["-9", pid]);
-            await new Promise(resolve => killProcess.on("close", resolve));
+          for (const pid of pids) {
+            if (pid) {
+              const killProcess = spawn("kill", ["-9", pid]);
+              await new Promise(resolve => {
+                killProcess.on("error", err => {
+                  console.error(`Failed to spawn kill for PID ${pid}:`, err);
+                  resolve();
+                });
+                killProcess.on("close", resolve);
+              });
+            }
           }
+        } catch (err) {
+          console.error(`Error finding/killing ${script} processes:`, err);
         }
       }
     }
