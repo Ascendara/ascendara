@@ -1560,10 +1560,19 @@ async function downloadUpdateInBackground() {
         },
         maxRedirects: 5,
         timeout: 30000,
-        onDownloadProgress: progressEvent => {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      });
+
+      // Get total size from content-length header
+      const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+      let downloadedSize = 0;
+
+      // Track progress from the stream
+      response.data.on("data", chunk => {
+        downloadedSize += chunk.length;
+        if (totalSize > 0) {
+          const progress = Math.round((downloadedSize * 100) / totalSize);
           mainWindow.webContents.send("update-download-progress", progress);
-        },
+        }
       });
 
       // Pipe the response data to file stream

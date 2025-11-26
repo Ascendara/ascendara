@@ -88,11 +88,18 @@ const MenuBar = () => {
 
     // Only set up the update checking if the app is outdated
     if (!isLatest) {
-      // Check timestamp file for downloading status
+      // Check timestamp file for downloading status, but only if auto-update is enabled
       const checkDownloadStatus = async () => {
         try {
-          const timestamp = await window.electron.getTimestampValue("downloadingUpdate");
-          setIsDownloadingUpdate(timestamp || false);
+          const settings = await window.electron.getSettings();
+          // Only show downloading badge if auto-update is enabled
+          if (settings.autoUpdate) {
+            const timestamp =
+              await window.electron.getTimestampValue("downloadingUpdate");
+            setIsDownloadingUpdate(timestamp || false);
+          } else {
+            setIsDownloadingUpdate(false);
+          }
         } catch (error) {
           console.error("Failed to read timestamp file:", error);
         }
@@ -294,45 +301,47 @@ const MenuBar = () => {
           </span>
         )}
 
-        {!isLatest && (
+        {/* Show downloading update badge when downloading */}
+        {isDownloadingUpdate && (
           <div className="ml-2 flex items-center gap-2">
-            {isDownloadingUpdate ? (
-              <>
-                <span className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1 py-0.5 text-[14px] text-green-500">
-                  <div className="relative h-4 w-4">
-                    {/* Track circle */}
-                    <svg className="absolute inset-0 h-full w-full -rotate-90">
-                      <circle
-                        cx="8"
-                        cy="8"
-                        r="6"
-                        fill="none"
-                        strokeWidth="3"
-                        className="stroke-green-500/20"
-                      />
-                      {/* Progress circle */}
-                      <circle
-                        cx="8"
-                        cy="8"
-                        r="6"
-                        fill="none"
-                        strokeWidth="3"
-                        className="stroke-green-500"
-                        strokeDasharray={`${downloadProgress * 0.377} 100`}
-                      />
-                    </svg>
-                  </div>
-                  {t("app.downloading-update")}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
-                  <AlertTriangle className="h-3 w-3" />
-                  {t("app.outdated")}
-                </span>
-              </>
-            )}
+            <span className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1 py-0.5 text-[14px] text-green-500">
+              <div className="relative h-4 w-4">
+                {/* Track circle */}
+                <svg className="absolute inset-0 h-full w-full -rotate-90">
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="6"
+                    fill="none"
+                    strokeWidth="3"
+                    className="stroke-green-500/20"
+                  />
+                  {/* Progress circle - circumference = 2 * PI * r = 2 * 3.14159 * 6 ≈ 37.7 */}
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="6"
+                    fill="none"
+                    strokeWidth="3"
+                    className="stroke-green-500"
+                    strokeDasharray="37.7"
+                    strokeDashoffset={37.7 - (downloadProgress / 100) * 37.7}
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              {t("app.downloading-update")}
+            </span>
+          </div>
+        )}
+
+        {/* Show outdated badge only when not downloading */}
+        {!isLatest && !isDownloadingUpdate && (
+          <div className="ml-2 flex items-center gap-2">
+            <span className="flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
+              <AlertTriangle className="h-3 w-3" />
+              {t("app.outdated")}
+            </span>
           </div>
         )}
         <div className="flex-1" />
