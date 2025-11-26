@@ -57,6 +57,7 @@ import {
   ArrowUpFromLine,
   X,
   Eye,
+  FileQuestion,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -1460,11 +1461,58 @@ export default function DownloadPage() {
                   </TooltipProvider>
                 )}
               </div>
-              {gameData.size && (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {t("download.size")}: {gameData.size}
-                </p>
-              )}
+              {gameData.size &&
+                (() => {
+                  const match = gameData.size
+                    .trim()
+                    .toLowerCase()
+                    .match(/^([\d.]+)\s*(gb|mb)$/);
+                  if (!match)
+                    return (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {t("download.installSize")}: {gameData.size}
+                      </p>
+                    );
+                  let [, num, unit] = match;
+                  num = parseFloat(num);
+                  let newNum, newUnit;
+                  if (unit === "gb") {
+                    newNum = num * 2.1;
+                    newUnit = "GB";
+                  } else {
+                    newNum = num * 2.1;
+                    newUnit = "MB";
+                  }
+                  const formatted =
+                    newUnit === "GB" ? newNum.toFixed(1) : Math.round(newNum);
+                  return (
+                    <p className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
+                      {t("download.installSize")}: ~{formatted} {newUnit}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <FileQuestion className="h-3.5 w-3.5 cursor-pointer text-muted-foreground hover:text-foreground" />
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {t("download.installSizeInfo.title")}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t("download.installSizeInfo.description")}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <p className="text-sm text-muted-foreground">
+                            {t("download.installSizeInfo.note")}
+                          </p>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      &nbsp;{t("download.gameSize")}: {gameData.size}
+                    </p>
+                  );
+                })()}
               <p className="mt-2 text-sm text-muted-foreground">
                 {t("download.latestUpdate")}: {formatLatestUpdate(gameData.latest_update)}
               </p>
