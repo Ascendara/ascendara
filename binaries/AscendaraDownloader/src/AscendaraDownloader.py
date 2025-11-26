@@ -369,17 +369,17 @@ class SmartDLDownloader:
                         time.sleep(retry_delay)
                         retry_delay = min(retry_delay * 1.5, 120)  # Exponential backoff, max 120s
 
-                    # Create SmartDL with resume support
-                    obj = SmartDL(url, dest, progress_bar=True, timeout=download_timeout, request_args=request_args)
+                    # Create SmartDL with thread count
+                    # Reduce threads on retry to improve stability for large files
+                    current_threads = threads if threads and threads > 0 else 5  # Default 5 threads
+                    if attempt > 0:
+                        current_threads = max(1, current_threads // (attempt + 1))  # Progressively reduce
+                        logging.info(f"[AscendaraDownloader] Using {current_threads} thread(s) for retry stability")
+                    
+                    obj = SmartDL(url, dest, progress_bar=True, timeout=download_timeout, 
+                                  request_args=request_args, threads=current_threads)
                     if max_speed and max_speed > 0:
                         obj.set_speed(max_speed)
-                    if threads and threads > 0:
-                        obj.threads = threads
-                    
-                    # Reduce threads on retry to improve stability
-                    if attempt > 0 and obj.threads and obj.threads > 1:
-                        obj.threads = max(1, obj.threads // 2)
-                        logging.info(f"[AscendaraDownloader] Reduced threads to {obj.threads} for retry stability")
                     
                     obj.start(blocking=False)
                     
@@ -431,11 +431,9 @@ class SmartDLDownloader:
                         if any(err_type in last_error for err_type in retryable_errors):
                             logging.warning(f"[AscendaraDownloader] Retryable error on attempt {attempt+1}: {last_error}")
                             
-                            # If we keep failing at the same point, try with single thread
+                            # Log consecutive failures for debugging
                             if consecutive_failures >= max_consecutive_failures:
-                                logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures, switching to single-thread mode")
-                                threads = 1
-                                consecutive_failures = 0
+                                logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures detected")
                             continue
                         else:
                             # Non-retryable error, fail immediately
@@ -451,11 +449,9 @@ class SmartDLDownloader:
                     if any(err_type in last_error for err_type in retryable_errors):
                         logging.warning(f"[AscendaraDownloader] Retryable exception on attempt {attempt+1}: {retry_exc}")
                         
-                        # If we keep failing, try with single thread
+                        # Log consecutive failures for debugging
                         if consecutive_failures >= max_consecutive_failures:
-                            logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures, switching to single-thread mode")
-                            threads = 1
-                            consecutive_failures = 0
+                            logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures detected")
                         continue
                     else:
                         raise  # Re-raise non-retryable exceptions
