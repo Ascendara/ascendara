@@ -128,6 +128,7 @@
     "reporting": "إعداد التقارير...",
     "retry": "حاول ثانية",
     "save": "يحفظ",
+    "saving": "توفير...",
     "search": "يبحث",
     "stop": "قف",
     "submit": "يُقدِّم",
@@ -144,6 +145,7 @@
     "by": "بواسطة",
     "categories": "فئات",
     "companies": "شركات",
+    "compareYourPC": "قارن جهاز الكمبيوتر الخاص بك",
     "completionist": "المكمل",
     "criticError": "فشل في تحميل مراجعات النقاد",
     "criticReviews": "مراجعات نقدية",
@@ -194,15 +196,23 @@
       },
       "waitingForBrowser": "في انتظار المتصفح الخاص بك لإرسال التحميل..."
     },
+    "failedToLoadSpecs": "فشل تحميل مواصفات النظام",
     "firstReleasedOn": "تم إصدار اللعبة",
     "gameNeedsEmulator": "وهذا يتطلب محاكيًا للتشغيل.",
     "gameNeedsVR": "قد تكون هناك حاجة إلى VR لهذه اللعبة.",
     "gameNotRated": "لم تتم مراجعة هذه اللعبة من قبل النقاد",
+    "gameSize": "حجم اللعبة",
     "genres": "الأنواع",
     "hours": "ساعات",
     "igdbLoading": "جارٍ تحميل معلومات اللعبة...",
     "igdbRating": "تم تصنيف هذه اللعبة بـ {{rating}} تفاحة. تختلف تقييمات Apple عن تقييمات النجوم على Ascendara، وهي أقرب إلى تصنيف عام للعبة.",
     "infoMaybeInaccurate": "قد تكون معلومات اللعبة غير دقيقة.",
+    "installSize": "حجم التثبيت",
+    "installSizeInfo": {
+      "description": "حجم التثبيت هو تقدير لمقدار المساحة التي ستشغلها اللعبة على القرص الخاص بك بعد الاستخراج. تتوسع التنزيلات المضغوطة عند استخراجها، وبالتالي يكون الحجم النهائي أكبر عادةً من حجم التنزيل.",
+      "note": "بعد اكتمال التنزيل، سيتم حذف الملف المضغوط ويجب أن يشغل فقط مقدار المساحة المدرجة بجوار حجم اللعبة.",
+      "title": "حول حجم التثبيت"
+    },
     "latestUpdate": "آخر تحديث",
     "linkCopied": "تم نسخ الرابط إلى الحافظة",
     "mainPlusExtras": "الرئيسية + الإضافات",
@@ -251,22 +261,32 @@
       "notAGame": "هذه ليست لعبة",
       "placeholder": "حدد سببًا"
     },
+    "required": "مطلوب",
     "reviewCount": "عدد المراجعات",
     "reviewSnippets": "مراجعة المقتطفات",
     "screenshots": "لقطات الشاشة",
     "scrollToViewMore": "قم بالتمرير لعرض المزيد من تفاصيل اللعبة",
     "selectPath": {
       "default": "المسار الافتراضي",
+      "defaultDirectory": "الدليل الافتراضي",
       "description": "لديك أدلة إضافية محددة في تفضيلاتك، اختر من أحد الأدلة أدناه لتنزيل هذه اللعبة.",
       "title": "أين تريد تنزيل هذه اللعبة؟"
     },
     "sendingTorrent": "إرسال تورنت...",
     "shareGame": "مشاركة رابط لعبة Ascendara",
     "showingResultsFor": "عرض النتائج ل",
-    "size": "مقاس",
+    "specs": {
+      "component": "عنصر",
+      "cpu": "وحدة المعالجة المركزية",
+      "directx": "دايركت اكس",
+      "gpu": "GPU",
+      "os": "نظام التشغيل",
+      "ram": "كبش"
+    },
     "submitReport": "إرسال التقرير",
     "submitting": "تقديم...",
     "switchProvider": "مزود التبديل",
+    "systemRequirements": "الحد الأدنى من المتطلبات",
     "tier": "الطبقة",
     "timeToBeat": "الوقت للفوز",
     "timemachine": {
@@ -303,7 +323,8 @@
       "title": "هل أنت مستعد لتحديث {{game}}؟"
     },
     "viewCriticReviews": "عرض المراجعات النقدية",
-    "viewOnOpenCritic": "عرض على OpenCritic"
+    "viewOnOpenCritic": "عرض على OpenCritic",
+    "yourPC": "جهاز الكمبيوتر الخاص بك"
   },
   "downloads": {
     "actions": {
@@ -492,7 +513,7 @@
     "cannotRunDev": "لا يمكن تشغيل الألعاب في وضع المطور",
     "cannotVerifyFiles": "لا يمكن التحقق من ملفات اللعبة",
     "changeCoverImage": "تغيير صورة الغلاف",
-    "changeExecutable": "تغيير قابل للتنفيذ",
+    "changeExecutable": "تغيير أو إضافة قابل للتنفيذ",
     "chooseDirectory": "اختر الدليل",
     "chooseExecutableFile": "اختر الملف القابل للتنفيذ...",
     "chooseOrUploadCoverImage": "اختر أو قم بتحميل صورة الغلاف لهذه اللعبة",
@@ -515,7 +536,24 @@
     "emptyFolderTitle": "هذا المجلد فارغ",
     "enterMoreChars": "ستظهر نتائج الصور هنا أثناء الكتابة",
     "executable": "قابل للتنفيذ",
+    "executableManager": {
+      "addExecutable": "إضافة قابل للتنفيذ",
+      "atLeastOne": "مطلوب ملف تنفيذي واحد على الأقل",
+      "change": "تغيير قابل للتنفيذ",
+      "description": "إدارة الملفات القابلة للتنفيذ لهذه اللعبة. سيتم تشغيل الملف الأساسي القابل للتنفيذ عند النقر فوق \"تشغيل\".",
+      "makePrimary": "جعل الابتدائي",
+      "noFile": "لم يتم تحديد أي ملف",
+      "primary": "أساسي",
+      "remove": "إزالة قابل للتنفيذ",
+      "saveFailed": "فشل في حفظ الملفات التنفيذية",
+      "saved": "تم حفظ الملفات التنفيذية بنجاح",
+      "title": "إدارة الملفات التنفيذية"
+    },
     "executableNotFound": "لم يتم العثور على اللعبة القابلة للتنفيذ",
+    "executableSelect": {
+      "description": "تحتوي هذه اللعبة على مجموعة من الملفات التنفيذية المتعددة. أي واحد تريد تشغيله؟",
+      "title": "حدد قابل للتنفيذ"
+    },
     "filters": {
       "favorites": "المفضلة",
       "onlineGames": "العاب اون لاين",

@@ -128,6 +128,7 @@
     "reporting": "Berichterstattung...",
     "retry": "Versuchen Sie es erneut",
     "save": "Speichern",
+    "saving": "Sparen...",
     "search": "Suchen",
     "stop": "Stoppen",
     "submit": "Einreichen",
@@ -144,6 +145,7 @@
     "by": "von",
     "categories": "Kategorien",
     "companies": "Unternehmen",
+    "compareYourPC": "Vergleichen Sie Ihren PC",
     "completionist": "Vervollständiger",
     "criticError": "Kritikerrezensionen konnten nicht geladen werden",
     "criticReviews": "Kritikerrezensionen",
@@ -194,15 +196,23 @@
       },
       "waitingForBrowser": "Warten darauf, dass Ihr Browser den Download sendet ..."
     },
+    "failedToLoadSpecs": "Systemspezifikationen konnten nicht geladen werden",
     "firstReleasedOn": "Spiel veröffentlicht",
     "gameNeedsEmulator": "Dies erfordert die Ausführung eines Emulators.",
     "gameNeedsVR": "Für dieses Spiel ist möglicherweise VR erforderlich.",
     "gameNotRated": "Dieses Spiel wurde nicht von Kritikern bewertet",
+    "gameSize": "Spielgröße",
     "genres": "Genres",
     "hours": "Std.",
     "igdbLoading": "Spielinformationen werden geladen...",
     "igdbRating": "Dieses Spiel wurde mit {{rating}} Äpfeln bewertet. Apple-Bewertungen unterscheiden sich von den Sternebewertungen für Ascendara und stellen eher eine allgemeine Bewertung des Spiels dar.",
     "infoMaybeInaccurate": "Spielinformationen können ungenau sein.",
+    "installSize": "Installationsgröße",
+    "installSizeInfo": {
+      "description": "Die Installationsgröße ist eine Schätzung, wie viel Speicherplatz das Spiel nach dem Extrahieren auf Ihrer Festplatte einnimmt. Komprimierte Downloads werden beim Extrahieren größer, sodass die endgültige Größe normalerweise größer ist als die Downloadgröße.",
+      "note": "Nach Abschluss des Downloads wird die komprimierte Datei gelöscht und sollte nur den neben der Spielgröße aufgeführten Speicherplatz beanspruchen.",
+      "title": "Informationen zur Installationsgröße"
+    },
     "latestUpdate": "Zuletzt aktualisiert",
     "linkCopied": "Link in die Zwischenablage kopiert",
     "mainPlusExtras": "Hauptmenü + Extras",
@@ -251,22 +261,32 @@
       "notAGame": "Das ist kein Spiel",
       "placeholder": "Wählen Sie einen Grund aus"
     },
+    "required": "Erforderlich",
     "reviewCount": "Anzahl der Bewertungen",
     "reviewSnippets": "Rezensionsausschnitte",
     "screenshots": "Screenshots",
     "scrollToViewMore": "Scrollen Sie, um weitere Spieldetails anzuzeigen",
     "selectPath": {
       "default": "Standardpfad",
+      "defaultDirectory": "Standardverzeichnis",
       "description": "Sie haben in Ihren Einstellungen zusätzliche Verzeichnisse festgelegt. Wählen Sie unten eines aus, um dieses Spiel herunterzuladen.",
       "title": "Wo möchtest du dieses Spiel herunterladen?"
     },
     "sendingTorrent": "Torrent wird gesendet...",
     "shareGame": "Teilen Sie den Ascendara-Spiellink",
     "showingResultsFor": "Ergebnisse werden angezeigt für",
-    "size": "Größe",
+    "specs": {
+      "component": "Komponente",
+      "cpu": "CPU",
+      "directx": "DirectX",
+      "gpu": "GPU",
+      "os": "Betriebssystem",
+      "ram": "RAM"
+    },
     "submitReport": "Bericht einreichen",
     "submitting": "Einreichen...",
     "switchProvider": "Anbieter wechseln",
+    "systemRequirements": "Mindestanforderungen",
     "tier": "Stufe",
     "timeToBeat": "Zeit zu schlagen",
     "timemachine": {
@@ -303,7 +323,8 @@
       "title": "Bereit, {{game}} zu aktualisieren?"
     },
     "viewCriticReviews": "Kritikerbewertungen anzeigen",
-    "viewOnOpenCritic": "Ansicht auf OpenCritic"
+    "viewOnOpenCritic": "Ansicht auf OpenCritic",
+    "yourPC": "Ihr PC"
   },
   "downloads": {
     "actions": {
@@ -492,7 +513,7 @@
     "cannotRunDev": "Spiele können nicht im Entwicklermodus ausgeführt werden",
     "cannotVerifyFiles": "Spieldateien können nicht überprüft werden",
     "changeCoverImage": "Titelbild ändern",
-    "changeExecutable": "Ausführbare Datei ändern",
+    "changeExecutable": "Ausführbare Datei ändern oder hinzufügen",
     "chooseDirectory": "Wählen Sie Verzeichnis",
     "chooseExecutableFile": "Ausführbare Datei auswählen...",
     "chooseOrUploadCoverImage": "Wählen Sie ein Titelbild für dieses Spiel aus oder laden Sie es hoch",
@@ -515,7 +536,24 @@
     "emptyFolderTitle": "Dieser Ordner ist leer",
     "enterMoreChars": "Bildergebnisse werden hier angezeigt, während Sie tippen",
     "executable": "Ausführbar",
+    "executableManager": {
+      "addExecutable": "Ausführbare Datei hinzufügen",
+      "atLeastOne": "Es ist mindestens eine ausführbare Datei erforderlich",
+      "change": "Ausführbare Datei ändern",
+      "description": "Verwalten Sie die ausführbaren Dateien für dieses Spiel. Die primäre ausführbare Datei wird gestartet, wenn Sie auf „Abspielen“ klicken.",
+      "makePrimary": "Machen Sie primär",
+      "noFile": "Keine Datei ausgewählt",
+      "primary": "Primär",
+      "remove": "Ausführbare Datei entfernen",
+      "saveFailed": "Ausführbare Dateien konnten nicht gespeichert werden",
+      "saved": "Ausführbare Dateien erfolgreich gespeichert",
+      "title": "Ausführbare Dateien verwalten"
+    },
     "executableNotFound": "Die ausführbare Datei des Spiels wurde nicht gefunden",
+    "executableSelect": {
+      "description": "Für dieses Spiel sind mehrere ausführbare Dateien festgelegt. Welches möchtest du laufen?",
+      "title": "Wählen Sie Ausführbare Datei aus"
+    },
     "filters": {
       "favorites": "Favoriten",
       "onlineGames": "Online-Spiele",
@@ -758,7 +796,7 @@
     },
     "cannotDisableTorrent": "Wechseln Sie zur SteamRIP-Quelle, bevor Sie die Torrent-Unterstützung deaktivieren",
     "checkConfig": "Überprüfen Sie die Konfiguration",
-    "comingSoon": "Demnächst verfügbar",
+    "comingSoon": "Demnächst erhältlich",
     "components": "Anwendungskomponenten",
     "componentsDescription": "Sehen Sie sich alle offiziellen App-Sidecars an und prüfen Sie, welche Spielabhängigkeiten installiert sind. Sie können auf dieser Seite auch erforderliche Abhängigkeiten neu installieren.",
     "currentSource": "Aktuelle Quelle",

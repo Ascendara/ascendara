@@ -128,6 +128,7 @@
     "reporting": "Segnalazione...",
     "retry": "Riprova",
     "save": "Salva",
+    "saving": "Risparmio...",
     "search": "Ricerca",
     "stop": "Fermare",
     "submit": "Invia",
@@ -144,6 +145,7 @@
     "by": "di",
     "categories": "Categorie",
     "companies": "Aziende",
+    "compareYourPC": "Confronta il tuo PC",
     "completionist": "Complezionista",
     "criticError": "Impossibile caricare le recensioni dei critici",
     "criticReviews": "Recensioni della critica",
@@ -194,15 +196,23 @@
       },
       "waitingForBrowser": "In attesa che il tuo browser invii il download..."
     },
+    "failedToLoadSpecs": "Impossibile caricare le specifiche di sistema",
     "firstReleasedOn": "Gioco rilasciato",
     "gameNeedsEmulator": "Ciò richiede l'esecuzione di un emulatore.",
     "gameNeedsVR": "Per questo gioco potrebbe essere necessaria la realtà virtuale.",
     "gameNotRated": "Questo gioco non è stato recensito dalla critica",
+    "gameSize": "Dimensioni del gioco",
     "genres": "Generi",
     "hours": "ore",
     "igdbLoading": "Caricamento informazioni sul gioco...",
     "igdbRating": "Questo gioco è classificato come {{rating}} mele. Le valutazioni di Apple sono diverse dalle valutazioni in stelle su Ascendara e sono più una valutazione generale del gioco.",
     "infoMaybeInaccurate": "Le informazioni sul gioco potrebbero essere imprecise.",
+    "installSize": "Dimensioni di installazione",
+    "installSizeInfo": {
+      "description": "La dimensione dell'installazione è una stima dello spazio che il gioco occuperà sul disco dopo l'estrazione. I download compressi si espandono quando vengono estratti, quindi la dimensione finale è in genere maggiore della dimensione del download.",
+      "note": "Una volta completato il download, il file compresso verrà eliminato e dovrebbe occupare solo la quantità di spazio indicata accanto alla dimensione del gioco.",
+      "title": "Informazioni sulle dimensioni dell'installazione"
+    },
     "latestUpdate": "Ultimo aggiornamento",
     "linkCopied": "Link copiato negli appunti",
     "mainPlusExtras": "Principale + Extra",
@@ -251,22 +261,32 @@
       "notAGame": "Questo non è un gioco",
       "placeholder": "Seleziona un motivo"
     },
+    "required": "Necessario",
     "reviewCount": "Numero di recensioni",
     "reviewSnippets": "Snippet di revisione",
     "screenshots": "Schermate",
     "scrollToViewMore": "Scorri per visualizzare ulteriori dettagli sul gioco",
     "selectPath": {
       "default": "Percorso predefinito",
+      "defaultDirectory": "Directory predefinita",
       "description": "Hai impostazioni di directory aggiuntive nelle tue preferenze, scegli da una di seguito per scaricare questo gioco.",
       "title": "Dove vuoi scaricare questo gioco?"
     },
     "sendingTorrent": "Invio del torrent...",
     "shareGame": "Condividi il collegamento al gioco Ascendara",
     "showingResultsFor": "Risultati per",
-    "size": "Misurare",
+    "specs": {
+      "component": "Componente",
+      "cpu": "processore",
+      "directx": "DirectX",
+      "gpu": "GPU",
+      "os": "sistema operativo",
+      "ram": "RAM"
+    },
     "submitReport": "Invia rapporto",
     "submitting": "Invio...",
     "switchProvider": "Cambia fornitore",
+    "systemRequirements": "Requisiti minimi",
     "tier": "Livello",
     "timeToBeat": "È ora di battere",
     "timemachine": {
@@ -303,7 +323,8 @@
       "title": "Pronto per aggiornare {{game}}?"
     },
     "viewCriticReviews": "Visualizza le recensioni della critica",
-    "viewOnOpenCritic": "Visualizza su OpenCritic"
+    "viewOnOpenCritic": "Visualizza su OpenCritic",
+    "yourPC": "Il tuo computer"
   },
   "downloads": {
     "actions": {
@@ -492,7 +513,7 @@
     "cannotRunDev": "Impossibile eseguire giochi in modalità sviluppatore",
     "cannotVerifyFiles": "Impossibile verificare i file di gioco",
     "changeCoverImage": "Cambia immagine di copertina",
-    "changeExecutable": "Modifica eseguibile",
+    "changeExecutable": "Modifica o aggiungi eseguibile",
     "chooseDirectory": "Scegli Rubrica",
     "chooseExecutableFile": "Scegli il file eseguibile...",
     "chooseOrUploadCoverImage": "Scegli o carica l'immagine di copertina per questo gioco",
@@ -515,7 +536,24 @@
     "emptyFolderTitle": "Questa cartella è vuota",
     "enterMoreChars": "I risultati delle immagini verranno visualizzati qui durante la digitazione",
     "executable": "Eseguibile",
+    "executableManager": {
+      "addExecutable": "Aggiungi eseguibile",
+      "atLeastOne": "È richiesto almeno un eseguibile",
+      "change": "Modifica eseguibile",
+      "description": "Gestisci i file eseguibili per questo gioco. L'eseguibile principale verrà avviato quando si fa clic su Riproduci.",
+      "makePrimary": "Rendi primario",
+      "noFile": "Nessun file selezionato",
+      "primary": "Primario",
+      "remove": "Rimuovere l'eseguibile",
+      "saveFailed": "Impossibile salvare gli eseguibili",
+      "saved": "Eseguibili salvati con successo",
+      "title": "Gestisci gli eseguibili"
+    },
     "executableNotFound": "Eseguibile del gioco non trovato",
+    "executableSelect": {
+      "description": "Questo gioco ha più set di eseguibili. Quale vuoi correre?",
+      "title": "Seleziona Eseguibile"
+    },
     "filters": {
       "favorites": "Preferiti",
       "onlineGames": "Giochi in linea",
@@ -804,7 +842,7 @@
       "translatingDialog": "Non chiudere Ascendara",
       "translatingDialogDesc": "Ascendara sta traducendo la lingua selezionata. L'operazione potrebbe richiedere alcuni minuti, puoi lasciarla ma non chiudere Ascendara."
     },
-    "fitgirlRepacksDescription": "Accedi agli oltre 5500 giochi di FitGirl su Ascendara. I giochi vengono acquistati tramite Hydralibrary e abbinati alle immagini utilizzando i servizi di dati di gioco. Non ci sono categorie o pesi supportati per questi giochi, sembreranno completamente casuali.",
+    "fitgirlRepacksDescription": "Accedi agli oltre 5500 giochi di FitGirl su Ascendara. I giochi vengono acquistati tramite Hydralibrary e abbinati alle immagini utilizzando i servizi di dati di gioco. Non sono supportate categorie o pesi per questi giochi, sembreranno completamente casuali.",
     "gameBackup": {
       "backupFormat": "Formato di backup",
       "backupLocation": "Posizione di backup",

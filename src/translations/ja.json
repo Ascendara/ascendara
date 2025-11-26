@@ -128,6 +128,7 @@
     "reporting": "報告...",
     "retry": "もう一度やり直してください",
     "save": "保存",
+    "saving": "保存中...",
     "search": "検索",
     "stop": "停止",
     "submit": "提出する",
@@ -144,6 +145,7 @@
     "by": "による",
     "categories": "カテゴリー",
     "companies": "企業",
+    "compareYourPC": "お使いの PC を比較してください",
     "completionist": "完全主義者",
     "criticError": "批評家のレビューを読み込めませんでした",
     "criticReviews": "批評家レビュー",
@@ -194,15 +196,23 @@
       },
       "waitingForBrowser": "ブラウザがダウンロードを送信するのを待っています..."
     },
+    "failedToLoadSpecs": "システム仕様のロードに失敗しました",
     "firstReleasedOn": "ゲームがリリースされました",
     "gameNeedsEmulator": "これにはエミュレータを実行する必要があります。",
     "gameNeedsVR": "このゲームには VR が必要になる場合があります。",
     "gameNotRated": "このゲームは批評家によってレビューされていません",
+    "gameSize": "ゲームサイズ",
     "genres": "ジャンル",
     "hours": "時間",
     "igdbLoading": "ゲーム情報を読み込んでいます...",
     "igdbRating": "このゲームの評価は {{rating}} 個のリンゴです。 Apple の評価は Ascendara の Star 評価とは異なり、ゲームの一般的な評価です。",
     "infoMaybeInaccurate": "ゲーム情報は不正確である可能性があります。",
+    "installSize": "設置サイズ",
+    "installSizeInfo": {
+      "description": "インストール サイズは、抽出後にゲームがディスク上で占有するスペースの推定値です。圧縮されたダウンロードは解凍時に拡張されるため、通常、最終的なサイズはダウンロード サイズより大きくなります。",
+      "note": "ダウンロードが完了すると、圧縮ファイルは削除され、ゲーム サイズの横に記載されている容量のみが必要になります。",
+      "title": "設置サイズについて"
+    },
     "latestUpdate": "最終更新日",
     "linkCopied": "リンクがクリップボードにコピーされました",
     "mainPlusExtras": "メイン+エクストラ",
@@ -251,22 +261,32 @@
       "notAGame": "これはゲームではありません",
       "placeholder": "理由を選択してください"
     },
+    "required": "必須",
     "reviewCount": "レビュー数",
     "reviewSnippets": "レビューのスニペット",
     "screenshots": "スクリーンショット",
     "scrollToViewMore": "スクロールしてゲームの詳細を表示します",
     "selectPath": {
       "default": "デフォルトのパス",
+      "defaultDirectory": "デフォルトのディレクトリ",
       "description": "環境設定で追加のディレクトリが設定されています。このゲームをダウンロードするには、以下の 1 つから選択してください。",
       "title": "このゲームをどこからダウンロードしますか?"
     },
     "sendingTorrent": "トレントを送信中...",
     "shareGame": "アセンダラ ゲーム リンクを共有する",
     "showingResultsFor": "の結果を表示中",
-    "size": "サイズ",
+    "specs": {
+      "component": "成分",
+      "cpu": "CPU",
+      "directx": "ダイレクトX",
+      "gpu": "GPU",
+      "os": "OS",
+      "ram": "ラム"
+    },
     "submitReport": "レポートの送信",
     "submitting": "送信中...",
     "switchProvider": "プロバイダーの切り替え",
+    "systemRequirements": "最小要件",
     "tier": "階層",
     "timeToBeat": "勝利の時",
     "timemachine": {
@@ -303,7 +323,8 @@
       "title": "{{game}} を更新する準備はできましたか?"
     },
     "viewCriticReviews": "批評家のレビューを見る",
-    "viewOnOpenCritic": "OpenCriticで見る"
+    "viewOnOpenCritic": "OpenCriticで見る",
+    "yourPC": "あなたのPC"
   },
   "downloads": {
     "actions": {
@@ -492,7 +513,7 @@
     "cannotRunDev": "開発者モードでゲームを実行できない",
     "cannotVerifyFiles": "ゲームファイルを検証できません",
     "changeCoverImage": "カバー画像の変更",
-    "changeExecutable": "実行ファイルの変更",
+    "changeExecutable": "実行可能ファイルの変更または追加",
     "chooseDirectory": "ディレクトリの選択",
     "chooseExecutableFile": "実行可能ファイルを選択してください...",
     "chooseOrUploadCoverImage": "このゲームのカバー画像を選択またはアップロードします",
@@ -515,7 +536,24 @@
     "emptyFolderTitle": "このフォルダは空です",
     "enterMoreChars": "入力すると画像の結果がここに表示されます",
     "executable": "実行可能",
+    "executableManager": {
+      "addExecutable": "実行可能ファイルの追加",
+      "atLeastOne": "少なくとも 1 つの実行可能ファイルが必要です",
+      "change": "実行ファイルの変更",
+      "description": "このゲームの実行可能ファイルを管理します。 「再生」をクリックすると、プライマリ実行可能ファイルが起動します。",
+      "makePrimary": "プライマリにする",
+      "noFile": "ファイルが選択されていません",
+      "primary": "主要な",
+      "remove": "実行可能ファイルを削除する",
+      "saveFailed": "実行可能ファイルの保存に失敗しました",
+      "saved": "実行可能ファイルは正常に保存されました",
+      "title": "実行可能ファイルの管理"
+    },
     "executableNotFound": "ゲームの実行可能ファイルが見つかりません",
+    "executableSelect": {
+      "description": "このゲームには複数の実行可能ファイルが設定されています。どちらを実行したいですか？",
+      "title": "実行可能ファイルの選択"
+    },
     "filters": {
       "favorites": "お気に入り",
       "onlineGames": "オンラインゲーム",
@@ -1035,7 +1073,7 @@
     "audioProcessing": "音声処理",
     "automaticUpdates": "自動更新",
     "automaticUpdatesDesc": "最新の機能と改善点が利用可能になり次第入手してください",
-    "automaticUpdatesTitle": "自動更新",
+    "automaticUpdatesTitle": "自動アップデート",
     "bePartOfImproving": "Ascendara の改善に参加してください",
     "bePartOfImprovingDesc": "Ascendara を使用するだけで Ascendara の改善に貢献する何百もの他の人たちに加わりましょう",
     "browse": "ブラウズ",

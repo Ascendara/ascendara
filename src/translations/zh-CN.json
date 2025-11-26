@@ -128,6 +128,7 @@
     "reporting": "报告...",
     "retry": "再试一次",
     "save": "节省",
+    "saving": "保存...",
     "search": "搜索",
     "stop": "停止",
     "submit": "提交",
@@ -144,6 +145,7 @@
     "by": "经过",
     "categories": "类别",
     "companies": "公司",
+    "compareYourPC": "比较您的电脑",
     "completionist": "完美主义者",
     "criticError": "无法加载评论家评论",
     "criticReviews": "评论家评论",
@@ -194,15 +196,23 @@
       },
       "waitingForBrowser": "正在等待您的浏览器发送下载..."
     },
+    "failedToLoadSpecs": "无法加载系统规格",
     "firstReleasedOn": "游戏发布",
     "gameNeedsEmulator": "这需要模拟器才能运行。",
     "gameNeedsVR": "该游戏可能需要 VR。",
     "gameNotRated": "该游戏尚未经过评论家的评论",
+    "gameSize": "游戏大小",
     "genres": "流派",
     "hours": "小时",
     "igdbLoading": "正在加载游戏信息...",
     "igdbRating": "该游戏的评级为{{rating}}个苹果。 Apple 评级与 Ascendara 上的星级评级不同，更多的是游戏的总体评级。",
     "infoMaybeInaccurate": "游戏信息可能不准确。",
+    "installSize": "安装尺寸",
+    "installSizeInfo": {
+      "description": "安装大小是游戏解压缩后将在磁盘上占用多少空间的估计值。压缩的下载内容在解压缩时会扩展，因此最终大小通常大于下载大小。",
+      "note": "下载完成后，压缩文件将被删除，并且只占用游戏大小旁边列出的空间量。",
+      "title": "关于安装尺寸"
+    },
     "latestUpdate": "最后更新",
     "linkCopied": "链接已复制到剪贴板",
     "mainPlusExtras": "主要+附加内容",
@@ -251,22 +261,32 @@
       "notAGame": "这不是游戏",
       "placeholder": "选择一个原因"
     },
+    "required": "必需的",
     "reviewCount": "评论数量",
     "reviewSnippets": "评论片段",
     "screenshots": "截图",
     "scrollToViewMore": "左右滑动查看更多游戏详情",
     "selectPath": {
       "default": "默认路径",
+      "defaultDirectory": "默认目录",
       "description": "您在偏好设置中设置了其他目录，请从下面的目录中进行选择来下载该游戏。",
       "title": "你想在哪里下载这个游戏？"
     },
     "sendingTorrent": "正在发送洪流...",
     "shareGame": "分享《Ascendara》游戏链接",
     "showingResultsFor": "显示结果为",
-    "size": "尺寸",
+    "specs": {
+      "component": "成分",
+      "cpu": "中央处理器",
+      "directx": "直接X",
+      "gpu": "图形处理器",
+      "os": "操作系统",
+      "ram": "内存"
+    },
     "submitReport": "提交报告",
     "submitting": "正在提交...",
     "switchProvider": "切换提供商",
+    "systemRequirements": "最低要求",
     "tier": "等级",
     "timeToBeat": "击败时间",
     "timemachine": {
@@ -303,7 +323,8 @@
       "title": "准备好更新{{game}}了吗？"
     },
     "viewCriticReviews": "查看评论家评论",
-    "viewOnOpenCritic": "在 OpenCritic 上查看"
+    "viewOnOpenCritic": "在 OpenCritic 上查看",
+    "yourPC": "你的电脑"
   },
   "downloads": {
     "actions": {
@@ -492,7 +513,7 @@
     "cannotRunDev": "开发者模式无法运行游戏",
     "cannotVerifyFiles": "无法验证游戏文件",
     "changeCoverImage": "更改封面图片",
-    "changeExecutable": "更改可执行文件",
+    "changeExecutable": "更改或添加可执行文件",
     "chooseDirectory": "选择目录",
     "chooseExecutableFile": "选择可执行文件...",
     "chooseOrUploadCoverImage": "选择或上传该游戏的封面图片",
@@ -515,7 +536,24 @@
     "emptyFolderTitle": "该文件夹是空的",
     "enterMoreChars": "当您键入时，图像结果将显示在此处",
     "executable": "可执行文件",
+    "executableManager": {
+      "addExecutable": "添加可执行文件",
+      "atLeastOne": "至少需要一个可执行文件",
+      "change": "更改可执行文件",
+      "description": "管理该游戏的可执行文件。当您单击“播放”时，将启动主要可执行文件。",
+      "makePrimary": "设为主要",
+      "noFile": "未选择文件",
+      "primary": "基本的",
+      "remove": "删除可执行文件",
+      "saveFailed": "无法保存可执行文件",
+      "saved": "可执行文件已成功保存",
+      "title": "管理可执行文件"
+    },
     "executableNotFound": "找不到游戏可执行文件",
+    "executableSelect": {
+      "description": "该游戏设置了多个可执行文件。你想跑哪一个？",
+      "title": "选择可执行文件"
+    },
     "filters": {
       "favorites": "收藏夹",
       "onlineGames": "网络游戏",

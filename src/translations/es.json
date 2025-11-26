@@ -128,6 +128,7 @@
     "reporting": "Informando...",
     "retry": "Intentar otra vez",
     "save": "Ahorrar",
+    "saving": "Ahorro...",
     "search": "Buscar",
     "stop": "Detener",
     "submit": "Entregar",
@@ -144,6 +145,7 @@
     "by": "por",
     "categories": "Categorías",
     "companies": "Empresas",
+    "compareYourPC": "Compara tu PC",
     "completionist": "Completista",
     "criticError": "No se pudieron cargar las reseñas críticas",
     "criticReviews": "Reseñas de críticos",
@@ -194,15 +196,23 @@
       },
       "waitingForBrowser": "Esperando a que su navegador envíe la descarga..."
     },
+    "failedToLoadSpecs": "No se pudieron cargar las especificaciones del sistema",
     "firstReleasedOn": "Juego lanzado",
     "gameNeedsEmulator": "Esto requiere un emulador para ejecutarse.",
     "gameNeedsVR": "Es posible que se requiera realidad virtual para este juego.",
     "gameNotRated": "Este juego no ha sido reseñado por los críticos.",
+    "gameSize": "Tamaño del juego",
     "genres": "Géneros",
     "hours": "horas",
     "igdbLoading": "Cargando información del juego...",
     "igdbRating": "Este juego tiene una clasificación de {{rating}} manzanas. Las calificaciones de Apple son diferentes a las calificaciones de estrellas en Ascendara y son más bien una calificación general del juego.",
     "infoMaybeInaccurate": "La información del juego puede ser inexacta.",
+    "installSize": "Tamaño de instalación",
+    "installSizeInfo": {
+      "description": "El tamaño de la instalación es una estimación de cuánto espacio ocupará el juego en tu disco después de la extracción. Las descargas comprimidas se expanden cuando se extraen, por lo que el tamaño final suele ser mayor que el tamaño de la descarga.",
+      "note": "Una vez completada la descarga, el archivo comprimido se eliminará y solo debería ocupar la cantidad de espacio que figura junto al tamaño del juego.",
+      "title": "Acerca del tamaño de instalación"
+    },
     "latestUpdate": "Última actualización",
     "linkCopied": "Enlace copiado al portapapeles",
     "mainPlusExtras": "Principal + Extras",
@@ -251,22 +261,32 @@
       "notAGame": "esto no es un juego",
       "placeholder": "Selecciona un motivo"
     },
+    "required": "Requerido",
     "reviewCount": "Número de reseñas",
     "reviewSnippets": "Fragmentos de revisión",
     "screenshots": "Capturas de pantalla",
     "scrollToViewMore": "Desplázate para ver más detalles del juego",
     "selectPath": {
       "default": "Ruta predeterminada",
+      "defaultDirectory": "Directorio predeterminado",
       "description": "Tienes directorios adicionales configurados en tus preferencias, elige uno de los siguientes para descargar este juego.",
       "title": "¿Dónde quieres descargar este juego?"
     },
     "sendingTorrent": "Enviando torrent...",
     "shareGame": "Compartir enlace del juego Ascendara",
     "showingResultsFor": "Mostrando resultados para",
-    "size": "Tamaño",
+    "specs": {
+      "component": "Componente",
+      "cpu": "UPC",
+      "directx": "DirectX",
+      "gpu": "GPU",
+      "os": "SO",
+      "ram": "RAM"
+    },
     "submitReport": "Enviar informe",
     "submitting": "Sumisión...",
     "switchProvider": "Cambiar de proveedor",
+    "systemRequirements": "Requisitos mínimos",
     "tier": "Nivel",
     "timeToBeat": "Es hora de vencer",
     "timemachine": {
@@ -303,7 +323,8 @@
       "title": "¿Listo para actualizar {{game}}?"
     },
     "viewCriticReviews": "Ver reseñas de críticos",
-    "viewOnOpenCritic": "Ver en OpenCritic"
+    "viewOnOpenCritic": "Ver en OpenCritic",
+    "yourPC": "Tu computadora"
   },
   "downloads": {
     "actions": {
@@ -492,7 +513,7 @@
     "cannotRunDev": "No se pueden ejecutar juegos en modo desarrollador",
     "cannotVerifyFiles": "No se pueden verificar los archivos del juego",
     "changeCoverImage": "Cambiar imagen de portada",
-    "changeExecutable": "Cambiar ejecutable",
+    "changeExecutable": "Cambiar o agregar ejecutable",
     "chooseDirectory": "Elija directorio",
     "chooseExecutableFile": "Elija el archivo ejecutable...",
     "chooseOrUploadCoverImage": "Elige o sube una imagen de portada para este juego",
@@ -515,7 +536,24 @@
     "emptyFolderTitle": "Esta carpeta está vacía",
     "enterMoreChars": "Los resultados de la imagen aparecerán aquí a medida que escribas.",
     "executable": "Ejecutable",
+    "executableManager": {
+      "addExecutable": "Agregar ejecutable",
+      "atLeastOne": "Se requiere al menos un ejecutable",
+      "change": "Cambiar ejecutable",
+      "description": "Administra los archivos ejecutables de este juego. El ejecutable principal se iniciará cuando hagas clic en Reproducir.",
+      "makePrimary": "Hacer primario",
+      "noFile": "Ningún archivo seleccionado",
+      "primary": "Primario",
+      "remove": "Eliminar ejecutable",
+      "saveFailed": "No se pudieron guardar los ejecutables",
+      "saved": "Ejecutables guardados exitosamente",
+      "title": "Administrar ejecutables"
+    },
     "executableNotFound": "Ejecutable del juego no encontrado",
+    "executableSelect": {
+      "description": "Este juego tiene varios ejecutables configurados. ¿Cuál quieres ejecutar?",
+      "title": "Seleccionar ejecutable"
+    },
     "filters": {
       "favorites": "Favoritos",
       "onlineGames": "Juegos en línea",

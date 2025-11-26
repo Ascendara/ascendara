@@ -108,7 +108,7 @@
       "cancel": "Annuler",
       "couldNotReport": "Le rapport n'a pas été soumis.",
       "couldNotReportDesc": "Votre rapport n'a pas été soumis. Veuillez réessayer plus tard.",
-      "description": "Aidez-nous à améliorer Ascendara en signalant tout problème que vous rencontrez.",
+      "description": "Aidez à améliorer Ascendara en signalant tout problème que vous rencontrez.",
       "detailsLabel": "Détails",
       "detailsPlaceholder": "Veuillez fournir plus de détails sur le problème...",
       "error": "Échec de l'envoi du rapport",
@@ -128,6 +128,7 @@
     "reporting": "Rapport...",
     "retry": "Essayer à nouveau",
     "save": "Sauvegarder",
+    "saving": "Économie...",
     "search": "Recherche",
     "stop": "Arrêt",
     "submit": "Soumettre",
@@ -144,6 +145,7 @@
     "by": "par",
     "categories": "Catégories",
     "companies": "Entreprises",
+    "compareYourPC": "Comparez votre PC",
     "completionist": "Finaliste",
     "criticError": "Échec du chargement des avis critiques",
     "criticReviews": "Critiques des critiques",
@@ -194,15 +196,23 @@
       },
       "waitingForBrowser": "En attendant que votre navigateur envoie le téléchargement..."
     },
+    "failedToLoadSpecs": "Échec du chargement des spécifications du système",
     "firstReleasedOn": "Jeu sorti",
     "gameNeedsEmulator": "Cela nécessite un émulateur pour fonctionner.",
     "gameNeedsVR": "La VR peut être requise pour ce jeu.",
     "gameNotRated": "Ce jeu n'a pas été évalué par les critiques",
+    "gameSize": "Taille du jeu",
     "genres": "Genre",
     "hours": "heures",
     "igdbLoading": "Chargement des informations sur le jeu...",
     "igdbRating": "Ce jeu est classé {{rating}} pommes. Les notes Apple sont différentes des notes Star sur Ascendara et constituent davantage une note générale du jeu.",
     "infoMaybeInaccurate": "Les informations sur le jeu peuvent être inexactes.",
+    "installSize": "Taille d'installation",
+    "installSizeInfo": {
+      "description": "La taille de l'installation est une estimation de l'espace que le jeu occupera sur votre disque après l'extraction. Les téléchargements compressés s'agrandissent une fois extraits, de sorte que la taille finale est généralement supérieure à la taille du téléchargement.",
+      "note": "Une fois le téléchargement terminé, le fichier compressé sera supprimé et ne devrait occuper que la quantité d'espace indiquée à côté de la taille du jeu.",
+      "title": "À propos de la taille de l'installation"
+    },
     "latestUpdate": "Dernière mise à jour",
     "linkCopied": "Lien copié dans le presse-papier",
     "mainPlusExtras": "Principal + Extras",
@@ -251,22 +261,32 @@
       "notAGame": "Ce n'est pas un jeu",
       "placeholder": "Sélectionnez une raison"
     },
+    "required": "Requis",
     "reviewCount": "Nombre d'avis",
     "reviewSnippets": "Extraits d’avis",
     "screenshots": "Captures d'écran",
     "scrollToViewMore": "Faites défiler pour voir plus de détails sur le jeu",
     "selectPath": {
       "default": "Chemin par défaut",
+      "defaultDirectory": "Répertoire par défaut",
       "description": "Vous disposez de répertoires supplémentaires définis dans vos préférences, choisissez-en un ci-dessous pour télécharger ce jeu.",
       "title": "Où voulez-vous télécharger ce jeu ?"
     },
     "sendingTorrent": "Envoi du torrent...",
     "shareGame": "Partager le lien du jeu Ascendara",
     "showingResultsFor": "Affichage des résultats pour",
-    "size": "Taille",
+    "specs": {
+      "component": "Composant",
+      "cpu": "Processeur",
+      "directx": "DirectX",
+      "gpu": "GPU",
+      "os": "Système d'exploitation",
+      "ram": "BÉLIER"
+    },
     "submitReport": "Soumettre le rapport",
     "submitting": "Soumission...",
     "switchProvider": "Changer de fournisseur",
+    "systemRequirements": "Exigences minimales",
     "tier": "Étage",
     "timeToBeat": "Il est temps de battre",
     "timemachine": {
@@ -303,7 +323,8 @@
       "title": "Prêt à mettre à jour {{game}} ?"
     },
     "viewCriticReviews": "Voir les avis des critiques",
-    "viewOnOpenCritic": "Voir sur OpenCritic"
+    "viewOnOpenCritic": "Voir sur OpenCritic",
+    "yourPC": "Votre PC"
   },
   "downloads": {
     "actions": {
@@ -492,7 +513,7 @@
     "cannotRunDev": "Impossible d'exécuter des jeux en mode développeur",
     "cannotVerifyFiles": "Impossible de vérifier les fichiers du jeu",
     "changeCoverImage": "Changer l'image de couverture",
-    "changeExecutable": "Modifier l'exécutable",
+    "changeExecutable": "Modifier ou ajouter un exécutable",
     "chooseDirectory": "Choisir l'annuaire",
     "chooseExecutableFile": "Choisissez le fichier exécutable...",
     "chooseOrUploadCoverImage": "Choisissez ou téléchargez une image de couverture pour ce jeu",
@@ -515,7 +536,24 @@
     "emptyFolderTitle": "Ce dossier est vide",
     "enterMoreChars": "Les résultats de l'image apparaîtront ici au fur et à mesure que vous tapez",
     "executable": "Exécutable",
+    "executableManager": {
+      "addExecutable": "Ajouter un exécutable",
+      "atLeastOne": "Au moins un exécutable est requis",
+      "change": "Modifier l'exécutable",
+      "description": "Gérez les fichiers exécutables de ce jeu. L'exécutable principal sera lancé lorsque vous cliquerez sur Jouer.",
+      "makePrimary": "Rendre primaire",
+      "noFile": "Aucun fichier sélectionné",
+      "primary": "Primaire",
+      "remove": "Supprimer l'exécutable",
+      "saveFailed": "Échec de l'enregistrement des exécutables",
+      "saved": "Exécutables enregistrés avec succès",
+      "title": "Gérer les exécutables"
+    },
     "executableNotFound": "Exécutable du jeu introuvable",
+    "executableSelect": {
+      "description": "Ce jeu comporte plusieurs exécutables. Lequel voulez-vous diriger ?",
+      "title": "Sélectionnez Exécutable"
+    },
     "filters": {
       "favorites": "Favoris",
       "onlineGames": "Jeux en ligne",
@@ -1112,7 +1150,7 @@
     "restart": "Redémarrage",
     "runtimeComponents": "Composants d'exécution",
     "sayHelloTo": "Dites bonjour à",
-    "securityPatchesDesc": "Restez protégé avec des mises à jour de sécurité importantes",
+    "securityPatchesDesc": "Restez protégé grâce à des mises à jour de sécurité importantes",
     "securityPatchesTitle": "Correctifs de sécurité",
     "seeEntireList": "Voir la liste complète des 105 langues",
     "seeWhatsNew": "Voir les nouveautés",
