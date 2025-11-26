@@ -1181,7 +1181,17 @@ ipcMain.handle("read-game-achievements", async (event, game, isCustom = false) =
       if (fs.existsSync(achievementsPath)) {
         try {
           const data = fs.readFileSync(achievementsPath, "utf8");
-          return JSON.parse(data);
+          const parsed = JSON.parse(data);
+
+          // Fix typo: rename achievementWater to watcher if present
+          if (parsed.achievementWater && !parsed.watcher) {
+            parsed.watcher = parsed.achievementWater;
+            delete parsed.achievementWater;
+            // Save the corrected file
+            fs.writeFileSync(achievementsPath, JSON.stringify(parsed, null, 4), "utf8");
+          }
+
+          return parsed;
         } catch (error) {
           console.error("Error reading achievements file:", error);
           return null;
@@ -1198,6 +1208,14 @@ ipcMain.handle("read-game-achievements", async (event, game, isCustom = false) =
       const gameInfo = gamesData.games.find(g => g.game === game);
 
       if (gameInfo) {
+        // Fix typo: rename achievementWater to achievementWatcher if present
+        if (gameInfo.achievementWater && !gameInfo.achievementWatcher) {
+          gameInfo.achievementWatcher = gameInfo.achievementWater;
+          delete gameInfo.achievementWater;
+          // Save the corrected games.json
+          fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 4), "utf8");
+        }
+
         if (gameInfo.achievementWatcher) {
           return gameInfo.achievementWatcher;
         }
