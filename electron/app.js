@@ -3795,6 +3795,82 @@ ipcMain.handle("folder-exclusion", async (event, boolean) => {
   }
 });
 
+ipcMain.handle("fetch-system-specs", async () => {
+  const os = require("os");
+  const { exec } = require("child_process");
+
+  const specs = {
+    os: `${os.type()} ${os.release()}`,
+    cpu: os.cpus()[0]?.model || "Unknown",
+    ram: `${Math.round(os.totalmem() / (1024 * 1024 * 1024))} GB`,
+    gpu: "Unknown",
+    directx: "Unknown",
+  };
+
+  // Get GPU info on Windows
+  if (process.platform === "win32") {
+    try {
+      // Get GPU - filter out virtual/generic adapters
+      const gpuResult = await new Promise(resolve => {
+        exec("wmic path win32_VideoController get name", (error, stdout) => {
+          if (!error && stdout) {
+            const lines = stdout
+              .split("\n")
+              .map(line => line.trim())
+              .filter(line => line && line !== "Name");
+
+            // Filter out virtual/generic adapters
+            const virtualKeywords = [
+              "virtual",
+              "basic",
+              "microsoft",
+              "remote",
+              "vnc",
+              "rdp",
+            ];
+            const realGpu = lines.find(
+              line =>
+                !virtualKeywords.some(keyword => line.toLowerCase().includes(keyword))
+            );
+
+            resolve(realGpu || lines[0] || "Unknown");
+          } else {
+            resolve("Unknown");
+          }
+        });
+      });
+      specs.gpu = gpuResult;
+
+      // Get DirectX version
+      const dxResult = await new Promise(resolve => {
+        exec(
+          'reg query "HKLM\\SOFTWARE\\Microsoft\\DirectX" /v Version',
+          (error, stdout) => {
+            if (!error && stdout) {
+              const match = stdout.match(/Version\s+REG_SZ\s+(\S+)/);
+              if (match) {
+                const version = match[1];
+                // Parse version like 4.09.00.0904 to DirectX 12
+                if (version.startsWith("4.09")) resolve("Version 12");
+                else resolve(`Version ${version}`);
+              } else {
+                resolve("Unknown");
+              }
+            } else {
+              resolve("Unknown");
+            }
+          }
+        );
+      });
+      specs.directx = dxResult;
+    } catch (err) {
+      console.error("[fetch-system-specs] Error fetching GPU/DirectX:", err);
+    }
+  }
+
+  return specs;
+});
+
 // Update a custom game's cover image
 ipcMain.handle("update-game-cover", async (event, game, imgID, imageData) => {
   const settings = settingsManager.getSettings();

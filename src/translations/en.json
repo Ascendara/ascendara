@@ -144,6 +144,7 @@
     "by": "by",
     "categories": "Categories",
     "companies": "Companies",
+    "compareYourPC": "Compare Your PC",
     "completionist": "Completionist",
     "criticError": "Failed to load critic reviews",
     "criticReviews": "Critic Reviews",
@@ -194,15 +195,23 @@
       },
       "waitingForBrowser": "Waiting for your browser to send the download..."
     },
+    "failedToLoadSpecs": "Failed to load system specs",
     "firstReleasedOn": "Game Released",
     "gameNeedsEmulator": "This requires an emulator to run.",
     "gameNeedsVR": "VR may be required for this game.",
     "gameNotRated": "This game has not been reviewed by critics",
+    "gameSize": "Game Size",
     "genres": "Genres",
     "hours": "hours",
     "igdbLoading": "Loading game information...",
     "igdbRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",
     "infoMaybeInaccurate": "Game information may be inaccurate.",
+    "installSize": "Installation Size",
+    "installSizeInfo": {
+      "description": "The installation size is an estimate of how much space the game will take on your disk after extraction. Compressed downloads expand when extracted, so the final size is typically larger than the download size.",
+      "note": "After the download is complete the compressed file will be deleted and should only take the amount of space listed next to game size.",
+      "title": "About Installation Size"
+    },
     "latestUpdate": "Last Updated",
     "linkCopied": "Link copied to clipboard",
     "mainPlusExtras": "Main + Extras",
@@ -251,22 +260,32 @@
       "notAGame": "This isn't a game",
       "placeholder": "Select a reason"
     },
+    "required": "Required",
     "reviewCount": "Number of Reviews",
     "reviewSnippets": "Review Snippets",
     "screenshots": "Screenshots",
     "scrollToViewMore": "Scroll to view more game details",
     "selectPath": {
       "default": "Default Path",
+      "defaultDirectory": "Default Directory",
       "description": "You have additional directories set in your preferences, choose from one below to download this game.",
       "title": "Where do you want to download this game?"
     },
     "sendingTorrent": "Sending Torrent...",
     "shareGame": "Share Ascendara Game Link",
     "showingResultsFor": "Showing results for",
-    "size": "Size",
+    "specs": {
+      "component": "Component",
+      "cpu": "CPU",
+      "directx": "DirectX",
+      "gpu": "GPU",
+      "os": "OS",
+      "ram": "RAM"
+    },
     "submitReport": "Submit Report",
     "submitting": "Submitting...",
     "switchProvider": "Switch Provider",
+    "systemRequirements": "Minimum Requirements",
     "tier": "Tier",
     "timeToBeat": "Time to Beat",
     "timemachine": {
@@ -303,7 +322,8 @@
       "title": "Ready to update {{game}}?"
     },
     "viewCriticReviews": "View Critic Reviews",
-    "viewOnOpenCritic": "View on OpenCritic"
+    "viewOnOpenCritic": "View on OpenCritic",
+    "yourPC": "Your PC"
   },
   "downloads": {
     "actions": {

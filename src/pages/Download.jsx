@@ -281,6 +281,9 @@ export default function DownloadPage() {
   const [igdbError, setIgdbError] = useState(null);
   const [igdbLoading, setIgdbLoading] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+  const [showCompareDialog, setShowCompareDialog] = useState(false);
+  const [systemSpecs, setSystemSpecs] = useState(null);
+  const [systemSpecsLoading, setSystemSpecsLoading] = useState(false);
 
   // Use a ref to track the event handler and active status
   const urlHandlerRef = useRef(null);
@@ -1511,7 +1514,201 @@ export default function DownloadPage() {
                 </AlertDialogContent>
               </AlertDialog>
             </div>
+
+            {/* System Requirements Section - Right Column */}
+            {gameData.minReqs && (
+              <div className="ml-auto mr-24 w-72 shrink-0">
+                <p className="mb-1.5 text-xs font-medium text-primary">
+                  {t("download.systemRequirements")}
+                </p>
+                <div className="rounded-md border border-border/30 bg-card/60 p-2 text-xs">
+                  <div className="grid gap-1">
+                    {gameData.minReqs.os && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                          {t("download.specs.os")}
+                        </span>
+                        <span className="text-right text-foreground">
+                          {gameData.minReqs.os}
+                        </span>
+                      </div>
+                    )}
+                    {gameData.minReqs.cpu && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                          {t("download.specs.cpu")}
+                        </span>
+                        <span className="text-right text-foreground">
+                          {gameData.minReqs.cpu}
+                        </span>
+                      </div>
+                    )}
+                    {gameData.minReqs.ram && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                          {t("download.specs.ram")}
+                        </span>
+                        <span className="text-right text-foreground">
+                          {gameData.minReqs.ram}
+                        </span>
+                      </div>
+                    )}
+                    {gameData.minReqs.gpu && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                          {t("download.specs.gpu")}
+                        </span>
+                        <span className="text-right text-foreground">
+                          {gameData.minReqs.gpu}
+                        </span>
+                      </div>
+                    )}
+                    {gameData.minReqs.directx && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                          {t("download.specs.directx")}
+                        </span>
+                        <span className="text-right text-foreground">
+                          {gameData.minReqs.directx}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 flex justify-center">
+                    <button
+                      className="text-xs text-primary hover:underline"
+                      onClick={async () => {
+                        setShowCompareDialog(true);
+                        setSystemSpecsLoading(true);
+                        try {
+                          const specs = await window.electron.fetchSystemSpecs();
+                          setSystemSpecs(specs);
+                        } catch (err) {
+                          console.error("Failed to fetch system specs:", err);
+                        } finally {
+                          setSystemSpecsLoading(false);
+                        }
+                      }}
+                    >
+                      {t("download.compareYourPC")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Compare Your PC Dialog */}
+          <AlertDialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
+            <AlertDialogContent className="max-w-2xl border-border bg-background/95 p-6 backdrop-blur-sm">
+              <X
+                className="absolute right-4 top-4 h-5 w-5 cursor-pointer text-primary hover:text-primary/80"
+                onClick={() => setShowCompareDialog(false)}
+              />
+              <AlertDialogHeader className="mb-4">
+                <AlertDialogTitle className="text-xl font-bold text-primary">
+                  {t("download.compareYourPC")}
+                </AlertDialogTitle>
+              </AlertDialogHeader>
+
+              {systemSpecsLoading ? (
+                <div className="flex h-48 items-center justify-center">
+                  <Loader className="h-10 w-10 animate-spin text-primary" />
+                </div>
+              ) : systemSpecs ? (
+                <div className="space-y-4">
+                  {/* Spec Comparison Table */}
+                  <div className="overflow-hidden rounded-lg border border-border/50">
+                    {/* Header Row */}
+                    <div className="grid grid-cols-3 bg-primary/10">
+                      <div className="p-3 text-sm font-semibold text-muted-foreground">
+                        {t("download.specs.component")}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm font-semibold text-primary">
+                        {t("download.yourPC")}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm font-semibold text-primary">
+                        {t("download.required")}
+                      </div>
+                    </div>
+
+                    {/* OS Row */}
+                    <div className="grid grid-cols-3 border-t border-border/30">
+                      <div className="p-3 text-sm font-medium text-muted-foreground">
+                        {t("download.specs.os")}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {systemSpecs.os}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {gameData.minReqs?.os || "-"}
+                      </div>
+                    </div>
+
+                    {/* CPU Row */}
+                    <div className="grid grid-cols-3 border-t border-border/30 bg-card/30">
+                      <div className="p-3 text-sm font-medium text-muted-foreground">
+                        {t("download.specs.cpu")}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {systemSpecs.cpu}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {gameData.minReqs?.cpu || "-"}
+                      </div>
+                    </div>
+
+                    {/* RAM Row */}
+                    <div className="grid grid-cols-3 border-t border-border/30">
+                      <div className="p-3 text-sm font-medium text-muted-foreground">
+                        {t("download.specs.ram")}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {systemSpecs.ram}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {gameData.minReqs?.ram || "-"}
+                      </div>
+                    </div>
+
+                    {/* GPU Row */}
+                    <div className="grid grid-cols-3 border-t border-border/30 bg-card/30">
+                      <div className="p-3 text-sm font-medium text-muted-foreground">
+                        {t("download.specs.gpu")}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {systemSpecs.gpu}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {gameData.minReqs?.gpu || "-"}
+                      </div>
+                    </div>
+
+                    {/* DirectX Row */}
+                    <div className="grid grid-cols-3 border-t border-border/30">
+                      <div className="p-3 text-sm font-medium text-muted-foreground">
+                        {t("download.specs.directx")}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {systemSpecs.directx}
+                      </div>
+                      <div className="border-l border-border/30 p-3 text-sm text-foreground">
+                        {gameData.minReqs?.directx || "-"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-48 items-center justify-center text-muted-foreground">
+                  {t("download.failedToLoadSpecs")}
+                </div>
+              )}
+
+              <AlertDialogFooter className="mt-6">
+                <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* OpenCritic Dialog */}
           <AlertDialog open={openCriticDialog} onOpenChange={setOpenCriticDialog}>

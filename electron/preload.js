@@ -186,6 +186,7 @@ contextBridge.exposeInMainWorld("electron", {
   getFullscreenState: () => ipcRenderer.invoke("get-fullscreen-state"),
   toggleFullscreen: () => ipcRenderer.invoke("toggle-fullscreen"),
   checkGameDependencies: () => ipcRenderer.invoke("check-game-dependencies"),
+  fetchSystemSpecs: () => ipcRenderer.invoke("fetch-system-specs"),
   showTestNotification: () => ipcRenderer.invoke("show-test-notification"),
   getPlatform: () => ipcRenderer.invoke("get-platform"),
   isExperiment: () => ipcRenderer.invoke("is-experiment"),
