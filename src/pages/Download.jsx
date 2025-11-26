@@ -1542,14 +1542,12 @@ export default function DownloadPage() {
                       {t("download.betaFeature")}
                     </AlertDialogTitle>
                     <AlertDialogDescription className="mt-3 text-sm" asChild>
-                      <div className="border-warning/30 bg-warning/5 rounded-md border p-3">
-                        {t("download.openCriticBetaWarning")}
-                      </div>
+                      <div className="p-3">{t("download.openCriticBetaWarning")}</div>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="mt-4">
                     <Button
-                      className="w-full"
+                      className="w-full text-secondary"
                       onClick={() => {
                         setShowOpenCriticWarning(false);
                         localStorage.setItem("openCriticBetaWarningShown", "1");
