@@ -1649,10 +1649,6 @@ export default function DownloadPage() {
           {/* Compare Your PC Dialog */}
           <AlertDialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
             <AlertDialogContent className="max-w-2xl border-border bg-background/95 p-6 backdrop-blur-sm">
-              <X
-                className="absolute right-4 top-4 h-5 w-5 cursor-pointer text-primary hover:text-primary/80"
-                onClick={() => setShowCompareDialog(false)}
-              />
               <AlertDialogHeader className="mb-4">
                 <AlertDialogTitle className="text-xl font-bold text-primary">
                   {t("download.compareYourPC")}
