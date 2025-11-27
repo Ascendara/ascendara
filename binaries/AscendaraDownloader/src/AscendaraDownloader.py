@@ -1023,10 +1023,21 @@ class SmartDLDownloader:
         # Check for nested directories that should be flattened
         nested_dirs_to_check = []
         
+        # Get list of protected files that should not be deleted (metadata files)
+        protected_files = {
+            f"{sanitize_folder_name(self.game)}.ascendara.json",
+            "filemap.ascendara.json",
+            "game.ascendara.json",
+            "header.jpg",
+            "header.png",
+            "header.webp"
+        }
+        
         # First check for directory named after the game
         game_named_dir = os.path.join(self.download_dir, sanitize_folder_name(self.game))
         if os.path.isdir(game_named_dir):
             nested_dirs_to_check.append(game_named_dir)
+            logging.info(f"[AscendaraDownloader] Found game-named directory to flatten: {game_named_dir}")
         
         # Also check for any single subdirectory that might contain the main content
         # (excluding json files and other metadata)
@@ -1036,24 +1047,81 @@ class SmartDLDownloader:
             if os.path.isdir(item_path) and not item.endswith('.ascendara') and item != '_CommonRedist':
                 subdirs.append(item_path)
         
+        logging.info(f"[AscendaraDownloader] Found {len(subdirs)} subdirectories in download dir: {[os.path.basename(s) for s in subdirs]}")
+        
         # If there's only one subdirectory and it's not already in our list, add it
+        # But only if there are no other files in the root (besides metadata)
         if len(subdirs) == 1 and subdirs[0] not in nested_dirs_to_check:
-            nested_dirs_to_check.append(subdirs[0])
-            logging.info(f"[AscendaraDownloader] Found single subdirectory to potentially flatten: {subdirs[0]}")
+            # Check if root directory only has metadata files (no game files)
+            root_files = [f for f in os.listdir(self.download_dir) 
+                         if os.path.isfile(os.path.join(self.download_dir, f)) 
+                         and f not in protected_files
+                         and not f.endswith('.ascendara.json')]
+            
+            if len(root_files) == 0:
+                # Only flatten if the subdirectory actually contains files
+                subdir_contents = os.listdir(subdirs[0])
+                if len(subdir_contents) > 0:
+                    nested_dirs_to_check.append(subdirs[0])
+                    logging.info(f"[AscendaraDownloader] Found single subdirectory to flatten: {subdirs[0]} (contains {len(subdir_contents)} items)")
+                else:
+                    logging.info(f"[AscendaraDownloader] Skipping empty subdirectory: {subdirs[0]}")
+            else:
+                logging.info(f"[AscendaraDownloader] Not flattening subdirectory because root has game files: {root_files[:5]}...")
         
         moved = False
         for nested_dir in nested_dirs_to_check:
             if os.path.isdir(nested_dir):
-                for item in os.listdir(nested_dir):
+                logging.info(f"[AscendaraDownloader] Flattening directory: {nested_dir}")
+                items_to_move = os.listdir(nested_dir)
+                logging.info(f"[AscendaraDownloader] Items to move: {items_to_move[:10]}{'...' if len(items_to_move) > 10 else ''}")
+                
+                for item in items_to_move:
                     src = os.path.join(nested_dir, item)
                     dst = os.path.join(self.download_dir, item)
+                    
+                    # CRITICAL: Skip if destination is the same as the source directory we're flattening
+                    # This happens when there's a subdirectory with the same name as the game
+                    if os.path.normpath(dst) == os.path.normpath(nested_dir):
+                        logging.warning(f"[AscendaraDownloader] Skipping item '{item}' - destination would be same as source directory")
+                        continue
+                    
+                    # Safety check: never overwrite protected metadata files
+                    if item in protected_files:
+                        logging.warning(f"[AscendaraDownloader] Skipping protected file during flatten: {item}")
+                        continue
+                    
+                    # Check if source still exists before trying to move
+                    if not os.path.exists(src):
+                        logging.warning(f"[AscendaraDownloader] Source no longer exists, skipping: {src}")
+                        continue
+                    
                     if os.path.exists(dst):
+                        # Only remove if it's safe to do so and dst is NOT the nested_dir
                         if os.path.isdir(dst):
+                            logging.info(f"[AscendaraDownloader] Removing existing directory before move: {dst}")
                             shutil.rmtree(dst, ignore_errors=True)
                         else:
+                            logging.info(f"[AscendaraDownloader] Removing existing file before move: {dst}")
                             os.remove(dst)
-                    shutil.move(src, dst)
-                shutil.rmtree(nested_dir, ignore_errors=True)
+                    
+                    try:
+                        shutil.move(src, dst)
+                        logging.debug(f"[AscendaraDownloader] Moved: {src} -> {dst}")
+                    except Exception as move_error:
+                        logging.error(f"[AscendaraDownloader] Failed to move {src} to {dst}: {move_error}")
+                
+                # Only delete the nested directory if it's now empty
+                try:
+                    remaining = os.listdir(nested_dir)
+                    if len(remaining) == 0:
+                        shutil.rmtree(nested_dir, ignore_errors=True)
+                        logging.info(f"[AscendaraDownloader] Deleted empty nested directory: {nested_dir}")
+                    else:
+                        logging.warning(f"[AscendaraDownloader] Nested directory not empty after flatten, keeping it: {nested_dir} (remaining: {remaining})")
+                except Exception as e:
+                    logging.warning(f"[AscendaraDownloader] Could not check/delete nested directory {nested_dir}: {e}")
+                
                 logging.info(f"[AscendaraDownloader] Moved files from nested '{nested_dir}' to '{self.download_dir}'.")
                 moved = True
             # Rebuild filemap after flattening
