@@ -4823,7 +4823,11 @@ ipcMain.handle(
 
       // If no immediate errors, consider it a success
       event.sender.send("game-launch-success", { game });
-      hideWindow();
+
+      // Only hide window if hideOnGameLaunch setting is enabled
+      if (settings.hideOnGameLaunch !== false) {
+        hideWindow();
+      }
 
       // Create shortcut and mark game as launched if it's the first time
       if (!isCustom) {
@@ -4861,9 +4865,11 @@ ipcMain.handle(
       runGame.on("exit", code => {
         console.log(`Game ${game} exited with code ${code}`);
 
-        // Update game status and show window first
+        // Update game status and show window if it was hidden
         runGameProcesses.delete(game);
-        showWindow();
+        if (settings.hideOnGameLaunch !== false) {
+          showWindow();
+        }
 
         // Then update Discord RPC with longer delay
         setTimeout(updateDiscordRPCToLibrary, 1000);
