@@ -876,6 +876,8 @@
     "giantBombApiKey": "GiantBomb API Key",
     "giantBombDescription": "GiantBomb provides game information from a community-driven gaming wiki with brief descriptions. Requires an API key.",
     "giantBombLearnHowtoGet": "Learn how to get API key",
+    "hideOnGameLaunch": "Hide on Game Launch",
+    "hideOnGameLaunchDescription": "Hide Ascendara when a game is launched from it.",
     "highThreadWarning": "Using more than 32 threads is considered extreme and may cause instability, bans, or network issues. Use with caution.",
     "igdbApiKeyDescription": "IGDB provides more detailed game information with developer-backed database and official game entries. Requires you to have a Twitch account and get a client ID and secret.",
     "igdbLearnHowtoGet": "Learn how to set this up",

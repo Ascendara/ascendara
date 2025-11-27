@@ -743,6 +743,7 @@ class SettingsManager {
       behaviorAfterDownload: "none",
       showOldDownloadLinks: false,
       seeInappropriateContent: false,
+      hideOnGameLaunch: true,
       earlyReleasePreview: false,
       viewWorkshopPage: false,
       notifications: true,

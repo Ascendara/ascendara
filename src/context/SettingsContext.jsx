@@ -18,6 +18,7 @@ export function SettingsProvider({ children }) {
     behaviorAfterDownload: "none",
     rpcEnabled: true,
     seeInappropriateContent: false,
+    hideOnGameLaunch: true,
     earlyReleasePreview: false,
     viewWorkshopPage: false,
     notifications: true,
