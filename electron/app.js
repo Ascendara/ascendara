@@ -11,7 +11,7 @@
  *  Learn more about developing Ascendara at https://ascendara.app/docs/developer/overview
  */
 
-let appVersion = "9.1.4";
+let appVersion = "9.1.5";
 
 const {
   app,
