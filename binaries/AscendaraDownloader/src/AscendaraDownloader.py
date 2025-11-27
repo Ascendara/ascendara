@@ -351,11 +351,32 @@ class SmartDLDownloader:
             # Track consecutive failures to detect persistent issues
             consecutive_failures = 0
             max_consecutive_failures = 3
+            
+            # Track if we should use resumable fallback (after SmartDL fails)
+            use_resumable_fallback = False
+            smartdl_failures = 0
 
             for attempt in range(max_retries):
                 try:
                     if attempt > 0:
-                        # Clean up any partial SmartDL temp files before retry
+                        logging.info(f"[AscendaraDownloader] Retry attempt {attempt}/{max_retries-1} after {retry_delay}s delay...")
+                        time.sleep(retry_delay)
+                        retry_delay = min(retry_delay * 1.5, 120)  # Exponential backoff, max 120s
+                    
+                    # After 2 SmartDL failures with IncompleteRead, switch to resumable fallback
+                    if use_resumable_fallback or smartdl_failures >= 2:
+                        logging.info(f"[AscendaraDownloader] Using resumable download fallback for better reliability")
+                        download_successful = self._resumable_download(
+                            url, dest, size_bytes, max_speed, 
+                            request_args['headers'], max_retries - attempt
+                        )
+                        if download_successful:
+                            break
+                        else:
+                            continue
+                    
+                    # Clean up any partial SmartDL temp files before retry (but keep partial dest file for resumable)
+                    if attempt > 0:
                         try:
                             for f in os.listdir(self.download_dir):
                                 if f.endswith('.000') or f.endswith('.001') or '.rar.0' in f or '.zip.0' in f:
@@ -364,10 +385,6 @@ class SmartDLDownloader:
                                     os.remove(partial_path)
                         except Exception as cleanup_err:
                             logging.warning(f"[AscendaraDownloader] Could not clean up partial files: {cleanup_err}")
-                        
-                        logging.info(f"[AscendaraDownloader] Retry attempt {attempt}/{max_retries-1} after {retry_delay}s delay...")
-                        time.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 1.5, 120)  # Exponential backoff, max 120s
 
                     # Create SmartDL with thread count
                     # Reduce threads on retry to improve stability for large files
@@ -430,6 +447,13 @@ class SmartDLDownloader:
                                           'ConnectionError', 'ReadTimeoutError', 'ProtocolError']
                         if any(err_type in last_error for err_type in retryable_errors):
                             logging.warning(f"[AscendaraDownloader] Retryable error on attempt {attempt+1}: {last_error}")
+                            smartdl_failures += 1
+                            
+                            # Switch to resumable fallback after repeated IncompleteRead errors
+                            if 'IncompleteRead' in last_error or 'Connection broken' in last_error:
+                                if smartdl_failures >= 2:
+                                    logging.info(f"[AscendaraDownloader] Switching to resumable fallback after {smartdl_failures} SmartDL failures")
+                                    use_resumable_fallback = True
                             
                             # Log consecutive failures for debugging
                             if consecutive_failures >= max_consecutive_failures:
@@ -448,6 +472,13 @@ class SmartDLDownloader:
                                       'ConnectionError', 'ReadTimeoutError', 'ProtocolError', 'stalled']
                     if any(err_type in last_error for err_type in retryable_errors):
                         logging.warning(f"[AscendaraDownloader] Retryable exception on attempt {attempt+1}: {retry_exc}")
+                        smartdl_failures += 1
+                        
+                        # Switch to resumable fallback after repeated failures
+                        if 'IncompleteRead' in last_error or 'Connection broken' in last_error:
+                            if smartdl_failures >= 2:
+                                logging.info(f"[AscendaraDownloader] Switching to resumable fallback after {smartdl_failures} SmartDL failures")
+                                use_resumable_fallback = True
                         
                         # Log consecutive failures for debugging
                         if consecutive_failures >= max_consecutive_failures:
@@ -622,6 +653,197 @@ class SmartDLDownloader:
 
         logging.info(f"[Buzzheavier] Downloaded as: {dest_path}")
         self._extract_files(dest_path)
+
+    def _resumable_download(self, url, dest, total_size, max_speed, headers, max_retries):
+        """
+        Resumable download fallback using requests with Range headers.
+        This is more reliable for large files when SmartDL fails with IncompleteRead errors.
+        """
+        logging.info(f"[AscendaraDownloader] Starting resumable download to: {dest}")
+        
+        # Check if we have a partial file to resume from
+        downloaded = 0
+        if os.path.exists(dest):
+            downloaded = os.path.getsize(dest)
+            logging.info(f"[AscendaraDownloader] Resuming from {read_size(downloaded)} ({downloaded} bytes)")
+        
+        # If we don't know total size, try to get it
+        if not total_size:
+            try:
+                resp = requests.head(url, allow_redirects=True, timeout=30)
+                if 'Content-Length' in resp.headers:
+                    total_size = int(resp.headers['Content-Length'])
+                    logging.info(f"[AscendaraDownloader] Total file size: {read_size(total_size)}")
+            except Exception as e:
+                logging.warning(f"[AscendaraDownloader] Could not determine file size: {e}")
+        
+        # Check if server supports range requests
+        supports_range = False
+        try:
+            test_resp = requests.head(url, allow_redirects=True, timeout=30)
+            accept_ranges = test_resp.headers.get('Accept-Ranges', '')
+            if accept_ranges == 'bytes' or 'Content-Range' in test_resp.headers:
+                supports_range = True
+            logging.info(f"[AscendaraDownloader] Server supports range requests: {supports_range}")
+        except Exception as e:
+            logging.warning(f"[AscendaraDownloader] Could not check range support: {e}")
+        
+        # If we have a partial file but server doesn't support range, start fresh
+        if downloaded > 0 and not supports_range:
+            logging.warning(f"[AscendaraDownloader] Server doesn't support range requests, starting fresh")
+            downloaded = 0
+            if os.path.exists(dest):
+                os.remove(dest)
+        
+        # If file is already complete, return success
+        if total_size and downloaded >= total_size:
+            logging.info(f"[AscendaraDownloader] File already complete")
+            return True
+        
+        chunk_size = 1024 * 1024  # 1 MB chunks for better progress tracking
+        retry_count = 0
+        max_chunk_retries = 5  # Retries per chunk
+        
+        while retry_count < max_retries:
+            try:
+                # Build request headers with range if resuming
+                req_headers = headers.copy()
+                if downloaded > 0 and supports_range:
+                    req_headers['Range'] = f'bytes={downloaded}-'
+                    logging.info(f"[AscendaraDownloader] Requesting range: bytes={downloaded}-")
+                
+                # Use a session for connection pooling
+                session = requests.Session()
+                session.headers.update(req_headers)
+                
+                # Stream the download with timeout
+                response = session.get(url, stream=True, timeout=(30, 60))  # (connect, read) timeouts
+                
+                # Check response status
+                if response.status_code == 416:  # Range not satisfiable - file complete
+                    logging.info(f"[AscendaraDownloader] Server returned 416 - file appears complete")
+                    return True
+                elif response.status_code not in (200, 206):
+                    logging.error(f"[AscendaraDownloader] Unexpected status code: {response.status_code}")
+                    retry_count += 1
+                    time.sleep(5)
+                    continue
+                
+                # Get content length from response
+                content_length = response.headers.get('Content-Length')
+                if content_length:
+                    remaining = int(content_length)
+                    if response.status_code == 200:  # Full content, not partial
+                        total_size = remaining
+                        downloaded = 0  # Reset if server sent full content
+                
+                # Open file in append mode if resuming, write mode otherwise
+                mode = 'ab' if downloaded > 0 and response.status_code == 206 else 'wb'
+                if mode == 'wb':
+                    downloaded = 0  # Reset counter if starting fresh
+                
+                start_time = time.time()
+                last_update_time = start_time
+                chunk_retry_count = 0
+                
+                with open(dest, mode) as f:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            chunk_retry_count = 0  # Reset on successful chunk
+                            
+                            # Apply speed limit if set
+                            if max_speed and max_speed > 0:
+                                elapsed = time.time() - start_time
+                                expected_time = downloaded / max_speed
+                                if expected_time > elapsed:
+                                    time.sleep(expected_time - elapsed)
+                            
+                            # Update progress every 0.5 seconds
+                            now = time.time()
+                            if now - last_update_time >= 0.5:
+                                elapsed = now - start_time
+                                speed = downloaded / elapsed if elapsed > 0 else 0
+                                
+                                if total_size and total_size > 0:
+                                    progress = (downloaded / total_size) * 100
+                                    remaining_bytes = total_size - downloaded
+                                    eta = remaining_bytes / speed if speed > 0 else 0
+                                else:
+                                    progress = 0
+                                    eta = 0
+                                
+                                # Format speed
+                                if speed >= 1024**3:
+                                    speed_str = f"{speed/1024**3:.2f} GB/s"
+                                elif speed >= 1024**2:
+                                    speed_str = f"{speed/1024**2:.2f} MB/s"
+                                elif speed >= 1024:
+                                    speed_str = f"{speed/1024:.2f} KB/s"
+                                else:
+                                    speed_str = f"{speed:.2f} B/s"
+                                
+                                # Format ETA
+                                eta_int = int(eta)
+                                if eta_int < 60:
+                                    eta_str = f"{eta_int} seconds"
+                                elif eta_int < 3600:
+                                    eta_str = f"{eta_int // 60} minute(s), {eta_int % 60} second(s)"
+                                else:
+                                    eta_str = f"{eta_int // 3600} hour(s), {(eta_int % 3600) // 60} minute(s)"
+                                
+                                self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
+                                self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed_str
+                                self.game_info["downloadingData"]["timeUntilComplete"] = eta_str
+                                self.game_info["downloadingData"]["resumable"] = True
+                                safe_write_json(self.game_info_path, self.game_info)
+                                last_update_time = now
+                                
+                                logging.debug(f"[AscendaraDownloader] Progress: {progress:.2f}% at {speed_str}")
+                
+                # Check if download is complete
+                if total_size and downloaded >= total_size:
+                    logging.info(f"[AscendaraDownloader] Resumable download completed: {read_size(downloaded)}")
+                    # Clean up resumable flag
+                    if 'resumable' in self.game_info.get('downloadingData', {}):
+                        del self.game_info['downloadingData']['resumable']
+                    return True
+                elif not total_size:
+                    # If we don't know total size, assume success if we got data
+                    logging.info(f"[AscendaraDownloader] Download completed (unknown total size): {read_size(downloaded)}")
+                    return True
+                else:
+                    # Incomplete - will retry
+                    logging.warning(f"[AscendaraDownloader] Download incomplete: {downloaded}/{total_size} bytes")
+                    retry_count += 1
+                    time.sleep(5)
+                    
+            except requests.exceptions.ChunkedEncodingError as e:
+                logging.warning(f"[AscendaraDownloader] ChunkedEncodingError at {read_size(downloaded)}: {e}")
+                retry_count += 1
+                time.sleep(5)
+            except requests.exceptions.ConnectionError as e:
+                logging.warning(f"[AscendaraDownloader] ConnectionError at {read_size(downloaded)}: {e}")
+                retry_count += 1
+                time.sleep(10)
+            except requests.exceptions.Timeout as e:
+                logging.warning(f"[AscendaraDownloader] Timeout at {read_size(downloaded)}: {e}")
+                retry_count += 1
+                time.sleep(5)
+            except Exception as e:
+                error_str = str(e)
+                if 'IncompleteRead' in error_str or 'Connection broken' in error_str:
+                    logging.warning(f"[AscendaraDownloader] Connection issue at {read_size(downloaded)}: {e}")
+                    retry_count += 1
+                    time.sleep(5)
+                else:
+                    logging.error(f"[AscendaraDownloader] Unexpected error in resumable download: {e}")
+                    retry_count += 1
+                    time.sleep(5)
+        
+        logging.error(f"[AscendaraDownloader] Resumable download failed after {max_retries} retries")
+        return False
 
     def _handle_post_download_behavior(self):
         try:
