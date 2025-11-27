@@ -691,223 +691,253 @@ function Settings() {
           <div className="space-y-6 lg:col-span-8">
             {/* General Settings Card */}
             <Card className="border-border p-6">
-              <h2 className="mb-2 text-xl font-semibold text-primary">
+              <h2 className="mb-4 text-xl font-semibold text-primary">
                 {t("settings.general")}
               </h2>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="mb-4">
-                    <Label>{t("settings.theme")}</Label>
-                    <Accordion
-                      type="single"
-                      collapsible
-                      className="mt-2 w-full rounded-lg border-border bg-background text-card-foreground shadow-sm"
+
+              {/* Appearance Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("settings.appearance")}
+                </h3>
+                <div>
+                  <Label>{t("settings.themes")}</Label>
+                  <Accordion
+                    type="single"
+                    collapsible
+                    className="mt-2 w-full rounded-lg border-border bg-background text-card-foreground shadow-sm"
+                  >
+                    <AccordionItem value="light-themes" className="border-0 px-1">
+                      <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {t("settings.lightThemes")}
+                          </span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {groupedThemes.light.map(t => (
+                            <ThemeButton
+                              key={t.id}
+                              theme={t}
+                              currentTheme={theme}
+                              onSelect={handleThemeChange}
+                            />
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem
+                      value="dark-themes"
+                      className="border-0 border-t border-t-border/20 px-1"
                     >
-                      <AccordionItem value="light-themes" className="border-0 px-1">
-                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {t("settings.lightThemes")}
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            {groupedThemes.light.map(t => (
-                              <ThemeButton
-                                key={t.id}
-                                theme={t}
-                                currentTheme={theme}
-                                onSelect={handleThemeChange}
-                              />
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-
-                      <AccordionItem
-                        value="dark-themes"
-                        className="border-0 border-t border-t-border/20 px-1"
-                      >
-                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {t("settings.darkThemes")}
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            {groupedThemes.dark.map(t => (
-                              <ThemeButton
-                                key={t.id}
-                                theme={t}
-                                currentTheme={theme}
-                                onSelect={handleThemeChange}
-                              />
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.defaultLandingPage")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.defaultLandingPageDescription")}
-                      </p>
-                    </div>
-                    <Select
-                      value={settings.defaultOpenPage || "home"}
-                      onValueChange={value =>
-                        handleSettingChange("defaultOpenPage", value)
-                      }
-                    >
-                      <SelectTrigger className="w-[180px] bg-background">
-                        <SelectValue placeholder="Home" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="home">{t("common.home")}</SelectItem>
-                        <SelectItem value="search">{t("common.search")}</SelectItem>
-                        <SelectItem value="library">{t("common.library")}</SelectItem>
-                        <SelectItem value="downloads">{t("common.downloads")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.ascendaraUpdates")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.ascendaraUpdatesDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.autoUpdate}
-                      onCheckedChange={() =>
-                        handleSettingChange("autoUpdate", !settings.autoUpdate)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.discordRPC")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.discordRPCDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.rpcEnabled}
-                      onCheckedChange={() =>
-                        handleSettingChange("rpcEnabled", !settings.rpcEnabled)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.notifications")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.notificationsDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.notifications}
-                      onCheckedChange={() =>
-                        handleSettingChange("notifications", !settings.notifications)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.quickLaunch")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.quickLaunchDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={!settings.endOnClose}
-                      onCheckedChange={() =>
-                        handleSettingChange("endOnClose", !settings.endOnClose)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.smoothTransitions")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.smoothTransitionsDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.smoothTransitions}
-                      onCheckedChange={() =>
-                        handleSettingChange(
-                          "smoothTransitions",
-                          !settings.smoothTransitions
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.sideScrollBar")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.sideScrollBarDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.sideScrollBar}
-                      onCheckedChange={() =>
-                        handleSettingChange("sideScrollBar", !settings.sideScrollBar)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.matureContent")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.matureContentDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.seeInappropriateContent}
-                      onCheckedChange={() =>
-                        handleSettingChange(
-                          "seeInappropriateContent",
-                          !settings.seeInappropriateContent
-                        )
-                      }
-                    />
-                  </div>
-
-                  {isOnWindows && (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>{t("settings.autoCreateShortcuts")}</Label>
-                        <p className="text-sm text-muted-foreground">
-                          {t("settings.autoCreateShortcutsDescription")}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={settings.autoCreateShortcuts}
-                        onCheckedChange={() =>
-                          handleSettingChange(
-                            "autoCreateShortcuts",
-                            !settings.autoCreateShortcuts
-                          )
-                        }
-                      />
-                    </div>
-                  )}
+                      <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {t("settings.darkThemes")}
+                          </span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {groupedThemes.dark.map(t => (
+                            <ThemeButton
+                              key={t.id}
+                              theme={t}
+                              currentTheme={theme}
+                              onSelect={handleThemeChange}
+                            />
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.smoothTransitions")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.smoothTransitionsDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.smoothTransitions}
+                    onCheckedChange={() =>
+                      handleSettingChange(
+                        "smoothTransitions",
+                        !settings.smoothTransitions
+                      )
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.sideScrollBar")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.sideScrollBarDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.sideScrollBar}
+                    onCheckedChange={() =>
+                      handleSettingChange("sideScrollBar", !settings.sideScrollBar)
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Application Section */}
+              <div className="mt-8 space-y-4">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("settings.application")}
+                </h3>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.defaultLandingPage")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.defaultLandingPageDescription")}
+                    </p>
+                  </div>
+                  <Select
+                    value={settings.defaultOpenPage || "home"}
+                    onValueChange={value => handleSettingChange("defaultOpenPage", value)}
+                  >
+                    <SelectTrigger className="w-[180px] bg-background">
+                      <SelectValue placeholder="Home" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="home">{t("common.home")}</SelectItem>
+                      <SelectItem value="search">{t("common.search")}</SelectItem>
+                      <SelectItem value="library">{t("common.library")}</SelectItem>
+                      <SelectItem value="downloads">{t("common.downloads")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.ascendaraUpdates")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.ascendaraUpdatesDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.autoUpdate}
+                    onCheckedChange={() =>
+                      handleSettingChange("autoUpdate", !settings.autoUpdate)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.notifications")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.notificationsDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.notifications}
+                    onCheckedChange={() =>
+                      handleSettingChange("notifications", !settings.notifications)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.quickLaunch")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.quickLaunchDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!settings.endOnClose}
+                    onCheckedChange={() =>
+                      handleSettingChange("endOnClose", !settings.endOnClose)
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Gaming Section */}
+              <div className="mt-8 space-y-4">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("settings.gaming")}
+                </h3>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.discordRPC")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.discordRPCDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.rpcEnabled}
+                    onCheckedChange={() =>
+                      handleSettingChange("rpcEnabled", !settings.rpcEnabled)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.hideOnGameLaunch")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.hideOnGameLaunchDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.hideOnGameLaunch}
+                    onCheckedChange={() =>
+                      handleSettingChange("hideOnGameLaunch", !settings.hideOnGameLaunch)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.matureContent")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.matureContentDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.seeInappropriateContent}
+                    onCheckedChange={() =>
+                      handleSettingChange(
+                        "seeInappropriateContent",
+                        !settings.seeInappropriateContent
+                      )
+                    }
+                  />
+                </div>
+
+                {isOnWindows && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.autoCreateShortcuts")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.autoCreateShortcutsDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.autoCreateShortcuts}
+                      onCheckedChange={() =>
+                        handleSettingChange(
+                          "autoCreateShortcuts",
+                          !settings.autoCreateShortcuts
+                        )
+                      }
+                    />
+                  </div>
+                )}
               </div>
             </Card>
 
