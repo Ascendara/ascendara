@@ -1155,6 +1155,22 @@
     "privacyPolicy": "Privacy Policy",
     "pythonIsRequired": "Python is Required",
     "pythonMustBeInstalled": "Python must be installed on your computer in order to run Ascendara's core tools on this operating system",
+    "referral": {
+      "otherPlaceholder": "Tell us where you found Ascendara...",
+      "sources": {
+        "discord": "Discord",
+        "fmhy": "FMHY",
+        "google": "Google Search",
+        "instagram": "Instagram",
+        "notsay": "Rather Not Say",
+        "other": "Other",
+        "reddit": "Reddit",
+        "tiktok": "TikTok",
+        "twitter": "Twitter / X"
+      },
+      "subtitle": "Help Ascendara understand where users are coming from. This is completely optional.",
+      "title": "How did you find Ascendara?"
+    },
     "requiredForModernGames": "Required for modern games",
     "restart": "Restart",
     "runtimeComponents": "Runtime components",

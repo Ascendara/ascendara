@@ -41,6 +41,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { languages } from "@/i18n";
 import { useTheme } from "@/context/ThemeContext";
 import { useTranslation } from "react-i18next";
+import { Input } from "@/components/ui/input";
 
 const executableToLabelMap = {
   "dotNetFx40_Full_x86_x64.exe": t => ".NET Framework 4.0",
@@ -245,6 +246,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [isExiting, setIsExiting] = useState(false);
   const [showAnalyticsStep, setShowAnalyticsStep] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(true);
+  const [referralSource, setReferralSource] = useState("");
+  const [customReferral, setCustomReferral] = useState("");
   const [settings, setSettings] = useState({
     downloadDirectory: "",
     showOldDownloadLinks: false,
@@ -422,6 +425,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "welcome") {
       setStep("noticeAppIsFree");
     } else if (step === "noticeAppIsFree") {
+      setStep("referral");
+    } else if (step === "referral") {
       setStep("directory");
     } else if (step === "directory") {
       setStep("extension");
@@ -1229,6 +1234,127 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
                 >
                   {t("welcome.okay")}
+                </Button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {step === "referral" && (
+            <motion.div
+              key="referral"
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <h2 className="mb-2 text-3xl font-bold text-primary">
+                  {t("welcome.referral.title")}
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                  {t("welcome.referral.subtitle")}
+                </p>
+              </motion.div>
+
+              <motion.div
+                className="mb-8 w-full max-w-2xl space-y-4"
+                variants={itemVariants}
+              >
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {[
+                    "tiktok",
+                    "twitter",
+                    "reddit",
+                    "instagram",
+                    "google",
+                    "discord",
+                    "fmhy",
+                    "other",
+                    "notsay",
+                  ].map(source => (
+                    <motion.button
+                      key={source}
+                      onClick={() => setReferralSource(source)}
+                      className={`flex flex-col items-center justify-center rounded-lg border-2 p-4 transition-all ${
+                        referralSource === source
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50 hover:bg-accent/50"
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <span className="text-sm font-medium">
+                        {t(`welcome.referral.sources.${source}`)}
+                      </span>
+                    </motion.button>
+                  ))}
+                </div>
+
+                {referralSource === "other" && (
+                  <motion.div
+                    className="mt-4"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Input
+                      type="text"
+                      placeholder={t("welcome.referral.otherPlaceholder")}
+                      className="w-full"
+                      value={customReferral}
+                      onChange={e => setCustomReferral(e.target.value)}
+                    />
+                  </motion.div>
+                )}
+              </motion.div>
+
+              <motion.div
+                className="flex w-full max-w-2xl justify-center"
+                variants={itemVariants}
+              >
+                <Button
+                  onClick={async () => {
+                    // Send referral source to API
+                    const sourceToSend =
+                      referralSource === "other"
+                        ? customReferral || "other"
+                        : referralSource;
+                    if (sourceToSend) {
+                      try {
+                        const AUTHORIZATION = await window.electron.getAPIKey();
+                        const tokenResponse = await fetch(
+                          "https://api.ascendara.app/auth/token",
+                          {
+                            headers: {
+                              Authorization: AUTHORIZATION,
+                            },
+                          }
+                        );
+
+                        if (tokenResponse.ok) {
+                          const { token } = await tokenResponse.json();
+                          await fetch("https://api.ascendara.app/app/downloadedfrom", {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ source: sourceToSend }),
+                          });
+                        }
+                      } catch (error) {
+                        console.error("Failed to send referral source:", error);
+                      }
+                    }
+                    handleNext();
+                  }}
+                  className="bg-primary px-8 py-6 text-base font-semibold text-secondary hover:bg-primary/90"
+                  disabled={
+                    !referralSource || (referralSource === "other" && !customReferral)
+                  }
+                >
+                  {t("welcome.next")}
                 </Button>
               </motion.div>
             </motion.div>
