@@ -33,6 +33,7 @@ export function SettingsProvider({ children }) {
     language: "en",
     theme: "purple",
     threadCount: 12,
+    singleStream: true,
     downloadLimit: 0,
     excludeFolders: false,
     sideScrollBar: false,

@@ -759,6 +759,7 @@ class SettingsManager {
       language: "en",
       theme: "purple",
       threadCount: 12,
+      singleStream: true,
       downloadLimit: 0,
       sideScrollBar: false,
       excludeFolders: false,

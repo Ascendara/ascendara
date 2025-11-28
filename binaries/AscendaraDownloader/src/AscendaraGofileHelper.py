@@ -168,16 +168,30 @@ class GofileDownloader:
         self.game_info_path = os.path.join(self.download_dir, f"{sanitize_folder_name(game)}.ascendara.json")
         # Download speed limit (KB/s, 0 means unlimited)
         self._download_speed_limit = 0
+        self._single_stream = True  # Default to single stream for stability
         try:
-            import platform
-            appdata = os.getenv('APPDATA') if platform.system() == 'Windows' else os.path.expanduser('~/.config')
-            settings_path = os.path.join(appdata, 'ascendara', 'ascendarasettings.json')
-            if os.path.exists(settings_path):
-                with open(settings_path, 'r') as f:
+            settings_path = None
+            if sys.platform == 'win32':
+                appdata = os.environ.get('APPDATA')
+                if appdata:
+                    candidate = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+                    if os.path.exists(candidate):
+                        settings_path = candidate
+            elif sys.platform == 'darwin':
+                user_data_dir = os.path.expanduser('~/Library/Application Support/ascendara')
+                candidate = os.path.join(user_data_dir, 'ascendarasettings.json')
+                if os.path.exists(candidate):
+                    settings_path = candidate
+            if settings_path and os.path.exists(settings_path):
+                with open(settings_path, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                     self._download_speed_limit = settings.get('downloadLimit', 0)  # KB/s
-        except Exception:
+                    self._single_stream = settings.get('singleStream', True)
+                logging.info(f"[AscendaraGofileHelper] Settings: speed_limit={self._download_speed_limit}, single_stream={self._single_stream}")
+        except Exception as e:
+            logging.warning(f"[AscendaraGofileHelper] Could not read settings: {e}")
             self._download_speed_limit = 0
+            self._single_stream = True
         # If updateFlow is True, preserve the JSON file and set updating flag
         if updateFlow and os.path.exists(self.game_info_path):
             with open(self.game_info_path, 'r') as f:

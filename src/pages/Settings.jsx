@@ -1070,18 +1070,43 @@ function Settings() {
                   />
                 </div>
 
+                {/* Single Stream Download Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="singleStream">
+                      {t("settings.singleStream", "Single Stream Download")}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        "settings.singleStreamDescription",
+                        "Use a single connection for downloads. More stable for large files but may be slower."
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    id="singleStream"
+                    checked={settings.singleStream}
+                    onCheckedChange={checked =>
+                      handleSettingChange("singleStream", checked)
+                    }
+                    disabled={isDownloaderRunning}
+                  />
+                </div>
+
                 {/* Download Threads Config */}
-                <div className="space-y-2">
+                <div className={`space-y-2 ${settings.singleStream ? "opacity-50" : ""}`}>
                   <Label
                     htmlFor="threadCount"
-                    className={isDownloaderRunning ? "opacity-50" : ""}
+                    className={
+                      isDownloaderRunning || settings.singleStream ? "opacity-50" : ""
+                    }
                   >
                     {t("settings.downloadThreads")}
                   </Label>
                   <p className="mb-4 text-sm font-normal text-muted-foreground">
                     {t("settings.downloadThreadsDescription")}
                   </p>
-                  {settings.threadCount > 32 && (
+                  {settings.threadCount > 32 && !settings.singleStream && (
                     <div className="mb-4 flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
                       <CircleAlert size={14} />
                       <p className="text-sm">{t("settings.highThreadWarning")}</p>
@@ -1098,7 +1123,11 @@ function Settings() {
                       <Button
                         variant="outline"
                         size="icon"
-                        disabled={isDownloaderRunning || settings.threadCount <= 2}
+                        disabled={
+                          isDownloaderRunning ||
+                          settings.singleStream ||
+                          settings.threadCount <= 2
+                        }
                         onClick={() => {
                           // For decrement, use the value we're going to
                           const currentValue = settings.threadCount;
@@ -1217,7 +1246,11 @@ function Settings() {
                       <Button
                         variant="outline"
                         size="icon"
-                        disabled={isDownloaderRunning || settings.threadCount >= 64}
+                        disabled={
+                          isDownloaderRunning ||
+                          settings.singleStream ||
+                          settings.threadCount >= 64
+                        }
                         onClick={() => {
                           // For increment, use the value we're coming from
                           const currentValue = settings.threadCount;
