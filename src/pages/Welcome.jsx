@@ -248,6 +248,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [referralSource, setReferralSource] = useState("");
   const [customReferral, setCustomReferral] = useState("");
+  const [referralSent, setReferralSent] = useState(false);
   const [settings, setSettings] = useState({
     downloadDirectory: "",
     showOldDownloadLinks: false,
@@ -1315,6 +1316,13 @@ const Welcome = ({ welcomeData, onComplete }) => {
               >
                 <Button
                   onClick={async () => {
+                    // Prevent double submission
+                    if (referralSent) {
+                      handleNext();
+                      return;
+                    }
+                    setReferralSent(true);
+
                     // Send referral source to API
                     const sourceToSend =
                       referralSource === "other"
@@ -1351,7 +1359,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   }}
                   className="bg-primary px-8 py-6 text-base font-semibold text-secondary hover:bg-primary/90"
                   disabled={
-                    !referralSource || (referralSource === "other" && !customReferral)
+                    referralSent ||
+                    !referralSource ||
+                    (referralSource === "other" && !customReferral)
                   }
                 >
                   {t("welcome.next")}
