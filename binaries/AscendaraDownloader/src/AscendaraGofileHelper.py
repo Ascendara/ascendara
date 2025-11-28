@@ -547,19 +547,19 @@ class GofileDownloader:
             
             # Format ETA with improved granularity
             if done:
-                eta = "0s"
+                eta = "0 seconds"
             elif eta_seconds <= 0:
                 eta = "calculating..."
             elif eta_seconds < 60:
-                eta = f"{int(eta_seconds)}s"
+                eta = f"{int(eta_seconds)} seconds"
             elif eta_seconds < 3600:
                 minutes = int(eta_seconds / 60)
                 seconds = int(eta_seconds % 60)
-                eta = f"{minutes}m, {seconds}s"
+                eta = f"{minutes} minutes, {seconds} seconds"
             elif eta_seconds < 86400:
                 hours = int(eta_seconds / 3600)
                 minutes = int((eta_seconds % 3600) / 60)
-                eta = f"{hours}h, {minutes}m"
+                eta = f"{hours} hours, {minutes} minutes"
             else:
                 days = int(eta_seconds / 86400)
                 hours = int((eta_seconds % 86400) / 3600)
