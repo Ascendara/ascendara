@@ -332,160 +332,14 @@ class SmartDLDownloader:
                 max_speed = 0
                 threads = None
 
-            request_args = {
-                'headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': '*/*',
-                    'Accept-Encoding': 'identity',
-                    'Connection': 'keep-alive',
-                }
-            }
-            download_timeout = 600  # seconds - longer timeout for large files
-
-            # Retry logic for handling IncompleteRead and connection errors
-            max_retries = 10  # Increased retries for large files
-            retry_delay = 5  # seconds between retries (start lower)
-            download_successful = False
-            last_error = None
+            # Use user's thread setting, default to 1 for stability
+            use_threads = threads if threads and threads >= 1 else 1
+            logging.info(f"[AscendaraDownloader] Using {use_threads} thread(s) for download")
             
-            # Track consecutive failures to detect persistent issues
-            consecutive_failures = 0
-            max_consecutive_failures = 3
-            
-            # Track if we should use resumable fallback (after SmartDL fails)
-            use_resumable_fallback = False
-            smartdl_failures = 0
-
-            for attempt in range(max_retries):
-                try:
-                    if attempt > 0:
-                        logging.info(f"[AscendaraDownloader] Retry attempt {attempt}/{max_retries-1} after {retry_delay}s delay...")
-                        time.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 1.5, 120)  # Exponential backoff, max 120s
-                    
-                    # After 2 SmartDL failures with IncompleteRead, switch to resumable fallback
-                    if use_resumable_fallback or smartdl_failures >= 2:
-                        logging.info(f"[AscendaraDownloader] Using resumable download fallback for better reliability")
-                        download_successful = self._resumable_download(
-                            url, dest, size_bytes, max_speed, 
-                            request_args['headers'], max_retries - attempt
-                        )
-                        if download_successful:
-                            break
-                        else:
-                            continue
-                    
-                    # Clean up any partial SmartDL temp files before retry (but keep partial dest file for resumable)
-                    if attempt > 0:
-                        try:
-                            for f in os.listdir(self.download_dir):
-                                if f.endswith('.000') or f.endswith('.001') or '.rar.0' in f or '.zip.0' in f:
-                                    partial_path = os.path.join(self.download_dir, f)
-                                    logging.info(f"[AscendaraDownloader] Cleaning up partial file: {partial_path}")
-                                    os.remove(partial_path)
-                        except Exception as cleanup_err:
-                            logging.warning(f"[AscendaraDownloader] Could not clean up partial files: {cleanup_err}")
-
-                    # Create SmartDL with thread count
-                    # Reduce threads on retry to improve stability for large files
-                    current_threads = threads if threads and threads > 0 else 5  # Default 5 threads
-                    if attempt > 0:
-                        current_threads = max(1, current_threads // (attempt + 1))  # Progressively reduce
-                        logging.info(f"[AscendaraDownloader] Using {current_threads} thread(s) for retry stability")
-                    
-                    obj = SmartDL(url, dest, progress_bar=True, timeout=download_timeout, 
-                                  request_args=request_args, threads=current_threads)
-                    if max_speed and max_speed > 0:
-                        obj.set_speed(max_speed)
-                    
-                    obj.start(blocking=False)
-                    
-                    # Track progress to detect stalls
-                    last_progress = 0
-                    stall_count = 0
-                    max_stalls = 60  # 30 seconds of no progress (0.5s * 60)
-
-                    while not obj.isFinished():
-                        progress = obj.get_progress() * 100
-                        speed = obj.get_speed(human=True)
-                        eta = obj.get_eta(human=True)
-                        
-                        # Detect stalls
-                        if progress == last_progress and progress < 99.9:
-                            stall_count += 1
-                            if stall_count >= max_stalls:
-                                logging.warning(f"[AscendaraDownloader] Download stalled at {progress:.2f}%, forcing retry")
-                                try:
-                                    obj.stop()
-                                except:
-                                    pass
-                                raise Exception("Download stalled - no progress for 30 seconds")
-                        else:
-                            stall_count = 0
-                            last_progress = progress
-                        
-                        self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
-                        self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed
-                        self.game_info["downloadingData"]["timeUntilComplete"] = eta
-                        if attempt > 0:
-                            self.game_info["downloadingData"]["retryAttempt"] = attempt
-                        safe_write_json(self.game_info_path, self.game_info)
-                        time.sleep(0.5)
-
-                    if obj.isSuccessful():
-                        download_successful = True
-                        consecutive_failures = 0
-                        break
-                    else:
-                        errors = obj.get_errors()
-                        last_error = str(errors)
-                        consecutive_failures += 1
-                        
-                        # Check if this is a retryable error
-                        retryable_errors = ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 
-                                          'timeout', 'Timeout', 'ChunkedEncodingError', 'RemoteDisconnected',
-                                          'ConnectionError', 'ReadTimeoutError', 'ProtocolError']
-                        if any(err_type in last_error for err_type in retryable_errors):
-                            logging.warning(f"[AscendaraDownloader] Retryable error on attempt {attempt+1}: {last_error}")
-                            smartdl_failures += 1
-                            
-                            # Switch to resumable fallback after repeated IncompleteRead errors
-                            if 'IncompleteRead' in last_error or 'Connection broken' in last_error:
-                                if smartdl_failures >= 2:
-                                    logging.info(f"[AscendaraDownloader] Switching to resumable fallback after {smartdl_failures} SmartDL failures")
-                                    use_resumable_fallback = True
-                            
-                            # Log consecutive failures for debugging
-                            if consecutive_failures >= max_consecutive_failures:
-                                logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures detected")
-                            continue
-                        else:
-                            # Non-retryable error, fail immediately
-                            logging.error(f"[AscendaraDownloader] Non-retryable error: {last_error}")
-                            break
-
-                except Exception as retry_exc:
-                    last_error = str(retry_exc)
-                    consecutive_failures += 1
-                    retryable_errors = ['IncompleteRead', 'Connection broken', 'ConnectionResetError', 
-                                      'timeout', 'Timeout', 'ChunkedEncodingError', 'RemoteDisconnected',
-                                      'ConnectionError', 'ReadTimeoutError', 'ProtocolError', 'stalled']
-                    if any(err_type in last_error for err_type in retryable_errors):
-                        logging.warning(f"[AscendaraDownloader] Retryable exception on attempt {attempt+1}: {retry_exc}")
-                        smartdl_failures += 1
-                        
-                        # Switch to resumable fallback after repeated failures
-                        if 'IncompleteRead' in last_error or 'Connection broken' in last_error:
-                            if smartdl_failures >= 2:
-                                logging.info(f"[AscendaraDownloader] Switching to resumable fallback after {smartdl_failures} SmartDL failures")
-                                use_resumable_fallback = True
-                        
-                        # Log consecutive failures for debugging
-                        if consecutive_failures >= max_consecutive_failures:
-                            logging.warning(f"[AscendaraDownloader] {consecutive_failures} consecutive failures detected")
-                        continue
-                    else:
-                        raise  # Re-raise non-retryable exceptions
+            # Use robust streaming download with automatic retry/resume
+            download_successful = self._robust_download(
+                url, dest, size_bytes, max_speed, use_threads
+            )
 
             # Clean up retry attempt from status
             if 'retryAttempt' in self.game_info.get('downloadingData', {}):
@@ -533,14 +387,14 @@ class SmartDLDownloader:
 
                 self._extract_files(dest)
             else:
-                logging.error(f"[AscendaraDownloader] Download failed after {max_retries} attempts: {last_error}")
+                logging.error(f"[AscendaraDownloader] Download failed")
                 if withNotification:
                     _launch_notification(
                         withNotification,
                         "Download Error",
-                        f"Error downloading {self.game_info['game']}: {last_error}"
+                        f"Error downloading {self.game_info['game']}"
                     )
-                raise Exception(str(last_error))
+                raise Exception("Download failed after multiple retries")
         except Exception as e:
             # Detect SSL version error and set provider_blocked_error
             err_str = str(e)
@@ -653,6 +507,175 @@ class SmartDLDownloader:
 
         logging.info(f"[Buzzheavier] Downloaded as: {dest_path}")
         self._extract_files(dest_path)
+
+    def _robust_download(self, url, dest, total_size, max_speed, num_threads):
+        """
+        Robust download with automatic retry and resume support.
+        Uses streaming download with proper timeout and connection handling.
+        """
+        max_retries = 15
+        retry_delay = 3
+        
+        request_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Encoding': 'identity',
+            'Connection': 'keep-alive',
+        }
+        
+        # Check if server supports range requests
+        supports_range = False
+        try:
+            test_resp = requests.head(url, allow_redirects=True, timeout=30, headers=request_headers)
+            accept_ranges = test_resp.headers.get('Accept-Ranges', '')
+            if accept_ranges == 'bytes':
+                supports_range = True
+            if not total_size and 'Content-Length' in test_resp.headers:
+                total_size = int(test_resp.headers['Content-Length'])
+            logging.info(f"[AscendaraDownloader] Server supports range requests: {supports_range}, total size: {total_size}")
+        except Exception as e:
+            logging.warning(f"[AscendaraDownloader] Could not check server capabilities: {e}")
+        
+        for attempt in range(max_retries):
+            try:
+                # Check existing file size for resume
+                downloaded = 0
+                if os.path.exists(dest) and supports_range:
+                    downloaded = os.path.getsize(dest)
+                    if total_size and downloaded >= total_size:
+                        logging.info(f"[AscendaraDownloader] File already complete: {read_size(downloaded)}")
+                        return True
+                    if downloaded > 0:
+                        logging.info(f"[AscendaraDownloader] Resuming from {read_size(downloaded)}")
+                
+                # Build headers with range if resuming
+                headers = request_headers.copy()
+                if downloaded > 0 and supports_range:
+                    headers['Range'] = f'bytes={downloaded}-'
+                
+                if attempt > 0:
+                    logging.info(f"[AscendaraDownloader] Retry attempt {attempt}/{max_retries-1}")
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 1.5, 60)
+                
+                # Create session with retry adapter
+                session = requests.Session()
+                
+                # Make request with long timeouts for large files
+                # timeout = (connect_timeout, read_timeout)
+                response = session.get(
+                    url, 
+                    stream=True, 
+                    headers=headers,
+                    timeout=(30, 300),  # 30s connect, 5min read timeout
+                    allow_redirects=True
+                )
+                
+                if response.status_code == 416:  # Range not satisfiable
+                    logging.info(f"[AscendaraDownloader] File appears complete (416)")
+                    return True
+                
+                response.raise_for_status()
+                
+                # Determine file mode and update total size
+                if response.status_code == 206:  # Partial content
+                    mode = 'ab'
+                    content_range = response.headers.get('Content-Range', '')
+                    if '/' in content_range:
+                        total_size = int(content_range.split('/')[-1])
+                else:
+                    mode = 'wb'
+                    downloaded = 0
+                    if 'Content-Length' in response.headers:
+                        total_size = int(response.headers['Content-Length'])
+                
+                logging.info(f"[AscendaraDownloader] Starting download: mode={mode}, downloaded={downloaded}, total={total_size}")
+                
+                chunk_size = 1024 * 1024  # 1 MB chunks
+                start_time = time.time()
+                last_update = start_time
+                session_downloaded = 0  # Track bytes downloaded in this session
+                
+                with open(dest, mode) as f:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            f.flush()  # Ensure data is written to disk
+                            chunk_len = len(chunk)
+                            downloaded += chunk_len
+                            session_downloaded += chunk_len
+                            
+                            # Update progress every 0.5 seconds
+                            now = time.time()
+                            if now - last_update >= 0.5:
+                                elapsed = now - start_time
+                                speed = session_downloaded / elapsed if elapsed > 0 else 0
+                                
+                                if total_size and total_size > 0:
+                                    progress = (downloaded / total_size) * 100
+                                    remaining = total_size - downloaded
+                                    eta = remaining / speed if speed > 0 else 0
+                                else:
+                                    progress = 0
+                                    eta = 0
+                                
+                                # Format speed
+                                if speed >= 1024**3:
+                                    speed_str = f"{speed/1024**3:.2f} GB/s"
+                                elif speed >= 1024**2:
+                                    speed_str = f"{speed/1024**2:.2f} MB/s"
+                                elif speed >= 1024:
+                                    speed_str = f"{speed/1024:.2f} KB/s"
+                                else:
+                                    speed_str = f"{speed:.2f} B/s"
+                                
+                                # Format ETA
+                                eta_int = int(eta)
+                                if eta_int < 60:
+                                    eta_str = f"{eta_int}s"
+                                elif eta_int < 3600:
+                                    eta_str = f"{eta_int // 60}m {eta_int % 60}s"
+                                else:
+                                    eta_str = f"{eta_int // 3600}h {(eta_int % 3600) // 60}m"
+                                
+                                self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
+                                self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed_str
+                                self.game_info["downloadingData"]["timeUntilComplete"] = eta_str
+                                safe_write_json(self.game_info_path, self.game_info)
+                                last_update = now
+                
+                # Verify download completed
+                if total_size and downloaded >= total_size:
+                    logging.info(f"[AscendaraDownloader] Download complete: {read_size(downloaded)}")
+                    return True
+                elif not total_size and downloaded > 0:
+                    logging.info(f"[AscendaraDownloader] Download complete (unknown size): {read_size(downloaded)}")
+                    return True
+                else:
+                    logging.warning(f"[AscendaraDownloader] Download incomplete: {downloaded}/{total_size}")
+                    # Don't delete partial file - we'll resume on next attempt
+                    continue
+                    
+            except requests.exceptions.Timeout as e:
+                logging.warning(f"[AscendaraDownloader] Timeout on attempt {attempt+1}: {e}")
+                continue
+            except requests.exceptions.ConnectionError as e:
+                logging.warning(f"[AscendaraDownloader] Connection error on attempt {attempt+1}: {e}")
+                continue
+            except requests.exceptions.ChunkedEncodingError as e:
+                logging.warning(f"[AscendaraDownloader] Chunked encoding error on attempt {attempt+1}: {e}")
+                continue
+            except Exception as e:
+                err_str = str(e)
+                if 'IncompleteRead' in err_str or 'Connection broken' in err_str:
+                    logging.warning(f"[AscendaraDownloader] Connection issue on attempt {attempt+1}: {e}")
+                    continue
+                else:
+                    logging.error(f"[AscendaraDownloader] Download error on attempt {attempt+1}: {e}")
+                    continue
+        
+        logging.error(f"[AscendaraDownloader] Download failed after {max_retries} attempts")
+        return False
 
     def _resumable_download(self, url, dest, total_size, max_speed, headers, max_retries):
         """
