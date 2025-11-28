@@ -2312,10 +2312,21 @@ ipcMain.handle(
           : `https://api.ascendara.app/v2/image/${imgID}`;
       console.log(`Downloading header image from: ${imageLink}`);
 
+      const timestamp = Math.floor(Date.now() / 1000);
+      const signature = crypto
+        .createHmac("sha256", imageKey)
+        .update(timestamp.toString())
+        .digest("hex");
+
       const response = await axios({
         url: imageLink,
         method: "GET",
         responseType: "arraybuffer",
+        headers: {
+          "X-Timestamp": timestamp.toString(),
+          "X-Signature": signature,
+          "Cache-Control": "no-store",
+        },
       });
       console.log(`Header image downloaded successfully`);
 
