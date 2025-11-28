@@ -339,6 +339,7 @@
     },
     "activeDownloads": "Downloading Games",
     "alreadyReported": "Already Reported",
+    "connectionBrokenError": "The download connection was interrupted. Try enabling Single Stream Download in Ascendara Preferences for a more stable download.",
     "connectionResetError": "The download could not start because the connection was aborted. Your internet service provider may be blocking this specific download source, consider using a VPN.",
     "contentTypeError": "The downloader reported a content type error. This most likely means the download link has expired.",
     "currentTotalSpeed": "Current Total Speed",

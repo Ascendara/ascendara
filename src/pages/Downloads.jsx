@@ -741,6 +741,8 @@ const DownloadCard = ({
     "provider_blocked_error",
     "[Errno 28] No space left on device",
     "[WinError 225]",
+    "Connection broken",
+    "IncompleteRead",
   ];
 
   function isPredefinedError(message) {
@@ -975,6 +977,14 @@ const DownloadCard = ({
                         {t("downloads.learnHowToFix", "Learn how to fix this")}{" "}
                         <ExternalLink className="mb-1 inline-block h-3 w-3" />
                       </a>
+                    </p>
+                  ) : downloadingData.message.includes("Connection broken") ||
+                    downloadingData.message.includes("IncompleteRead") ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        "downloads.connectionBrokenError",
+                        "The download connection was interrupted. Try enabling Single Stream Download in Settings for more stable downloads."
+                      )}
                     </p>
                   ) : (
                     <p className="text-sm text-muted-foreground">
