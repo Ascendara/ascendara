@@ -353,10 +353,12 @@
       "title": "在 Ascendara 上下载",
       "understand": "我明白"
     },
+    "learnHowToFix": "了解如何解决此问题",
     "limitedTo": "仅限于",
     "noDownloads": "嗯，这样很放松...",
     "noDownloadsMessage": "您现在没有下载任何内容，请在此处开始下载以跟踪其进度。",
     "noFilesError": "下载器找不到任何要下载的文件。这很可能意味着该文件已从源中删除。",
+    "noSpaceLeftError": "设备上没有剩余空间。请释放磁盘空间以继续下载。",
     "retryDataNotAvailable": "重试数据不可用。下载将被删除，您必须手动重新启动下载。",
     "speedHistory": "下载速度",
     "statistics": "统计数据",
@@ -373,7 +375,8 @@
     "verifying": "正在验证文件...",
     "verifyingDescription": "Ascendara 正在验证游戏文件。这也可能需要一段时间，具体取决于游戏大小。",
     "waiting": "等待同行",
-    "waitingDescription": "qBittorrent 正在寻找对等点进行连接，从其他用户那里下载 torrent 文件的片段，然后依次上传给他们。其他人可能能够看到您正在下载的内容和/或确定您的公共 IP 地址。"
+    "waitingDescription": "qBittorrent 正在寻找对等点进行连接，从其他用户那里下载 torrent 文件的片段，然后依次上传给他们。其他人可能能够看到您正在下载的内容和/或确定您的公共 IP 地址。",
+    "windowsDefenderError": "Windows 检测到误报并阻止下载完成。请在 Ascendara 首选项中启用保护目录。"
   },
   "game": {
     "metadata": {
@@ -772,6 +775,8 @@
     "additionalLocations": "其他地点",
     "advanced": "先进的",
     "apiKeySaved": "API 密钥已保存",
+    "appearance": "外貌",
+    "application": "应用",
     "ascendaraAnalytics": "使用情况分析",
     "ascendaraAnalyticsDescription": "通过发送使用数据帮助改进 Ascendara。该数据是匿名的，无法用于识别您的身份。",
     "ascendaraTimechine": "上升时间机器",
@@ -787,7 +792,7 @@
     "behaviorAfterDownloadDescription": "选择下载完成后您的计算机应发生的情况。",
     "behaviors": {
       "lock": "锁",
-      "none": "什么也不做",
+      "none": "什么都不做",
       "shutdown": "关闭",
       "sleep": "睡觉"
     },
@@ -866,10 +871,13 @@
     },
     "gameSources": "索引游戏源",
     "gameSourcesDescription": "Ascendara 主要使用 SteamRIP 作为其值得信赖的游戏来源",
+    "gaming": "赌博",
     "general": "一般的",
     "giantBombApiKey": "GiantBomb API 密钥",
     "giantBombDescription": "GiantBomb 提供来自社区驱动的游戏维基的游戏信息以及简要说明。需要 API 密钥。",
     "giantBombLearnHowtoGet": "了解如何获取 API 密钥",
+    "hideOnGameLaunch": "游戏启动时隐藏",
+    "hideOnGameLaunchDescription": "当游戏启动时隐藏 Ascendara。",
     "highThreadWarning": "使用超过 32 个线程被认为是极端的，可能会导致不稳定、禁止或网络问题。谨慎使用。",
     "igdbApiKeyDescription": "IGDB 通过开发者支持的数据库和官方游戏条目提供更详细的游戏信息。要求您拥有 Twitch 帐户并获取客户端 ID 和密钥。",
     "igdbLearnHowtoGet": "了解如何设置",
@@ -922,11 +930,12 @@
     },
     "smoothTransitions": "平滑过渡",
     "smoothTransitionsDescription": "应用程序中页面之间的切换具有流畅的动画，使其感觉更加自然。",
-    "sourceChangeReload": "更改游戏源后需要重新加载Ascendara。当您切换源时，所有缓存的数据将被清除。",
+    "sourceChangeReload": "更改游戏源后需要重新加载Ascendara。当您切换来源时，所有缓存的数据将被清除。",
     "sourceInactive": "不活跃",
     "steamripDescription": "SteamRIP 是 Ascendara 的主要来源，提供安全可靠的游戏集合并定期更新。",
     "switchSource": "切换到这个源",
     "theme": "外貌",
+    "themes": "应用程序主题",
     "threads": "线程数",
     "timeMachineDisabledFitgirl": "使用 FitGirl Repacks 作为游戏源时，Ascendara Timemachine 不可用。",
     "title": "登高偏好设置",
@@ -1143,6 +1152,22 @@
     "privacyPolicy": "隐私政策",
     "pythonIsRequired": "需要Python",
     "pythonMustBeInstalled": "您的计算机上必须安装 Python 才能在此操作系统上运行 Ascendara 的核心工具",
+    "referral": {
+      "otherPlaceholder": "告诉我们您在哪里找到 Ascendara...",
+      "sources": {
+        "discord": "不和谐",
+        "fmhy": "FMHY",
+        "google": "谷歌搜索",
+        "instagram": "Instagram",
+        "notsay": "宁愿不说",
+        "other": "其他",
+        "reddit": "红迪网",
+        "tiktok": "抖音",
+        "twitter": "推特/X"
+      },
+      "subtitle": "帮助 Ascendara 了解用户来自哪里。这是完全可选的。",
+      "title": "您是如何找到阿森达拉的？"
+    },
     "requiredForModernGames": "现代游戏所需",
     "restart": "重新启动",
     "runtimeComponents": "运行时组件",

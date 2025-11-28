@@ -353,10 +353,12 @@
       "title": "Download su Ascendara",
       "understand": "Capisco"
     },
+    "learnHowToFix": "Scopri come risolvere questo problema",
     "limitedTo": "Limitato a",
     "noDownloads": "Beh, è ​​rilassante...",
     "noDownloadsMessage": "Non stai scaricando nulla in questo momento, avvia un download per monitorarne l'avanzamento qui.",
     "noFilesError": "Il downloader non è riuscito a trovare alcun file da scaricare. Ciò molto probabilmente significa che il file è stato rimosso dall'origine.",
+    "noSpaceLeftError": "Spazio esaurito sul dispositivo. Liberare spazio su disco per continuare il download.",
     "retryDataNotAvailable": "Riprova dati non disponibili. Il download verrà eliminato e dovrai riavviarlo manualmente.",
     "speedHistory": "Scarica velocità",
     "statistics": "Statistiche",
@@ -373,7 +375,8 @@
     "verifying": "Verifica dei file...",
     "verifyingDescription": "Ascendara sta verificando i file di gioco. L'operazione potrebbe richiedere del tempo a seconda delle dimensioni del gioco.",
     "waiting": "In attesa dei pari",
-    "waitingDescription": "qBittorrent sta cercando peer a cui connettersi per scaricare parti del file torrent da altri utenti e caricarli a loro volta. Altri potrebbero essere in grado di vedere cosa stai scaricando e/o determinare il tuo indirizzo IP pubblico."
+    "waitingDescription": "qBittorrent sta cercando peer a cui connettersi per scaricare parti del file torrent da altri utenti e caricarli a loro volta. Altri potrebbero essere in grado di vedere cosa stai scaricando e/o determinare il tuo indirizzo IP pubblico.",
+    "windowsDefenderError": "Windows ha rilevato un falso positivo e ha impedito il completamento del download. Abilita Proteggi directory nelle preferenze di Ascendara."
   },
   "game": {
     "metadata": {
@@ -467,7 +470,7 @@
     "availableSpace": "Spazio disponibile",
     "backToLibrary": "Ritorno alla Biblioteca",
     "backups": {
-      "autoBackupDesc": "Esegui automaticamente il backup dei dati di salvataggio alla chiusura del gioco",
+      "autoBackupDesc": "Effettua il backup automatico dei dati di salvataggio alla chiusura del gioco",
       "autoBackupDisabled": "Backup automatico disabilitato",
       "autoBackupDisabledDesc": "Backup automatico disabilitato per {{game}}",
       "autoBackupEnabled": "Backup automatico abilitato",
@@ -775,6 +778,8 @@
     "additionalLocations": "Posizioni aggiuntive",
     "advanced": "AVANZATO",
     "apiKeySaved": "Chiave API salvata",
+    "appearance": "Aspetto",
+    "application": "Applicazione",
     "ascendaraAnalytics": "Analisi dell'utilizzo",
     "ascendaraAnalyticsDescription": "Contribuisci a migliorare Ascendara inviando dati di utilizzo. Questi dati sono anonimi e non possono essere utilizzati per identificarti.",
     "ascendaraTimechine": "La macchina del tempo di Ascendara",
@@ -842,7 +847,7 @@
       "translatingDialog": "Non chiudere Ascendara",
       "translatingDialogDesc": "Ascendara sta traducendo la lingua selezionata. L'operazione potrebbe richiedere alcuni minuti, puoi lasciarla ma non chiudere Ascendara."
     },
-    "fitgirlRepacksDescription": "Accedi agli oltre 5500 giochi di FitGirl su Ascendara. I giochi vengono acquistati tramite Hydralibrary e abbinati alle immagini utilizzando i servizi di dati di gioco. Non sono supportate categorie o pesi per questi giochi, sembreranno completamente casuali.",
+    "fitgirlRepacksDescription": "Accedi agli oltre 5500 giochi di FitGirl su Ascendara. I giochi vengono acquistati tramite Hydralibrary e abbinati alle immagini utilizzando i servizi di dati di gioco. Non ci sono categorie o pesi supportati per questi giochi, sembreranno completamente casuali.",
     "gameBackup": {
       "backupFormat": "Formato di backup",
       "backupLocation": "Posizione di backup",
@@ -869,10 +874,13 @@
     },
     "gameSources": "Sorgente del gioco indicizzata",
     "gameSourcesDescription": "Ascendara utilizza principalmente SteamRIP come fonte attendibile per i giochi",
+    "gaming": "Gioco",
     "general": "Generale",
     "giantBombApiKey": "Chiave API GiantBomb",
     "giantBombDescription": "GiantBomb fornisce informazioni sul gioco da una wiki di giochi guidata dalla comunità con brevi descrizioni. Richiede una chiave API.",
     "giantBombLearnHowtoGet": "Scopri come ottenere la chiave API",
+    "hideOnGameLaunch": "Nascondi all'avvio del gioco",
+    "hideOnGameLaunchDescription": "Nascondi Ascendara quando viene avviato un gioco da esso.",
     "highThreadWarning": "L'utilizzo di più di 32 thread è considerato estremo e può causare instabilità, ban o problemi di rete. Usare con cautela.",
     "igdbApiKeyDescription": "IGDB fornisce informazioni di gioco più dettagliate con database supportato dagli sviluppatori e voci di gioco ufficiali. Richiede che tu abbia un account Twitch e ottenga un ID cliente e un segreto.",
     "igdbLearnHowtoGet": "Scopri come configurarlo",
@@ -930,6 +938,7 @@
     "steamripDescription": "SteamRIP è la fonte principale di Ascendara e fornisce una raccolta di giochi sicura e affidabile con aggiornamenti regolari.",
     "switchSource": "Passa a questa fonte",
     "theme": "Aspetto",
+    "themes": "Temi dell'app",
     "threads": "Discussioni",
     "timeMachineDisabledFitgirl": "Ascendara Timemachine non è disponibile quando si utilizza FitGirl Repacks come sorgente del gioco.",
     "title": "Preferenze di Ascendara",
@@ -1023,7 +1032,7 @@
   },
   "tour": {
     "downloads": {
-      "content": "Questa è la tua area Download. Puoi tenere traccia dei download correnti, verificare l'avanzamento e gestire i download qui.",
+      "content": "Questa è la tua area Download. Puoi tenere traccia dei tuoi download correnti, controllare l'avanzamento e gestire i download qui.",
       "title": "Download"
     },
     "final": {
@@ -1107,7 +1116,7 @@
     "graphicsAndMultimedia": "Grafica e multimedialità",
     "havePython": "Ho Python",
     "haveWine": "Ho questi, portami al tour",
-    "helpIdentifyAndFix": "Aiuta a identificare e risolvere i problemi più rapidamente",
+    "helpIdentifyAndFix": "Aiuta a identificare e risolvere i problemi più velocemente",
     "helpIdentifyAndFixDesc": "Tutti gli errori verranno automaticamente inviati ad Analytics con un flag urgente, inserendoli in cima all'elenco",
     "helpImprove": "Aiuta a migliorare Ascendara",
     "howItWorks": "Come funziona:",
@@ -1124,7 +1133,7 @@
     "installingDependencies": "Installazione delle dipendenze...",
     "lightThemes": "Temi leggeri",
     "lightningFastDesc": "V7 è ottimizzato per velocità e prestazioni per rendere la tua esperienza più fluida e veloce che mai",
-    "lightningFastTitle": "Fulmineo",
+    "lightningFastTitle": "Velocissimo",
     "makeSureYouHaveEnoughDiskSpaceInTheSelectedLocation": "Assicurati di avere abbastanza spazio su disco nella posizione selezionata",
     "manualUpdates": "Aggiornamenti manuali",
     "neverAutomaticallyUpdate": "Non aggiornare mai automaticamente",
@@ -1146,6 +1155,22 @@
     "privacyPolicy": "politica sulla riservatezza",
     "pythonIsRequired": "Python è obbligatorio",
     "pythonMustBeInstalled": "Python deve essere installato sul tuo computer per poter eseguire gli strumenti principali di Ascendara su questo sistema operativo",
+    "referral": {
+      "otherPlaceholder": "Raccontaci dove hai trovato Ascendara...",
+      "sources": {
+        "discord": "Discordia",
+        "fmhy": "FMHY",
+        "google": "Ricerca Google",
+        "instagram": "Instagram",
+        "notsay": "Piuttosto non dirlo",
+        "other": "Altro",
+        "reddit": "Reddit",
+        "tiktok": "TikTok",
+        "twitter": "Twitter/X"
+      },
+      "subtitle": "Aiuta Ascendara a capire da dove provengono gli utenti. Questo è completamente facoltativo.",
+      "title": "Come hai trovato Ascendara?"
+    },
     "requiredForModernGames": "Richiesto per i giochi moderni",
     "restart": "Ricomincia",
     "runtimeComponents": "Componenti di esecuzione",
@@ -1179,7 +1204,7 @@
     "youCanAddMoreLater": "Puoi aggiungere più directory nelle preferenze in un secondo momento",
     "youCanChangeThisLater": "Puoi sempre aggiornare la tua lingua in un secondo momento nelle Impostazioni.",
     "youCanChangeThisSettingLater": "Puoi modificarlo in seguito in Impostazioni.",
-    "youWillReceiveAdminPrompts": "Riceverai le richieste dell'amministratore dai programmi di installazione Microsoft ufficiali per installare i componenti richiesti. Potrebbe essere necessario riavviare il computer dopo l'installazione.",
+    "youWillReceiveAdminPrompts": "Riceverai richieste di amministratore dai programmi di installazione Microsoft ufficiali per installare i componenti richiesti. Potrebbe essere necessario riavviare il computer dopo l'installazione.",
     "yourContinuedSupport": "Il vostro continuo sostegno ha reso Ascendara quello che è oggi. Ascendara è stata completamente ricostruita da zero con il nuovo aspetto e l'atmosfera che stavi chiedendo."
   },
   "workshopDownloader": {

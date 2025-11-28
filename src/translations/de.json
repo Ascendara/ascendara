@@ -7,7 +7,7 @@
       }
     },
     "brokenVersion": {
-      "description": "Diese Version von Ascendara weist bekannte kritische Probleme mit ihrer Funktionalität auf, wie z. B. Downloads, Aktualisierungen und anderen Kernfunktionen.",
+      "description": "Diese Version von Ascendara weist bekannte kritische Probleme mit der Funktionalität auf, z. B. beim Herunterladen, Aktualisieren und anderen Kernfunktionen.",
       "development": "Bei der Verwendung dieser Version kann es zu Problemen oder Abstürzen kommen. Bitte aktualisieren Sie Ascendara auf der Website auf die neueste Version.",
       "title": "Sie verwenden eine defekte Version",
       "understand": "Ich verstehe die Probleme, fahren Sie fort",
@@ -15,7 +15,7 @@
     },
     "crashScreen": {
       "checkConnection": "Überprüfen Sie Ihre Internetverbindung",
-      "clearCache": "Löschen Sie Ihren Browser-Cache und Ihre Cookies",
+      "clearCache": "Leeren Sie Ihren Browser-Cache und Ihre Cookies",
       "contactSupport": "Wenn das Problem weiterhin besteht, melden Sie es bitte dem Support",
       "description": "Ascendara gefiel nicht, was gerade passiert war. Keine Sorge, wenn Sie die Analyse aktiviert haben, wurde dieser Fehler verfolgt und der Entwickler wird ihn beheben lassen.",
       "reload": "Ascendara neu laden",
@@ -236,7 +236,7 @@
     "online": "ONLINE",
     "onlineFixWarningDescription": "Dieses Spiel wird mit installiertem Online-Fix geliefert. Wenn Sie es starten, werden Sie in einer Meldung darauf hingewiesen, dass es vom Online-Fix-Team erstellt wurde. Das ist normal und sollte nur einmal bei jedem Spiel damit angezeigt werden.",
     "onlineFixWarningTitle": "Online-Fix-Eingabeaufforderung beim Start",
-    "onlineTooltip": "Online-Multiplayer-Funktionen aktiviert durch online-fix.me",
+    "onlineTooltip": "Online-Multiplayer-Funktionen durch online-fix.me aktiviert",
     "openCriticBetaWarning": "Dieser API-Endpunkt befindet sich in der Betaphase und es können Probleme auftreten. Wenn OpenCritic ein anderes Spiel anzeigt, melden Sie das Spiel bitte, indem Sie rechts neben dem Titel auf „Melden“ klicken.",
     "platforms": "Plattformen",
     "pressEscToGoBack": "Drücken Sie die ESC-Taste, um zurückzugehen",
@@ -353,10 +353,12 @@
       "title": "Herunterladen auf Ascendara",
       "understand": "Ich verstehe"
     },
+    "learnHowToFix": "Erfahren Sie, wie Sie dieses Problem beheben können",
     "limitedTo": "Begrenzt auf",
     "noDownloads": "Nun ja, das ist entspannend...",
     "noDownloadsMessage": "Sie laden gerade nichts herunter. Starten Sie hier einen Download, um den Fortschritt zu verfolgen.",
     "noFilesError": "Der Downloader konnte keine Dateien zum Herunterladen finden. Dies bedeutet höchstwahrscheinlich, dass die Datei aus der Quelle entfernt wurde.",
+    "noSpaceLeftError": "Auf dem Gerät ist kein Speicherplatz mehr vorhanden. Bitte geben Sie Speicherplatz frei, um den Download fortzusetzen.",
     "retryDataNotAvailable": "Wiederholungsdaten nicht verfügbar. Der Download wird gelöscht und Sie müssen den Download manuell neu starten.",
     "speedHistory": "Download-Geschwindigkeiten",
     "statistics": "Statistiken",
@@ -373,7 +375,8 @@
     "verifying": "Dateien werden überprüft...",
     "verifyingDescription": "Ascendara überprüft die Spieldateien. Dies kann je nach Spielgröße auch eine Weile dauern.",
     "waiting": "Warten auf Gleichgesinnte",
-    "waitingDescription": "qBittorrent sucht nach Kollegen, die sich verbinden können, um Teile der Torrent-Datei von anderen Benutzern herunterzuladen und diese wiederum auf sie hochzuladen. Andere können möglicherweise sehen, was Sie herunterladen und/oder Ihre öffentliche IP-Adresse ermitteln."
+    "waitingDescription": "qBittorrent sucht nach Kollegen, die sich verbinden können, um Teile der Torrent-Datei von anderen Benutzern herunterzuladen und diese wiederum auf sie hochzuladen. Andere können möglicherweise sehen, was Sie herunterladen und/oder Ihre öffentliche IP-Adresse ermitteln.",
+    "windowsDefenderError": "Windows hat ein falsch positives Ergebnis erkannt und den Download verhindert. Bitte aktivieren Sie „Verzeichnisse schützen“ in den Ascendara-Einstellungen."
   },
   "game": {
     "metadata": {
@@ -699,7 +702,7 @@
     "games": "Spiele, die Sie spielen",
     "gamesPlayed": "Gespielte Spiele",
     "levelProgress": "Sammeln Sie Erfahrung und steigen Sie auf, indem Sie Spiele auf Ascendara spielen!",
-    "memberSince": "Sie haben mit der Nutzung von Ascendara am {{date}} begonnen",
+    "memberSince": "Sie haben Ascendara am {{date}} verwendet",
     "mostPlayed": "Meistgespieltes Spiel",
     "nextLevel": "Weiter: Ebene {{level}}",
     "noGames": "Keine Spiele",
@@ -764,8 +767,8 @@
     "achievementWatcher": {
       "addDir": "Verzeichnis hinzufügen",
       "defaultDirs": "Standardüberwachungsverzeichnisse",
-      "defaultDirsNote": "Diese Verzeichnisse werden stets auf Erfolge überprüft. Sie können unten weitere Verzeichnisse hinzufügen.",
-      "description": "Dies sind die Ordner, die auf Erfolge überprüft werden. Alle gefundenen Erfolge werden Ihrer Bibliothek hinzugefügt. Der Achievement Watcher basiert auf dem Original von xan105 und wurde für Ascendara modifiziert.",
+      "defaultDirsNote": "Diese Verzeichnisse werden stets auf Erfolge überwacht. Sie können unten weitere Verzeichnisse hinzufügen.",
+      "description": "Dies sind die Ordner, die auf Erfolge überwacht werden. Alle gefundenen Erfolge werden Ihrer Bibliothek hinzugefügt. Der Achievement Watcher basiert auf dem Original von xan105 und wurde für Ascendara modifiziert.",
       "noDirs": "Keine Verzeichnisse ausgewählt",
       "title": "Leistungsbeobachter"
     },
@@ -775,6 +778,8 @@
     "additionalLocations": "Zusätzliche Standorte",
     "advanced": "FORTSCHRITTLICH",
     "apiKeySaved": "API-Schlüssel gespeichert",
+    "appearance": "Aussehen",
+    "application": "Anwendung",
     "ascendaraAnalytics": "Nutzungsanalyse",
     "ascendaraAnalyticsDescription": "Helfen Sie mit, Ascendara zu verbessern, indem Sie Nutzungsdaten senden. Diese Daten sind anonym und können nicht dazu verwendet werden, Sie zu identifizieren.",
     "ascendaraTimechine": "Ascendara-Zeitmaschine",
@@ -796,7 +801,7 @@
     },
     "cannotDisableTorrent": "Wechseln Sie zur SteamRIP-Quelle, bevor Sie die Torrent-Unterstützung deaktivieren",
     "checkConfig": "Überprüfen Sie die Konfiguration",
-    "comingSoon": "Demnächst erhältlich",
+    "comingSoon": "Demnächst verfügbar",
     "components": "Anwendungskomponenten",
     "componentsDescription": "Sehen Sie sich alle offiziellen App-Sidecars an und prüfen Sie, welche Spielabhängigkeiten installiert sind. Sie können auf dieser Seite auch erforderliche Abhängigkeiten neu installieren.",
     "currentSource": "Aktuelle Quelle",
@@ -869,10 +874,13 @@
     },
     "gameSources": "Indizierte Spielquelle",
     "gameSourcesDescription": "Ascendara nutzt hauptsächlich SteamRIP als vertrauenswürdige Quelle für Spiele",
+    "gaming": "Spielen",
     "general": "Allgemein",
     "giantBombApiKey": "GiantBomb-API-Schlüssel",
     "giantBombDescription": "GiantBomb bietet Spielinformationen aus einem von der Community betriebenen Gaming-Wiki mit kurzen Beschreibungen. Erfordert einen API-Schlüssel.",
     "giantBombLearnHowtoGet": "Erfahren Sie, wie Sie einen API-Schlüssel erhalten",
+    "hideOnGameLaunch": "Beim Spielstart ausblenden",
+    "hideOnGameLaunchDescription": "Verstecke Ascendara, wenn ein Spiel von dort aus gestartet wird.",
     "highThreadWarning": "Die Verwendung von mehr als 32 Threads gilt als extrem und kann zu Instabilität, Sperren oder Netzwerkproblemen führen. Mit Vorsicht verwenden.",
     "igdbApiKeyDescription": "IGDB bietet detailliertere Spielinformationen mit einer von Entwicklern unterstützten Datenbank und offiziellen Spieleinträgen. Erfordert, dass Sie über ein Twitch-Konto verfügen und eine Kunden-ID und ein Geheimnis erhalten.",
     "igdbLearnHowtoGet": "Erfahren Sie, wie Sie dies einrichten",
@@ -930,6 +938,7 @@
     "steamripDescription": "SteamRIP ist die Hauptquelle für Ascendara und bietet eine sichere und zuverlässige Spielesammlung mit regelmäßigen Updates.",
     "switchSource": "Wechseln Sie zu dieser Quelle",
     "theme": "Aussehen",
+    "themes": "App-Themen",
     "threads": "Themen",
     "timeMachineDisabledFitgirl": "Ascendara Timemachine ist nicht verfügbar, wenn FitGirl Repacks als Spielquelle verwendet wird.",
     "title": "Ascendara-Einstellungen",
@@ -1146,6 +1155,22 @@
     "privacyPolicy": "Datenschutzrichtlinie",
     "pythonIsRequired": "Python ist erforderlich",
     "pythonMustBeInstalled": "Python muss auf Ihrem Computer installiert sein, um die Kerntools von Ascendara auf diesem Betriebssystem auszuführen",
+    "referral": {
+      "otherPlaceholder": "Sagen Sie uns, wo Sie Ascendara gefunden haben ...",
+      "sources": {
+        "discord": "Zwietracht",
+        "fmhy": "FMHY",
+        "google": "Google-Suche",
+        "instagram": "Instagram",
+        "notsay": "Lieber nicht sagen",
+        "other": "Andere",
+        "reddit": "Reddit",
+        "tiktok": "TikTok",
+        "twitter": "Twitter / X"
+      },
+      "subtitle": "Helfen Sie Ascendara zu verstehen, woher Benutzer kommen. Dies ist völlig optional.",
+      "title": "Wie haben Sie Ascendara gefunden?"
+    },
     "requiredForModernGames": "Erforderlich für moderne Spiele",
     "restart": "Neustart",
     "runtimeComponents": "Laufzeitkomponenten",

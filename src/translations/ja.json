@@ -353,10 +353,12 @@
       "title": "Ascendara でダウンロードする",
       "understand": "わかりました"
     },
+    "learnHowToFix": "これを修正する方法を学ぶ",
     "limitedTo": "限定",
     "noDownloads": "まあ、それはリラックスしています...",
     "noDownloadsMessage": "現在は何もダウンロードしていません。ここでダウンロードを開始して進行状況を追跡してください。",
     "noFilesError": "ダウンローダーはダウンロードするファイルを見つけることができませんでした。これはおそらく、ファイルがソースから削除されたことを意味します。",
+    "noSpaceLeftError": "デバイスに空き領域がありません。ダウンロードを続行するには、ディスク容量を解放してください。",
     "retryDataNotAvailable": "再試行データがありません。ダウンロードは削除されるため、ダウンロードを手動で再開する必要があります。",
     "speedHistory": "ダウンロード速度",
     "statistics": "統計",
@@ -373,7 +375,8 @@
     "verifying": "ファイルを検証しています...",
     "verifyingDescription": "Ascendara はゲーム ファイルを検証しています。ゲームのサイズによっては、これにも時間がかかる場合があります。",
     "waiting": "ピアを待っています",
-    "waitingDescription": "qBittorrent は、他のユーザーから torrent ファイルの一部をダウンロードし、順番にアップロードするために接続するピアを探しています。他の人は、あなたがダウンロードしているものを閲覧したり、あなたのパブリック IP アドレスを特定したりできる可能性があります。"
+    "waitingDescription": "qBittorrent は、他のユーザーから torrent ファイルの一部をダウンロードし、順番にアップロードするために接続するピアを探しています。他の人は、あなたがダウンロードしているものを閲覧したり、あなたのパブリック IP アドレスを特定したりできる可能性があります。",
+    "windowsDefenderError": "Windows が誤検知を検出したため、ダウンロードが完了できませんでした。 Ascendara 設定でディレクトリの保護を有効にしてください。"
   },
   "game": {
     "metadata": {
@@ -495,7 +498,7 @@
       "restoreButton": "セーブデータを復元する",
       "restoreFailed": "復元に失敗しました",
       "restoreLatest": "最新のバックアップを復元する",
-      "restoreResult": "復元結果",
+      "restoreResult": "結果の復元",
       "restoreSpecificWarningDesc": "{{backup}} で作成されたバックアップから {{game}} のセーブ データを復元しようとしています。",
       "restoreSuccess": "復元に成功しました",
       "restoreSuccessDesc": "{{game}} のセーブデータが正常に復元されました",
@@ -587,7 +590,7 @@
     "importSuccessDesc": "Steam ゲームは正常にインポートされました。一部のゲーム カバーと実行可能パスが見つからないか正しくない場合があります。ゲーム情報を更新することでこれを修正できます。",
     "importSuccessTitle": "インポート完了！",
     "importingGames": "Steam ゲームをインポートしています...",
-    "importingGamesDesc": "Steam ゲームがインポートされている間、お待ちください。ライブラリのサイズによっては、これには数分かかる場合があります。",
+    "importingGamesDesc": "Steam ゲームがインポートされている間お待ちください。ライブラリのサイズによっては、これには数分かかる場合があります。",
     "includesAllDLCs": "すべてのDLCを含む",
     "launchError": "起動エラー",
     "launchErrorMessage": "{{game}} を実行できませんでした。ゲームの実行可能ファイルの名前がゲーム名と異なる場合があります。 Ascendara が正しいファイルを実行しようとしていることを確認してください。",
@@ -607,7 +610,7 @@
       "desc": "新しいフォルダーの名前を入力します",
       "exists": "この名前のフォルダーはすでに存在します",
       "placeholder": "フォルダ名",
-      "required": "フォルダー名は必須です",
+      "required": "フォルダ名は必須です",
       "title": "新しいフォルダー"
     },
     "noResultsFound": "結果が見つかりませんでした。検索は正確にしてください。",
@@ -648,9 +651,9 @@
     "searchGameCoverNotice": "カバーは、現在インデックスされている SteamRIP ソースから検索されます。",
     "searchLibrary": "ゲームを検索...",
     "searchOnline": "検索インデックス",
-    "setExecutable": "ゲームの実行ファイルを設定する",
+    "setExecutable": "ゲームの実行可能ファイルを設定する",
     "shortcutCreated": "ショートカットが作成されました",
-    "shortcutError": "ショートカット作成中にエラーが発生しました。実行ファイルのパスが存在しないのではないでしょうか？",
+    "shortcutError": "ショートカットの作成中にエラーが発生しました。実行ファイルのパスが存在しないのではないでしょうか？",
     "size": "サイズ",
     "sort": { "aToZ": "A から Z まで並べ替える", "zToA": "Z から A に並べ替える" },
     "spaceTooltip": {
@@ -767,7 +770,7 @@
       "defaultDirsNote": "これらのディレクトリは常に実績が監視されています。以下にさらにディレクトリを追加できます。",
       "description": "これらは、実績が監視されるフォルダーです。見つかった実績はライブラリに追加されます。 Achievement Watcher は xan105 によるオリジナルに基づいており、Ascendara 用に修正されています。",
       "noDirs": "ディレクトリが選択されていません",
-      "title": "実績監視者"
+      "title": "アチーブメントウォッチャー"
     },
     "addLocation": "ダウンロードディレクトリの追加",
     "additionalGameInfo": "アセンダラ エクストラ",
@@ -775,6 +778,8 @@
     "additionalLocations": "追加の場所",
     "advanced": "高度な",
     "apiKeySaved": "APIキーが保存されました",
+    "appearance": "外観",
+    "application": "応用",
     "ascendaraAnalytics": "使用状況分析",
     "ascendaraAnalyticsDescription": "使用状況データを送信して Ascendara の改善にご協力ください。このデータは匿名であり、お客様を特定するために使用することはできません。",
     "ascendaraTimechine": "アセンダラ・タイムマシン",
@@ -869,13 +874,16 @@
     },
     "gameSources": "インデックス付きゲームソース",
     "gameSourcesDescription": "Ascendara は主に SteamRIP をゲームの信頼できるソースとして使用します",
+    "gaming": "ゲーム",
     "general": "一般的な",
     "giantBombApiKey": "GiantBomb API キー",
     "giantBombDescription": "GiantBomb は、コミュニティ主導のゲーム Wiki からゲーム情報を簡単な説明とともに提供します。 API キーが必要です。",
     "giantBombLearnHowtoGet": "API キーの取得方法を学ぶ",
+    "hideOnGameLaunch": "ゲーム起動時に非表示にする",
+    "hideOnGameLaunchDescription": "ゲームが起動されるときに Ascendara を非表示にします。",
     "highThreadWarning": "32 を超えるスレッドの使用は極端とみなされ、不安定、禁止、またはネットワークの問題が発生する可能性があります。慎重に使用してください。",
     "igdbApiKeyDescription": "IGDB は、開発者支援のデータベースと公式ゲーム エントリにより、より詳細なゲーム情報を提供します。 Twitch アカウントを持ち、クライアント ID とシークレットを取得する必要があります。",
-    "igdbLearnHowtoGet": "設定方法を学ぶ",
+    "igdbLearnHowtoGet": "この設定方法を学ぶ",
     "installGameDependencies": "依存関係",
     "languageSetNote": "注: これにより、ゲーム名、タグ、または提供されるゲームに関係するものは変更されません。",
     "languageSettings": "言語設定",
@@ -930,6 +938,7 @@
     "steamripDescription": "SteamRIP は Ascendara の主要なソースであり、安全で信頼性の高いゲームのコレクションを定期的に更新して提供します。",
     "switchSource": "このソースに切り替える",
     "theme": "外観",
+    "themes": "アプリのテーマ",
     "threads": "スレッド",
     "timeMachineDisabledFitgirl": "FitGirl Repacks をゲーム ソースとして使用している場合、Ascendara Timemachine は利用できません。",
     "title": "アセンダラの設定",
@@ -1035,7 +1044,7 @@
       "title": "ゲームライブラリ"
     },
     "navigationBar": {
-      "content": "ここで Ascendara のページを切り替えることができます。 Ctrl キーと 1 ～ 5 の数字を使用してページを切り替えることもできます。",
+      "content": "ここで、Ascendara のページを切り替えることができます。 Ctrl キーと 1 ～ 5 の数字を使用してページを切り替えることもできます。",
       "title": "ナビゲーションバー"
     },
     "profile": {
@@ -1073,7 +1082,7 @@
     "audioProcessing": "音声処理",
     "automaticUpdates": "自動更新",
     "automaticUpdatesDesc": "最新の機能と改善点が利用可能になり次第入手してください",
-    "automaticUpdatesTitle": "自動アップデート",
+    "automaticUpdatesTitle": "自動更新",
     "bePartOfImproving": "Ascendara の改善に参加してください",
     "bePartOfImprovingDesc": "Ascendara を使用するだけで Ascendara の改善に貢献する何百もの他の人たちに加わりましょう",
     "browse": "ブラウズ",
@@ -1123,7 +1132,7 @@
     "installationFailed": "インストールに失敗しました",
     "installingDependencies": "依存関係をインストールしています...",
     "lightThemes": "ライトテーマ",
-    "lightningFastDesc": "V7 は速度とパフォーマンスに関して最適化されており、これまでよりもスムーズかつ高速なエクスペリエンスを実現します。",
+    "lightningFastDesc": "V7 は速度とパフォーマンスに関して最適化されており、これまで以上にスムーズかつ高速なエクスペリエンスを実現します。",
     "lightningFastTitle": "電光石火の速さ",
     "makeSureYouHaveEnoughDiskSpaceInTheSelectedLocation": "選択した場所に十分なディスク容量があることを確認してください",
     "manualUpdates": "手動アップデート",
@@ -1146,6 +1155,22 @@
     "privacyPolicy": "プライバシーポリシー",
     "pythonIsRequired": "Pythonは必須です",
     "pythonMustBeInstalled": "このオペレーティング システムで Ascendara のコア ツールを実行するには、Python をコンピュータにインストールする必要があります",
+    "referral": {
+      "otherPlaceholder": "アセンダラをどこで見つけたか教えてください...",
+      "sources": {
+        "discord": "不和",
+        "fmhy": "FMHY",
+        "google": "Google検索",
+        "instagram": "インスタグラム",
+        "notsay": "むしろ言わないでください",
+        "other": "他の",
+        "reddit": "レディット",
+        "tiktok": "TikTok",
+        "twitter": "ツイッター / ×"
+      },
+      "subtitle": "Ascendara がユーザーがどこから来ているかを理解できるように支援してください。これは完全にオプションです。",
+      "title": "アセンダラをどうやって見つけたのですか？"
+    },
     "requiredForModernGames": "最近のゲームには必須",
     "restart": "再起動",
     "runtimeComponents": "ランタイムコンポーネント",
@@ -1177,7 +1202,7 @@
     "wineIsRequired": "ワインと遊ぶ",
     "wineMustBeInstalled": "Windows ゲームを実行するには、Wine、DXVK、およびその他のツールをコンピューターにインストールしてセットアップする必要があります。ただし、心配しないでください。Ascendara がすべてをインストールして設定できます。",
     "youCanAddMoreLater": "後で環境設定でさらにディレクトリを追加できます",
-    "youCanChangeThisLater": "後から「設定」でいつでも言語を更新できます。",
+    "youCanChangeThisLater": "後から [設定] でいつでも言語を更新できます。",
     "youCanChangeThisSettingLater": "これは後から「設定」で変更できます。",
     "youWillReceiveAdminPrompts": "公式 Microsoft インストーラーから、必要なコンポーネントをインストールするための管理者プロンプトが表示されます。インストール後にコンピュータの再起動が必要になる場合があります。",
     "yourContinuedSupport": "皆様の継続的なサポートのおかげで、Ascendara は今日の姿になりました。 Ascendara は、お客様が求めていた新しい外観と操作性を備えて、ゼロから完全に再構築されました。"
@@ -1203,6 +1228,6 @@
     "mainTitle": "ワークショップアイテムをダウンロード",
     "waitingForLogs": "ダウンロードの開始を待っています...",
     "welcome": "Ascendara のワークショップ ダウンローダーへようこそ",
-    "welcomeDescription": "ここでは、アカウントを持っていなくても、Steam ワークショップからアイテムをダウンロードできます。"
+    "welcomeDescription": "ここでは、アカウントを持っていなくても Steam ワークショップからアイテムをダウンロードできます。"
   }
 }
