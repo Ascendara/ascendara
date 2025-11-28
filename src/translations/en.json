@@ -353,10 +353,12 @@
       "title": "Downloading on Ascendara",
       "understand": "I understand"
     },
+    "learnHowToFix": "Learn how to fix this",
     "limitedTo": "Limited to",
     "noDownloads": "Well that's relaxing...",
     "noDownloadsMessage": "You're not downloading anything right now, start a download to track its progress here.",
     "noFilesError": "The downloader could not find any files to download. This most likely means the file was removed from the source.",
+    "noSpaceLeftError": "No space left on device. Please free up disk space to continue the download.",
     "retryDataNotAvailable": "Retry data not available. The download will be deleted and you will have to manually restart the download.",
     "speedHistory": "Download Speeds",
     "statistics": "Statistics",
@@ -373,7 +375,8 @@
     "verifying": "Verifying files...",
     "verifyingDescription": "Ascendara is verifying the game files. This may also take a while depending on the game size.",
     "waiting": "Waiting for Peers",
-    "waitingDescription": "qBittorrent is looking for peers to connect to download pieces of the torrent file from other users and upload to them in turn. Others may be able to see what you're downloading and/or determine your public IP address."
+    "waitingDescription": "qBittorrent is looking for peers to connect to download pieces of the torrent file from other users and upload to them in turn. Others may be able to see what you're downloading and/or determine your public IP address.",
+    "windowsDefenderError": "Windows detected a false positive and prevented the download from completing. Please enable Protect Directories in Ascendara preferences."
   },
   "game": {
     "metadata": {

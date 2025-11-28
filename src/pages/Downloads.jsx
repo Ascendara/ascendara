@@ -740,6 +740,7 @@ const DownloadCard = ({
     "no_files_error",
     "provider_blocked_error",
     "[Errno 28] No space left on device",
+    "[WinError 225]",
   ];
 
   function isPredefinedError(message) {
@@ -955,6 +956,25 @@ const DownloadCard = ({
                         "downloads.noSpaceLeftError",
                         "No space left on device. Please free up disk space to continue the download."
                       )}
+                    </p>
+                  ) : downloadingData.message.includes("[WinError 225]") ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        "downloads.windowsDefenderError",
+                        "Windows detected a false positive and blocked the download. You may need to add an exclusion in Windows Security."
+                      )}
+                      <br />
+                      <a
+                        onClick={() =>
+                          window.electron.openURL(
+                            "https://ascendara.app/docs/features/overview#protecting-directories-from-windows-defender"
+                          )
+                        }
+                        className="cursor-pointer text-primary hover:underline"
+                      >
+                        {t("downloads.learnHowToFix", "Learn how to fix this")}{" "}
+                        <ExternalLink className="mb-1 inline-block h-3 w-3" />
+                      </a>
                     </p>
                   ) : (
                     <p className="text-sm text-muted-foreground">
