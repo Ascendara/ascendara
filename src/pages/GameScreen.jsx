@@ -73,20 +73,50 @@ import igdbService from "@/services/gameInfoService";
 import GameRate from "@/components/GameRate";
 import EditCoverDialog from "@/components/EditCoverDialog";
 
-const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t }) => {
+const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
+  const [exeExists, setExeExists] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open && gameName) {
       setLoading(true);
-      gameUpdateService.getGameExecutables(gameName, isCustom).then(exes => {
-        setExecutables(exes.length > 0 ? exes : [""]);
+      gameUpdateService.getGameExecutables(gameName, isCustom).then(async exes => {
+        const exeList = exes.length > 0 ? exes : [""];
+        setExecutables(exeList);
+        // Check which executables exist
+        const existsMap = {};
+        for (const exe of exeList) {
+          if (exe) {
+            existsMap[exe] = await window.electron.checkFileExists(exe);
+          }
+        }
+        setExeExists(existsMap);
         setLoading(false);
       });
     }
   }, [open, gameName, isCustom]);
+
+  // Update existence check when executables change
+  useEffect(() => {
+    const checkExists = async () => {
+      const newExistsMap = { ...exeExists };
+      let hasChanges = false;
+      for (const exe of executables) {
+        if (exe && !(exe in newExistsMap)) {
+          newExistsMap[exe] = await window.electron.checkFileExists(exe);
+          hasChanges = true;
+        }
+      }
+      if (hasChanges) {
+        setExeExists(newExistsMap);
+      }
+    };
+    if (!loading && executables.length > 0) {
+      checkExists();
+    }
+  }, [executables, loading]);
 
   const handleAddExecutable = async () => {
     // Open dialog in the same directory as the first executable
@@ -94,6 +124,9 @@ const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t }) => {
     const exePath = await window.electron.openFileDialog(startPath);
     if (exePath) {
       setExecutables(prev => [...prev, exePath]);
+      // Immediately check if the new exe exists
+      const exists = await window.electron.checkFileExists(exePath);
+      setExeExists(prev => ({ ...prev, [exePath]: exists }));
     }
   };
 
@@ -107,6 +140,9 @@ const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t }) => {
         updated[index] = exePath;
         return updated;
       });
+      // Immediately check if the new exe exists
+      const exists = await window.electron.checkFileExists(exePath);
+      setExeExists(prev => ({ ...prev, [exePath]: exists }));
     }
   };
 
@@ -140,6 +176,9 @@ const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t }) => {
     setSaving(false);
     if (success) {
       toast.success(t("library.executableManager.saved"));
+      if (onSave) {
+        onSave(validExecutables);
+      }
       onClose();
     } else {
       toast.error(t("library.executableManager.saveFailed"));
@@ -2175,6 +2214,17 @@ export default function GameScreen() {
 
       <ExecutableManagerDialog
         open={showExecutableManager}
+        onSave={async newExecutables => {
+          if (newExecutables.length > 0) {
+            setGame(prev => ({
+              ...prev,
+              executable: newExecutables[0],
+              executables: newExecutables,
+            }));
+            const exists = await window.electron.checkFileExists(newExecutables[0]);
+            setExecutableExists(exists);
+          }
+        }}
         onClose={() => setShowExecutableManager(false)}
         gameName={game?.game || game?.name}
         isCustom={game?.isCustom}
