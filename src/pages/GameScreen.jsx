@@ -1852,7 +1852,7 @@ export default function GameScreen() {
                           <Monitor className="h-5 w-5 text-muted-foreground" />
                           <div>
                             <span className="text-sm text-muted-foreground">
-                              {t("library.executable").toUpperCase()}
+                              {t("library.executable")}
                             </span>
                             <div className="flex items-center gap-2">
                               <p className="max-w-[220px] truncate text-sm font-medium text-foreground">

@@ -539,7 +539,7 @@
     "emptyFolderDescription": "There are no games in this folder. Add games to get started!",
     "emptyFolderTitle": "This Folder is Empty",
     "enterMoreChars": "Image results will appear here as you type",
-    "executable": "Executable",
+    "executable": "Primary Executable",
     "executableManager": {
       "addExecutable": "Add Executable",
       "atLeastOne": "At least one executable is required",
