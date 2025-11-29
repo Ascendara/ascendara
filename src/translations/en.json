@@ -239,7 +239,7 @@
     "onlineTooltip": "Online multiplayer capabilities enabled through online-fix.me",
     "openCriticBetaWarning": "This API endpoint is in beta and there may be issues. If OpenCritic shows a different game, please report the game by clicking 'Report' to the right of the title.",
     "platforms": "Platforms",
-    "pressEscToGoBack": "Press ESC key to go back",
+    "pressEscToGoBack": "Click Me or ESC key to go back",
     "protectYourself": {
       "learnHow": "How to protect yourself from fake downloads",
       "warning": "Do not click on any ads or deceptive download buttons. The file size should match what you see here - be suspicious of small KB-sized files.",

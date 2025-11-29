@@ -1227,10 +1227,11 @@ export default function DownloadPage() {
     >
       <div className="w-full max-w-6xl">
         <div
-          className="text-center font-bold text-muted-foreground"
+          className="cursor-pointer text-center font-bold text-muted-foreground transition-colors hover:text-foreground"
           style={{
             animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
           }}
+          onClick={() => navigate("/search")}
         >
           {t("download.pressEscToGoBack")}
         </div>
