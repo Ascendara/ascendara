@@ -655,7 +655,7 @@
     "searchLibrary": "Search your games...",
     "searchOnline": "Search Index",
     "setExecutable": "Set the Game Executable",
-    "shortcutCreated": "Shortcut created",
+    "shortcutCreated": "Shortcut created for primary executable",
     "shortcutError": "Error creating shortcut. Maybe the executable path doesn't exist?",
     "size": "Size",
     "sort": {
