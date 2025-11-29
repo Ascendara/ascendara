@@ -160,10 +160,32 @@ const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t }) => {
           </AlertDialogTitle>
           <AlertDialogDescription className="text-muted-foreground">
             {t("library.executableManager.description")}
+
+            {executables.some(exe => exe && exeExists[exe] === false) && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    {t("library.executableManager.exeLocationHint")}
+                  </span>
+                  <button
+                    onClick={() =>
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/troubleshooting/common-issues#executable-not-found-launch-error"
+                      )
+                    }
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    {t("library.executableManager.learnMore")}
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="my-4 max-h-64 space-y-2 overflow-y-auto">
+        <div className="my-2 max-h-64 space-y-2 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -176,6 +198,9 @@ const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t }) => {
               >
                 <div className="flex flex-1 flex-col overflow-hidden">
                   <div className="flex items-center gap-2">
+                    {exe && exeExists[exe] === false && (
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-500" />
+                    )}
                     {index === 0 && (
                       <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
                         {t("library.executableManager.primary")}

@@ -545,6 +545,8 @@
       "atLeastOne": "At least one executable is required",
       "change": "Change executable",
       "description": "Manage the executable files for this game. The primary executable will be launched when you click Play.",
+      "exeLocationHint": "Can't find the executable? It may be in a subfolder like \"bin\", \"x64\", \"x86\", or \"Binaries\".",
+      "learnMore": "Learn more",
       "makePrimary": "Make primary",
       "noFile": "No file selected",
       "primary": "Primary",
