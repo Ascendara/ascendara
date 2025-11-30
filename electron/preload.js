@@ -23,9 +23,12 @@ contextBridge.exposeInMainWorld("electron", {
     off: (channel, func) => ipcRenderer.off(channel, func),
     removeListener: (channel, func) => ipcRenderer.removeListener(channel, func),
     invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-    readFile: path => ipcRenderer.invoke("read-file", path),
+    readFile: path => ipcRenderer.invoke("read-local-file", path),
     writeFile: (path, content) => ipcRenderer.invoke("write-file", path, content),
   },
+
+  // Local Index
+  getLocalImageUrl: imagePath => ipcRenderer.invoke("get-local-image-url", imagePath),
 
   // Settings and Configuration
   getSettings: () => ipcRenderer.invoke("get-settings"),
