@@ -234,6 +234,7 @@ function Settings() {
   const [isDev, setIsDev] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [exclusionLoading, setExclusionLoading] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
 
   // Use a ref to track if this is the first mount
   const isFirstMount = useRef(true);
@@ -262,6 +263,25 @@ function Settings() {
       setTwitchClientId(settings.twitchClientId);
     }
   }, [settings]);
+
+  // Load last refresh time from progress.json
+  useEffect(() => {
+    const loadLastRefreshTime = async () => {
+      try {
+        const currentSettings = await window.electron.getSettings();
+        const indexPath = currentSettings?.localIndex;
+        if (indexPath && window.electron?.getLocalRefreshProgress) {
+          const progress = await window.electron.getLocalRefreshProgress(indexPath);
+          if (progress?.timestamp) {
+            setLastRefreshTime(new Date(progress.timestamp * 1000));
+          }
+        }
+      } catch (e) {
+        console.log("No progress file found for last refresh time");
+      }
+    };
+    loadLastRefreshTime();
+  }, []);
 
   useEffect(() => {
     const checkExperiment = async () => {
@@ -709,8 +729,8 @@ function Settings() {
                       <Clock className="h-4 w-4" />
                       <span>
                         {t("settings.lastIndexRefresh") || "Last refresh"}:{" "}
-                        {settings?.lastGameListRefresh
-                          ? new Date(settings.lastGameListRefresh).toLocaleDateString()
+                        {lastRefreshTime
+                          ? lastRefreshTime.toLocaleDateString()
                           : t("localRefresh.never") || "Never"}
                       </span>
                     </div>
@@ -2006,6 +2026,9 @@ function Settings() {
 
             {/* Game Sources Card */}
             <Card className="border-border p-6">
+              <p className="mb-4 text-sm font-bold text-primary">
+                {t("common.deprecated")}
+              </p>
               <div className="mb-6 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-primary">
@@ -2312,6 +2335,9 @@ function Settings() {
 
             {/* Timemachine Card */}
             <Card className="border-border p-6">
+              <p className="mb-4 text-sm font-bold text-primary">
+                {t("common.deprecated")}
+              </p>
               <div className="mb-2 flex items-center gap-2">
                 <History className="mb-2 h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold text-primary">
