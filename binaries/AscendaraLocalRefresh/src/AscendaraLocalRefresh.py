@@ -610,8 +610,8 @@ def main():
         logging.info(f"Building output with {len(game_data)} games...")
         
         metadata = {
-            "apiVersion": "2.5",
             "getDate": datetime.datetime.now().strftime("%B %d, %Y, %I:%M %p"),
+            "local": True,
             "source": "STEAMRIP",
             "games": str(len(game_data))
         }
