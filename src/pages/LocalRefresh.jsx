@@ -581,34 +581,48 @@ const LocalRefresh = () => {
 
           {/* Status Section */}
           <div className="space-y-6">
-            {/* Status Header */}
-            <div className="flex items-center justify-between">
+            {/* Status Bar */}
+            <div className="flex items-center gap-6 rounded-xl bg-gradient-to-r from-primary/5 via-transparent to-transparent py-4 pl-5 pr-4">
               <div className="flex items-center gap-3">
-                {getStatusIcon()}
-                <div>
-                  <h2 className="text-lg font-semibold">{getStatusText()}</h2>
-                  <p className="text-sm text-muted-foreground">
+                <div className="relative">
+                  {getStatusIcon()}
+                  {isRefreshing && (
+                    <span className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-primary" />
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold">{getStatusText()}</span>
+                  <span className="text-xs text-muted-foreground">
                     {currentStep ||
                       t("localRefresh.readyToStart") ||
                       "Ready to start refresh"}
-                  </p>
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+
+              <div className="h-8 w-px bg-border/50" />
+
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{formatLastRefreshTime(lastRefreshTime)}</span>
+              </div>
+
+              <div className="ml-auto">
                 {!isRefreshing ? (
                   <Button
                     onClick={handleOpenRefreshDialog}
+                    size="sm"
                     className="gap-2 text-secondary"
                     disabled={isRefreshing}
                   >
                     {refreshStatus === "completed" ? (
                       <>
-                        <RefreshCw className="h-4 w-4" />
+                        <RefreshCw className="h-3.5 w-3.5" />
                         {t("localRefresh.refreshAgain") || "Refresh Again"}
                       </>
                     ) : (
                       <>
-                        <Play className="h-4 w-4" />
+                        <Play className="h-3.5 w-3.5" />
                         {t("localRefresh.startRefresh") || "Start Refresh"}
                       </>
                     )}
@@ -616,10 +630,11 @@ const LocalRefresh = () => {
                 ) : (
                   <Button
                     variant="destructive"
+                    size="sm"
                     onClick={() => setShowStopDialog(true)}
                     className="gap-2"
                   >
-                    <StopCircle className="h-4 w-4" />
+                    <StopCircle className="h-3.5 w-3.5" />
                     {t("localRefresh.stopRefresh") || "Stop"}
                   </Button>
                 )}
@@ -681,15 +696,6 @@ const LocalRefresh = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Last Refresh Info */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>
-                {t("localRefresh.lastRefresh") || "Last refresh"}:{" "}
-                {formatLastRefreshTime(lastRefreshTime)}
-              </span>
-            </div>
           </div>
           {/* Already Using Local Index Section */}
           {settings?.usingLocalIndex && (
