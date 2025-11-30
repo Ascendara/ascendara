@@ -2864,9 +2864,26 @@ let localRefreshProcess = null;
 let localRefreshProgressInterval = null;
 let localRefreshShouldMonitor = false;
 
+// Track if a refresh is currently starting to prevent duplicate calls
+let localRefreshStarting = false;
+
 ipcMain.handle(
   "start-local-refresh",
   async (event, { outputPath, cfClearance, perPage }) => {
+    // Prevent multiple simultaneous start calls
+    if (localRefreshStarting) {
+      console.log("Local refresh already starting, ignoring duplicate call");
+      return { success: true, message: "Refresh already starting" };
+    }
+
+    // Check if process is already running
+    if (localRefreshProcess && !localRefreshProcess.killed) {
+      console.log("Local refresh process already running, ignoring duplicate call");
+      return { success: true, message: "Refresh already running" };
+    }
+
+    localRefreshStarting = true;
+
     try {
       // Stop any existing monitoring first
       localRefreshShouldMonitor = false;
@@ -2974,6 +2991,7 @@ ipcMain.handle(
       localRefreshProcess.on("close", code => {
         console.log(`LocalRefresh process exited with code ${code}`);
         localRefreshProcess = null;
+        localRefreshStarting = false;
 
         // Stop progress monitoring
         if (localRefreshProgressInterval) {
@@ -2990,11 +3008,15 @@ ipcMain.handle(
 
       localRefreshProcess.on("error", err => {
         console.error(`LocalRefresh process error: ${err}`);
+        localRefreshStarting = false;
         const mainWindow = BrowserWindow.getAllWindows().find(win => win);
         if (mainWindow) {
           mainWindow.webContents.send("local-refresh-error", { error: err.message });
         }
       });
+
+      // Reset starting flag now that process has spawned
+      localRefreshStarting = false;
 
       // Start monitoring progress.json after a brief delay to let the new process initialize
       console.log("Monitoring progress file:", progressFilePath);
@@ -3040,6 +3062,7 @@ ipcMain.handle(
       return { success: true };
     } catch (error) {
       console.error("Failed to start local refresh:", error);
+      localRefreshStarting = false;
       return { success: false, error: error.message };
     }
   }
