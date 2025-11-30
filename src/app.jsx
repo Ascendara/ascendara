@@ -6,6 +6,7 @@ import SupportDialog from "@/components/SupportDialog";
 import PlatformWarningDialog from "@/components/PlatformWarningDialog";
 import WatcherWarnDialog from "@/components/WatcherWarnDialog";
 import BrokenVersionDialog from "@/components/BrokenVersionDialog";
+import FirstIndexDialog from "@/components/FirstIndexDialog";
 import PageTransition from "@/components/PageTransition";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -40,6 +41,7 @@ import GameScreen from "./pages/GameScreen";
 import Profile from "./pages/Profile";
 import Library from "./pages/Library";
 import FolderView from "./pages/FolderView";
+import LocalRefresh from "./pages/LocalRefresh";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 import Welcome from "./pages/Welcome";
@@ -74,6 +76,7 @@ const AppRoutes = () => {
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
+  const [showFirstIndexDialog, setShowFirstIndexDialog] = useState(false);
   const location = useLocation();
   const hasChecked = useRef(false);
   const loadStartTime = useRef(Date.now());
@@ -360,6 +363,30 @@ const AppRoutes = () => {
     checkVersion();
   }, []);
 
+  // Check if user needs to set up game index for the first time
+  useEffect(() => {
+    const checkFirstIndex = async () => {
+      // Only check after loading is done and welcome is not showing
+      if (isLoading || showWelcome) return;
+
+      try {
+        const hasIndexBefore = await window.electron.getTimestampValue("hasIndexBefore");
+        console.log("Has indexed before:", hasIndexBefore);
+
+        // If hasIndexBefore doesn't exist or is false, show the dialog
+        if (!hasIndexBefore) {
+          // Small delay to let other dialogs settle
+          setTimeout(() => {
+            setShowFirstIndexDialog(true);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error("Error checking first index status:", error);
+      }
+    };
+    checkFirstIndex();
+  }, [isLoading, showWelcome]);
+
   const handleInstallAndRestart = async () => {
     setIsInstalling(true);
     // Set isUpdating timestamp first
@@ -643,6 +670,16 @@ const AppRoutes = () => {
               }
             />
             <Route
+              path="localrefresh"
+              element={
+                <AnimatePresence mode="wait">
+                  <PageTransition key="localrefresh">
+                    <LocalRefresh />
+                  </PageTransition>
+                </AnimatePresence>
+              }
+            />
+            <Route
               path="profile"
               element={
                 <AnimatePresence mode="wait">
@@ -692,6 +729,9 @@ const AppRoutes = () => {
       )}
       {isBrokenVersion && (
         <BrokenVersionDialog onClose={() => setIsBrokenVersion(false)} />
+      )}
+      {showFirstIndexDialog && (
+        <FirstIndexDialog onClose={() => setShowFirstIndexDialog(false)} />
       )}
       <WatcherWarnDialog open={showWatcherWarn} onOpenChange={setShowWatcherWarn} />
     </>
