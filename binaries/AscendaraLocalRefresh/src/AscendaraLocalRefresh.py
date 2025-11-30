@@ -20,6 +20,7 @@ import argparse
 import logging
 import subprocess
 import atexit
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -543,6 +544,10 @@ def main():
     
     try:
         os.makedirs(output_dir, exist_ok=True)
+        # Delete existing imgs folder before creating new one
+        if os.path.exists(imgs_dir):
+            shutil.rmtree(imgs_dir)
+            logging.info(f"Deleted existing imgs directory")
         os.makedirs(imgs_dir, exist_ok=True)
         logging.info(f"Created output directories")
     except Exception as e:
