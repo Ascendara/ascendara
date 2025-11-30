@@ -145,7 +145,7 @@ def handleerror(game_info, game_info_path, e):
     safe_write_json(game_info_path, game_info)
 
 class GofileDownloader:
-    def __init__(self, game, online, dlc, isVr, updateFlow, version, size, download_dir, max_workers=5):
+    def __init__(self, game, online, dlc, isVr, updateFlow, version, size, download_dir, gameID="", max_workers=5):
         self._max_retries = 3
         self._download_timeout = 30 
         self._token = self._getToken()
@@ -163,6 +163,7 @@ class GofileDownloader:
         self.isVr = isVr
         self.version = version
         self.size = size
+        self.gameID = gameID
         self.download_dir = os.path.join(download_dir, sanitize_folder_name(game))
         os.makedirs(self.download_dir, exist_ok=True)
         self.game_info_path = os.path.join(self.download_dir, f"{sanitize_folder_name(game)}.ascendara.json")
@@ -207,6 +208,7 @@ class GofileDownloader:
                 "isVr": isVr,
                 "version": version if version else "",
                 "size": size,
+                "gameID": gameID,
                 "executable": os.path.join(self.download_dir, f"{sanitize_folder_name(game)}.exe"),
                 "isRunning": False,
                 "downloadingData": {
@@ -1009,6 +1011,7 @@ def main():
     parser.add_argument("version", help="Version of the game")
     parser.add_argument("size", help="Size of the file in (ex: 12 GB, 439 MB)")
     parser.add_argument("download_dir", help="Directory to save the downloaded files")
+    parser.add_argument("gameID", nargs="?", default="", help="Game ID from SteamRIP")
     parser.add_argument("--password", help="Password for protected content", default=None)
     parser.add_argument("--withNotification", help="Theme name for notifications (e.g. light, dark, blue)", default=None)
 
@@ -1026,7 +1029,7 @@ def main():
                      f"isVr={args.isVr}, update={args.updateFlow}, version={args.version}, size={args.size}, "
                      f"download_dir={args.download_dir}, withNotification={args.withNotification}")
         
-        downloader = GofileDownloader(args.game, args.online, args.dlc, args.isVr, args.updateFlow, args.version, args.size, args.download_dir)
+        downloader = GofileDownloader(args.game, args.online, args.dlc, args.isVr, args.updateFlow, args.version, args.size, args.download_dir, args.gameID)
         if args.withNotification:
             _launch_notification(args.withNotification, "Download Started", f"Starting download for {args.game}")
         downloader.download_from_gofile(args.url, args.password, args.withNotification)

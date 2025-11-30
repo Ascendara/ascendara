@@ -178,7 +178,7 @@ def handleerror(game_info, game_info_path, e):
 
 # Downloader class for managing downloads and extraction
 class SmartDLDownloader:
-    def __init__(self, game, online, dlc, isVr, updateFlow, version, size, download_dir):
+    def __init__(self, game, online, dlc, isVr, updateFlow, version, size, download_dir, gameID=""):
         self.game = game
         self.online = online
         self.dlc = dlc
@@ -186,6 +186,7 @@ class SmartDLDownloader:
         self.updateFlow = updateFlow
         self.version = version
         self.size = size
+        self.gameID = gameID
         self.download_dir = os.path.join(download_dir, sanitize_folder_name(game))
         os.makedirs(self.download_dir, exist_ok=True)
         self.game_info_path = os.path.join(self.download_dir, f"{sanitize_folder_name(game)}.ascendara.json")
@@ -204,6 +205,7 @@ class SmartDLDownloader:
                 "isVr": isVr,
                 "version": version if version else "",
                 "size": size,
+                "gameID": gameID,
                 "executable": os.path.join(self.download_dir, f"{sanitize_folder_name(game)}.exe"),
                 "isRunning": False,
                 "downloadingData": {
@@ -1034,11 +1036,12 @@ def main():
     parser.add_argument("version", help="Version of the game")
     parser.add_argument("size", help="Size of the file (ex: 12 GB, 439 MB)")
     parser.add_argument("download_dir", help="Directory to save the downloaded files")
+    parser.add_argument("gameID", nargs="?", default="", help="Game ID from SteamRIP")
     parser.add_argument("--withNotification", help="Theme name for notifications (e.g. light, dark, blue)", default=None)
     args = parser.parse_args()
     try:
         downloader = SmartDLDownloader(
-            args.game, args.online, args.dlc, args.isVr, args.updateFlow, args.version, args.size, args.download_dir
+            args.game, args.online, args.dlc, args.isVr, args.updateFlow, args.version, args.size, args.download_dir, args.gameID
         )
         # Store notification theme on downloader for extraction notification
         if args.withNotification:

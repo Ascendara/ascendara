@@ -2245,10 +2245,11 @@ ipcMain.handle(
     version,
     imgID,
     size,
-    additionalDirIndex
+    additionalDirIndex,
+    gameID
   ) => {
     console.log(
-      `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}`
+      `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
     );
 
     const settings = settingsManager.getSettings();
@@ -2439,6 +2440,7 @@ ipcMain.handle(
                 version || -1,
                 size,
                 targetDirectory,
+                gameID || "",
               ];
       } else {
         executablePath = "python3";
@@ -2486,6 +2488,7 @@ ipcMain.handle(
                 version || -1,
                 size,
                 targetDirectory,
+                gameID || "",
               ];
       }
 

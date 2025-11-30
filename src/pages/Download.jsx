@@ -593,7 +593,8 @@ export default function DownloadPage() {
         gameData.version || "",
         gameData.imgID,
         gameData.size || "",
-        dir
+        dir,
+        gameData.gameID || ""
       );
       // Keep isStarting true until download actually begins
       const removeDownloadListener = window.electron.onDownloadProgress(downloadInfo => {
