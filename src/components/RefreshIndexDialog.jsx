@@ -162,7 +162,7 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <Button variant="outline" onClick={handleClose}>
+              <Button variant="outline" className="text-primary" onClick={handleClose}>
                 {t("common.cancel") || "Cancel"}
               </Button>
               <Button onClick={() => setStep(2)} className="gap-2 text-secondary">
@@ -236,11 +236,15 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <Button variant="ghost" onClick={() => setStep(1)} className="gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setStep(1)}
+                className="gap-2 text-primary"
+              >
                 <ChevronLeft className="h-4 w-4" />
                 {t("common.back") || "Back"}
               </Button>
-              <Button variant="outline" onClick={handleClose}>
+              <Button variant="outline" className="text-primary" onClick={handleClose}>
                 {t("common.cancel") || "Cancel"}
               </Button>
             </AlertDialogFooter>
@@ -307,13 +311,18 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
               <Button
                 variant="ghost"
                 onClick={() => setStep(2)}
-                className="gap-2"
+                className="gap-2 text-primary"
                 disabled={cookieReceived}
               >
                 <ChevronLeft className="h-4 w-4" />
                 {t("common.back") || "Back"}
               </Button>
-              <Button variant="outline" onClick={handleClose} disabled={cookieReceived}>
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={handleClose}
+                disabled={cookieReceived}
+              >
                 {t("common.cancel") || "Cancel"}
               </Button>
             </AlertDialogFooter>
@@ -397,11 +406,15 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <Button variant="ghost" onClick={() => setStep(2)} className="gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setStep(2)}
+                className="gap-2 text-primary"
+              >
                 <ChevronLeft className="h-4 w-4" />
                 {t("common.back") || "Back"}
               </Button>
-              <Button variant="outline" onClick={handleClose}>
+              <Button variant="outline" className="text-primary" onClick={handleClose}>
                 {t("common.cancel") || "Cancel"}
               </Button>
               <Button onClick={() => setStep(5)} className="gap-2 text-secondary">
@@ -446,11 +459,15 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <Button variant="ghost" onClick={() => setStep(4)} className="gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setStep(4)}
+                className="gap-2 text-primary"
+              >
                 <ChevronLeft className="h-4 w-4" />
                 {t("common.back") || "Back"}
               </Button>
-              <Button variant="outline" onClick={handleClose}>
+              <Button variant="outline" className="text-primary" onClick={handleClose}>
                 {t("common.cancel") || "Cancel"}
               </Button>
               <Button
