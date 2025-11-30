@@ -42,6 +42,7 @@ import {
   Download,
   Scale,
   ClockAlert,
+  Clock,
   FlaskConical,
   ChevronUp,
   ChevronLeft,
@@ -63,6 +64,7 @@ import {
   SquareCode,
   CpuIcon,
   CornerDownRight,
+  Database,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -689,6 +691,43 @@ function Settings() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Left Column - Core Settings */}
           <div className="space-y-6 lg:col-span-8">
+            {/* Local Game Index Card */}
+            <Card className="border-border p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-lg bg-primary/10 p-3">
+                    <Database className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-semibold text-primary">
+                      {t("settings.localIndex") || "Local Game Index"}
+                    </h2>
+                    <p className="max-w-[500px] text-sm text-muted-foreground">
+                      {t("settings.localIndexDescription")}
+                    </p>
+                    <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>
+                        {t("settings.lastIndexRefresh") || "Last refresh"}:{" "}
+                        {settings?.lastGameListRefresh
+                          ? new Date(settings.lastGameListRefresh).toLocaleDateString()
+                          : t("localRefresh.never") || "Never"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="shrink-0 gap-2 text-secondary"
+                  onClick={() => navigate("/localrefresh")}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {t("settings.manageIndex") || "Manage Index"}
+                </Button>
+              </div>
+            </Card>
+
             {/* General Settings Card */}
             <Card className="border-border p-6">
               <h2 className="mb-4 text-xl font-semibold text-primary">
@@ -940,7 +979,6 @@ function Settings() {
                 )}
               </div>
             </Card>
-
             <Card className="mb-6 border-border">
               <div className="space-y-3 p-6">
                 <h3 className="mb-2 text-xl font-semibold text-primary">
@@ -1977,18 +2015,6 @@ function Settings() {
                     {t("settings.gameSourcesDescription")}
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshIndex}
-                  disabled={isRefreshing}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                  />
-                  {isRefreshing ? t("search.refreshingIndex") : t("search.refreshIndex")}
-                </Button>
               </div>
 
               <div className="space-y-6">

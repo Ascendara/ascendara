@@ -43,6 +43,8 @@ export function SettingsProvider({ children }) {
     twitchClientId: "",
     giantBombKey: "",
     torboxApiKey: "",
+    localIndex: "",
+    fetchPageCount: 50,
     ludusavi: {
       backupLocation: "",
       backupFormat: "zip",

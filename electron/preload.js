@@ -33,6 +33,24 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("save-settings", options, directory),
   updateSetting: (key, value) => ipcRenderer.invoke("update-setting", key, value),
   toggleDiscordRPC: enabled => ipcRenderer.invoke("toggle-discord-rpc", enabled),
+  getDefaultLocalIndexPath: () => ipcRenderer.invoke("get-default-local-index-path"),
+
+  // Local Refresh
+  startLocalRefresh: data => ipcRenderer.invoke("start-local-refresh", data),
+  stopLocalRefresh: () => ipcRenderer.invoke("stop-local-refresh"),
+  getLocalRefreshProgress: outputPath =>
+    ipcRenderer.invoke("get-local-refresh-progress", outputPath),
+  getLocalRefreshStatus: outputPath =>
+    ipcRenderer.invoke("get-local-refresh-status", outputPath),
+  onLocalRefreshProgress: callback =>
+    ipcRenderer.on("local-refresh-progress", (event, data) => callback(data)),
+  onLocalRefreshComplete: callback =>
+    ipcRenderer.on("local-refresh-complete", (event, data) => callback(data)),
+  onLocalRefreshError: callback =>
+    ipcRenderer.on("local-refresh-error", (event, data) => callback(data)),
+  offLocalRefreshProgress: () => ipcRenderer.removeAllListeners("local-refresh-progress"),
+  offLocalRefreshComplete: () => ipcRenderer.removeAllListeners("local-refresh-complete"),
+  offLocalRefreshError: () => ipcRenderer.removeAllListeners("local-refresh-error"),
 
   // Language Management
   downloadLanguage: langCode => ipcRenderer.invoke("download-language", langCode),

@@ -769,6 +769,8 @@ class SettingsManager {
       twitchClientId: "",
       giantBombKey: "",
       torboxApiKey: "",
+      localIndex: "",
+      fetchPageCount: 50,
       ludusavi: {
         backupLocation: "",
         backupFormat: "zip",
@@ -2801,6 +2803,278 @@ ipcMain.handle("get-timestamp-value", async (event, key) => {
 // Add a getter for settings
 ipcMain.handle("get-settings", () => {
   return settingsManager.getSettings();
+});
+
+ipcMain.handle("get-default-local-index-path", () => {
+  return path.join(app.getPath("appData"), "Ascendara by tagoWorks", "localindex");
+});
+
+// Local Refresh Tool
+let localRefreshProcess = null;
+let localRefreshProgressInterval = null;
+let localRefreshShouldMonitor = false;
+
+ipcMain.handle(
+  "start-local-refresh",
+  async (event, { outputPath, cfClearance, perPage }) => {
+    try {
+      // Stop any existing monitoring first
+      localRefreshShouldMonitor = false;
+      if (localRefreshProgressInterval) {
+        clearInterval(localRefreshProgressInterval);
+        localRefreshProgressInterval = null;
+      }
+
+      // Kill ALL AscendaraLocalRefresh processes by name first (handles orphans from previous runs)
+      if (isWindows) {
+        console.log("Killing any existing AscendaraLocalRefresh.exe processes...");
+        try {
+          require("child_process").execSync("taskkill /IM AscendaraLocalRefresh.exe /F", {
+            stdio: "ignore",
+          });
+        } catch (e) {
+          // No processes found or already dead
+        }
+      }
+
+      // Also kill by PID if we have a reference
+      if (localRefreshProcess) {
+        console.log("Killing existing local refresh process by PID...");
+        if (isWindows) {
+          try {
+            require("child_process").execSync(
+              `taskkill /pid ${localRefreshProcess.pid} /T /F`,
+              { stdio: "ignore" }
+            );
+          } catch (e) {
+            // Process may already be dead
+          }
+        } else {
+          localRefreshProcess.kill("SIGKILL");
+        }
+        localRefreshProcess = null;
+      }
+
+      // Wait a moment for processes to fully terminate
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Ensure output directory exists
+      if (!fs.existsSync(outputPath)) {
+        fs.mkdirSync(outputPath, { recursive: true });
+      }
+
+      // Clear old progress.json to avoid reading stale data
+      const progressFilePath = path.join(outputPath, "progress.json");
+      if (fs.existsSync(progressFilePath)) {
+        console.log("Deleting old progress.json...");
+        fs.unlinkSync(progressFilePath);
+      }
+
+      let executablePath;
+      let args;
+
+      // Use perPage from settings, default to 50 if not provided
+      const fetchPerPage = perPage || 50;
+
+      if (isWindows) {
+        executablePath = isDev
+          ? path.join("./binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh.exe")
+          : path.join(appDirectory, "/resources/AscendaraLocalRefresh.exe");
+        args = [
+          "--output",
+          outputPath,
+          "--cookie",
+          cfClearance,
+          "--per-page",
+          String(fetchPerPage),
+        ];
+      } else {
+        executablePath = "python3";
+        const scriptPath = isDev
+          ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py"
+          : path.join(appDirectory, "/resources/AscendaraLocalRefresh.py");
+        args = [
+          scriptPath,
+          "--output",
+          outputPath,
+          "--cookie",
+          cfClearance,
+          "--per-page",
+          String(fetchPerPage),
+        ];
+      }
+
+      console.log(
+        `Starting local refresh: ${executablePath} --output ${outputPath} --cookie [REDACTED] --per-page ${fetchPerPage}`
+      );
+
+      localRefreshProcess = spawn(executablePath, args, {
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsVerbatimArguments: isWindows, // Preserve special characters on Windows
+      });
+
+      localRefreshProcess.stdout.on("data", data => {
+        console.log(`LocalRefresh stdout: ${data}`);
+      });
+
+      localRefreshProcess.stderr.on("data", data => {
+        console.error(`LocalRefresh stderr: ${data}`);
+      });
+
+      localRefreshProcess.on("close", code => {
+        console.log(`LocalRefresh process exited with code ${code}`);
+        localRefreshProcess = null;
+
+        // Stop progress monitoring
+        if (localRefreshProgressInterval) {
+          clearInterval(localRefreshProgressInterval);
+          localRefreshProgressInterval = null;
+        }
+
+        // Send final status to renderer
+        const mainWindow = BrowserWindow.getAllWindows().find(win => win);
+        if (mainWindow) {
+          mainWindow.webContents.send("local-refresh-complete", { code });
+        }
+      });
+
+      localRefreshProcess.on("error", err => {
+        console.error(`LocalRefresh process error: ${err}`);
+        const mainWindow = BrowserWindow.getAllWindows().find(win => win);
+        if (mainWindow) {
+          mainWindow.webContents.send("local-refresh-error", { error: err.message });
+        }
+      });
+
+      // Start monitoring progress.json after a brief delay to let the new process initialize
+      console.log("Monitoring progress file:", progressFilePath);
+      localRefreshShouldMonitor = true;
+      setTimeout(() => {
+        // Only start monitoring if we should still be monitoring
+        if (!localRefreshShouldMonitor) {
+          console.log("Monitoring cancelled before it started");
+          return;
+        }
+        const intervalId = setInterval(() => {
+          // Check if we should stop monitoring
+          if (!localRefreshShouldMonitor) {
+            console.log("Stopping progress monitoring (flag cleared)");
+            clearInterval(intervalId);
+            if (localRefreshProgressInterval === intervalId) {
+              localRefreshProgressInterval = null;
+            }
+            return;
+          }
+          try {
+            if (fs.existsSync(progressFilePath)) {
+              const progressData = JSON.parse(fs.readFileSync(progressFilePath, "utf8"));
+              const mainWindow = BrowserWindow.getAllWindows().find(win => win);
+              if (mainWindow) {
+                console.log(
+                  "Sending progress update:",
+                  progressData.phase,
+                  progressData.processedPosts,
+                  "/",
+                  progressData.totalPosts
+                );
+                mainWindow.webContents.send("local-refresh-progress", progressData);
+              }
+            }
+          } catch (err) {
+            // Ignore read errors (file might be being written)
+          }
+        }, 500);
+        localRefreshProgressInterval = intervalId;
+      }, 1000); // Wait 1 second before starting to monitor
+
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to start local refresh:", error);
+      return { success: false, error: error.message };
+    }
+  }
+);
+
+ipcMain.handle("stop-local-refresh", async () => {
+  try {
+    // Stop monitoring first
+    localRefreshShouldMonitor = false;
+    if (localRefreshProgressInterval) {
+      clearInterval(localRefreshProgressInterval);
+      localRefreshProgressInterval = null;
+    }
+    console.log("Progress monitoring stopped");
+
+    // Kill the process
+    if (localRefreshProcess) {
+      const pid = localRefreshProcess.pid;
+      console.log("Stopping local refresh process with PID:", pid);
+
+      if (isWindows) {
+        // Force kill on Windows using taskkill with tree flag
+        try {
+          require("child_process").execSync(`taskkill /pid ${pid} /T /F`, {
+            stdio: "ignore",
+          });
+        } catch (e) {
+          // Process may already be dead
+        }
+      } else {
+        localRefreshProcess.kill("SIGKILL");
+      }
+      localRefreshProcess = null;
+    }
+
+    // Also kill any orphaned AscendaraLocalRefresh processes by name
+    if (isWindows) {
+      console.log("Killing any remaining AscendaraLocalRefresh.exe processes...");
+      try {
+        require("child_process").execSync("taskkill /IM AscendaraLocalRefresh.exe /F", {
+          stdio: "ignore",
+        });
+      } catch (e) {
+        // No processes found or already dead
+      }
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to stop local refresh:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("get-local-refresh-progress", async (event, outputPath) => {
+  try {
+    const progressFilePath = path.join(outputPath, "progress.json");
+    if (fs.existsSync(progressFilePath)) {
+      const progressData = JSON.parse(fs.readFileSync(progressFilePath, "utf8"));
+      return progressData;
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to read local refresh progress:", error);
+    return null;
+  }
+});
+
+ipcMain.handle("get-local-refresh-status", async (event, outputPath) => {
+  try {
+    const isRunning = localRefreshProcess !== null && localRefreshShouldMonitor;
+    let progressData = null;
+
+    if (isRunning && outputPath) {
+      const progressFilePath = path.join(outputPath, "progress.json");
+      if (fs.existsSync(progressFilePath)) {
+        progressData = JSON.parse(fs.readFileSync(progressFilePath, "utf8"));
+      }
+    }
+
+    return { isRunning, progress: progressData };
+  } catch (error) {
+    console.error("Failed to get local refresh status:", error);
+    return { isRunning: false, progress: null };
+  }
 });
 
 let isInstalling = false;
@@ -5873,8 +6147,23 @@ function handleProtocolUrl(url) {
       lastHandledUrl = cleanUrl;
       lastHandleTime = currentTime;
 
-      // Check if this is a game URL
-      if (cleanUrl.includes("game")) {
+      // Check if this is a steamrip-cookie URL from the extension
+      if (cleanUrl.includes("steamrip-cookie")) {
+        try {
+          // Extract the cookie value - format: ascendara://steamrip-cookie/COOKIE_VALUE
+          const cookieMatch = cleanUrl.match(/steamrip-cookie\/(.+)/);
+          if (cookieMatch && cookieMatch[1]) {
+            const cookieValue = decodeURIComponent(cookieMatch[1]);
+            console.log("Received steamrip cookie from extension");
+            existingWindow.webContents.send("steamrip-cookie-received", {
+              cookie: cookieValue,
+            });
+          }
+        } catch (error) {
+          console.error("Error parsing steamrip cookie URL:", error);
+        }
+      } else if (cleanUrl.includes("game")) {
+        // Check if this is a game URL
         try {
           // Extract the ID, removing any query parameters
           const imageId = cleanUrl.split("?").pop().replace("/", "");
