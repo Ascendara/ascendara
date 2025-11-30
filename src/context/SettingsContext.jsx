@@ -44,6 +44,8 @@ export function SettingsProvider({ children }) {
     giantBombKey: "",
     torboxApiKey: "",
     localIndex: "",
+    blacklistIDs: [2013, 24872, 28688],
+    usingLocalIndex: false,
     fetchPageCount: 50,
     ludusavi: {
       backupLocation: "",
@@ -73,6 +75,19 @@ export function SettingsProvider({ children }) {
         await window.electron.saveSettings(updatedSettings);
       } catch (error) {
         console.error("Error saving settings:", error);
+      }
+    },
+    [settings]
+  );
+
+  const updateSetting = useCallback(
+    async (key, value) => {
+      const updatedSettings = { ...settings, [key]: value };
+      setSettingsState(updatedSettings);
+      try {
+        await window.electron.updateSetting(key, value);
+      } catch (error) {
+        console.error("Error updating setting:", error);
       }
     },
     [settings]
@@ -128,6 +143,7 @@ export function SettingsProvider({ children }) {
       value={{
         settings,
         setSettings,
+        updateSetting,
       }}
     >
       {children}

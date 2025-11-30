@@ -770,6 +770,8 @@ class SettingsManager {
       giantBombKey: "",
       torboxApiKey: "",
       localIndex: "",
+      blacklistIDs: [2013, 24872, 28688],
+      usingLocalIndex: false,
       fetchPageCount: 50,
       ludusavi: {
         backupLocation: "",

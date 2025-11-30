@@ -21,6 +21,11 @@ import {
   FolderOpen,
   Folder,
   Settings2,
+  ToggleRight,
+  ArrowLeftRight,
+  X,
+  Plus,
+  Ban,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -36,6 +41,8 @@ import {
 import RefreshIndexDialog from "@/components/RefreshIndexDialog";
 import { useNavigate } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
+import imageCacheService from "@/services/imageCacheService";
+import gameService from "@/services/gameService";
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -85,18 +92,15 @@ const LocalRefresh = () => {
   const [showRefreshDialog, setShowRefreshDialog] = useState(false);
   const [localIndexPath, setLocalIndexPath] = useState("");
   const [currentPhase, setCurrentPhase] = useState(""); // Track current phase for indeterminate progress
+  const [hasIndexBefore, setHasIndexBefore] = useState(false);
   const manuallyStoppedRef = useRef(false);
+  const [newBlacklistId, setNewBlacklistId] = useState("");
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
     const initializeSettings = async () => {
       try {
         const settings = await window.electron.getSettings();
-
-        // Load last refresh time
-        if (settings?.lastGameListRefresh) {
-          setLastRefreshTime(new Date(settings.lastGameListRefresh));
-        }
 
         // Check if localIndex is set, if not set it to default
         let indexPath = settings?.localIndex;
@@ -108,6 +112,25 @@ const LocalRefresh = () => {
           console.log("Set default localIndex path:", defaultPath);
         } else {
           setLocalIndexPath(indexPath);
+        }
+
+        // Check if user has indexed before from timestamp
+        if (window.electron?.getTimestampValue) {
+          const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
+          setHasIndexBefore(hasIndexed === true);
+        }
+
+        // Load last refresh time from progress.json timestamp
+        if (indexPath && window.electron?.getLocalRefreshProgress) {
+          try {
+            const progress = await window.electron.getLocalRefreshProgress(indexPath);
+            if (progress?.timestamp) {
+              // timestamp is in seconds (Unix epoch), convert to milliseconds
+              setLastRefreshTime(new Date(progress.timestamp * 1000));
+            }
+          } catch (e) {
+            console.log("No progress file found for last refresh time");
+          }
         }
 
         // Check if a refresh is currently running and restore UI state
@@ -214,9 +237,12 @@ const LocalRefresh = () => {
       if (data.status === "completed") {
         setRefreshStatus("completed");
         setIsRefreshing(false);
-        setLastRefreshTime(new Date());
-        // Update setting with last refresh time
-        window.electron?.updateSetting("lastGameListRefresh", new Date().toISOString());
+        // Use timestamp from progress data if available
+        if (data.timestamp) {
+          setLastRefreshTime(new Date(data.timestamp * 1000));
+        } else {
+          setLastRefreshTime(new Date());
+        }
         toast.success(
           t("localRefresh.refreshComplete") || "Game list refresh completed!"
         );
@@ -227,13 +253,22 @@ const LocalRefresh = () => {
       }
     };
 
-    const handleComplete = data => {
+    const handleComplete = async data => {
       if (data.code === 0) {
         setRefreshStatus("completed");
         setIsRefreshing(false);
-        setLastRefreshTime(new Date());
         manuallyStoppedRef.current = false;
-        window.electron?.updateSetting("lastGameListRefresh", new Date().toISOString());
+        // Read timestamp from progress.json
+        try {
+          const progress = await window.electron.getLocalRefreshProgress(localIndexPath);
+          if (progress?.timestamp) {
+            setLastRefreshTime(new Date(progress.timestamp * 1000));
+          } else {
+            setLastRefreshTime(new Date());
+          }
+        } catch (e) {
+          setLastRefreshTime(new Date());
+        }
         toast.success(
           t("localRefresh.refreshComplete") || "Game list refresh completed!"
         );
@@ -393,10 +428,14 @@ const LocalRefresh = () => {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return t("localRefresh.justNow") || "Just now";
+    if (diffMins === 1)
+      return `${diffMins} ${t("localRefresh.minuteAgo") || "minute ago"}`;
     if (diffMins < 60)
       return `${diffMins} ${t("localRefresh.minutesAgo") || "minutes ago"}`;
+    if (diffHours === 1) return `${diffHours} ${t("localRefresh.hourAgo") || "hour ago"}`;
     if (diffHours < 24)
       return `${diffHours} ${t("localRefresh.hoursAgo") || "hours ago"}`;
+    if (diffDays === 1) return `${diffDays} ${t("localRefresh.dayAgo") || "day ago"}`;
     return `${diffDays} ${t("localRefresh.daysAgo") || "days ago"}`;
   };
 
@@ -458,6 +497,87 @@ const LocalRefresh = () => {
               </p>
             </div>
           </div>
+
+          {!settings?.usingLocalIndex && (
+            <div
+              className={`relative overflow-hidden rounded-xl border-2 p-6 transition-all ${
+                hasIndexBefore
+                  ? "border-primary bg-gradient-to-br from-primary/10 via-primary/5 to-transparent"
+                  : "border-dashed border-muted-foreground/30 bg-muted/10"
+              }`}
+            >
+              {hasIndexBefore && (
+                <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+              )}
+              <div className="relative flex flex-col items-center space-y-4 text-center">
+                <div
+                  className={`rounded-full p-4 ${
+                    hasIndexBefore ? "bg-primary/20" : "bg-muted"
+                  }`}
+                >
+                  <ArrowLeftRight
+                    className={`h-8 w-8 ${
+                      hasIndexBefore ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <h3
+                    className={`text-xl font-bold ${
+                      hasIndexBefore ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {t("localRefresh.switchToLocal") || "Switch to Local Index"}
+                  </h3>
+                  <p className="max-w-md text-sm text-muted-foreground">
+                    {hasIndexBefore
+                      ? t("localRefresh.switchToLocalReady")
+                      : t("localRefresh.switchToLocalNotReady")}
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  variant={hasIndexBefore ? "default" : "outline"}
+                  className={`gap-2 ${hasIndexBefore ? "text-secondary" : ""}`}
+                  disabled={!hasIndexBefore || isRefreshing}
+                  onClick={async () => {
+                    // Clear all caches before switching to local index
+                    console.log(
+                      "[LocalRefresh] Clearing caches before switching to local index"
+                    );
+
+                    // Invalidate settings cache first
+                    imageCacheService.invalidateSettingsCache();
+
+                    // Clear image cache (memory + IndexedDB), skip auto-refresh since we're reloading
+                    await imageCacheService.clearCache(true);
+
+                    // Clear game service memory cache
+                    gameService.clearMemoryCache();
+
+                    // Clear localStorage caches
+                    localStorage.removeItem("ascendara_games_cache");
+                    localStorage.removeItem("local_ascendara_games_timestamp");
+                    localStorage.removeItem("local_ascendara_metadata_cache");
+                    localStorage.removeItem("local_ascendara_last_updated");
+
+                    // Now enable local index
+                    await updateSetting("usingLocalIndex", true);
+
+                    toast.success(t("localRefresh.switchedToLocal"));
+
+                    // Force reload the page to ensure fresh data
+                    window.location.reload();
+                  }}
+                >
+                  <ToggleRight className="h-4 w-4" />
+                  {hasIndexBefore
+                    ? t("localRefresh.enableLocalIndex") || "Enable Local Index"
+                    : t("localRefresh.refreshFirst") || "Refresh Index First"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Status Section */}
           <div className="space-y-6">
@@ -571,7 +691,25 @@ const LocalRefresh = () => {
               </span>
             </div>
           </div>
-
+          {/* Already Using Local Index Section */}
+          {settings?.usingLocalIndex && (
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-5">
+              <div className="flex items-start gap-4">
+                <div className="rounded-lg bg-green-500/20 p-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-green-600 dark:text-green-400">
+                    {t("localRefresh.usingLocalIndex") || "Using Local Index"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t("localRefresh.usingLocalIndexDesc") ||
+                      "You are currently using your local game index. Games are loaded from your local storage."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Divider */}
           <div className="border-t border-border" />
 
@@ -670,6 +808,24 @@ const LocalRefresh = () => {
             </motion.div>
           )}
 
+          {/* Info Section */}
+          <div className="rounded-lg border border-border bg-muted/20 p-5">
+            <div className="flex items-start gap-4">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Database className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-semibold">
+                  {t("localRefresh.whatThisDoes") || "What does this do?"}
+                </h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {t("localRefresh.whatThisDoesDescription") ||
+                    "This process re-scrapes SteamRIP to fetch newly added games and updates your local game index. This is useful when you want to see the latest games available for download."}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Storage Location Section */}
           <div className="rounded-lg border border-border bg-muted/20 p-5">
             <div className="flex items-start gap-4">
@@ -700,7 +856,7 @@ const LocalRefresh = () => {
                     disabled={isRefreshing}
                   >
                     <FolderOpen className="h-4 w-4" />
-                    {t("common.change") || "Change"}
+                    {t("settings.selectDirectory")}
                   </Button>
                 </div>
               </div>
@@ -753,20 +909,79 @@ const LocalRefresh = () => {
             </div>
           </div>
 
-          {/* Info Section */}
+          {/* Blacklist Section */}
           <div className="rounded-lg border border-border bg-muted/20 p-5">
             <div className="flex items-start gap-4">
               <div className="rounded-lg bg-primary/10 p-2">
-                <Database className="h-5 w-5 text-primary" />
+                <Ban className="h-5 w-5 text-primary" />
               </div>
-              <div className="space-y-1">
-                <h3 className="font-semibold">
-                  {t("localRefresh.whatThisDoes") || "What does this do?"}
-                </h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {t("localRefresh.whatThisDoesDescription") ||
-                    "This process re-scrapes SteamRIP to fetch newly added games and updates your local game index. This is useful when you want to see the latest games available for download."}
-                </p>
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h3 className="font-semibold">
+                    {t("localRefresh.blacklist") || "Blacklisted Games"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t("localRefresh.blacklistDesc") ||
+                      "Games with these IDs will be excluded from the scrape"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder={t("localRefresh.enterGameId") || "Enter game ID"}
+                    value={newBlacklistId}
+                    onChange={e => setNewBlacklistId(e.target.value)}
+                    className="w-32 bg-background text-sm"
+                    disabled={isRefreshing}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && newBlacklistId) {
+                        const id = parseInt(newBlacklistId);
+                        if (!isNaN(id) && !settings?.blacklistIDs?.includes(id)) {
+                          const newList = [...(settings?.blacklistIDs || []), id];
+                          updateSetting("blacklistIDs", newList);
+                          setNewBlacklistId("");
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isRefreshing || !newBlacklistId}
+                    onClick={() => {
+                      const id = parseInt(newBlacklistId);
+                      if (!isNaN(id) && !settings?.blacklistIDs?.includes(id)) {
+                        const newList = [...(settings?.blacklistIDs || []), id];
+                        updateSetting("blacklistIDs", newList);
+                        setNewBlacklistId("");
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {settings?.blacklistIDs?.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {settings.blacklistIDs.map(id => (
+                      <div
+                        key={id}
+                        className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-sm"
+                      >
+                        <span className="font-mono">{id}</span>
+                        <button
+                          onClick={() => {
+                            const newList = settings.blacklistIDs.filter(i => i !== id);
+                            updateSetting("blacklistIDs", newList);
+                          }}
+                          disabled={isRefreshing}
+                          className="hover:bg-destructive/20 hover:text-destructive ml-1 rounded p-0.5 disabled:opacity-50"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
