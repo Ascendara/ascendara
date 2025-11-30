@@ -53,7 +53,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
         }
       },
       {
-        rootMargin: "50px",
+        rootMargin: "200px", // Increased for earlier preloading
         threshold: 0.1,
       }
     );

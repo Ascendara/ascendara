@@ -1636,6 +1636,36 @@ ipcMain.handle("get-api-key", () => {
   return apiKeyOverride || APIKEY;
 });
 
+// Read file from local filesystem (for local index)
+ipcMain.handle("read-local-file", async (event, filePath) => {
+  try {
+    const content = await fs.promises.readFile(filePath, "utf8");
+    return content;
+  } catch (error) {
+    console.error("Error reading local file:", error);
+    throw error;
+  }
+});
+
+// Get local image as base64 data URL
+ipcMain.handle("get-local-image-url", async (event, imagePath) => {
+  try {
+    // Check if file exists
+    if (fs.existsSync(imagePath)) {
+      // Read file and convert to base64 data URL
+      const imageBuffer = await fs.promises.readFile(imagePath);
+      const base64 = imageBuffer.toString("base64");
+      const mimeType = "image/jpeg"; // Local images are saved as .jpg
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+      return dataUrl;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting local image:", error);
+    return null;
+  }
+});
+
 // Handle external urls
 ipcMain.handle("open-url", async (event, url) => {
   shell.openExternal(url);
@@ -2307,38 +2337,58 @@ ipcMain.handle(
         return;
       }
 
-      // Download game header image
-      const imageLink =
-        settings.gameSource === "fitgirl"
-          ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
-          : `https://api.ascendara.app/v2/image/${imgID}`;
-      console.log(`Downloading header image from: ${imageLink}`);
+      // Download game header image - check for local image first
+      let headerImagePath;
+      let imageBuffer;
 
-      const timestamp = Math.floor(Date.now() / 1000);
-      const signature = crypto
-        .createHmac("sha256", imageKey)
-        .update(timestamp.toString())
-        .digest("hex");
+      if (settings.usingLocalIndex && settings.localIndex && imgID) {
+        // Try to use local image
+        const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+        console.log(`Checking for local image at: ${localImagePath}`);
 
-      const response = await axios({
-        url: imageLink,
-        method: "GET",
-        responseType: "arraybuffer",
-        headers: {
-          "X-Timestamp": timestamp.toString(),
-          "X-Signature": signature,
-          "Cache-Control": "no-store",
-        },
-      });
-      console.log(`Header image downloaded successfully`);
+        if (fs.existsSync(localImagePath)) {
+          console.log(`Using local image for header`);
+          imageBuffer = await fs.promises.readFile(localImagePath);
+          headerImagePath = path.join(gameDirectory, `header.ascendara.jpg`);
+          await fs.promises.writeFile(headerImagePath, imageBuffer);
+          console.log(`Header image copied from local index to: ${headerImagePath}`);
+        }
+      }
 
-      // Save the image
-      const imageBuffer = Buffer.from(response.data);
-      const mimeType = response.headers["content-type"];
-      const extension = getExtensionFromMimeType(mimeType);
-      const headerImagePath = path.join(gameDirectory, `header.ascendara${extension}`);
-      await fs.promises.writeFile(headerImagePath, imageBuffer);
-      console.log(`Header image saved to: ${headerImagePath}`);
+      // If no local image found, download from API
+      if (!headerImagePath) {
+        const imageLink =
+          settings.gameSource === "fitgirl"
+            ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
+            : `https://api.ascendara.app/v2/image/${imgID}`;
+        console.log(`Downloading header image from: ${imageLink}`);
+
+        const timestamp = Math.floor(Date.now() / 1000);
+        const signature = crypto
+          .createHmac("sha256", imageKey)
+          .update(timestamp.toString())
+          .digest("hex");
+
+        const response = await axios({
+          url: imageLink,
+          method: "GET",
+          responseType: "arraybuffer",
+          headers: {
+            "X-Timestamp": timestamp.toString(),
+            "X-Signature": signature,
+            "Cache-Control": "no-store",
+          },
+        });
+        console.log(`Header image downloaded successfully`);
+
+        // Save the image
+        imageBuffer = Buffer.from(response.data);
+        const mimeType = response.headers["content-type"];
+        const extension = getExtensionFromMimeType(mimeType);
+        headerImagePath = path.join(gameDirectory, `header.ascendara${extension}`);
+        await fs.promises.writeFile(headerImagePath, imageBuffer);
+        console.log(`Header image saved to: ${headerImagePath}`);
+      }
 
       const isWindows = process.platform === "win32";
       console.log(`Platform detected: ${isWindows ? "Windows" : "Non-Windows"}`);

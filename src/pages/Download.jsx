@@ -2008,21 +2008,40 @@ export default function DownloadPage() {
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* DMCA Notice Banner */}
-          <div
-            className="w-full cursor-pointer rounded-lg border border-primary/20 bg-primary/10 p-3 transition-colors hover:bg-primary/15"
-            onClick={() => window.electron.openURL("https://ascendara.app/dmca")}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MessageSquareWarning className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium">{t("download.dmcaNotice")}</span>
+          {/* DMCA / Local Notice Banner */}
+          {settings?.usingLocalIndex ? (
+            <div
+              className="w-full cursor-pointer rounded-lg border border-green-500/30 bg-green-500/10 p-3 transition-colors hover:bg-green-500/20"
+              onClick={() => window.electron.openURL("https://ascendara.app/support")}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <InfoIcon className="h-5 w-5 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">
+                    {t("download.localSourceMsg")}
+                  </span>
+                </div>
+                <span className="flex items-center gap-1 text-sm text-green-700">
+                  {t("common.learnMore")}
+                </span>
               </div>
-              <span className="flex items-center gap-1 text-sm text-primary hover:underline">
-                {t("common.learnMore")} <ExternalLink size={16} />
-              </span>
             </div>
-          </div>
+          ) : (
+            <div
+              className="w-full cursor-pointer rounded-lg border border-primary/20 bg-primary/10 p-3 transition-colors hover:bg-primary/15"
+              onClick={() => window.electron.openURL("https://ascendara.app/dmca")}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquareWarning className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">{t("download.dmcaNotice")}</span>
+                </div>
+                <span className="flex items-center gap-1 text-sm text-primary hover:underline">
+                  {t("common.learnMore")} <ExternalLink size={16} />
+                </span>
+              </div>
+            </div>
+          )}
 
           <Separator className="my-1" />
 

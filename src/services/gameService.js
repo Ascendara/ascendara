@@ -15,6 +15,8 @@ let memoryCache = {
   timestamp: null,
   lastUpdated: null,
   imageIdMap: null, // New cache for image ID lookups
+  isLocalIndex: false, // Track if using local index
+  localIndexPath: null, // Path to local index
 };
 
 const gameService = {
@@ -24,7 +26,7 @@ const gameService = {
   },
 
   async getCachedData() {
-    // Check memory cache first
+    // Check memory cache FIRST - no async, instant return
     const now = Date.now();
     if (memoryCache.games && memoryCache.metadata && memoryCache.timestamp) {
       const age = now - memoryCache.timestamp;
@@ -36,7 +38,50 @@ const gameService = {
       }
     }
 
-    // Check localStorage cache
+    // Check if using local index
+    const settings = await window.electron.getSettings();
+    const usingLocalIndex = settings?.usingLocalIndex === true;
+
+    // If local index setting changed, invalidate cache
+    if (memoryCache.isLocalIndex !== usingLocalIndex) {
+      console.log("[GameService] Local index setting changed, invalidating cache");
+      memoryCache = {
+        games: null,
+        metadata: null,
+        timestamp: null,
+        lastUpdated: null,
+        imageIdMap: null,
+        isLocalIndex: usingLocalIndex,
+        localIndexPath: settings?.localIndex,
+      };
+    }
+
+    // If using local index, load from local file
+    if (usingLocalIndex && settings?.localIndex) {
+      try {
+        const data = await this.fetchDataFromLocalIndex(settings.localIndex);
+        if (data && data.games && data.games.length > 0) {
+          await this.updateCache(data, true, settings.localIndex);
+          return data;
+        }
+        console.warn("[GameService] Local index file empty or not found");
+        // Return empty data to prevent mixing local and API data
+        return {
+          games: [],
+          metadata: { local: true, games: 0, source: "LOCAL", getDate: "Not available" },
+        };
+      } catch (error) {
+        console.error("[GameService] Error loading local index:", error);
+        // Don't fall back to API when local index is enabled - return empty
+        // This prevents mixing local and API data
+        return {
+          games: [],
+          metadata: { local: true, games: 0, source: "LOCAL", getDate: "Not available" },
+        };
+      }
+    }
+
+    // Check localStorage cache (only when NOT using local index)
     const cachedGames = localStorage.getItem(CACHE_KEY);
     const cachedMetadata = localStorage.getItem(METADATA_CACHE_KEY);
     const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
@@ -49,10 +94,12 @@ const gameService = {
 
         // Update memory cache
         memoryCache = {
+          ...memoryCache,
           games: parsedGames,
           metadata: parsedMetadata,
           timestamp: parseInt(timestamp),
           lastUpdated: parsedMetadata.getDate,
+          isLocalIndex: usingLocalIndex,
         };
 
         return {
@@ -84,6 +131,37 @@ const gameService = {
       }
       console.error("Error fetching data:", error);
       return { games: [], metadata: null };
+    }
+  },
+
+  async fetchDataFromLocalIndex(localIndexPath) {
+    try {
+      console.log("[GameService] Loading local index from:", localIndexPath);
+      const filePath = `${localIndexPath}/ascendara_games.json`;
+      const fileContent = await window.electron.ipcRenderer.readFile(filePath);
+      const data = JSON.parse(fileContent);
+
+      // Sanitize game titles
+      if (data.games) {
+        data.games = data.games.map(game => ({
+          ...game,
+          name: sanitizeText(game.name || game.game),
+          game: sanitizeText(game.game),
+        }));
+      }
+
+      return {
+        games: data.games,
+        metadata: {
+          ...data.metadata,
+          games: data.games?.length,
+          local: true,
+          localIndexPath: localIndexPath,
+        },
+      };
+    } catch (error) {
+      console.error("[GameService] Error reading local index file:", error);
+      throw error;
     }
   },
 
@@ -178,7 +256,7 @@ const gameService = {
     }
   },
 
-  async updateCache(data) {
+  async updateCache(data, isLocalIndex = false, localIndexPath = null) {
     try {
       const now = Date.now();
 
@@ -197,6 +275,8 @@ const gameService = {
         timestamp: now,
         lastUpdated: data.metadata?.getDate,
         imageIdMap, // Store the map in memory cache
+        isLocalIndex,
+        localIndexPath,
       };
 
       // Update localStorage cache
@@ -255,6 +335,34 @@ const gameService = {
 
   getImageUrl(imgID) {
     return `${API_URL}/v2/image/${imgID}`;
+  },
+
+  async getLocalImagePath(imgID) {
+    if (!memoryCache.isLocalIndex || !memoryCache.localIndexPath) {
+      return null;
+    }
+    return `${memoryCache.localIndexPath}/imgs/${imgID}.jpg`;
+  },
+
+  isUsingLocalIndex() {
+    return memoryCache.isLocalIndex === true;
+  },
+
+  getLocalIndexPath() {
+    return memoryCache.localIndexPath;
+  },
+
+  clearMemoryCache() {
+    console.log("[GameService] Clearing memory cache");
+    memoryCache = {
+      games: null,
+      metadata: null,
+      timestamp: null,
+      lastUpdated: null,
+      imageIdMap: null,
+      isLocalIndex: false,
+      localIndexPath: null,
+    };
   },
 
   async searchGameCovers(query) {

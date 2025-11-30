@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   X,
   SendIcon,
+  Database,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import {
@@ -209,11 +210,7 @@ const Search = memo(() => {
     [isCacheValid]
   );
 
-  useEffect(() => {
-    setLoading(true);
-    refreshGames().finally(() => setLoading(false));
-  }, [refreshGames]);
-
+  // Load games on mount - single effect to avoid duplicate loading
   useEffect(() => {
     setLoading(true);
     refreshGames(true).finally(() => setLoading(false));
@@ -271,11 +268,15 @@ const Search = memo(() => {
     return () => unsubscribe();
   }, []);
 
-  // Start status check interval when component mounts
+  // Start status check interval when component mounts (skip for local index)
   useEffect(() => {
+    // Skip server status checks if using local index
+    if (settings?.usingLocalIndex) {
+      return;
+    }
     const stopStatusCheck = startStatusCheck();
     return () => stopStatusCheck();
-  }, []);
+  }, [settings?.usingLocalIndex]);
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
@@ -513,75 +514,108 @@ const Search = memo(() => {
       <div className="flex-1 p-8 pb-24">
         <div className="mx-auto max-w-[1400px]">
           {apiMetadata && (
-            <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-              <span>
-                {apiMetadata.games.toLocaleString()} {t("search.gamesIndexed")}
-              </span>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <InfoIcon className="h-4 w-4 cursor-pointer transition-colors hover:text-foreground" />
-                </AlertDialogTrigger>
-                <AlertDialogContent className="border-border">
-                  <AlertDialogCancel className="absolute right-2 top-2 cursor-pointer text-foreground transition-colors">
-                    <X className="h-4 w-4" />
-                  </AlertDialogCancel>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                      {t("search.indexedInformation")}
-                    </AlertDialogTitle>
-                    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                      <p>
-                        {t("search.indexedInformationDescription")}{" "}
-                        <a
-                          onClick={() =>
-                            window.electron.openURL("https://ascendara.app/dmca")
-                          }
-                          className="cursor-pointer text-primary hover:underline"
-                        >
-                          {t("common.learnMore")}{" "}
-                          <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                        </a>
-                      </p>
-
-                      <Separator className="bg-border/50" />
-                      <p>
-                        {t("search.totalGames")}: {apiMetadata.games.toLocaleString()}
-                      </p>
-                      <p>
-                        {t("search.source")}: {apiMetadata.source}
-                      </p>
-                      <p>
-                        {t("search.lastUpdated")}: {apiMetadata.getDate}
-                      </p>
-                      <Separator className="bg-border/50" />
-                      <div className="space-y-2 pt-2">
-                        <Button
-                          variant="outline"
-                          onClick={handleRefreshIndex}
-                          disabled={isRefreshing}
-                          className="flex w-full items-center justify-center gap-2"
-                        >
-                          <RefreshCw
-                            className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                          />
-                          {isRefreshing
-                            ? t("search.refreshingIndex")
-                            : t("search.refreshIndex")}
-                        </Button>
-
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsRefreshRequestDialogOpen(true)}
-                          className="flex w-full items-center justify-center gap-2"
-                        >
-                          <SendIcon className="h-4 w-4" />
-                          {t("search.sendRefreshRequest")}
-                        </Button>
+            <div className="mb-6 flex flex-col gap-3">
+              {!apiMetadata.local && (
+                <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{t("search.usingApiWarning")}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>
+                  {apiMetadata.games.toLocaleString()} {t("search.gamesIndexed")}
+                </span>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <InfoIcon className="h-4 w-4 cursor-pointer transition-colors hover:text-foreground" />
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-border">
+                    <AlertDialogCancel className="absolute right-2 top-2 cursor-pointer text-foreground transition-colors">
+                      <X className="h-4 w-4" />
+                    </AlertDialogCancel>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                        {apiMetadata.local
+                          ? t("search.localIndexedInformation")
+                          : t("search.indexedInformation")}
+                      </AlertDialogTitle>
+                      <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                        {apiMetadata.local ? (
+                          <>
+                            <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-green-600 dark:text-green-400">
+                              <Database className="h-4 w-4 shrink-0" />
+                              <span>{t("search.usingLocalIndex")}</span>
+                            </div>
+                            <p>{t("search.localIndexedDescription")}</p>
+                            <Separator className="bg-border/50" />
+                            <p>
+                              {t("search.totalGames")}:{" "}
+                              {apiMetadata.games.toLocaleString()}
+                            </p>
+                            <p>
+                              {t("search.source")}: {apiMetadata.source}
+                            </p>
+                            <p>
+                              {t("search.lastUpdated")}: {apiMetadata.getDate}
+                            </p>
+                            <Separator className="bg-border/50" />
+                            <div className="pt-2">
+                              <Button
+                                className="flex w-full items-center justify-center gap-2 text-secondary"
+                                onClick={() => navigate("/localrefresh")}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                {t("search.refreshLocalIndex")}
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p>
+                              {t("search.indexedInformationDescription")}{" "}
+                              <a
+                                onClick={() =>
+                                  window.electron.openURL("https://ascendara.app/dmca")
+                                }
+                                className="cursor-pointer text-primary hover:underline"
+                              >
+                                {t("common.learnMore")}{" "}
+                                <ExternalLink className="mb-1 inline-block h-3 w-3" />
+                              </a>
+                            </p>
+                            <Separator className="bg-border/50" />
+                            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-yellow-600 dark:text-yellow-400">
+                              <AlertTriangle className="h-4 w-4 shrink-0" />
+                              <span>{t("search.usingApiWarning")}</span>
+                            </div>
+                            <Separator className="bg-border/50" />
+                            <p>
+                              {t("search.totalGames")}:{" "}
+                              {apiMetadata.games.toLocaleString()}
+                            </p>
+                            <p>
+                              {t("search.source")}: {apiMetadata.source}
+                            </p>
+                            <p>
+                              {t("search.lastUpdated")}: {apiMetadata.getDate}
+                            </p>
+                            <Separator className="bg-border/50" />
+                            <div className="pt-2">
+                              <Button
+                                className="flex w-full items-center justify-center gap-2 text-secondary"
+                                onClick={() => navigate("/localrefresh")}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                {t("search.switchToLocalIndex")}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    </div>
-                  </AlertDialogHeader>
-                </AlertDialogContent>
-              </AlertDialog>
+                    </AlertDialogHeader>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
 
               {/* Send Refresh Request Confirmation Dialog */}
               <AlertDialog
