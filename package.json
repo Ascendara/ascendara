@@ -172,6 +172,10 @@
         "to": "."
       },
       {
+        "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh.exe",
+        "to": "."
+      },
+      {
         "from": "binaries/AscendaraGofileHelper/src/debian/AscendaraGofileHelper.py",
         "to": "."
       },
@@ -193,6 +197,10 @@
       },
       {
         "from": "binaries/AscendaraLanguageTranslation/src/debian/AscendaraLanguageTranslation.py",
+        "to": "."
+      },
+      {
+        "from": "binaries/AscendaraLocalRefresh/src/debian/AscendaraLocalRefresh.py",
         "to": "."
       },
       {
