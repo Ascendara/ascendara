@@ -14,7 +14,8 @@ let memoryCache = {
   metadata: null,
   timestamp: null,
   lastUpdated: null,
-  imageIdMap: null, // New cache for image ID lookups
+  imageIdMap: null, // Cache for image ID lookups
+  gameIdMap: null, // Cache for game ID lookups
   isLocalIndex: false, // Track if using local index
   localIndexPath: null, // Path to local index
 };
@@ -51,6 +52,7 @@ const gameService = {
         timestamp: null,
         lastUpdated: null,
         imageIdMap: null,
+        gameIdMap: null,
         isLocalIndex: usingLocalIndex,
         localIndexPath: settings?.localIndex,
       };
@@ -371,6 +373,7 @@ const gameService = {
       timestamp: null,
       lastUpdated: null,
       imageIdMap: null,
+      gameIdMap: null,
       isLocalIndex: false,
       localIndexPath: null,
     };
@@ -469,6 +472,43 @@ const gameService = {
       return game;
     } catch (error) {
       console.error("Error finding game by image ID:", error);
+      return null;
+    }
+  },
+
+  async findGameByGameID(gameID) {
+    try {
+      // Ensure we have the latest data
+      if (!memoryCache.gameIdMap) {
+        const data = await this.getCachedData();
+        if (!memoryCache.gameIdMap) {
+          // Create game ID map if it doesn't exist
+          const gameIdMap = new Map();
+          data.games.forEach(game => {
+            if (game.gameID) {
+              // Store the game with its download links directly from the API
+              gameIdMap.set(game.gameID, {
+                ...game,
+                // Ensure download_links exists, even if empty
+                download_links: game.download_links || {},
+              });
+            }
+          });
+          memoryCache.gameIdMap = gameIdMap;
+        }
+      }
+
+      // O(1) lookup from the map
+      const game = memoryCache.gameIdMap.get(gameID);
+      if (!game) {
+        console.warn(`No game found with game ID: ${gameID}`);
+        return null;
+      }
+
+      console.log("Found game with download links:", game.download_links);
+      return game;
+    } catch (error) {
+      console.error("Error finding game by game ID:", error);
       return null;
     }
   },

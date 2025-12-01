@@ -174,20 +174,20 @@ const AppRoutes = () => {
 
       try {
         // Set up game protocol URL listener
-        const handleGameProtocol = async (event, { imageId }) => {
-          console.log("Received game protocol URL with imageId:", imageId);
-          if (!imageId) {
-            console.error("No imageId received in game protocol URL");
+        const handleGameProtocol = async (event, { gameID }) => {
+          console.log("Received game protocol URL with gameID:", gameID);
+          if (!gameID) {
+            console.error("No gameID received in game protocol URL");
             return;
           }
 
           try {
-            // Clean the imageId by removing any query parameters or slashes
-            const cleanImageId = imageId.replace(/[?/]/g, "");
-            console.log("Looking up game with cleaned imageId:", cleanImageId);
+            // Clean the gameID by removing any query parameters or slashes
+            const cleanGameID = gameID.replace(/[?/]/g, "");
+            console.log("Looking up game with cleaned gameID:", cleanGameID);
 
             // Find the game using the efficient lookup service
-            const game = await gameService.findGameByImageId(cleanImageId);
+            const game = await gameService.findGameByGameID(cleanGameID);
             console.log("Found game:", game);
 
             if (!game) {

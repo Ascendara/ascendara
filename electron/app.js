@@ -40,7 +40,7 @@ let isLatest = true;
 let updateDownloaded = false;
 let notificationShown = false;
 let updateDownloadInProgress = false;
-let experiment = true;
+let experiment = false;
 let installedTools = [];
 let isBrokenVersion = false;
 let rpcIsConnected = false;
@@ -6252,13 +6252,13 @@ function handleProtocolUrl(url) {
           console.error("Error parsing steamrip cookie URL:", error);
         }
       } else if (cleanUrl.includes("game")) {
-        // Check if this is a game URL
+        // Check if this is a game URL - format: ascendara://game?{gameID}
         try {
-          // Extract the ID, removing any query parameters
-          const imageId = cleanUrl.split("?").pop().replace("/", "");
-          if (imageId) {
-            console.log("Sending game URL to renderer with imageId:", imageId);
-            existingWindow.webContents.send("protocol-game-url", { imageId });
+          // Extract the gameID from the URL
+          const gameID = cleanUrl.split("?").pop().replace("/", "");
+          if (gameID) {
+            console.log("Sending game URL to renderer with gameID:", gameID);
+            existingWindow.webContents.send("protocol-game-url", { gameID });
           }
         } catch (error) {
           console.error("Error parsing game URL:", error);
