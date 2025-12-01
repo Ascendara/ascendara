@@ -50,9 +50,9 @@ Ascendara simplifies your game management experience by providing a seamless way
 
   Beautiful, appealing themes to choose from for a truly unique experience.
 
-- 🕑 **Ascendara Timemachine**
+- 🕑 **Local Indexing**
 
-  Access and download previous versions of games with the Ascendara Timemachine.
+  Search for games at crazy speeds and refresh whenever you want.
 
 - 👤 **Your own username**
 
