@@ -39,7 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import RefreshIndexDialog from "@/components/RefreshIndexDialog";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
 import imageCacheService from "@/services/imageCacheService";
 import gameService from "@/services/gameService";
@@ -58,7 +58,12 @@ const itemVariants = {
 const LocalRefresh = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { settings, updateSetting } = useSettings();
+
+  // Get welcomeStep, indexRefreshStarted, and indexComplete from navigation state if coming from Welcome page
+  const welcomeStep = location.state?.welcomeStep;
+  const indexRefreshStartedFromWelcome = location.state?.indexRefreshStarted;
 
   // Add CSS animation for indeterminate progress
   useEffect(() => {
@@ -466,7 +471,7 @@ const LocalRefresh = () => {
   };
 
   return (
-    <div className="mt-12 min-h-screen bg-background">
+    <div className={`${welcomeStep ? "mt-0 pt-10" : "mt-6"} min-h-screen bg-background`}>
       <div className="container mx-auto max-w-4xl px-4 py-8">
         <motion.div
           variants={containerVariants}
@@ -480,7 +485,23 @@ const LocalRefresh = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                // If we came from Welcome, navigate back with the step state and refresh status
+                if (welcomeStep) {
+                  // Check if refresh is currently running or completed
+                  const stillRefreshing = isRefreshing || indexRefreshStartedFromWelcome;
+                  const isComplete = refreshStatus === "completed";
+                  navigate("/welcome", {
+                    state: {
+                      welcomeStep,
+                      indexRefreshStarted: stillRefreshing && !isComplete,
+                      indexComplete: isComplete,
+                    },
+                  });
+                } else {
+                  navigate(-1);
+                }
+              }}
               className="gap-2 text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -632,7 +653,7 @@ const LocalRefresh = () => {
                     variant="destructive"
                     size="sm"
                     onClick={() => setShowStopDialog(true)}
-                    className="gap-2"
+                    className="gap-2 text-primary"
                   >
                     <StopCircle className="h-3.5 w-3.5" />
                     {t("localRefresh.stopRefresh") || "Stop"}
@@ -847,6 +868,9 @@ const LocalRefresh = () => {
                     {t("localRefresh.storageLocationDesc") ||
                       "Where the local game index and images are stored"}
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("localRefresh.storageLocationInfo")}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
@@ -1007,10 +1031,7 @@ const LocalRefresh = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("common.cancel") || "Cancel"}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleStopRefresh}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
+              <AlertDialogAction className="text-secondary" onClick={handleStopRefresh}>
                 {t("localRefresh.stopRefresh") || "Stop Refresh"}
               </AlertDialogAction>
             </AlertDialogFooter>

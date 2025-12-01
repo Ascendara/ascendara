@@ -24,7 +24,10 @@ import {
   FolderDownIcon,
   Unplug,
   Wine,
+  Database,
+  AlertTriangle,
 } from "lucide-react";
+import RefreshIndexDialog from "@/components/RefreshIndexDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { languages } from "@/i18n";
 import { useTheme } from "@/context/ThemeContext";
@@ -215,9 +218,13 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const { t } = useTranslation();
   const { language, changeLanguage } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { setTheme } = useTheme();
   const [isV7Welcome, setIsV7Welcome] = useState(welcomeData.isV7Welcome);
-  const [step, setStep] = useState("language");
+  // Restore step and refresh state from navigation state if coming back from localrefresh
+  const [step, setStep] = useState(location.state?.welcomeStep || "language");
+  const restoredRefreshState = location.state?.indexRefreshStarted || false;
+  const restoredIndexComplete = location.state?.indexComplete || false;
   const [selectedTheme, setSelectedTheme] = useState("purple");
   const [showingLightThemes, setShowingLightThemes] = useState(true);
   const [privacyChecked, setPrivacyChecked] = useState(false);
@@ -246,6 +253,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [showAnalyticsStep, setShowAnalyticsStep] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [referralSource, setReferralSource] = useState("");
+  const [showRefreshDialog, setShowRefreshDialog] = useState(false);
+  const [isIndexRefreshing, setIsIndexRefreshing] = useState(restoredRefreshState);
+  const [indexRefreshStarted, setIndexRefreshStarted] = useState(restoredRefreshState);
+  const [indexComplete, setIndexComplete] = useState(restoredIndexComplete);
   const [customReferral, setCustomReferral] = useState("");
   const [referralSent, setReferralSent] = useState(false);
   const [settings, setSettings] = useState({
@@ -425,12 +436,14 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "welcome") {
       setStep("noticeAppIsFree");
     } else if (step === "noticeAppIsFree") {
+      setStep("extension");
+    } else if (step === "extension") {
+      setStep("localIndex");
+    } else if (step === "localIndex") {
       setStep("referral");
     } else if (step === "referral") {
       setStep("directory");
     } else if (step === "directory") {
-      setStep("extension");
-    } else if (step === "extension") {
       setStep("theme");
     } else if (step === "theme") {
       setStep("analytics");
@@ -677,6 +690,48 @@ const Welcome = ({ welcomeData, onComplete }) => {
     checkPlatform();
   }, []);
 
+  const handleStartLocalRefresh = async refreshData => {
+    try {
+      setIsIndexRefreshing(true);
+      setIndexRefreshStarted(true);
+
+      // Get default local index path
+      const defaultPath = await window.electron.getDefaultLocalIndexPath();
+
+      // Update settings to enable local index
+      const currentSettings = await window.electron.getSettings();
+      const updatedSettings = {
+        ...currentSettings,
+        usingLocalIndex: true,
+        localIndex: defaultPath,
+      };
+      await window.electron.saveSettings(updatedSettings);
+
+      // Start the refresh
+      await window.electron.startLocalRefresh({
+        outputPath: defaultPath,
+        cfClearance: refreshData.cfClearance || "",
+      });
+
+      // Listen for completion
+      const handleComplete = () => {
+        setIsIndexRefreshing(false);
+        window.electron.offLocalRefreshComplete();
+      };
+
+      const handleError = () => {
+        setIsIndexRefreshing(false);
+        window.electron.offLocalRefreshError();
+      };
+
+      window.electron.onLocalRefreshComplete(handleComplete);
+      window.electron.onLocalRefreshError(handleError);
+    } catch (error) {
+      console.error("Error starting local refresh:", error);
+      setIsIndexRefreshing(false);
+    }
+  };
+
   if (welcomeData.isV7Welcome) {
     if (showAnalyticsStep) {
       return (
@@ -726,19 +781,19 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 </div>
                 <ul className="mb-6 space-y-3 text-left">
                   <li className="flex items-start space-x-2">
-                    <CheckCircle2
+                    <CircleCheck
                       className={`h-5 w-5 ${analyticsConsent ? "text-primary" : "text-muted-foreground"} mt-0.5 shrink-0`}
                     />
                     <span>{t("welcome.helpIdentifyAndFix")}</span>
                   </li>
                   <li className="flex items-start space-x-2">
-                    <CheckCircle2
+                    <CircleCheck
                       className={`h-5 w-5 ${analyticsConsent ? "text-primary" : "text-muted-foreground"} mt-0.5 shrink-0`}
                     />
                     <span>{t("welcome.influenceFutureFeatures")}</span>
                   </li>
                   <li className="flex items-start space-x-2">
-                    <CheckCircle2
+                    <CircleCheck
                       className={`h-5 w-5 ${analyticsConsent ? "text-primary" : "text-muted-foreground"} mt-0.5 shrink-0`}
                     />
                     <span>{t("welcome.bePartOfImproving")}</span>
@@ -1239,6 +1294,89 @@ const Welcome = ({ welcomeData, onComplete }) => {
             </motion.div>
           )}
 
+          {step === "localIndex" && (
+            <motion.div
+              key="localIndex"
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <Database className="mx-auto mb-4 h-16 w-16 text-primary" />
+                <h2 className="mb-2 text-3xl font-bold text-primary">
+                  {t("welcome.localIndex.title")}
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                  {t("welcome.localIndex.subtitle")}
+                </p>
+              </motion.div>
+
+              <motion.div
+                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6"
+                variants={itemVariants}
+              >
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                  <p>{t("welcome.localIndex.point1")}</p>
+                </div>
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                  <p>{t("welcome.localIndex.point2")}</p>
+                </div>
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                  <p>{t("welcome.localIndex.point3")}</p>
+                </div>
+              </motion.div>
+
+              {indexRefreshStarted ? (
+                <motion.div variants={itemVariants} className="space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-primary">
+                    {isIndexRefreshing ? (
+                      <>
+                        <Loader className="h-5 w-5 animate-spin" />
+                        <span>{t("welcome.localIndex.refreshing")}</span>
+                      </>
+                    ) : (
+                      <>
+                        <CircleCheck className="h-5 w-5" />
+                        <span>{t("welcome.localIndex.refreshComplete")}</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {t("welcome.localIndex.canContinue")}
+                  </p>
+                  <Button
+                    size="lg"
+                    onClick={handleNext}
+                    className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                  >
+                    {t("welcome.continue")}
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div variants={itemVariants}>
+                  <Button
+                    size="lg"
+                    onClick={() => setShowRefreshDialog(true)}
+                    className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                  >
+                    {t("welcome.localIndex.setupIndex")}
+                  </Button>
+                </motion.div>
+              )}
+
+              <RefreshIndexDialog
+                open={showRefreshDialog}
+                onOpenChange={setShowRefreshDialog}
+                onStartRefresh={handleStartLocalRefresh}
+              />
+            </motion.div>
+          )}
+
           {step === "referral" && (
             <motion.div
               key="referral"
@@ -1625,7 +1763,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   <div className="mb-6 space-y-4">
                     {analyticsFeatures.map(feature => (
                       <div key={feature.title} className="flex items-start space-x-2">
-                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                        <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                         <div className="text-left">
                           <p className="font-medium text-muted-foreground">
                             {feature.title}
@@ -1729,7 +1867,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   <div className="mb-6 space-y-4">
                     {features.map(feature => (
                       <div key={feature.title} className="flex items-start space-x-2">
-                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                        <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                         <div className="text-left">
                           <p className="font-medium text-primary">{feature.title}</p>
                           <p className="text-sm text-foreground/70">
@@ -1799,6 +1937,22 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     {t("welcome.essentialDependencies")}
                   </h2>
                 </motion.div>
+                {isIndexRefreshing && (
+                  <motion.div
+                    className="mb-6 flex items-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3"
+                    variants={itemVariants}
+                  >
+                    <AlertTriangle className="h-5 w-5 flex-shrink-0 text-yellow-500" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-yellow-600">
+                        {t("welcome.localIndex.stillRefreshing")}
+                      </p>
+                      <p className="text-xs text-yellow-600/80">
+                        {t("welcome.localIndex.waitForRefresh")}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
                 <motion.div className="mb-12 max-w-2xl space-y-6" variants={itemVariants}>
                   <p className="text-xl text-foreground/80">
                     {t("welcome.dependenciesDesc")}
@@ -1850,21 +2004,21 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       className="h-2"
                     />
                   </motion.div>
-                ) : (
+                ) : indexComplete ? (
                   <motion.div
-                    className="flex justify-center space-x-4"
+                    className="flex flex-col items-center space-y-6"
                     variants={itemVariants}
                   >
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setShowDepsAlert(true)}
-                      className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
-                    >
-                      {t("welcome.installDependencies")}
-                    </Button>
+                    <div className="flex justify-center space-x-4">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => setShowDepsAlert(true)}
+                        className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        {t("welcome.installDependencies")}
+                      </Button>
 
-                    <div className="flex flex-col items-center space-y-4">
                       <Button
                         onClick={() => handleExit(true)}
                         size="lg"
@@ -1872,18 +2026,57 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       >
                         <Rocket className="mr-2 h-5 w-5 text-secondary" />
                         <span className="text-secondary">
-                          {" "}
                           {t("welcome.iHaveTheseTakeMeToTheTour")}
                         </span>
                       </Button>
-
-                      <button
-                        onClick={() => handleExit(false)}
-                        className="text-sm text-foreground/60 transition-colors hover:text-primary"
-                      >
-                        {t("welcome.skipTheTour")}
-                      </button>
                     </div>
+
+                    <button
+                      onClick={() => handleExit(false)}
+                      className="text-sm text-foreground/60 transition-colors hover:text-primary"
+                    >
+                      {t("welcome.skipTheTour")}
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    className="flex flex-col items-center space-y-6"
+                    variants={itemVariants}
+                  >
+                    <div className="flex justify-center space-x-4">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => setShowDepsAlert(true)}
+                        className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        {t("welcome.installDependencies")}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() =>
+                          navigate("/localrefresh", {
+                            state: {
+                              welcomeStep: step,
+                              indexRefreshStarted,
+                              indexComplete,
+                            },
+                          })
+                        }
+                        className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        <Database className="mr-2 h-5 w-5" />
+                        {t("welcome.localIndex.title")}
+                      </Button>
+                    </div>
+
+                    {isIndexRefreshing && (
+                      <p className="text-sm text-muted-foreground">
+                        {t("welcome.localIndex.stillRefreshing")}
+                      </p>
+                    )}
                   </motion.div>
                 )}
               </motion.div>
@@ -2013,21 +2206,58 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 {t("welcome.allRequiredDependenciesHaveBeenInstalledDesc")}
               </motion.p>
 
-              <motion.div
-                className="flex justify-center space-x-4"
-                variants={itemVariants}
-              >
-                <Button onClick={() => handleExit(true)} size="lg" className="px-8 py-6">
-                  <Rocket className="mr-2 h-5 w-5" />
-                  {t("welcome.takeTour")}
-                </Button>
-                <button
-                  onClick={() => handleExit(false)}
-                  className="text-sm text-foreground/60 transition-colors hover:text-primary"
+              {indexComplete ? (
+                <motion.div
+                  className="flex flex-col items-center space-y-4"
+                  variants={itemVariants}
                 >
-                  {t("welcome.skipTour")}
-                </button>
-              </motion.div>
+                  <Button
+                    onClick={() => handleExit(true)}
+                    size="lg"
+                    className="px-8 py-6"
+                  >
+                    <Rocket className="mr-2 h-5 w-5" />
+                    {t("welcome.takeTour")}
+                  </Button>
+                  <button
+                    onClick={() => handleExit(false)}
+                    className="text-sm text-foreground/60 transition-colors hover:text-primary"
+                  >
+                    {t("welcome.skipTour")}
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  className="flex flex-col items-center space-y-6"
+                  variants={itemVariants}
+                >
+                  <div className="flex justify-center space-x-4">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() =>
+                        navigate("/localrefresh", {
+                          state: {
+                            welcomeStep: step,
+                            indexRefreshStarted,
+                            indexComplete,
+                          },
+                        })
+                      }
+                      className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
+                    >
+                      <Database className="mr-2 h-5 w-5" />
+                      {t("welcome.localIndex.title")}
+                    </Button>
+                  </div>
+
+                  {isIndexRefreshing && (
+                    <p className="text-sm text-muted-foreground">
+                      {t("welcome.localIndex.stillRefreshing")}
+                    </p>
+                  )}
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

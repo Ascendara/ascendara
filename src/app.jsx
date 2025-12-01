@@ -565,6 +565,7 @@ const AppRoutes = () => {
       {showWelcome ? (
         <Routes>
           <Route path="/extralanguages" element={<ExtraLanguages />} />
+          <Route path="/localrefresh" element={<LocalRefresh />} />
           <Route
             path="*"
             element={

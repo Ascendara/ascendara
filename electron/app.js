@@ -2755,7 +2755,18 @@ ipcMain.handle("set-v7", () => {
 });
 
 ipcMain.handle("create-timestamp", () => {
+  // Read existing timestamp file to preserve other fields like hasIndexBefore
+  let existingData = {};
+  try {
+    if (fs.existsSync(TIMESTAMP_FILE)) {
+      existingData = JSON.parse(fs.readFileSync(TIMESTAMP_FILE, "utf8"));
+    }
+  } catch (err) {
+    console.error("Failed to read existing timestamp file:", err);
+  }
+
   const timestamp = {
+    ...existingData,
     timestamp: Date.now(),
     v7: true,
   };
@@ -2861,7 +2872,7 @@ ipcMain.handle("get-settings", () => {
 });
 
 ipcMain.handle("get-default-local-index-path", () => {
-  return path.join(app.getPath("appData"), "Ascendara by tagoWorks", "localindex");
+  return path.join(app.getPath("appData"), "ascendara", "localindex");
 });
 
 // Local Refresh Tool
