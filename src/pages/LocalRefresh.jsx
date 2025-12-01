@@ -242,6 +242,7 @@ const LocalRefresh = () => {
       if (data.status === "completed") {
         setRefreshStatus("completed");
         setIsRefreshing(false);
+        setHasIndexBefore(true); // Update UI immediately after successful refresh
         // Use timestamp from progress data if available
         if (data.timestamp) {
           setLastRefreshTime(new Date(data.timestamp * 1000));
@@ -262,6 +263,7 @@ const LocalRefresh = () => {
       if (data.code === 0) {
         setRefreshStatus("completed");
         setIsRefreshing(false);
+        setHasIndexBefore(true); // Update UI immediately after successful refresh
         manuallyStoppedRef.current = false;
         // Read timestamp from progress.json
         try {
@@ -412,6 +414,7 @@ const LocalRefresh = () => {
             setTimeout(() => {
               setRefreshStatus("completed");
               setIsRefreshing(false);
+              setHasIndexBefore(true); // Update UI immediately after successful refresh
               setLastRefreshTime(new Date());
               toast.success(
                 t("localRefresh.refreshComplete") || "Game list refresh completed!"
