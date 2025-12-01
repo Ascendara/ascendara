@@ -35,6 +35,90 @@ output_dir = ""
 progress_file = ""
 scraper = None
 
+# Character set for encoding post IDs (uppercase and lowercase letters)
+GAME_ID_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"  # 46 chars (no I, L, O, i, l, o)
+GAME_ID_LENGTH = 6
+
+
+def encode_game_id(post_id):
+    """Convert numeric post_id to a 6-character identifier.
+    Always produces the same output for the same input."""
+    try:
+        num = int(post_id)
+    except (ValueError, TypeError):
+        return ""
+    
+    base = len(GAME_ID_CHARS)
+    result = []
+    
+    # Add offset to ensure we always get 6 chars even for small numbers
+    num += base ** (GAME_ID_LENGTH - 1)
+    
+    while num > 0 and len(result) < GAME_ID_LENGTH:
+        result.append(GAME_ID_CHARS[num % base])
+        num //= base
+    
+    # Pad if needed
+    while len(result) < GAME_ID_LENGTH:
+        result.append(GAME_ID_CHARS[0])
+    
+    return ''.join(reversed(result))
+
+
+def decode_game_id(game_id):
+    """Convert 6-character identifier back to numeric post_id."""
+    if not game_id or len(game_id) != GAME_ID_LENGTH:
+        return None
+    
+    try:
+        base = len(GAME_ID_CHARS)
+        num = 0
+        
+        for char in game_id:
+            if char not in GAME_ID_CHARS:
+                return None
+            num = num * base + GAME_ID_CHARS.index(char)
+        
+        # Remove the offset we added during encoding
+        num -= base ** (GAME_ID_LENGTH - 1)
+        
+        return str(num) if num >= 0 else None
+    except Exception:
+        return None
+
+
+def get_blacklist_ids():
+    """Read blacklisted game IDs from settings file and decode them to numeric IDs."""
+    try:
+        settings_path = None
+        if sys.platform == 'win32':
+            appdata = os.environ.get('APPDATA')
+            if appdata:
+                candidate = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+                if os.path.exists(candidate):
+                    settings_path = candidate
+        elif sys.platform == 'darwin':
+            user_data_dir = os.path.expanduser('~/Library/Application Support/ascendara')
+            candidate = os.path.join(user_data_dir, 'ascendarasettings.json')
+            if os.path.exists(candidate):
+                settings_path = candidate
+
+        if settings_path and os.path.exists(settings_path):
+            with open(settings_path, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                blacklist = settings.get('blacklistIDs', [])
+                # Decode the 5-character IDs back to numeric post IDs
+                numeric_ids = set()
+                for encoded_id in blacklist:
+                    decoded = decode_game_id(str(encoded_id))
+                    if decoded:
+                        numeric_ids.add(int(decoded))
+                logging.info(f"Loaded {len(numeric_ids)} blacklisted IDs from settings")
+                return numeric_ids
+    except Exception as e:
+        logging.error(f"Failed to read blacklist from settings: {e}")
+    return set()
+
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
     """Launch crash reporter on exit"""
@@ -444,9 +528,15 @@ def download_image(scraper, image_url, img_id, imgs_dir, progress):
     return ""
 
 
-def process_post(post, scraper, category_map, imgs_dir, progress):
+def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=None):
     """Process a single post and return game data"""
     try:
+        # Check if post is blacklisted
+        post_id = post.get("id")
+        if blacklist_ids and post_id and int(post_id) in blacklist_ids:
+            logging.debug(f"Skipping blacklisted post ID: {post_id}")
+            return None
+        
         title = post.get("title", {}).get("rendered", "")
         game_name = clean_game_name(title)
         
@@ -481,6 +571,9 @@ def process_post(post, scraper, category_map, imgs_dir, progress):
         # Get view count
         views = fetch_view_count(scraper, post_id) if post_id else "0"
         
+        # Encode post_id to a nice 5-character identifier
+        encoded_game_id = encode_game_id(post_id) if post_id else ""
+        
         game_entry = {
             "game": game_name,
             "size": game_size,
@@ -491,7 +584,7 @@ def process_post(post, scraper, category_map, imgs_dir, progress):
             "download_links": download_links,
             "weight": views,
             "imgID": img_id,
-            "gameID": str(post_id) if post_id else "",
+            "gameID": encoded_game_id,
             "category": categories,
             "latest_update": latest_update,
             "minReqs": min_reqs
@@ -587,6 +680,9 @@ def main():
         logging.info(f"Total posts fetched: {len(posts)}")
         progress.set_total_posts(len(posts))
         
+        # Load blacklist IDs from settings
+        blacklist_ids = get_blacklist_ids()
+        
         # Process posts
         progress.set_phase("processing_posts")
         game_data = []
@@ -596,7 +692,7 @@ def main():
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {
                 executor.submit(
-                    process_post, post, scraper, category_map, imgs_dir, progress
+                    process_post, post, scraper, category_map, imgs_dir, progress, blacklist_ids
                 ): post for post in posts
             }
             
