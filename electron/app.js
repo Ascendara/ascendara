@@ -40,7 +40,7 @@ let isLatest = true;
 let updateDownloaded = false;
 let notificationShown = false;
 let updateDownloadInProgress = false;
-let experiment = false;
+let experiment = true;
 let installedTools = [];
 let isBrokenVersion = false;
 let rpcIsConnected = false;
@@ -770,7 +770,7 @@ class SettingsManager {
       giantBombKey: "",
       torboxApiKey: "",
       localIndex: "",
-      blacklistIDs: ["BAAAxp", "BAANnk", "BAAQch"],
+      blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
       usingLocalIndex: false,
       fetchPageCount: 50,
       ludusavi: {

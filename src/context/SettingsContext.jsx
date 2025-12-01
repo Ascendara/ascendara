@@ -44,7 +44,7 @@ export function SettingsProvider({ children }) {
     giantBombKey: "",
     torboxApiKey: "",
     localIndex: "",
-    blacklistIDs: ["BAAAxp", "BAANnk", "BAAQch"],
+    blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
     usingLocalIndex: false,
     fetchPageCount: 50,
     ludusavi: {
