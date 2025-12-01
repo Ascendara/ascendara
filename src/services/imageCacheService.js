@@ -183,27 +183,27 @@ class ImageCacheService {
     const isLocalIndex = settings?.usingLocalIndex && settings?.localIndex;
 
     // For local index - load directly from disk (no IndexedDB wait needed)
+    // When using local index, NEVER fall back to API
     if (isLocalIndex) {
       const loadPromise = this._loadLocalImage(imgID, settings.localIndex);
       this.activeRequests.set(imgID, loadPromise);
 
       try {
         const result = await loadPromise;
-        if (result) {
-          return result;
-        }
+        return result; // Return result even if null - don't fall back to API
       } catch (error) {
-        // Fall through to API
+        console.warn(`[ImageCache] Failed to load local image ${imgID}:`, error);
+        return null; // Return null instead of falling through to API
       } finally {
         this.activeRequests.delete(imgID);
       }
     }
 
-    // For API images, wait for IndexedDB initialization
+    // For API images only (not using local index), wait for IndexedDB initialization
     await this.initPromise;
 
     // Try IndexedDB cache if available (only for API images)
-    if (this.db && !isLocalIndex) {
+    if (this.db) {
       try {
         const cachedImage = await this.getFromIndexedDB(imgID);
         if (cachedImage) {
@@ -216,7 +216,7 @@ class ImageCacheService {
       }
     }
 
-    // Load from API
+    // Load from API (only when NOT using local index)
     const loadPromise = this._loadFromAPI(imgID, settings, options);
     this.activeRequests.set(imgID, loadPromise);
 

@@ -416,6 +416,12 @@ const gameService = {
 
   async checkMetadataUpdate() {
     try {
+      // Skip API check if using local index
+      const settings = await window.electron.getSettings();
+      if (settings?.usingLocalIndex) {
+        return null;
+      }
+
       const response = await fetch(`${API_URL}/json/games`, {
         method: "HEAD", // Only get headers to check Last-Modified
       });
