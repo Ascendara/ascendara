@@ -285,6 +285,30 @@ export default function DownloadPage() {
   const [showCompareDialog, setShowCompareDialog] = useState(false);
   const [systemSpecs, setSystemSpecs] = useState(null);
   const [systemSpecsLoading, setSystemSpecsLoading] = useState(false);
+  const [gameRating, setGameRating] = useState(gameData?.rating || 0);
+
+  // Fetch rating from new API when using local index
+  useEffect(() => {
+    const fetchRating = async () => {
+      if (settings.usingLocalIndex && gameData?.gameID) {
+        try {
+          const response = await fetch(
+            `https://api.ascendara.app/app/v2/gamerating/${gameData.gameID}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.rating > 0) {
+              setGameRating(data.rating);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching game rating:", error);
+        }
+      }
+    };
+
+    fetchRating();
+  }, [gameData?.gameID, settings.usingLocalIndex]);
 
   // Use a ref to track the event handler and active status
   const urlHandlerRef = useRef(null);
@@ -1097,18 +1121,33 @@ export default function DownloadPage() {
 
       const { token: authToken } = await response.json();
 
-      const reportResponse = await fetch("https://api.ascendara.app/app/report", {
+      // Use v2 endpoint with gameID if using local index
+      const useV2 = settings.usingLocalIndex && gameData.gameID;
+      const endpoint = useV2
+        ? "https://api.ascendara.app/app/v2/report"
+        : "https://api.ascendara.app/app/report";
+
+      const body = useV2
+        ? {
+            reportType: "GameBrowsing",
+            reason: reportReason,
+            details: reportDetails,
+            gameID: gameData.gameID,
+          }
+        : {
+            reportType: "GameBrowsing",
+            reason: reportReason,
+            details: reportDetails,
+            gameName: gameData.game,
+          };
+
+      const reportResponse = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({
-          reportType: "GameBrowsing",
-          reason: reportReason,
-          details: reportDetails,
-          gameName: gameData.game,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!reportResponse.ok) {
@@ -1126,18 +1165,13 @@ export default function DownloadPage() {
 
           const { token: newAuthToken } = await newTokenResponse.json();
 
-          const retryResponse = await fetch("https://api.ascendara.app/app/report", {
+          const retryResponse = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${newAuthToken}`,
             },
-            body: JSON.stringify({
-              reportType: "GameBrowsing",
-              reason: reportReason,
-              details: reportDetails,
-              gameName: gameData.game,
-            }),
+            body: JSON.stringify(body),
           });
 
           if (retryResponse.ok) {
@@ -1241,7 +1275,7 @@ export default function DownloadPage() {
           {/* Game Header Section */}
           <div className="flex items-start gap-4">
             <img
-              src={cachedImage || `https://api.ascendara.app/v2/image/${gameData.imgID}`}
+              src={cachedImage || `https://api.ascendara.app/v3/image/${gameData.gameID}`}
               alt={gameData.game}
               className="h-36 w-64 rounded-lg object-cover"
             />
@@ -1249,12 +1283,12 @@ export default function DownloadPage() {
               <div className="flex items-center justify-between">
                 <h1 className="flex items-center gap-2 text-2xl font-bold">
                   {gameData.game}
-                  {gameData.rating > 0 && (
+                  {gameRating > 0 && (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="ml-2 flex cursor-help">
-                            {[...Array(Math.round(gameData.rating))].map((_, i) => (
+                            {[...Array(Math.round(gameRating))].map((_, i) => (
                               <Star
                                 key={i}
                                 className="h-5 w-5 fill-current text-yellow-400"
@@ -1264,7 +1298,7 @@ export default function DownloadPage() {
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
                           <p className="max-w-[300px] font-semibold text-secondary">
-                            {t("download.ratingTooltip", { rating: gameData.rating })}
+                            {t("download.ratingTooltip", { rating: gameRating })}
                           </p>
                         </TooltipContent>
                       </Tooltip>

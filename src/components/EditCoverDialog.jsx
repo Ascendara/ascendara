@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search as SearchIcon, Upload as UploadIcon } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSettings } from "@/context/SettingsContext";
 import { cn } from "@/lib/utils";
 import gameService from "@/services/gameService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,7 @@ import imageCacheService from "@/services/imageCacheService";
 
 const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
   const { t } = useLanguage();
+  const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState("search");
   const [coverSearch, setCoverSearch] = useState({
     query: "",
@@ -86,7 +88,11 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
     if (activeTab === "search" && coverSearch.selectedCover) {
       // Fetch new image from search results and save to localStorage
       try {
-        const imageUrl = gameService.getImageUrl(coverSearch.selectedCover.imgID);
+        // Use v3 endpoint with gameID when using local index, otherwise use v2 with imgID
+        const imageUrl =
+          settings.usingLocalIndex && coverSearch.selectedCover.gameID
+            ? gameService.getImageUrlByGameId(coverSearch.selectedCover.gameID)
+            : gameService.getImageUrl(coverSearch.selectedCover.imgID);
         const response = await fetch(imageUrl);
         const blob = await response.blob();
         const reader = new FileReader();
@@ -272,7 +278,11 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
                     )}
                   >
                     <img
-                      src={gameService.getImageUrl(cover.imgID)}
+                      src={
+                        settings.usingLocalIndex && cover.gameID
+                          ? gameService.getImageUrlByGameId(cover.gameID)
+                          : gameService.getImageUrl(cover.imgID)
+                      }
                       alt={cover.title}
                       className="h-full w-full object-cover"
                     />

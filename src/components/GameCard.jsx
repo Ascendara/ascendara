@@ -41,8 +41,10 @@ const GameCard = memo(function GameCard({ game, compact }) {
   const [isInstalled, setIsInstalled] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [gameRating, setGameRating] = useState(game?.rating || 0);
   const isMounted = useRef(true);
   const { t } = useLanguage();
+  const { settings } = useSettings();
 
   // Setup intersection observer for lazy loading
   useEffect(() => {
@@ -107,6 +109,29 @@ const GameCard = memo(function GameCard({ game, compact }) {
     };
   }, [game.game]);
 
+  // Fetch rating from new API when using local index
+  useEffect(() => {
+    const fetchRating = async () => {
+      if (settings.usingLocalIndex && game.gameID) {
+        try {
+          const response = await fetch(
+            `https://api.ascendara.app/app/v2/gamerating/${game.gameID}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (isMounted.current && data.rating > 0) {
+              setGameRating(data.rating);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching game rating:", error);
+        }
+      }
+    };
+
+    fetchRating();
+  }, [game.gameID, settings.usingLocalIndex]);
+
   const handleDownload = useCallback(() => {
     if (isInstalled && !needsUpdate) return;
     setIsLoading(true);
@@ -153,8 +178,6 @@ const GameCard = memo(function GameCard({ game, compact }) {
     );
   }
 
-  const { settings } = useSettings();
-
   return (
     <Card
       ref={cardRef}
@@ -196,7 +219,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
             <h3 className="line-clamp-1 text-lg font-semibold text-foreground">
               {sanitizeText(game.game)}
             </h3>
-            {game.rating > 0 && (
+            {gameRating > 0 && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -225,7 +248,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
                           fontSize="10"
                           fontWeight="bold"
                         >
-                          {Math.round(game.rating)}
+                          {Math.round(gameRating)}
                         </text>
                       </svg>
                     </div>

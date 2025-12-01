@@ -92,6 +92,11 @@ const gameService = {
         const parsedGames = JSON.parse(cachedGames);
         const parsedMetadata = JSON.parse(cachedMetadata);
 
+        // Ensure local property is set correctly for cached API data
+        if (parsedMetadata.local === undefined) {
+          parsedMetadata.local = false;
+        }
+
         // Update memory cache
         memoryCache = {
           ...memoryCache,
@@ -199,6 +204,7 @@ const gameService = {
           getDate: data.metadata?.getDate,
           source: data.metadata?.source || source,
           imagesAvailable: true,
+          local: false, // Explicitly mark as not local
         },
       };
     } catch (error) {
@@ -246,6 +252,7 @@ const gameService = {
             getDate: data.metadata?.getDate,
             source: data.metadata?.source || source,
             imagesAvailable: false, // Images won't be available when using CDN
+            local: false, // Explicitly mark as not local
           },
         };
       } catch (cdnError) {
@@ -337,6 +344,10 @@ const gameService = {
     return `${API_URL}/v2/image/${imgID}`;
   },
 
+  getImageUrlByGameId(gameID) {
+    return `${API_URL}/v3/image/${gameID}`;
+  },
+
   async getLocalImagePath(imgID) {
     if (!memoryCache.isLocalIndex || !memoryCache.localIndexPath) {
       return null;
@@ -372,7 +383,7 @@ const gameService = {
 
     const searchTerm = query.toLowerCase();
 
-    // First try memory cache
+    // First try memory cache (this includes local index data if loaded)
     if (memoryCache.games) {
       return memoryCache.games
         .filter(game => game.game?.toLowerCase().includes(searchTerm))
@@ -381,57 +392,23 @@ const gameService = {
           id: game.game,
           title: game.game,
           imgID: game.imgID,
+          gameID: game.gameID,
         }));
     }
 
-    // Then try localStorage cache
-    try {
-      const cachedData = localStorage.getItem(CACHE_KEY);
-      if (cachedData) {
-        const { games } = JSON.parse(cachedData);
-        if (games?.length) {
-          // Update memory cache for future searches
-          memoryCache.games = games;
-          memoryCache.timestamp = Date.now();
-
-          return games
-            .filter(game => game.game?.toLowerCase().includes(searchTerm))
-            .slice(0, 20)
-            .map(game => ({
-              id: game.game,
-              title: game.game,
-              imgID: game.imgID,
-            }));
-        }
-      }
-    } catch (cacheError) {
-      console.error("Error using cached data:", cacheError);
-    }
-
-    // Only if no cache is available, make an API request
-    try {
-      const response = await fetch(`${API_URL}/json/games`);
-      const data = await response.json();
-
-      if (data?.games?.length) {
-        // Update caches in background
-        setTimeout(() => {
-          memoryCache.games = data.games;
-          memoryCache.timestamp = Date.now();
-          this.updateCache({ games: data.games, metadata: data.metadata });
-        }, 0);
-
-        return data.games
-          .filter(game => game.game?.toLowerCase().includes(searchTerm))
-          .slice(0, 20)
-          .map(game => ({
-            id: game.game,
-            title: game.game,
-            imgID: game.imgID,
-          }));
-      }
-    } catch (error) {
-      console.error("Error searching game covers:", error);
+    // Ensure we have the latest data by calling getCachedData
+    // This will load from local index or API as appropriate
+    const { games } = await this.getCachedData();
+    if (games?.length) {
+      return games
+        .filter(game => game.game?.toLowerCase().includes(searchTerm))
+        .slice(0, 20)
+        .map(game => ({
+          id: game.game,
+          title: game.game,
+          imgID: game.imgID,
+          gameID: game.gameID,
+        }));
     }
 
     return [];

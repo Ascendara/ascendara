@@ -83,16 +83,16 @@ const GameRate = ({ game, isOpen, onClose }) => {
       // Get a fresh token for each request to ensure timestamp validity
       const freshToken = await getToken();
 
-      const response = await fetch("https://api.ascendara.app/app/gamerate", {
+      const response = await fetch("https://api.ascendara.app/app/v2/gamerate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${freshToken}`,
         },
         body: JSON.stringify({
-          gameName: game.game,
+          gameID: game.gameID,
           rating: rating,
-          ...(comments.trim() && { comments: comments.trim() }), // Only include comments if non-empty
+          ...(comments.trim() && { comments: comments.trim() }),
         }),
       });
 

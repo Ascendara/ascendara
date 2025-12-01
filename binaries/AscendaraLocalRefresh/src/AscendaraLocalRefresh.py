@@ -35,32 +35,36 @@ output_dir = ""
 progress_file = ""
 scraper = None
 
-# Character set for encoding post IDs (uppercase and lowercase letters)
+# Character set for encoding post IDs (mixed case for visual variety)
 GAME_ID_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"  # 46 chars (no I, L, O, i, l, o)
 GAME_ID_LENGTH = 6
+
+# Scramble multiplier - a prime number to spread out sequential IDs
+# This makes IDs look more random while still being deterministic
+SCRAMBLE_MULT = 2971
+SCRAMBLE_MOD = 46 ** 6  # Max value for 6 chars in base 46
 
 
 def encode_game_id(post_id):
     """Convert numeric post_id to a 6-character identifier.
-    Always produces the same output for the same input."""
+    Always produces the same output for the same input.
+    Uses scrambling to make sequential IDs look more varied."""
     try:
         num = int(post_id)
     except (ValueError, TypeError):
         return ""
     
+    # Scramble the number to spread out sequential IDs
+    scrambled = (num * SCRAMBLE_MULT) % SCRAMBLE_MOD
+    
     base = len(GAME_ID_CHARS)
     result = []
     
-    # Add offset to ensure we always get 6 chars even for small numbers
-    num += base ** (GAME_ID_LENGTH - 1)
-    
-    while num > 0 and len(result) < GAME_ID_LENGTH:
-        result.append(GAME_ID_CHARS[num % base])
-        num //= base
-    
-    # Pad if needed
-    while len(result) < GAME_ID_LENGTH:
-        result.append(GAME_ID_CHARS[0])
+    # Convert to base-46
+    temp = scrambled
+    for _ in range(GAME_ID_LENGTH):
+        result.append(GAME_ID_CHARS[temp % base])
+        temp //= base
     
     return ''.join(reversed(result))
 
@@ -79,10 +83,12 @@ def decode_game_id(game_id):
                 return None
             num = num * base + GAME_ID_CHARS.index(char)
         
-        # Remove the offset we added during encoding
-        num -= base ** (GAME_ID_LENGTH - 1)
+        # Reverse the scramble using modular multiplicative inverse
+        # inv = pow(SCRAMBLE_MULT, -1, SCRAMBLE_MOD)
+        inv = pow(SCRAMBLE_MULT, -1, SCRAMBLE_MOD)
+        original = (num * inv) % SCRAMBLE_MOD
         
-        return str(num) if num >= 0 else None
+        return str(original)
     except Exception:
         return None
 
@@ -687,24 +693,43 @@ def main():
         progress.set_phase("processing_posts")
         game_data = []
         
-        logging.info(f"Processing {len(posts)} posts with {args.workers} workers...")
+        # Split posts into two halves and process from both ends simultaneously
+        total_posts = len(posts)
+        mid = total_posts // 2
+        first_half = posts[:mid]  # Process 0 -> mid
+        second_half = posts[mid:][::-1]  # Process end -> mid (reversed)
         
-        with ThreadPoolExecutor(max_workers=args.workers) as executor:
-            futures = {
-                executor.submit(
-                    process_post, post, scraper, category_map, imgs_dir, progress, blacklist_ids
-                ): post for post in posts
-            }
+        logging.info(f"Processing {len(posts)} posts with {args.workers} workers per direction (both ends simultaneously)...")
+        
+        game_data_lock = threading.Lock()
+        
+        def process_batch(batch, direction):
+            results = []
+            with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                futures = {
+                    executor.submit(
+                        process_post, post, scraper, category_map, imgs_dir, progress, blacklist_ids
+                    ): post for post in batch
+                }
+                
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        if result:
+                            results.append(result)
+                    except Exception as e:
+                        logging.error(f"Thread error ({direction}): {e}")
+                        progress.add_error(f"Thread error: {str(e)}")
+                    progress.increment_processed()
+            return results
+        
+        # Run both batches concurrently
+        with ThreadPoolExecutor(max_workers=2) as batch_executor:
+            future_first = batch_executor.submit(process_batch, first_half, "forward")
+            future_second = batch_executor.submit(process_batch, second_half, "backward")
             
-            for future in as_completed(futures):
-                try:
-                    result = future.result()
-                    if result:
-                        game_data.append(result)
-                except Exception as e:
-                    logging.error(f"Thread error: {e}")
-                    progress.add_error(f"Thread error: {str(e)}")
-                progress.increment_processed()
+            game_data.extend(future_first.result())
+            game_data.extend(future_second.result())
         
         # Build output
         progress.set_phase("saving")

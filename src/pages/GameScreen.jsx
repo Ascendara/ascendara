@@ -701,7 +701,12 @@ export default function GameScreen() {
           g => (g.game || g.name) === (game.game || game.name)
         );
 
-        if (gameData && gameData.launchCount === 1) {
+        if (
+          gameData &&
+          gameData.launchCount === 1 &&
+          settings.usingLocalIndex &&
+          game.gameID
+        ) {
           setShowRateDialog(true);
         }
       }
@@ -1495,7 +1500,7 @@ export default function GameScreen() {
                 )}
               </TabsList>
 
-              {!hasRated && (
+              {!hasRated && settings.usingLocalIndex && game.gameID && (
                 <Card className="mb-4 overflow-hidden bg-gradient-to-br from-primary/80 via-primary to-primary/90 shadow-lg transition-all hover:shadow-xl">
                   <CardContent className="flex items-center justify-between p-6">
                     <div className="flex items-center space-x-4 text-secondary">
