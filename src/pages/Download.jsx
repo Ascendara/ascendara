@@ -1070,7 +1070,7 @@ export default function DownloadPage() {
   };
 
   const handleShareLink = async () => {
-    const shareLink = `https://ascendara.app/game/${gameData.imgID}`;
+    const shareLink = `https://ascendara.app/game/${gameData.gameID}`;
     await navigator.clipboard.writeText(shareLink);
     setShowShareCopySuccess(true);
     setTimeout(() => setShowShareCopySuccess(false), 2000);
@@ -2513,7 +2513,7 @@ export default function DownloadPage() {
         <div className="mt-4 opacity-50">{t("download.scrollToViewMore")}</div>
       )}
 
-      {settings.gameSource !== "fitgirl" && (
+      {settings.usingLocalIndex && (
         <TooltipProvider>
           <Tooltip open={showShareCopySuccess}>
             <TooltipTrigger asChild>
