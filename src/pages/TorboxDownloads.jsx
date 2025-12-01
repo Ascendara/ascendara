@@ -28,7 +28,7 @@ import {
   Server,
   HardDrive,
   Clock,
-  CheckCircle,
+  CircleCheck,
   AlertCircle,
   Loader2,
   MoreVertical,

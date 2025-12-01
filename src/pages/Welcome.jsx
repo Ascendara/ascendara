@@ -8,7 +8,6 @@ import {
   Rocket,
   Shield,
   Download,
-  CheckCircle2,
   PuzzleIcon,
   PackageOpen,
   Palette,

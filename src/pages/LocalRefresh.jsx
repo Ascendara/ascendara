@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Play,
   StopCircle,
-  CheckCircle,
+  CircleCheck,
   AlertCircle,
   Loader,
   Database,
@@ -444,7 +444,7 @@ const LocalRefresh = () => {
       case "running":
         return <Loader className="h-5 w-5 animate-spin text-primary" />;
       case "completed":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <CircleCheck className="h-5 w-5 text-green-500" />;
       case "error":
         return <XCircle className="h-5 w-5 text-red-500" />;
       default:
@@ -702,7 +702,7 @@ const LocalRefresh = () => {
             <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-5">
               <div className="flex items-start gap-4">
                 <div className="rounded-lg bg-green-500/20 p-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <CircleCheck className="h-5 w-5 text-green-500" />
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-green-600 dark:text-green-400">

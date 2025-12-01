@@ -9,7 +9,7 @@ import {
 import { Button } from "./ui/button";
 import {
   AlertTriangle,
-  CheckCircle2,
+  CircleCheck,
   Loader,
   FolderSync,
   FolderOpen,
@@ -374,7 +374,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
         <Card className="border-green-500/20 bg-green-500/5">
           <CardContent className="flex flex-col items-center justify-center space-y-4 p-6">
             <div className="rounded-full bg-green-500/10 p-3">
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
+              <CircleCheck className="h-8 w-8 text-green-500" />
             </div>
             <div className="text-center">
               <h3 className="mb-1 text-lg font-medium text-green-500">
@@ -438,7 +438,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
         <Card className="border-green-500/20 bg-green-500/5">
           <CardContent className="flex flex-col items-center justify-center space-y-4 p-6">
             <div className="rounded-full bg-green-500/10 p-3">
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
+              <CircleCheck className="h-8 w-8 text-green-500" />
             </div>
             <div className="text-center">
               <h3 className="mb-1 text-lg font-medium text-green-500">

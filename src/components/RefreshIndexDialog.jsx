@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ExternalLink,
-  CheckCircle,
+  CircleCheck,
   ChevronRight,
   ChevronLeft,
   Globe,
@@ -200,15 +200,11 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
                         setStep(3);
                       }}
                     >
-                      <CheckCircle className="h-5 w-5 shrink-0 text-green-500" />
+                      <CircleCheck className="h-5 w-5 shrink-0 text-green-500" />
                       <div>
                         <span className="block font-medium text-foreground">
                           {t("refreshDialog.yesHaveExtension") ||
                             "Yes, I have the extension"}
-                        </span>
-                        <span className="block text-sm text-muted-foreground">
-                          {t("refreshDialog.yesHaveExtensionDesc") ||
-                            "After completing the captcha, click 'Send to Ascendara' in the popup"}
                         </span>
                       </div>
                     </Button>
@@ -265,7 +261,7 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
                 <div className="space-y-4 text-sm text-muted-foreground">
                   {cookieReceived ? (
                     <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-                      <CheckCircle className="h-6 w-6 text-green-500" />
+                      <CircleCheck className="h-6 w-6 text-green-500" />
                       <span className="text-green-600 dark:text-green-400">
                         {t("refreshDialog.cookieReceivedDesc") ||
                           "Successfully received the cookie from the extension!"}
@@ -479,7 +475,7 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
                 className="gap-2 text-secondary"
               >
                 {t("refreshDialog.startRefresh") || "Start Refresh"}
-                <CheckCircle className="h-4 w-4" />
+                <CircleCheck className="h-4 w-4" />
               </Button>
             </AlertDialogFooter>
           </>
