@@ -6,6 +6,7 @@
 # https://ascendara.app/docs/binary-tool/local-refresh
 
 import cloudscraper
+import requests
 import json
 import datetime
 import os
@@ -23,6 +24,7 @@ import atexit
 import shutil
 import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from queue import Queue, Empty
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -44,6 +46,75 @@ class CookieExpiredError(Exception):
 output_dir = ""
 progress_file = ""
 scraper = None
+cookie_refresh_event = threading.Event()
+cookie_refresh_lock = threading.Lock()
+new_cookie_value = [None]  # Use list to allow modification across threads
+
+# Keep-alive thread control
+keep_alive_stop_event = threading.Event()
+keep_alive_thread = None
+
+# View count fetching - runs in parallel with post processing
+view_count_queue = Queue()  # Queue of post_ids to fetch views for
+view_count_cache = {}
+view_count_cache_lock = threading.Lock()
+view_count_stop_event = threading.Event()
+view_count_thread = None
+
+def start_keep_alive(scraper_instance, interval=30):
+    """Start a background thread that periodically pings SteamRIP to keep the cookie alive"""
+    global keep_alive_thread
+    
+    def keep_alive_worker():
+        """Worker function that runs in background thread"""
+        keep_alive_urls = [
+            "https://steamrip.com/",
+            "https://steamrip.com/category/games/",
+            "https://steamrip.com/category/action/",
+        ]
+        url_index = 0
+        
+        logging.info(f"Keep-alive thread started (interval: {interval}s)")
+        
+        while not keep_alive_stop_event.is_set():
+            try:
+                # Wait for the interval, but check stop event frequently
+                for _ in range(interval):
+                    if keep_alive_stop_event.is_set():
+                        break
+                    time.sleep(1)
+                
+                if keep_alive_stop_event.is_set():
+                    break
+                
+                # Make a lightweight request to keep the session alive
+                url = keep_alive_urls[url_index % len(keep_alive_urls)]
+                url_index += 1
+                
+                response = scraper_instance.head(url, timeout=10)
+                if response.status_code == 200:
+                    logging.debug(f"Keep-alive ping successful: {url}")
+                elif response.status_code == 403:
+                    logging.warning(f"Keep-alive got 403 - cookie may be expiring")
+                else:
+                    logging.debug(f"Keep-alive response: {response.status_code}")
+                    
+            except Exception as e:
+                logging.debug(f"Keep-alive request failed: {e}")
+        
+        logging.info("Keep-alive thread stopped")
+    
+    keep_alive_stop_event.clear()
+    keep_alive_thread = threading.Thread(target=keep_alive_worker, daemon=True)
+    keep_alive_thread.start()
+
+def stop_keep_alive():
+    """Stop the keep-alive background thread"""
+    global keep_alive_thread
+    keep_alive_stop_event.set()
+    if keep_alive_thread and keep_alive_thread.is_alive():
+        keep_alive_thread.join(timeout=5)
+    keep_alive_thread = None
 
 # Character set for encoding post IDs (mixed case for visual variety)
 GAME_ID_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"  # 46 chars (no I, L, O, i, l, o)
@@ -244,7 +315,8 @@ class RefreshProgress:
                 "progress": round(self.processed_posts / max(1, self.total_posts), 4),
                 "elapsedSeconds": round(elapsed, 1),
                 "errors": self.errors[-10:],  # Keep last 10 errors
-                "timestamp": time.time()
+                "timestamp": time.time(),
+                "waitingForCookie": self.phase == "waiting_for_cookie"
             }
             try:
                 with open(self.progress_file, 'w', encoding='utf-8') as f:
@@ -326,77 +398,27 @@ def create_scraper(cookie):
         cookie = f"cf_clearance={cookie}"
     
     logging.info(f"Final cookie for header: {cookie[:50]}...")
+    
+    # Create scraper with larger connection pool for parallel requests
     scraper = cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
+    
+    # Increase connection pool size to handle parallel requests
+    adapter = requests.adapters.HTTPAdapter(
+        pool_connections=50,
+        pool_maxsize=50,
+        max_retries=3
+    )
+    scraper.mount('https://', adapter)
+    scraper.mount('http://', adapter)
 
     scraper.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
         "Cookie": cookie
     })
-    logging.info("Scraper created successfully")
+    logging.info("Scraper created successfully with pool size 50")
     return scraper
-
-
-def fetch_all_posts(scraper, base_url, progress, per_page=100):
-    """Fetch all posts from the WordPress API"""
-    all_posts = []
-    page = 1
-    
-    logging.info(f"Starting to fetch posts from {base_url}")
-    progress.set_phase("fetching_posts")
-    
-    while True:
-        url = f"{base_url}?per_page={per_page}&page={page}"
-        logging.debug(f"Fetching: {url}")
-        max_retries = 3
-        
-        for attempt in range(max_retries):
-            try:
-                response = scraper.get(url, timeout=30)
-                logging.debug(f"Response status: {response.status_code}")
-                
-                if response.status_code == 400:
-                    logging.info(f"Reached end of posts at page {page}")
-                    return all_posts
-                
-                if response.status_code == 403:
-                    error_msg = "Cloudflare verification failed. Cookie may be invalid or expired."
-                    logging.error(error_msg)
-                    progress.add_error(error_msg)
-                    progress.set_status("error")
-                    return all_posts
-                
-                response.raise_for_status()
-                posts = response.json()
-                logging.debug(f"Parsed {len(posts)} posts from JSON")
-                
-                if not posts:
-                    logging.info(f"No more posts at page {page}")
-                    return all_posts
-                
-                all_posts.extend(posts)
-                logging.info(f"Page {page}: fetched {len(posts)} posts (total: {len(all_posts)})")
-                # Update progress message only - no counts since we don't know total pages
-                progress.update(f"Fetched {len(all_posts)} posts...")
-                page += 1
-                time.sleep(0.3)
-                break  # Success, exit retry loop
-                
-            except Exception as e:
-                if 'timed out' in str(e).lower() or 'read timed out' in str(e).lower():
-                    logging.warning(f"Timeout fetching page {page} (attempt {attempt+1}/{max_retries}): {e}")
-                    if attempt == max_retries - 1:
-                        logging.error(f"Max retries reached for page {page}. Skipping.")
-                        progress.add_error(f"Timeout on page {page} after {max_retries} attempts")
-                        break
-                    time.sleep(2 * (attempt + 1))
-                else:
-                    logging.error(f"Error fetching page {page}: {e}")
-                    progress.add_error(f"Error fetching page {page}: {str(e)}")
-                    return all_posts
-    
-    return all_posts
 
 
 def fetch_categories(scraper, progress):
@@ -551,35 +573,181 @@ def get_image_url(post):
         return ""
 
 
-def fetch_view_count(scraper, post_id):
-    """Fetch view count via admin-ajax endpoint"""
-    try:
-        url = f"https://steamrip.com/wp-admin/admin-ajax.php?postviews_id={post_id}&action=tie_postviews&_={int(time.time() * 1000)}"
-        response = scraper.get(url, timeout=10)
-        if response.status_code == 200:
-            views = re.sub(r'[^\d]', '', response.text.strip())
-            return views if views else "0"
-    except Exception:
-        pass
-    return "0"
+def start_view_count_fetcher(cookie, num_workers=8):
+    """Start background threads that fetch view counts from the queue using a dedicated scraper"""
+    global view_count_thread
+    
+    def view_count_worker():
+        """Worker that continuously fetches view counts from queue"""
+        logging.info(f"View count fetcher started with {num_workers} workers")
+        
+        # Create a dedicated lightweight session for view counts (no retries, fast timeout)
+        view_scraper = requests.Session()
+        view_scraper.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Cookie": cookie if cookie.startswith("cf_clearance=") else f"cf_clearance={cookie}"
+        })
+        # No retries - if it fails, just skip it (view counts aren't critical)
+        adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20, max_retries=0)
+        view_scraper.mount('https://', adapter)
+        
+        fetched_count = 0
+        failed_count = 0
+        
+        while not view_count_stop_event.is_set() or not view_count_queue.empty():
+            try:
+                # Get next post_id with timeout so we can check stop event
+                try:
+                    post_id = view_count_queue.get(timeout=0.5)
+                except Empty:
+                    continue
+                
+                # Fetch view count with very short timeout, no retries
+                try:
+                    url = f"https://steamrip.com/wp-admin/admin-ajax.php?postviews_id={post_id}&action=tie_postviews&_={int(time.time() * 1000)}"
+                    response = view_scraper.get(url, timeout=3)
+                    if response.status_code == 200:
+                        views = re.sub(r'[^\d]', '', response.text.strip())
+                        with view_count_cache_lock:
+                            view_count_cache[post_id] = views if views else "0"
+                        fetched_count += 1
+                    else:
+                        failed_count += 1
+                except Exception:
+                    failed_count += 1
+                    # Don't log - just skip silently
+                
+                # Small rate limit to be nice to the server
+                time.sleep(0.05)
+                
+            except Exception as e:
+                logging.debug(f"View count worker error: {e}")
+        
+        view_scraper.close()
+        logging.info(f"View count fetcher finished. Fetched: {fetched_count}, Failed: {failed_count}")
+    
+    view_count_stop_event.clear()
+    # Start multiple worker threads for parallel fetching
+    view_count_threads = []
+    for i in range(num_workers):
+        t = threading.Thread(target=view_count_worker, daemon=True, name=f"ViewCountWorker-{i}")
+        t.start()
+        view_count_threads.append(t)
+    
+    # Store threads for later cleanup
+    global view_count_thread
+    view_count_thread = view_count_threads
 
 
-def download_image(scraper, image_url, img_id, imgs_dir, progress):
+def stop_view_count_fetcher():
+    """Stop the view count fetcher threads and wait for them to finish"""
+    global view_count_thread
+    
+    if view_count_thread:
+        logging.info("Stopping view count fetcher...")
+        view_count_stop_event.set()
+        
+        # Wait for all worker threads
+        if isinstance(view_count_thread, list):
+            for t in view_count_thread:
+                if t.is_alive():
+                    t.join(timeout=5)
+        elif view_count_thread.is_alive():
+            view_count_thread.join(timeout=5)
+        
+        logging.info(f"View count fetcher stopped. Cached {len(view_count_cache)} view counts.")
+
+
+def queue_view_count_fetch(post_id):
+    """Add a post_id to the view count fetch queue"""
+    if post_id:
+        view_count_queue.put(post_id)
+
+
+# fetch_single_view_count is now inlined in the worker threads
+
+
+def get_cached_view_count(post_id):
+    """Get view count from cache, returns '0' if not yet fetched"""
+    with view_count_cache_lock:
+        return view_count_cache.get(post_id, "0")
+
+
+def wait_for_cookie_refresh():
+    """Wait for user to provide a new cookie via stdin. Returns True if cookie was refreshed."""
+    global scraper, new_cookie_value, failed_image_count
+    
+    # Immediately reset failed count to prevent other threads from also triggering
+    with failed_image_lock:
+        failed_image_count = 0
+    
+    with cookie_refresh_lock:
+        # Check if another thread already refreshed the cookie
+        if new_cookie_value[0] is not None:
+            return True
+        
+        logging.info("="*60)
+        logging.info("COOKIE EXPIRED - Waiting for new cookie...")
+        logging.info("Please provide a new cf_clearance cookie value.")
+        logging.info("The process will continue automatically once a new cookie is provided.")
+        logging.info("="*60)
+        
+        # Signal that we need a cookie refresh
+        cookie_refresh_event.set()
+        
+        # Read new cookie from stdin (blocking)
+        try:
+            print("\n" + "="*60, flush=True)
+            print("COOKIE_REFRESH_NEEDED", flush=True)
+            print("Enter new cf_clearance cookie value:", flush=True)
+            print("="*60, flush=True)
+            
+            new_cookie = input().strip()
+            
+            if new_cookie:
+                logging.info("Received new cookie, refreshing scraper...")
+                scraper = create_scraper(new_cookie)
+                new_cookie_value[0] = new_cookie
+                
+                cookie_refresh_event.clear()
+                logging.info("Cookie refreshed successfully, resuming...")
+                return True
+            else:
+                logging.error("No cookie provided, cannot continue")
+                return False
+        except EOFError:
+            logging.error("No input available for cookie refresh")
+            return False
+        except Exception as e:
+            logging.error(f"Error reading new cookie: {e}")
+            return False
+
+
+def download_image(scraper_ref, image_url, img_id, imgs_dir, progress):
     """Download and save image with rate limiting and retry"""
-    global last_image_download, failed_image_count
+    global last_image_download, failed_image_count, scraper
     
     if not image_url:
         return ""
-    
-    # Check if we've already hit the failure threshold
-    with failed_image_lock:
-        if failed_image_count >= MAX_FAILED_IMAGES:
-            raise CookieExpiredError("Cookie expired or rate limited")
     
     progress.increment_images()
     max_retries = 3
     
     for attempt in range(max_retries):
+        # Check if we've hit the failure threshold and need cookie refresh
+        with failed_image_lock:
+            if failed_image_count >= MAX_FAILED_IMAGES:
+                logging.warning(f"Hit {MAX_FAILED_IMAGES} failed downloads, triggering cookie refresh...")
+                raise CookieExpiredError("Too many failed image downloads - cookie likely expired")
+        
+        # Check if cookie refresh is needed
+        if cookie_refresh_event.is_set():
+            # Wait for the refresh to complete
+            while cookie_refresh_event.is_set():
+                time.sleep(0.5)
+            # Use the refreshed scraper
+            scraper_ref = scraper
+        
         try:
             with image_download_lock:
                 elapsed = time.time() - last_image_download
@@ -587,7 +755,7 @@ def download_image(scraper, image_url, img_id, imgs_dir, progress):
                     time.sleep(IMAGE_DOWNLOAD_DELAY - elapsed)
                 last_image_download = time.time()
             
-            response = scraper.get(image_url, timeout=15)
+            response = scraper_ref.get(image_url, timeout=15)
             
             if response.status_code == 429:
                 wait_time = (attempt + 1) * 5
@@ -595,15 +763,29 @@ def download_image(scraper, image_url, img_id, imgs_dir, progress):
                 time.sleep(wait_time)
                 continue
             
+            if response.status_code == 403:
+                logging.warning(f"403 Forbidden on image (attempt {attempt+1}), cookie may be expired")
+                with failed_image_lock:
+                    failed_image_count += 1
+                    if failed_image_count >= MAX_FAILED_IMAGES:
+                        raise CookieExpiredError("Cookie expired or rate limited")
+                time.sleep((attempt + 1) * 2)
+                continue
+            
             response.raise_for_status()
             img_path = os.path.join(imgs_dir, f"{img_id}.jpg")
             with open(img_path, 'wb') as f:
                 f.write(response.content)
             progress.increment_downloaded_images()
+            
+            # Reset failed count on success
+            with failed_image_lock:
+                failed_image_count = 0
+            
             return img_id
             
         except CookieExpiredError:
-            raise  # Re-raise to stop processing
+            raise  # Re-raise to trigger cookie refresh
         except Exception as e:
             if attempt < max_retries - 1:
                 time.sleep((attempt + 1) * 2)
@@ -613,7 +795,7 @@ def download_image(scraper, image_url, img_id, imgs_dir, progress):
                 with failed_image_lock:
                     failed_image_count += 1
                     if failed_image_count >= MAX_FAILED_IMAGES:
-                        logging.error(f"Reached {MAX_FAILED_IMAGES} failed image downloads, stopping scraper")
+                        logging.error(f"Reached {MAX_FAILED_IMAGES} failed image downloads")
                         raise CookieExpiredError("Cookie expired or rate limited")
     return ""
 
@@ -658,12 +840,13 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
         # Get post ID (permanent identifier from SteamRIP)
         post_id = post.get("id")
         
-        # Get view count
-        views = fetch_view_count(scraper, post_id) if post_id else "0"
+        # Queue view count fetch (runs in background thread)
+        queue_view_count_fetch(post_id)
         
         # Encode post_id to a nice 5-character identifier
         encoded_game_id = encode_game_id(post_id) if post_id else ""
         
+        # View count will be populated from cache after all processing
         game_entry = {
             "game": game_name,
             "size": game_size,
@@ -672,7 +855,8 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
             "dlc": has_dlc,
             "dirlink": post.get("link", ""),
             "download_links": download_links,
-            "weight": views,
+            "weight": "0",  # Will be populated from cache
+            "_post_id": post_id,  # Temporary field for view count lookup
             "imgID": img_id,
             "gameID": encoded_game_id,
             "category": categories,
@@ -714,8 +898,19 @@ def main():
     parser.add_argument(
         '--per-page', '-p',
         type=int,
-        default=50,
-        help='Number of posts to fetch per page (default: 50)'
+        default=100,
+        help='Number of posts to fetch per page (default: 100, max: 100)'
+    )
+    parser.add_argument(
+        '--skip-views',
+        action='store_true',
+        help='Skip fetching view counts (faster refresh)'
+    )
+    parser.add_argument(
+        '--view-workers',
+        type=int,
+        default=4,
+        help='Number of workers for view count fetching (default: 4)'
     )
     
     args = parser.parse_args()
@@ -830,81 +1025,203 @@ def main():
         logging.info("Creating fresh scraper session for posts...")
         scraper = create_scraper(args.cookie)
         
-        # Fetch all posts
-        base_url = "https://steamrip.com/wp-json/wp/v2/posts"
-        logging.info(f"Fetching posts from: {base_url} (per_page={args.per_page})")
-        posts = fetch_all_posts(scraper, base_url, progress, per_page=args.per_page)
+        # Start keep-alive thread to prevent cookie expiration
+        start_keep_alive(scraper, interval=30)
         
-        if not posts:
-            error_msg = "No posts fetched! Cookie may be invalid or expired."
-            logging.error(error_msg)
-            progress.add_error(error_msg)
-            progress.complete(success=False)
-            launch_crash_reporter(1, error_msg)
-            sys.exit(1)
-        
-        logging.info(f"Total posts fetched: {len(posts)}")
-        progress.set_total_posts(len(posts))
+        # Start view count fetcher in background (fetches views while posts are processed)
+        if not args.skip_views:
+            start_view_count_fetcher(args.cookie, num_workers=args.view_workers)
         
         # Load blacklist IDs from settings
         blacklist_ids = get_blacklist_ids()
         
-        # Process posts
+        # Stream-process posts: fetch pages and process each post immediately
+        base_url = "https://steamrip.com/wp-json/wp/v2/posts"
+        per_page = args.per_page
         progress.set_phase("processing_posts")
         game_data = []
+        processed_post_ids = set()
         
-        # Split posts into two halves and process from both ends simultaneously
-        total_posts = len(posts)
-        mid = total_posts // 2
-        first_half = posts[:mid]  # Process 0 -> mid
-        second_half = posts[mid:][::-1]  # Process end -> mid (reversed)
+        # First, get total count from headers
+        logging.info("Getting total post count...")
+        try:
+            head_response = scraper.head(f"{base_url}?per_page=1", timeout=30)
+            total_posts = int(head_response.headers.get('X-WP-Total', 0))
+            logging.info(f"Total posts available: {total_posts}")
+            progress.set_total_posts(total_posts)
+        except Exception as e:
+            logging.warning(f"Could not get total count: {e}")
+            total_posts = 0
         
-        logging.info(f"Processing {len(posts)} posts with {args.workers} workers per direction (both ends simultaneously)...")
+        page = 1
+        max_cookie_refreshes = 10
+        refresh_count = 0
+        consecutive_failures = 0
+        max_consecutive_failures = 5
         
-        game_data_lock = threading.Lock()
+        logging.info(f"Starting streaming post processing ({per_page} posts per page)...")
         
-        cookie_expired = [False]  # Use list to allow modification in nested function
-        
-        def process_batch(batch, direction):
-            results = []
-            with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                futures = {
-                    executor.submit(
-                        process_post, post, scraper, category_map, imgs_dir, progress, blacklist_ids
-                    ): post for post in batch
-                }
+        while True:
+            # Fetch page of posts
+            try:
+                response = scraper.get(f"{base_url}?per_page={per_page}&page={page}", timeout=30)
                 
-                for future in as_completed(futures):
-                    # Check if cookie expired was triggered by another thread
-                    if cookie_expired[0]:
-                        executor.shutdown(wait=False, cancel_futures=True)
+                if response.status_code == 400:
+                    # No more posts
+                    logging.info(f"Reached end of posts at page {page}")
+                    break
+                
+                if response.status_code == 403:
+                    logging.warning(f"403 Forbidden on page {page}, cookie may be expired")
+                    consecutive_failures += 1
+                    
+                    if consecutive_failures >= max_consecutive_failures:
+                        if refresh_count >= max_cookie_refreshes:
+                            logging.error("Max cookie refreshes reached")
+                            break
+                        
+                        refresh_count += 1
+                        logging.info(f"Cookie refresh attempt {refresh_count}/{max_cookie_refreshes}")
+                        progress.set_phase("waiting_for_cookie")
+                        progress.set_status("waiting")
+                        
+                        if wait_for_cookie_refresh():
+                            scraper = create_scraper(new_cookie_value[0])
+                            new_cookie_value[0] = None
+                            consecutive_failures = 0
+                            progress.set_phase("processing_posts")
+                            progress.set_status("running")
+                            continue  # Retry same page
+                        else:
+                            logging.error("No new cookie provided")
+                            break
+                    
+                    time.sleep(2)
+                    continue  # Retry same page
+                
+                response.raise_for_status()
+                posts = response.json()
+                
+                if not posts:
+                    logging.info(f"No posts returned at page {page}")
+                    break
+                
+                consecutive_failures = 0  # Reset on success
+                logging.info(f"Page {page}: fetched {len(posts)} posts, processing with {args.workers} workers...")
+                
+                # Filter posts to process (skip already processed and blacklisted)
+                posts_to_process = []
+                for post in posts:
+                    post_id = post.get("id")
+                    if post_id in processed_post_ids:
+                        continue
+                    if blacklist_ids and post_id and int(post_id) in blacklist_ids:
+                        logging.debug(f"Skipping blacklisted post ID: {post_id}")
+                        processed_post_ids.add(post_id)
+                        progress.increment_processed()
+                        continue
+                    posts_to_process.append(post)
+                
+                # Process posts in parallel using thread pool
+                cookie_expired_in_page = False
+                page_results = []
+                
+                with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                    futures = {
+                        executor.submit(process_post, post, scraper, category_map, imgs_dir, progress, blacklist_ids): post
+                        for post in posts_to_process
+                    }
+                    
+                    for future in as_completed(futures):
+                        post = futures[future]
+                        post_id = post.get("id")
+                        
+                        try:
+                            result = future.result()
+                            if result:
+                                page_results.append(result)
+                            processed_post_ids.add(post_id)
+                            progress.increment_processed()
+                        
+                        except CookieExpiredError:
+                            logging.warning(f"Cookie expired while processing post {post_id}")
+                            cookie_expired_in_page = True
+                            # Cancel remaining futures
+                            for f in futures:
+                                f.cancel()
+                            break
+                            
+                        except Exception as e:
+                            logging.error(f"Error processing post {post_id}: {e}")
+                            progress.add_error(f"Error processing post {post_id}: {str(e)}")
+                            processed_post_ids.add(post_id)
+                            progress.increment_processed()
+                
+                # Add results from this page
+                game_data.extend(page_results)
+                
+                # Check if cookie expired during page processing
+                if cookie_expired_in_page:
+                    consecutive_failures = max_consecutive_failures  # Trigger refresh on next iteration
+                    continue
+                
+                page += 1
+                time.sleep(0.1)  # Small delay between page requests
+                
+            except Exception as e:
+                if 'timed out' in str(e).lower():
+                    logging.warning(f"Timeout on page {page}, retrying...")
+                    time.sleep(2)
+                    continue
+                else:
+                    logging.error(f"Error fetching page {page}: {e}")
+                    progress.add_error(f"Error fetching page {page}: {str(e)}")
+                    consecutive_failures += 1
+                    
+                    if consecutive_failures >= max_consecutive_failures:
+                        # Try cookie refresh
+                        if refresh_count < max_cookie_refreshes:
+                            refresh_count += 1
+                            progress.set_phase("waiting_for_cookie")
+                            progress.set_status("waiting")
+                            
+                            if wait_for_cookie_refresh():
+                                scraper = create_scraper(new_cookie_value[0])
+                                new_cookie_value[0] = None
+                                consecutive_failures = 0
+                                progress.set_phase("processing_posts")
+                                progress.set_status("running")
+                                continue
                         break
-                    try:
-                        result = future.result()
-                        if result:
-                            results.append(result)
-                    except CookieExpiredError:
-                        logging.error("Cookie expired or rate limited, stopping batch processing")
-                        cookie_expired[0] = True
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        break
-                    except Exception as e:
-                        logging.error(f"Thread error ({direction}): {e}")
-                        progress.add_error(f"Thread error: {str(e)}")
-                    progress.increment_processed()
-            return results
+                    
+                    time.sleep(2)
+                    continue
         
-        # Run both batches concurrently
-        with ThreadPoolExecutor(max_workers=2) as batch_executor:
-            future_first = batch_executor.submit(process_batch, first_half, "forward")
-            future_second = batch_executor.submit(process_batch, second_half, "backward")
+        logging.info(f"Processed {len(game_data)} games total")
+        
+        # Stop keep-alive thread
+        stop_keep_alive()
+        
+        # Stop view count fetcher and wait for remaining fetches to complete
+        if not args.skip_views:
+            logging.info("Waiting for view count fetcher to finish...")
+            stop_view_count_fetcher()
             
-            game_data.extend(future_first.result())
-            game_data.extend(future_second.result())
+            # Apply cached view counts to game data
+            logging.info("Applying view counts to game data...")
+            for game in game_data:
+                post_id = game.pop("_post_id", None)  # Remove temp field
+                if post_id:
+                    game["weight"] = get_cached_view_count(post_id)
+            logging.info(f"Applied {len(view_count_cache)} view counts")
+        else:
+            # Just remove the temp field if skipping views
+            for game in game_data:
+                game.pop("_post_id", None)
         
-        # Check if we stopped due to cookie expiration
-        if cookie_expired[0]:
-            raise CookieExpiredError("Cookie expired or rate limited")
+        if refresh_count >= max_cookie_refreshes:
+            logging.warning(f"Reached maximum cookie refresh attempts ({max_cookie_refreshes})")
+            progress.add_error(f"Reached maximum cookie refresh attempts")
         
         # Build output
         progress.set_phase("saving")
@@ -959,14 +1276,18 @@ def main():
             logging.warning(f"Failed to update timestamp file: {e}")
         
     except CookieExpiredError:
-        logging.error("Cookie expired or rate limited - stopping scraper")
+        # This should only be reached if cookie expires during initial fetch phase
+        # (post processing has its own cookie refresh handling)
+        stop_keep_alive()
+        stop_view_count_fetcher()
+        logging.error("Cookie expired during initial fetch phase - stopping scraper")
         # Clear all errors and set single meaningful error
-        progress.clear_errors_and_set("Cookie expired or rate limited")
+        progress.clear_errors_and_set("Cookie expired or rate limited during initial fetch")
         progress.complete(success=False)
         # Send failure notification (checks settings internally)
         _launch_notification(
             "Index Refresh Failed",
-            "Cookie expired or rate limited"
+            "Cookie expired during initial fetch"
         )
         # Unregister atexit handler since we're manually restoring
         atexit.unregister(on_exit_restore)
@@ -976,6 +1297,8 @@ def main():
         sys.exit(1)
         
     except KeyboardInterrupt:
+        stop_keep_alive()
+        stop_view_count_fetcher()
         logging.info("Refresh cancelled by user")
         progress.add_error("Cancelled by user")
         progress.complete(success=False)
@@ -987,6 +1310,8 @@ def main():
         sys.exit(1)
         
     except Exception as e:
+        stop_keep_alive()
+        stop_view_count_fetcher()
         logging.error(f"Unexpected error: {e}")
         progress.add_error(str(e))
         progress.complete(success=False)

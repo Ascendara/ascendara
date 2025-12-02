@@ -2989,24 +2989,44 @@ ipcMain.handle(
       let executablePath;
       let args;
 
-      // Use perPage from settings, default to 50 if not provided
       const fetchPerPage = perPage || 50;
       const workerCount = workers || 8;
 
       if (isWindows) {
-        executablePath = isDev
-          ? path.join("./binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh.exe")
-          : path.join(appDirectory, "/resources/AscendaraLocalRefresh.exe");
-        args = [
-          "--output",
-          outputPath,
-          "--cookie",
-          cfClearance,
-          "--per-page",
-          String(fetchPerPage),
-          "--workers",
-          String(workerCount),
-        ];
+        if (isDev) {
+          // In dev mode, run Python script directly to avoid needing to rebuild exe
+          executablePath = "python";
+          args = [
+            "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
+            "--output",
+            outputPath,
+            "--cookie",
+            cfClearance,
+            "--per-page",
+            String(fetchPerPage),
+            "--workers",
+            String(workerCount),
+            "--view-workers",
+            "4", // Parallel view count fetchers (lightweight, no retries)
+          ];
+        } else {
+          executablePath = path.join(
+            appDirectory,
+            "/resources/AscendaraLocalRefresh.exe"
+          );
+          args = [
+            "--output",
+            outputPath,
+            "--cookie",
+            cfClearance,
+            "--per-page",
+            String(fetchPerPage),
+            "--workers",
+            String(workerCount),
+            "--view-workers",
+            "4", // Parallel view count fetchers (lightweight, no retries)
+          ];
+        }
       } else {
         executablePath = "python3";
         const scriptPath = isDev
@@ -3022,20 +3042,73 @@ ipcMain.handle(
           String(fetchPerPage),
           "--workers",
           String(workerCount),
+          "--view-workers",
+          "32", // Parallel view count fetchers
         ];
       }
 
       console.log(
-        `Starting local refresh: ${executablePath} --output ${outputPath} --cookie [REDACTED] --per-page ${fetchPerPage}`
+        `Starting local refresh: ${executablePath} --output ${outputPath} --cookie [REDACTED]`
       );
 
       localRefreshProcess = spawn(executablePath, args, {
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"], // stdin enabled for cookie refresh
         windowsVerbatimArguments: isWindows, // Preserve special characters on Windows
       });
 
-      localRefreshProcess.stdout.on("data", data => {
-        console.log(`LocalRefresh stdout: ${data}`);
+      localRefreshProcess.stdout.on("data", async data => {
+        const output = data.toString();
+        console.log(`LocalRefresh stdout: ${output}`);
+
+        // Check for cookie refresh request
+        if (output.includes("COOKIE_REFRESH_NEEDED")) {
+          console.log("Cookie refresh requested by LocalRefresh process");
+          const mainWindow = BrowserWindow.getAllWindows().find(win => win);
+          if (mainWindow) {
+            mainWindow.webContents.send("local-refresh-cookie-needed");
+          }
+
+          // Send system notification
+          try {
+            const settings = settingsManager.getSettings();
+            if (settings.notifications) {
+              const theme = settings.theme || "purple";
+
+              if (isWindows) {
+                const notificationHelperPath = isDev
+                  ? path.join(
+                      "./binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe"
+                    )
+                  : path.join(appDirectory, "/resources/AscendaraNotificationHelper.exe");
+                const args = [
+                  "--theme",
+                  theme,
+                  "--title",
+                  "Cookie Expired",
+                  "--message",
+                  "The Cloudflare cookie has expired. Please provide a new cookie to continue the refresh.",
+                ];
+                const notifProcess = spawn(notificationHelperPath, args, {
+                  detached: true,
+                  stdio: "ignore",
+                });
+                notifProcess.unref();
+              } else {
+                const notification = new Notification({
+                  title: "Cookie Expired",
+                  body: "The Cloudflare cookie has expired. Please provide a new cookie to continue the refresh.",
+                  silent: false,
+                  timeoutType: "default",
+                  urgency: "critical",
+                  icon: path.join(app.getAppPath(), "build", "icon.png"),
+                });
+                notification.show();
+              }
+            }
+          } catch (notifError) {
+            console.error("Failed to send cookie refresh notification:", notifError);
+          }
+        }
       });
 
       localRefreshProcess.stderr.on("data", data => {
@@ -3122,7 +3195,23 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle("stop-local-refresh", async () => {
+ipcMain.handle("send-local-refresh-cookie", async (event, newCookie) => {
+  try {
+    if (localRefreshProcess && localRefreshProcess.stdin && !localRefreshProcess.killed) {
+      console.log("Sending new cookie to LocalRefresh process...");
+      localRefreshProcess.stdin.write(newCookie + "\n");
+      return { success: true };
+    } else {
+      console.error("LocalRefresh process not running or stdin not available");
+      return { success: false, error: "Process not running" };
+    }
+  } catch (error) {
+    console.error("Failed to send cookie to LocalRefresh:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("stop-local-refresh", async (event, outputPath) => {
   try {
     // Stop monitoring first
     localRefreshShouldMonitor = false;
@@ -3161,6 +3250,49 @@ ipcMain.handle("stop-local-refresh", async () => {
         });
       } catch (e) {
         // No processes found or already dead
+      }
+    }
+
+    // Restore backups since force kill doesn't allow Python to clean up
+    // Get outputPath from settings if not provided
+    let localIndexPath = outputPath;
+    if (!localIndexPath) {
+      const settings = settingsManager.getSettings();
+      localIndexPath = settings.localIndex;
+    }
+
+    if (localIndexPath) {
+      const imgsDir = path.join(localIndexPath, "imgs");
+      const imgsBackupDir = path.join(localIndexPath, "imgs_backup");
+      const gamesFile = path.join(localIndexPath, "ascendara_games.json");
+      const gamesBackupFile = path.join(localIndexPath, "ascendara_games_backup.json");
+
+      console.log("Restoring backups after manual stop...");
+
+      // Restore imgs folder from backup
+      if (fs.existsSync(imgsBackupDir)) {
+        try {
+          if (fs.existsSync(imgsDir)) {
+            fs.rmSync(imgsDir, { recursive: true, force: true });
+          }
+          fs.renameSync(imgsBackupDir, imgsDir);
+          console.log("Restored imgs folder from backup");
+        } catch (e) {
+          console.error("Failed to restore imgs backup:", e);
+        }
+      }
+
+      // Restore games file from backup
+      if (fs.existsSync(gamesBackupFile)) {
+        try {
+          if (fs.existsSync(gamesFile)) {
+            fs.unlinkSync(gamesFile);
+          }
+          fs.renameSync(gamesBackupFile, gamesFile);
+          console.log("Restored ascendara_games.json from backup");
+        } catch (e) {
+          console.error("Failed to restore games backup:", e);
+        }
       }
     }
 
