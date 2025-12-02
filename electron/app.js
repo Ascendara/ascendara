@@ -739,6 +739,7 @@ class SettingsManager {
     this.defaultSettings = {
       downloadDirectory: "",
       additionalDirectories: [],
+      watchingFolders: [],
       defaultOpenPage: "home",
       behaviorAfterDownload: "none",
       showOldDownloadLinks: false,
