@@ -6,7 +6,16 @@ const PageTransition = ({ children }) => {
   const { settings } = useSettings();
 
   if (!settings.smoothTransitions) {
-    return children;
+    return (
+      <motion.div
+        initial={false}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 1 }}
+        transition={{ duration: 0 }}
+      >
+        {children}
+      </motion.div>
+    );
   }
 
   return (

@@ -98,6 +98,10 @@ const LocalRefresh = () => {
   const manuallyStoppedRef = useRef(false);
   const [newBlacklistId, setNewBlacklistId] = useState("");
   const [workerCount, setWorkerCount] = useState(8);
+  const [fetchPageCount, setFetchPageCount] = useState(50);
+  const [showCookieRefreshDialog, setShowCookieRefreshDialog] = useState(false);
+  const [cookieRefreshCount, setCookieRefreshCount] = useState(0);
+  const cookieSubmittedRef = useRef(false);
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -108,6 +112,9 @@ const LocalRefresh = () => {
         // Load saved refresh preferences
         if (settings?.localRefreshWorkers !== undefined) {
           setWorkerCount(settings.localRefreshWorkers);
+        }
+        if (settings?.fetchPageCount !== undefined) {
+          setFetchPageCount(settings.fetchPageCount);
         }
 
         // Check if localIndex is set, if not set it to default
@@ -165,6 +172,11 @@ const LocalRefresh = () => {
                     t("localRefresh.fetchingPosts") || "Fetching game posts...",
                   processing_posts:
                     t("localRefresh.processingPosts") || "Processing games...",
+                  fetching_views:
+                    t("localRefresh.fetchingViews") || "Fetching view counts...",
+                  waiting_for_cookie:
+                    t("localRefresh.waitingForCookie") ||
+                    "Cookie expired - waiting for new cookie...",
                   saving: t("localRefresh.saving") || "Saving data...",
                   done: t("localRefresh.done") || "Done",
                 };
@@ -211,10 +223,26 @@ const LocalRefresh = () => {
             t("localRefresh.fetchingCategories") || "Fetching categories...",
           fetching_posts: t("localRefresh.fetchingPosts") || "Fetching game posts...",
           processing_posts: t("localRefresh.processingPosts") || "Processing games...",
+          waiting_for_cookie:
+            t("localRefresh.waitingForCookie") ||
+            "Cookie expired - waiting for new cookie...",
           saving: t("localRefresh.saving") || "Saving data...",
           done: t("localRefresh.done") || "Done",
         };
         setCurrentStep(phaseMessages[data.phase] || data.phase);
+
+        // Auto-show cookie dialog when waiting for cookie (but not if we just submitted one)
+        if (
+          (data.phase === "waiting_for_cookie" || data.waitingForCookie) &&
+          !cookieSubmittedRef.current
+        ) {
+          setShowCookieRefreshDialog(true);
+        }
+
+        // Reset the cookie submitted flag when phase changes away from waiting_for_cookie
+        if (data.phase !== "waiting_for_cookie" && !data.waitingForCookie) {
+          cookieSubmittedRef.current = false;
+        }
       }
       if (data.currentGame) {
         setCurrentStep(prev => `${prev} - ${data.currentGame}`);
@@ -302,16 +330,23 @@ const LocalRefresh = () => {
       toast.error(t("localRefresh.refreshFailed") || "Game list refresh failed");
     };
 
+    const handleCookieNeeded = () => {
+      console.log("Cookie refresh needed - showing dialog");
+      setShowCookieRefreshDialog(true);
+    };
+
     // Subscribe to IPC events
     if (window.electron?.onLocalRefreshProgress) {
       window.electron.onLocalRefreshProgress(handleProgressUpdate);
       window.electron.onLocalRefreshComplete(handleComplete);
       window.electron.onLocalRefreshError(handleError);
+      window.electron.onLocalRefreshCookieNeeded?.(handleCookieNeeded);
 
       return () => {
         window.electron.offLocalRefreshProgress?.();
         window.electron.offLocalRefreshComplete?.();
         window.electron.offLocalRefreshError?.();
+        window.electron.offLocalRefreshCookieNeeded?.();
       };
     }
   }, [t]);
@@ -329,6 +364,7 @@ const LocalRefresh = () => {
     setErrors([]);
     setCurrentPhase("initializing");
     manuallyStoppedRef.current = false;
+    setCookieRefreshCount(0);
     setCurrentStep(t("localRefresh.initializing") || "Initializing...");
 
     try {
@@ -337,7 +373,7 @@ const LocalRefresh = () => {
         const result = await window.electron.startLocalRefresh({
           outputPath: localIndexPath,
           cfClearance: refreshData.cfClearance,
-          perPage: settings?.fetchPageCount || 50,
+          perPage: fetchPageCount,
           workers: workerCount,
         });
 
@@ -362,16 +398,65 @@ const LocalRefresh = () => {
     manuallyStoppedRef.current = true;
     try {
       if (window.electron?.stopLocalRefresh) {
-        await window.electron.stopLocalRefresh();
+        // Pass localIndexPath so Electron can restore backups
+        await window.electron.stopLocalRefresh(localIndexPath);
       }
       setIsRefreshing(false);
       setRefreshStatus("idle");
       setCurrentStep(t("localRefresh.stopped") || "Refresh stopped");
-      toast.info(t("localRefresh.refreshStopped") || "Game list refresh stopped");
+      toast.info(
+        t("localRefresh.refreshStopped") ||
+          "Game list refresh stopped and backups restored"
+      );
     } catch (error) {
       console.error("Failed to stop refresh:", error);
       manuallyStoppedRef.current = false;
       toast.error(t("localRefresh.stopFailed") || "Failed to stop refresh");
+    }
+  };
+
+  const handleCookieRefresh = async refreshData => {
+    // This is called when user provides a new cookie during mid-refresh
+    if (refreshData.isCookieRefresh && refreshData.cfClearance) {
+      try {
+        if (window.electron?.sendLocalRefreshCookie) {
+          const result = await window.electron.sendLocalRefreshCookie(
+            refreshData.cfClearance
+          );
+          if (result.success) {
+            cookieSubmittedRef.current = true; // Mark that cookie was successfully submitted BEFORE dialog closes
+            setCookieRefreshCount(prev => prev + 1);
+            // Don't call setShowCookieRefreshDialog here - the dialog's handleClose will do it
+            toast.success(
+              t("localRefresh.cookieRefreshed") || "Cookie refreshed, resuming..."
+            );
+            return; // Return early so the dialog close handler knows cookie was sent
+          } else {
+            toast.error(
+              result.error ||
+                t("localRefresh.cookieRefreshFailed") ||
+                "Failed to refresh cookie"
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Failed to send new cookie:", error);
+        toast.error(t("localRefresh.cookieRefreshFailed") || "Failed to refresh cookie");
+      }
+    }
+  };
+
+  const handleCookieRefreshDialogClose = async open => {
+    if (!open && showCookieRefreshDialog) {
+      setShowCookieRefreshDialog(false);
+      // Only stop refresh if user cancelled without submitting a cookie
+      if (!cookieSubmittedRef.current) {
+        await handleStopRefresh();
+      }
+      // Reset the flag for next time
+      cookieSubmittedRef.current = false;
+    } else {
+      setShowCookieRefreshDialog(open);
     }
   };
 
@@ -610,15 +695,30 @@ const LocalRefresh = () => {
                       {currentPhase !== "fetching_posts" &&
                         currentPhase !== "fetching_categories" &&
                         currentPhase !== "initializing" &&
-                        currentPhase !== "starting" && (
+                        currentPhase !== "starting" &&
+                        currentPhase !== "waiting_for_cookie" && (
                           <span className="font-medium">{Math.round(progress)}%</span>
                         )}
+                      {currentPhase === "waiting_for_cookie" && (
+                        <span className="font-medium text-orange-500">
+                          {t("localRefresh.waitingForCookieShort") || "Waiting..."}
+                        </span>
+                      )}
                     </div>
-                    {(currentPhase === "fetching_posts" ||
-                      currentPhase === "fetching_categories" ||
-                      currentPhase === "initializing" ||
-                      currentPhase === "starting") &&
-                    isRefreshing ? (
+                    {currentPhase === "waiting_for_cookie" ? (
+                      <div className="relative h-2 w-full overflow-hidden rounded-full bg-orange-200 dark:bg-orange-900/30">
+                        <div
+                          className="absolute h-full rounded-full bg-orange-500"
+                          style={{
+                            animation: "progress-loading 2s ease-in-out infinite",
+                          }}
+                        />
+                      </div>
+                    ) : (currentPhase === "fetching_posts" ||
+                        currentPhase === "fetching_categories" ||
+                        currentPhase === "initializing" ||
+                        currentPhase === "starting") &&
+                      isRefreshing ? (
                       <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
                         <div
                           className="absolute h-full rounded-full bg-primary"
@@ -827,20 +927,21 @@ const LocalRefresh = () => {
                       </Label>
                       <p className="text-xs text-muted-foreground">
                         {t("localRefresh.gamesPerPageHint") ||
-                          "Lower values help avoid timeouts (10-100)"}
+                          "Higher values are faster but may timeout (10-100)"}
                       </p>
                     </div>
                     <Input
                       type="number"
                       min={10}
                       max={100}
-                      value={settings?.fetchPageCount || 50}
+                      value={fetchPageCount}
                       onChange={e => {
                         const value = Math.min(
                           100,
                           Math.max(10, parseInt(e.target.value) || 50)
                         );
-                        updateSetting("fetchPageCount", value);
+                        setFetchPageCount(value);
+                        window.electron?.updateSetting("fetchPageCount", value);
                       }}
                       disabled={isRefreshing}
                       className="w-20 text-center"
@@ -976,6 +1077,15 @@ const LocalRefresh = () => {
           open={showRefreshDialog}
           onOpenChange={setShowRefreshDialog}
           onStartRefresh={handleStartRefresh}
+        />
+
+        {/* Cookie Refresh Dialog - reuses RefreshIndexDialog in cookie-refresh mode */}
+        <RefreshIndexDialog
+          open={showCookieRefreshDialog}
+          onOpenChange={handleCookieRefreshDialogClose}
+          onStartRefresh={handleCookieRefresh}
+          mode="cookie-refresh"
+          cookieRefreshCount={cookieRefreshCount}
         />
       </div>
     </div>

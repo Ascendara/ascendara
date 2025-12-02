@@ -44,7 +44,9 @@ contextBridge.exposeInMainWorld("electron", {
 
   // Local Refresh
   startLocalRefresh: data => ipcRenderer.invoke("start-local-refresh", data),
-  stopLocalRefresh: () => ipcRenderer.invoke("stop-local-refresh"),
+  stopLocalRefresh: outputPath => ipcRenderer.invoke("stop-local-refresh", outputPath),
+  sendLocalRefreshCookie: cookie =>
+    ipcRenderer.invoke("send-local-refresh-cookie", cookie),
   getLocalRefreshProgress: outputPath =>
     ipcRenderer.invoke("get-local-refresh-progress", outputPath),
   getLocalRefreshStatus: outputPath =>
@@ -55,9 +57,13 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("local-refresh-complete", (event, data) => callback(data)),
   onLocalRefreshError: callback =>
     ipcRenderer.on("local-refresh-error", (event, data) => callback(data)),
+  onLocalRefreshCookieNeeded: callback =>
+    ipcRenderer.on("local-refresh-cookie-needed", event => callback()),
   offLocalRefreshProgress: () => ipcRenderer.removeAllListeners("local-refresh-progress"),
   offLocalRefreshComplete: () => ipcRenderer.removeAllListeners("local-refresh-complete"),
   offLocalRefreshError: () => ipcRenderer.removeAllListeners("local-refresh-error"),
+  offLocalRefreshCookieNeeded: () =>
+    ipcRenderer.removeAllListeners("local-refresh-cookie-needed"),
 
   // Language Management
   downloadLanguage: langCode => ipcRenderer.invoke("download-language", langCode),

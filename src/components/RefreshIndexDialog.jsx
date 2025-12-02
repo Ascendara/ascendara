@@ -27,7 +27,13 @@ import {
 
 const STEAMRIP_POSTS_URL = "https://steamrip.com/wp-json/wp/v2/posts?per_page=1&page=1";
 
-const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
+const RefreshIndexDialog = ({
+  open,
+  onOpenChange,
+  onStartRefresh,
+  mode = "refresh",
+  cookieRefreshCount = 0,
+}) => {
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [hasExtension, setHasExtension] = useState(null);
@@ -37,11 +43,14 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
   const [cookieReceived, setCookieReceived] = useState(false);
   const [hasStartedRefresh, setHasStartedRefresh] = useState(false);
 
+  // Determine if this is a cookie refresh (mid-process) vs initial refresh
+  const isCookieRefresh = mode === "cookie-refresh";
+
   // Listen for cookie from extension via protocol handler
   useEffect(() => {
     if (!open || step !== 3 || hasStartedRefresh) return;
 
-    const handleCookieReceived = (event, data) => {
+    const handleCookieReceived = async (event, data) => {
       if (data?.cookie && !hasStartedRefresh) {
         console.log("Received cookie from extension");
         setCfClearance(data.cookie);
@@ -49,8 +58,14 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
         setIsListening(false);
         setHasStartedRefresh(true);
         // Auto-start refresh after a brief delay to show success state
-        setTimeout(() => {
-          onStartRefresh({ method: "extension", cfClearance: data.cookie });
+        setTimeout(async () => {
+          // Wait for onStartRefresh to complete before closing
+          // This ensures the cookie is sent before the dialog close handler runs
+          await onStartRefresh({
+            method: "extension",
+            cfClearance: data.cookie,
+            isCookieRefresh,
+          });
           handleClose();
         }, 1000);
       }
@@ -114,13 +129,42 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
           <>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                {t("refreshDialog.step1Title") || "Complete Cloudflare Verification"}
+                {isCookieRefresh
+                  ? t("refreshDialog.cookieExpiredTitle") || "Cookie Expired"
+                  : t("refreshDialog.step1Title") || "Complete Cloudflare Verification"}
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
                 <div className="space-y-4 text-sm text-muted-foreground">
+                  {isCookieRefresh && (
+                    <div className="flex items-center gap-3 rounded-lg border border-orange-500/30 bg-orange-500/10 p-4">
+                      <Cookie className="h-5 w-5 shrink-0 text-orange-500" />
+                      <div>
+                        <span className="block font-medium text-orange-600 dark:text-orange-400">
+                          {t("refreshDialog.cookieExpiredWarning") ||
+                            "The Cloudflare cookie has expired"}
+                        </span>
+                        <span className="block text-sm text-muted-foreground">
+                          {t("refreshDialog.cookieExpiredDesc") ||
+                            "Cloudflare cookies expire after about 10 minutes. Please get a new cookie to continue the refresh."}
+                          {cookieRefreshCount > 0 && (
+                            <span className="ml-1 text-xs">
+                              (
+                              {t("refreshDialog.refreshedTimes", {
+                                count: cookieRefreshCount,
+                              }) || `Refreshed ${cookieRefreshCount} time(s)`}
+                              )
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <p>
-                    {t("refreshDialog.step1Description") ||
-                      "First, you need to open the SteamRIP posts link and complete Cloudflare's verification challenge."}
+                    {isCookieRefresh
+                      ? t("refreshDialog.cookieRefreshDescription") ||
+                        "Open SteamRIP again and complete the Cloudflare verification to get a new cookie."
+                      : t("refreshDialog.step1Description") ||
+                        "First, you need to open the SteamRIP posts link and complete Cloudflare's verification challenge."}
                   </p>
                   <div className="rounded-lg border bg-muted/50 p-4">
                     <p className="mb-3 text-sm font-medium text-foreground">
@@ -163,7 +207,9 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <Button variant="outline" className="text-primary" onClick={handleClose}>
-                {t("common.cancel") || "Cancel"}
+                {isCookieRefresh
+                  ? t("localRefresh.stopRefresh") || "Stop Refresh"
+                  : t("common.cancel") || "Cancel"}
               </Button>
               <Button onClick={() => setStep(2)} className="gap-2 text-secondary">
                 {t("common.next") || "Next"}
@@ -241,7 +287,9 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
                 {t("common.back") || "Back"}
               </Button>
               <Button variant="outline" className="text-primary" onClick={handleClose}>
-                {t("common.cancel") || "Cancel"}
+                {isCookieRefresh
+                  ? t("localRefresh.stopRefresh") || "Stop Refresh"
+                  : t("common.cancel") || "Cancel"}
               </Button>
             </AlertDialogFooter>
           </>
@@ -319,7 +367,9 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
                 onClick={handleClose}
                 disabled={cookieReceived}
               >
-                {t("common.cancel") || "Cancel"}
+                {isCookieRefresh
+                  ? t("localRefresh.stopRefresh") || "Stop Refresh"
+                  : t("common.cancel") || "Cancel"}
               </Button>
             </AlertDialogFooter>
           </>
@@ -411,7 +461,9 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
                 {t("common.back") || "Back"}
               </Button>
               <Button variant="outline" className="text-primary" onClick={handleClose}>
-                {t("common.cancel") || "Cancel"}
+                {isCookieRefresh
+                  ? t("localRefresh.stopRefresh") || "Stop Refresh"
+                  : t("common.cancel") || "Cancel"}
               </Button>
               <Button onClick={() => setStep(5)} className="gap-2 text-secondary">
                 {t("common.next") || "Next"}
@@ -464,17 +516,25 @@ const RefreshIndexDialog = ({ open, onOpenChange, onStartRefresh }) => {
                 {t("common.back") || "Back"}
               </Button>
               <Button variant="outline" className="text-primary" onClick={handleClose}>
-                {t("common.cancel") || "Cancel"}
+                {isCookieRefresh
+                  ? t("localRefresh.stopRefresh") || "Stop Refresh"
+                  : t("common.cancel") || "Cancel"}
               </Button>
               <Button
                 onClick={() => {
-                  onStartRefresh({ method: "manual", cfClearance: cfClearance.trim() });
+                  onStartRefresh({
+                    method: "manual",
+                    cfClearance: cfClearance.trim(),
+                    isCookieRefresh,
+                  });
                   handleClose();
                 }}
                 disabled={!cfClearance.trim()}
                 className="gap-2 text-secondary"
               >
-                {t("refreshDialog.startRefresh") || "Start Refresh"}
+                {isCookieRefresh
+                  ? t("refreshDialog.continueRefresh") || "Continue Refresh"
+                  : t("refreshDialog.startRefresh") || "Start Refresh"}
                 <CircleCheck className="h-4 w-4" />
               </Button>
             </AlertDialogFooter>

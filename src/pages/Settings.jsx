@@ -1803,44 +1803,48 @@ function Settings() {
                       "Default directories always tracked:"}
                   </span>
                 </div>
-                <ul className="ml-6 space-y-1 text-xs text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>Public/Documents/Steam/CODEX</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>AppData/Roaming/Steam/CODEX</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>AppData/Roaming/Goldberg SteamEmu Saves</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>AppData/Roaming/EMPRESS</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>Public/Documents/Steam/RUNE</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>Public/Documents/EMPRESS</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>Public/Documents/OnlineFix</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>ProgramData/Steam</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>LocalAppData/SKIDROW</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/Steam/CODEX</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/EMPRESS</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/Goldberg SteamEmu Saves</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>AppData/Roaming/SmartSteamEmu</span>
-                  </li>
-                </ul>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>ProgramData/Steam</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>LocalAppData/SKIDROW</span>
+                  </div>
+                </div>
                 <div className="mt-2 text-xs italic text-muted-foreground">
                   {t("settings.achievementWatcher.defaultDirsNote") ||
                     "These directories and files are always tracked by default and cannot be removed."}

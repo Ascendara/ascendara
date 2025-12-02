@@ -72,6 +72,10 @@ module.exports.getFolders = async userDir_file => {
       },
     },
     {
+      dir: path.join(process.env["Public"], "Documents/Steam/RUNE"),
+      options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
+    },
+    {
       dir: path.join(process.env["Public"], "Documents/OnlineFix"),
       options: {
         recursive: true,

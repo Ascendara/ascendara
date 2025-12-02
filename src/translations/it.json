@@ -699,6 +699,8 @@
   "localRefresh": {
     "blacklist": "Giochi nella lista nera",
     "blacklistDesc": "Escludi giochi specifici dall'indice",
+    "cookieRefreshFailed": "Impossibile aggiornare il cookie",
+    "cookieRefreshed": "Cookie aggiornato, ripresa in corso...",
     "dayAgo": "giorno fa",
     "daysAgo": "giorni fa",
     "description": "Aggiorna l'indice dei giochi per vedere gli ultimi giochi disponibili",
@@ -710,6 +712,7 @@
     "fetchSettingsDesc": "Configura il modo in cui i giochi vengono recuperati dalla sorgente",
     "fetchingCategories": "Recupero delle categorie in corso...",
     "fetchingPosts": "Recupero post di gioco in corso...",
+    "fetchingViews": "Recupero conteggio visualizzazioni...",
     "gamesPerPage": "Giochi per pagina",
     "gamesPerPageHint": "Valori più bassi aiutano a evitare timeout (10-100)",
     "gamesProcessed": "Giochi elaborati",
@@ -757,6 +760,7 @@
     "usingLocalIndex": "Utilizzo dell'indice locale",
     "usingLocalIndexDesc": "Attualmente stai utilizzando l'indice di gioco locale. I giochi vengono caricati dalla memoria locale.",
     "viewProgress": "Visualizza l'avanzamento",
+    "waitingForCookie": "Cookie scaduto: in attesa di un nuovo cookie...",
     "whatThisDoes": "Cosa fa questo?",
     "whatThisDoesDescription": "L'indice locale memorizza i dati di gioco sul tuo dispositivo per una navigazione più rapida e un accesso offline. L'aggiornamento aggiorna l'indice con gli ultimi giochi di SteamRIP.",
     "workerCount": "Discussioni sui lavoratori",
@@ -799,10 +803,14 @@
   "refreshDialog": {
     "beginRefresh": "Inizia l'aggiornamento",
     "clickToOpen": "Fare clic sul pulsante in basso per aprire SteamRIP:",
+    "cookieExpiredDesc": "Il cookie è scaduto durante il processo di aggiornamento. Dovrai procurartene uno nuovo per continuare.",
+    "cookieExpiredTitle": "Cookie scaduto",
+    "cookieExpiredWarning": "Cookie scaduto durante l'aggiornamento",
     "cookieNote": "Il cookie dovrebbe essere una lunga stringa di lettere e numeri.",
     "cookiePlaceholder": "Incolla il cookie cf_clearance qui...",
     "cookieReceivedDesc": "Cookie ricevuto dall'estensione con successo!",
     "cookieReceivedTitle": "Biscotto ricevuto!",
+    "cookieRefreshDescription": "Completa nuovamente la verifica per ottenere un nuovo cookie e continuare l'aggiornamento.",
     "copyLink": "Copia collegamento",
     "extNote": "L'aggiornamento inizierà automaticamente una volta che l'estensione avrà inviato i dati.",
     "extStep1": "Completa il captcha di Cloudflare sulla pagina SteamRIP",
@@ -1284,7 +1292,7 @@
       "stillRefreshing": "Il tuo indice di gioco è ancora in fase di creazione",
       "subtitle": "Ascendara utilizza un indice di gioco locale per una navigazione più rapida e un accesso offline",
       "title": "Imposta l'indice del tuo gioco",
-      "waitForRefresh": "Non potrai sfogliare i giochi finché l'indice non sarà completo. Di solito l'operazione richiede alcuni minuti."
+      "waitForRefresh": "Non potrai sfogliare i giochi finché l'indice non sarà completo. Solitamente l'operazione richiede alcuni minuti."
     },
     "makeSureYouHaveEnoughDiskSpaceInTheSelectedLocation": "Assicurati di avere abbastanza spazio su disco nella posizione selezionata",
     "manualUpdates": "Aggiornamenti manuali",
