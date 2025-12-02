@@ -21,6 +21,7 @@ import logging
 import subprocess
 import atexit
 import shutil
+import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,6 +30,15 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 image_download_lock = threading.Lock()
 last_image_download = 0
 IMAGE_DOWNLOAD_DELAY = 0.15  # seconds between image downloads
+
+# Failed image download tracking
+failed_image_count = 0
+failed_image_lock = threading.Lock()
+MAX_FAILED_IMAGES = 5
+
+# Custom exception for cookie expiration/rate limiting
+class CookieExpiredError(Exception):
+    pass
 
 # Global variables
 output_dir = ""
@@ -124,6 +134,60 @@ def get_blacklist_ids():
     except Exception as e:
         logging.error(f"Failed to read blacklist from settings: {e}")
     return set()
+
+
+def get_notification_settings():
+    """Read notification settings from settings file. Returns (enabled, theme) tuple."""
+    try:
+        settings_path = None
+        if sys.platform == 'win32':
+            appdata = os.environ.get('APPDATA')
+            if appdata:
+                candidate = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+                if os.path.exists(candidate):
+                    settings_path = candidate
+        elif sys.platform == 'darwin':
+            user_data_dir = os.path.expanduser('~/Library/Application Support/ascendara')
+            candidate = os.path.join(user_data_dir, 'ascendarasettings.json')
+            if os.path.exists(candidate):
+                settings_path = candidate
+
+        if settings_path and os.path.exists(settings_path):
+            with open(settings_path, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                enabled = settings.get('notifications', True)
+                theme = settings.get('theme', 'dark')
+                return (enabled, theme)
+    except Exception as e:
+        logging.error(f"Failed to read notification settings: {e}")
+    return (True, 'dark')  # Default to enabled with dark theme
+
+
+def _launch_notification(title, message):
+    """Launch notification helper to show a system notification if enabled."""
+    # Check if notifications are enabled
+    enabled, theme = get_notification_settings()
+    if not enabled:
+        logging.debug("Notifications disabled in settings, skipping notification")
+        return
+    
+    try:
+        # Get the directory where the current executable is located
+        exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        notification_helper_path = os.path.join(exe_dir, 'AscendaraNotificationHelper.exe')
+        logging.debug(f"Looking for notification helper at: {notification_helper_path}")
+        
+        if os.path.exists(notification_helper_path):
+            logging.debug(f"Launching notification helper with theme={theme}, title='{title}', message='{message}'")
+            subprocess.Popen(
+                [notification_helper_path, "--theme", theme, "--title", title, "--message", message],
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+            )
+            logging.debug("Notification helper process started successfully")
+        else:
+            logging.error(f"Notification helper not found at: {notification_helper_path}")
+    except Exception as e:
+        logging.error(f"Failed to launch notification helper: {e}")
 
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
@@ -227,6 +291,14 @@ class RefreshProgress:
             "message": error_msg,
             "timestamp": time.time()
         })
+        self._update_progress()
+    
+    def clear_errors_and_set(self, error_msg):
+        """Clear all errors and set a single error message"""
+        self.errors = [{
+            "message": error_msg,
+            "timestamp": time.time()
+        }]
         self._update_progress()
     
     def complete(self, success=True):
@@ -494,10 +566,15 @@ def fetch_view_count(scraper, post_id):
 
 def download_image(scraper, image_url, img_id, imgs_dir, progress):
     """Download and save image with rate limiting and retry"""
-    global last_image_download
+    global last_image_download, failed_image_count
     
     if not image_url:
         return ""
+    
+    # Check if we've already hit the failure threshold
+    with failed_image_lock:
+        if failed_image_count >= MAX_FAILED_IMAGES:
+            raise CookieExpiredError("Cookie expired or rate limited")
     
     progress.increment_images()
     max_retries = 3
@@ -525,12 +602,19 @@ def download_image(scraper, image_url, img_id, imgs_dir, progress):
             progress.increment_downloaded_images()
             return img_id
             
+        except CookieExpiredError:
+            raise  # Re-raise to stop processing
         except Exception as e:
             if attempt < max_retries - 1:
                 time.sleep((attempt + 1) * 2)
             else:
                 logging.warning(f"Failed to download image after {max_retries} attempts: {image_url}")
-                progress.add_error(f"Failed to download image: {image_url}")
+                # Increment failed count and check threshold
+                with failed_image_lock:
+                    failed_image_count += 1
+                    if failed_image_count >= MAX_FAILED_IMAGES:
+                        logging.error(f"Reached {MAX_FAILED_IMAGES} failed image downloads, stopping scraper")
+                        raise CookieExpiredError("Cookie expired or rate limited")
     return ""
 
 
@@ -598,6 +682,8 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
         
         return game_entry
     
+    except CookieExpiredError:
+        raise  # Re-raise to stop all processing
     except Exception as e:
         error_msg = f"Error processing post {post.get('id')}: {e}"
         logging.error(error_msg)
@@ -640,17 +726,91 @@ def main():
     # Setup directories
     output_dir = args.output
     imgs_dir = os.path.join(output_dir, "imgs")
+    imgs_backup_dir = os.path.join(output_dir, "imgs_backup")
+    games_file = os.path.join(output_dir, "ascendara_games.json")
+    games_backup_file = os.path.join(output_dir, "ascendara_games_backup.json")
+    
+    def restore_backup():
+        """Restore from backup if it exists"""
+        restored = False
+        try:
+            # Restore imgs folder
+            if os.path.exists(imgs_backup_dir):
+                if os.path.exists(imgs_dir):
+                    shutil.rmtree(imgs_dir)
+                shutil.move(imgs_backup_dir, imgs_dir)
+                logging.info("Restored imgs folder from backup")
+                restored = True
+            # Restore games file
+            if os.path.exists(games_backup_file):
+                if os.path.exists(games_file):
+                    os.remove(games_file)
+                shutil.move(games_backup_file, games_file)
+                logging.info("Restored ascendara_games.json from backup")
+                restored = True
+        except Exception as e:
+            logging.error(f"Failed to restore backup: {e}")
+        return restored
+    
+    def cleanup_backup():
+        """Remove backup files after successful completion"""
+        try:
+            if os.path.exists(imgs_backup_dir):
+                shutil.rmtree(imgs_backup_dir)
+                logging.info("Cleaned up imgs backup")
+            if os.path.exists(games_backup_file):
+                os.remove(games_backup_file)
+                logging.info("Cleaned up games backup")
+        except Exception as e:
+            logging.warning(f"Failed to cleanup backup: {e}")
+    
+    # Track if we completed successfully to decide whether to restore on exit
+    refresh_completed_successfully = [False]  # Use list to allow modification in nested function
+    
+    def on_exit_restore():
+        """Restore backup on unexpected exit if not completed successfully"""
+        if not refresh_completed_successfully[0]:
+            logging.info("Process exiting without successful completion, attempting to restore backup...")
+            restore_backup()
+    
+    # Register atexit handler to restore backup if process is killed
+    atexit.register(on_exit_restore)
+    
+    # Handle SIGTERM (sent by taskkill) to restore backup
+    def signal_handler(signum, frame):
+        logging.info(f"Received signal {signum}, restoring backup and exiting...")
+        restore_backup()
+        sys.exit(1)
+    
+    # Register signal handlers (SIGTERM for graceful kill, SIGINT for Ctrl+C)
+    signal.signal(signal.SIGTERM, signal_handler)
+    if sys.platform != 'win32':
+        signal.signal(signal.SIGINT, signal_handler)
     
     try:
         os.makedirs(output_dir, exist_ok=True)
-        # Delete existing imgs folder before creating new one
+        
+        # Clean up any old backups first
+        if os.path.exists(imgs_backup_dir):
+            shutil.rmtree(imgs_backup_dir)
+        if os.path.exists(games_backup_file):
+            os.remove(games_backup_file)
+        
+        # Backup existing imgs folder before creating new one
         if os.path.exists(imgs_dir):
-            shutil.rmtree(imgs_dir)
-            logging.info(f"Deleted existing imgs directory")
+            shutil.move(imgs_dir, imgs_backup_dir)
+            logging.info("Backed up existing imgs directory")
+        
+        # Backup existing games file
+        if os.path.exists(games_file):
+            shutil.copy2(games_file, games_backup_file)
+            logging.info("Backed up existing ascendara_games.json")
+        
         os.makedirs(imgs_dir, exist_ok=True)
-        logging.info(f"Created output directories")
+        logging.info("Created output directories")
     except Exception as e:
         logging.error(f"Failed to create directories: {e}")
+        restore_backup()
         launch_crash_reporter(1, str(e))
         sys.exit(1)
     
@@ -703,6 +863,8 @@ def main():
         
         game_data_lock = threading.Lock()
         
+        cookie_expired = [False]  # Use list to allow modification in nested function
+        
         def process_batch(batch, direction):
             results = []
             with ThreadPoolExecutor(max_workers=args.workers) as executor:
@@ -713,10 +875,19 @@ def main():
                 }
                 
                 for future in as_completed(futures):
+                    # Check if cookie expired was triggered by another thread
+                    if cookie_expired[0]:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        break
                     try:
                         result = future.result()
                         if result:
                             results.append(result)
+                    except CookieExpiredError:
+                        logging.error("Cookie expired or rate limited, stopping batch processing")
+                        cookie_expired[0] = True
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        break
                     except Exception as e:
                         logging.error(f"Thread error ({direction}): {e}")
                         progress.add_error(f"Thread error: {str(e)}")
@@ -730,6 +901,10 @@ def main():
             
             game_data.extend(future_first.result())
             game_data.extend(future_second.result())
+        
+        # Check if we stopped due to cookie expiration
+        if cookie_expired[0]:
+            raise CookieExpiredError("Cookie expired or rate limited")
         
         # Build output
         progress.set_phase("saving")
@@ -756,6 +931,19 @@ def main():
         progress.complete(success=True)
         logging.info(f"=== Done! Saved {len(game_data)} games to {output_file} ===")
         
+        # Send notification (checks settings internally)
+        _launch_notification(
+            "Index Refresh Complete",
+            f"Successfully indexed {len(game_data)} games"
+        )
+        
+        # Mark as successfully completed so atexit handler doesn't restore
+        refresh_completed_successfully[0] = True
+        atexit.unregister(on_exit_restore)
+        
+        # Success - cleanup backup files
+        cleanup_backup()
+        
         # Mark that user has successfully indexed
         try:
             timestamp_path = os.path.join(os.environ['USERPROFILE'], 'timestamp.ascendara.json')
@@ -770,16 +958,43 @@ def main():
         except Exception as e:
             logging.warning(f"Failed to update timestamp file: {e}")
         
+    except CookieExpiredError:
+        logging.error("Cookie expired or rate limited - stopping scraper")
+        # Clear all errors and set single meaningful error
+        progress.clear_errors_and_set("Cookie expired or rate limited")
+        progress.complete(success=False)
+        # Send failure notification (checks settings internally)
+        _launch_notification(
+            "Index Refresh Failed",
+            "Cookie expired or rate limited"
+        )
+        # Unregister atexit handler since we're manually restoring
+        atexit.unregister(on_exit_restore)
+        # Restore from backup
+        if restore_backup():
+            logging.info("Previous data restored after cookie expiration")
+        sys.exit(1)
+        
     except KeyboardInterrupt:
         logging.info("Refresh cancelled by user")
         progress.add_error("Cancelled by user")
         progress.complete(success=False)
+        # Unregister atexit handler since we're manually restoring
+        atexit.unregister(on_exit_restore)
+        # Restore from backup on cancellation
+        if restore_backup():
+            logging.info("Previous data restored after cancellation")
         sys.exit(1)
         
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
         progress.add_error(str(e))
         progress.complete(success=False)
+        # Unregister atexit handler since we're manually restoring
+        atexit.unregister(on_exit_restore)
+        # Restore from backup on error
+        if restore_backup():
+            logging.info("Previous data restored after error")
         launch_crash_reporter(1, str(e))
         sys.exit(1)
 
