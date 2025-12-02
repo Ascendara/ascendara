@@ -1650,6 +1650,37 @@ ipcMain.handle("read-local-file", async (event, filePath) => {
   }
 });
 
+// Fetch image from API (bypasses CORS in renderer)
+ipcMain.handle(
+  "fetch-api-image",
+  async (event, endpoint, imgID, timestamp, signature) => {
+    try {
+      const url = `https://api.ascendara.app/${endpoint}/${imgID}`;
+      console.log(`[ImageFetch] Fetching: ${url}`);
+      const response = await axios.get(url, {
+        headers: {
+          "X-Timestamp": timestamp.toString(),
+          "X-Signature": signature,
+          "Cache-Control": "no-store",
+        },
+        responseType: "arraybuffer",
+      });
+
+      if (response.status !== 200) {
+        return { error: true, status: response.status };
+      }
+
+      // Convert to base64 data URL
+      const base64 = Buffer.from(response.data).toString("base64");
+      const contentType = response.headers["content-type"] || "image/jpeg";
+      return { dataUrl: `data:${contentType};base64,${base64}` };
+    } catch (error) {
+      console.error("Error fetching API image:", error.message);
+      return { error: true, status: error.response?.status || 0, message: error.message };
+    }
+  }
+);
+
 // Get local image as base64 data URL
 ipcMain.handle("get-local-image-url", async (event, imagePath) => {
   try {
@@ -3155,13 +3186,99 @@ ipcMain.handle("get-local-refresh-progress", async (event, outputPath) => {
 
 ipcMain.handle("get-local-refresh-status", async (event, outputPath) => {
   try {
-    const isRunning = localRefreshProcess !== null && localRefreshShouldMonitor;
+    let isRunning = localRefreshProcess !== null && localRefreshShouldMonitor;
     let progressData = null;
 
-    if (isRunning && outputPath) {
+    // Read progress file if outputPath is provided
+    if (outputPath) {
       const progressFilePath = path.join(outputPath, "progress.json");
       if (fs.existsSync(progressFilePath)) {
         progressData = JSON.parse(fs.readFileSync(progressFilePath, "utf8"));
+      }
+    }
+
+    if (!isRunning && progressData && progressData.status === "running") {
+      try {
+        if (isWindows) {
+          const result = require("child_process").execSync(
+            'tasklist /FI "IMAGENAME eq AscendaraLocalRefresh.exe" /FO CSV /NH',
+            { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }
+          );
+          // If the process is found, tasklist returns a CSV line with the process name
+          isRunning = result.toLowerCase().includes("ascendaralocalrefresh.exe");
+        } else {
+          // macOS/Linux: check with pgrep
+          try {
+            require("child_process").execSync("pgrep -f AscendaraLocalRefresh", {
+              stdio: "ignore",
+            });
+            isRunning = true;
+          } catch (e) {
+            // pgrep returns non-zero if no process found
+            isRunning = false;
+          }
+        }
+
+        if (isRunning) {
+          console.log(
+            "Detected AscendaraLocalRefresh process running in background after app restart"
+          );
+          // Start monitoring the progress file again since we found a running process
+          if (!localRefreshProgressInterval && outputPath) {
+            localRefreshShouldMonitor = true;
+            localRefreshProgressInterval = setInterval(() => {
+              if (!localRefreshShouldMonitor) {
+                clearInterval(localRefreshProgressInterval);
+                localRefreshProgressInterval = null;
+                return;
+              }
+              try {
+                const progressFilePath = path.join(outputPath, "progress.json");
+                if (fs.existsSync(progressFilePath)) {
+                  const data = JSON.parse(fs.readFileSync(progressFilePath, "utf8"));
+                  const mainWindow = BrowserWindow.getAllWindows().find(win => win);
+                  if (mainWindow) {
+                    mainWindow.webContents.send("local-refresh-progress", data);
+                  }
+                  // Stop monitoring if process completed or failed
+                  if (data.status === "completed" || data.status === "failed") {
+                    console.log("Background refresh completed, stopping monitor");
+                    localRefreshShouldMonitor = false;
+                    clearInterval(localRefreshProgressInterval);
+                    localRefreshProgressInterval = null;
+                    const mainWindow = BrowserWindow.getAllWindows().find(win => win);
+                    if (mainWindow) {
+                      mainWindow.webContents.send("local-refresh-complete", {
+                        code: data.status === "completed" ? 0 : 1,
+                      });
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error("Error reading progress during background monitor:", e);
+              }
+            }, 1000);
+          }
+        } else {
+          // Process is not running but status says "running" - it crashed or was killed
+          // Update the progress file to reflect this
+          console.log("Progress shows running but process not found - marking as failed");
+          if (outputPath) {
+            const progressFilePath = path.join(outputPath, "progress.json");
+            if (fs.existsSync(progressFilePath)) {
+              progressData.status = "failed";
+              progressData.phase = "done";
+              if (!progressData.errors) progressData.errors = [];
+              progressData.errors.push({
+                message: "Process terminated unexpectedly",
+                timestamp: Date.now() / 1000,
+              });
+              fs.writeFileSync(progressFilePath, JSON.stringify(progressData, null, 2));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error checking for background refresh process:", e);
       }
     }
 

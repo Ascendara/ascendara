@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld("electron", {
   // Local Index
   getLocalImageUrl: imagePath => ipcRenderer.invoke("get-local-image-url", imagePath),
 
+  // API Image Fetch (bypasses CORS)
+  fetchApiImage: (endpoint, imgID, timestamp, signature) =>
+    ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
+
   // Settings and Configuration
   getSettings: () => ipcRenderer.invoke("get-settings"),
   saveSettings: (options, directory) =>
