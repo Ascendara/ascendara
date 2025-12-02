@@ -27,6 +27,7 @@ import torboxService from "@/services/torboxService";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { analytics } from "@/services/analyticsService";
+import ratingQueueService from "@/services/ratingQueueService";
 
 const GameCard = memo(function GameCard({ game, compact }) {
   const navigate = useNavigate();
@@ -109,27 +110,26 @@ const GameCard = memo(function GameCard({ game, compact }) {
     };
   }, [game.game]);
 
-  // Fetch rating from new API when using local index
+  // Fetch rating from queue service when using local index
+  // This ensures ratings are fetched one at a time to prevent API flooding
   useEffect(() => {
-    const fetchRating = async () => {
-      if (settings.usingLocalIndex && game.gameID) {
-        try {
-          const response = await fetch(
-            `https://api.ascendara.app/app/v2/gamerating/${game.gameID}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (isMounted.current && data.rating > 0) {
-              setGameRating(data.rating);
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching game rating:", error);
-        }
-      }
-    };
+    if (!settings.usingLocalIndex || !game.gameID) return;
 
-    fetchRating();
+    // Check for cached rating first
+    const cachedRating = ratingQueueService.getCachedRating(game.gameID);
+    if (cachedRating !== null && cachedRating > 0) {
+      setGameRating(cachedRating);
+      return;
+    }
+
+    // Subscribe to rating updates - will be processed in queue
+    const unsubscribe = ratingQueueService.subscribe(game.gameID, rating => {
+      if (isMounted.current && rating > 0) {
+        setGameRating(rating);
+      }
+    });
+
+    return () => unsubscribe();
   }, [game.gameID, settings.usingLocalIndex]);
 
   const handleDownload = useCallback(() => {
