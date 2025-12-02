@@ -47,6 +47,7 @@ export function SettingsProvider({ children }) {
     blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
     usingLocalIndex: false,
     fetchPageCount: 50,
+    localRefreshWorkers: 8,
     ludusavi: {
       backupLocation: "",
       backupFormat: "zip",

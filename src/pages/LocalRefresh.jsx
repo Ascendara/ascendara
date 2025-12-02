@@ -100,12 +100,18 @@ const LocalRefresh = () => {
   const [hasIndexBefore, setHasIndexBefore] = useState(false);
   const manuallyStoppedRef = useRef(false);
   const [newBlacklistId, setNewBlacklistId] = useState("");
+  const [workerCount, setWorkerCount] = useState(8);
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
     const initializeSettings = async () => {
       try {
         const settings = await window.electron.getSettings();
+
+        // Load saved refresh preferences
+        if (settings?.localRefreshWorkers !== undefined) {
+          setWorkerCount(settings.localRefreshWorkers);
+        }
 
         // Check if localIndex is set, if not set it to default
         let indexPath = settings?.localIndex;

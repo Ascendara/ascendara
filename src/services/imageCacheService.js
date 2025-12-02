@@ -274,7 +274,7 @@ class ImageCacheService {
   }
 
   /**
-   * Load image from API with retry logic
+   * Load image from API with retry logic (uses IPC to bypass CORS)
    */
   async _loadFromAPI(
     imgID,
@@ -294,38 +294,47 @@ class ImageCacheService {
         endpoint = "v2/fitgirl/image";
       }
 
-      // Add quality parameter for progressive loading
-      if (options.quality === "low") {
-        endpoint += "/preview";
-      }
+      // Use IPC to fetch image from main process (bypasses CORS)
+      const result = await window.electron.fetchApiImage(
+        endpoint,
+        imgID,
+        timestamp,
+        signature
+      );
 
-      const response = await fetch(`https://api.ascendara.app/${endpoint}/${imgID}`, {
-        headers: {
-          "X-Timestamp": timestamp.toString(),
-          "X-Signature": signature,
-          "Cache-Control": "no-store",
-        },
-      });
-      if (!response.ok) {
-        if (response.status === 404) {
+      if (result.error) {
+        if (result.status === 404) {
           this.recent404Count++;
           if (this.recent404Count >= this.max404BeforeClear) {
             await this.clearCache();
             this.recent404Count = 0;
           }
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${result.status}`);
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+
+      // Result is a data URL, use it directly
+      const url = result.dataUrl;
+
       // Cache the result with correct quality
       this._setMemoryCache(imgID, url, options.quality);
-      // Save to IndexedDB in the background if available (only for API images)
+
+      // For IndexedDB, we need to convert data URL to blob
       if (this.db) {
-        this.saveToIndexedDB(imgID, blob).catch(error => {
-          console.warn(`[ImageCache] Failed to save image ${imgID} to IndexedDB:`, error);
-        });
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          this.saveToIndexedDB(imgID, blob).catch(error => {
+            console.warn(
+              `[ImageCache] Failed to save image ${imgID} to IndexedDB:`,
+              error
+            );
+          });
+        } catch (e) {
+          // Ignore IndexedDB save errors
+        }
       }
+
       // Reset 404 counter on success
       if (this.recent404Count > 0) this.recent404Count = 0;
       return url;

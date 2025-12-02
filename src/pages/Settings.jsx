@@ -65,6 +65,7 @@ import {
   CpuIcon,
   CornerDownRight,
   Database,
+  LoaderIcon,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -235,6 +236,7 @@ function Settings() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [exclusionLoading, setExclusionLoading] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
 
   // Use a ref to track if this is the first mount
   const isFirstMount = useRef(true);
@@ -264,23 +266,53 @@ function Settings() {
     }
   }, [settings]);
 
-  // Load last refresh time from progress.json
+  // Load last refresh time and check if refresh is running
   useEffect(() => {
-    const loadLastRefreshTime = async () => {
+    const loadRefreshStatus = async () => {
       try {
         const currentSettings = await window.electron.getSettings();
         const indexPath = currentSettings?.localIndex;
-        if (indexPath && window.electron?.getLocalRefreshProgress) {
-          const progress = await window.electron.getLocalRefreshProgress(indexPath);
-          if (progress?.timestamp) {
-            setLastRefreshTime(new Date(progress.timestamp * 1000));
+        if (indexPath) {
+          // Check if refresh is currently running
+          if (window.electron?.getLocalRefreshStatus) {
+            const status = await window.electron.getLocalRefreshStatus(indexPath);
+            setIsIndexRefreshing(status.isRunning);
+            if (status.progress?.timestamp) {
+              setLastRefreshTime(new Date(status.progress.timestamp * 1000));
+            }
+          } else if (window.electron?.getLocalRefreshProgress) {
+            const progress = await window.electron.getLocalRefreshProgress(indexPath);
+            if (progress?.timestamp) {
+              setLastRefreshTime(new Date(progress.timestamp * 1000));
+            }
+            // Check status from progress file
+            setIsIndexRefreshing(progress?.status === "running");
           }
         }
       } catch (e) {
         console.log("No progress file found for last refresh time");
       }
     };
-    loadLastRefreshTime();
+    loadRefreshStatus();
+
+    // Listen for refresh progress updates
+    if (window.electron?.onLocalRefreshProgress) {
+      const handleProgress = data => {
+        if (data.status === "running") {
+          setIsIndexRefreshing(true);
+        } else if (data.status === "completed" || data.status === "failed") {
+          setIsIndexRefreshing(false);
+          if (data.timestamp) {
+            setLastRefreshTime(new Date(data.timestamp * 1000));
+          }
+        }
+      };
+      window.electron.onLocalRefreshProgress(handleProgress);
+
+      return () => {
+        window.electron.offLocalRefreshProgress?.();
+      };
+    }
   }, []);
 
   useEffect(() => {
@@ -716,17 +748,34 @@ function Settings() {
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
                   <div className="rounded-lg bg-primary/10 p-3">
-                    <Database className="h-6 w-6 text-primary" />
+                    {isIndexRefreshing ? (
+                      <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
+                    ) : (
+                      <Database className="h-6 w-6 text-primary" />
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <h2 className="text-xl font-semibold text-primary">
-                      {t("settings.localIndex") || "Local Game Index"}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-semibold text-primary">
+                        {t("settings.localIndex") || "Local Game Index"}
+                      </h2>
+                      {isIndexRefreshing && (
+                        <Badge variant="secondary" className="mb-2.5 text-xs">
+                          {t("localRefresh.statusRunning") || "Refreshing..."}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="max-w-[500px] text-sm text-muted-foreground">
                       {t("settings.localIndexDescription")}
                     </p>
-                    <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
+                    <div
+                      className={`flex items-center gap-2 pt-2 text-sm ${lastRefreshTime ? "text-muted-foreground" : "font-bold text-yellow-500"}`}
+                    >
+                      {lastRefreshTime ? (
+                        <Clock className="h-4 w-4" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4" />
+                      )}
                       <span>
                         {t("settings.lastIndexRefresh") || "Last refresh"}:{" "}
                         {lastRefreshTime
@@ -742,8 +791,9 @@ function Settings() {
                   className="shrink-0 gap-2 text-secondary"
                   onClick={() => navigate("/localrefresh")}
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  {t("settings.manageIndex") || "Manage Index"}
+                  {isIndexRefreshing
+                    ? t("localRefresh.viewProgress") || "View Progress"
+                    : t("settings.manageIndex") || "Manage Index"}
                 </Button>
               </div>
             </Card>

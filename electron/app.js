@@ -773,6 +773,7 @@ class SettingsManager {
       blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
       usingLocalIndex: false,
       fetchPageCount: 50,
+      localRefreshWorkers: 8,
       ludusavi: {
         backupLocation: "",
         backupFormat: "zip",
@@ -2885,7 +2886,7 @@ let localRefreshStarting = false;
 
 ipcMain.handle(
   "start-local-refresh",
-  async (event, { outputPath, cfClearance, perPage }) => {
+  async (event, { outputPath, cfClearance, perPage, workers }) => {
     // Prevent multiple simultaneous start calls
     if (localRefreshStarting) {
       console.log("Local refresh already starting, ignoring duplicate call");
@@ -2958,6 +2959,7 @@ ipcMain.handle(
 
       // Use perPage from settings, default to 50 if not provided
       const fetchPerPage = perPage || 50;
+      const workerCount = workers || 8;
 
       if (isWindows) {
         executablePath = isDev
@@ -2970,6 +2972,8 @@ ipcMain.handle(
           cfClearance,
           "--per-page",
           String(fetchPerPage),
+          "--workers",
+          String(workerCount),
         ];
       } else {
         executablePath = "python3";
@@ -2984,6 +2988,8 @@ ipcMain.handle(
           cfClearance,
           "--per-page",
           String(fetchPerPage),
+          "--workers",
+          String(workerCount),
         ];
       }
 
