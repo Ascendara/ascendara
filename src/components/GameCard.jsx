@@ -28,6 +28,7 @@ import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { analytics } from "@/services/analyticsService";
 import ratingQueueService from "@/services/ratingQueueService";
+import installedGamesService from "@/services/installedGamesService";
 
 const GameCard = memo(function GameCard({ game, compact }) {
   const navigate = useNavigate();
@@ -83,32 +84,23 @@ const GameCard = memo(function GameCard({ game, compact }) {
   }, [gameCategories, showAllTags]);
 
   useEffect(() => {
-    const checkInstalled = async () => {
-      try {
-        const installedGames = await window.electron.getGames();
+    // Use cached installed games service to prevent IPC flooding
+    installedGamesService
+      .checkGameStatus(game.game, game.version)
+      .then(({ isInstalled: installed, needsUpdate: update }) => {
         if (isMounted.current) {
-          const installedGame = installedGames.find(ig => ig.game === game.game);
-          if (installedGame && game.version) {
-            const installedVersion = installedGame.version || "0.0.0";
-            const newVersion = game.version;
-            setNeedsUpdate(installedVersion !== newVersion);
-            setIsInstalled(!needsUpdate);
-          } else {
-            setIsInstalled(!!installedGame);
-            setNeedsUpdate(false);
-          }
+          setIsInstalled(installed);
+          setNeedsUpdate(update);
         }
-      } catch (error) {
+      })
+      .catch(error => {
         console.error("Error checking game installation:", error);
-      }
-    };
-
-    checkInstalled();
+      });
 
     return () => {
       isMounted.current = false;
     };
-  }, [game.game]);
+  }, [game.game, game.version]);
 
   // Fetch rating from queue service when using local index
   // This ensures ratings are fetched one at a time to prevent API flooding

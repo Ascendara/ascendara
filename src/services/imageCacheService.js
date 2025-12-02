@@ -35,16 +35,67 @@ class ImageCacheService {
     // Settings cache to avoid repeated IPC calls
     this._settingsCache = null;
     this._settingsCacheTime = 0;
-    this._settingsCacheDuration = 5000; // 5 seconds
+    this._settingsCacheDuration = 30000; // 30 seconds - longer cache for settings
+    this._settingsLoadPromise = null;
+
+    // Initialize settings eagerly (non-blocking)
+    this._preloadSettings();
 
     // Initialize
     this.initPromise = this.initializeDB();
   }
 
   /**
+   * Preload settings on service initialization
+   */
+  _preloadSettings() {
+    if (!this._settingsLoadPromise) {
+      this._settingsLoadPromise = window.electron
+        .getSettings()
+        .then(settings => {
+          this._settingsCache = settings;
+          this._settingsCacheTime = Date.now();
+          this._settingsLoadPromise = null;
+          return settings;
+        })
+        .catch(err => {
+          console.warn("[ImageCache] Failed to preload settings:", err);
+          this._settingsLoadPromise = null;
+          return null;
+        });
+    }
+    return this._settingsLoadPromise;
+  }
+
+  /**
    * Get cached settings or fetch fresh ones
+   * Returns cached value immediately if available, otherwise waits for load
    */
   async _getSettings() {
+    const now = Date.now();
+
+    // Return cached settings if valid
+    if (
+      this._settingsCache &&
+      now - this._settingsCacheTime < this._settingsCacheDuration
+    ) {
+      return this._settingsCache;
+    }
+
+    // If already loading, wait for that promise
+    if (this._settingsLoadPromise) {
+      return this._settingsLoadPromise;
+    }
+
+    // Load fresh settings
+    return this._preloadSettings();
+  }
+
+  /**
+   * Get settings synchronously if cached, null otherwise
+   * Use this for non-blocking checks
+   */
+  _getSettingsSync() {
     const now = Date.now();
     if (
       this._settingsCache &&
@@ -52,9 +103,9 @@ class ImageCacheService {
     ) {
       return this._settingsCache;
     }
-    this._settingsCache = await window.electron.getSettings();
-    this._settingsCacheTime = now;
-    return this._settingsCache;
+    // Trigger async load but don't wait
+    this._preloadSettings();
+    return this._settingsCache; // May be stale or null
   }
 
   /**
