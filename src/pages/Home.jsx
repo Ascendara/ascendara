@@ -326,7 +326,7 @@ const HorizontalSection = ({
             <Icon className="h-4 w-4 text-primary" />
           </div>
           <h2 className="text-lg font-bold text-foreground">{title}</h2>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+          <span className="mb-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
             {games.length}
           </span>
         </div>
