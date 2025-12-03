@@ -4860,11 +4860,17 @@ ipcMain.handle(
       }
 
       // Download and save the cover image if imgID is provided
+      // imgID can be either an imgID (v2 API) or a gameID (v3 API for local index)
       if (imgID) {
-        const imageLink =
-          settings.gameSource === "fitgirl"
-            ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
-            : `https://api.ascendara.app/v2/image/${imgID}`;
+        let imageLink;
+        if (settings.usingLocalIndex) {
+          // When using local index, imgID is actually a gameID, use v3 endpoint
+          imageLink = `https://api.ascendara.app/v3/image/${imgID}`;
+        } else if (settings.gameSource === "fitgirl") {
+          imageLink = `https://api.ascendara.app/v2/fitgirl/image/${imgID}`;
+        } else {
+          imageLink = `https://api.ascendara.app/v2/image/${imgID}`;
+        }
 
         const response = await axios({
           url: imageLink,

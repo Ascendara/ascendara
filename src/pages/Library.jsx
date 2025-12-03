@@ -62,6 +62,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import igdbService from "@/services/gameInfoService";
 import { useIgdbConfig } from "@/services/gameInfoConfig";
+import { useSettings } from "@/context/SettingsContext";
 
 import NewFolderDialog from "@/components/NewFolderDialog";
 import FolderCard from "@/components/FolderCard";
@@ -1184,6 +1185,7 @@ const InstalledGameCard = memo(
     onSelectCheckbox,
   }) => {
     const { t } = useLanguage();
+    const { settings } = useSettings();
     const [isRunning, setIsRunning] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [imageData, setImageData] = useState(null);
@@ -1376,7 +1378,11 @@ const InstalledGameCard = memo(
                       )}
                     >
                       <img
-                        src={gameService.getImageUrl(cover.imgID)}
+                        src={
+                          settings.usingLocalIndex && cover.gameID
+                            ? gameService.getImageUrlByGameId(cover.gameID)
+                            : gameService.getImageUrl(cover.imgID)
+                        }
                         alt={cover.title}
                         className="h-full w-full object-cover"
                       />
@@ -1412,9 +1418,12 @@ const InstalledGameCard = memo(
                   localStorage.removeItem(localStorageKey);
                   // Fetch new image and save to localStorage
                   try {
-                    const imageUrl = gameService.getImageUrl(
-                      coverSearch.selectedCover.imgID
-                    );
+                    const imageUrl =
+                      settings.usingLocalIndex && coverSearch.selectedCover.gameID
+                        ? gameService.getImageUrlByGameId(
+                            coverSearch.selectedCover.gameID
+                          )
+                        : gameService.getImageUrl(coverSearch.selectedCover.imgID);
                     const response = await fetch(imageUrl);
                     const blob = await response.blob();
                     const reader = new FileReader();
@@ -1574,6 +1583,7 @@ InstalledGameCard.displayName = "InstalledGameCard";
 
 const AddGameForm = ({ onSuccess }) => {
   const { t } = useLanguage();
+  const { settings } = useSettings();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showImportingDialog, setShowImportingDialog] = useState(false);
   const [importSuccess, setImportSuccess] = useState(null);
@@ -1680,13 +1690,18 @@ const AddGameForm = ({ onSuccess }) => {
 
   const handleSubmit = async e => {
     e.preventDefault();
+    // When using local index, pass gameID; otherwise pass imgID
+    const coverImageId =
+      settings.usingLocalIndex && coverSearch.selectedCover?.gameID
+        ? coverSearch.selectedCover.gameID
+        : coverSearch.selectedCover?.imgID;
     await window.electron.addGame(
       formData.name,
       formData.isOnline,
       formData.hasDLC,
       formData.version,
       formData.executable,
-      coverSearch.selectedCover?.imgID
+      coverImageId
     );
     onSuccess();
   };
@@ -1955,7 +1970,11 @@ const AddGameForm = ({ onSuccess }) => {
                   )}
                 >
                   <img
-                    src={gameService.getImageUrl(cover.imgID)}
+                    src={
+                      settings.usingLocalIndex && cover.gameID
+                        ? gameService.getImageUrlByGameId(cover.gameID)
+                        : gameService.getImageUrl(cover.imgID)
+                    }
                     alt={cover.title}
                     className="h-full w-full object-cover"
                   />
@@ -1976,7 +1995,11 @@ const AddGameForm = ({ onSuccess }) => {
             <div className="mt-4 flex justify-center">
               <div className="relative aspect-video w-64 overflow-hidden rounded-lg border-2 border-primary">
                 <img
-                  src={gameService.getImageUrl(coverSearch.selectedCover.imgID)}
+                  src={
+                    settings.usingLocalIndex && coverSearch.selectedCover.gameID
+                      ? gameService.getImageUrlByGameId(coverSearch.selectedCover.gameID)
+                      : gameService.getImageUrl(coverSearch.selectedCover.imgID)
+                  }
                   alt={coverSearch.selectedCover.title}
                   className="h-full w-full object-cover"
                 />
