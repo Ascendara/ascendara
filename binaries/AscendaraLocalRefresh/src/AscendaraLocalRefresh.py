@@ -49,6 +49,7 @@ scraper = None
 cookie_refresh_event = threading.Event()
 cookie_refresh_lock = threading.Lock()
 new_cookie_value = [None]  # Use list to allow modification across threads
+current_user_agent = [None]  # Store the user-agent for cookie refresh
 
 # Keep-alive thread control
 keep_alive_stop_event = threading.Event()
@@ -713,7 +714,7 @@ def get_cached_view_count(post_id):
 
 def wait_for_cookie_refresh():
     """Wait for user to provide a new cookie via stdin. Returns True if cookie was refreshed."""
-    global scraper, new_cookie_value, failed_image_count
+    global scraper, new_cookie_value, failed_image_count, current_user_agent
     
     # Immediately reset failed count to prevent other threads from also triggering
     with failed_image_lock:
@@ -744,7 +745,8 @@ def wait_for_cookie_refresh():
             
             if new_cookie:
                 logging.info("Received new cookie, refreshing scraper...")
-                scraper = create_scraper(new_cookie)
+                # Use the stored user_agent when creating the new scraper
+                scraper = create_scraper(new_cookie, current_user_agent[0])
                 new_cookie_value[0] = new_cookie
                 
                 cookie_refresh_event.clear()
@@ -1057,6 +1059,10 @@ def main():
     progress.set_status("running")
     
     try:
+        # Store the user_agent globally for cookie refresh
+        global current_user_agent
+        current_user_agent[0] = args.user_agent
+        
         # Create scraper
         progress.set_phase("initializing")
         scraper = create_scraper(args.cookie, args.user_agent)
