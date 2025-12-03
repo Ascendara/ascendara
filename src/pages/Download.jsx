@@ -986,7 +986,7 @@ export default function DownloadPage() {
   useEffect(() => {
     const handleKeyDown = event => {
       if (event.key === "Escape") {
-        navigate("/search");
+        navigate(-1);
       }
     };
 
