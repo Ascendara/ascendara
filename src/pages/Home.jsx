@@ -318,7 +318,7 @@ const HorizontalSection = ({
         <div className="flex items-center gap-3">
           <div
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-lg",
+              "mb-2 flex h-9 w-9 items-center justify-center rounded-lg",
               `bg-${accentColor}/10`
             )}
             style={{ backgroundColor: `rgb(var(--color-${accentColor}) / 0.1)` }}
