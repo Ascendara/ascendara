@@ -299,6 +299,15 @@ class RefreshProgress:
         self.current_game = ""
         self.errors = []
         self.start_time = time.time()
+        # Load previous lastSuccessfulTimestamp if it exists
+        self.last_successful_timestamp = None
+        try:
+            if os.path.exists(self.progress_file):
+                with open(self.progress_file, 'r', encoding='utf-8') as f:
+                    old_progress = json.load(f)
+                    self.last_successful_timestamp = old_progress.get('lastSuccessfulTimestamp')
+        except Exception as e:
+            logging.debug(f"Could not load previous progress: {e}")
         self._update_progress()
     
     def _update_progress(self):
@@ -321,7 +330,8 @@ class RefreshProgress:
                 "elapsedSeconds": round(elapsed, 1),
                 "errors": self.errors[-10:],  # Keep last 10 errors
                 "timestamp": time.time(),
-                "waitingForCookie": self.phase == "waiting_for_cookie"
+                "waitingForCookie": self.phase == "waiting_for_cookie",
+                "lastSuccessfulTimestamp": self.last_successful_timestamp
             }
             try:
                 with open(self.progress_file, 'w', encoding='utf-8') as f:
@@ -381,6 +391,8 @@ class RefreshProgress:
     def complete(self, success=True):
         self.status = "completed" if success else "failed"
         self.phase = "done"
+        if success:
+            self.last_successful_timestamp = time.time()
         self._update_progress()
 
 
