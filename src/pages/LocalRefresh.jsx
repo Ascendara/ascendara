@@ -211,7 +211,7 @@ const LocalRefresh = () => {
 
   // Listen for refresh progress updates from the backend
   useEffect(() => {
-    const handleProgressUpdate = data => {
+    const handleProgressUpdate = async data => {
       console.log("Progress update received:", data);
       // Map progress.json fields to UI state
       if (data.progress !== undefined) {
@@ -290,9 +290,26 @@ const LocalRefresh = () => {
         } else {
           setLastRefreshTime(new Date());
         }
+
+        // Clear caches so the app loads fresh data with new imgIDs
+        console.log("[LocalRefresh] Refresh complete, clearing caches to load new data");
+        imageCacheService.invalidateSettingsCache();
+        await imageCacheService.clearCache(true); // Skip auto-refresh, we'll reload manually
+        gameService.clearMemoryCache();
+        localStorage.removeItem("ascendara_games_cache");
+        localStorage.removeItem("local_ascendara_games_timestamp");
+        localStorage.removeItem("local_ascendara_metadata_cache");
+        localStorage.removeItem("local_ascendara_last_updated");
+
         toast.success(
           t("localRefresh.refreshComplete") || "Game list refresh completed!"
         );
+
+        // Reload the page after a short delay to ensure all components get fresh data
+        // This is necessary because components may have cached old imgIDs in their state
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else if (data.status === "failed" || data.status === "error") {
         setRefreshStatus("error");
         setIsRefreshing(false);
