@@ -251,10 +251,10 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
       <div className="absolute bottom-0 left-0 right-0 p-2">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-1 text-xs font-semibold text-white">
+            <h3 className="text-md line-clamp-1 font-semibold text-white">
               {sanitizedGameName}
             </h3>
-            <p className="text-[10px] text-white/70">{getTimeSinceLastPlayed()}</p>
+            <p className="text-[12px] text-white/70">{getTimeSinceLastPlayed()}</p>
           </div>
           <div
             className={cn(
@@ -1077,7 +1077,7 @@ const Home = memo(() => {
                 className="hidden flex-col lg:flex"
                 style={{ height: "calc(100% - 0px)" }}
               >
-                <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <div className="mb-1 flex items-center gap-2 text-lg font-medium text-muted-foreground">
                   <Play className="h-3 w-3 text-primary" />
                   {t("home.recentGames")}
                 </div>
