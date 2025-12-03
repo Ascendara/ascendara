@@ -463,12 +463,22 @@
   },
   "home": {
     "actionGames": "动作游戏",
+    "footer": {
+      "description": "Ascendara 由单个开发人员作为一个充满热情的项目构建和维护。您的支持有助于让 Ascendara 保持免费、无广告，并为每个人不断改进。",
+      "donate": "支持发展",
+      "github": "在 GitHub 上查看",
+      "madeWith": "由 Santiago 用 ❤️ 制作",
+      "title": "帮助保持 Ascendara 免费"
+    },
     "mostRecentlyUpdated": "最近更新",
+    "noRecentGames": "这里显示您最近最热门的 3 款游戏",
+    "noRecentGamesHint": "开始玩以查看您的游戏",
     "onlineGames": "网络游戏",
     "popularCategories": "热门类别",
     "randomGames": "随机游戏",
     "recentGames": "最近的比赛",
-    "topGames": "热门游戏"
+    "topGames": "热门游戏",
+    "viewGame": "查看游戏"
   },
   "library": {
     "addFavorite": "添加到收藏夹",

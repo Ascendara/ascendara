@@ -463,12 +463,22 @@
   },
   "home": {
     "actionGames": "العاب اكشن",
+    "footer": {
+      "description": "تم بناء Ascendara وصيانته بواسطة مطور واحد كمشروع شغوف. يساعد دعمك في الحفاظ على Ascendara مجانيًا وخاليًا من الإعلانات ويتحسن باستمرار للجميع.",
+      "donate": "دعم التنمية",
+      "github": "عرض على جيثب",
+      "madeWith": "مصنوع من ❤️ بواسطة سانتياغو",
+      "title": "ساعد في الحفاظ على Ascendara مجانيًا"
+    },
     "mostRecentlyUpdated": "الأكثر تحديثًا مؤخرًا",
+    "noRecentGames": "أفضل 3 ألعاب حديثة تظهر هنا",
+    "noRecentGamesHint": "ابدأ اللعب لترى ألعابك",
     "onlineGames": "العاب اون لاين",
     "popularCategories": "الفئات الشعبية",
     "randomGames": "العاب عشوائية",
     "recentGames": "الألعاب الأخيرة",
-    "topGames": "أفضل الألعاب"
+    "topGames": "أفضل الألعاب",
+    "viewGame": "عرض اللعبة"
   },
   "library": {
     "addFavorite": "أضف إلى المفضلة",
