@@ -2918,7 +2918,7 @@ let localRefreshStarting = false;
 
 ipcMain.handle(
   "start-local-refresh",
-  async (event, { outputPath, cfClearance, perPage, workers }) => {
+  async (event, { outputPath, cfClearance, perPage, workers, userAgent }) => {
     // Prevent multiple simultaneous start calls
     if (localRefreshStarting) {
       console.log("Local refresh already starting, ignoring duplicate call");
@@ -3009,6 +3009,9 @@ ipcMain.handle(
             "--view-workers",
             "4", // Parallel view count fetchers (lightweight, no retries)
           ];
+          if (userAgent) {
+            args.push("--user-agent", userAgent);
+          }
         } else {
           executablePath = path.join(
             appDirectory,
@@ -3026,6 +3029,9 @@ ipcMain.handle(
             "--view-workers",
             "4", // Parallel view count fetchers (lightweight, no retries)
           ];
+          if (userAgent) {
+            args.push("--user-agent", userAgent);
+          }
         }
       } else {
         executablePath = "python3";
@@ -3045,6 +3051,9 @@ ipcMain.handle(
           "--view-workers",
           "32", // Parallel view count fetchers
         ];
+        if (userAgent) {
+          args.push("--user-agent", userAgent);
+        }
       }
 
       console.log(
@@ -3053,7 +3062,8 @@ ipcMain.handle(
 
       localRefreshProcess = spawn(executablePath, args, {
         stdio: ["pipe", "pipe", "pipe"], // stdin enabled for cookie refresh
-        windowsVerbatimArguments: isWindows, // Preserve special characters on Windows
+        // Note: Don't use windowsVerbatimArguments as it disables automatic quoting
+        // which breaks arguments with spaces like User-Agent strings
       });
 
       localRefreshProcess.stdout.on("data", async data => {
@@ -6502,12 +6512,64 @@ function handleProtocolUrl(url) {
       if (cleanUrl.includes("steamrip-cookie")) {
         try {
           // Extract the cookie value - format: ascendara://steamrip-cookie/COOKIE_VALUE
+          // New format sends JSON with both cookie and userAgent
           const cookieMatch = cleanUrl.match(/steamrip-cookie\/(.+)/);
           if (cookieMatch && cookieMatch[1]) {
-            const cookieValue = decodeURIComponent(cookieMatch[1]);
-            console.log("Received steamrip cookie from extension");
+            let cookieValue;
+            let userAgent = null;
+            const rawValue = cookieMatch[1];
+
+            if (rawValue.startsWith("b64:")) {
+              try {
+                const base64Data = rawValue.substring(4);
+                const decoded = Buffer.from(base64Data, "base64").toString("utf-8");
+                console.log("Decoded base64 data");
+
+                // Try to parse as JSON (new format with cookie + userAgent)
+                try {
+                  const payload = JSON.parse(decoded);
+                  cookieValue = payload.cookie;
+                  userAgent = payload.userAgent;
+                  console.log("Parsed JSON payload with cookie and userAgent");
+                } catch (jsonError) {
+                  // Old format - just the cookie string
+                  cookieValue = decoded;
+                  console.log("Legacy format - cookie string only");
+                }
+              } catch (decodeError) {
+                console.error("Error decoding base64 cookie:", decodeError);
+                return;
+              }
+            } else {
+              // URL encoded (from Chrome)
+              const decoded = decodeURIComponent(rawValue);
+
+              // Try to parse as JSON (new format with cookie + userAgent)
+              try {
+                const payload = JSON.parse(decoded);
+                cookieValue = payload.cookie;
+                userAgent = payload.userAgent;
+                console.log("Parsed JSON payload with cookie and userAgent");
+              } catch (jsonError) {
+                // Old format - just the cookie string
+                cookieValue = decoded;
+                console.log("Legacy format - cookie string only");
+              }
+            }
+
+            console.log(
+              "Received steamrip cookie from extension (length:",
+              cookieValue.length + ")"
+            );
+            if (userAgent) {
+              console.log(
+                "Received User-Agent from extension:",
+                userAgent.substring(0, 50) + "..."
+              );
+            }
             existingWindow.webContents.send("steamrip-cookie-received", {
               cookie: cookieValue,
+              userAgent: userAgent,
             });
           }
         } catch (error) {

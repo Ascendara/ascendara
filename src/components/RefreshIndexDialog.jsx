@@ -53,6 +53,12 @@ const RefreshIndexDialog = ({
     const handleCookieReceived = async (event, data) => {
       if (data?.cookie && !hasStartedRefresh) {
         console.log("Received cookie from extension");
+        if (data.userAgent) {
+          console.log(
+            "Received User-Agent from extension:",
+            data.userAgent.substring(0, 50) + "..."
+          );
+        }
         setCfClearance(data.cookie);
         setCookieReceived(true);
         setIsListening(false);
@@ -64,6 +70,7 @@ const RefreshIndexDialog = ({
           await onStartRefresh({
             method: "extension",
             cfClearance: data.cookie,
+            userAgent: data.userAgent,
             isCookieRefresh,
           });
           handleClose();

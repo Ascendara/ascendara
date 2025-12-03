@@ -388,8 +388,8 @@ def generate_random_id(length=10):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 
-def create_scraper(cookie):
-    """Create a cloudscraper instance with the provided cookie"""
+def create_scraper(cookie, user_agent=None):
+    """Create a cloudscraper instance with the provided cookie and optional user-agent"""
     logging.info("Creating cloudscraper instance...")
     logging.info(f"Raw cookie received (first 50 chars): {repr(cookie[:50])}")
     logging.info(f"Raw cookie length: {len(cookie)}")
@@ -403,9 +403,17 @@ def create_scraper(cookie):
     
     logging.info(f"Final cookie for header: {cookie[:50]}...")
     
+    # Determine browser type from user-agent for cloudscraper config
+    browser_type = "chrome"
+    if user_agent:
+        ua_lower = user_agent.lower()
+        if "firefox" in ua_lower:
+            browser_type = "firefox"
+        logging.info(f"Using custom User-Agent (browser: {browser_type}): {user_agent[:60]}...")
+    
     # Create scraper with larger connection pool for parallel requests
     scraper = cloudscraper.create_scraper(
-        browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        browser={"browser": browser_type, "platform": "windows", "mobile": False}
     )
     
     # Increase connection pool size to handle parallel requests
@@ -417,8 +425,11 @@ def create_scraper(cookie):
     scraper.mount('https://', adapter)
     scraper.mount('http://', adapter)
 
+    # Use custom user-agent if provided, otherwise use default Chrome UA
+    final_user_agent = user_agent if user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    
     scraper.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+        "User-Agent": final_user_agent,
         "Cookie": cookie
     })
     logging.info("Scraper created successfully with pool size 50")
@@ -577,7 +588,7 @@ def get_image_url(post):
         return ""
 
 
-def start_view_count_fetcher(cookie, num_workers=8):
+def start_view_count_fetcher(cookie, num_workers=8, user_agent=None):
     """Start background threads that fetch view counts from the queue using cloudscraper"""
     global view_count_thread
     
@@ -586,16 +597,22 @@ def start_view_count_fetcher(cookie, num_workers=8):
     if not cookie_str.startswith("cf_clearance="):
         cookie_str = f"cf_clearance={cookie_str}"
     
+    # Determine browser type and user-agent
+    browser_type = "chrome"
+    final_user_agent = user_agent if user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    if user_agent and "firefox" in user_agent.lower():
+        browser_type = "firefox"
+    
     def view_count_worker(worker_id):
         """Worker that continuously fetches view counts from queue"""
         logging.info(f"View count worker {worker_id} started")
         
         # Create a dedicated cloudscraper instance for this worker (required for Cloudflare bypass)
         view_scraper = cloudscraper.create_scraper(
-            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+            browser={"browser": browser_type, "platform": "windows", "mobile": False}
         )
         view_scraper.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+            "User-Agent": final_user_agent,
             "Cookie": cookie_str
         })
         # Increase pool size for parallel requests
@@ -933,6 +950,11 @@ def main():
         default=4,
         help='Number of workers for view count fetching (default: 4)'
     )
+    parser.add_argument(
+        '--user-agent', '-u',
+        default=None,
+        help='Custom User-Agent string (for Firefox/Opera cookie compatibility)'
+    )
     
     args = parser.parse_args()
     
@@ -1037,21 +1059,21 @@ def main():
     try:
         # Create scraper
         progress.set_phase("initializing")
-        scraper = create_scraper(args.cookie)
+        scraper = create_scraper(args.cookie, args.user_agent)
         
         # Fetch categories
         logging.info("Fetching categories...")
         category_map = fetch_categories(scraper, progress)
         
         logging.info("Creating fresh scraper session for posts...")
-        scraper = create_scraper(args.cookie)
+        scraper = create_scraper(args.cookie, args.user_agent)
         
         # Start keep-alive thread to prevent cookie expiration
         start_keep_alive(scraper, interval=30)
         
         # Start view count fetcher in background (fetches views while posts are processed)
         if not args.skip_views:
-            start_view_count_fetcher(args.cookie, num_workers=args.view_workers)
+            start_view_count_fetcher(args.cookie, num_workers=args.view_workers, user_agent=args.user_agent)
         
         # Load blacklist IDs from settings
         blacklist_ids = get_blacklist_ids()
@@ -1107,7 +1129,7 @@ def main():
                         progress.set_status("waiting")
                         
                         if wait_for_cookie_refresh():
-                            scraper = create_scraper(new_cookie_value[0])
+                            scraper = create_scraper(new_cookie_value[0], args.user_agent)
                             new_cookie_value[0] = None
                             consecutive_failures = 0
                             progress.set_phase("processing_posts")
@@ -1207,7 +1229,7 @@ def main():
                             progress.set_status("waiting")
                             
                             if wait_for_cookie_refresh():
-                                scraper = create_scraper(new_cookie_value[0])
+                                scraper = create_scraper(new_cookie_value[0], args.user_agent)
                                 new_cookie_value[0] = None
                                 consecutive_failures = 0
                                 progress.set_phase("processing_posts")

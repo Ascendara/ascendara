@@ -377,6 +377,7 @@ const LocalRefresh = () => {
           cfClearance: refreshData.cfClearance,
           perPage: fetchPageCount,
           workers: workerCount,
+          userAgent: refreshData.userAgent,
         });
 
         if (!result.success) {
