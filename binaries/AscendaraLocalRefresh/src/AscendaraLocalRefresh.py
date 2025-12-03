@@ -304,6 +304,10 @@ class RefreshProgress:
         """Write progress to file with thread safety"""
         with self.lock:
             elapsed = time.time() - self.start_time
+            # Cap progress at 1.0 to prevent exceeding 100%
+            raw_progress = self.processed_posts / max(1, self.total_posts)
+            capped_progress = min(raw_progress, 1.0)
+            
             progress_data = {
                 "status": self.status,
                 "phase": self.phase,
@@ -312,7 +316,7 @@ class RefreshProgress:
                 "totalImages": self.total_images,
                 "downloadedImages": self.downloaded_images,
                 "currentGame": self.current_game,
-                "progress": round(self.processed_posts / max(1, self.total_posts), 4),
+                "progress": round(capped_progress, 4),
                 "elapsedSeconds": round(elapsed, 1),
                 "errors": self.errors[-10:],  # Keep last 10 errors
                 "timestamp": time.time(),

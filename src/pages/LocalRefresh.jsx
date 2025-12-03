@@ -159,7 +159,8 @@ const LocalRefresh = () => {
             if (status.progress) {
               const data = status.progress;
               if (data.progress !== undefined) {
-                setProgress(Math.round(data.progress * 100));
+                // Cap progress at 100% to prevent display issues
+                setProgress(Math.min(Math.round(data.progress * 100), 100));
               }
               if (data.phase) {
                 setCurrentPhase(data.phase);
@@ -212,7 +213,8 @@ const LocalRefresh = () => {
       console.log("Progress update received:", data);
       // Map progress.json fields to UI state
       if (data.progress !== undefined) {
-        setProgress(Math.round(data.progress * 100));
+        // Cap progress at 100% to prevent display issues
+        setProgress(Math.min(Math.round(data.progress * 100), 100));
       }
       if (data.phase) {
         setCurrentPhase(data.phase); // Track phase for indeterminate progress
