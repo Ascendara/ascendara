@@ -306,17 +306,36 @@ const gameService = {
   },
 
   async getRandomTopGames(count = 8) {
-    const { games } = await this.getCachedData();
+    const { games, metadata } = await this.getCachedData();
     if (!games || !games.length) return [];
 
-    // Filter games with high weights and images
+    // Check if using local index
+    const isLocalIndex = metadata?.local === true;
+
     const validGames = games
-      .filter(game => game.weight >= 7 && game.imgID)
+      .filter(game => {
+        if (!game.imgID) return false;
+        if (isLocalIndex) return true;
+        return (game.weight || 0) >= 7;
+      })
       .map(game => ({
         ...game,
-        name: sanitizeText(game.name),
+        name: sanitizeText(game.name || game.game),
         game: sanitizeText(game.game),
       }));
+
+    // If no valid games found, return any games with imgID
+    if (validGames.length === 0) {
+      const fallbackGames = games
+        .filter(game => game.imgID)
+        .map(game => ({
+          ...game,
+          name: sanitizeText(game.name || game.game),
+          game: sanitizeText(game.game),
+        }));
+      const shuffled = fallbackGames.sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, count);
+    }
 
     // Shuffle and return requested number of games
     const shuffled = validGames.sort(() => 0.5 - Math.random());
