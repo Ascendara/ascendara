@@ -463,12 +463,22 @@
   },
   "home": {
     "actionGames": "Action Games",
+    "footer": {
+      "description": "Ascendara is built and maintained by a single developer as a passion project. Your support helps keep Ascendara free, ad-free, and continuously improving for everyone.",
+      "donate": "Support Development",
+      "github": "View on GitHub",
+      "madeWith": "Made with ❤️ by Santiago",
+      "title": "Help Keep Ascendara Free"
+    },
     "mostRecentlyUpdated": "Most Recently Updated",
+    "noRecentGames": "Your top 3 recent games show here",
+    "noRecentGamesHint": "Start playing to see your games",
     "onlineGames": "Online Games",
     "popularCategories": "Popular Categories",
     "randomGames": "Random Games",
     "recentGames": "Recent Games",
-    "topGames": "Top Games"
+    "topGames": "Top Games",
+    "viewGame": "View Game"
   },
   "library": {
     "addFavorite": "Add to Favorites",

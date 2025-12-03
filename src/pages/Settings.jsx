@@ -2389,9 +2389,6 @@ function Settings() {
 
             {/* Timemachine Card */}
             <Card className="border-border p-6">
-              <p className="mb-4 text-sm font-bold text-primary">
-                {t("common.deprecated")}
-              </p>
               <div className="mb-2 flex items-center gap-2">
                 <History className="mb-2 h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold text-primary">

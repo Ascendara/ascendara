@@ -463,12 +463,22 @@
   },
   "home": {
     "actionGames": "アクションゲーム",
+    "footer": {
+      "description": "Ascendara は、情熱を持ったプロジェクトとして 1 人の開発者によって構築および保守されています。あなたのサポートは、Ascendara を無料、広告なしで維持し、すべての人のために継続的に改善するのに役立ちます。",
+      "donate": "サポート開発",
+      "github": "GitHub で見る",
+      "madeWith": "サンティアゴの❤️で作りました",
+      "title": "アセンダラを自由に保つために協力してください"
+    },
     "mostRecentlyUpdated": "最近更新されたもの",
+    "noRecentGames": "最近のゲーム トップ 3 がここに表示されます",
+    "noRecentGamesHint": "プレイを開始してゲームを確認してください",
     "onlineGames": "オンラインゲーム",
     "popularCategories": "人気のカテゴリ",
     "randomGames": "ランダムゲーム",
     "recentGames": "最近のゲーム",
-    "topGames": "人気のゲーム"
+    "topGames": "人気のゲーム",
+    "viewGame": "ゲームを見る"
   },
   "library": {
     "addFavorite": "お気に入りに追加",

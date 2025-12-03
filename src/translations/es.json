@@ -463,12 +463,22 @@
   },
   "home": {
     "actionGames": "Juegos de acción",
+    "footer": {
+      "description": "Ascendara es construido y mantenido por un único desarrollador como un proyecto apasionante. Su apoyo ayuda a que Ascendara sea gratuito, sin publicidad y en continua mejora para todos.",
+      "donate": "Desarrollo de soporte",
+      "github": "Ver en GitHub",
+      "madeWith": "Hecho con ❤️ por Santiago",
+      "title": "Ayude a mantener Ascendara libre"
+    },
     "mostRecentlyUpdated": "Actualizado más recientemente",
+    "noRecentGames": "Tus 3 mejores juegos recientes se muestran aquí",
+    "noRecentGamesHint": "Empieza a jugar para ver tus juegos.",
     "onlineGames": "Juegos en línea",
     "popularCategories": "Categorías populares",
     "randomGames": "Juegos aleatorios",
     "recentGames": "Juegos recientes",
-    "topGames": "Mejores juegos"
+    "topGames": "Mejores juegos",
+    "viewGame": "Ver juego"
   },
   "library": {
     "addFavorite": "Añadir a favoritos",
