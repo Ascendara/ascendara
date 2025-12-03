@@ -102,6 +102,8 @@ const LocalRefresh = () => {
   const [showCookieRefreshDialog, setShowCookieRefreshDialog] = useState(false);
   const [cookieRefreshCount, setCookieRefreshCount] = useState(0);
   const cookieSubmittedRef = useRef(false);
+  const lastCookieToastTimeRef = useRef(0);
+  const cookieDialogOpenRef = useRef(false);
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -236,14 +238,20 @@ const LocalRefresh = () => {
         // Auto-show cookie dialog when waiting for cookie (but not if we just submitted one)
         if (
           (data.phase === "waiting_for_cookie" || data.waitingForCookie) &&
-          !cookieSubmittedRef.current
+          !cookieSubmittedRef.current &&
+          !cookieDialogOpenRef.current
         ) {
+          cookieDialogOpenRef.current = true;
           setShowCookieRefreshDialog(true);
         }
 
         // Reset the cookie submitted flag when phase changes away from waiting_for_cookie
+        // but only after a delay to prevent race conditions with multiple progress updates
         if (data.phase !== "waiting_for_cookie" && !data.waitingForCookie) {
-          cookieSubmittedRef.current = false;
+          // Delay reset to ensure we don't get caught by rapid progress updates
+          setTimeout(() => {
+            cookieSubmittedRef.current = false;
+          }, 2000);
         }
       }
       if (data.currentGame) {
@@ -430,9 +438,14 @@ const LocalRefresh = () => {
             cookieSubmittedRef.current = true; // Mark that cookie was successfully submitted BEFORE dialog closes
             setCookieRefreshCount(prev => prev + 1);
             // Don't call setShowCookieRefreshDialog here - the dialog's handleClose will do it
-            toast.success(
-              t("localRefresh.cookieRefreshed") || "Cookie refreshed, resuming..."
-            );
+            // Debounce toast to prevent spam - only show if last toast was more than 3 seconds ago
+            const now = Date.now();
+            if (now - lastCookieToastTimeRef.current > 3000) {
+              lastCookieToastTimeRef.current = now;
+              toast.success(
+                t("localRefresh.cookieRefreshed") || "Cookie refreshed, resuming..."
+              );
+            }
             return; // Return early so the dialog close handler knows cookie was sent
           } else {
             toast.error(
@@ -451,14 +464,16 @@ const LocalRefresh = () => {
 
   const handleCookieRefreshDialogClose = async open => {
     if (!open && showCookieRefreshDialog) {
+      cookieDialogOpenRef.current = false;
       setShowCookieRefreshDialog(false);
       // Only stop refresh if user cancelled without submitting a cookie
       if (!cookieSubmittedRef.current) {
         await handleStopRefresh();
       }
-      // Reset the flag for next time
-      cookieSubmittedRef.current = false;
+      // Don't reset cookieSubmittedRef here - let the progress handler do it
+      // after the phase changes away from waiting_for_cookie
     } else {
+      cookieDialogOpenRef.current = open;
       setShowCookieRefreshDialog(open);
     }
   };

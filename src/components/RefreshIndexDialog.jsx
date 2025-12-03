@@ -50,32 +50,36 @@ const RefreshIndexDialog = ({
   useEffect(() => {
     if (!open || step !== 3 || hasStartedRefresh) return;
 
+    let cookieProcessed = false; // Local guard to prevent duplicate processing
+
     const handleCookieReceived = async (event, data) => {
-      if (data?.cookie && !hasStartedRefresh) {
-        console.log("Received cookie from extension");
-        if (data.userAgent) {
-          console.log(
-            "Received User-Agent from extension:",
-            data.userAgent.substring(0, 50) + "..."
-          );
-        }
-        setCfClearance(data.cookie);
-        setCookieReceived(true);
-        setIsListening(false);
-        setHasStartedRefresh(true);
-        // Auto-start refresh after a brief delay to show success state
-        setTimeout(async () => {
-          // Wait for onStartRefresh to complete before closing
-          // This ensures the cookie is sent before the dialog close handler runs
-          await onStartRefresh({
-            method: "extension",
-            cfClearance: data.cookie,
-            userAgent: data.userAgent,
-            isCookieRefresh,
-          });
-          handleClose();
-        }, 1000);
+      // Guard against duplicate events and already processed cookies
+      if (cookieProcessed || !data?.cookie || hasStartedRefresh) return;
+      cookieProcessed = true;
+
+      console.log("Received cookie from extension");
+      if (data.userAgent) {
+        console.log(
+          "Received User-Agent from extension:",
+          data.userAgent.substring(0, 50) + "..."
+        );
       }
+      setCfClearance(data.cookie);
+      setCookieReceived(true);
+      setIsListening(false);
+      setHasStartedRefresh(true);
+      // Auto-start refresh after a brief delay to show success state
+      setTimeout(async () => {
+        // Wait for onStartRefresh to complete before closing
+        // This ensures the cookie is sent before the dialog close handler runs
+        await onStartRefresh({
+          method: "extension",
+          cfClearance: data.cookie,
+          userAgent: data.userAgent,
+          isCookieRefresh,
+        });
+        handleClose();
+      }, 1000);
     };
 
     // Start listening
@@ -153,15 +157,6 @@ const RefreshIndexDialog = ({
                         <span className="block text-sm text-muted-foreground">
                           {t("refreshDialog.cookieExpiredDesc") ||
                             "Cloudflare cookies expire after about 10 minutes. Please get a new cookie to continue the refresh."}
-                          {cookieRefreshCount > 0 && (
-                            <span className="ml-1 text-xs">
-                              (
-                              {t("refreshDialog.refreshedTimes", {
-                                count: cookieRefreshCount,
-                              }) || `Refreshed ${cookieRefreshCount} time(s)`}
-                              )
-                            </span>
-                          )}
                         </span>
                       </div>
                     </div>
