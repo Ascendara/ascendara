@@ -102,6 +102,8 @@ const LocalRefresh = () => {
   const [showCookieRefreshDialog, setShowCookieRefreshDialog] = useState(false);
   const [cookieRefreshCount, setCookieRefreshCount] = useState(0);
   const cookieSubmittedRef = useRef(false);
+  const lastCookieToastTimeRef = useRef(0);
+  const cookieDialogOpenRef = useRef(false);
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -159,7 +161,8 @@ const LocalRefresh = () => {
             if (status.progress) {
               const data = status.progress;
               if (data.progress !== undefined) {
-                setProgress(Math.round(data.progress * 100));
+                // Cap progress at 100% to prevent display issues
+                setProgress(Math.min(Math.round(data.progress * 100), 100));
               }
               if (data.phase) {
                 setCurrentPhase(data.phase);
@@ -208,11 +211,12 @@ const LocalRefresh = () => {
 
   // Listen for refresh progress updates from the backend
   useEffect(() => {
-    const handleProgressUpdate = data => {
+    const handleProgressUpdate = async data => {
       console.log("Progress update received:", data);
       // Map progress.json fields to UI state
       if (data.progress !== undefined) {
-        setProgress(Math.round(data.progress * 100));
+        // Cap progress at 100% to prevent display issues
+        setProgress(Math.min(Math.round(data.progress * 100), 100));
       }
       if (data.phase) {
         setCurrentPhase(data.phase); // Track phase for indeterminate progress
@@ -234,14 +238,20 @@ const LocalRefresh = () => {
         // Auto-show cookie dialog when waiting for cookie (but not if we just submitted one)
         if (
           (data.phase === "waiting_for_cookie" || data.waitingForCookie) &&
-          !cookieSubmittedRef.current
+          !cookieSubmittedRef.current &&
+          !cookieDialogOpenRef.current
         ) {
+          cookieDialogOpenRef.current = true;
           setShowCookieRefreshDialog(true);
         }
 
         // Reset the cookie submitted flag when phase changes away from waiting_for_cookie
+        // but only after a delay to prevent race conditions with multiple progress updates
         if (data.phase !== "waiting_for_cookie" && !data.waitingForCookie) {
-          cookieSubmittedRef.current = false;
+          // Delay reset to ensure we don't get caught by rapid progress updates
+          setTimeout(() => {
+            cookieSubmittedRef.current = false;
+          }, 2000);
         }
       }
       if (data.currentGame) {
@@ -280,9 +290,26 @@ const LocalRefresh = () => {
         } else {
           setLastRefreshTime(new Date());
         }
+
+        // Clear caches so the app loads fresh data with new imgIDs
+        console.log("[LocalRefresh] Refresh complete, clearing caches to load new data");
+        imageCacheService.invalidateSettingsCache();
+        await imageCacheService.clearCache(true); // Skip auto-refresh, we'll reload manually
+        gameService.clearMemoryCache();
+        localStorage.removeItem("ascendara_games_cache");
+        localStorage.removeItem("local_ascendara_games_timestamp");
+        localStorage.removeItem("local_ascendara_metadata_cache");
+        localStorage.removeItem("local_ascendara_last_updated");
+
         toast.success(
           t("localRefresh.refreshComplete") || "Game list refresh completed!"
         );
+
+        // Reload the page after a short delay to ensure all components get fresh data
+        // This is necessary because components may have cached old imgIDs in their state
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else if (data.status === "failed" || data.status === "error") {
         setRefreshStatus("error");
         setIsRefreshing(false);
@@ -375,6 +402,7 @@ const LocalRefresh = () => {
           cfClearance: refreshData.cfClearance,
           perPage: fetchPageCount,
           workers: workerCount,
+          userAgent: refreshData.userAgent,
         });
 
         if (!result.success) {
@@ -427,9 +455,14 @@ const LocalRefresh = () => {
             cookieSubmittedRef.current = true; // Mark that cookie was successfully submitted BEFORE dialog closes
             setCookieRefreshCount(prev => prev + 1);
             // Don't call setShowCookieRefreshDialog here - the dialog's handleClose will do it
-            toast.success(
-              t("localRefresh.cookieRefreshed") || "Cookie refreshed, resuming..."
-            );
+            // Debounce toast to prevent spam - only show if last toast was more than 3 seconds ago
+            const now = Date.now();
+            if (now - lastCookieToastTimeRef.current > 3000) {
+              lastCookieToastTimeRef.current = now;
+              toast.success(
+                t("localRefresh.cookieRefreshed") || "Cookie refreshed, resuming..."
+              );
+            }
             return; // Return early so the dialog close handler knows cookie was sent
           } else {
             toast.error(
@@ -448,14 +481,16 @@ const LocalRefresh = () => {
 
   const handleCookieRefreshDialogClose = async open => {
     if (!open && showCookieRefreshDialog) {
+      cookieDialogOpenRef.current = false;
       setShowCookieRefreshDialog(false);
       // Only stop refresh if user cancelled without submitting a cookie
       if (!cookieSubmittedRef.current) {
         await handleStopRefresh();
       }
-      // Reset the flag for next time
-      cookieSubmittedRef.current = false;
+      // Don't reset cookieSubmittedRef here - let the progress handler do it
+      // after the phase changes away from waiting_for_cookie
     } else {
+      cookieDialogOpenRef.current = open;
       setShowCookieRefreshDialog(open);
     }
   };

@@ -49,6 +49,7 @@ scraper = None
 cookie_refresh_event = threading.Event()
 cookie_refresh_lock = threading.Lock()
 new_cookie_value = [None]  # Use list to allow modification across threads
+current_user_agent = [None]  # Store the user-agent for cookie refresh
 
 # Keep-alive thread control
 keep_alive_stop_event = threading.Event()
@@ -298,12 +299,25 @@ class RefreshProgress:
         self.current_game = ""
         self.errors = []
         self.start_time = time.time()
+        # Load previous lastSuccessfulTimestamp if it exists
+        self.last_successful_timestamp = None
+        try:
+            if os.path.exists(self.progress_file):
+                with open(self.progress_file, 'r', encoding='utf-8') as f:
+                    old_progress = json.load(f)
+                    self.last_successful_timestamp = old_progress.get('lastSuccessfulTimestamp')
+        except Exception as e:
+            logging.debug(f"Could not load previous progress: {e}")
         self._update_progress()
     
     def _update_progress(self):
         """Write progress to file with thread safety"""
         with self.lock:
             elapsed = time.time() - self.start_time
+            # Cap progress at 1.0 to prevent exceeding 100%
+            raw_progress = self.processed_posts / max(1, self.total_posts)
+            capped_progress = min(raw_progress, 1.0)
+            
             progress_data = {
                 "status": self.status,
                 "phase": self.phase,
@@ -312,11 +326,12 @@ class RefreshProgress:
                 "totalImages": self.total_images,
                 "downloadedImages": self.downloaded_images,
                 "currentGame": self.current_game,
-                "progress": round(self.processed_posts / max(1, self.total_posts), 4),
+                "progress": round(capped_progress, 4),
                 "elapsedSeconds": round(elapsed, 1),
                 "errors": self.errors[-10:],  # Keep last 10 errors
                 "timestamp": time.time(),
-                "waitingForCookie": self.phase == "waiting_for_cookie"
+                "waitingForCookie": self.phase == "waiting_for_cookie",
+                "lastSuccessfulTimestamp": self.last_successful_timestamp
             }
             try:
                 with open(self.progress_file, 'w', encoding='utf-8') as f:
@@ -376,6 +391,8 @@ class RefreshProgress:
     def complete(self, success=True):
         self.status = "completed" if success else "failed"
         self.phase = "done"
+        if success:
+            self.last_successful_timestamp = time.time()
         self._update_progress()
 
 
@@ -384,8 +401,8 @@ def generate_random_id(length=10):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 
-def create_scraper(cookie):
-    """Create a cloudscraper instance with the provided cookie"""
+def create_scraper(cookie, user_agent=None):
+    """Create a cloudscraper instance with the provided cookie and optional user-agent"""
     logging.info("Creating cloudscraper instance...")
     logging.info(f"Raw cookie received (first 50 chars): {repr(cookie[:50])}")
     logging.info(f"Raw cookie length: {len(cookie)}")
@@ -399,9 +416,17 @@ def create_scraper(cookie):
     
     logging.info(f"Final cookie for header: {cookie[:50]}...")
     
+    # Determine browser type from user-agent for cloudscraper config
+    browser_type = "chrome"
+    if user_agent:
+        ua_lower = user_agent.lower()
+        if "firefox" in ua_lower:
+            browser_type = "firefox"
+        logging.info(f"Using custom User-Agent (browser: {browser_type}): {user_agent[:60]}...")
+    
     # Create scraper with larger connection pool for parallel requests
     scraper = cloudscraper.create_scraper(
-        browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        browser={"browser": browser_type, "platform": "windows", "mobile": False}
     )
     
     # Increase connection pool size to handle parallel requests
@@ -413,8 +438,11 @@ def create_scraper(cookie):
     scraper.mount('https://', adapter)
     scraper.mount('http://', adapter)
 
+    # Use custom user-agent if provided, otherwise use default Chrome UA
+    final_user_agent = user_agent if user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    
     scraper.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+        "User-Agent": final_user_agent,
         "Cookie": cookie
     })
     logging.info("Scraper created successfully with pool size 50")
@@ -573,7 +601,7 @@ def get_image_url(post):
         return ""
 
 
-def start_view_count_fetcher(cookie, num_workers=8):
+def start_view_count_fetcher(cookie, num_workers=8, user_agent=None):
     """Start background threads that fetch view counts from the queue using cloudscraper"""
     global view_count_thread
     
@@ -582,16 +610,22 @@ def start_view_count_fetcher(cookie, num_workers=8):
     if not cookie_str.startswith("cf_clearance="):
         cookie_str = f"cf_clearance={cookie_str}"
     
+    # Determine browser type and user-agent
+    browser_type = "chrome"
+    final_user_agent = user_agent if user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    if user_agent and "firefox" in user_agent.lower():
+        browser_type = "firefox"
+    
     def view_count_worker(worker_id):
         """Worker that continuously fetches view counts from queue"""
         logging.info(f"View count worker {worker_id} started")
         
         # Create a dedicated cloudscraper instance for this worker (required for Cloudflare bypass)
         view_scraper = cloudscraper.create_scraper(
-            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+            browser={"browser": browser_type, "platform": "windows", "mobile": False}
         )
         view_scraper.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+            "User-Agent": final_user_agent,
             "Cookie": cookie_str
         })
         # Increase pool size for parallel requests
@@ -656,8 +690,13 @@ def start_view_count_fetcher(cookie, num_workers=8):
     view_count_thread = view_count_threads
 
 
-def stop_view_count_fetcher():
-    """Stop the view count fetcher threads and wait for them to finish"""
+def stop_view_count_fetcher(wait_for_queue=False):
+    """Stop the view count fetcher threads and wait for them to finish.
+    
+    Args:
+        wait_for_queue: If True, wait for the queue to be empty before stopping.
+                       If False, stop immediately (for cookie refresh restarts).
+    """
     global view_count_thread
     
     if view_count_thread:
@@ -672,7 +711,37 @@ def stop_view_count_fetcher():
         elif view_count_thread.is_alive():
             view_count_thread.join(timeout=5)
         
+        view_count_thread = None
         logging.info(f"View count fetcher stopped. Cached {len(view_count_cache)} view counts.")
+
+
+def restart_view_count_fetcher(cookie, num_workers=4, user_agent=None):
+    """Restart the view count fetcher with a new cookie (used after cookie refresh).
+    
+    This preserves the existing queue and cache, just creates new worker threads
+    with the updated cookie.
+    """
+    global view_count_thread
+    
+    logging.info("Restarting view count fetcher with new cookie...")
+    
+    # Stop existing workers (but don't clear the queue or cache)
+    if view_count_thread:
+        view_count_stop_event.set()
+        if isinstance(view_count_thread, list):
+            for t in view_count_thread:
+                if t.is_alive():
+                    t.join(timeout=2)
+        elif view_count_thread.is_alive():
+            view_count_thread.join(timeout=2)
+        view_count_thread = None
+    
+    # Clear the stop event and start new workers
+    view_count_stop_event.clear()
+    
+    # Start new workers with the new cookie
+    start_view_count_fetcher(cookie, num_workers=num_workers, user_agent=user_agent)
+    logging.info("View count fetcher restarted with new cookie")
 
 
 def queue_view_count_fetch(post_id):
@@ -692,7 +761,7 @@ def get_cached_view_count(post_id):
 
 def wait_for_cookie_refresh():
     """Wait for user to provide a new cookie via stdin. Returns True if cookie was refreshed."""
-    global scraper, new_cookie_value, failed_image_count
+    global scraper, new_cookie_value, failed_image_count, current_user_agent
     
     # Immediately reset failed count to prevent other threads from also triggering
     with failed_image_lock:
@@ -723,7 +792,8 @@ def wait_for_cookie_refresh():
             
             if new_cookie:
                 logging.info("Received new cookie, refreshing scraper...")
-                scraper = create_scraper(new_cookie)
+                # Use the stored user_agent when creating the new scraper
+                scraper = create_scraper(new_cookie, current_user_agent[0])
                 new_cookie_value[0] = new_cookie
                 
                 cookie_refresh_event.clear()
@@ -929,31 +999,59 @@ def main():
         default=4,
         help='Number of workers for view count fetching (default: 4)'
     )
+    parser.add_argument(
+        '--user-agent', '-u',
+        default=None,
+        help='Custom User-Agent string (for Firefox/Opera cookie compatibility)'
+    )
     
     args = parser.parse_args()
     
     logging.info("=== Starting Ascendara Local Refresh ===")
     logging.info(f"Output directory: {args.output}")
     
-    # Setup directories
+    # Setup directories - use staging approach:
+    # - incoming: new data written here during refresh (app doesn't read this)
+    # - current: live data the app reads (imgs/ and ascendara_games.json)
+    # - backup: created only when swapping incoming -> current
     output_dir = args.output
+    
+    # Current (live) paths - what the app reads
     imgs_dir = os.path.join(output_dir, "imgs")
-    imgs_backup_dir = os.path.join(output_dir, "imgs_backup")
     games_file = os.path.join(output_dir, "ascendara_games.json")
+    
+    # Incoming (staging) paths - where new data is written during refresh
+    imgs_incoming_dir = os.path.join(output_dir, "imgs_incoming")
+    games_incoming_file = os.path.join(output_dir, "ascendara_games_incoming.json")
+    
+    # Backup paths - created during swap for rollback safety
+    imgs_backup_dir = os.path.join(output_dir, "imgs_backup")
     games_backup_file = os.path.join(output_dir, "ascendara_games_backup.json")
     
+    def cleanup_incoming():
+        """Remove incomplete incoming data on failure"""
+        try:
+            if os.path.exists(imgs_incoming_dir):
+                shutil.rmtree(imgs_incoming_dir)
+                logging.info("Cleaned up incomplete incoming imgs")
+            if os.path.exists(games_incoming_file):
+                os.remove(games_incoming_file)
+                logging.info("Cleaned up incomplete incoming games file")
+        except Exception as e:
+            logging.warning(f"Failed to cleanup incoming: {e}")
+    
     def restore_backup():
-        """Restore from backup if it exists"""
+        """Restore from backup if swap was interrupted"""
         restored = False
         try:
-            # Restore imgs folder
+            # Restore imgs folder from backup
             if os.path.exists(imgs_backup_dir):
                 if os.path.exists(imgs_dir):
                     shutil.rmtree(imgs_dir)
                 shutil.move(imgs_backup_dir, imgs_dir)
                 logging.info("Restored imgs folder from backup")
                 restored = True
-            # Restore games file
+            # Restore games file from backup
             if os.path.exists(games_backup_file):
                 if os.path.exists(games_file):
                     os.remove(games_file)
@@ -965,7 +1063,7 @@ def main():
         return restored
     
     def cleanup_backup():
-        """Remove backup files after successful completion"""
+        """Remove backup files after successful swap"""
         try:
             if os.path.exists(imgs_backup_dir):
                 shutil.rmtree(imgs_backup_dir)
@@ -976,22 +1074,66 @@ def main():
         except Exception as e:
             logging.warning(f"Failed to cleanup backup: {e}")
     
-    # Track if we completed successfully to decide whether to restore on exit
+    def swap_incoming_to_current():
+        """Atomically swap incoming data to current (live) location.
+        Creates backups first for rollback safety."""
+        try:
+            logging.info("Swapping incoming data to current...")
+            
+            # Step 1: Backup current imgs (if exists) -> imgs_backup
+            if os.path.exists(imgs_dir):
+                if os.path.exists(imgs_backup_dir):
+                    shutil.rmtree(imgs_backup_dir)
+                shutil.move(imgs_dir, imgs_backup_dir)
+                logging.info("Backed up current imgs to imgs_backup")
+            
+            # Step 2: Backup current games file (if exists) -> games_backup
+            if os.path.exists(games_file):
+                if os.path.exists(games_backup_file):
+                    os.remove(games_backup_file)
+                shutil.copy2(games_file, games_backup_file)
+                logging.info("Backed up current games file")
+            
+            # Step 3: Move incoming imgs -> current imgs
+            if os.path.exists(imgs_incoming_dir):
+                shutil.move(imgs_incoming_dir, imgs_dir)
+                logging.info("Moved incoming imgs to current")
+            
+            # Step 4: Move incoming games file -> current games file
+            if os.path.exists(games_incoming_file):
+                if os.path.exists(games_file):
+                    os.remove(games_file)
+                shutil.move(games_incoming_file, games_file)
+                logging.info("Moved incoming games file to current")
+            
+            # Step 5: Cleanup backups (swap successful)
+            cleanup_backup()
+            
+            logging.info("Swap completed successfully")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Swap failed: {e}, attempting rollback...")
+            # Attempt rollback
+            restore_backup()
+            return False
+    
+    # Track if we completed successfully to decide whether to cleanup on exit
     refresh_completed_successfully = [False]  # Use list to allow modification in nested function
     
-    def on_exit_restore():
-        """Restore backup on unexpected exit if not completed successfully"""
+    def on_exit_cleanup():
+        """Cleanup incoming data on unexpected exit if not completed successfully"""
         if not refresh_completed_successfully[0]:
-            logging.info("Process exiting without successful completion, attempting to restore backup...")
-            restore_backup()
+            logging.info("Process exiting without successful completion, cleaning up incoming data...")
+            cleanup_incoming()
     
-    # Register atexit handler to restore backup if process is killed
-    atexit.register(on_exit_restore)
+    # Register atexit handler to cleanup incoming data if process is killed
+    atexit.register(on_exit_cleanup)
     
-    # Handle SIGTERM (sent by taskkill) to restore backup
+    # Handle SIGTERM (sent by taskkill) to cleanup incoming data
     def signal_handler(signum, frame):
-        logging.info(f"Received signal {signum}, restoring backup and exiting...")
-        restore_backup()
+        logging.info(f"Received signal {signum}, cleaning up incoming data and exiting...")
+        cleanup_incoming()
         sys.exit(1)
     
     # Register signal handlers (SIGTERM for graceful kill, SIGINT for Ctrl+C)
@@ -1002,27 +1144,26 @@ def main():
     try:
         os.makedirs(output_dir, exist_ok=True)
         
-        # Clean up any old backups first
+        # Clean up any old incoming/backup data from previous failed runs
+        if os.path.exists(imgs_incoming_dir):
+            shutil.rmtree(imgs_incoming_dir)
+            logging.info("Cleaned up old incoming imgs")
+        if os.path.exists(games_incoming_file):
+            os.remove(games_incoming_file)
+            logging.info("Cleaned up old incoming games file")
         if os.path.exists(imgs_backup_dir):
             shutil.rmtree(imgs_backup_dir)
+            logging.info("Cleaned up old backup imgs")
         if os.path.exists(games_backup_file):
             os.remove(games_backup_file)
+            logging.info("Cleaned up old backup games file")
         
-        # Backup existing imgs folder before creating new one
-        if os.path.exists(imgs_dir):
-            shutil.move(imgs_dir, imgs_backup_dir)
-            logging.info("Backed up existing imgs directory")
-        
-        # Backup existing games file
-        if os.path.exists(games_file):
-            shutil.copy2(games_file, games_backup_file)
-            logging.info("Backed up existing ascendara_games.json")
-        
-        os.makedirs(imgs_dir, exist_ok=True)
-        logging.info("Created output directories")
+        # Create incoming directory for new data (current data stays untouched)
+        os.makedirs(imgs_incoming_dir, exist_ok=True)
+        logging.info("Created incoming directories (current data untouched)")
     except Exception as e:
         logging.error(f"Failed to create directories: {e}")
-        restore_backup()
+        cleanup_incoming()
         launch_crash_reporter(1, str(e))
         sys.exit(1)
     
@@ -1031,23 +1172,27 @@ def main():
     progress.set_status("running")
     
     try:
+        # Store the user_agent globally for cookie refresh
+        global current_user_agent
+        current_user_agent[0] = args.user_agent
+        
         # Create scraper
         progress.set_phase("initializing")
-        scraper = create_scraper(args.cookie)
+        scraper = create_scraper(args.cookie, args.user_agent)
         
         # Fetch categories
         logging.info("Fetching categories...")
         category_map = fetch_categories(scraper, progress)
         
         logging.info("Creating fresh scraper session for posts...")
-        scraper = create_scraper(args.cookie)
+        scraper = create_scraper(args.cookie, args.user_agent)
         
         # Start keep-alive thread to prevent cookie expiration
         start_keep_alive(scraper, interval=30)
         
         # Start view count fetcher in background (fetches views while posts are processed)
         if not args.skip_views:
-            start_view_count_fetcher(args.cookie, num_workers=args.view_workers)
+            start_view_count_fetcher(args.cookie, num_workers=args.view_workers, user_agent=args.user_agent)
         
         # Load blacklist IDs from settings
         blacklist_ids = get_blacklist_ids()
@@ -1103,7 +1248,10 @@ def main():
                         progress.set_status("waiting")
                         
                         if wait_for_cookie_refresh():
-                            scraper = create_scraper(new_cookie_value[0])
+                            scraper = create_scraper(new_cookie_value[0], args.user_agent)
+                            # Restart view count fetcher with new cookie
+                            if not args.skip_views:
+                                restart_view_count_fetcher(new_cookie_value[0], num_workers=args.view_workers, user_agent=args.user_agent)
                             new_cookie_value[0] = None
                             consecutive_failures = 0
                             progress.set_phase("processing_posts")
@@ -1145,7 +1293,7 @@ def main():
                 
                 with ThreadPoolExecutor(max_workers=args.workers) as executor:
                     futures = {
-                        executor.submit(process_post, post, scraper, category_map, imgs_dir, progress, blacklist_ids): post
+                        executor.submit(process_post, post, scraper, category_map, imgs_incoming_dir, progress, blacklist_ids): post
                         for post in posts_to_process
                     }
                     
@@ -1203,7 +1351,10 @@ def main():
                             progress.set_status("waiting")
                             
                             if wait_for_cookie_refresh():
-                                scraper = create_scraper(new_cookie_value[0])
+                                scraper = create_scraper(new_cookie_value[0], args.user_agent)
+                                # Restart view count fetcher with new cookie
+                                if not args.skip_views:
+                                    restart_view_count_fetcher(new_cookie_value[0], num_workers=args.view_workers, user_agent=args.user_agent)
                                 new_cookie_value[0] = None
                                 consecutive_failures = 0
                                 progress.set_phase("processing_posts")
@@ -1222,15 +1373,31 @@ def main():
         # Stop view count fetcher and wait for remaining fetches to complete
         if not args.skip_views:
             logging.info("Waiting for view count fetcher to finish...")
+            # Wait for queue to drain before stopping (give workers time to process remaining items)
+            queue_wait_start = time.time()
+            max_queue_wait = 60  # Max 60 seconds to wait for queue
+            while not view_count_queue.empty() and (time.time() - queue_wait_start) < max_queue_wait:
+                remaining = view_count_queue.qsize()
+                if remaining > 0:
+                    logging.info(f"Waiting for {remaining} view counts to be fetched...")
+                time.sleep(2)
             stop_view_count_fetcher()
             
             # Apply cached view counts to game data
             logging.info("Applying view counts to game data...")
+            games_with_views = 0
+            games_without_views = 0
             for game in game_data:
                 post_id = game.pop("_post_id", None)  # Remove temp field
                 if post_id:
-                    game["weight"] = get_cached_view_count(post_id)
-            logging.info(f"Applied {len(view_count_cache)} view counts")
+                    view_count = get_cached_view_count(post_id)
+                    game["weight"] = view_count
+                    if view_count != "0":
+                        games_with_views += 1
+                    else:
+                        games_without_views += 1
+            logging.info(f"View count stats: {games_with_views} games with views, {games_without_views} games with weight=0")
+            logging.info(f"Total cached view counts: {len(view_count_cache)}")
         else:
             # Just remove the temp field if skipping views
             for game in game_data:
@@ -1256,14 +1423,25 @@ def main():
             "games": game_data
         }
         
-        output_file = os.path.join(output_dir, "ascendara_games.json")
-        logging.info(f"Writing to {output_file}...")
+        # Write to incoming file first (not touching current data yet)
+        logging.info(f"Writing to incoming file: {games_incoming_file}...")
         
-        with open(output_file, "w", encoding="utf-8") as f:
+        with open(games_incoming_file, "w", encoding="utf-8") as f:
             json.dump(output_data, f, ensure_ascii=False, indent=2)
         
+        # Now swap incoming data to current (atomic operation with backup)
+        progress.set_phase("swapping")
+        logging.info("Swapping incoming data to current...")
+        
+        if not swap_incoming_to_current():
+            logging.error("Failed to swap incoming data to current")
+            progress.add_error("Failed to swap incoming data to current")
+            progress.complete(success=False)
+            cleanup_incoming()
+            sys.exit(1)
+        
         progress.complete(success=True)
-        logging.info(f"=== Done! Saved {len(game_data)} games to {output_file} ===")
+        logging.info(f"=== Done! Saved {len(game_data)} games ===")
         
         # Send notification (checks settings internally)
         _launch_notification(
@@ -1271,12 +1449,9 @@ def main():
             f"Successfully indexed {len(game_data)} games"
         )
         
-        # Mark as successfully completed so atexit handler doesn't restore
+        # Mark as successfully completed so atexit handler doesn't cleanup
         refresh_completed_successfully[0] = True
-        atexit.unregister(on_exit_restore)
-        
-        # Success - cleanup backup files
-        cleanup_backup()
+        atexit.unregister(on_exit_cleanup)
         
         # Mark that user has successfully indexed
         try:
@@ -1306,11 +1481,11 @@ def main():
             "Index Refresh Failed",
             "Cookie expired during initial fetch"
         )
-        # Unregister atexit handler since we're manually restoring
-        atexit.unregister(on_exit_restore)
-        # Restore from backup
-        if restore_backup():
-            logging.info("Previous data restored after cookie expiration")
+        # Unregister atexit handler since we're manually cleaning up
+        atexit.unregister(on_exit_cleanup)
+        # Cleanup incomplete incoming data (current data is untouched)
+        cleanup_incoming()
+        logging.info("Cleaned up incomplete incoming data, current data unchanged")
         sys.exit(1)
         
     except KeyboardInterrupt:
@@ -1319,11 +1494,11 @@ def main():
         logging.info("Refresh cancelled by user")
         progress.add_error("Cancelled by user")
         progress.complete(success=False)
-        # Unregister atexit handler since we're manually restoring
-        atexit.unregister(on_exit_restore)
-        # Restore from backup on cancellation
-        if restore_backup():
-            logging.info("Previous data restored after cancellation")
+        # Unregister atexit handler since we're manually cleaning up
+        atexit.unregister(on_exit_cleanup)
+        # Cleanup incomplete incoming data (current data is untouched)
+        cleanup_incoming()
+        logging.info("Cleaned up incomplete incoming data, current data unchanged")
         sys.exit(1)
         
     except Exception as e:
@@ -1332,11 +1507,11 @@ def main():
         logging.error(f"Unexpected error: {e}")
         progress.add_error(str(e))
         progress.complete(success=False)
-        # Unregister atexit handler since we're manually restoring
-        atexit.unregister(on_exit_restore)
-        # Restore from backup on error
-        if restore_backup():
-            logging.info("Previous data restored after error")
+        # Unregister atexit handler since we're manually cleaning up
+        atexit.unregister(on_exit_cleanup)
+        # Cleanup incomplete incoming data (current data is untouched)
+        cleanup_incoming()
+        logging.info("Cleaned up incomplete incoming data, current data unchanged")
         launch_crash_reporter(1, str(e))
         sys.exit(1)
 

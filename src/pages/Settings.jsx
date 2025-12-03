@@ -277,13 +277,17 @@ function Settings() {
           if (window.electron?.getLocalRefreshStatus) {
             const status = await window.electron.getLocalRefreshStatus(indexPath);
             setIsIndexRefreshing(status.isRunning);
-            if (status.progress?.timestamp) {
-              setLastRefreshTime(new Date(status.progress.timestamp * 1000));
+            // Use lastSuccessfulTimestamp which persists across refresh attempts
+            if (status.progress?.lastSuccessfulTimestamp) {
+              setLastRefreshTime(
+                new Date(status.progress.lastSuccessfulTimestamp * 1000)
+              );
             }
           } else if (window.electron?.getLocalRefreshProgress) {
             const progress = await window.electron.getLocalRefreshProgress(indexPath);
-            if (progress?.timestamp) {
-              setLastRefreshTime(new Date(progress.timestamp * 1000));
+            // Use lastSuccessfulTimestamp which persists across refresh attempts
+            if (progress?.lastSuccessfulTimestamp) {
+              setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
             }
             // Check status from progress file
             setIsIndexRefreshing(progress?.status === "running");
@@ -302,8 +306,9 @@ function Settings() {
           setIsIndexRefreshing(true);
         } else if (data.status === "completed" || data.status === "failed") {
           setIsIndexRefreshing(false);
-          if (data.timestamp) {
-            setLastRefreshTime(new Date(data.timestamp * 1000));
+          // Use lastSuccessfulTimestamp which only updates on successful completion
+          if (data.lastSuccessfulTimestamp) {
+            setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
           }
         }
       };

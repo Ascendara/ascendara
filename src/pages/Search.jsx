@@ -57,6 +57,9 @@ const Search = memo(() => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showStickySearch, setShowStickySearch] = useState(false);
+  const mainSearchRef = useRef(null);
+  const searchSectionRef = useRef(null);
   const [selectedCategories, setSelectedCategories] = useState(() => {
     const saved = window.localStorage.getItem("selectedCategories");
     return saved ? JSON.parse(saved) : [];
@@ -93,11 +96,48 @@ const Search = memo(() => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef(null);
+  const scrollThreshold = 200;
   const gamesPerLoad = useWindowSize();
   const [apiMetadata, setApiMetadata] = useState(null);
   const { t } = useLanguage();
   const isFitGirlSource = settings.gameSource === "fitgirl";
   const navigate = useNavigate();
+
+  // Handle scroll to show/hide sticky search bar
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setShowStickySearch(scrollY > scrollThreshold);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [scrollThreshold]);
+
+  // Handle sticky search click - scroll to top and focus input
+  const handleStickySearchClick = useCallback(() => {
+    const startPosition = window.scrollY;
+    const duration = 600;
+    const startTime = performance.now();
+
+    const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+
+    const animateScroll = currentTime => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = easeOutCubic(progress);
+
+      window.scrollTo(0, startPosition * (1 - easedProgress));
+
+      if (progress < 1) {
+        requestAnimationFrame(animateScroll);
+      } else {
+        mainSearchRef.current?.focus();
+      }
+    };
+
+    requestAnimationFrame(animateScroll);
+  }, []);
 
   const isCacheValid = useCallback(() => {
     return (
@@ -511,6 +551,22 @@ const Search = memo(() => {
 
   return (
     <div className="flex flex-col bg-background">
+      {/* Sticky Search Bar */}
+      <div
+        onClick={handleStickySearchClick}
+        className={`fixed left-1/2 z-50 -translate-x-1/2 cursor-pointer transition-all duration-300 ease-out ${
+          showStickySearch
+            ? "top-4 translate-y-0 opacity-100"
+            : "pointer-events-none top-0 -translate-y-full opacity-0"
+        }`}
+      >
+        <div className="flex min-w-[280px] items-center gap-3 rounded-full border border-border/50 bg-background/80 px-6 py-2.5 shadow-lg backdrop-blur-md transition-colors hover:border-border hover:bg-background/90">
+          <SearchIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            {searchQuery || t("search.placeholder")}
+          </span>
+        </div>
+      </div>
       <div className="flex-1 p-8 pb-24">
         <div className="mx-auto max-w-[1400px]">
           {apiMetadata && (
@@ -656,6 +712,7 @@ const Search = memo(() => {
               <div className="relative flex-1">
                 <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  ref={mainSearchRef}
                   placeholder={t("search.placeholder")}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
