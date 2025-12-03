@@ -690,6 +690,65 @@ const Welcome = ({ welcomeData, onComplete }) => {
     checkPlatform();
   }, []);
 
+  // Check if user has ever completed a local index refresh (e.g., from a previous session)
+  useEffect(() => {
+    const checkRefreshStatus = async () => {
+      try {
+        // First check if user has ever indexed before (persisted in timestamp file)
+        if (window.electron?.getTimestampValue) {
+          const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
+          if (hasIndexed === true) {
+            // User has completed a local index before - show as complete
+            setIndexRefreshStarted(true);
+            setIsIndexRefreshing(false);
+            setIndexComplete(true);
+            return;
+          }
+        }
+
+        // If no hasIndexBefore flag, check progress file for current session
+        if (indexRefreshStarted && isIndexRefreshing) {
+          const defaultPath = await window.electron.getDefaultLocalIndexPath();
+          const progress = await window.electron.getLocalRefreshProgress(defaultPath);
+
+          if (progress?.status === "completed") {
+            setIsIndexRefreshing(false);
+            setIndexComplete(true);
+          } else if (progress?.status === "failed" || progress?.status === "error") {
+            setIsIndexRefreshing(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking refresh status:", error);
+      }
+    };
+
+    checkRefreshStatus();
+  }, []); // Run once on mount
+
+  // Listen for local refresh progress updates to detect completion
+  useEffect(() => {
+    if (!indexRefreshStarted) return;
+
+    const handleProgressUpdate = data => {
+      // Check if refresh completed via progress status
+      if (data.status === "completed") {
+        setIsIndexRefreshing(false);
+        setIndexComplete(true);
+      } else if (data.status === "failed" || data.status === "error") {
+        setIsIndexRefreshing(false);
+      }
+    };
+
+    if (window.electron?.onLocalRefreshProgress) {
+      window.electron.onLocalRefreshProgress(handleProgressUpdate);
+
+      return () => {
+        window.electron.offLocalRefreshProgress?.();
+      };
+    }
+  }, [indexRefreshStarted]);
+
   const handleStartLocalRefresh = async refreshData => {
     try {
       setIsIndexRefreshing(true);
