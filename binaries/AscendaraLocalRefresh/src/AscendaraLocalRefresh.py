@@ -574,21 +574,28 @@ def get_image_url(post):
 
 
 def start_view_count_fetcher(cookie, num_workers=8):
-    """Start background threads that fetch view counts from the queue using a dedicated scraper"""
+    """Start background threads that fetch view counts from the queue using cloudscraper"""
     global view_count_thread
     
-    def view_count_worker():
+    # Prepare cookie string
+    cookie_str = cookie.strip().strip('"\'')
+    if not cookie_str.startswith("cf_clearance="):
+        cookie_str = f"cf_clearance={cookie_str}"
+    
+    def view_count_worker(worker_id):
         """Worker that continuously fetches view counts from queue"""
-        logging.info(f"View count fetcher started with {num_workers} workers")
+        logging.info(f"View count worker {worker_id} started")
         
-        # Create a dedicated lightweight session for view counts (no retries, fast timeout)
-        view_scraper = requests.Session()
+        # Create a dedicated cloudscraper instance for this worker (required for Cloudflare bypass)
+        view_scraper = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        )
         view_scraper.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Cookie": cookie if cookie.startswith("cf_clearance=") else f"cf_clearance={cookie}"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+            "Cookie": cookie_str
         })
-        # No retries - if it fails, just skip it (view counts aren't critical)
-        adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20, max_retries=0)
+        # Increase pool size for parallel requests
+        adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=1)
         view_scraper.mount('https://', adapter)
         
         fetched_count = 0
@@ -602,37 +609,47 @@ def start_view_count_fetcher(cookie, num_workers=8):
                 except Empty:
                     continue
                 
-                # Fetch view count with very short timeout, no retries
+                # Fetch view count
                 try:
                     url = f"https://steamrip.com/wp-admin/admin-ajax.php?postviews_id={post_id}&action=tie_postviews&_={int(time.time() * 1000)}"
-                    response = view_scraper.get(url, timeout=3)
+                    response = view_scraper.get(url, timeout=10)
                     if response.status_code == 200:
+                        # Extract just the digits from the response
                         views = re.sub(r'[^\d]', '', response.text.strip())
-                        with view_count_cache_lock:
-                            view_count_cache[post_id] = views if views else "0"
-                        fetched_count += 1
+                        if views:
+                            with view_count_cache_lock:
+                                view_count_cache[post_id] = views
+                            fetched_count += 1
+                            if fetched_count % 100 == 0:
+                                logging.debug(f"Worker {worker_id}: Fetched {fetched_count} view counts")
+                        else:
+                            failed_count += 1
                     else:
                         failed_count += 1
-                except Exception:
+                        if response.status_code == 403:
+                            logging.debug(f"Worker {worker_id}: 403 on view count for post {post_id}")
+                except Exception as e:
                     failed_count += 1
-                    # Don't log - just skip silently
+                    logging.debug(f"Worker {worker_id}: Error fetching view count for {post_id}: {e}")
                 
                 # Small rate limit to be nice to the server
-                time.sleep(0.05)
+                time.sleep(0.1)
                 
             except Exception as e:
-                logging.debug(f"View count worker error: {e}")
+                logging.debug(f"View count worker {worker_id} error: {e}")
         
         view_scraper.close()
-        logging.info(f"View count fetcher finished. Fetched: {fetched_count}, Failed: {failed_count}")
+        logging.info(f"View count worker {worker_id} finished. Fetched: {fetched_count}, Failed: {failed_count}")
     
     view_count_stop_event.clear()
     # Start multiple worker threads for parallel fetching
     view_count_threads = []
     for i in range(num_workers):
-        t = threading.Thread(target=view_count_worker, daemon=True, name=f"ViewCountWorker-{i}")
+        t = threading.Thread(target=view_count_worker, args=(i,), daemon=True, name=f"ViewCountWorker-{i}")
         t.start()
         view_count_threads.append(t)
+    
+    logging.info(f"Started {num_workers} view count fetcher workers")
     
     # Store threads for later cleanup
     global view_count_thread
