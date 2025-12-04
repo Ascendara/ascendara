@@ -66,6 +66,11 @@ import {
   CornerDownRight,
   Database,
   LoaderIcon,
+  Palette,
+  Upload,
+  Download as DownloadIcon,
+  UploadIcon,
+  Globe,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -205,7 +210,7 @@ function createDebouncedFunction(func, wait) {
 function Settings() {
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
-  const { settings, setSettings } = useSettings();
+  const { settings, setSettings, setSettingsLocal } = useSettings();
   const navigate = useNavigate();
   const [isInitialized, setIsInitialized] = useState(false);
   const initialSettingsRef = useRef(null);
@@ -237,6 +242,28 @@ function Settings() {
   const [exclusionLoading, setExclusionLoading] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
+  const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
+  const [customColors, setCustomColors] = useState({
+    background: "255 255 255",
+    foreground: "15 23 42",
+    primary: "124 58 237",
+    secondary: "221 214 254",
+    muted: "221 214 254",
+    mutedForeground: "88 28 135",
+    accent: "221 214 254",
+    accentForeground: "88 28 135",
+    border: "167 139 250",
+    input: "167 139 250",
+    ring: "88 28 135",
+    card: "255 255 255",
+    cardForeground: "15 23 42",
+    popover: "255 255 255",
+    popoverForeground: "15 23 42",
+  });
+  const [originalColorsOnOpen, setOriginalColorsOnOpen] = useState(null);
+  const [showPublicThemesDialog, setShowPublicThemesDialog] = useState(false);
+  const [publicThemes, setPublicThemes] = useState([]);
+  const [loadingPublicThemes, setLoadingPublicThemes] = useState(false);
 
   // Use a ref to track if this is the first mount
   const isFirstMount = useRef(true);
@@ -426,7 +453,7 @@ function Settings() {
     }
 
     if (key === "sideScrollBar") {
-      setSettings(prev => ({
+      setSettingsLocal(prev => ({
         ...prev,
         [key]: value,
       }));
@@ -449,7 +476,7 @@ function Settings() {
         })
         .then(success => {
           if (success) {
-            setSettings(prev => ({
+            setSettingsLocal(prev => ({
               ...prev,
               ludusavi: {
                 ...(prev.ludusavi || {}),
@@ -463,7 +490,7 @@ function Settings() {
 
     window.electron.updateSetting(key, value).then(success => {
       if (success) {
-        setSettings(prev => ({
+        setSettingsLocal(prev => ({
           ...prev,
           [key]: value,
         }));
@@ -507,9 +534,33 @@ function Settings() {
     }
   }, [handleSettingChange, t]);
 
+  // Helper to clear custom theme CSS variables
+  const clearCustomThemeStyles = () => {
+    const root = document.documentElement;
+    root.style.removeProperty("--color-background");
+    root.style.removeProperty("--color-foreground");
+    root.style.removeProperty("--color-primary");
+    root.style.removeProperty("--color-secondary");
+    root.style.removeProperty("--color-muted");
+    root.style.removeProperty("--color-muted-foreground");
+    root.style.removeProperty("--color-accent");
+    root.style.removeProperty("--color-accent-foreground");
+    root.style.removeProperty("--color-border");
+    root.style.removeProperty("--color-input");
+    root.style.removeProperty("--color-ring");
+    root.style.removeProperty("--color-card");
+    root.style.removeProperty("--color-card-foreground");
+    root.style.removeProperty("--color-popover");
+    root.style.removeProperty("--color-popover-foreground");
+  };
+
   // Theme handling
   const handleThemeChange = useCallback(
     newTheme => {
+      // Clear custom theme styles when switching away from custom
+      if (newTheme !== "custom") {
+        clearCustomThemeStyles();
+      }
       setTheme(newTheme);
       localStorage.setItem("ascendara-theme", newTheme);
       handleSettingChange("theme", newTheme);
@@ -533,6 +584,204 @@ function Settings() {
   const groupedThemes = {
     light: themes.filter(t => t.group === "light"),
     dark: themes.filter(t => t.group === "dark"),
+  };
+
+  // Load custom colors from settings
+  useEffect(() => {
+    if (
+      settings.customTheme &&
+      Array.isArray(settings.customTheme) &&
+      settings.customTheme.length > 0
+    ) {
+      const customThemeObj = settings.customTheme[0];
+      if (customThemeObj) {
+        setCustomColors(customThemeObj);
+      }
+    }
+  }, [settings.customTheme]);
+
+  // Apply custom theme CSS variables when custom theme is active
+  useEffect(() => {
+    if (theme === "custom" && customColors) {
+      const root = document.documentElement;
+      root.style.setProperty("--color-background", customColors.background);
+      root.style.setProperty("--color-foreground", customColors.foreground);
+      root.style.setProperty("--color-primary", customColors.primary);
+      root.style.setProperty("--color-secondary", customColors.secondary);
+      root.style.setProperty("--color-muted", customColors.muted);
+      root.style.setProperty("--color-muted-foreground", customColors.mutedForeground);
+      root.style.setProperty("--color-accent", customColors.accent);
+      root.style.setProperty("--color-accent-foreground", customColors.accentForeground);
+      root.style.setProperty("--color-border", customColors.border);
+      root.style.setProperty("--color-input", customColors.input);
+      root.style.setProperty("--color-ring", customColors.ring);
+      root.style.setProperty("--color-card", customColors.card);
+      root.style.setProperty("--color-card-foreground", customColors.cardForeground);
+      root.style.setProperty("--color-popover", customColors.popover);
+      root.style.setProperty(
+        "--color-popover-foreground",
+        customColors.popoverForeground
+      );
+    }
+  }, [theme, customColors]);
+
+  // Helper to convert RGB string to hex
+  const rgbToHex = rgbString => {
+    const parts = rgbString.split(" ").map(Number);
+    if (parts.length !== 3) return "#000000";
+    return (
+      "#" +
+      parts
+        .map(x => {
+          const hex = x.toString(16);
+          return hex.length === 1 ? "0" + hex : hex;
+        })
+        .join("")
+    );
+  };
+
+  // Helper to convert hex to RGB string
+  const hexToRgb = hex => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!result) return "0 0 0";
+    return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`;
+  };
+
+  // Handle custom color change - only called on blur/change complete
+  const handleCustomColorChange = (colorKey, hexValue) => {
+    const rgbValue = hexToRgb(hexValue);
+    setCustomColors(prev => ({
+      ...prev,
+      [colorKey]: rgbValue,
+    }));
+  };
+
+  // ColorPickerInput component - native color picker with local state for smooth dragging
+  const ColorPickerInput = ({ colorKey, label, value }) => {
+    const [localColor, setLocalColor] = useState(rgbToHex(value));
+    const [localRgb, setLocalRgb] = useState(value);
+
+    // Sync local state when parent value changes (e.g., on import)
+    useEffect(() => {
+      setLocalColor(rgbToHex(value));
+      setLocalRgb(value);
+    }, [value]);
+
+    return (
+      <div className="flex items-center gap-3">
+        <input
+          type="color"
+          value={localColor}
+          onChange={e => {
+            setLocalColor(e.target.value);
+            setLocalRgb(hexToRgb(e.target.value));
+          }}
+          onBlur={() => handleCustomColorChange(colorKey, localColor)}
+          style={{
+            width: "56px",
+            height: "40px",
+            padding: 0,
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        />
+        <div className="flex-1">
+          <Label className="text-xs">{label}</Label>
+          <p className="text-xs text-muted-foreground">{localRgb}</p>
+        </div>
+      </div>
+    );
+  };
+
+  // Save custom colors and apply theme
+  const handleSaveCustomColors = async () => {
+    // Create the theme array
+    const themeArray = [{ ...customColors }];
+    console.log("Saving custom theme:", themeArray);
+
+    // Save custom theme array first using dedicated function
+    const success = await window.electron.saveCustomThemeColors(themeArray);
+    console.log("Save success:", success);
+
+    if (success) {
+      // Also save theme to "custom"
+      await window.electron.updateSetting("theme", "custom");
+
+      // Update React state without triggering full save
+      setTheme("custom");
+      localStorage.setItem("ascendara-theme", "custom");
+
+      setShowCustomColorsDialog(false);
+      toast.success(t("settings.customColorsSaved") || "Custom colors saved!");
+    } else {
+      toast.error("Failed to save custom theme");
+    }
+  };
+
+  // Export custom theme to file
+  const handleExportTheme = async () => {
+    const result = await window.electron.exportCustomTheme([customColors]);
+    if (result.success) {
+      toast.success(t("settings.themeExported") || "Theme exported successfully!");
+    } else if (!result.canceled) {
+      toast.error(
+        result.error || t("settings.themeExportFailed") || "Failed to export theme"
+      );
+    }
+  };
+
+  // Import custom theme from file
+  const handleImportTheme = async () => {
+    const result = await window.electron.importCustomTheme();
+    if (result.success && result.customTheme) {
+      setCustomColors(result.customTheme[0]);
+      toast.success(t("settings.themeImported") || "Theme imported successfully!");
+    } else if (!result.canceled) {
+      toast.error(
+        result.error || t("settings.themeImportFailed") || "Failed to import theme"
+      );
+    }
+  };
+
+  // Browse public themes
+  const handleBrowsePublicThemes = async () => {
+    setShowCustomColorsDialog(false);
+    setShowPublicThemesDialog(true);
+    setLoadingPublicThemes(true);
+    try {
+      const response = await fetch("https://api.ascendara.app/json/publicthemes");
+      const data = await response.json();
+      // Ensure we always have an array
+      let themesArray = [];
+      if (Array.isArray(data)) {
+        themesArray = data;
+      } else if (data && Array.isArray(data.themes)) {
+        themesArray = data.themes;
+      } else if (data && typeof data === "object") {
+        // If it's an object with theme entries, convert to array
+        themesArray = Object.values(data).filter(
+          item => item && typeof item === "object"
+        );
+      }
+      setPublicThemes(themesArray);
+    } catch (error) {
+      console.error("Error fetching public themes:", error);
+      toast.error(t("settings.publicThemesFailed") || "Failed to load public themes");
+      setPublicThemes([]);
+    } finally {
+      setLoadingPublicThemes(false);
+    }
+  };
+
+  // Apply a public theme
+  const handleApplyPublicTheme = themeColors => {
+    setCustomColors(themeColors);
+    setShowPublicThemesDialog(false);
+    setShowCustomColorsDialog(true);
+    toast.success(
+      t("settings.publicThemeApplied") || "Theme applied! Click Apply Colors to save."
+    );
   };
 
   // Check if in development mode
@@ -816,6 +1065,39 @@ function Settings() {
                 </h3>
                 <div>
                   <Label>{t("settings.themes")}</Label>
+
+                  {/* Custom Colors Button */}
+                  <div
+                    className={`mt-3 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent/50 ${theme === "custom" ? "border-primary bg-primary/5" : "border-border"}`}
+                    onClick={() => {
+                      setOriginalColorsOnOpen({ ...customColors });
+                      setShowCustomColorsDialog(true);
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-primary/20 to-accent/20">
+                        <Palette className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {t("settings.customColors") || "Custom Colors"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("settings.customColorsSubtitle") || "Create your own theme"}
+                        </p>
+                      </div>
+                    </div>
+                    {theme === "custom" ? (
+                      <div className="flex items-center gap-2 rounded-full bg-primary/10 px-2 py-1">
+                        <div className="h-2 w-2 rounded-full bg-primary" />
+                        <span className="text-xs font-medium text-primary">
+                          {t("settings.active") || "Active"}
+                        </span>
+                      </div>
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
                   <Accordion
                     type="single"
                     collapsible
@@ -2827,6 +3109,445 @@ function Settings() {
             >
               {t("settings.reload")}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Custom Colors Dialog */}
+      <AlertDialog open={showCustomColorsDialog}>
+        <AlertDialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <Palette />
+              {t("settings.customColors") || "Customize Theme"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {t("settings.customColorsDescription") ||
+                "Customize each color in your theme."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="grid grid-cols-1 gap-6 py-4 lg:grid-cols-2">
+            {/* Left Side - Color Pickers */}
+            <div className="space-y-4 overflow-y-auto pr-2" style={{ maxHeight: "60vh" }}>
+              {/* Background Colors */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-foreground">
+                  {t("settings.colorSection.backgrounds") || "Backgrounds"}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <ColorPickerInput
+                    colorKey="background"
+                    label={t("settings.color.background") || "Background"}
+                    value={customColors.background}
+                  />
+                  <ColorPickerInput
+                    colorKey="secondary"
+                    label={t("settings.color.secondary") || "Secondary"}
+                    value={customColors.secondary}
+                  />
+                  <ColorPickerInput
+                    colorKey="card"
+                    label={t("settings.color.card") || "Card"}
+                    value={customColors.card}
+                  />
+                  <ColorPickerInput
+                    colorKey="popover"
+                    label={t("settings.color.popover") || "Popover"}
+                    value={customColors.popover}
+                  />
+                </div>
+              </div>
+
+              {/* Text Colors */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-foreground">
+                  {t("settings.colorSection.text") || "Text Colors"}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <ColorPickerInput
+                    colorKey="foreground"
+                    label={t("settings.color.foreground") || "Foreground"}
+                    value={customColors.foreground}
+                  />
+                  <ColorPickerInput
+                    colorKey="mutedForeground"
+                    label={t("settings.color.mutedForeground") || "Muted Text"}
+                    value={customColors.mutedForeground}
+                  />
+                  <ColorPickerInput
+                    colorKey="cardForeground"
+                    label={t("settings.color.cardForeground") || "Card Text"}
+                    value={customColors.cardForeground}
+                  />
+                  <ColorPickerInput
+                    colorKey="popoverForeground"
+                    label={t("settings.color.popoverForeground") || "Popover Text"}
+                    value={customColors.popoverForeground}
+                  />
+                </div>
+              </div>
+
+              {/* Accent Colors */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-foreground">
+                  {t("settings.colorSection.accents") || "Accent Colors"}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <ColorPickerInput
+                    colorKey="primary"
+                    label={t("settings.color.primary") || "Primary"}
+                    value={customColors.primary}
+                  />
+                  <ColorPickerInput
+                    colorKey="accent"
+                    label={t("settings.color.accent") || "Accent"}
+                    value={customColors.accent}
+                  />
+                  <ColorPickerInput
+                    colorKey="accentForeground"
+                    label={t("settings.color.accentForeground") || "Accent Text"}
+                    value={customColors.accentForeground}
+                  />
+                  <ColorPickerInput
+                    colorKey="muted"
+                    label={t("settings.color.muted") || "Muted"}
+                    value={customColors.muted}
+                  />
+                </div>
+              </div>
+
+              {/* Border & Input Colors */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-foreground">
+                  {t("settings.colorSection.borders") || "Borders & Inputs"}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <ColorPickerInput
+                    colorKey="border"
+                    label={t("settings.color.border") || "Border"}
+                    value={customColors.border}
+                  />
+                  <ColorPickerInput
+                    colorKey="input"
+                    label={t("settings.color.input") || "Input"}
+                    value={customColors.input}
+                  />
+                  <ColorPickerInput
+                    colorKey="ring"
+                    label={t("settings.color.ring") || "Ring/Focus"}
+                    value={customColors.ring}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side - Live Preview */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground">
+                {t("settings.colorSection.preview") || "Live Preview"}
+              </h4>
+              <div
+                className="rounded-lg border p-4"
+                style={{
+                  backgroundColor: `rgb(${customColors.background})`,
+                  borderColor: `rgb(${customColors.border})`,
+                }}
+              >
+                {/* Card Preview */}
+                <div
+                  className="rounded-md border p-4"
+                  style={{
+                    backgroundColor: `rgb(${customColors.card})`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="text-base font-semibold"
+                    style={{ color: `rgb(${customColors.cardForeground})` }}
+                  >
+                    {t("settings.preview.cardTitle")}
+                  </p>
+                  <p
+                    className="mt-1 text-sm"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.cardDescription")}
+                  </p>
+
+                  {/* Buttons */}
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      className="rounded-md px-3 py-1.5 text-sm font-medium"
+                      style={{
+                        backgroundColor: `rgb(${customColors.primary})`,
+                        color: `rgb(${customColors.secondary})`,
+                      }}
+                    >
+                      {t("settings.preview.primaryButton")}
+                    </button>
+                    <button
+                      className="rounded-md border px-3 py-1.5 text-sm font-medium"
+                      style={{
+                        backgroundColor: `rgb(${customColors.secondary})`,
+                        borderColor: `rgb(${customColors.border})`,
+                        color: `rgb(${customColors.foreground})`,
+                      }}
+                    >
+                      {t("settings.preview.secondaryButton")}
+                    </button>
+                    <button
+                      className="rounded-md px-3 py-1.5 text-sm font-medium"
+                      style={{
+                        backgroundColor: `rgb(${customColors.accent})`,
+                        color: `rgb(${customColors.accentForeground})`,
+                      }}
+                    >
+                      {t("settings.preview.accentButton")}
+                    </button>
+                  </div>
+
+                  {/* Toggle Preview */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <div
+                      className="h-5 w-9 rounded-full p-0.5"
+                      style={{ backgroundColor: `rgb(${customColors.primary})` }}
+                    >
+                      <div
+                        className="h-4 w-4 rounded-full"
+                        style={{
+                          backgroundColor: `rgb(${customColors.card})`,
+                          marginLeft: "auto",
+                        }}
+                      />
+                    </div>
+                    <span
+                      style={{
+                        color: `rgb(${customColors.foreground})`,
+                        fontSize: "14px",
+                      }}
+                    >
+                      {t("settings.preview.toggleEnabled")}
+                    </span>
+                  </div>
+
+                  {/* Input Preview */}
+                  <div className="mt-4">
+                    <div
+                      className="rounded-md border px-3 py-2 text-sm"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background})`,
+                        borderColor: `rgb(${customColors.input})`,
+                        color: `rgb(${customColors.foreground})`,
+                      }}
+                    >
+                      {t("settings.preview.inputPlaceholder")}
+                    </div>
+                  </div>
+
+                  {/* Badge/Muted Preview */}
+                  <div className="mt-4 flex gap-2">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs"
+                      style={{
+                        backgroundColor: `rgb(${customColors.muted})`,
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      {t("settings.preview.badge")}
+                    </span>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs"
+                      style={{
+                        backgroundColor: `rgb(${customColors.accent})`,
+                        color: `rgb(${customColors.accentForeground})`,
+                      }}
+                    >
+                      {t("settings.preview.accentBadge")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Popover Preview */}
+                <div
+                  className="mt-3 rounded-md border p-3 shadow-sm"
+                  style={{
+                    backgroundColor: `rgb(${customColors.popover})`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: `rgb(${customColors.popoverForeground})` }}
+                  >
+                    {t("settings.preview.popoverTitle")}
+                  </p>
+                  <p
+                    className="text-xs"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.popoverDescription")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Browse Public Themes Button */}
+              <Button
+                variant="outline"
+                className="mt-3 w-full gap-2 text-primary"
+                onClick={handleBrowsePublicThemes}
+              >
+                <Globe className="h-4 w-4" />
+                {t("settings.browsePublicThemes") || "Browse Community Themes"}
+              </Button>
+            </div>
+          </div>
+
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImportTheme}
+                className="gap-1 text-primary"
+              >
+                <DownloadIcon className="h-4 w-4" />
+                {t("settings.importTheme") || "Import"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportTheme}
+                className="gap-1 text-primary"
+              >
+                <UploadIcon className="h-4 w-4" />
+                {t("settings.exportTheme") || "Export"}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={() => {
+                  if (originalColorsOnOpen) {
+                    setCustomColors(originalColorsOnOpen);
+                  }
+                  setShowCustomColorsDialog(false);
+                }}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button className="text-secondary" onClick={handleSaveCustomColors}>
+                {t("settings.applyCustomColors") || "Apply Colors"}
+              </Button>
+            </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Public Themes Dialog */}
+      <AlertDialog open={showPublicThemesDialog} onOpenChange={setShowPublicThemesDialog}>
+        <AlertDialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <Palette />
+              {t("settings.communityThemes") || "Community Themes"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {t("settings.communityThemesDescription") ||
+                "Browse and apply themes created by the community."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-4">
+            {loadingPublicThemes ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : publicThemes.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                {t("settings.noPublicThemes") || "No community themes available yet."}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {publicThemes.map((theme, index) => (
+                  <div
+                    key={index}
+                    className="cursor-pointer rounded-lg border border-border p-3 transition-all hover:border-primary hover:shadow-md"
+                    onClick={() => handleApplyPublicTheme(theme.colors || theme)}
+                  >
+                    {/* Theme Preview */}
+                    <div
+                      className="mb-2 rounded-md p-3"
+                      style={{
+                        backgroundColor: `rgb(${theme.colors?.background || theme.background})`,
+                      }}
+                    >
+                      <div
+                        className="rounded p-2"
+                        style={{
+                          backgroundColor: `rgb(${theme.colors?.card || theme.card})`,
+                        }}
+                      >
+                        <div
+                          className="mb-1 h-2 w-16 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.primary || theme.primary})`,
+                          }}
+                        />
+                        <div
+                          className="h-1.5 w-10 rounded opacity-50"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.foreground || theme.foreground})`,
+                          }}
+                        />
+                      </div>
+                      <div className="mt-2 flex gap-1">
+                        <div
+                          className="h-4 w-4 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.primary || theme.primary})`,
+                          }}
+                        />
+                        <div
+                          className="h-4 w-4 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.accent || theme.accent})`,
+                          }}
+                        />
+                        <div
+                          className="h-4 w-4 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.secondary || theme.secondary})`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium text-foreground">
+                      {theme.name || `Theme ${index + 1}`}
+                    </p>
+                    {theme.author && (
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.themeBy") || "by"} {theme.author}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => {
+                setShowPublicThemesDialog(false);
+                setShowCustomColorsDialog(true);
+              }}
+            >
+              {t("common.back") || "Back"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

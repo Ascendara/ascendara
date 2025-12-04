@@ -32,6 +32,7 @@ export function SettingsProvider({ children }) {
     endOnClose: false,
     language: "en",
     theme: "purple",
+    customTheme: [],
     threadCount: 12,
     singleStream: true,
     downloadLimit: 0,
@@ -77,6 +78,18 @@ export function SettingsProvider({ children }) {
       } catch (error) {
         console.error("Error saving settings:", error);
       }
+    },
+    [settings]
+  );
+
+  // Update local state only without saving to electron
+  const setSettingsLocal = useCallback(
+    newSettings => {
+      const updatedSettings =
+        typeof newSettings === "function"
+          ? newSettings(settings)
+          : { ...settings, ...newSettings };
+      setSettingsState(updatedSettings);
     },
     [settings]
   );
@@ -144,6 +157,7 @@ export function SettingsProvider({ children }) {
       value={{
         settings,
         setSettings,
+        setSettingsLocal,
         updateSetting,
       }}
     >

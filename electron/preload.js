@@ -222,6 +222,11 @@ contextBridge.exposeInMainWorld("electron", {
   reload: () => ipcRenderer.invoke("reload"),
   getLaunchCount: () => ipcRenderer.invoke("get-launch-count"),
   isBrokenVersion: () => ipcRenderer.invoke("is-broken-version"),
+  saveCustomThemeColors: customTheme =>
+    ipcRenderer.invoke("save-custom-theme-colors", customTheme),
+  exportCustomTheme: customTheme =>
+    ipcRenderer.invoke("export-custom-theme", customTheme),
+  importCustomTheme: () => ipcRenderer.invoke("import-custom-theme"),
   isOnWindows: () => ipcRenderer.invoke("is-on-windows"),
   getFullscreenState: () => ipcRenderer.invoke("get-fullscreen-state"),
   toggleFullscreen: () => ipcRenderer.invoke("toggle-fullscreen"),

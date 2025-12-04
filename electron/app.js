@@ -759,6 +759,7 @@ class SettingsManager {
       endOnClose: false,
       language: "en",
       theme: "purple",
+      customTheme: [],
       threadCount: 12,
       singleStream: true,
       downloadLimit: 0,
@@ -813,15 +814,24 @@ class SettingsManager {
       if (fs.existsSync(this.filePath)) {
         settings = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
       }
-      // Ensure all default settings exist
+      // Ensure all default settings exist, but preserve arrays like customTheme
       const mergedSettings = { ...this.defaultSettings };
       for (const [key, value] of Object.entries(settings)) {
         if (key in this.defaultSettings) {
-          mergedSettings[key] = value;
+          // For arrays, only use default if the saved value doesn't exist
+          // Don't replace a populated array with an empty default
+          if (Array.isArray(this.defaultSettings[key]) && Array.isArray(value)) {
+            mergedSettings[key] = value;
+          } else {
+            mergedSettings[key] = value;
+          }
         }
       }
-      // Save if any default settings were missing
-      if (JSON.stringify(settings) !== JSON.stringify(mergedSettings)) {
+      // Save if any default settings were missing (but don't save just to reset arrays)
+      const settingsChanged = Object.keys(this.defaultSettings).some(
+        key => !(key in settings)
+      );
+      if (settingsChanged) {
         fs.writeFileSync(this.filePath, JSON.stringify(mergedSettings, null, 2));
       }
       return mergedSettings;
@@ -833,8 +843,12 @@ class SettingsManager {
 
   saveSettings(settings) {
     try {
-      // Merge with existing settings to prevent overwriting
-      const existingSettings = this.loadSettings();
+      // Read existing settings directly from file to avoid loadSettings() side effects
+      let existingSettings = {};
+      if (fs.existsSync(this.filePath)) {
+        existingSettings = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
+      }
+
       const mergedSettings = {
         ...existingSettings,
         ...settings,
@@ -858,8 +872,11 @@ class SettingsManager {
 
   updateSetting(key, value) {
     try {
-      // Load current settings to ensure we have the latest
-      const currentSettings = this.loadSettings();
+      // Read current settings directly from file to avoid loadSettings() side effects
+      let currentSettings = {};
+      if (fs.existsSync(this.filePath)) {
+        currentSettings = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
+      }
 
       // Encrypt value if it's a sensitive key
       const processedValue = this.sensitiveKeys.includes(key) ? encrypt(value) : value;
@@ -1730,6 +1747,113 @@ ipcMain.handle("is-downloader-running", async () => {
 ipcMain.handle("is-broken-version", () => {
   return isBrokenVersion;
 });
+
+// Save custom theme to settings
+ipcMain.handle("save-custom-theme-colors", async (event, customTheme) => {
+  try {
+    console.log("Saving custom theme:", JSON.stringify(customTheme));
+
+    // Directly read, modify, and write the settings file
+    const filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
+    const existingSettings = fs.readJsonSync(filePath);
+    existingSettings.customTheme = customTheme;
+    fs.writeJsonSync(filePath, existingSettings, { spaces: 2 });
+
+    // Update the settings manager's internal state
+    settingsManager.settings = existingSettings;
+
+    console.log("Save result: true");
+    console.log("Saved customTheme:", JSON.stringify(existingSettings.customTheme));
+    return true;
+  } catch (error) {
+    console.error("Error saving custom theme:", error);
+    return false;
+  }
+});
+
+// Export custom theme to JSON file
+ipcMain.handle("export-custom-theme", async (event, customTheme) => {
+  try {
+    const result = await dialog.showSaveDialog({
+      title: "Export Custom Theme",
+      defaultPath: "ascendaratheme.json",
+      filters: [{ name: "JSON Files", extensions: ["json"] }],
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+
+    const themeData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      customTheme: customTheme,
+    };
+
+    await fs.writeJson(result.filePath, themeData, { spaces: 2 });
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    console.error("Error exporting custom theme:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Import custom theme from JSON file
+ipcMain.handle("import-custom-theme", async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: "Import Custom Theme",
+      filters: [{ name: "JSON Files", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+
+    const filePath = result.filePaths[0];
+    const themeData = await fs.readJson(filePath);
+
+    // Validate the imported data
+    if (
+      !themeData.customTheme ||
+      !Array.isArray(themeData.customTheme) ||
+      themeData.customTheme.length === 0
+    ) {
+      return { success: false, error: "Invalid theme file format" };
+    }
+
+    const customColors = themeData.customTheme[0];
+    const requiredKeys = [
+      "background",
+      "foreground",
+      "primary",
+      "secondary",
+      "muted",
+      "mutedForeground",
+      "accent",
+      "accentForeground",
+      "border",
+      "input",
+      "ring",
+      "card",
+      "cardForeground",
+      "popover",
+      "popoverForeground",
+    ];
+
+    const hasAllKeys = requiredKeys.every(key => customColors.hasOwnProperty(key));
+    if (!hasAllKeys) {
+      return { success: false, error: "Theme file is missing required color values" };
+    }
+
+    return { success: true, customTheme: themeData.customTheme };
+  } catch (error) {
+    console.error("Error importing custom theme:", error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle("enable-game-auto-backups", async (event, game, isCustom) => {
   const filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
   try {
