@@ -151,8 +151,9 @@ class GofileDownloader:
         self._token = self._getToken()
         self._lock = Lock()
         self._rate_window = []  # Store recent rate measurements
-        self._rate_window_size = 5  # Number of measurements to average
+        self._rate_window_size = 20  # Number of measurements to average (10 seconds at 0.5s intervals)
         self._last_progress = 0  # Track highest progress
+        self._download_start_time = 0  # Track when download started for overall speed calc
         self._current_file_progress = {}  # Track progress per file
         self._total_downloaded = 0  # Track total bytes downloaded
         self._total_size = 0  # Track total bytes to download
@@ -472,24 +473,30 @@ class GofileDownloader:
                                     self._last_progress = progress
                                 else:
                                     progress = 0
+                                 
+                                # Calculate current rate from this interval
+                                interval_rate = bytes_since_last_update / (current_time - last_update)
                                 
-                                # Calculate current rate
-                                current_rate = bytes_since_last_update / (current_time - last_update)
-                                
-                                # Update rate window
-                                self._rate_window.append(current_rate)
+                                # Update rate window with interval rate
+                                self._rate_window.append(interval_rate)
                                 if len(self._rate_window) > self._rate_window_size:
                                     self._rate_window.pop(0)
                                 
-                                # Use average rate for smoother updates
-                                avg_rate = sum(self._rate_window) / len(self._rate_window)
+                                # Calculate overall average speed from session start for stability
+                                session_elapsed = current_time - start_time
+                                overall_rate = bytes_downloaded / session_elapsed if session_elapsed > 0 else 0
+                                
+                                # Blend: 70% overall rate + 30% recent window average for smooth but responsive display
+                                window_avg = sum(self._rate_window) / len(self._rate_window) if self._rate_window else 0
+                                display_rate = (overall_rate * 0.7) + (window_avg * 0.3)
+                                
                                 remaining_bytes = self._total_size - self._total_downloaded
-                                eta = int(remaining_bytes / avg_rate) if avg_rate > 0 else 0
+                                eta = int(remaining_bytes / display_rate) if display_rate > 0 else 0
                                 
                                 self._update_progress(
                                     file_info["filename"], 
                                     progress,
-                                    avg_rate,
+                                    display_rate,
                                     eta
                                 )
                                 
@@ -563,23 +570,23 @@ class GofileDownloader:
             
             # Format ETA with improved granularity
             if done:
-                eta = "0 seconds"
+                eta = "0s"
             elif eta_seconds <= 0:
                 eta = "calculating..."
             elif eta_seconds < 60:
-                eta = f"{int(eta_seconds)} seconds"
+                eta = f"{int(eta_seconds)}s"
             elif eta_seconds < 3600:
                 minutes = int(eta_seconds / 60)
                 seconds = int(eta_seconds % 60)
-                eta = f"{minutes} minutes, {seconds} seconds"
+                eta = f"{minutes}m {seconds}s"
             elif eta_seconds < 86400:
                 hours = int(eta_seconds / 3600)
                 minutes = int((eta_seconds % 3600) / 60)
-                eta = f"{hours} hours, {minutes} minutes"
+                eta = f"{hours}h {minutes}m"
             else:
                 days = int(eta_seconds / 86400)
                 hours = int((eta_seconds % 86400) / 3600)
-                eta = f"{days}d, {hours}h"
+                eta = f"{days}d {hours}h"
             
             self.game_info["downloadingData"]["timeUntilComplete"] = eta
             
@@ -684,14 +691,25 @@ class GofileDownloader:
                             elif file.endswith('.rar'):
                                 from unrar import rarfile
                                 with rarfile.RarFile(archive_path, 'r') as rar_ref:
-                                    # Get file list before extraction
+                                    # Extract all files first
+                                    try:
+                                        rar_ref.extractall(extract_dir)
+                                    except OSError as extract_error:
+                                        # Handle long path issues on Windows
+                                        logging.warning(f"[AscendaraGofileHelper] extractall failed: {extract_error}, trying file-by-file extraction")
+                                        for rar_info in rar_ref.infolist():
+                                            try:
+                                                rar_ref.extract(rar_info, extract_dir)
+                                            except OSError as file_error:
+                                                logging.warning(f"[AscendaraGofileHelper] Could not extract {rar_info.filename}: {file_error}")
+                                                continue
+                                    # Build watching data after extraction
                                     for rar_info in rar_ref.infolist():
-                                        if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:  # Skip .url files and _CommonRedist
+                                        if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:
                                             extracted_path = os.path.join(extract_dir, rar_info.filename)
-                                            key = f"{os.path.relpath(extracted_path, self.download_dir)}"
-                                            watching_data[key] = {"size": rar_info.file_size}
-                                    # Extract all files
-                                    rar_ref.extractall(extract_dir)
+                                            if os.path.exists(extracted_path):
+                                                key = f"{os.path.relpath(extracted_path, self.download_dir)}"
+                                                watching_data[key] = {"size": rar_info.file_size}
                         else:
                             # For non-Windows, use appropriate extraction tool
                             try:
@@ -754,6 +772,12 @@ class GofileDownloader:
                             except Exception as e:
                                 logging.error(f"Error during extraction on non-Windows system: {str(e)}")
                                 raise
+                        # Delete archive after successful extraction
+                        try:
+                            os.remove(archive_path)
+                            logging.info(f"[AscendaraGofileHelper] Deleted archive: {archive_path}")
+                        except Exception as del_e:
+                            logging.warning(f"[AscendaraGofileHelper] Could not delete archive {archive_path}: {del_e}")
                     except Exception as e:
                         logging.error(f"[AscendaraGofileHelper] Error extracting {archive_path}: {str(e)}")
                         continue
