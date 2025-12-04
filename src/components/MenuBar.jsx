@@ -294,6 +294,13 @@ const MenuBar = () => {
           </span>
         )}
 
+        {isDev && (
+          <span className="ml-2 flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1 py-0.5 text-[14px] text-blue-500">
+            <Hammer className="h-3 w-3" />
+            {t("app.runningInDev")}
+          </span>
+        )}
+
         {/* Show downloading update badge when downloading */}
         {isDownloadingUpdate && (
           <div className="ml-2 flex items-center gap-2">
@@ -338,6 +345,18 @@ const MenuBar = () => {
           </div>
         )}
         <div className="flex-1" />
+        {isDev && (
+          <div className="ml-2 flex items-center">
+            <button
+              onClick={handleExportSvg}
+              className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500 transition-colors hover:bg-blue-500/20"
+              style={{ WebkitAppRegion: "no-drag" }}
+            >
+              <Download className="h-3 w-3" />
+              {t("app.exportSvg", "Export SVG")}
+            </button>
+          </div>
+        )}
       </div>
       {!leftSideActions && (
         <div className="window-controls mr-2 flex items-center">
