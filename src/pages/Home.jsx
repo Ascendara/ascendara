@@ -270,7 +270,10 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
   );
 });
 
-// Horizontal Scroll Section Component
+// Horizontal Scroll Section Component with lazy loading
+const INITIAL_LOAD_COUNT = 12;
+const LOAD_MORE_COUNT = 12;
+
 const HorizontalSection = ({
   title,
   icon: Icon,
@@ -281,24 +284,57 @@ const HorizontalSection = ({
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [loadedCount, setLoadedCount] = useState(INITIAL_LOAD_COUNT);
 
-  const checkScroll = () => {
+  // Reset loaded count when games change
+  useEffect(() => {
+    setLoadedCount(INITIAL_LOAD_COUNT);
+  }, [games]);
+
+  const visibleGames = games?.slice(0, loadedCount) || [];
+  const hasMoreGames = games?.length > loadedCount;
+
+  const checkScroll = useCallback(() => {
     if (scrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
       setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+      // Can scroll right if there's more content OR more games to load
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10 || hasMoreGames);
     }
-  };
+  }, [hasMoreGames]);
 
-  const scroll = direction => {
-    if (scrollRef.current) {
-      const scrollAmount = 600;
-      scrollRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
+  const loadMore = useCallback(() => {
+    if (hasMoreGames) {
+      setLoadedCount(prev => Math.min(prev + LOAD_MORE_COUNT, games.length));
     }
-  };
+  }, [hasMoreGames, games?.length]);
+
+  const scroll = useCallback(
+    direction => {
+      if (scrollRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+        const scrollAmount = 600;
+
+        if (direction === "right") {
+          // Check if we're near the end and need to load more
+          const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 100;
+          if (isNearEnd && hasMoreGames) {
+            loadMore();
+          }
+          scrollRef.current.scrollBy({
+            left: scrollAmount,
+            behavior: "smooth",
+          });
+        } else {
+          scrollRef.current.scrollBy({
+            left: -scrollAmount,
+            behavior: "smooth",
+          });
+        }
+      }
+    },
+    [hasMoreGames, loadMore]
+  );
 
   useEffect(() => {
     checkScroll();
@@ -307,7 +343,7 @@ const HorizontalSection = ({
       ref.addEventListener("scroll", checkScroll);
       return () => ref.removeEventListener("scroll", checkScroll);
     }
-  }, [games]);
+  }, [visibleGames, checkScroll]);
 
   if (!games?.length) return null;
 
@@ -327,7 +363,8 @@ const HorizontalSection = ({
           </div>
           <h2 className="text-lg font-bold text-foreground">{title}</h2>
           <span className="mb-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-            {games.length}
+            {visibleGames.length}
+            {hasMoreGames ? "+" : ""}
           </span>
         </div>
 
@@ -365,7 +402,7 @@ const HorizontalSection = ({
         className="scrollbar-hide flex gap-4 overflow-x-auto pb-2"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {games.map(game => (
+        {visibleGames.map(game => (
           <CompactGameCard
             key={game.game}
             game={game}
@@ -384,6 +421,7 @@ const Home = memo(() => {
   const [loading, setLoading] = useState(true);
   const [carouselGames, setCarouselGames] = useState([]);
   const [topGames, setTopGames] = useState([]);
+  const [recentlyUpdatedGames, setRecentlyUpdatedGames] = useState([]);
   const [onlineGames, setOnlineGames] = useState([]);
   const [actionGames, setActionGames] = useState([]);
   const [popularCategories, setPopularCategories] = useState({});
@@ -557,9 +595,10 @@ const Home = memo(() => {
   }, [installedGames, apiGames]);
 
   useEffect(() => {
-    // Get game sections first
+    // Get game sections
     const {
       topGames: topSection,
+      recentlyUpdatedGames: recentlyUpdatedSection,
       onlineGames: onlineSection,
       actionGames: actionSection,
       usedGames,
@@ -568,65 +607,54 @@ const Home = memo(() => {
     // Then get popular categories, passing the used games set
     const popularCats = getPopularCategories(apiGames, usedGames);
 
-    // Update state based on source
-    const source = settings?.gameSource || "steamrip";
-    if (source === "fitgirl") {
-      // For fitgirl, track used games to avoid duplicates
-      const usedGames = new Set([...recentGames.map(g => g.game)]);
-
-      // Get online games first
-      const onlineGamesSection = apiGames
-        .filter(game => game.online && !usedGames.has(game.game))
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 6);
-
-      // Add online games to used set
-      onlineGamesSection.forEach(game => usedGames.add(game.game));
-
-      // Then get random non-online games, excluding used ones
-      const randomGamesSection = apiGames
-        .filter(game => !game.online && !usedGames.has(game.game))
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 6);
-
-      setTopGames(randomGamesSection);
-      setOnlineGames(onlineGamesSection);
-      setActionGames([]);
-      setPopularCategories({});
-    } else {
-      // For steamrip, show all sections
-      setTopGames(topSection);
-      setOnlineGames(onlineSection);
-      setActionGames(actionSection);
-      setPopularCategories(popularCats);
-    }
-  }, [apiGames, settings?.gameSource, recentGames]);
+    setTopGames(topSection);
+    setRecentlyUpdatedGames(recentlyUpdatedSection);
+    setOnlineGames(onlineSection);
+    setActionGames(actionSection);
+    setPopularCategories(popularCats);
+  }, [apiGames]);
 
   const getGameSections = games => {
-    if (!Array.isArray(games)) return { topGames: [], onlineGames: [], actionGames: [] };
+    if (!Array.isArray(games))
+      return {
+        topGames: [],
+        recentlyUpdatedGames: [],
+        onlineGames: [],
+        actionGames: [],
+        usedGames: new Set(),
+      };
 
     // Create a shared Set to track used games across all sections
     const usedGames = new Set();
 
-    // Get top games first (they get priority)
+    // Get top games first (they get priority) - only top 100 by weight
     const topGamesSection = games
       .filter(game => parseInt(game.weight || 0) > 30)
       .sort((a, b) => parseInt(b.weight || 0) - parseInt(a.weight || 0))
-      .slice(0, 6);
+      .slice(0, 100);
 
-    // Add top games to used set
+    // Mark top games as used
     topGamesSection.forEach(game => usedGames.add(game.game));
 
-    // Get online games, excluding used ones
+    // Get recently updated games, excluding already used games - limit to 100
+    const recentlyUpdatedSection = games
+      .filter(game => !!game.latest_update && !usedGames.has(game.game))
+      .sort((a, b) => new Date(b.latest_update) - new Date(a.latest_update))
+      .slice(0, 100);
+
+    // Mark recently updated games as used
+    recentlyUpdatedSection.forEach(game => usedGames.add(game.game));
+
+    // Get online games, excluding already used games - limit to 100
     const onlineGamesSection = games
       .filter(game => game.online && !usedGames.has(game.game))
       .sort((a, b) => parseInt(b.weight || 0) - parseInt(a.weight || 0))
-      .slice(0, 6);
+      .slice(0, 100);
 
-    // Add online games to used set
+    // Mark online games as used
     onlineGamesSection.forEach(game => usedGames.add(game.game));
 
-    // Get action games, excluding used ones
+    // Get action games, excluding already used games - limit to 100
     const actionGamesSection = games
       .filter(
         game =>
@@ -637,13 +665,14 @@ const Home = memo(() => {
           !usedGames.has(game.game)
       )
       .sort((a, b) => parseInt(b.weight || 0) - parseInt(a.weight || 0))
-      .slice(0, 6);
+      .slice(0, 100);
 
-    // Add action games to used set
+    // Mark action games as used
     actionGamesSection.forEach(game => usedGames.add(game.game));
 
     return {
       topGames: topGamesSection,
+      recentlyUpdatedGames: recentlyUpdatedSection,
       onlineGames: onlineGamesSection,
       actionGames: actionGamesSection,
       usedGames, // Return the set of used games for use in getPopularCategories
@@ -873,12 +902,6 @@ const Home = memo(() => {
     },
     [isDragging, handleMouseUp]
   );
-
-  // Get recently updated games
-  const recentlyUpdatedGames = apiGames
-    .filter(game => !!game.latest_update)
-    .sort((a, b) => new Date(b.latest_update) - new Date(a.latest_update))
-    .slice(0, 10);
 
   // Loading State
   if (loading) {
@@ -1133,11 +1156,7 @@ const Home = memo(() => {
         {/* Top Games - Horizontal Scroll */}
         {topGames.length > 0 && (
           <HorizontalSection
-            title={
-              settings?.gameSource === "fitgirl"
-                ? t("home.randomGames")
-                : t("home.topGames")
-            }
+            title={t("home.topGames")}
             icon={TrendingUp}
             games={topGames}
             onGameClick={handleCarouselGameClick}
@@ -1169,7 +1188,7 @@ const Home = memo(() => {
         )}
 
         {/* Action Games - Horizontal Scroll */}
-        {settings?.gameSource !== "fitgirl" && actionGames.length > 0 && (
+        {actionGames.length > 0 && (
           <div className="mt-8">
             <HorizontalSection
               title={t("home.actionGames")}
@@ -1181,53 +1200,52 @@ const Home = memo(() => {
         )}
 
         {/* Popular Categories - Grid of Cards */}
-        {settings?.gameSource !== "fitgirl" &&
-          Object.keys(popularCategories).length > 0 && (
-            <section className="mt-10">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                  <Flame className="h-4 w-4 text-primary" />
-                </div>
-                <h2 className="text-lg font-bold text-foreground">
-                  {t("home.popularCategories")}
-                </h2>
+        {Object.keys(popularCategories).length > 0 && (
+          <section className="mt-10">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                <Flame className="h-4 w-4 text-primary" />
               </div>
+              <h2 className="text-lg font-bold text-foreground">
+                {t("home.popularCategories")}
+              </h2>
+            </div>
 
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {Object.entries(popularCategories).map(([category, games]) => (
-                  <Card
-                    key={category}
-                    className="group overflow-hidden border-border/50 bg-gradient-to-br from-card to-card/50 transition-all hover:border-primary/30 hover:shadow-xl"
-                  >
-                    <CardContent className="p-5">
-                      <div className="mb-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                            <Gamepad2 className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-foreground">{category}</h3>
-                            <p className="text-xs text-muted-foreground">
-                              {games.length} games
-                            </p>
-                          </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Object.entries(popularCategories).map(([category, games]) => (
+                <Card
+                  key={category}
+                  className="group overflow-hidden border-border/50 bg-gradient-to-br from-card to-card/50 transition-all hover:border-primary/30 hover:shadow-xl"
+                >
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                          <Gamepad2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-foreground">{category}</h3>
+                          <p className="text-xs text-muted-foreground">
+                            {games.length} games
+                          </p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        {games.slice(0, 4).map(game => (
-                          <MiniGameCard
-                            key={game.game}
-                            game={game}
-                            onClick={() => handleCarouselGameClick(game)}
-                          />
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {games.slice(0, 4).map(game => (
+                        <MiniGameCard
+                          key={game.game}
+                          game={game}
+                          onClick={() => handleCarouselGameClick(game)}
+                        />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Footer - Support Section */}
         <footer className="mt-16 border-t border-border/30 pb-8 pt-10">
