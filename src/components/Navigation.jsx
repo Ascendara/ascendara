@@ -13,6 +13,8 @@ import {
   Package,
   User,
   ServerIcon,
+  ArrowBigDown,
+  CircleArrowDown,
 } from "lucide-react";
 
 const Navigation = memo(({ items }) => {
@@ -122,7 +124,7 @@ const Navigation = memo(({ items }) => {
       {
         path: "/downloads",
         label: t("common.downloads"),
-        icon: Download,
+        icon: CircleArrowDown,
         color: "from-orange-500 to-amber-400",
       },
       {
