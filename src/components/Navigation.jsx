@@ -13,6 +13,8 @@ import {
   Package,
   User,
   ServerIcon,
+  ArrowBigDown,
+  CircleArrowDown,
 } from "lucide-react";
 
 const Navigation = memo(({ items }) => {
@@ -122,7 +124,7 @@ const Navigation = memo(({ items }) => {
       {
         path: "/downloads",
         label: t("common.downloads"),
-        icon: Download,
+        icon: CircleArrowDown,
         color: "from-orange-500 to-amber-400",
       },
       {
@@ -273,9 +275,9 @@ const Navigation = memo(({ items }) => {
                     }`}
                   >
                     <item.icon className="h-5 w-5" />
-                    {item.icon === Download && downloadCount > 0 && (
-                      <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                        <span className="mb-0.5">{downloadCount}</span>
+                    {item.icon === CircleArrowDown && downloadCount > 0 && (
+                      <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
+                        {downloadCount}
                       </div>
                     )}
                   </div>

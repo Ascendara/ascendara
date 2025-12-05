@@ -66,6 +66,15 @@ def read_size(size, decimal_places=2):
 NEW_LINE = "\n" if sys.platform != "Windows" else "\r\n"
 IS_DEV = False  # Development mode flag
 
+def long_path(path):
+    """Convert a path to extended-length format on Windows to support paths > 260 chars.
+    Uses the \\\\?\\ prefix which allows paths up to ~32,767 characters."""
+    if sys.platform == "win32" and path and not path.startswith("\\\\?\\"):
+        # Convert to absolute path first, then add prefix
+        abs_path = os.path.abspath(path)
+        return "\\\\?\\" + abs_path
+    return path
+
 def _launch_crash_reporter_on_exit(error_code, error_message):
     try:
         crash_reporter_path = os.path.join('./AscendaraCrashReporter.exe')
@@ -110,22 +119,50 @@ def safe_write_json(filepath, data):
     temp_dir = os.path.dirname(filepath)
     temp_file_path = None
     try:
-        with NamedTemporaryFile('w', delete=False, dir=temp_dir) as temp_file:
+        # Use a unique suffix to avoid conflicts with other temp files
+        with NamedTemporaryFile('w', delete=False, dir=temp_dir, suffix='.json.tmp', prefix='ascendara_') as temp_file:
             json.dump(data, temp_file, indent=4)
             temp_file_path = temp_file.name
-        retry_attempts = 3
+        retry_attempts = 5
         for attempt in range(retry_attempts):
             try:
                 os.replace(temp_file_path, filepath)
-                break
+                return  # Success
             except PermissionError as e:
                 if attempt < retry_attempts - 1:
-                    time.sleep(1)
+                    time.sleep(0.5)
                 else:
-                    raise e
+                    # Last resort: try direct write if atomic replace keeps failing
+                    logging.warning(f"[AscendaraGofileHelper] Atomic write failed, falling back to direct write: {e}")
+                    try:
+                        with open(filepath, 'w') as f:
+                            json.dump(data, f, indent=4)
+                        return
+                    except Exception as fallback_e:
+                        logging.error(f"[AscendaraGofileHelper] Direct write also failed: {fallback_e}")
+                        raise e
+            except OSError as e:
+                if attempt < retry_attempts - 1:
+                    time.sleep(0.5)
+                else:
+                    # Last resort: try direct write
+                    logging.warning(f"[AscendaraGofileHelper] Atomic write failed with OSError, falling back to direct write: {e}")
+                    try:
+                        with open(filepath, 'w') as f:
+                            json.dump(data, f, indent=4)
+                        return
+                    except Exception as fallback_e:
+                        logging.error(f"[AscendaraGofileHelper] Direct write also failed: {fallback_e}")
+                        raise e
+    except Exception as e:
+        logging.error(f"[AscendaraGofileHelper] Error in safe_write_json: {e}")
+        raise
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+            try:
+                os.remove(temp_file_path)
+            except:
+                pass  # Ignore cleanup errors
 
 def sanitize_folder_name(name):
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
@@ -151,8 +188,9 @@ class GofileDownloader:
         self._token = self._getToken()
         self._lock = Lock()
         self._rate_window = []  # Store recent rate measurements
-        self._rate_window_size = 5  # Number of measurements to average
+        self._rate_window_size = 20  # Number of measurements to average (10 seconds at 0.5s intervals)
         self._last_progress = 0  # Track highest progress
+        self._download_start_time = 0  # Track when download started for overall speed calc
         self._current_file_progress = {}  # Track progress per file
         self._total_downloaded = 0  # Track total bytes downloaded
         self._total_size = 0  # Track total bytes to download
@@ -218,7 +256,14 @@ class GofileDownloader:
                     "updating": updateFlow,
                     "progressCompleted": "0.00",
                     "progressDownloadSpeeds": "0.00 KB/s",
-                    "timeUntilComplete": "0s"
+                    "timeUntilComplete": "0s",
+                    "extractionProgress": {
+                        "currentFile": "",
+                        "filesExtracted": 0,
+                        "totalFiles": 0,
+                        "percentComplete": "0.00",
+                        "extractionSpeed": "0 files/s"
+                    }
                 }
             }
         safe_write_json(self.game_info_path, self.game_info)
@@ -472,24 +517,30 @@ class GofileDownloader:
                                     self._last_progress = progress
                                 else:
                                     progress = 0
+                                 
+                                # Calculate current rate from this interval
+                                interval_rate = bytes_since_last_update / (current_time - last_update)
                                 
-                                # Calculate current rate
-                                current_rate = bytes_since_last_update / (current_time - last_update)
-                                
-                                # Update rate window
-                                self._rate_window.append(current_rate)
+                                # Update rate window with interval rate
+                                self._rate_window.append(interval_rate)
                                 if len(self._rate_window) > self._rate_window_size:
                                     self._rate_window.pop(0)
                                 
-                                # Use average rate for smoother updates
-                                avg_rate = sum(self._rate_window) / len(self._rate_window)
+                                # Calculate overall average speed from session start for stability
+                                session_elapsed = current_time - start_time
+                                overall_rate = bytes_downloaded / session_elapsed if session_elapsed > 0 else 0
+                                
+                                # Blend: 70% overall rate + 30% recent window average for smooth but responsive display
+                                window_avg = sum(self._rate_window) / len(self._rate_window) if self._rate_window else 0
+                                display_rate = (overall_rate * 0.7) + (window_avg * 0.3)
+                                
                                 remaining_bytes = self._total_size - self._total_downloaded
-                                eta = int(remaining_bytes / avg_rate) if avg_rate > 0 else 0
+                                eta = int(remaining_bytes / display_rate) if display_rate > 0 else 0
                                 
                                 self._update_progress(
                                     file_info["filename"], 
                                     progress,
-                                    avg_rate,
+                                    display_rate,
                                     eta
                                 )
                                 
@@ -563,23 +614,23 @@ class GofileDownloader:
             
             # Format ETA with improved granularity
             if done:
-                eta = "0 seconds"
+                eta = "0s"
             elif eta_seconds <= 0:
                 eta = "calculating..."
             elif eta_seconds < 60:
-                eta = f"{int(eta_seconds)} seconds"
+                eta = f"{int(eta_seconds)}s"
             elif eta_seconds < 3600:
                 minutes = int(eta_seconds / 60)
                 seconds = int(eta_seconds % 60)
-                eta = f"{minutes} minutes, {seconds} seconds"
+                eta = f"{minutes}m {seconds}s"
             elif eta_seconds < 86400:
                 hours = int(eta_seconds / 3600)
                 minutes = int((eta_seconds % 3600) / 60)
-                eta = f"{hours} hours, {minutes} minutes"
+                eta = f"{hours}h {minutes}m"
             else:
                 days = int(eta_seconds / 86400)
                 hours = int((eta_seconds % 86400) / 3600)
-                eta = f"{days}d, {hours}h"
+                eta = f"{days}d {hours}h"
             
             self.game_info["downloadingData"]["timeUntilComplete"] = eta
             
@@ -588,6 +639,22 @@ class GofileDownloader:
             else:
                 print(f"\rDownloading {filename}: {progress:.1f}% {format_speed(rate)} ETA: {eta}", end="")
             
+            safe_write_json(self.game_info_path, self.game_info)
+
+    def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int):
+        """Update extraction progress in the game info JSON."""
+        with self._lock:
+            elapsed = time.time() - self._extraction_start_time
+            speed = files_extracted / elapsed if elapsed > 0 else 0
+            percent = (files_extracted / total_files * 100) if total_files > 0 else 0
+            
+            self.game_info["downloadingData"]["extractionProgress"] = {
+                "currentFile": current_file[:50] + "..." if len(current_file) > 50 else current_file,
+                "filesExtracted": files_extracted,
+                "totalFiles": total_files,
+                "percentComplete": f"{percent:.2f}",
+                "extractionSpeed": f"{speed:.1f} files/s" if speed >= 1 else f"{speed:.2f} files/s"
+            }
             safe_write_json(self.game_info_path, self.game_info)
 
     def _check_extraction_tools(self):
@@ -640,7 +707,19 @@ class GofileDownloader:
 
     def _extract_files(self):
         self.game_info["downloadingData"]["extracting"] = True
+        # Initialize extraction progress tracking
+        self.game_info["downloadingData"]["extractionProgress"] = {
+            "currentFile": "",
+            "filesExtracted": 0,
+            "totalFiles": 0,
+            "percentComplete": "0.00",
+            "extractionSpeed": "0 files/s"
+        }
         safe_write_json(self.game_info_path, self.game_info)
+        
+        # Track extraction timing
+        self._extraction_start_time = time.time()
+        self._files_extracted_count = 0
 
         # Check if extraction tools are available
         if not self._check_extraction_tools():
@@ -658,124 +737,228 @@ class GofileDownloader:
         watching_path = os.path.join(self.download_dir, "filemap.ascendara.json")
         watching_data = {}
         self.archive_paths = []  # Store archive paths as instance variable
-        # First extract all archives
+        
+        # First, count total files across all archives for progress tracking
+        total_files_to_extract = 0
+        archives_to_process = []
         for root, _, files in os.walk(self.download_dir):
             for file in files:
                 if file.endswith(('.zip', '.rar')):
                     archive_path = os.path.join(root, file)
-                    # Store the archive path for later cleanup
+                    archives_to_process.append((archive_path, file))
                     self.archive_paths.append(archive_path)
-                    # Always extract to the game directory instead of the archive's directory
-                    extract_dir = self.download_dir
-                    logging.info(f"[AscendaraGofileHelper] Extracting {archive_path}")
-                    
                     try:
-                        # check os
-                        if sys.platform == "win32":
-                            if file.endswith('.zip'):
-                                with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                                    for zip_info in zip_ref.infolist():
-                                        if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename:  # Skip .url files and _CommonRedist
-                                            extracted_path = os.path.join(extract_dir, zip_info.filename)
-                                            zip_ref.extract(zip_info, extract_dir)
-                                            # Add to watching data
-                                            key = f"{os.path.relpath(extracted_path, self.download_dir)}"
-                                            watching_data[key] = {"size": zip_info.file_size}
-                            elif file.endswith('.rar'):
-                                from unrar import rarfile
-                                with rarfile.RarFile(archive_path, 'r') as rar_ref:
-                                    # Get file list before extraction
-                                    for rar_info in rar_ref.infolist():
-                                        if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:  # Skip .url files and _CommonRedist
-                                            extracted_path = os.path.join(extract_dir, rar_info.filename)
-                                            key = f"{os.path.relpath(extracted_path, self.download_dir)}"
-                                            watching_data[key] = {"size": rar_info.file_size}
-                                    # Extract all files
-                                    rar_ref.extractall(extract_dir)
-                        else:
-                            # For non-Windows, use appropriate extraction tool
-                            try:
-                                # Create a temporary directory for extraction
-                                import tempfile
-                                with tempfile.TemporaryDirectory() as temp_dir:
-                                    if file.endswith('.rar'):
-                                        if sys.platform == "darwin":
-                                            # Use unar on macOS
-                                            unar_cmd = ['unar', '-force-overwrite', '-o', temp_dir, archive_path]
-                                            try:
-                                                result = subprocess.run(unar_cmd, check=True, capture_output=True, text=True)
-                                                logging.info(f"unar extraction output: {result.stdout}")
-                                            except subprocess.CalledProcessError as e:
-                                                logging.error(f"unar extraction failed: {e.stderr}")
-                                                raise
-                                        else:
-                                            # Use unrar on Linux
-                                            unrar_cmd = ['unrar', 'x', '-y', archive_path, temp_dir]
-                                            try:
-                                                result = subprocess.run(unrar_cmd, check=True, capture_output=True, text=True)
-                                                logging.info(f"unrar extraction output: {result.stdout}")
-                                            except subprocess.CalledProcessError as e:
-                                                logging.error(f"unrar extraction failed: {e.stderr}")
-                                                raise
-                                    else:
-                                        # Use patoolib for other formats
-                                        patoolib.extract_archive(archive_path, outdir=temp_dir)
-                                    
-                                    # Find the SteamRIP folder if it exists
-                                    steamrip_folder = None
-                                    for item in os.listdir(temp_dir):
-                                        if 'steamrip' in item.lower() and os.path.isdir(os.path.join(temp_dir, item)):
-                                            steamrip_folder = os.path.join(temp_dir, item)
-                                            break
-                                    
-                                    # Set the source directory to either SteamRIP folder or temp_dir
-                                    src_root = steamrip_folder if steamrip_folder else temp_dir
-                                    
-                                    # Move files from source to final location and track them
-                                    for dirpath, _, filenames in os.walk(src_root):
-                                        for fname in filenames:
-                                            if not fname.endswith('.url') and '_CommonRedist' not in fname:
-                                                src_path = os.path.join(dirpath, fname)
-                                                # Calculate relative path from source root
-                                                rel_path = os.path.relpath(src_path, src_root)
-                                                dst_path = os.path.join(extract_dir, rel_path)
-                                                
-                                                # Create destination directory if needed
-                                                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                                                
-                                                # Move file and track it
-                                                try:
-                                                    shutil.move(src_path, dst_path)
-                                                    key = os.path.relpath(dst_path, self.download_dir)
-                                                    watching_data[key] = {"size": os.path.getsize(dst_path)}
-                                                    logging.info(f"[AscendaraGofileHelper] Extracted: {key}")
-                                                except (OSError, IOError) as e:
-                                                    logging.error(f"Error moving file {src_path}: {str(e)}")
-                            except Exception as e:
-                                logging.error(f"Error during extraction on non-Windows system: {str(e)}")
-                                raise
+                        if file.endswith('.zip'):
+                            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                                for zip_info in zip_ref.infolist():
+                                    if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
+                                        total_files_to_extract += 1
+                        elif file.endswith('.rar'):
+                            from unrar import rarfile
+                            with rarfile.RarFile(archive_path, 'r') as rar_ref:
+                                for rar_info in rar_ref.infolist():
+                                    # Check if it's a directory by filename ending with / or \
+                                    is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                                    if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename and not is_dir:
+                                        total_files_to_extract += 1
                     except Exception as e:
-                        logging.error(f"[AscendaraGofileHelper] Error extracting {archive_path}: {str(e)}")
-                        continue
+                        logging.warning(f"[AscendaraGofileHelper] Could not count files in {archive_path}: {e}")
+        
+        logging.info(f"[AscendaraGofileHelper] Total files to extract: {total_files_to_extract}")
+        self._files_extracted_count = 0
+        self._update_extraction_progress("Preparing...", 0, total_files_to_extract)
+        
+        # Extract all archives with progress tracking
+        for archive_path, file in archives_to_process:
+            extract_dir = self.download_dir
+            logging.info(f"[AscendaraGofileHelper] Extracting {archive_path}")
+            
+            try:
+                # check os
+                if sys.platform == "win32":
+                    if file.endswith('.zip'):
+                        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                            for zip_info in zip_ref.infolist():
+                                if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename:
+                                    extracted_path = os.path.join(extract_dir, zip_info.filename)
+                                    zip_ref.extract(zip_info, extract_dir)
+                                    # Add to watching data
+                                    key = f"{os.path.relpath(extracted_path, self.download_dir)}"
+                                    watching_data[key] = {"size": zip_info.file_size}
+                                    # Update progress for non-directory entries
+                                    if not zip_info.is_dir():
+                                        self._files_extracted_count += 1
+                                        self._update_extraction_progress(zip_info.filename, self._files_extracted_count, total_files_to_extract)
+                    elif file.endswith('.rar'):
+                        from unrar import rarfile
+                        # Use long path prefix for extraction to support paths > 260 chars
+                        long_extract_dir = long_path(extract_dir)
+                        with rarfile.RarFile(archive_path, 'r') as rar_ref:
+                            # Get file list for progress tracking
+                            rar_files = [info for info in rar_ref.infolist() 
+                                        if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename]
+                            
+                            # Extract file by file for progress tracking
+                            for rar_info in rar_files:
+                                try:
+                                    # Try with long path first, fall back to regular path
+                                    try:
+                                        rar_ref.extract(rar_info, long_extract_dir)
+                                    except Exception:
+                                        rar_ref.extract(rar_info, extract_dir)
+                                    extracted_path = os.path.join(extract_dir, rar_info.filename)
+                                    # Check existence with long path support
+                                    if os.path.exists(long_path(extracted_path)) or os.path.exists(extracted_path):
+                                        key = f"{os.path.relpath(extracted_path, self.download_dir)}"
+                                        watching_data[key] = {"size": rar_info.file_size}
+                                    # Update progress for non-directory entries (check by filename ending)
+                                    is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                                    if not is_dir:
+                                        self._files_extracted_count += 1
+                                        self._update_extraction_progress(rar_info.filename, self._files_extracted_count, total_files_to_extract)
+                                except OSError as file_error:
+                                    logging.warning(f"[AscendaraGofileHelper] Could not extract {rar_info.filename}: {file_error}")
+                                    continue
+                else:
+                    # For non-Windows, use appropriate extraction tool
+                    try:
+                        # Create a temporary directory for extraction
+                        import tempfile
+                        with tempfile.TemporaryDirectory() as temp_dir:
+                            if file.endswith('.rar'):
+                                if sys.platform == "darwin":
+                                    # Use unar on macOS
+                                    unar_cmd = ['unar', '-force-overwrite', '-o', temp_dir, archive_path]
+                                    try:
+                                        result = subprocess.run(unar_cmd, check=True, capture_output=True, text=True)
+                                        logging.info(f"unar extraction output: {result.stdout}")
+                                    except subprocess.CalledProcessError as e:
+                                        logging.error(f"unar extraction failed: {e.stderr}")
+                                        raise
+                                else:
+                                    # Use unrar on Linux
+                                    unrar_cmd = ['unrar', 'x', '-y', archive_path, temp_dir]
+                                    try:
+                                        result = subprocess.run(unrar_cmd, check=True, capture_output=True, text=True)
+                                        logging.info(f"unrar extraction output: {result.stdout}")
+                                    except subprocess.CalledProcessError as e:
+                                        logging.error(f"unrar extraction failed: {e.stderr}")
+                                        raise
+                            else:
+                                # Use patoolib for other formats
+                                patoolib.extract_archive(archive_path, outdir=temp_dir)
+                            
+                            # Find the SteamRIP folder if it exists
+                            steamrip_folder = None
+                            for item in os.listdir(temp_dir):
+                                if 'steamrip' in item.lower() and os.path.isdir(os.path.join(temp_dir, item)):
+                                    steamrip_folder = os.path.join(temp_dir, item)
+                                    break
+                            
+                            # Set the source directory to either SteamRIP folder or temp_dir
+                            src_root = steamrip_folder if steamrip_folder else temp_dir
+                            
+                            # Move files from source to final location and track them
+                            for dirpath, _, filenames in os.walk(src_root):
+                                for fname in filenames:
+                                    if not fname.endswith('.url') and '_CommonRedist' not in fname:
+                                        src_path = os.path.join(dirpath, fname)
+                                        # Calculate relative path from source root
+                                        rel_path = os.path.relpath(src_path, src_root)
+                                        dst_path = os.path.join(extract_dir, rel_path)
+                                        
+                                        # Create destination directory if needed
+                                        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                                        
+                                        # Move file and track it
+                                        try:
+                                            shutil.move(src_path, dst_path)
+                                            key = os.path.relpath(dst_path, self.download_dir)
+                                            watching_data[key] = {"size": os.path.getsize(dst_path)}
+                                            self._files_extracted_count += 1
+                                            self._update_extraction_progress(fname, self._files_extracted_count, total_files_to_extract)
+                                            logging.info(f"[AscendaraGofileHelper] Extracted: {key}")
+                                        except (OSError, IOError) as e:
+                                            logging.error(f"Error moving file {src_path}: {str(e)}")
+                    except Exception as e:
+                        logging.error(f"Error during extraction on non-Windows system: {str(e)}")
+                        raise
+                # Delete archive after successful extraction
+                try:
+                    os.remove(archive_path)
+                    logging.info(f"[AscendaraGofileHelper] Deleted archive: {archive_path}")
+                except Exception as del_e:
+                    logging.warning(f"[AscendaraGofileHelper] Could not delete archive {archive_path}: {del_e}")
+            except Exception as e:
+                logging.error(f"[AscendaraGofileHelper] Error extracting {archive_path}: {str(e)}")
+                continue
 
+        # Flatten nested directories - but be careful not to delete the game directory itself
         nested_dir = os.path.join(self.download_dir, sanitize_folder_name(self.game))
         moved = False
-        if os.path.isdir(nested_dir):
-            for item in os.listdir(nested_dir):
-                src = os.path.join(nested_dir, item)
-                dst = os.path.join(self.download_dir, item)
-                if os.path.exists(dst):
-                    if os.path.isdir(dst):
-                        shutil.rmtree(dst, ignore_errors=True)
+        
+        # Only flatten if the nested dir exists AND is different from download_dir
+        if os.path.isdir(nested_dir) and os.path.normpath(nested_dir) != os.path.normpath(self.download_dir):
+            logging.info(f"[AscendaraGofileHelper] Found nested directory to flatten: {nested_dir}")
+            try:
+                # Get list of items first to avoid issues during iteration
+                items_to_move = list(os.listdir(nested_dir))
+                logging.info(f"[AscendaraGofileHelper] Items to move: {len(items_to_move)}")
+                
+                for item in items_to_move:
+                    src = os.path.join(nested_dir, item)
+                    dst = os.path.join(self.download_dir, item)
+                    
+                    # Don't overwrite the game info file
+                    if item.endswith('.ascendara.json'):
+                        continue
+                    
+                    # Skip if source doesn't exist anymore
+                    if not os.path.exists(src):
+                        logging.warning(f"[AscendaraGofileHelper] Source no longer exists: {src}")
+                        continue
+                    
+                    try:
+                        if os.path.exists(dst):
+                            if os.path.isdir(dst):
+                                # Merge directories instead of replacing
+                                for sub_item in os.listdir(src):
+                                    sub_src = os.path.join(src, sub_item)
+                                    sub_dst = os.path.join(dst, sub_item)
+                                    if os.path.exists(sub_dst):
+                                        if os.path.isdir(sub_dst):
+                                            shutil.rmtree(sub_dst, ignore_errors=True)
+                                        else:
+                                            os.remove(sub_dst)
+                                    shutil.move(sub_src, sub_dst)
+                                shutil.rmtree(src, ignore_errors=True)
+                            else:
+                                os.remove(dst)
+                                shutil.move(src, dst)
+                        else:
+                            shutil.move(src, dst)
+                    except Exception as move_error:
+                        logging.warning(f"[AscendaraGofileHelper] Could not move {item}: {move_error}")
+                        continue
+                
+                # Only remove nested dir if it's empty or nearly empty
+                if os.path.exists(nested_dir):
+                    remaining = os.listdir(nested_dir)
+                    if len(remaining) == 0:
+                        shutil.rmtree(nested_dir, ignore_errors=True)
+                        logging.info(f"[AscendaraGofileHelper] Removed empty nested directory: {nested_dir}")
                     else:
-                        os.remove(dst)
-                shutil.move(src, dst)
-            shutil.rmtree(nested_dir, ignore_errors=True)
-            logging.info(f"[AscendaraGofileHelper] Moved files from nested '{nested_dir}' to '{self.download_dir}'.")
-            moved = True
-            # Rebuild filemap after flattening
-            watching_data = {}
-            archive_exts = {'.rar', '.zip', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso'}
+                        logging.info(f"[AscendaraGofileHelper] Nested directory still has {len(remaining)} items, not removing")
+                
+                logging.info(f"[AscendaraGofileHelper] Moved files from nested '{nested_dir}' to '{self.download_dir}'.")
+                moved = True
+            except Exception as e:
+                logging.error(f"[AscendaraGofileHelper] Error during flattening: {e}")
+        
+        # Rebuild filemap after any changes
+        watching_data = {}
+        archive_exts = {'.rar', '.zip', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso'}
+        if os.path.exists(self.download_dir):
             for dirpath, _, filenames in os.walk(self.download_dir):
                 rel_dir = os.path.relpath(dirpath, self.download_dir)
                 for fname in filenames:
@@ -783,10 +966,15 @@ class GofileDownloader:
                         continue
                     if os.path.splitext(fname)[1].lower() in archive_exts:
                         continue
-                    rel_path = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != '.' else fname
-                    rel_path = rel_path.replace('\\', '/').replace('\\', '/')
-                    watching_data[rel_path] = {"size": os.path.getsize(os.path.join(dirpath, fname))}
+                    if fname.endswith('.ascendara.json'):
+                        continue
+                    full_path = os.path.join(dirpath, fname)
+                    if os.path.exists(full_path):
+                        rel_path = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != '.' else fname
+                        rel_path = rel_path.replace('\\', '/')
+                        watching_data[rel_path] = {"size": os.path.getsize(full_path)}
             safe_write_json(watching_path, watching_data)
+
         # Remove all .url files after extraction
         for dirpath, _, filenames in os.walk(self.download_dir):
             for fname in filenames:
@@ -798,37 +986,35 @@ class GofileDownloader:
                     except Exception as e:
                         logging.warning(f"[AscendaraGofileHelper] Could not delete .url file: {file_path}: {e}")
         # If not found, try to match by first word of game name
-        if not moved:
+        if not moved and os.path.exists(self.download_dir):
             first_word = self.game.strip().split()[0].lower()
-            for entry in os.listdir(self.download_dir):
-                entry_path = os.path.join(self.download_dir, entry)
-                if os.path.isdir(entry_path) and entry.lower().startswith(first_word):
-                    for item in os.listdir(entry_path):
-                        src = os.path.join(entry_path, item)
-                        dst = os.path.join(self.download_dir, item)
-                        if os.path.exists(dst):
-                            if os.path.isdir(dst):
-                                shutil.rmtree(dst, ignore_errors=True)
-                            else:
-                                os.remove(dst)
-                        shutil.move(src, dst)
-                    shutil.rmtree(entry_path, ignore_errors=True)
-                    logging.info(f"[AscendaraGofileHelper] Moved files from nested '{entry_path}' (matched by first word) to '{self.download_dir}'.")
-                    # Rebuild filemap after flattening
-                    watching_data = {}
-                    archive_exts = {'.rar', '.zip', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso'}
-                    for dirpath, _, filenames in os.walk(self.download_dir):
-                        rel_dir = os.path.relpath(dirpath, self.download_dir)
-                        for fname in filenames:
-                            if fname.endswith('.url') or '_CommonRedist' in dirpath:
+            try:
+                for entry in os.listdir(self.download_dir):
+                    entry_path = os.path.join(self.download_dir, entry)
+                    # Skip if it's the same as download_dir or if it's a file
+                    if not os.path.isdir(entry_path):
+                        continue
+                    if os.path.normpath(entry_path) == os.path.normpath(self.download_dir):
+                        continue
+                    if entry.lower().startswith(first_word):
+                        logging.info(f"[AscendaraGofileHelper] Found nested directory by first word match: {entry_path}")
+                        for item in os.listdir(entry_path):
+                            src = os.path.join(entry_path, item)
+                            dst = os.path.join(self.download_dir, item)
+                            # Don't overwrite the game info file
+                            if item.endswith('.ascendara.json'):
                                 continue
-                            if os.path.splitext(fname)[1].lower() in archive_exts:
-                                continue
-                            rel_path = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != '.' else fname
-                            rel_path = rel_path.replace('\\', '/').replace('\\', '/')
-                            watching_data[rel_path] = {"size": os.path.getsize(os.path.join(dirpath, fname))}
-                    safe_write_json(watching_path, watching_data)
-                    break
+                            if os.path.exists(dst):
+                                if os.path.isdir(dst):
+                                    shutil.rmtree(dst, ignore_errors=True)
+                                else:
+                                    os.remove(dst)
+                            shutil.move(src, dst)
+                        shutil.rmtree(entry_path, ignore_errors=True)
+                        logging.info(f"[AscendaraGofileHelper] Moved files from nested '{entry_path}' (matched by first word) to '{self.download_dir}'.")
+                        break
+            except Exception as e:
+                logging.error(f"[AscendaraGofileHelper] Error during first-word flattening: {e}")
         # Remove archive files from watching_data (if not already rebuilt)
         archive_exts = {'.rar', '.zip', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso'}
         watching_data = {k: v for k, v in watching_data.items() if os.path.splitext(k)[1].lower() not in archive_exts}
@@ -843,7 +1029,16 @@ class GofileDownloader:
         self._verify_extracted_files(watching_path)
 
     def _verify_extracted_files(self, watching_path):
+        verify_errors = []  # Initialize early to avoid reference errors
         try:
+            # Check if watching_path exists
+            if not os.path.exists(watching_path):
+                logging.warning(f"[AscendaraGofileHelper] Watching path not found: {watching_path}, skipping verification")
+                # Still mark as complete even if we can't verify
+                self.game_info["downloadingData"]["verifying"] = False
+                safe_write_json(self.game_info_path, self.game_info)
+                return
+                
             with open(watching_path, 'r') as f:
                 watching_data = json.load(f)
 
@@ -859,7 +1054,6 @@ class GofileDownloader:
                     except Exception as e:
                         logging.error(f"[AscendaraGofileHelper] Error deleting _CommonRedist directory: {str(e)}")
 
-            verify_errors = []
             filtered_watching_data = {}
             for file_path, file_info in watching_data.items():
                 if "_CommonRedist" not in file_path:

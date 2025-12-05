@@ -823,13 +823,16 @@ function ToasterWithTheme() {
   return (
     <Toaster
       position="top-right"
-      className="!border-border !bg-card !text-card-foreground"
       toastOptions={{
         style: {
-          background: "rgb(var(--color-card))",
-          color: "rgb(var(--color-card-foreground))",
-          border: "1px solid rgb(var(--color-border))",
+          background: "rgb(var(--color-background) / 0.8)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          color: "rgb(var(--color-foreground))",
+          border: "1px solid rgb(var(--color-border) / 0.5)",
+          borderRadius: "12px",
           padding: "16px",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)",
         },
         descriptionStyle: {
           color: "rgb(var(--color-muted-foreground))",
@@ -838,19 +841,21 @@ function ToasterWithTheme() {
           background: "rgb(var(--color-primary))",
           color: "rgb(var(--color-primary-foreground))",
           border: "none",
+          borderRadius: "8px",
+          fontWeight: "500",
         },
         actionButtonHoverStyle: {
           background: "rgb(var(--color-primary))",
-          opacity: 0.8,
+          opacity: 0.9,
         },
         cancelButtonStyle: {
-          background: "rgb(var(--color-muted))",
+          background: "rgb(var(--color-muted) / 0.5)",
           color: "rgb(var(--color-muted-foreground))",
-          border: "none",
+          border: "1px solid rgb(var(--color-border) / 0.3)",
+          borderRadius: "8px",
         },
         cancelButtonHoverStyle: {
-          background: "rgb(var(--color-muted))",
-          opacity: 0.8,
+          background: "rgb(var(--color-muted) / 0.7)",
         },
       }}
     />

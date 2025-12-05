@@ -271,7 +271,7 @@ and easier to distribute.
 
 | File                                                                             | SHA-256                                                          | VirusTotal Results                                                                                                      |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | ae7a4fd508d96cbe29ace93d41a7a7228fbd5e0bb0cc93f3e39602023df1e648 | [1/72 Detections](https://www.virustotal.com/gui/file/ae7a4fd508d96cbe29ace93d41a7a7228fbd5e0bb0cc93f3e39602023df1e648) |
+| [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b | [1/72 Detections](https://www.virustotal.com/gui/file/bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b) |
 
 ## 🤝 Contributing
 
@@ -293,6 +293,7 @@ The Ascendara project is organized into the following main directories:
   - **translations/**: Internationalization files
 
 - **binaries/**: Prebuilt binaries for core application functionality
+  - **AscendaraLocalRefresh/**: Custom refresh tool to update game index
   - **AscendaraAchievementWatcher/**: Game achievement tracking functionality
   - **AscendaraCrashReporter/**: Crash reporting functionality
   - **AscendaraDownloader/**: Game download managers to handle most files
@@ -306,7 +307,6 @@ The Ascendara project is organized into the following main directories:
 
 - **scripts/**: Helper scripts for development, deployment, and maintenance
 - **electron/**: The source code for the Electron app and IPC handles
-- **installer/**: Source code for the graphical installer and setup process
 
 ## 🛠️ Running from Source
 
