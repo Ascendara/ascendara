@@ -366,6 +366,7 @@
       "title": "Downloading on Ascendara",
       "understand": "I understand"
     },
+    "largeFileNotice": "This file is larger than others and is taking longer to extract...",
     "learnHowToFix": "Learn how to fix this",
     "limitedTo": "Limited to",
     "noDownloads": "Well that's relaxing...",

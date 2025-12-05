@@ -28,6 +28,18 @@ import {
   AlertTriangle,
   Download,
   Clock,
+  Clock1,
+  Clock2,
+  Clock3,
+  Clock4,
+  Clock5,
+  Clock6,
+  Clock7,
+  Clock8,
+  Clock9,
+  Clock10,
+  Clock11,
+  Clock12,
   ExternalLink,
   CircleCheck,
   Coffee,
@@ -41,6 +53,7 @@ import {
   CheckCircle2,
   XCircle,
   ArrowDownToLine,
+  Wifi,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -133,7 +146,7 @@ const SpeedIndicator = memo(({ speed, isHigh }) => (
     )}
   >
     {isHigh && <SpeedLines />}
-    <Zap
+    <Wifi
       className={cn(
         "relative z-10 h-4 w-4 transition-all duration-300",
         isHigh ? "animate-pulse text-primary" : "text-muted-foreground"
@@ -195,6 +208,11 @@ const Downloads = () => {
             speed: 0,
           }));
   });
+  // Track the actual peak speed separately (persists until page refresh or no active downloads)
+  const [peakSpeed, setPeakSpeed] = useState(() => {
+    const savedPeak = localStorage.getItem("peakSpeed");
+    return savedPeak ? parseFloat(savedPeak) : 0;
+  });
   const { t } = useLanguage();
 
   const normalizeSpeed = speed => {
@@ -240,34 +258,48 @@ const Downloads = () => {
         }
 
         // Detect games that were verifying and are now gone (completed)
-        const currentIds = new Set(downloading.map(g => g.id));
-        const prevVerifying = downloadingGamesRef.current.filter(
-          g => g.downloadingData?.verifying
-        );
+        // Use game.game (name) as the unique identifier since games don't have an id property
+        const currentNames = new Set(downloading.map(g => g.game));
+        const prevGames = downloadingGamesRef.current;
 
-        prevVerifying.forEach(game => {
-          const isAlreadyCompleted = completedGamesRef.current.has(game.id);
-          const isAlreadyFading = fadingGamesRef.current.has(game.id);
+        // Find games that were verifying in the previous poll
+        const newlyCompleted = [];
+        prevGames.forEach(game => {
+          const gameName = game.game;
+          const wasVerifying = game.downloadingData?.verifying;
+          const isGone = !currentNames.has(gameName);
+          const isAlreadyTracked =
+            completedGamesRef.current.has(gameName) ||
+            fadingGamesRef.current.has(gameName);
 
-          if (!currentIds.has(game.id) && !isAlreadyCompleted && !isAlreadyFading) {
-            // This game was verifying and is now gone - it completed!
-            console.log("Game completed:", game.game);
-            setCompletedGames(prev => new Set([...prev, game.id]));
+          if (wasVerifying && isGone && !isAlreadyTracked) {
+            console.log("Game completed:", gameName);
+            newlyCompleted.push(game);
 
-            // After 2 seconds, start fading
+            // Mark as completed immediately in ref
+            completedGamesRef.current = new Set([...completedGamesRef.current, gameName]);
+
+            // Schedule fade out
             setTimeout(() => {
+              completedGamesRef.current = new Set(
+                [...completedGamesRef.current].filter(n => n !== gameName)
+              );
+              fadingGamesRef.current = new Set([...fadingGamesRef.current, gameName]);
               setCompletedGames(prev => {
                 const next = new Set(prev);
-                next.delete(game.id);
+                next.delete(gameName);
                 return next;
               });
-              setFadingGames(prev => new Set([...prev, game.id]));
+              setFadingGames(prev => new Set([...prev, gameName]));
 
-              // After fade animation (500ms), remove completely
+              // Remove completely after fade
               setTimeout(() => {
+                fadingGamesRef.current = new Set(
+                  [...fadingGamesRef.current].filter(n => n !== gameName)
+                );
                 setFadingGames(prev => {
                   const next = new Set(prev);
-                  next.delete(game.id);
+                  next.delete(gameName);
                   return next;
                 });
               }, 500);
@@ -275,19 +307,33 @@ const Downloads = () => {
           }
         });
 
-        // Include completed/fading games in the display list temporarily
-        const completedGamesList = downloadingGamesRef.current.filter(
-          g => completedGamesRef.current.has(g.id) || fadingGamesRef.current.has(g.id)
-        );
+        // Update completed games state if we found new ones
+        if (newlyCompleted.length > 0) {
+          setCompletedGames(
+            prev => new Set([...prev, ...newlyCompleted.map(g => g.game)])
+          );
+        }
 
-        // Merge current downloading with completed games
+        // Build the display list: current downloads + completed/fading games
         const allGames = [...downloading];
-        completedGamesList.forEach(cg => {
-          if (!allGames.find(g => g.id === cg.id)) {
-            allGames.push({ ...cg, isCompleted: completedGamesRef.current.has(cg.id) });
+
+        // Add completed games that aren't in the current download list
+        prevGames.forEach(pg => {
+          const isCompleted = completedGamesRef.current.has(pg.game);
+          const isFading = fadingGamesRef.current.has(pg.game);
+          const alreadyInList = allGames.some(g => g.game === pg.game);
+
+          if ((isCompleted || isFading) && !alreadyInList) {
+            allGames.push({
+              ...pg,
+              isCompleted: isCompleted,
+              downloadingData: { ...pg.downloadingData, verifying: false },
+            });
           }
         });
 
+        // Update the ref BEFORE setting state to prevent stale reads
+        downloadingGamesRef.current = allGames;
         setDownloadingGames(allGames);
 
         let totalSpeedNum = 0;
@@ -304,6 +350,20 @@ const Downloads = () => {
         setActiveDownloads(activeCount);
         const formattedSpeed = `${totalSpeedNum.toFixed(2)} MB/s`;
         setTotalSpeed(formattedSpeed);
+
+        // Update peak speed if current speed is higher
+        setPeakSpeed(prevPeak => {
+          const newPeak = Math.max(prevPeak, totalSpeedNum);
+          localStorage.setItem("peakSpeed", newPeak.toString());
+          return newPeak;
+        });
+
+        // Reset peak when no active downloads
+        if (activeCount === 0) {
+          setPeakSpeed(0);
+          localStorage.setItem("peakSpeed", "0");
+        }
+
         // Update speed history
         setSpeedHistory(prevHistory => {
           const newHistory = [
@@ -347,7 +407,7 @@ const Downloads = () => {
 
   const executeStopDownload = async (game, deleteContents = false) => {
     console.log("Executing stop download for:", game, "deleteContents:", deleteContents);
-    setStoppingDownloads(prev => new Set([...prev, game.id]));
+    setStoppingDownloads(prev => new Set([...prev, game.game]));
     try {
       const result = await window.electron.stopDownload(game.game, deleteContents);
       console.log("Stop download result:", result);
@@ -366,14 +426,14 @@ const Downloads = () => {
     } finally {
       setStoppingDownloads(prev => {
         const newSet = new Set(prev);
-        newSet.delete(game.id);
+        newSet.delete(game.game);
         return newSet;
       });
       // Optimistically remove the game from the downloads list if deleteContents is true
       if (deleteContents) {
         // Clear the cached download data since the download is being deleted
         clearCachedDownloadData(game.game);
-        setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
+        setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
       }
       setStopModalOpen(false);
       setGameToStop(null);
@@ -388,7 +448,7 @@ const Downloads = () => {
       await window.electron.deleteGameDirectory(game.game);
       clearCachedDownloadData(game.game);
 
-      setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
+      setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
 
       navigate("/download", {
         state: {
@@ -398,16 +458,13 @@ const Downloads = () => {
     } else {
       toast.error(t("downloads.retryDataNotAvailable"));
       await window.electron.deleteGameDirectory(game.game);
-      setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
+      setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
     }
   };
 
   const handleOpenFolder = async game => {
     await window.electron.openGameDirectory(game.game);
   };
-
-  // Calculate peak speed for stats
-  const peakSpeed = Math.max(...speedHistory.map(h => h.speed));
 
   // Custom tooltip for the chart
   const CustomTooltip = ({ active, payload }) => {
@@ -600,11 +657,13 @@ const Downloads = () => {
                 onStop={() => handleStopDownload(game)}
                 onRetry={() => handleRetryDownload(game)}
                 onOpenFolder={() => handleOpenFolder(game)}
-                isStopping={stoppingDownloads.has(game.id)}
-                isCompleted={completedGames.has(game.id)}
-                isFading={fadingGames.has(game.id)}
+                isStopping={stoppingDownloads.has(game.game)}
+                isCompleted={completedGames.has(game.game)}
+                isFading={fadingGames.has(game.game)}
                 onDelete={deletedGame => {
-                  setDownloadingGames(prev => prev.filter(g => g.id !== deletedGame.id));
+                  setDownloadingGames(prev =>
+                    prev.filter(g => g.game !== deletedGame.game)
+                  );
                 }}
                 onClearCache={clearCachedDownloadData}
               />
@@ -752,10 +811,76 @@ const DownloadCard = ({
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
+  const [lastExtractedFile, setLastExtractedFile] = useState(null);
+  const [fileStartTime, setFileStartTime] = useState(null);
+  const [clockIndex, setClockIndex] = useState(0);
   const { t } = useLanguage();
   const { settings } = useSettings();
 
   const { downloadingData } = game;
+
+  // Track extraction time per file to show notice for large files
+  useEffect(() => {
+    const currentFile = downloadingData?.extractionProgress?.currentFile;
+
+    if (currentFile && currentFile !== lastExtractedFile) {
+      // New file started extracting - reset timer and hide notice
+      setLastExtractedFile(currentFile);
+      setFileStartTime(Date.now());
+      setShowLargeFileNotice(false);
+    }
+
+    // Reset when extraction completes
+    if (!downloadingData?.extracting) {
+      setShowLargeFileNotice(false);
+      setLastExtractedFile(null);
+      setFileStartTime(null);
+    }
+  }, [
+    downloadingData?.extractionProgress?.currentFile,
+    downloadingData?.extracting,
+    lastExtractedFile,
+  ]);
+
+  // Separate interval to check if file is taking too long
+  useEffect(() => {
+    if (!downloadingData?.extracting || !fileStartTime) return;
+
+    const checkInterval = setInterval(() => {
+      const elapsed = Date.now() - fileStartTime;
+      if (elapsed > 4000) {
+        setShowLargeFileNotice(true);
+      }
+    }, 500);
+
+    return () => clearInterval(checkInterval);
+  }, [downloadingData?.extracting, fileStartTime]);
+
+  // Animated clock for large file notice
+  useEffect(() => {
+    if (!showLargeFileNotice) return;
+    const interval = setInterval(() => {
+      setClockIndex(prev => (prev + 1) % 12);
+    }, 250);
+    return () => clearInterval(interval);
+  }, [showLargeFileNotice]);
+
+  const ClockIcons = [
+    Clock12,
+    Clock1,
+    Clock2,
+    Clock3,
+    Clock4,
+    Clock5,
+    Clock6,
+    Clock7,
+    Clock8,
+    Clock9,
+    Clock10,
+    Clock11,
+  ];
+  const AnimatedClockIcon = ClockIcons[clockIndex];
   const isDownloading = downloadingData?.downloading;
   const isExtracting = downloadingData?.extracting;
   const isWaiting = downloadingData?.waiting;
@@ -971,7 +1096,7 @@ const DownloadCard = ({
                 ) : hasError ? (
                   <AlertCircle className="h-5 w-5 text-red-500" />
                 ) : isExtracting ? (
-                  <Package className="h-5 w-5 animate-pulse text-primary" />
+                  <Loader className="h-5 w-5 animate-spin text-primary" />
                 ) : (
                   <Download className="h-5 w-5 text-primary" />
                 )}
@@ -1254,22 +1379,88 @@ const DownloadCard = ({
           {/* Extracting State */}
           {isExtracting && (
             <div className="space-y-3">
-              <div className="relative h-2 overflow-hidden rounded-full bg-muted/50">
-                <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-primary/20 via-primary to-primary/20" />
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                  <Loader className="h-5 w-5 animate-spin text-amber-600" />
+              {/* Large file notice */}
+              {showLargeFileNotice && (
+                <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-600">
+                  <AnimatedClockIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>{t("downloads.largeFileNotice")}</span>
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">
-                    {t("downloads.extracting")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("downloads.extractingDescription")}
-                  </p>
-                </div>
-              </div>
+              )}
+              {/* Extraction progress bar */}
+              {downloadingData?.extractionProgress?.totalFiles > 0 ? (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-foreground">
+                        {parseFloat(
+                          downloadingData.extractionProgress.percentComplete || 0
+                        ).toFixed(1)}
+                        %
+                      </span>
+                      <span className="text-muted-foreground">
+                        {downloadingData.extractionProgress.filesExtracted} /{" "}
+                        {downloadingData.extractionProgress.totalFiles} files
+                      </span>
+                    </div>
+                    <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/50">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-300"
+                        style={{
+                          width: `${parseFloat(downloadingData.extractionProgress.percentComplete || 0)}%`,
+                        }}
+                      />
+                      {/* Shimmer effect */}
+                      <div
+                        className="absolute inset-y-0 left-0 animate-shimmer rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                        style={{
+                          width: `${parseFloat(downloadingData.extractionProgress.percentComplete || 0)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                      <Loader className="h-5 w-5 animate-spin text-amber-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-foreground">
+                          {t("downloads.extracting")}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          {downloadingData.extractionProgress.extractionSpeed}
+                        </span>
+                      </div>
+                      <p
+                        className="truncate text-sm text-muted-foreground"
+                        title={downloadingData.extractionProgress.currentFile}
+                      >
+                        {downloadingData.extractionProgress.currentFile ||
+                          t("downloads.extractingDescription")}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="relative h-2 overflow-hidden rounded-full bg-muted/50">
+                    <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-primary/20 via-primary to-primary/20" />
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                      <Loader className="h-5 w-5 animate-spin text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {t("downloads.extracting")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t("downloads.preparingExtraction") || "Preparing extraction..."}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

@@ -235,9 +235,9 @@ class ChunkedDownloader:
     Uses smaller chunk sizes and validates each chunk before proceeding.
     """
     
-    CHUNK_SIZE = 8 * 1024 * 1024  # 8MB chunks for better reliability
+    STREAM_CHUNK_SIZE = 1024 * 1024  # 1MB read chunks for streaming
     PROGRESS_UPDATE_INTERVAL = 0.5  # Update progress every 0.5 seconds
-    MAX_RETRIES_PER_CHUNK = 10
+    MAX_RETRIES = 10  # Max retries for the entire download
     RETRY_DELAY_BASE = 2
     RETRY_DELAY_MAX = 60
     
@@ -259,28 +259,47 @@ class ChunkedDownloader:
             # Try HEAD request first
             response = self.session.head(self.url, allow_redirects=True, timeout=30)
             
-            if response.status_code == 405:
-                # HEAD not allowed, try GET with Range header
-                response = self.session.get(
-                    self.url, 
-                    stream=True, 
-                    headers={"Range": "bytes=0-0"}, 
-                    timeout=30
-                )
-                response.close()
-                
-                if 'Content-Range' in response.headers:
-                    # Parse total size from Content-Range: bytes 0-0/total
-                    content_range = response.headers['Content-Range']
-                    if '/' in content_range:
-                        self.total_size = int(content_range.split('/')[-1])
-                        self.supports_range = True
-            else:
-                # Check Accept-Ranges header
-                self.supports_range = response.headers.get('Accept-Ranges', '').lower() == 'bytes'
-                
-                if 'Content-Length' in response.headers:
-                    self.total_size = int(response.headers['Content-Length'])
+            # Check Accept-Ranges header
+            self.supports_range = response.headers.get('Accept-Ranges', '').lower() == 'bytes'
+            
+            if 'Content-Length' in response.headers:
+                self.total_size = int(response.headers['Content-Length'])
+            
+            # If HEAD didn't give us size or returned 405, try GET with Range header
+            if response.status_code == 405 or self.total_size is None:
+                try:
+                    range_response = self.session.get(
+                        self.url, 
+                        stream=True, 
+                        headers={"Range": "bytes=0-0"}, 
+                        timeout=30
+                    )
+                    
+                    if 'Content-Range' in range_response.headers:
+                        # Parse total size from Content-Range: bytes 0-0/total
+                        content_range = range_response.headers['Content-Range']
+                        if '/' in content_range:
+                            total_str = content_range.split('/')[-1]
+                            if total_str != '*':
+                                self.total_size = int(total_str)
+                                self.supports_range = True
+                    elif 'Content-Length' in range_response.headers and self.total_size is None:
+                        # Some servers return full content-length even with range request
+                        self.total_size = int(range_response.headers['Content-Length'])
+                    
+                    range_response.close()
+                except Exception as e:
+                    logging.warning(f"[ChunkedDownloader] Range probe failed: {e}")
+            
+            # Last resort: start a streaming GET and check content-length
+            if self.total_size is None:
+                try:
+                    stream_response = self.session.get(self.url, stream=True, timeout=30)
+                    if 'Content-Length' in stream_response.headers:
+                        self.total_size = int(stream_response.headers['Content-Length'])
+                    stream_response.close()
+                except Exception as e:
+                    logging.warning(f"[ChunkedDownloader] Stream probe failed: {e}")
             
             logging.info(f"[ChunkedDownloader] Server probe: size={read_size(self.total_size) if self.total_size else 'unknown'}, range_support={self.supports_range}")
             return True
@@ -314,7 +333,8 @@ class ChunkedDownloader:
             remaining = self.total_size - self.downloaded_bytes
             eta = remaining / speed if speed > 0 else 0
         else:
-            progress = 0
+            # Unknown total size - show downloaded amount instead of percentage
+            progress = 0  # Will show as "downloading..." in UI
             eta = 0
         
         # Format speed
@@ -326,74 +346,77 @@ class ChunkedDownloader:
             speed_str = f"{speed:.2f} B/s"
         
         # Format ETA
-        eta_int = int(eta)
-        if eta_int < 60:
-            eta_str = f"{eta_int}s"
-        elif eta_int < 3600:
-            eta_str = f"{eta_int // 60}m {eta_int % 60}s"
+        if self.total_size is None or self.total_size == 0:
+            eta_str = f"Downloaded: {read_size(self.downloaded_bytes)}"
         else:
-            eta_str = f"{eta_int // 3600}h {(eta_int % 3600) // 60}m"
+            eta_int = int(eta)
+            if eta_int < 60:
+                eta_str = f"{eta_int}s"
+            elif eta_int < 3600:
+                eta_str = f"{eta_int // 60}m {eta_int % 60}s"
+            else:
+                eta_str = f"{eta_int // 3600}h {(eta_int % 3600) // 60}m"
         
         self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
         self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed_str
         self.game_info["downloadingData"]["timeUntilComplete"] = eta_str
+        self.game_info["downloadingData"]["downloading"] = True
         safe_write_json(self.game_info_path, self.game_info)
     
-    def _download_chunk(self, start: int, end: Optional[int] = None) -> bytes:
-        """Download a specific byte range with retries."""
+    def _stream_download(self, start_byte: int, file_handle) -> bool:
+        """
+        Stream download from start_byte, writing directly to file.
+        Returns True if completed successfully, False if interrupted.
+        """
         headers = {}
-        if end:
-            headers['Range'] = f'bytes={start}-{end}'
-        else:
-            headers['Range'] = f'bytes={start}-'
+        if start_byte > 0 and self.supports_range:
+            headers['Range'] = f'bytes={start_byte}-'
         
-        retry_delay = self.RETRY_DELAY_BASE
-        
-        for attempt in range(self.MAX_RETRIES_PER_CHUNK):
-            try:
-                response = self.session.get(
-                    self.url,
-                    headers=headers,
-                    stream=True,
-                    timeout=(30, 120)
-                )
-                
-                if response.status_code == 416:
-                    # Range not satisfiable - file is complete
-                    return b''
-                
-                response.raise_for_status()
-                
-                # Read the chunk
-                chunk_data = b''
-                for data in response.iter_content(chunk_size=1024 * 1024):
-                    if data:
-                        chunk_data += data
-                
-                return chunk_data
-                
-            except Exception as e:
-                logging.warning(f"[ChunkedDownloader] Chunk download failed (attempt {attempt + 1}): {e}")
-                
-                if attempt < self.MAX_RETRIES_PER_CHUNK - 1:
-                    # Update game info with retry status
-                    self.game_info["downloadingData"]["retryAttempt"] = attempt + 1
-                    safe_write_json(self.game_info_path, self.game_info)
-                    
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 1.5, self.RETRY_DELAY_MAX)
-                    
-                    # Recreate session on connection errors
-                    self.session.close()
-                    self.session = create_robust_session()
-                else:
-                    raise
-        
-        raise Exception("Max retries exceeded for chunk download")
+        try:
+            response = self.session.get(
+                self.url,
+                headers=headers,
+                stream=True,
+                timeout=(30, 300)  # 30s connect, 5min read timeout
+            )
+            
+            if response.status_code == 416:
+                # Range not satisfiable - file is complete
+                return True
+            
+            response.raise_for_status()
+            
+            # Try to get total size from Content-Range or Content-Length
+            if self.total_size is None:
+                if 'Content-Range' in response.headers:
+                    content_range = response.headers['Content-Range']
+                    if '/' in content_range:
+                        total_str = content_range.split('/')[-1]
+                        if total_str != '*':
+                            self.total_size = int(total_str)
+                            logging.info(f"[ChunkedDownloader] Got total size from Content-Range: {read_size(self.total_size)}")
+                elif 'Content-Length' in response.headers:
+                    content_length = int(response.headers['Content-Length'])
+                    self.total_size = start_byte + content_length
+                    logging.info(f"[ChunkedDownloader] Calculated total size: {read_size(self.total_size)}")
+            
+            # Stream the content
+            for data in response.iter_content(chunk_size=self.STREAM_CHUNK_SIZE):
+                if data:
+                    file_handle.write(data)
+                    file_handle.flush()  # Ensure data is written to disk
+                    self.downloaded_bytes += len(data)
+                    self._update_progress()
+            
+            return True
+            
+        except Exception as e:
+            logging.warning(f"[ChunkedDownloader] Stream interrupted at {read_size(self.downloaded_bytes)}: {e}")
+            return False
     
     def download(self) -> bool:
         """
-        Download the file with chunked resume support.
+        Download the file with streaming and automatic resume on failure.
         Returns True if successful, False otherwise.
         """
         try:
@@ -417,69 +440,60 @@ class ChunkedDownloader:
                 self.downloaded_bytes = 0
             
             self.start_time = time.time()
+            retry_count = 0
+            retry_delay = self.RETRY_DELAY_BASE
             
-            # Open file for writing/appending
-            mode = 'ab' if self.downloaded_bytes > 0 else 'wb'
-            
-            with open(self.dest_path, mode) as f:
-                while True:
-                    # Calculate chunk range
-                    start = self.downloaded_bytes
+            # Retry loop - keeps trying until success or max retries
+            while retry_count < self.MAX_RETRIES:
+                # Open file for writing/appending
+                mode = 'ab' if self.downloaded_bytes > 0 else 'wb'
+                
+                with open(self.dest_path, mode) as f:
+                    success = self._stream_download(self.downloaded_bytes, f)
+                
+                if success:
+                    # Check if download is complete
+                    final_size = os.path.getsize(self.dest_path)
                     
-                    if self.total_size:
-                        end = min(start + self.CHUNK_SIZE - 1, self.total_size - 1)
+                    if self.total_size is None or final_size >= self.total_size:
+                        # Clear retry status
+                        if 'retryAttempt' in self.game_info.get('downloadingData', {}):
+                            del self.game_info['downloadingData']['retryAttempt']
+                            safe_write_json(self.game_info_path, self.game_info)
                         
-                        if start >= self.total_size:
-                            break
-                    else:
-                        end = start + self.CHUNK_SIZE - 1
-                    
-                    # Download chunk
-                    if self.supports_range:
-                        chunk_data = self._download_chunk(start, end)
-                    else:
-                        # No range support - download entire file in one go
-                        response = self.session.get(self.url, stream=True, timeout=(30, 300))
-                        response.raise_for_status()
+                        # Final progress update
+                        self._update_progress(force=True)
                         
-                        for data in response.iter_content(chunk_size=1024 * 1024):
-                            if data:
-                                f.write(data)
-                                self.downloaded_bytes += len(data)
-                                self._update_progress()
-                        break
-                    
-                    if not chunk_data:
-                        # Empty response means we're done
-                        break
-                    
-                    # Write chunk
-                    f.write(chunk_data)
-                    self.downloaded_bytes += len(chunk_data)
-                    
-                    # Update progress
-                    self._update_progress()
-                    
-                    # Check if complete
-                    if self.total_size and self.downloaded_bytes >= self.total_size:
-                        break
-            
-            # Clear retry status
-            if 'retryAttempt' in self.game_info.get('downloadingData', {}):
-                del self.game_info['downloadingData']['retryAttempt']
+                        logging.info(f"[ChunkedDownloader] Download complete: {read_size(final_size)}")
+                        return True
+                    else:
+                        # Partial download - continue
+                        logging.info(f"[ChunkedDownloader] Partial: {read_size(final_size)}/{read_size(self.total_size)}, continuing...")
+                        self.downloaded_bytes = final_size
+                        continue
+                
+                # Stream was interrupted - retry if we have range support
+                if not self.supports_range:
+                    logging.error("[ChunkedDownloader] Download interrupted and server doesn't support resume")
+                    return False
+                
+                retry_count += 1
+                self.downloaded_bytes = os.path.getsize(self.dest_path) if os.path.exists(self.dest_path) else 0
+                
+                # Update game info with retry status
+                self.game_info["downloadingData"]["retryAttempt"] = retry_count
                 safe_write_json(self.game_info_path, self.game_info)
+                
+                logging.info(f"[ChunkedDownloader] Retry {retry_count}/{self.MAX_RETRIES} in {retry_delay}s, resuming from {read_size(self.downloaded_bytes)}")
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 1.5, self.RETRY_DELAY_MAX)
+                
+                # Recreate session
+                self.session.close()
+                self.session = create_robust_session()
             
-            # Final progress update
-            self._update_progress(force=True)
-            
-            # Verify download
-            final_size = os.path.getsize(self.dest_path)
-            if self.total_size and final_size < self.total_size:
-                logging.error(f"[ChunkedDownloader] Incomplete: {read_size(final_size)}/{read_size(self.total_size)}")
-                return False
-            
-            logging.info(f"[ChunkedDownloader] Download complete: {read_size(final_size)}")
-            return True
+            logging.error(f"[ChunkedDownloader] Max retries ({self.MAX_RETRIES}) exceeded")
+            return False
             
         except Exception as e:
             logging.error(f"[ChunkedDownloader] Download failed: {e}")
@@ -543,7 +557,14 @@ class RobustDownloader:
                     "updating": updateFlow,
                     "progressCompleted": "0.00",
                     "progressDownloadSpeeds": "0.00 KB/s",
-                    "timeUntilComplete": "0s"
+                    "timeUntilComplete": "0s",
+                    "extractionProgress": {
+                        "currentFile": "",
+                        "filesExtracted": 0,
+                        "totalFiles": 0,
+                        "percentComplete": "0.00",
+                        "extractionSpeed": "0 files/s"
+                    }
                 }
             }
         safe_write_json(self.game_info_path, self.game_info)
@@ -675,12 +696,12 @@ class RobustDownloader:
         return dest
     
     def _download_buzzheavier(self, url: str):
-        """Download from Buzzheavier with proper handling."""
+        """Download from Buzzheavier with robust chunked download and resume support."""
         from bs4 import BeautifulSoup
-        from tqdm import tqdm
         
         logging.info(f"[RobustDownloader] Buzzheavier download: {url}")
         
+        # Get the actual download URL from Buzzheavier
         session = create_robust_session()
         response = session.get(url)
         response.raise_for_status()
@@ -706,72 +727,56 @@ class RobustDownloader:
         domain = url.split('/')[2]
         final_url = f'https://{domain}' + hx_redirect if hx_redirect.startswith('/dl/') else hx_redirect
         
-        file_response = session.get(final_url, stream=True)
-        file_response.raise_for_status()
+        session.close()
         
-        total_size = int(file_response.headers.get('content-length', 0))
+        # Use the robust ChunkedDownloader for the actual file download
         dest_path = os.path.join(self.download_dir, title)
         
-        start_time = time.time()
-        downloaded = 0
-        last_update_time = start_time
-        
-        with open(dest_path, 'wb') as f, tqdm(total=total_size, unit='B', unit_scale=True, desc=title) as progress_bar:
-            for chunk in file_response.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-                    progress_bar.update(len(chunk))
-                    downloaded += len(chunk)
-                    now = time.time()
-                    elapsed = now - start_time
-                    
-                    if elapsed > 0 and (now - last_update_time > 0.5 or downloaded == total_size):
-                        percent = (downloaded / total_size) * 100 if total_size else 0
-                        speed = downloaded / elapsed if elapsed > 0 else 0
-                        remaining = total_size - downloaded
-                        eta = remaining / speed if speed > 0 else 0
-                        
-                        # Format speed
-                        if speed >= 1024**2:
-                            speed_str = f"{speed/1024**2:.2f} MB/s"
-                        elif speed >= 1024:
-                            speed_str = f"{speed/1024:.2f} KB/s"
-                        else:
-                            speed_str = f"{speed:.2f} B/s"
-                        
-                        # Format ETA
-                        eta_int = int(eta)
-                        if eta_int < 60:
-                            eta_str = f"{eta_int}s"
-                        elif eta_int < 3600:
-                            eta_str = f"{eta_int // 60}m {eta_int % 60}s"
-                        else:
-                            eta_str = f"{eta_int // 3600}h {(eta_int % 3600) // 60}m"
-                        
-                        self.game_info["downloadingData"]["progressCompleted"] = f"{percent:.2f}"
-                        self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed_str
-                        self.game_info["downloadingData"]["timeUntilComplete"] = eta_str
-                        self.game_info["downloadingData"]["downloading"] = True
-                        safe_write_json(self.game_info_path, self.game_info)
-                        last_update_time = now
-        
-        session.close()
-        logging.info(f"[Buzzheavier] Downloaded as: {dest_path}")
-        
-        # Update state and extract
-        self.game_info["downloadingData"]["downloading"] = False
-        self.game_info["downloadingData"]["progressCompleted"] = "100.00"
+        # Update state
+        self.game_info["downloadingData"]["downloading"] = True
         safe_write_json(self.game_info_path, self.game_info)
         
-        self._extract_files(dest_path)
+        # Create chunked downloader and start download
+        downloader = ChunkedDownloader(final_url, dest_path, self.game_info, self.game_info_path)
+        success = downloader.download()
         
-        if self.withNotification:
-            _launch_notification(self.withNotification, "Download Complete", f"Successfully downloaded {self.game}")
+        if success:
+            logging.info(f"[Buzzheavier] Downloaded as: {dest_path}")
+            
+            # Update state
+            self.game_info["downloadingData"]["downloading"] = False
+            self.game_info["downloadingData"]["progressCompleted"] = "100.00"
+            self.game_info["downloadingData"]["progressDownloadSpeeds"] = "0.00 KB/s"
+            self.game_info["downloadingData"]["timeUntilComplete"] = "0s"
+            safe_write_json(self.game_info_path, self.game_info)
+            
+            # Detect and fix file extension
+            dest_path = self._fix_file_extension(dest_path)
+            
+            # Extract files
+            self._extract_files(dest_path)
+            
+            if self.withNotification:
+                _launch_notification(self.withNotification, "Download Complete", f"Successfully downloaded {self.game}")
+        else:
+            raise Exception("Buzzheavier download failed after all retries")
     
     def _extract_files(self, archive_path: Optional[str] = None):
         """Extract archive files and flatten nested directories."""
         self.game_info["downloadingData"]["extracting"] = True
+        # Initialize extraction progress tracking
+        self.game_info["downloadingData"]["extractionProgress"] = {
+            "currentFile": "",
+            "filesExtracted": 0,
+            "totalFiles": 0,
+            "percentComplete": "0.00",
+            "extractionSpeed": "0 files/s"
+        }
         safe_write_json(self.game_info_path, self.game_info)
+        
+        # Track extraction timing
+        self._extraction_start_time = time.time()
+        self._files_extracted_count = 0
         
         watching_path = os.path.join(self.download_dir, "filemap.ascendara.json")
         watching_data = {}
@@ -789,6 +794,31 @@ class RobustDownloader:
                     ext = os.path.splitext(file)[1].lower()
                     if ext in archive_exts:
                         archives_to_process.append(os.path.join(root, file))
+        
+        # Count total files for progress tracking
+        total_files_to_extract = 0
+        for arch_path in archives_to_process:
+            try:
+                ext = os.path.splitext(arch_path)[1].lower()
+                if ext == '.zip':
+                    with zipfile.ZipFile(arch_path, 'r') as zip_ref:
+                        for zip_info in zip_ref.infolist():
+                            if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
+                                total_files_to_extract += 1
+                elif ext == '.rar':
+                    from unrar import rarfile
+                    with rarfile.RarFile(arch_path) as rar_ref:
+                        for rar_info in rar_ref.infolist():
+                            # Check if it's a directory by filename ending with / or \
+                            is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                            if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename and not is_dir:
+                                total_files_to_extract += 1
+            except Exception as e:
+                logging.warning(f"[RobustDownloader] Could not count files in {arch_path}: {e}")
+        
+        logging.info(f"[RobustDownloader] Total files to extract: {total_files_to_extract}")
+        self._total_files_to_extract = total_files_to_extract
+        self._update_extraction_progress("Preparing...", 0, total_files_to_extract)
         
         processed_archives = set()
         
@@ -861,6 +891,21 @@ class RobustDownloader:
         # Verify
         self._verify_extracted_files(watching_path)
     
+    def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int):
+        """Update extraction progress in the game info JSON."""
+        elapsed = time.time() - self._extraction_start_time
+        speed = files_extracted / elapsed if elapsed > 0 else 0
+        percent = (files_extracted / total_files * 100) if total_files > 0 else 0
+        
+        self.game_info["downloadingData"]["extractionProgress"] = {
+            "currentFile": current_file[:50] + "..." if len(current_file) > 50 else current_file,
+            "filesExtracted": files_extracted,
+            "totalFiles": total_files,
+            "percentComplete": f"{percent:.2f}",
+            "extractionSpeed": f"{speed:.1f} files/s" if speed >= 1 else f"{speed:.2f} files/s"
+        }
+        safe_write_json(self.game_info_path, self.game_info)
+
     def _extract_zip(self, archive_path: str, watching_data: Dict):
         """Extract a ZIP file."""
         try:
@@ -882,6 +927,10 @@ class RobustDownloader:
                         extracted_path = os.path.join(self.download_dir, zip_info.filename)
                         key = os.path.relpath(extracted_path, self.download_dir)
                         watching_data[key] = {"size": zip_info.file_size}
+                        # Update progress for non-directory entries
+                        if not zip_info.is_dir():
+                            self._files_extracted_count += 1
+                            self._update_extraction_progress(zip_info.filename, self._files_extracted_count, self._total_files_to_extract)
                     except Exception as e:
                         logging.error(f"[RobustDownloader] Failed to extract {zip_info.filename}: {e}")
     
@@ -894,12 +943,23 @@ class RobustDownloader:
             raise ImportError("unrar module required for RAR extraction")
         
         with rarfile.RarFile(archive_path) as rar_ref:
-            rar_ref.extractall(self.download_dir)
-            for rar_info in rar_ref.infolist():
-                if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:
+            # Extract file by file for progress tracking
+            rar_files = [info for info in rar_ref.infolist() 
+                        if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename]
+            
+            for rar_info in rar_files:
+                try:
+                    rar_ref.extract(rar_info, self.download_dir)
                     extracted_path = os.path.join(self.download_dir, rar_info.filename)
                     key = os.path.relpath(extracted_path, self.download_dir)
                     watching_data[key] = {"size": rar_info.file_size}
+                    # Update progress for non-directory entries (check by filename ending)
+                    is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                    if not is_dir:
+                        self._files_extracted_count += 1
+                        self._update_extraction_progress(rar_info.filename, self._files_extracted_count, self._total_files_to_extract)
+                except Exception as e:
+                    logging.error(f"[RobustDownloader] Failed to extract {rar_info.filename}: {e}")
     
     def _flatten_directories(self):
         """Flatten nested directories that should be at root level."""
