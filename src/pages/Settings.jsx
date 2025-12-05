@@ -3454,8 +3454,14 @@ function Settings() {
               {t("settings.communityThemes") || "Community Themes"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              {t("settings.communityThemesDescription") ||
-                "Browse and apply themes created by the community."}
+              {t("settings.communityThemesDescription")}&nbsp;
+              <a
+                className="cursor-pointer text-primary hover:underline"
+                onClick={() => window.electron.openURL("https://ascendara.app/discord")}
+              >
+                {t("settings.joinDiscord")}
+                <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
+              </a>
             </AlertDialogDescription>
           </AlertDialogHeader>
 
