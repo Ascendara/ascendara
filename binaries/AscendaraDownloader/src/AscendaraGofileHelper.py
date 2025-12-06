@@ -1030,6 +1030,7 @@ class GofileDownloader:
 
     def _verify_extracted_files(self, watching_path):
         verify_errors = []  # Initialize early to avoid reference errors
+        verify_start_time = time.time()
         try:
             # Check if watching_path exists
             if not os.path.exists(watching_path):
@@ -1125,6 +1126,11 @@ class GofileDownloader:
             self.game_info["downloadingData"]["downloading"] = False
             self.game_info["downloadingData"]["extracting"] = False
             self.game_info["downloadingData"]["verifying"] = False
+
+        # Ensure verifying state shows for at least 1 second in the UI
+        elapsed = time.time() - verify_start_time
+        if elapsed < 1.0:
+            time.sleep(1.0 - elapsed)
 
         # Set verifying to false when done
         self.game_info["downloadingData"]["verifying"] = False
