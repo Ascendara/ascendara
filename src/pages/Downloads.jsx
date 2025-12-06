@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getCachedDownloadData,
@@ -812,8 +812,9 @@ const DownloadCard = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
-  const [lastExtractedFile, setLastExtractedFile] = useState(null);
-  const [fileStartTime, setFileStartTime] = useState(null);
+  const fileStartTimeRef = useRef(null);
+  const trackedFileRef = useRef(null);
+  const noticeShownForFileRef = useRef(null);
   const [clockIndex, setClockIndex] = useState(0);
   const { t } = useLanguage();
   const { settings } = useSettings();
@@ -823,39 +824,50 @@ const DownloadCard = ({
   // Track extraction time per file to show notice for large files
   useEffect(() => {
     const currentFile = downloadingData?.extractionProgress?.currentFile;
+    const isExtracting = downloadingData?.extracting;
 
-    if (currentFile && currentFile !== lastExtractedFile) {
-      // New file started extracting - reset timer and hide notice
-      setLastExtractedFile(currentFile);
-      setFileStartTime(Date.now());
+    // Reset everything when extraction stops
+    if (!isExtracting) {
       setShowLargeFileNotice(false);
+      fileStartTimeRef.current = null;
+      trackedFileRef.current = null;
+      noticeShownForFileRef.current = null;
+      return;
     }
 
-    // Reset when extraction completes
-    if (!downloadingData?.extracting) {
-      setShowLargeFileNotice(false);
-      setLastExtractedFile(null);
-      setFileStartTime(null);
+    // New file started - reset tracking for this file
+    if (currentFile && currentFile !== trackedFileRef.current) {
+      trackedFileRef.current = currentFile;
+      fileStartTimeRef.current = Date.now();
+      // Only hide notice if we haven't shown it for this specific file
+      if (noticeShownForFileRef.current !== currentFile) {
+        setShowLargeFileNotice(false);
+      }
     }
-  }, [
-    downloadingData?.extractionProgress?.currentFile,
-    downloadingData?.extracting,
-    lastExtractedFile,
-  ]);
+  }, [downloadingData?.extractionProgress?.currentFile, downloadingData?.extracting]);
 
   // Separate interval to check if file is taking too long
   useEffect(() => {
-    if (!downloadingData?.extracting || !fileStartTime) return;
+    if (!downloadingData?.extracting) return;
 
     const checkInterval = setInterval(() => {
-      const elapsed = Date.now() - fileStartTime;
+      const startTime = fileStartTimeRef.current;
+      const currentFile = trackedFileRef.current;
+
+      if (!startTime || !currentFile) return;
+
+      // Skip if we already showed notice for this file
+      if (noticeShownForFileRef.current === currentFile) return;
+
+      const elapsed = Date.now() - startTime;
       if (elapsed > 4000) {
+        noticeShownForFileRef.current = currentFile;
         setShowLargeFileNotice(true);
       }
     }, 500);
 
     return () => clearInterval(checkInterval);
-  }, [downloadingData?.extracting, fileStartTime]);
+  }, [downloadingData?.extracting]);
 
   // Animated clock for large file notice
   useEffect(() => {
