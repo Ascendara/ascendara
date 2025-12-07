@@ -33,9 +33,9 @@ import psutil
 if sys.platform == 'darwin':
     ascendara_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
 else:
-    ascendara_dir = os.path.join(os.environ.get('APPDATA', ''), 'ascendara')
+    ascendara_dir = os.path.join(os.environ.get('APPDATA', ''), 'Ascendara by tagoWorks')
 
-log_file_path = os.path.join(appdata, "Ascendara by tagoWorks")
+log_file_path = os.path.join(ascendara_dir, 'gamehandler.log')
 
 # Ensure the log directory exists
 os.makedirs(ascendara_dir, exist_ok=True)
