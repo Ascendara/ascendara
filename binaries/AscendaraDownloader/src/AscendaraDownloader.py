@@ -989,6 +989,32 @@ class RobustDownloader:
         
         logging.info(f"[RobustDownloader] Found {len(subdirs)} subdirectories")
         
+        # Also check for SteamRIP-style directories (game name with -SteamRIP.com suffix)
+        for subdir in subdirs:
+            subdir_name = os.path.basename(subdir).lower()
+            game_lower = self.game.lower()
+            # Get first meaningful word (strip punctuation)
+            first_word = ''.join(c for c in game_lower.split()[0] if c.isalnum()) if game_lower else ""
+            # Normalize subdir name for comparison
+            subdir_normalized = subdir_name.replace('-', ' ').replace('_', ' ').replace('.', ' ')
+            
+            should_flatten = False
+            reason = ""
+            
+            if 'steamrip' in subdir_name:
+                should_flatten = True
+                reason = "contains 'steamrip'"
+            elif game_lower.replace(' ', '-').replace(':', '') in subdir_name.replace(' ', '-').replace(':', ''):
+                should_flatten = True
+                reason = "matches game name pattern"
+            elif first_word and len(first_word) >= 3 and first_word in subdir_normalized:
+                should_flatten = True
+                reason = f"contains first word '{first_word}'"
+            
+            if should_flatten and subdir not in nested_dirs_to_check:
+                nested_dirs_to_check.append(subdir)
+                logging.info(f"[RobustDownloader] Found dir to flatten: {subdir} ({reason})")
+        
         if len(subdirs) == 1 and subdirs[0] not in nested_dirs_to_check:
             root_files = [f for f in os.listdir(self.download_dir) 
                          if os.path.isfile(os.path.join(self.download_dir, f)) 
@@ -1000,6 +1026,9 @@ class RobustDownloader:
                 if len(subdir_contents) > 0:
                     nested_dirs_to_check.append(subdirs[0])
                     logging.info(f"[RobustDownloader] Found single subdir to flatten: {subdirs[0]}")
+        
+        if not nested_dirs_to_check:
+            logging.info(f"[RobustDownloader] No directories to flatten")
         
         for nested_dir in nested_dirs_to_check:
             if os.path.isdir(nested_dir):
@@ -1062,21 +1091,39 @@ class RobustDownloader:
     
     def _verify_extracted_files(self, watching_path: str):
         """Verify extracted files match expected sizes."""
+        logging.info(f"[RobustDownloader] Starting verification of extracted files")
+        verify_start_time = time.time()
         try:
             with open(watching_path, 'r') as f:
                 watching_data = json.load(f)
             
+            logging.info(f"[RobustDownloader] Verifying {len(watching_data)} files")
             verify_errors = []
+            verified_count = 0
             for file_path, file_info in watching_data.items():
                 if os.path.basename(file_path) == 'filemap.ascendara.json':
                     continue
                 
                 full_path = os.path.join(self.download_dir, file_path)
-                if not os.path.exists(full_path) or os.path.getsize(full_path) != file_info['size']:
-                    verify_errors.append({"file": file_path, "error": "File missing or size mismatch"})
+                if not os.path.exists(full_path):
+                    verify_errors.append({"file": file_path, "error": "File not found"})
+                    logging.warning(f"[RobustDownloader] Verification failed - file not found: {file_path}")
+                elif os.path.getsize(full_path) != file_info['size']:
+                    verify_errors.append({"file": file_path, "error": f"Size mismatch: expected {file_info['size']}, got {os.path.getsize(full_path)}"})
+                    logging.warning(f"[RobustDownloader] Verification failed - size mismatch: {file_path}")
+                else:
+                    verified_count += 1
+            
+            logging.info(f"[RobustDownloader] Verification complete: {verified_count} files OK, {len(verify_errors)} errors")
+            
+            # Ensure verifying state shows for at least 1 second in the UI
+            elapsed = time.time() - verify_start_time
+            if elapsed < 1.0:
+                time.sleep(1.0 - elapsed)
             
             self.game_info["downloadingData"]["verifying"] = False
-            self.game_info["downloadingData"]["verifyError"] = verify_errors
+            if verify_errors:
+                self.game_info["downloadingData"]["verifyError"] = verify_errors
             safe_write_json(self.game_info_path, self.game_info)
             
             if not verify_errors:
@@ -1085,6 +1132,7 @@ class RobustDownloader:
                     del self.game_info["downloadingData"]
                     safe_write_json(self.game_info_path, self.game_info)
         except Exception as e:
+            logging.error(f"[RobustDownloader] Verification error: {e}")
             handleerror(self.game_info, self.game_info_path, e)
     
     def _handle_post_download_behavior(self):

@@ -71,6 +71,7 @@ import {
   Download as DownloadIcon,
   UploadIcon,
   Globe,
+  MessageCircleQuestion,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -264,6 +265,11 @@ function Settings() {
   const [showPublicThemesDialog, setShowPublicThemesDialog] = useState(false);
   const [publicThemes, setPublicThemes] = useState([]);
   const [loadingPublicThemes, setLoadingPublicThemes] = useState(false);
+  const [showSupportDialog, setShowSupportDialog] = useState(false);
+  const [showSupportConfirmDialog, setShowSupportConfirmDialog] = useState(false);
+  const [supportCode, setSupportCode] = useState(["", "", "", "", "", ""]);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const supportInputRefs = useRef([]);
 
   // Use a ref to track if this is the first mount
   const isFirstMount = useRef(true);
@@ -2635,6 +2641,27 @@ function Settings() {
 
           {/* Right Column - Additional Settings */}
           <div className="space-y-6 lg:col-span-4">
+            <Card className="border-border p-6">
+              <div className="mb-2 flex items-center gap-2">
+                <MessageCircleQuestion className="mb-2 h-5 w-5 text-primary" />
+                <h2 className="text-xl font-semibold text-primary">
+                  {t("settings.quickSupport")}
+                </h2>
+              </div>
+              <p className="mb-4 text-sm text-muted-foreground">
+                {t("settings.supportDesc")}
+              </p>
+              <Button
+                className="flex w-full items-center gap-2 text-secondary"
+                onClick={() => {
+                  setSupportCode(["", "", "", "", "", ""]);
+                  setShowSupportDialog(true);
+                }}
+              >
+                {t("settings.getHelp")}
+              </Button>
+            </Card>
+
             {/* Analytics Card */}
             <Card className="border-border p-6">
               <div className="mb-2 flex items-center gap-2">
@@ -3554,6 +3581,229 @@ function Settings() {
             >
               {t("common.back") || "Back"}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Support Code Dialog */}
+      <AlertDialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <MessageCircleQuestion className="h-6 w-6" />
+              {t("settings.quickSupport")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {t("settings.supportCodeDesc")}&nbsp;
+              <a
+                className="cursor-pointer text-primary hover:underline"
+                onClick={() => window.electron.openURL("https://ascendara.app/discord")}
+              >
+                {t("settings.joinDiscord")}
+                <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
+              </a>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-6">
+            <div className="flex justify-center gap-3">
+              {supportCode.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={el => (supportInputRefs.current[index] = el)}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={e => {
+                    const value = e.target.value.replace(/[^0-9]/g, "");
+                    if (value.length <= 1) {
+                      const newCode = [...supportCode];
+                      newCode[index] = value;
+                      setSupportCode(newCode);
+                      // Auto-focus next input
+                      if (value && index < 5) {
+                        supportInputRefs.current[index + 1]?.focus();
+                      }
+                    }
+                  }}
+                  onKeyDown={e => {
+                    // Handle backspace to go to previous input
+                    if (e.key === "Backspace" && !digit && index > 0) {
+                      supportInputRefs.current[index - 1]?.focus();
+                    }
+                  }}
+                  onPaste={e => {
+                    e.preventDefault();
+                    const pastedData = e.clipboardData
+                      .getData("text")
+                      .replace(/[^0-9]/g, "")
+                      .slice(0, 6);
+                    if (pastedData) {
+                      const newCode = [...supportCode];
+                      for (let i = 0; i < pastedData.length && i < 6; i++) {
+                        newCode[i] = pastedData[i];
+                      }
+                      setSupportCode(newCode);
+                      // Focus the next empty input or the last one
+                      const nextEmptyIndex = newCode.findIndex(d => !d);
+                      supportInputRefs.current[
+                        nextEmptyIndex !== -1 ? nextEmptyIndex : 5
+                      ]?.focus();
+                    }
+                  }}
+                  className="h-14 w-12 rounded-lg border-2 border-border bg-background text-center text-2xl font-bold text-foreground transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              ))}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={supportLoading}
+              onClick={() => setSupportCode(["", "", "", "", "", ""])}
+            >
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={supportCode.some(d => !d) || supportLoading}
+              onClick={e => {
+                e.preventDefault();
+                setShowSupportDialog(false);
+                setShowSupportConfirmDialog(true);
+              }}
+            >
+              {t("common.submit") || "Submit"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Support Log Upload Confirmation Dialog */}
+      <AlertDialog
+        open={showSupportConfirmDialog}
+        onOpenChange={setShowSupportConfirmDialog}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-xl font-bold text-foreground">
+              <ShieldAlert className="h-5 w-5 text-yellow-500" />
+              {t("settings.logUploadWarningTitle") || "Log Upload Notice"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-muted-foreground">
+              <p>
+                {t("settings.logUploadWarningDesc") ||
+                  "The logs you're about to upload may contain:"}
+              </p>
+              <ul className="ml-4 list-disc space-y-1 text-sm">
+                <li>{t("settings.logWarningUsername") || "Your Windows username"}</li>
+                <li>
+                  {t("settings.logWarningDirectories") ||
+                    "Download directories and file paths"}
+                </li>
+                <li>
+                  {t("settings.logWarningActivity") ||
+                    "Ascendara, Downloader, and Game Handler activity"}
+                </li>
+              </ul>
+              <p className="text-sm">
+                {t("settings.logUploadPurpose") ||
+                  "This information helps us assist you with your issue. Your data will be deleted after support is complete."}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={supportLoading}
+              onClick={() => {
+                setShowSupportConfirmDialog(false);
+                setShowSupportDialog(true);
+              }}
+            >
+              {t("common.back") || "Back"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={supportLoading}
+              onClick={async e => {
+                e.preventDefault();
+                const code = supportCode.join("");
+                setSupportLoading(true);
+
+                try {
+                  // Step 1: Validate the support code
+                  const validateResponse = await fetch(
+                    "https://api.ascendara.app/support/validate",
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ code }),
+                    }
+                  );
+
+                  const validateData = await validateResponse.json();
+
+                  if (!validateData.valid) {
+                    toast.error(
+                      t("settings.invalidSupportCode") ||
+                        "Invalid or expired support code"
+                    );
+                    setSupportLoading(false);
+                    setShowSupportConfirmDialog(false);
+                    setShowSupportDialog(true);
+                    return;
+                  }
+
+                  const sessionToken = validateData.session_token;
+
+                  // Step 2: Get app token
+                  const AUTHORIZATION = await window.electron.getAPIKey();
+                  const tokenResponse = await fetch(
+                    "https://api.ascendara.app/auth/token",
+                    {
+                      headers: { Authorization: AUTHORIZATION },
+                    }
+                  );
+
+                  if (!tokenResponse.ok) {
+                    throw new Error("Failed to obtain token");
+                  }
+
+                  const tokenData = await tokenResponse.json();
+                  const appToken = tokenData.token;
+
+                  // Step 3: Upload logs
+                  const uploadResult = await window.electron.uploadSupportLogs(
+                    sessionToken,
+                    appToken
+                  );
+
+                  if (uploadResult.success) {
+                    toast.success(
+                      t("settings.logsUploaded") || "Logs uploaded successfully!"
+                    );
+                    setShowSupportConfirmDialog(false);
+                    setShowSupportDialog(false);
+                    setSupportCode(["", "", "", "", "", ""]);
+                  } else {
+                    throw new Error(uploadResult.error || "Upload failed");
+                  }
+                } catch (error) {
+                  console.error("Support code error:", error);
+                  toast.error(
+                    t("settings.supportError") ||
+                      "Failed to upload logs. Please try again."
+                  );
+                } finally {
+                  setSupportLoading(false);
+                }
+              }}
+            >
+              {supportLoading ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                t("settings.uploadLogs") || "Upload Logs"
+              )}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

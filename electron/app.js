@@ -11,7 +11,7 @@
  *  Learn more about developing Ascendara at https://ascendara.app/docs/developer/overview
  */
 
-let appVersion = "9.4.0";
+let appVersion = "9.4.1";
 
 const {
   app,
@@ -1698,6 +1698,61 @@ ipcMain.handle(
     }
   }
 );
+
+// Upload support logs with validated session token
+ipcMain.handle("upload-support-logs", async (event, sessionToken, appToken) => {
+  try {
+    const appDataPath = app.getPath("appData");
+    const ascendaraPath = path.join(appDataPath, "Ascendara by tagoWorks");
+
+    // Define log file paths
+    const logFiles = {
+      "debug.log": path.join(ascendaraPath, "debug.log"),
+      "downloadmanager.log": path.join(ascendaraPath, "downloadmanager.log"),
+      "notificationhelper.log": path.join(ascendaraPath, "notificationhelper.log"),
+      "gamehandler.log": path.join(ascendaraPath, "gamehandler.log"),
+    };
+
+    // Read all log files
+    const logs = {};
+    for (const [name, filePath] of Object.entries(logFiles)) {
+      try {
+        if (fs.existsSync(filePath)) {
+          const content = await fs.promises.readFile(filePath, "utf-8");
+          // Limit to last 500KB to avoid huge uploads
+          logs[name] = content.slice(-512000);
+        } else {
+          logs[name] = "[File not found]";
+        }
+      } catch (err) {
+        logs[name] = `[Error reading file: ${err.message}]`;
+      }
+    }
+
+    // Upload to API
+    const response = await axios.post(
+      "https://api.ascendara.app/support/upload-logs",
+      {
+        session_token: sessionToken,
+        logs: logs,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${appToken}`,
+        },
+      }
+    );
+
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Error uploading support logs:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+    };
+  }
+});
 
 // Get local image as base64 data URL
 ipcMain.handle("get-local-image-url", async (event, imagePath) => {
