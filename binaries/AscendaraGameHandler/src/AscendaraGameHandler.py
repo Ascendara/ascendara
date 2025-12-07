@@ -35,7 +35,7 @@ if sys.platform == 'darwin':
 else:
     ascendara_dir = os.path.join(os.environ.get('APPDATA', ''), 'ascendara')
 
-log_file_path = os.path.join(ascendara_dir, 'gamehandler.log')
+log_file_path = os.path.join(appdata, "Ascendara by tagoWorks")
 
 # Ensure the log directory exists
 os.makedirs(ascendara_dir, exist_ok=True)
