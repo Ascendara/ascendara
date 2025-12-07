@@ -241,6 +241,8 @@ contextBridge.exposeInMainWorld("electron", {
   uninstallAscendara: () => ipcRenderer.invoke("uninstall-ascendara"),
   openURL: url => ipcRenderer.invoke("open-url", url),
   getAPIKey: () => ipcRenderer.invoke("get-api-key"),
+  uploadSupportLogs: (sessionToken, appToken) =>
+    ipcRenderer.invoke("upload-support-logs", sessionToken, appToken),
   openReqPath: game => ipcRenderer.invoke("required-libraries", game),
   uploadProfileImage: imageBase64 =>
     ipcRenderer.invoke("upload-profile-image", imageBase64),
