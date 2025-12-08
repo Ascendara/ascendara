@@ -241,7 +241,13 @@ const Navigation = memo(({ items }) => {
   return (
     <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 select-none p-6">
       <div className="nav-container relative mx-auto max-w-xl" style={navStyle}>
-        <div className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border bg-background/80 p-3 shadow-lg backdrop-blur-lg">
+        <div
+          className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border p-3 shadow-lg backdrop-blur-lg"
+          style={{
+            backgroundColor:
+              "rgb(var(--color-nav-background, var(--color-background)) / 0.8)",
+          }}
+        >
           <div
             className="pointer-events-auto absolute -left-2 -top-2 h-4 w-4 cursor-nw-resize"
             onMouseDown={e => handleMouseDown(e, true)}

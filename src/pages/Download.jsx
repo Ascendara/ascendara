@@ -2667,7 +2667,14 @@ export default function DownloadPage() {
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div className="flex cursor-help items-center gap-2">
-                                      <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                                      <Star
+                                        className="h-5 w-5"
+                                        style={{
+                                          fill: "rgb(var(--color-star-filled, 250 204 21))",
+                                          color:
+                                            "rgb(var(--color-star-filled, 250 204 21))",
+                                        }}
+                                      />
                                       <span className="text-sm font-medium text-primary">
                                         {gameData.rating}
                                       </span>

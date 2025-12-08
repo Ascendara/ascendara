@@ -164,12 +164,17 @@ const GameRate = ({ game, isOpen, onClose }) => {
                   >
                     <Star
                       size={32}
-                      className={cn(
-                        "transition-colors",
-                        (hoveredRating || rating) >= value
-                          ? "fill-yellow-400 stroke-yellow-400"
-                          : "fill-none stroke-muted-foreground"
-                      )}
+                      className="transition-colors"
+                      style={{
+                        fill:
+                          (hoveredRating || rating) >= value
+                            ? "rgb(var(--color-star-filled, 250 204 21))"
+                            : "transparent",
+                        stroke:
+                          (hoveredRating || rating) >= value
+                            ? "rgb(var(--color-star-filled, 250 204 21))"
+                            : "rgb(var(--color-star-empty, 148 163 184))",
+                      }}
                     />
                   </motion.button>
                 ))}

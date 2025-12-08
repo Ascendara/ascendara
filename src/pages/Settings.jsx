@@ -72,6 +72,11 @@ import {
   UploadIcon,
   Globe,
   MessageCircleQuestion,
+  Star,
+  Home,
+  Bell,
+  CheckCircle,
+  Info,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -260,6 +265,22 @@ function Settings() {
     cardForeground: "15 23 42",
     popover: "255 255 255",
     popoverForeground: "15 23 42",
+    // Navigation colors
+    navBackground: "255 255 255",
+    navActive: "124 58 237",
+    navActiveText: "255 255 255",
+    navHover: "221 214 254",
+    // Status colors
+    success: "34 197 94",
+    warning: "234 179 8",
+    error: "239 68 68",
+    info: "59 130 246",
+    // Star rating
+    starFilled: "250 204 21",
+    starEmpty: "148 163 184",
+    // Startup/Welcome screen
+    startupBackground: "255 255 255",
+    startupAccent: "124 58 237",
   });
   const [originalColorsOnOpen, setOriginalColorsOnOpen] = useState(null);
   const [showPublicThemesDialog, setShowPublicThemesDialog] = useState(false);
@@ -558,6 +579,22 @@ function Settings() {
     root.style.removeProperty("--color-card-foreground");
     root.style.removeProperty("--color-popover");
     root.style.removeProperty("--color-popover-foreground");
+    // Navigation colors
+    root.style.removeProperty("--color-nav-background");
+    root.style.removeProperty("--color-nav-active");
+    root.style.removeProperty("--color-nav-active-text");
+    root.style.removeProperty("--color-nav-hover");
+    // Status colors
+    root.style.removeProperty("--color-success");
+    root.style.removeProperty("--color-warning");
+    root.style.removeProperty("--color-error");
+    root.style.removeProperty("--color-info");
+    // Star rating
+    root.style.removeProperty("--color-star-filled");
+    root.style.removeProperty("--color-star-empty");
+    // Startup screen
+    root.style.removeProperty("--color-startup-background");
+    root.style.removeProperty("--color-startup-accent");
   };
 
   // Theme handling
@@ -592,6 +629,37 @@ function Settings() {
     dark: themes.filter(t => t.group === "dark"),
   };
 
+  // Default custom colors for merging with saved themes (handles missing new properties)
+  const defaultCustomColors = {
+    background: "255 255 255",
+    foreground: "15 23 42",
+    primary: "124 58 237",
+    secondary: "221 214 254",
+    muted: "221 214 254",
+    mutedForeground: "88 28 135",
+    accent: "221 214 254",
+    accentForeground: "88 28 135",
+    border: "167 139 250",
+    input: "167 139 250",
+    ring: "88 28 135",
+    card: "255 255 255",
+    cardForeground: "15 23 42",
+    popover: "255 255 255",
+    popoverForeground: "15 23 42",
+    navBackground: "255 255 255",
+    navActive: "124 58 237",
+    navActiveText: "255 255 255",
+    navHover: "221 214 254",
+    success: "34 197 94",
+    warning: "234 179 8",
+    error: "239 68 68",
+    info: "59 130 246",
+    starFilled: "250 204 21",
+    starEmpty: "148 163 184",
+    startupBackground: "255 255 255",
+    startupAccent: "124 58 237",
+  };
+
   // Load custom colors from settings
   useEffect(() => {
     if (
@@ -601,7 +669,8 @@ function Settings() {
     ) {
       const customThemeObj = settings.customTheme[0];
       if (customThemeObj) {
-        setCustomColors(customThemeObj);
+        // Merge with defaults to ensure all properties exist (handles old saved themes)
+        setCustomColors(prev => ({ ...defaultCustomColors, ...customThemeObj }));
       }
     }
   }, [settings.customTheme]);
@@ -628,13 +697,54 @@ function Settings() {
         "--color-popover-foreground",
         customColors.popoverForeground
       );
+      // Navigation colors
+      root.style.setProperty(
+        "--color-nav-background",
+        customColors.navBackground || customColors.background
+      );
+      root.style.setProperty(
+        "--color-nav-active",
+        customColors.navActive || customColors.primary
+      );
+      root.style.setProperty(
+        "--color-nav-active-text",
+        customColors.navActiveText || customColors.secondary
+      );
+      root.style.setProperty(
+        "--color-nav-hover",
+        customColors.navHover || customColors.secondary
+      );
+      // Status colors
+      root.style.setProperty("--color-success", customColors.success || "34 197 94");
+      root.style.setProperty("--color-warning", customColors.warning || "234 179 8");
+      root.style.setProperty("--color-error", customColors.error || "239 68 68");
+      root.style.setProperty("--color-info", customColors.info || "59 130 246");
+      // Star rating
+      root.style.setProperty(
+        "--color-star-filled",
+        customColors.starFilled || "250 204 21"
+      );
+      root.style.setProperty(
+        "--color-star-empty",
+        customColors.starEmpty || "148 163 184"
+      );
+      // Startup screen
+      root.style.setProperty(
+        "--color-startup-background",
+        customColors.startupBackground || customColors.background
+      );
+      root.style.setProperty(
+        "--color-startup-accent",
+        customColors.startupAccent || customColors.primary
+      );
     }
   }, [theme, customColors]);
 
   // Helper to convert RGB string to hex
   const rgbToHex = rgbString => {
+    if (!rgbString || typeof rgbString !== "string") return "#000000";
     const parts = rgbString.split(" ").map(Number);
-    if (parts.length !== 3) return "#000000";
+    if (parts.length !== 3 || parts.some(isNaN)) return "#000000";
     return (
       "#" +
       parts
@@ -664,13 +774,15 @@ function Settings() {
 
   // ColorPickerInput component - native color picker with local state for smooth dragging
   const ColorPickerInput = ({ colorKey, label, value }) => {
-    const [localColor, setLocalColor] = useState(rgbToHex(value));
-    const [localRgb, setLocalRgb] = useState(value);
+    const safeValue = value || "128 128 128"; // Default gray if undefined
+    const [localColor, setLocalColor] = useState(rgbToHex(safeValue));
+    const [localRgb, setLocalRgb] = useState(safeValue);
 
     // Sync local state when parent value changes (e.g., on import)
     useEffect(() => {
-      setLocalColor(rgbToHex(value));
-      setLocalRgb(value);
+      const syncValue = value || "128 128 128";
+      setLocalColor(rgbToHex(syncValue));
+      setLocalRgb(syncValue);
     }, [value]);
 
     return (
@@ -692,9 +804,9 @@ function Settings() {
             cursor: "pointer",
           }}
         />
-        <div className="flex-1">
-          <Label className="text-xs">{label}</Label>
-          <p className="text-xs text-muted-foreground">{localRgb}</p>
+        <div className="min-w-0 flex-1">
+          <Label className="block truncate text-xs text-foreground">{label}</Label>
+          <p className="truncate text-xs text-foreground/60">{localRgb}</p>
         </div>
       </div>
     );
@@ -3142,7 +3254,7 @@ function Settings() {
 
       {/* Custom Colors Dialog */}
       <AlertDialog open={showCustomColorsDialog}>
-        <AlertDialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+        <AlertDialogContent className="max-h-[95vh] max-w-6xl overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
               <Palette />
@@ -3154,122 +3266,188 @@ function Settings() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="grid grid-cols-1 gap-6 py-4 lg:grid-cols-2">
-            {/* Left Side - Color Pickers */}
-            <div className="space-y-4 overflow-y-auto pr-2" style={{ maxHeight: "60vh" }}>
-              {/* Background Colors */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-foreground">
-                  {t("settings.colorSection.backgrounds") || "Backgrounds"}
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <ColorPickerInput
-                    colorKey="background"
-                    label={t("settings.color.background") || "Background"}
-                    value={customColors.background}
-                  />
-                  <ColorPickerInput
-                    colorKey="secondary"
-                    label={t("settings.color.secondary") || "Secondary"}
-                    value={customColors.secondary}
-                  />
-                  <ColorPickerInput
-                    colorKey="card"
-                    label={t("settings.color.card") || "Card"}
-                    value={customColors.card}
-                  />
-                  <ColorPickerInput
-                    colorKey="popover"
-                    label={t("settings.color.popover") || "Popover"}
-                    value={customColors.popover}
-                  />
-                </div>
-              </div>
-
-              {/* Text Colors */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-foreground">
-                  {t("settings.colorSection.text") || "Text Colors"}
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <ColorPickerInput
-                    colorKey="foreground"
-                    label={t("settings.color.foreground") || "Foreground"}
-                    value={customColors.foreground}
-                  />
-                  <ColorPickerInput
-                    colorKey="mutedForeground"
-                    label={t("settings.color.mutedForeground") || "Muted Text"}
-                    value={customColors.mutedForeground}
-                  />
-                  <ColorPickerInput
-                    colorKey="cardForeground"
-                    label={t("settings.color.cardForeground") || "Card Text"}
-                    value={customColors.cardForeground}
-                  />
-                  <ColorPickerInput
-                    colorKey="popoverForeground"
-                    label={t("settings.color.popoverForeground") || "Popover Text"}
-                    value={customColors.popoverForeground}
-                  />
-                </div>
-              </div>
-
-              {/* Accent Colors */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-foreground">
-                  {t("settings.colorSection.accents") || "Accent Colors"}
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <ColorPickerInput
-                    colorKey="primary"
-                    label={t("settings.color.primary") || "Primary"}
-                    value={customColors.primary}
-                  />
-                  <ColorPickerInput
-                    colorKey="accent"
-                    label={t("settings.color.accent") || "Accent"}
-                    value={customColors.accent}
-                  />
-                  <ColorPickerInput
-                    colorKey="accentForeground"
-                    label={t("settings.color.accentForeground") || "Accent Text"}
-                    value={customColors.accentForeground}
-                  />
-                  <ColorPickerInput
-                    colorKey="muted"
-                    label={t("settings.color.muted") || "Muted"}
-                    value={customColors.muted}
-                  />
-                </div>
-              </div>
-
-              {/* Border & Input Colors */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-foreground">
-                  {t("settings.colorSection.borders") || "Borders & Inputs"}
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <ColorPickerInput
-                    colorKey="border"
-                    label={t("settings.color.border") || "Border"}
-                    value={customColors.border}
-                  />
-                  <ColorPickerInput
-                    colorKey="input"
-                    label={t("settings.color.input") || "Input"}
-                    value={customColors.input}
-                  />
-                  <ColorPickerInput
-                    colorKey="ring"
-                    label={t("settings.color.ring") || "Ring/Focus"}
-                    value={customColors.ring}
-                  />
-                </div>
+          <div className="space-y-4 py-4">
+            {/* Core Colors */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Core
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="background"
+                  label="Background"
+                  value={customColors.background}
+                />
+                <ColorPickerInput
+                  colorKey="foreground"
+                  label="Text"
+                  value={customColors.foreground}
+                />
+                <ColorPickerInput
+                  colorKey="primary"
+                  label="Primary"
+                  value={customColors.primary}
+                />
+                <ColorPickerInput
+                  colorKey="secondary"
+                  label="Secondary"
+                  value={customColors.secondary}
+                />
+                <ColorPickerInput
+                  colorKey="accent"
+                  label="Accent"
+                  value={customColors.accent}
+                />
+                <ColorPickerInput
+                  colorKey="accentForeground"
+                  label="Accent Text"
+                  value={customColors.accentForeground}
+                />
+                <ColorPickerInput
+                  colorKey="muted"
+                  label="Muted"
+                  value={customColors.muted}
+                />
+                <ColorPickerInput
+                  colorKey="mutedForeground"
+                  label="Muted Text"
+                  value={customColors.mutedForeground}
+                />
               </div>
             </div>
 
-            {/* Right Side - Live Preview */}
+            {/* Cards & Surfaces */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Surfaces
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="card"
+                  label="Card"
+                  value={customColors.card}
+                />
+                <ColorPickerInput
+                  colorKey="cardForeground"
+                  label="Card Text"
+                  value={customColors.cardForeground}
+                />
+                <ColorPickerInput
+                  colorKey="popover"
+                  label="Popover"
+                  value={customColors.popover}
+                />
+                <ColorPickerInput
+                  colorKey="popoverForeground"
+                  label="Popover Text"
+                  value={customColors.popoverForeground}
+                />
+                <ColorPickerInput
+                  colorKey="border"
+                  label="Border"
+                  value={customColors.border}
+                />
+                <ColorPickerInput
+                  colorKey="input"
+                  label="Input"
+                  value={customColors.input}
+                />
+                <ColorPickerInput
+                  colorKey="ring"
+                  label="Focus Ring"
+                  value={customColors.ring}
+                />
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Navigation
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="navBackground"
+                  label="Background"
+                  value={customColors.navBackground}
+                />
+                <ColorPickerInput
+                  colorKey="navActive"
+                  label="Active"
+                  value={customColors.navActive}
+                />
+                <ColorPickerInput
+                  colorKey="navActiveText"
+                  label="Active Text"
+                  value={customColors.navActiveText}
+                />
+                <ColorPickerInput
+                  colorKey="navHover"
+                  label="Hover"
+                  value={customColors.navHover}
+                />
+              </div>
+            </div>
+
+            {/* Status & Feedback */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Status
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="success"
+                  label="Success"
+                  value={customColors.success}
+                />
+                <ColorPickerInput
+                  colorKey="warning"
+                  label="Warning"
+                  value={customColors.warning}
+                />
+                <ColorPickerInput
+                  colorKey="error"
+                  label="Error"
+                  value={customColors.error}
+                />
+                <ColorPickerInput
+                  colorKey="info"
+                  label="Info"
+                  value={customColors.info}
+                />
+                <ColorPickerInput
+                  colorKey="starFilled"
+                  label="Star Filled"
+                  value={customColors.starFilled}
+                />
+                <ColorPickerInput
+                  colorKey="starEmpty"
+                  label="Star Empty"
+                  value={customColors.starEmpty}
+                />
+              </div>
+            </div>
+
+            {/* Startup Screen */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Startup
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="startupBackground"
+                  label="Background"
+                  value={customColors.startupBackground}
+                />
+                <ColorPickerInput
+                  colorKey="startupAccent"
+                  label="Accent"
+                  value={customColors.startupAccent}
+                />
+              </div>
+            </div>
+
+            {/* Live Preview */}
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-foreground">
                 {t("settings.colorSection.preview") || "Live Preview"}
@@ -3415,6 +3593,184 @@ function Settings() {
                   >
                     {t("settings.preview.popoverDescription")}
                   </p>
+                </div>
+
+                {/* Navigation Bar Preview */}
+                <div
+                  className="mt-3 rounded-xl border p-2"
+                  style={{
+                    backgroundColor: `rgb(${customColors.navBackground} / 0.8)`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="mb-2 text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.navBar") || "Navigation Bar"}
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        backgroundColor: `rgb(${customColors.navActive})`,
+                        color: `rgb(${customColors.navActiveText})`,
+                      }}
+                    >
+                      <Home className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        backgroundColor: `rgb(${customColors.navHover})`,
+                        color: `rgb(${customColors.foreground})`,
+                      }}
+                    >
+                      <Bell className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Star Rating Preview */}
+                <div className="mt-3">
+                  <p
+                    className="mb-2 text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.starRating") || "Star Rating"}
+                  </p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <Star
+                        key={i}
+                        className="h-5 w-5"
+                        style={{
+                          fill:
+                            i <= 3 ? `rgb(${customColors.starFilled})` : "transparent",
+                          color:
+                            i <= 3
+                              ? `rgb(${customColors.starFilled})`
+                              : `rgb(${customColors.starEmpty})`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Toast/Notification Previews */}
+                <div className="mt-3 space-y-2">
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.notifications") || "Notifications"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.success} / 0.5)`,
+                      }}
+                    >
+                      <CheckCircle
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.success})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.success") || "Success"}
+                      </span>
+                    </div>
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.warning} / 0.5)`,
+                      }}
+                    >
+                      <AlertTriangle
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.warning})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.warning") || "Warning"}
+                      </span>
+                    </div>
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.error} / 0.5)`,
+                      }}
+                    >
+                      <X
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.error})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.error") || "Error"}
+                      </span>
+                    </div>
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.info} / 0.5)`,
+                      }}
+                    >
+                      <Info
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.info})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.info") || "Info"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Startup Screen Preview */}
+                <div
+                  className="mt-3 rounded-lg border p-3"
+                  style={{
+                    backgroundColor: `rgb(${customColors.startupBackground})`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="mb-2 text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.startupScreen") || "Startup Screen"}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-6 w-6 rounded-full"
+                      style={{ backgroundColor: `rgb(${customColors.startupAccent})` }}
+                    />
+                    <div className="flex-1">
+                      <div
+                        className="mb-1 h-2 w-16 rounded"
+                        style={{ backgroundColor: `rgb(${customColors.startupAccent})` }}
+                      />
+                      <div
+                        className="h-1.5 w-24 rounded opacity-50"
+                        style={{ backgroundColor: `rgb(${customColors.foreground})` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 

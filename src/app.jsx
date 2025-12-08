@@ -517,7 +517,7 @@ const AppRoutes = () => {
           width: "100%",
           height: "100%",
           background:
-            "linear-gradient(135deg, rgb(var(--color-primary) / 0.1) 0%, rgb(var(--color-background)) 100%)",
+            "linear-gradient(135deg, rgb(var(--color-startup-accent, var(--color-primary)) / 0.1) 0%, rgb(var(--color-startup-background, var(--color-background))) 100%)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
