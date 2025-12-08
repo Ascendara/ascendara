@@ -117,8 +117,8 @@ def cleanup_build_artifacts():
             # Remove all files except .js files and directories
             for item in os.listdir(electron_dir):
                 item_path = os.path.join(electron_dir, item)
-                # Keep .js files, the guide directory, and the services directory
-                if item.endswith('.js') or (os.path.isdir(item_path) and (item == 'guide' or item == 'services')):
+                # Keep .js files, the guide directory, services directory, and modules directory
+                if item.endswith('.js') or (os.path.isdir(item_path) and item in ('guide', 'services', 'modules')):
                     continue
                 
                 if os.path.isdir(item_path):
@@ -184,11 +184,15 @@ def cleanup_after_build():
                 shutil.rmtree(assets_dir)
                 print("Removed electron/assets directory")
             
-            # Do NOT remove the services directory
+            # Do NOT remove the services or modules directories
             # If you want to clean up inside services, add logic here, but do not delete the folder
             services_dir = os.path.join(electron_dir, 'services')
             if os.path.exists(services_dir):
                 print("Preserved electron/services directory")
+            
+            modules_dir = os.path.join(electron_dir, 'modules')
+            if os.path.exists(modules_dir):
+                print("Preserved electron/modules directory")
             
             # Remove other temporary files
             temp_files = ['icon.png', 'no-image.png']
