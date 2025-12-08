@@ -51,12 +51,6 @@ const FirstIndexDialog = ({ onClose }) => {
                 {t("app.firstIndexDialog.goToIndex") || "Set Up Game Index"}
                 <ArrowRight size={20} />
               </button>
-              <button
-                onClick={handleSkip}
-                className="w-full rounded-lg bg-secondary px-4 py-3 text-muted-foreground transition-colors hover:bg-secondary/90"
-              >
-                {t("app.firstIndexDialog.skip") || "Skip for Now"}
-              </button>
             </div>
 
             <p className="text-center text-xs text-muted-foreground">
