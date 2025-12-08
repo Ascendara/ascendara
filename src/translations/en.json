@@ -1217,6 +1217,8 @@
       "title": "Enable Torrent Support",
       "vpnWarning": "Your IP address will be visible to other peers. Use a VPN to protect your privacy and avoid potential legal issues."
     },
+    "torrenting": "Torrenting",
+    "torrentingDescription": "Configure torrent downloads on Ascendara. Torrenting requires qBittorrent and a VPN is strongly recommended.",
     "totalGames": "Total Games",
     "twitchClientId": "Twitch Client ID",
     "twitchSecret": "Twitch Client Secret",
