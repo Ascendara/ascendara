@@ -67,6 +67,9 @@ import {
   Bell,
   CheckCircle,
   Info,
+  Search,
+  Library,
+  Settings2,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -271,6 +274,7 @@ function Settings() {
   const [showPublicThemesDialog, setShowPublicThemesDialog] = useState(false);
   const [publicThemes, setPublicThemes] = useState([]);
   const [loadingPublicThemes, setLoadingPublicThemes] = useState(false);
+  const [selectedThemeVersion, setSelectedThemeVersion] = useState(null);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showSupportConfirmDialog, setShowSupportConfirmDialog] = useState(false);
   const [supportCode, setSupportCode] = useState(["", "", "", "", "", ""]);
@@ -872,8 +876,9 @@ function Settings() {
   };
 
   // Apply a public theme
-  const handleApplyPublicTheme = themeColors => {
+  const handleApplyPublicTheme = (themeColors, themeVersion) => {
     setCustomColors(themeColors);
+    setSelectedThemeVersion(themeVersion);
     setShowPublicThemesDialog(false);
     setShowCustomColorsDialog(true);
     toast.success(
@@ -1134,6 +1139,7 @@ function Settings() {
                     className={`mt-3 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent/50 ${theme === "custom" ? "border-primary bg-primary/5" : "border-border"}`}
                     onClick={() => {
                       setOriginalColorsOnOpen({ ...customColors });
+                      setSelectedThemeVersion(null);
                       setShowCustomColorsDialog(true);
                     }}
                   >
@@ -2967,6 +2973,16 @@ function Settings() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
+          {(selectedThemeVersion === 1 || selectedThemeVersion === "1") && (
+            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-500">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>
+                {t("settings.legacyThemeWarning") ||
+                  "This theme uses an older format and may be missing some color options. Some colors will use default values."}
+              </span>
+            </div>
+          )}
+
           <div className="space-y-4 py-4">
             {/* Core Colors */}
             <div>
@@ -3071,21 +3087,6 @@ function Settings() {
                   colorKey="navBackground"
                   label="Background"
                   value={customColors.navBackground}
-                />
-                <ColorPickerInput
-                  colorKey="navActive"
-                  label="Active"
-                  value={customColors.navActive}
-                />
-                <ColorPickerInput
-                  colorKey="navActiveText"
-                  label="Active Text"
-                  value={customColors.navActiveText}
-                />
-                <ColorPickerInput
-                  colorKey="navHover"
-                  label="Hover"
-                  value={customColors.navHover}
                 />
               </div>
             </div>
@@ -3311,23 +3312,40 @@ function Settings() {
                     {t("settings.preview.navBar") || "Navigation Bar"}
                   </p>
                   <div className="flex items-center justify-center gap-2">
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{
-                        backgroundColor: `rgb(${customColors.navActive})`,
-                        color: `rgb(${customColors.navActiveText})`,
-                      }}
-                    >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 text-white">
                       <Home className="h-4 w-4" />
                     </div>
                     <div
                       className="flex h-8 w-8 items-center justify-center rounded-lg"
                       style={{
-                        backgroundColor: `rgb(${customColors.navHover})`,
-                        color: `rgb(${customColors.foreground})`,
+                        color: `rgb(${customColors.mutedForeground})`,
                       }}
                     >
-                      <Bell className="h-4 w-4" />
+                      <Search className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      <Library className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      <Settings2 className="h-4 w-4" />
                     </div>
                   </div>
                 </div>
@@ -3564,7 +3582,9 @@ function Settings() {
                   <div
                     key={index}
                     className="cursor-pointer rounded-lg border border-border p-3 transition-all hover:border-primary hover:shadow-md"
-                    onClick={() => handleApplyPublicTheme(theme.colors || theme)}
+                    onClick={() =>
+                      handleApplyPublicTheme(theme.colors || theme, theme.version)
+                    }
                   >
                     {/* Theme Preview */}
                     <div
@@ -3613,9 +3633,17 @@ function Settings() {
                         />
                       </div>
                     </div>
-                    <p className="text-sm font-medium text-foreground">
-                      {theme.name || `Theme ${index + 1}`}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground">
+                        {theme.name || `Theme ${index + 1}`}
+                      </p>
+                      {(theme.version === 1 || theme.version === "1") && (
+                        <span className="flex items-center gap-1 rounded bg-yellow-500/20 px-1.5 py-0.5 text-xs text-yellow-500">
+                          <AlertTriangle className="h-3 w-3" />
+                          OUTDATED
+                        </span>
+                      )}
+                    </div>
                     {theme.author && (
                       <p className="text-xs text-muted-foreground">
                         {t("settings.themeBy") || "by"} {theme.author}

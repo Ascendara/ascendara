@@ -47,7 +47,7 @@ function registerThemeHandlers() {
       }
 
       const themeData = {
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
         customTheme: customTheme,
       };
