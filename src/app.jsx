@@ -7,17 +7,22 @@ import PlatformWarningDialog from "@/components/PlatformWarningDialog";
 import WatcherWarnDialog from "@/components/WatcherWarnDialog";
 import BrokenVersionDialog from "@/components/BrokenVersionDialog";
 import FirstIndexDialog from "@/components/FirstIndexDialog";
-import PageTransition from "@/components/PageTransition";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { analytics } from "@/services/analyticsService";
+import {
+  initializeStatusService,
+  cleanupStatusService,
+} from "@/services/ascendStatusService";
+import { getUnreadMessageCount } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AdminWarningScreen from "@/components/AdminWarningScreen";
@@ -39,6 +44,7 @@ import SidecarAndDependencies from "./pages/SidecarAndDependencies";
 import TorboxDownloads from "./pages/TorboxDownloads";
 import GameScreen from "./pages/GameScreen";
 import Profile from "./pages/Profile";
+import Ascend from "./pages/Ascend";
 import Library from "./pages/Library";
 import FolderView from "./pages/FolderView";
 import LocalRefresh from "./pages/LocalRefresh";
@@ -61,10 +67,99 @@ const ScrollToTop = () => {
   return null;
 };
 
+// Initialize Ascend status service when user is authenticated
+const AscendStatusInitializer = () => {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.uid) {
+      console.log("[App] Initializing Ascend status service for user:", user.uid);
+      initializeStatusService(null, user.uid).catch(err => {
+        console.error("[App] Failed to initialize status service:", err);
+      });
+
+      return () => {
+        cleanupStatusService();
+      };
+    }
+  }, [user?.uid]);
+
+  return null;
+};
+
+// Check for new messages and show notifications
+const MessageNotificationChecker = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const lastCheckedRef = useRef({});
+  const checkIntervalRef = useRef(null);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      // Clear interval if user logs out
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+      lastCheckedRef.current = {};
+      return;
+    }
+
+    const checkForNewMessages = async () => {
+      try {
+        const result = await getUnreadMessageCount();
+        if (result.error || result.newMessages.length === 0) return;
+
+        // Check for new messages we haven't notified about
+        result.newMessages.forEach(msg => {
+          const lastNotified = lastCheckedRef.current[msg.conversationId] || 0;
+
+          // Only notify if this is a new message (more unread than before)
+          if (msg.unreadCount > lastNotified) {
+            // Show toast notification
+            toast(t("ascend.messages.newMessage", { name: msg.senderName }), {
+              description:
+                msg.messageText?.substring(0, 50) +
+                (msg.messageText?.length > 50 ? "..." : ""),
+              action: {
+                label: t("common.view"),
+                onClick: () => navigate("/ascend"),
+              },
+              duration: 5000,
+            });
+          }
+
+          // Update last checked count
+          lastCheckedRef.current[msg.conversationId] = msg.unreadCount;
+        });
+      } catch (e) {
+        console.error("[MessageNotificationChecker] Error:", e);
+      }
+    };
+
+    // Initial check after a short delay
+    const initialTimeout = setTimeout(checkForNewMessages, 3000);
+
+    // Check every 30 seconds
+    checkIntervalRef.current = setInterval(checkForNewMessages, 30000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+    };
+  }, [user?.uid, t, navigate]);
+
+  return null;
+};
+
 const AppRoutes = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [showWelcome, setShowWelcome] = useState(null);
   const [isNewInstall, setIsNewInstall] = useState(false);
@@ -542,17 +637,20 @@ const AppRoutes = () => {
     );
   }
 
-  if (showWelcome === null) {
-    console.log("Rendering null - showWelcome is null");
+  if (showWelcome === null && isLoading) {
+    console.log("Rendering null - showWelcome is null and still loading");
     return null;
   }
 
-  if (location.pathname === "/welcome" && !showWelcome) {
+  // If showWelcome is null but we're not loading, default to false to prevent blank screen
+  const effectiveShowWelcome = showWelcome ?? false;
+
+  if (location.pathname === "/welcome" && !effectiveShowWelcome) {
     console.log("Redirecting from welcome to home");
     return <Navigate to="/" replace />;
   }
 
-  if (location.pathname === "/" && showWelcome) {
+  if (location.pathname === "/" && effectiveShowWelcome) {
     console.log("Redirecting from home to welcome");
     return <Navigate to="/welcome" replace />;
   }
@@ -562,7 +660,7 @@ const AppRoutes = () => {
   return (
     <>
       <MenuBar />
-      {showWelcome ? (
+      {effectiveShowWelcome ? (
         <Routes>
           <Route path="/extralanguages" element={<ExtraLanguages />} />
           <Route path="/localrefresh" element={<LocalRefresh />} />
@@ -578,148 +676,23 @@ const AppRoutes = () => {
           />
         </Routes>
       ) : (
-        <Routes location={location}>
+        <Routes location={location} key={user?.uid || "logged-out"}>
           <Route path="/" element={<Layout />}>
-            <Route
-              index
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="home">
-                    <Home />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="search"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="search">
-                    <Search />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="library"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="library">
-                    <Library />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="folderview/:folderName"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="folderview">
-                    <FolderView />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="gamescreen"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="gamescreen">
-                    <GameScreen />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="downloads"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="downloads">
-                    <Downloads />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="torboxdownloads"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="torboxdownloads">
-                    <TorboxDownloads />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="settings">
-                    <Settings />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="sidecaranddependencies"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="sidecaranddependencies">
-                    <SidecarAndDependencies />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="localrefresh"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="localrefresh">
-                    <LocalRefresh />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="profile"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="profile">
-                    <Profile />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="workshopdownloader"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="workshopdownloader">
-                    <WorkshopDownloader />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="download"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="download">
-                    <DownloadPage />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="extralanguages"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="extralanguages">
-                    <ExtraLanguages />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
+            <Route index element={<Home />} />
+            <Route path="search" element={<Search />} />
+            <Route path="library" element={<Library />} />
+            <Route path="folderview/:folderName" element={<FolderView />} />
+            <Route path="gamescreen" element={<GameScreen />} />
+            <Route path="downloads" element={<Downloads />} />
+            <Route path="torboxdownloads" element={<TorboxDownloads />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="sidecaranddependencies" element={<SidecarAndDependencies />} />
+            <Route path="localrefresh" element={<LocalRefresh />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="ascend" element={<Ascend />} />
+            <Route path="workshopdownloader" element={<WorkshopDownloader />} />
+            <Route path="download" element={<DownloadPage />} />
+            <Route path="extralanguages" element={<ExtraLanguages />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
@@ -963,20 +936,22 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <SettingsProvider>
-            <TourProvider>
-              <Router>
-                <ToasterWithTheme />
-                <ContextMenu />
-                <ScrollToTop />
-                <AnimatePresence mode="wait">
+            <AuthProvider>
+              <TourProvider>
+                <Router>
+                  <ToasterWithTheme />
+                  <ContextMenu />
+                  <ScrollToTop />
+                  <AscendStatusInitializer />
+                  <MessageNotificationChecker />
                   <AppRoutes />
-                </AnimatePresence>
-                <MiniPlayer
-                  expanded={playerExpanded}
-                  onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
-                />
-              </Router>
-            </TourProvider>
+                  <MiniPlayer
+                    expanded={playerExpanded}
+                    onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
+                  />
+                </Router>
+              </TourProvider>
+            </AuthProvider>
           </SettingsProvider>
         </LanguageProvider>
       </ThemeProvider>

@@ -44,6 +44,15 @@ contextBridge.exposeInMainWorld("electron", {
   onWindowStateChange: callback => {
     ipcRenderer.on("window-state-changed", (_, maximized) => callback(maximized));
   },
+  onAppClose: callback => {
+    ipcRenderer.on("app-closing", () => callback());
+  },
+  onAppHidden: callback => {
+    ipcRenderer.on("app-hidden", () => callback());
+  },
+  onAppShown: callback => {
+    ipcRenderer.on("app-shown", () => callback());
+  },
 
   //===========================================================================
   // SETTINGS & CONFIGURATION
@@ -87,6 +96,11 @@ contextBridge.exposeInMainWorld("electron", {
   getLaunchCount: () => ipcRenderer.invoke("get-launch-count"),
   onWelcomeComplete: callback => ipcRenderer.on("welcome-complete", () => callback()),
   triggerWelcomeComplete: () => ipcRenderer.invoke("welcome-complete"),
+
+  //===========================================================================
+  // HARDWARE ID (for trial verification)
+  //===========================================================================
+  getHardwareId: () => ipcRenderer.invoke("get-hardware-id"),
 
   //===========================================================================
   // DISCORD RPC

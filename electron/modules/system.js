@@ -7,6 +7,8 @@ const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
 const disk = require("diskusage");
+const crypto = require("crypto");
+const { machineIdSync } = require("node-machine-id");
 const { exec, spawn } = require("child_process");
 const { ipcMain, app, dialog, shell, BrowserWindow, Notification } = require("electron");
 const unzipper = require("unzipper");
@@ -128,10 +130,30 @@ async function checkGameDependencies() {
 }
 
 /**
+ * Get hardware ID for trial lock
+ * Returns a hashed machine ID that's consistent for the same hardware
+ */
+function getHardwareId() {
+  try {
+    const machineId = machineIdSync(true);
+    // Hash it for privacy - same hardware always produces same hash
+    return crypto.createHash("sha256").update(machineId).digest("hex");
+  } catch (error) {
+    console.error("Failed to get hardware ID:", error);
+    return null;
+  }
+}
+
+/**
  * Register system-related IPC handlers
  */
 function registerSystemHandlers() {
   const settingsManager = getSettingsManager();
+
+  // Get hardware ID for trial verification
+  ipcMain.handle("get-hardware-id", async () => {
+    return getHardwareId();
+  });
 
   // Get drive space
   ipcMain.handle("get-drive-space", async (_, directory) => {

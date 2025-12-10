@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from "react";
-import { Outlet, useSearchParams } from "react-router-dom";
+import React, { useState, useEffect, useContext } from "react";
+import { Outlet, useSearchParams, useLocation } from "react-router-dom";
 import Navigation from "./Navigation";
 import MenuBar from "./MenuBar";
 import Tour from "./Tour";
+import PageTransition from "./PageTransition";
 import { useTheme } from "@/context/ThemeContext";
+import { SettingsContext } from "@/context/SettingsContext";
 
 function Layout() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showTour, setShowTour] = useState(false);
   const { theme, resolvedTheme } = useTheme();
+  const location = useLocation();
+  const context = useContext(SettingsContext);
+  const smoothTransitions = context?.settings?.smoothTransitions ?? true;
 
   useEffect(() => {
     if (searchParams.get("tour") === "true") {
@@ -26,7 +31,9 @@ function Layout() {
       <MenuBar className="fixed left-0 right-0 top-0 z-50" />
       <div className="h-8" />
       <main className="flex-1 overflow-y-auto px-4 pb-24">
-        <Outlet />
+        <PageTransition key={location.pathname}>
+          <Outlet />
+        </PageTransition>
         {showTour && <Tour onClose={handleCloseTour} />}
       </main>
       <Navigation className="fixed bottom-0 left-0 right-0" />

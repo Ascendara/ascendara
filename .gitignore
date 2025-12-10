@@ -42,3 +42,4 @@ yarn.lock
 /src/pages/concept
 binaries/AscendaraDownloader/src/AscendaraDownloaderV1.py
 electron/appOrginal.js
+src/services/firestore.rules

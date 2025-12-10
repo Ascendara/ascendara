@@ -46,6 +46,10 @@ module.exports = {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
         },
+        "page-fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -54,6 +58,7 @@ module.exports = {
         "collapsible-up": "collapsible-up 0.2s ease-out",
         shimmer: "shimmer 3s ease-in-out infinite",
         shine: "shine 3s ease-in-out infinite",
+        "page-fade-in": "page-fade-in 0.2s ease-out",
       },
     },
   },

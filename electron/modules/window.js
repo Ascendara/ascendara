@@ -55,7 +55,19 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, "..", "index.html"));
   }
 
-  mainWindow.webContents.setWindowOpenHandler(info => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Allow Firebase/Google auth popups
+    if (
+      url.includes("accounts.google.com") ||
+      url.includes("firebaseapp.com") ||
+      url.includes("googleapis.com")
+    ) {
+      return { action: "allow" };
+    }
+    // Open other external links in system browser
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      require("electron").shell.openExternal(url);
+    }
     return { action: "deny" };
   });
 
@@ -63,11 +75,15 @@ function createWindow() {
   mainWindow.on("hide", () => {
     mainWindowHidden = true;
     console.log("Window hidden event fired");
+    // Notify renderer to set status to invisible when hiding to tray
+    mainWindow.webContents.send("app-hidden");
   });
 
   mainWindow.on("show", () => {
     mainWindowHidden = false;
     console.log("Window shown event fired");
+    // Notify renderer to restore status when showing from tray
+    mainWindow.webContents.send("app-shown");
   });
 
   mainWindow.on("close", () => {

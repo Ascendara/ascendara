@@ -204,6 +204,11 @@ async function initializeApp() {
   // Before quit cleanup
   app.on("before-quit", () => {
     console.log("App is quitting...");
+    // Notify renderer to set status to invisible
+    const mainWindow = windowModule.getMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("app-closing");
+    }
     discordRpc.destroyDiscordRPC();
   });
 

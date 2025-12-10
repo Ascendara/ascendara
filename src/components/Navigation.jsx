@@ -15,6 +15,7 @@ import {
   ServerIcon,
   ArrowBigDown,
   CircleArrowDown,
+  AtSign,
 } from "lucide-react";
 
 const Navigation = memo(({ items }) => {
@@ -141,6 +142,13 @@ const Navigation = memo(({ items }) => {
       label: t("common.profile"),
       icon: User,
       color: "from-red-500 to-pink-400",
+    });
+
+    items.push({
+      path: "/ascend",
+      label: t("common.ascend"),
+      icon: AtSign,
+      color: "from-pink-200 to-purple-500",
     });
 
     if (settings.viewWorkshopPage) {
