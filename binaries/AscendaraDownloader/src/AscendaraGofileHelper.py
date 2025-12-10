@@ -371,9 +371,10 @@ class GofileDownloader:
             raise
 
     def _parseLinksRecursively(self, content_id, password, current_path=""):
-        url = f"https://api.gofile.io/contents/{content_id}?wt=4fd6sg89d7s6&cache=true"
+        # GoFile API change: wt parameter moved to X-Website-Token header
+        url = f"https://api.gofile.io/contents/{content_id}"
         if password:
-            url = f"{url}&password={password}"
+            url = f"{url}?password={password}"
 
         headers = {
             "User-Agent": os.getenv("GF_USERAGENT", "Mozilla/5.0"),
@@ -381,12 +382,13 @@ class GofileDownloader:
             "Accept": "*/*",
             "Connection": "keep-alive",
             "Authorization": f"Bearer {self._token}",
+            "X-Website-Token": "4fd6sg89d7s6",
         }
 
         response = requests.get(url, headers=headers).json()
 
         if response["status"] != "ok":
-            logging.error(f"[AscendaraGofileHelper] Failed to get a link as response from the {url}.")
+            logging.error(f"[AscendaraGofileHelper] Failed to get a link as response from {url}. Status: {response.get('status')}")
             return {}
 
         data = response["data"]
