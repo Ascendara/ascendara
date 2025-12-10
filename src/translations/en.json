@@ -297,6 +297,25 @@
       "totalXP": "Total XP",
       "xp": "XP"
     },
+    "report": {
+      "details": "Details",
+      "detailsPlaceholder": "Please provide more details about your report...",
+      "failed": "Failed to submit report",
+      "fillAllFields": "Please fill in all fields",
+      "reason": "Reason",
+      "reasons": {
+        "harassment": "Harassment",
+        "impersonation": "Impersonation",
+        "inappropriateContent": "Inappropriate Content",
+        "other": "Other",
+        "spam": "Spam"
+      },
+      "selectReason": "Select a reason",
+      "submit": "Submit Report",
+      "submitted": "Report submitted successfully",
+      "submitting": "Submitting...",
+      "title": "Report User"
+    },
     "requests": {
       "accept": "Accept",
       "cancel": "Cancel",
@@ -857,6 +876,22 @@
     "chooseOrUploadCoverImage": "Choose or Upload Cover Image for this game",
     "clickToOpenFolder": "Click to open folder",
     "clickToUpload": "Click to Upload",
+    "cloudOnly": {
+      "badge": "Cloud",
+      "customBadge": "Custom",
+      "restore": "Download & Restore",
+      "restoreCustom": "Add & Restore",
+      "restoring": "Finding game...",
+      "subtitle": "Games saved in your cloud library that aren't installed locally",
+      "title": "Cloud Games"
+    },
+    "cloudRestore": {
+      "customGameInfo": "Add this game to your library with the same name to restore your cloud data.",
+      "error": "Failed to restore game from cloud",
+      "gameNotFound": "Game not found in the index. It may have been removed.",
+      "noGameId": "This game cannot be restored - no game ID found",
+      "restored": "Cloud data restored! Your playtime and stats are back."
+    },
     "confirmDelete": "Woah!",
     "confirmRemoveFolderDesc": "Are you sure you want to remove this folder? All games inside will be moved back to your main library.",
     "confirmRemoveFolderTitle": "Remove Folder?",

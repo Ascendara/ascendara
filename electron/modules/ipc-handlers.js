@@ -533,6 +533,84 @@ function registerMiscHandlers() {
     }
   });
 
+  // Write game achievements (for cloud restore)
+  // isCustom parameter tells us if this is a custom game (stored in games.json)
+  ipcMain.handle(
+    "write-game-achievements",
+    async (_, gameName, achievements, isCustom = false) => {
+      const settings = settingsManager.getSettings();
+      try {
+        if (!settings.downloadDirectory) {
+          return { success: false, error: "Download directory not set" };
+        }
+
+        // First, check if this is a custom game in games.json
+        const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+        if (fs.existsSync(gamesFilePath)) {
+          const gamesData = JSON.parse(await fs.promises.readFile(gamesFilePath, "utf8"));
+
+          // Find the game by name (case-insensitive)
+          const gameIndex = gamesData.games?.findIndex(
+            g => g.game?.toLowerCase() === gameName.toLowerCase()
+          );
+
+          if (gameIndex !== -1) {
+            // This is a custom game - store achievements in games.json
+            gamesData.games[gameIndex].achievementWatcher = achievements;
+            await fs.promises.writeFile(
+              gamesFilePath,
+              JSON.stringify(gamesData, null, 4),
+              "utf8"
+            );
+            console.log(`Wrote achievements for ${gameName} to games.json (custom game)`);
+            return { success: true };
+          }
+        }
+
+        // Not a custom game - find the game directory
+        const { sanitizeText } = require("./utils");
+        const sanitizedGame = sanitizeText(gameName);
+        const allDirectories = [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ];
+
+        // Find the game directory (try both sanitized and original name)
+        for (const directory of allDirectories) {
+          // Try sanitized name first
+          let gameDir = path.join(directory, sanitizedGame);
+          if (fs.existsSync(gameDir)) {
+            const achievementsPath = path.join(gameDir, "achievements.ascendara.json");
+            await fs.promises.writeFile(
+              achievementsPath,
+              JSON.stringify(achievements, null, 4),
+              "utf8"
+            );
+            console.log(`Wrote achievements for ${gameName} to ${achievementsPath}`);
+            return { success: true };
+          }
+          // Try original name
+          gameDir = path.join(directory, gameName);
+          if (fs.existsSync(gameDir)) {
+            const achievementsPath = path.join(gameDir, "achievements.ascendara.json");
+            await fs.promises.writeFile(
+              achievementsPath,
+              JSON.stringify(achievements, null, 4),
+              "utf8"
+            );
+            console.log(`Wrote achievements for ${gameName} to ${achievementsPath}`);
+            return { success: true };
+          }
+        }
+
+        return { success: false, error: "Game not found" };
+      } catch (error) {
+        console.error("Error writing game achievements:", error);
+        return { success: false, error: error.message };
+      }
+    }
+  );
+
   // Save custom game
   ipcMain.handle(
     "save-custom-game",

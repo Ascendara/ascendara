@@ -1291,6 +1291,8 @@ export const searchUsers = async searchQuery => {
         bio: data.bio || null,
         country: data.country || null,
         verified: data.verified || false,
+        owner: data.owner || false,
+        contributor: data.contributor || false,
         status,
         level: 1,
         totalPlaytime,
@@ -1380,6 +1382,8 @@ export const getUserPublicProfile = async userId => {
         bio: userData.bio || null,
         country: userData.country || null,
         verified: userData.verified || false,
+        owner: userData.owner || false,
+        contributor: userData.contributor || false,
         socials: userData.socials || null,
         status,
         level: 1, // TODO: Calculate level from XP if needed

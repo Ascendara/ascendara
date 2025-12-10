@@ -12,6 +12,7 @@ plugins.unshift(MillionLint.vite());
 export default defineConfig({
   plugins: plugins,
   publicDir: path.join(__dirname, "src/public"),
+  envDir: __dirname,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_REVISION__: JSON.stringify(execSync("git rev-parse HEAD").toString()),

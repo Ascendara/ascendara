@@ -19,6 +19,8 @@ import {
   CreditCard,
   CloudIcon,
   BadgeCheck,
+  Crown,
+  Hammer,
 } from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
@@ -295,6 +297,12 @@ const AscendSidebar = ({
           <div className="hidden min-w-0 flex-1 text-left lg:block">
             <p className="flex items-center gap-1 truncate text-sm font-medium">
               {user?.displayName || "User"}
+              {userData?.owner && (
+                <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+              )}
+              {userData?.contributor && (
+                <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+              )}
               {userData?.verified && (
                 <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />
               )}

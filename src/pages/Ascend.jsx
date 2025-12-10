@@ -107,7 +107,21 @@ import {
   Crown,
   BadgeCheck,
   CloudOff,
+  Flag,
+  Loader,
+  Hammer,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 // Google Icon SVG Component
 const GoogleIcon = ({ className }) => (
@@ -239,6 +253,12 @@ const Ascend = () => {
   // User profile viewing state
   const [viewingProfile, setViewingProfile] = useState(null); // User profile data being viewed
   const [loadingProfile, setLoadingProfile] = useState(false);
+
+  // Report user state
+  const [isReportingUser, setIsReportingUser] = useState(false);
+  const [reportUserReason, setReportUserReason] = useState("");
+  const [reportUserDetails, setReportUserDetails] = useState("");
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [profileError, setProfileError] = useState(null);
 
   // Verify Ascend access and load data when user is logged in
@@ -916,6 +936,95 @@ const Ascend = () => {
     setViewingProfile(null);
     setProfileError(null);
     setActiveSection("search");
+  };
+
+  // Submit user report
+  const handleSubmitUserReport = async () => {
+    if (!reportUserReason || !reportUserDetails.trim()) {
+      toast.error(t("ascend.report.fillAllFields") || "Please fill in all fields");
+      return;
+    }
+
+    setIsReportingUser(true);
+    try {
+      const AUTHORIZATION = await window.electron.getAPIKey();
+      const response = await fetch("https://api.ascendara.app/auth/token", {
+        headers: {
+          Authorization: AUTHORIZATION,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to obtain token");
+      }
+
+      const { token: authToken } = await response.json();
+
+      const reportResponse = await fetch("https://api.ascendara.app/app/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          reportType: "UserReport",
+          reason: reportUserReason,
+          details: reportUserDetails,
+          gameName: `User: ${viewingProfile?.displayName || "Unknown"} (${viewingProfile?.uid || "Unknown UID"})`,
+        }),
+      });
+
+      if (!reportResponse.ok) {
+        if (reportResponse.status === 401) {
+          const newTokenResponse = await fetch("https://api.ascendara.app/auth/token", {
+            headers: {
+              Authorization: AUTHORIZATION,
+            },
+          });
+
+          if (!newTokenResponse.ok) {
+            throw new Error("Failed to obtain new token");
+          }
+
+          const { token: newAuthToken } = await newTokenResponse.json();
+
+          const retryResponse = await fetch("https://api.ascendara.app/app/report", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${newAuthToken}`,
+            },
+            body: JSON.stringify({
+              reportType: "UserReport",
+              reason: reportUserReason,
+              details: reportUserDetails,
+              gameName: `User: ${viewingProfile?.displayName || "Unknown"} (${viewingProfile?.uid || "Unknown UID"})`,
+            }),
+          });
+
+          if (retryResponse.ok) {
+            toast.success(
+              t("ascend.report.submitted") || "Report submitted successfully"
+            );
+            setReportUserReason("");
+            setReportUserDetails("");
+            setReportDialogOpen(false);
+            return;
+          }
+        }
+        throw new Error("Failed to submit report");
+      }
+
+      toast.success(t("ascend.report.submitted") || "Report submitted successfully");
+      setReportUserReason("");
+      setReportUserDetails("");
+      setReportDialogOpen(false);
+    } catch (error) {
+      console.error("Error submitting report:", error);
+      toast.error(t("ascend.report.failed") || "Failed to submit report");
+    } finally {
+      setIsReportingUser(false);
+    }
   };
 
   const handleAcceptRequest = async (requestId, fromUid) => {
@@ -1794,7 +1903,6 @@ const Ascend = () => {
         case "search":
           return (
             <div className="mb-20 space-y-6">
-              {/* Premium Header */}
               <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 p-6">
                 <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
                 <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-violet-500/20 blur-3xl" />
@@ -1905,6 +2013,12 @@ const Ascend = () => {
                               <h3 className="truncate text-lg font-semibold">
                                 {result.displayName}
                               </h3>
+                              {result.owner && (
+                                <Crown className="h-5 w-5 shrink-0 text-yellow-500" />
+                              )}
+                              {result.contributor && (
+                                <Hammer className="h-5 w-5 shrink-0 text-orange-500" />
+                              )}
                               {result.verified && (
                                 <BadgeCheck className="h-5 w-5 shrink-0 text-blue-500" />
                               )}
@@ -2531,7 +2645,6 @@ const Ascend = () => {
         case "settings":
           return (
             <div className="mb-40 space-y-6">
-              {/* Premium Header */}
               <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-violet-500/10 p-6">
                 <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
                 <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-violet-500/20 blur-3xl" />
@@ -2776,6 +2889,12 @@ const Ascend = () => {
                       <div className="min-w-0 flex-1">
                         <h3 className="flex items-center gap-1 truncate text-xl font-semibold">
                           {user.displayName}
+                          {userData?.owner && (
+                            <Crown className="mt-1 h-4 w-4 shrink-0 text-yellow-500" />
+                          )}
+                          {userData?.contributor && (
+                            <Hammer className="mt-1 h-4 w-4 shrink-0 text-orange-500" />
+                          )}
                           {userData?.verified && (
                             <BadgeCheck className="mt-1 h-4 w-4 shrink-0 text-blue-500" />
                           )}
@@ -3074,8 +3193,7 @@ const Ascend = () => {
                 )
               : 0;
           return (
-            <div className="space-y-6">
-              {/* Premium Header with gradient */}
+            <div className="mb-24 space-y-6">
               <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-violet-500/10 p-6">
                 <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
                 <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-violet-500/20 blur-3xl" />
@@ -3121,7 +3239,6 @@ const Ascend = () => {
                 </div>
               </div>
 
-              {/* Stats Cards - Premium Design */}
               {cloudLibrary && (
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                   <motion.div
@@ -3237,7 +3354,6 @@ const Ascend = () => {
                 </Select>
               </div>
 
-              {/* Games List - Premium Cards */}
               {loadingCloudLibrary ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <div className="relative">
@@ -3654,6 +3770,12 @@ const Ascend = () => {
                             <h1 className="truncate text-3xl font-bold">
                               {viewingProfile.displayName}
                             </h1>
+                            {viewingProfile.owner && (
+                              <Crown className="mb-2 h-7 w-7 shrink-0 text-yellow-500" />
+                            )}
+                            {viewingProfile.contributor && (
+                              <Hammer className="mb-2 h-7 w-7 shrink-0 text-orange-500" />
+                            )}
                             {viewingProfile.verified && (
                               <BadgeCheck className="mb-2 h-7 w-7 shrink-0 text-blue-500" />
                             )}
@@ -3753,6 +3875,120 @@ const Ascend = () => {
                               {t("ascend.friends.addFriend")}
                             </Button>
                           )}
+
+                          {/* Report User Button */}
+                          <AlertDialog
+                            open={reportDialogOpen}
+                            onOpenChange={setReportDialogOpen}
+                          >
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="text-destructive hover:bg-destructive/10"
+                              >
+                                <Flag className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <form
+                                onSubmit={e => {
+                                  e.preventDefault();
+                                  handleSubmitUserReport();
+                                }}
+                              >
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                                    {t("ascend.report.title") || "Report User"}:{" "}
+                                    {viewingProfile.displayName}
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription className="space-y-4">
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium">
+                                        {t("ascend.report.reason") || "Reason"}
+                                      </label>
+                                      <Select
+                                        value={reportUserReason}
+                                        onValueChange={setReportUserReason}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue
+                                            placeholder={
+                                              t("ascend.report.selectReason") ||
+                                              "Select a reason"
+                                            }
+                                          />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="inappropriate-content">
+                                            {t(
+                                              "ascend.report.reasons.inappropriateContent"
+                                            ) || "Inappropriate Content"}
+                                          </SelectItem>
+                                          <SelectItem value="harassment">
+                                            {t("ascend.report.reasons.harassment") ||
+                                              "Harassment"}
+                                          </SelectItem>
+                                          <SelectItem value="spam">
+                                            {t("ascend.report.reasons.spam") || "Spam"}
+                                          </SelectItem>
+                                          <SelectItem value="impersonation">
+                                            {t("ascend.report.reasons.impersonation") ||
+                                              "Impersonation"}
+                                          </SelectItem>
+                                          <SelectItem value="other">
+                                            {t("ascend.report.reasons.other") || "Other"}
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium">
+                                        {t("ascend.report.details") || "Details"}
+                                      </label>
+                                      <Textarea
+                                        placeholder={
+                                          t("ascend.report.detailsPlaceholder") ||
+                                          "Please provide more details about your report..."
+                                        }
+                                        value={reportUserDetails}
+                                        onChange={e =>
+                                          setReportUserDetails(e.target.value)
+                                        }
+                                        className="min-h-[100px]"
+                                      />
+                                    </div>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+
+                                <AlertDialogFooter className="mt-4 gap-2">
+                                  <AlertDialogCancel
+                                    className="text-primary"
+                                    onClick={() => {
+                                      setReportUserReason("");
+                                      setReportUserDetails("");
+                                    }}
+                                  >
+                                    {t("common.cancel") || "Cancel"}
+                                  </AlertDialogCancel>
+                                  <Button
+                                    type="submit"
+                                    className="text-secondary"
+                                    disabled={isReportingUser}
+                                  >
+                                    {isReportingUser ? (
+                                      <>
+                                        <Loader className="mr-2 h-4 w-4 animate-spin" />
+                                        {t("ascend.report.submitting") || "Submitting..."}
+                                      </>
+                                    ) : (
+                                      t("ascend.report.submit") || "Submit Report"
+                                    )}
+                                  </Button>
+                                </AlertDialogFooter>
+                              </form>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     </div>

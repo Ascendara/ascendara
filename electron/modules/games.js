@@ -831,6 +831,119 @@ function registerGameHandlers() {
       return false;
     }
   });
+
+  // Restore cloud game data (playTime, launchCount, etc.) to a game's JSON file
+  ipcMain.handle("restore-cloud-game-data", async (_, gameName, cloudData) => {
+    const settings = settingsManager.getSettings();
+    try {
+      if (!settings.downloadDirectory) {
+        return { success: false, error: "Download directory not set" };
+      }
+
+      const sanitizedGame = sanitizeText(gameName);
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ];
+
+      // First, try to find the game in regular game folders
+      let gameInfoPath = null;
+      for (const directory of allDirectories) {
+        // Try with sanitized name
+        let testPath = path.join(
+          directory,
+          sanitizedGame,
+          `${sanitizedGame}.ascendara.json`
+        );
+        if (fs.existsSync(testPath)) {
+          gameInfoPath = testPath;
+          break;
+        }
+        // Also try with original name (in case folder name wasn't sanitized)
+        testPath = path.join(directory, gameName, `${gameName}.ascendara.json`);
+        if (fs.existsSync(testPath)) {
+          gameInfoPath = testPath;
+          break;
+        }
+      }
+
+      // If found in regular games, update the JSON file
+      if (gameInfoPath) {
+        const gameData = JSON.parse(await fs.promises.readFile(gameInfoPath, "utf8"));
+
+        if (cloudData.playTime !== undefined) {
+          gameData.playTime = cloudData.playTime;
+        }
+        if (cloudData.launchCount !== undefined) {
+          gameData.launchCount = cloudData.launchCount;
+        }
+        if (cloudData.lastPlayed !== undefined) {
+          gameData.lastPlayed = cloudData.lastPlayed;
+        }
+        if (cloudData.favorite !== undefined) {
+          gameData.favorite = cloudData.favorite;
+        }
+
+        await fs.promises.writeFile(
+          gameInfoPath,
+          JSON.stringify(gameData, null, 4),
+          "utf8"
+        );
+
+        console.log(`Restored cloud data for ${gameName} (regular game):`, {
+          playTime: cloudData.playTime,
+          launchCount: cloudData.launchCount,
+        });
+
+        return { success: true };
+      }
+
+      // If not found in regular games, check custom games in games.json
+      const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+      if (fs.existsSync(gamesFilePath)) {
+        const gamesData = JSON.parse(await fs.promises.readFile(gamesFilePath, "utf8"));
+
+        // Find the game by name (case-insensitive)
+        const gameIndex = gamesData.games?.findIndex(
+          g => g.game?.toLowerCase() === gameName.toLowerCase()
+        );
+
+        if (gameIndex !== -1) {
+          // Update the custom game data
+          if (cloudData.playTime !== undefined) {
+            gamesData.games[gameIndex].playTime = cloudData.playTime;
+          }
+          if (cloudData.launchCount !== undefined) {
+            gamesData.games[gameIndex].launchCount = cloudData.launchCount;
+          }
+          if (cloudData.lastPlayed !== undefined) {
+            gamesData.games[gameIndex].lastPlayed = cloudData.lastPlayed;
+          }
+          if (cloudData.favorite !== undefined) {
+            gamesData.games[gameIndex].favorite = cloudData.favorite;
+          }
+
+          await fs.promises.writeFile(
+            gamesFilePath,
+            JSON.stringify(gamesData, null, 4),
+            "utf8"
+          );
+
+          console.log(`Restored cloud data for ${gameName} (custom game):`, {
+            playTime: cloudData.playTime,
+            launchCount: cloudData.launchCount,
+          });
+
+          return { success: true };
+        }
+      }
+
+      return { success: false, error: "Game not found" };
+    } catch (error) {
+      console.error("Error restoring cloud game data:", error);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 module.exports = {

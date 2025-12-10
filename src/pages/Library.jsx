@@ -38,6 +38,9 @@ import {
   FolderPlus,
   ChevronDown,
   ChevronUp,
+  Cloud,
+  CloudDownload,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +66,8 @@ import { useNavigate } from "react-router-dom";
 import igdbService from "@/services/gameInfoService";
 import { useIgdbConfig } from "@/services/gameInfoConfig";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
+import { getCloudLibrary, getGameAchievements } from "@/services/firebaseService";
 
 import NewFolderDialog from "@/components/NewFolderDialog";
 import FolderCard from "@/components/FolderCard";
@@ -138,8 +143,14 @@ const Library = () => {
     const savedFolders = localStorage.getItem("library-folders");
     return savedFolders ? JSON.parse(savedFolders) : [];
   });
+  // Cloud-only games state
+  const [cloudOnlyGames, setCloudOnlyGames] = useState([]);
+  const [loadingCloudGames, setLoadingCloudGames] = useState(false);
+  const [restoringGame, setRestoringGame] = useState(null);
+  const [cloudGameImages, setCloudGameImages] = useState({});
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     localStorage.setItem("game-favorites", JSON.stringify(favorites));
@@ -341,6 +352,217 @@ const Library = () => {
     init();
   }, []);
 
+  // Load cloud-only games (games in cloud but not installed locally)
+  useEffect(() => {
+    const loadCloudOnlyGames = async () => {
+      if (!user) {
+        setCloudOnlyGames([]);
+        return;
+      }
+
+      setLoadingCloudGames(true);
+      try {
+        const cloudResult = await getCloudLibrary();
+        if (cloudResult.data?.games) {
+          // Get local game names for comparison
+          const installedGames = await window.electron.getGames();
+          const customGames = await window.electron.getCustomGames();
+          const localGameNames = new Set([
+            ...(installedGames || []).map(g => (g.game || g.name)?.toLowerCase()),
+            ...(customGames || []).map(g => (g.game || g.name)?.toLowerCase()),
+          ]);
+
+          // Filter to cloud games that are NOT installed locally
+          // Include both regular games (with gameID) and custom games
+          const cloudOnly = cloudResult.data.games.filter(
+            g => !localGameNames.has(g.name?.toLowerCase()) && (g.gameID || g.isCustom)
+          );
+
+          setCloudOnlyGames(cloudOnly);
+
+          // Load images for cloud-only games (only for non-custom games with gameID)
+          const images = {};
+          for (const game of cloudOnly
+            .filter(g => g.gameID && !g.isCustom)
+            .slice(0, 20)) {
+            try {
+              const localStorageKey = `game-cover-${game.name}`;
+              const cachedImage = localStorage.getItem(localStorageKey);
+              if (cachedImage) {
+                images[game.name] = cachedImage;
+              } else if (game.gameID) {
+                const response = await fetch(
+                  `https://api.ascendara.app/v3/image/${game.gameID}`
+                );
+                if (response.ok) {
+                  const blob = await response.blob();
+                  const dataUrl = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                  });
+                  images[game.name] = dataUrl;
+                  try {
+                    localStorage.setItem(localStorageKey, dataUrl);
+                  } catch (e) {
+                    console.warn("Could not cache cloud game image:", e);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("Error loading cloud game image:", error);
+            }
+          }
+          setCloudGameImages(images);
+        }
+      } catch (e) {
+        console.error("Failed to load cloud library:", e);
+      }
+      setLoadingCloudGames(false);
+    };
+
+    loadCloudOnlyGames();
+  }, [user, games]); // Re-run when user changes or games list changes
+
+  // Restore game from cloud - find in local index and start download
+  const handleRestoreFromCloud = async cloudGame => {
+    // Handle custom games differently - they need to be manually re-added
+    if (cloudGame.isCustom) {
+      // Store cloud data in localStorage to restore after user manually adds the game
+      const cloudRestoreData = {
+        gameName: cloudGame.name,
+        playTime: cloudGame.playTime,
+        launchCount: cloudGame.launchCount,
+        lastPlayed: cloudGame.lastPlayed,
+        favorite: cloudGame.favorite,
+        isCustom: true,
+      };
+      localStorage.setItem(
+        `cloud-restore-${cloudGame.name}`,
+        JSON.stringify(cloudRestoreData)
+      );
+
+      // Show info toast and open add game dialog
+      toast.info(t("library.cloudRestore.customGameInfo"));
+      setIsAddGameOpen(true);
+      return;
+    }
+
+    if (!cloudGame.gameID) {
+      toast.error(t("library.cloudRestore.noGameId"));
+      return;
+    }
+
+    setRestoringGame(cloudGame.name);
+    try {
+      // Find the game in the local index using gameID
+      const gameData = await gameService.findGameByGameID(cloudGame.gameID);
+      if (!gameData) {
+        toast.error(t("library.cloudRestore.gameNotFound"));
+        setRestoringGame(null);
+        return;
+      }
+
+      // Store cloud data in localStorage to restore after download completes
+      const cloudRestoreData = {
+        gameName: cloudGame.name,
+        playTime: cloudGame.playTime,
+        launchCount: cloudGame.launchCount,
+        lastPlayed: cloudGame.lastPlayed,
+        favorite: cloudGame.favorite,
+      };
+      localStorage.setItem(
+        `cloud-restore-${cloudGame.name}`,
+        JSON.stringify(cloudRestoreData)
+      );
+
+      // Navigate to download page with the game data
+      navigate("/download", {
+        state: {
+          gameData: {
+            ...gameData,
+            fromCloudRestore: true,
+          },
+          fromCloudRestore: true,
+        },
+      });
+    } catch (error) {
+      console.error("Error restoring game from cloud:", error);
+      toast.error(t("library.cloudRestore.error"));
+    }
+    setRestoringGame(null);
+  };
+
+  // Check for pending cloud restores when games are loaded
+  // This handles the case where a cloud game was downloaded and we need to restore its data
+  const checkPendingCloudRestores = async installedGames => {
+    // Get all cloud-restore keys from localStorage
+    const keysToCheck = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("cloud-restore-")) {
+        keysToCheck.push(key);
+      }
+    }
+
+    for (const key of keysToCheck) {
+      const gameName = key.replace("cloud-restore-", "");
+      // Check if this game is now installed
+      const isInstalled = installedGames.some(
+        g => (g.game || g.name)?.toLowerCase() === gameName.toLowerCase()
+      );
+
+      if (isInstalled) {
+        try {
+          const cloudRestoreDataStr = localStorage.getItem(key);
+          if (cloudRestoreDataStr) {
+            const cloudRestoreData = JSON.parse(cloudRestoreDataStr);
+            console.log("Restoring cloud data for:", gameName, cloudRestoreData);
+
+            // Restore the cloud data to the game's JSON file
+            const result = await window.electron.restoreCloudGameData(
+              gameName,
+              cloudRestoreData
+            );
+
+            // Also restore achievements from cloud if available
+            if (user) {
+              try {
+                const achievementsResult = await getGameAchievements(gameName);
+                // Check if we have achievement data (could be in .achievements or directly in .data)
+                if (achievementsResult.data) {
+                  console.log(
+                    "Restoring achievements for:",
+                    gameName,
+                    achievementsResult.data
+                  );
+                  await window.electron.writeGameAchievements(
+                    gameName,
+                    achievementsResult.data
+                  );
+                }
+              } catch (achError) {
+                console.error("Error restoring achievements:", achError);
+              }
+            }
+
+            if (result.success) {
+              toast.success(t("library.cloudRestore.restored"));
+            } else {
+              console.error("Failed to restore cloud data:", result.error);
+            }
+
+            // Clean up localStorage
+            localStorage.removeItem(key);
+          }
+        } catch (error) {
+          console.error("Error restoring cloud data:", error);
+          localStorage.removeItem(key);
+        }
+      }
+    }
+  };
+
   const handleCreateFolder = name => {
     // Create new folder using the folderManager library
     const newFolder = createFolder(name);
@@ -359,6 +581,9 @@ const Library = () => {
       // Get games from main process
       const installedGames = await window.electron.getGames();
       const customGames = await window.electron.getCustomGames();
+
+      // Check for pending cloud restores (games that were downloaded from cloud)
+      await checkPendingCloudRestores([...installedGames, ...customGames]);
 
       // Filter out games that are being verified or downloading
       const filteredInstalledGames = installedGames.filter(
@@ -1144,6 +1369,36 @@ const Library = () => {
               </Button>
             </div>
           )}
+
+          {/* Cloud-Only Games Section */}
+          {user && cloudOnlyGames.length > 0 && (
+            <div className="mt-10">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
+                  <Cloud className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">
+                    {t("library.cloudOnly.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.cloudOnly.subtitle")}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {cloudOnlyGames.map(game => (
+                  <CloudOnlyGameCard
+                    key={game.name}
+                    game={game}
+                    imageData={cloudGameImages[game.name]}
+                    onRestore={() => handleRestoreFromCloud(game)}
+                    isRestoring={restoringGame === game.name}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1580,6 +1835,120 @@ const InstalledGameCard = memo(
 );
 
 InstalledGameCard.displayName = "InstalledGameCard";
+
+// Cloud-only game card with gray animation effect
+const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => {
+  const { t } = useLanguage();
+
+  const formatPlaytime = seconds => {
+    if (!seconds || seconds < 60) return t("library.neverPlayed");
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours === 0)
+      return `${minutes} ${t("library.minutes")} ${t("library.ofPlaytime")}`;
+    if (hours === 1) return `1 ${t("library.hour")} ${t("library.ofPlaytime")}`;
+    return `${hours} ${t("library.hours")} ${t("library.ofPlaytime")}`;
+  };
+
+  const isCustomGame = game.isCustom;
+
+  return (
+    <Card
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+        "hover:-translate-y-1 hover:shadow-xl"
+      )}
+    >
+      <CardContent className="p-0">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          {/* Gray overlay with shimmer animation */}
+          <div
+            className={cn(
+              "absolute inset-0 z-10",
+              isCustomGame
+                ? "bg-gradient-to-br from-purple-400/60 via-purple-500/50 to-purple-600/60"
+                : "bg-gradient-to-br from-gray-400/60 via-gray-500/50 to-gray-600/60"
+            )}
+          >
+            {/* Animated shimmer effect */}
+            <div
+              className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+              }}
+            />
+          </div>
+          {imageData ? (
+            <img
+              src={imageData}
+              alt={game.name}
+              className="h-full w-full border-b border-border object-cover grayscale"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-muted">
+              <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+            </div>
+          )}
+          {/* Cloud badge - different color for custom games */}
+          <span
+            className={cn(
+              "absolute left-2 top-2 z-20 flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-white",
+              isCustomGame ? "bg-purple-500/90" : "bg-blue-500/90"
+            )}
+          >
+            <Cloud className="h-3 w-3" />
+            {isCustomGame
+              ? t("library.cloudOnly.customBadge")
+              : t("library.cloudOnly.badge")}
+          </span>
+        </div>
+      </CardContent>
+      <CardFooter className="flex flex-col items-start gap-3 p-4 pt-3">
+        <div className="flex w-full items-center gap-2">
+          <h3 className="flex-1 truncate text-lg font-semibold text-foreground">
+            {game.name}
+          </h3>
+          {game.online && <Gamepad2 className="h-4 w-4 text-muted-foreground" />}
+          {game.dlc && <Gift className="h-4 w-4 text-muted-foreground" />}
+        </div>
+        <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span>{formatPlaytime(game.playTime)}</span>
+        </div>
+        <Button
+          onClick={onRestore}
+          disabled={isRestoring}
+          className={cn(
+            "w-full gap-2 text-white",
+            isCustomGame
+              ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              : "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+          )}
+        >
+          {isRestoring ? (
+            <>
+              <Loader className="h-4 w-4 animate-spin" />
+              {t("library.cloudOnly.restoring")}
+            </>
+          ) : isCustomGame ? (
+            <>
+              <Plus className="h-4 w-4" />
+              {t("library.cloudOnly.restoreCustom")}
+            </>
+          ) : (
+            <>
+              <CloudDownload className="h-4 w-4" />
+              {t("library.cloudOnly.restore")}
+            </>
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+});
+
+CloudOnlyGameCard.displayName = "CloudOnlyGameCard";
 
 const AddGameForm = ({ onSuccess }) => {
   const { t } = useLanguage();
