@@ -1155,12 +1155,17 @@ export const verifyAscendAccess = async (hardwareId = null) => {
 
     const userDoc = await getDoc(doc(db, "users", user.uid));
     if (!userDoc.exists()) {
+      const authCreationTime = new Date(user.metadata.creationTime);
+      const now = new Date();
+      const trialEndDate = new Date(authCreationTime.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const daysRemaining = Math.ceil((trialEndDate - now) / (24 * 60 * 60 * 1000));
+
       return {
-        hasAccess: false,
-        daysRemaining: 0,
+        hasAccess: daysRemaining > 0,
+        daysRemaining: Math.max(0, daysRemaining),
         isSubscribed: false,
         trialBlocked: false,
-        error: "User not found",
+        error: null,
       };
     }
 
