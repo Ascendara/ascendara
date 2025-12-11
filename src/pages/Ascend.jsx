@@ -4777,7 +4777,16 @@ const Ascend = () => {
                     </span>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {t("account.pricingDetails")}
+                    {t("account.pricingDetails")}&nbsp;
+                    <a
+                      onClick={() =>
+                        window.electron.openURL("https://ascendara.app/ascend")
+                      }
+                      className="cursor inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                    >
+                      {t("common.learnMore")}
+                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
+                    </a>
                   </p>
                 </div>
               </motion.div>
