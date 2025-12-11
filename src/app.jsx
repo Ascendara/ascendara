@@ -18,6 +18,7 @@ import {
   initializeStatusService,
   cleanupStatusService,
 } from "@/services/ascendStatusService";
+import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
 import { getUnreadMessageCount } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
@@ -63,6 +64,132 @@ const ScrollToTop = () => {
     window.scrollTo(0, 0);
     analytics.trackPageView(pathname);
   }, [pathname]);
+
+  return null;
+};
+
+// Track user activity and update Firebase customMessage
+const UserActivityTracker = () => {
+  const { pathname, state } = useLocation();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // Map routes to activity types
+    const updateActivity = async () => {
+      switch (pathname) {
+        case "/":
+          await setActivity(ActivityType.BROWSING_LIBRARY);
+          break;
+        case "/search":
+          await setActivity(ActivityType.SEARCHING_GAMES);
+          break;
+        case "/library":
+          await setActivity(ActivityType.BROWSING_LIBRARY);
+          break;
+        case "/downloads":
+        case "/torboxdownloads":
+          await setActivity(ActivityType.BROWSING_DOWNLOADS);
+          break;
+        case "/settings":
+          await setActivity(ActivityType.IN_SETTINGS);
+          break;
+        case "/ascend":
+          await setActivity(ActivityType.IN_ASCEND);
+          break;
+        case "/download":
+          // When viewing a specific game's download page
+          const gameName = state?.gameData?.game || state?.gameData?.name;
+          if (gameName) {
+            await setActivity(ActivityType.VIEWING_GAME, gameName);
+          } else {
+            await setActivity(ActivityType.SEARCHING_GAMES);
+          }
+          break;
+        case "/gamescreen":
+          // When viewing a game's details
+          const gameScreenName = state?.game?.game || state?.game?.name;
+          if (gameScreenName) {
+            await setActivity(ActivityType.VIEWING_GAME, gameScreenName);
+          }
+          break;
+        default:
+          await setActivity(ActivityType.IDLE);
+          break;
+      }
+    };
+
+    updateActivity();
+  }, [pathname, state, user?.uid]);
+
+  // Listen for game launch/close events
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const handleGameLaunch = (_, data) => {
+      const gameName = data?.game || "a game";
+      setActivity(ActivityType.PLAYING_GAME, gameName);
+    };
+
+    const handleGameClosed = (_, data) => {
+      // Restore to browsing library when game closes
+      setActivity(ActivityType.BROWSING_LIBRARY);
+    };
+
+    // Listen for game events from Electron
+    window.electron?.ipcRenderer?.on("game-launch-success", handleGameLaunch);
+    window.electron?.ipcRenderer?.on("game-closed", handleGameClosed);
+
+    return () => {
+      window.electron?.ipcRenderer?.off("game-launch-success", handleGameLaunch);
+      window.electron?.ipcRenderer?.off("game-closed", handleGameClosed);
+    };
+  }, [user?.uid]);
+
+  // Listen for download events
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    let currentDownloadGame = null;
+
+    const handleDownloadProgress = data => {
+      // Only update if the game name changed to avoid spamming Firebase
+      if (data?.game && data.game !== currentDownloadGame) {
+        currentDownloadGame = data.game;
+        setActivity(ActivityType.DOWNLOADING, data.game);
+      }
+    };
+
+    const handleDownloadComplete = data => {
+      currentDownloadGame = null;
+      // Return to browsing after download completes
+      setActivity(ActivityType.BROWSING_LIBRARY);
+    };
+
+    const unsubProgress = window.electron?.onDownloadProgress?.(handleDownloadProgress);
+    const unsubComplete = window.electron?.onDownloadComplete?.(handleDownloadComplete);
+
+    return () => {
+      if (typeof unsubProgress === "function") unsubProgress();
+      if (typeof unsubComplete === "function") unsubComplete();
+    };
+  }, [user?.uid]);
+
+  // Clear activity when app closes
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const handleAppClose = () => {
+      clearActivity();
+    };
+
+    window.electron?.onAppClose?.(handleAppClose);
+
+    return () => {
+      clearActivity();
+    };
+  }, [user?.uid]);
 
   return null;
 };
@@ -943,6 +1070,7 @@ function App() {
                   <ContextMenu />
                   <ScrollToTop />
                   <AscendStatusInitializer />
+                  <UserActivityTracker />
                   <MessageNotificationChecker />
                   <AppRoutes />
                   <MiniPlayer

@@ -107,6 +107,8 @@ service cloud.firestore {
         allow update: if request.auth != null 
           && request.auth.uid != resource.data.senderId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        // Allow participants to delete messages (for cleanup of old messages)
+        allow delete: if request.auth != null;
       }
     }
   }
