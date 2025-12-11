@@ -459,11 +459,6 @@ const LevelingCard = ({ level, currentXP, nextLevelXp, totalXP }) => {
           </div>
         </div>
       </CardContent>
-      <CardFooter>
-        <p className="text-xs text-muted-foreground opacity-30">
-          {t("profile.notreallol")}
-        </p>
-      </CardFooter>
     </Card>
   );
 };
