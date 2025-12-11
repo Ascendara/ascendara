@@ -51,6 +51,7 @@ import {
   getAllGameAchievements,
   deleteCloudGame,
   getUserPublicProfile,
+  getNotifications,
 } from "@/services/firebaseService";
 import {
   User,
@@ -277,6 +278,10 @@ const Ascend = () => {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [profileError, setProfileError] = useState(null);
 
+  // Notifications state
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+
   // Verify Ascend access and load data when user is logged in
   useEffect(() => {
     if (user?.uid && !showDisplayNamePrompt) {
@@ -288,6 +293,7 @@ const Ascend = () => {
       loadProfileStats();
       loadLocalStats();
       loadCloudLibrary();
+      loadNotifications();
     }
   }, [user?.uid, showDisplayNamePrompt]);
 
@@ -840,6 +846,19 @@ const Ascend = () => {
       console.error("Failed to load conversations:", e);
     }
     setLoadingConversations(false);
+  };
+
+  const loadNotifications = async () => {
+    setLoadingNotifications(true);
+    try {
+      const result = await getNotifications();
+      if (!result.error) {
+        setNotifications(result.notifications);
+      }
+    } catch (e) {
+      console.error("Failed to load notifications:", e);
+    }
+    setLoadingNotifications(false);
   };
 
   const handleSelectConversation = async conversation => {
@@ -2892,12 +2911,32 @@ const Ascend = () => {
           return (
             <div className="space-y-6">
               <h1 className="text-2xl font-bold">{t("ascend.notifications.title")}</h1>
-              <div className="rounded-xl border border-border/50 bg-card/50 p-6 text-center">
-                <Bell className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-4 text-sm text-muted-foreground">
-                  {t("ascend.notifications.empty")}
-                </p>
-              </div>
+              {loadingNotifications ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="rounded-xl border border-border/50 bg-card/50 p-6 text-center">
+                  <Bell className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    {t("ascend.notifications.empty")}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notifications.map(notification => (
+                    <div
+                      key={notification.id}
+                      className="rounded-xl border border-border/50 bg-card/50 p-4"
+                    >
+                      <p className="text-sm">{notification.message}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        — {notification.author}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
 

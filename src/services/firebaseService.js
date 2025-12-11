@@ -2111,5 +2111,26 @@ const getErrorMessage = errorCode => {
   return errorMessages[errorCode] || "An unexpected error occurred";
 };
 
+/**
+ * Get all notifications from the notifications collection
+ * @returns {Promise<{notifications: array, error: string|null}>}
+ */
+export const getNotifications = async () => {
+  try {
+    const notificationsRef = collection(db, "notifications");
+    const snapshot = await getDocs(notificationsRef);
+
+    const notifications = snapshot.docs.map(docSnap => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    return { notifications, error: null };
+  } catch (error) {
+    console.error("Get notifications error:", error);
+    return { notifications: [], error: error.message };
+  }
+};
+
 // Export Firebase instances for advanced usage
 export { app, auth, db, analytics };
