@@ -1103,9 +1103,41 @@ export const registerHardwareId = async (hardwareId, userId) => {
 };
 
 /**
- * Verify user's Ascend access (trial or subscription)
+ * Update user's Ascend subscription status in Firestore
+ * @param {object} subscriptionData - Subscription data from Stripe
+ * @returns {Promise<{success: boolean, error: string|null}>}
+ */
+export const updateAscendSubscription = async subscriptionData => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const userRef = doc(db, "users", user.uid);
+
+    await updateDoc(userRef, {
+      ascendSubscription: {
+        active: true,
+        subscriptionId: subscriptionData.subscriptionId,
+        customerId: subscriptionData.customerId,
+        expiresAt: Timestamp.fromMillis(subscriptionData.currentPeriodEnd * 1000),
+        cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd || false,
+        updatedAt: serverTimestamp(),
+      },
+    });
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("Update Ascend subscription error:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Verify user's Ascend access (subscription only - trial removed)
  * This checks server-side data that can't be manipulated client-side
- * @param {string} hardwareId - Optional hardware ID to verify against
+ * @param {string} hardwareId - Optional hardware ID (kept for compatibility)
  * @returns {Promise<{hasAccess: boolean, daysRemaining: number, isSubscribed: boolean, trialBlocked: boolean, error: string|null}>}
  */
 export const verifyAscendAccess = async (hardwareId = null) => {

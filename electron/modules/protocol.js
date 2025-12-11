@@ -42,7 +42,30 @@ function handleProtocolUrl(url) {
       lastHandledUrl = cleanUrl;
       lastHandleTime = currentTime;
 
-      if (cleanUrl.includes("steamrip-cookie")) {
+      console.log("Processing protocol URL:", cleanUrl);
+
+      if (cleanUrl.includes("checkout-success")) {
+        try {
+          const normalizedUrl = cleanUrl
+            .replace(
+              "ascendara://checkout-success/",
+              "https://placeholder/checkout-success"
+            )
+            .replace(
+              "ascendara://checkout-success",
+              "https://placeholder/checkout-success"
+            );
+          const urlParams = new URL(normalizedUrl);
+          const sessionId = urlParams.searchParams.get("session_id");
+          console.log("Checkout success with session:", sessionId);
+          existingWindow.webContents.send("checkout-success", { sessionId });
+        } catch (error) {
+          console.error("Error parsing checkout success URL:", error);
+        }
+      } else if (cleanUrl.includes("checkout-canceled")) {
+        console.log("Checkout was canceled");
+        existingWindow.webContents.send("checkout-canceled");
+      } else if (cleanUrl.includes("steamrip-cookie")) {
         try {
           const cookieMatch = cleanUrl.match(/steamrip-cookie\/(.+)/);
           if (cookieMatch && cookieMatch[1]) {

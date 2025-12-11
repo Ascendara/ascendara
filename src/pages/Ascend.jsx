@@ -110,6 +110,8 @@ import {
   Flag,
   Loader,
   Hammer,
+  Heart,
+  BadgeDollarSign,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -144,6 +146,17 @@ const GoogleIcon = ({ className }) => (
     />
   </svg>
 );
+
+// Helper function to get auth token for API calls
+const getAuthToken = async () => {
+  const AUTHORIZATION = await window.electron.getAPIKey();
+  const response = await fetch("https://api.ascendara.app/auth/token", {
+    headers: { Authorization: AUTHORIZATION },
+  });
+  if (!response.ok) throw new Error("Failed to obtain token");
+  const { token } = await response.json();
+  return token;
+};
 
 const Ascend = () => {
   const { t } = useTranslation();
@@ -207,6 +220,7 @@ const Ascend = () => {
     verified: false,
   });
   const [verifyingAccess, setVerifyingAccess] = useState(true);
+  const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
 
   // Messaging state
   const [conversations, setConversations] = useState([]);
@@ -1125,6 +1139,154 @@ const Ascend = () => {
     setEditSteam("");
   };
 
+  // Subscribe to Ascend via Stripe Checkout
+  const handleSubscribe = async () => {
+    try {
+      const productResponse = await fetch(
+        "https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW"
+      );
+      if (!productResponse.ok) {
+        toast.error(t("ascend.settings.checkoutError"));
+        return;
+      }
+      const product = await productResponse.json();
+
+      // Get the first price (monthly subscription)
+      const priceId = product.prices?.[0]?.id;
+      if (!priceId) {
+        toast.error(t("ascend.settings.checkoutError"));
+        return;
+      }
+
+      const authToken = await getAuthToken();
+      const response = await fetch(
+        "https://api.ascendara.app/stripe/create-checkout-session",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            priceId: priceId,
+            successUrl: "https://ascendara.app/ascend?success=true",
+            cancelUrl: "https://ascendara.app/ascend?canceled=true",
+          }),
+        }
+      );
+      if (response.ok) {
+        const { url } = await response.json();
+        window.electron?.openURL?.(url);
+      } else {
+        toast.error(t("ascend.settings.checkoutError"));
+      }
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      toast.error(t("ascend.settings.checkoutError"));
+    }
+  };
+
+  // Open Stripe Customer Portal for managing subscription
+  const handleManageSubscription = async () => {
+    try {
+      const authToken = await getAuthToken();
+      const response = await fetch("https://api.ascendara.app/stripe/customer-portal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          returnUrl: "ascendara://checkout-canceled",
+        }),
+      });
+      if (response.ok) {
+        const { url } = await response.json();
+        window.electron?.openURL?.(url);
+      } else {
+        toast.error(t("ascend.settings.portalError"));
+      }
+    } catch (error) {
+      console.error("Error opening customer portal:", error);
+      toast.error(t("ascend.settings.portalError"));
+    }
+  };
+
+  // Handle checkout success callback from protocol
+  const handleCheckoutSuccess = async sessionId => {
+    try {
+      // User might not be loaded yet when protocol callback fires
+      if (!user?.uid) {
+        console.log("User not loaded yet, waiting...");
+        // Wait a bit for user to load and retry
+        setTimeout(() => handleCheckoutSuccess(sessionId), 1000);
+        return;
+      }
+
+      const authToken = await getAuthToken();
+      const response = await fetch("https://api.ascendara.app/stripe/verify-checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          userId: user.uid,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Backend updates Firestore directly via Admin SDK
+          setShowSubscriptionSuccess(true);
+          // Refresh access status
+          verifyAccess();
+        } else {
+          toast.error(data.message || t("ascend.settings.paymentNotCompleted"));
+        }
+      } else {
+        toast.error(t("ascend.settings.verifyCheckoutError"));
+      }
+    } catch (error) {
+      console.error("Error verifying checkout:", error);
+      toast.error(t("ascend.settings.verifyCheckoutError"));
+    }
+  };
+
+  // Handle checkout canceled callback from protocol
+  const handleCheckoutCanceled = () => {
+    toast.info(t("ascend.settings.checkoutCanceled"));
+  };
+
+  // Listen for checkout protocol callbacks
+  useEffect(() => {
+    if (!window.electron?.ipcRenderer) return;
+
+    const onCheckoutSuccess = (event, data) => {
+      console.log("Checkout success received:", data);
+      if (data?.sessionId) {
+        handleCheckoutSuccess(data.sessionId);
+      }
+    };
+
+    const onCheckoutCanceled = () => {
+      console.log("Checkout canceled received");
+      handleCheckoutCanceled();
+    };
+
+    window.electron.ipcRenderer.on("checkout-success", onCheckoutSuccess);
+    window.electron.ipcRenderer.on("checkout-canceled", onCheckoutCanceled);
+
+    return () => {
+      window.electron.ipcRenderer.removeListener("checkout-success", onCheckoutSuccess);
+      window.electron.ipcRenderer.removeListener("checkout-canceled", onCheckoutCanceled);
+    };
+  }, [user?.uid]);
+
   // Check email verification every 5 seconds
   useEffect(() => {
     if (
@@ -1493,13 +1655,9 @@ const Ascend = () => {
                 ? t("ascend.access.trialBlockedMessage")
                 : t("ascend.access.expiredMessage")}
             </p>
-            <Button
-              onClick={() =>
-                window.electron?.openURL("https://ascendara.app/ascend/subscribe")
-              }
-              className="w-full text-secondary"
-            >
-              {t("ascend.subscription.upgrade")}
+            <Button onClick={handleSubscribe} className="w-full text-secondary">
+              <BadgeDollarSign className="mr-2 h-4 w-4" />
+              {t("ascend.settings.subscribe")}
             </Button>
             <button
               onClick={handleLogout}
@@ -2988,86 +3146,128 @@ const Ascend = () => {
                 )}
               </div>
 
-              {/* Subscription Management */}
-              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
-                <div className="flex items-center justify-between border-b border-border/50 p-5">
+              {/* Subscription Management - Premium Card Design */}
+              <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+                {/* Animated background effects for subscribed users */}
+                {ascendAccess.isSubscribed && (
+                  <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/10 blur-3xl" />
+                    <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/20 to-violet-500/10 blur-3xl" />
+                    <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
+                  </div>
+                )}
+
+                <div className="relative flex items-center justify-between border-b border-border/50 p-5">
                   <div className="flex items-center gap-2">
-                    <CreditCard className="mb-3 h-5 w-5 text-primary" />
+                    <div
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${ascendAccess.isSubscribed ? "bg-gradient-to-br from-yellow-500/20 to-amber-500/20" : "bg-primary/10"}`}
+                    >
+                      <BadgeDollarSign
+                        className={`h-4 w-4 ${ascendAccess.isSubscribed ? "text-yellow-500" : "text-primary"}`}
+                      />
+                    </div>
                     <h2 className="font-semibold">{t("ascend.settings.subscription")}</h2>
                   </div>
+                  {ascendAccess.isSubscribed && (
+                    <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-500/20 to-amber-500/20 px-3 py-1">
+                      <Sparkle className="h-3.5 w-3.5 text-yellow-500" />
+                      <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
+                        PRO
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="p-5">
+                <div className="relative p-5">
                   {ascendAccess.isSubscribed ? (
-                    // Active Subscription
-                    <div className="space-y-5">
+                    // Active Subscription - Premium Design
+                    <div className="space-y-6">
                       <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20">
-                          <Crown className="h-7 w-7 text-yellow-500" />
+                        <div className="relative">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-600 shadow-lg shadow-yellow-500/25">
+                            <BadgeDollarSign className="h-8 w-8 text-white" />
+                          </div>
+                          <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-background">
+                            <BadgeCheck className="h-4 w-4 text-white" />
+                          </div>
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">
+                            <h3 className="bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-xl font-bold text-transparent">
                               {t("ascend.settings.ascendPro")}
                             </h3>
-                            <BadgeCheck className="h-5 w-5 text-primary" />
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {t("ascend.settings.activeSubscription")}
+                            {t("ascend.settings.thankYouSubscriber")}
                           </p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-muted/50 p-4">
-                          <p className="mb-1 text-xs text-muted-foreground">
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 p-4 ring-1 ring-emerald-500/20"
+                        >
+                          <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-emerald-500/10 blur-xl transition-all group-hover:bg-emerald-500/20" />
+                          <p className="mb-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                             {t("ascend.settings.status")}
                           </p>
-                          <p className="flex items-center gap-1.5 font-medium text-emerald-500">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          <p className="flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span className="relative flex h-2.5 w-2.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                            </span>
                             {t("ascend.settings.active")}
                           </p>
-                        </div>
-                        <div className="rounded-xl bg-muted/50 p-4">
-                          <p className="mb-1 text-xs text-muted-foreground">
+                        </motion.div>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 }}
+                          className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 p-4 ring-1 ring-primary/20"
+                        >
+                          <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-primary/10 blur-xl transition-all group-hover:bg-primary/20" />
+                          <p className="mb-1 text-xs font-medium text-primary">
                             {t("ascend.settings.billingCycle")}
                           </p>
-                          <p className="font-medium">{t("ascend.settings.monthly")}</p>
+                          <p className="font-semibold">{t("ascend.settings.monthly")}</p>
+                        </motion.div>
+                      </div>
+
+                      <div className="rounded-xl bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-orange-500/10 p-4 ring-1 ring-yellow-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/20">
+                            <Heart className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {t("ascend.settings.supportMessage")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t("ascend.settings.supportMessageSub")}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex gap-3">
-                        <Button
-                          variant="outline"
-                          className="h-11 flex-1"
-                          onClick={() =>
-                            window.electron?.openURL?.(
-                              "https://ascendara.app/account/billing"
-                            )
-                          }
-                        >
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          {t("ascend.settings.manageBilling")}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-11"
-                          onClick={() =>
-                            window.electron?.openURL?.(
-                              "https://ascendara.app/account/cancel"
-                            )
-                          }
-                        >
-                          {t("ascend.settings.cancelSubscription")}
-                        </Button>
-                      </div>
+                      <Button
+                        variant="outline"
+                        className="h-12 w-full gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
+                        onClick={handleManageSubscription}
+                      >
+                        <Settings className="h-4 w-4" />
+                        {t("ascend.settings.manageSubscription")}
+                      </Button>
                     </div>
                   ) : ascendAccess.hasAccess && ascendAccess.daysRemaining > 0 ? (
-                    // Trial Active
+                    // Trial Active - Engaging Design
                     <div className="space-y-5">
                       <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/20">
-                          <Calendar className="h-7 w-7 text-primary" />
+                        <div className="relative">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/20 ring-2 ring-primary/20">
+                            <Clock className="h-7 w-7 text-primary" />
+                          </div>
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold">
@@ -3081,93 +3281,163 @@ const Ascend = () => {
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-gradient-to-br from-primary/10 to-violet-500/10 p-4">
-                        <div className="mb-2 flex items-center justify-between">
+                      <div className="rounded-xl bg-gradient-to-br from-primary/10 to-violet-500/10 p-4 ring-1 ring-primary/20">
+                        <div className="mb-3 flex items-center justify-between">
                           <span className="text-sm font-medium">
                             {t("ascend.settings.trialProgress")}
                           </span>
-                          <span className="text-sm text-muted-foreground">
-                            {7 - ascendAccess.daysRemaining}/7 {t("ascend.settings.days")}
+                          <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
+                            {ascendAccess.daysRemaining} {t("ascend.settings.daysLeft")}
                           </span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500 transition-all"
-                            style={{
+                        <div className="h-3 w-full overflow-hidden rounded-full bg-muted/50">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{
                               width: `${((7 - ascendAccess.daysRemaining) / 7) * 100}%`,
                             }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500"
                           />
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-                        <h4 className="mb-2 flex items-center gap-2 font-medium">
-                          <Crown className="h-4 w-4 text-yellow-500" />
-                          {t("ascend.settings.upgradeToProTitle")}
-                        </h4>
-                        <p className="mb-3 text-sm text-muted-foreground">
-                          {t("ascend.settings.upgradeToProDescription")}
-                        </p>
-                        <Button
-                          className="h-11 w-full text-secondary"
-                          onClick={() =>
-                            window.electron?.openURL?.("https://ascendara.app/ascend")
-                          }
-                        >
-                          <Crown className="mr-2 h-4 w-4" />
-                          {t("ascend.settings.upgradeToPro")}
-                        </Button>
+                      <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 to-violet-500/5 p-5">
+                        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+                        <div className="relative">
+                          <div className="mb-3 flex items-center gap-2">
+                            <BadgeDollarSign className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold">
+                              {t("ascend.settings.upgradeToProTitle")}
+                            </h4>
+                          </div>
+                          <p className="mb-4 text-sm text-muted-foreground">
+                            {t("ascend.settings.upgradeToProDescription")}
+                          </p>
+                          <Button
+                            className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
+                            onClick={handleSubscribe}
+                          >
+                            <BadgeDollarSign className="h-4 w-4" />
+                            {t("ascend.settings.upgradeToPro")}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    // No Access / Trial Expired
+                    // No Access / Trial Expired - Compelling CTA
                     <div className="space-y-5">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
-                          <Crown className="h-7 w-7 text-muted-foreground" />
+                      <div className="text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/20">
+                          <BadgeDollarSign className="h-8 w-8 text-primary" />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold">
-                            {t("ascend.settings.noSubscription")}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            {t("ascend.settings.subscribeToUnlock")}
-                          </p>
-                        </div>
+                        <h3 className="text-xl font-bold">
+                          {t("ascend.settings.joinAscend")}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t("ascend.settings.subscribeToUnlock")}
+                        </p>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3 text-sm">
-                          <BadgeCheck className="h-5 w-5 shrink-0 text-primary" />
-                          <span>{t("ascend.settings.feature1")}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm">
-                          <BadgeCheck className="h-5 w-5 shrink-0 text-primary" />
-                          <span>{t("ascend.settings.feature2")}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm">
-                          <BadgeCheck className="h-5 w-5 shrink-0 text-primary" />
-                          <span>{t("ascend.settings.feature3")}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm">
-                          <BadgeCheck className="h-5 w-5 shrink-0 text-primary" />
-                          <span>{t("ascend.settings.feature4")}</span>
-                        </div>
+                      <div className="grid gap-2">
+                        {[
+                          { icon: Users, text: t("ascend.settings.feature1") },
+                          { icon: CloudIcon, text: t("ascend.settings.feature2") },
+                          { icon: Gamepad2, text: t("ascend.settings.feature3") },
+                          { icon: Sparkle, text: t("ascend.settings.feature4") },
+                        ].map((feature, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                            className="flex items-center gap-3 rounded-lg bg-muted/30 p-3"
+                          >
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                              <feature.icon className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-sm">{feature.text}</span>
+                          </motion.div>
+                        ))}
                       </div>
 
                       <Button
-                        className="h-11 w-full text-secondary"
-                        onClick={() =>
-                          window.electron?.openURL?.("https://ascendara.app/ascend")
-                        }
+                        className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
+                        onClick={handleSubscribe}
                       >
-                        <Crown className="mr-2 h-4 w-4" />
+                        <BadgeDollarSign className="h-4 w-4" />
                         {t("ascend.settings.subscribe")}
                       </Button>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Subscription Success Dialog */}
+              <AlertDialog
+                open={showSubscriptionSuccess}
+                onOpenChange={setShowSubscriptionSuccess}
+              >
+                <AlertDialogContent className="max-w-md overflow-hidden border-0 bg-gradient-to-b from-background to-background/95 p-0 shadow-2xl">
+                  <AlertDialogHeader className="sr-only">
+                    <AlertDialogTitle>
+                      {t("ascend.settings.welcomeToAscend")}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("ascend.settings.subscriptionSuccessMessage")}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-yellow-500/20 blur-3xl" />
+                    <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+                    <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
+                  </div>
+
+                  <div className="relative p-8 text-center">
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", duration: 0.8 }}
+                      className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-yellow-500 to-amber-600 shadow-xl shadow-yellow-500/30"
+                    >
+                      <Crown className="h-10 w-10 text-white" />
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      <h2 className="mb-2 bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-2xl font-bold text-transparent">
+                        {t("ascend.settings.welcomeToAscend")}
+                      </h2>
+                      <p className="mb-6 text-muted-foreground">
+                        {t("ascend.settings.subscriptionSuccessMessage")}
+                      </p>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                      className="space-y-3"
+                    >
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <BadgeCheck className="h-4 w-4 text-emerald-500" />
+                        <span>{t("ascend.settings.allFeaturesUnlocked")}</span>
+                      </div>
+
+                      <Button
+                        className="h-12 w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/25 transition-shadow hover:shadow-yellow-500/40"
+                        onClick={() => setShowSubscriptionSuccess(false)}
+                      >
+                        <Sparkle className="h-4 w-4" />
+                        {t("ascend.settings.startExploring")}
+                      </Button>
+                    </motion.div>
+                  </div>
+                </AlertDialogContent>
+              </AlertDialog>
 
               {/* Sign out */}
               <button
