@@ -50,9 +50,10 @@ function createWindow() {
   });
 
   if (isDev) {
+    // Load from localhost:5173 in development
     mainWindow.loadURL("http://localhost:5173");
   } else {
-    mainWindow.loadFile(path.join(__dirname, "..", "index.html"));
+    mainWindow.loadURL("http://localhost:5432");
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
