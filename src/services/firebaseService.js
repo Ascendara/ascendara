@@ -1138,7 +1138,7 @@ export const updateAscendSubscription = async subscriptionData => {
  * Verify user's Ascend access (subscription only - trial removed)
  * This checks server-side data that can't be manipulated client-side
  * @param {string} hardwareId - Optional hardware ID (kept for compatibility)
- * @returns {Promise<{hasAccess: boolean, daysRemaining: number, isSubscribed: boolean, trialBlocked: boolean, error: string|null}>}
+ * @returns {Promise<{hasAccess: boolean, daysRemaining: number, isSubscribed: boolean, isVerified: boolean, trialBlocked: boolean, error: string|null}>}
  */
 export const verifyAscendAccess = async (hardwareId = null) => {
   try {
@@ -1148,6 +1148,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
         hasAccess: false,
         daysRemaining: 0,
         isSubscribed: false,
+        isVerified: false,
         trialBlocked: false,
         error: "Not authenticated",
       };
@@ -1164,12 +1165,26 @@ export const verifyAscendAccess = async (hardwareId = null) => {
         hasAccess: daysRemaining > 0,
         daysRemaining: Math.max(0, daysRemaining),
         isSubscribed: false,
+        isVerified: false,
         trialBlocked: false,
         error: null,
       };
     }
 
     const userData = userDoc.data();
+
+    // Check if user is verified (owner, contributor, or verified badge)
+    // Verified users get full access without subscription
+    if (userData.verified || userData.owner || userData.contributor) {
+      return {
+        hasAccess: true,
+        daysRemaining: -1,
+        isSubscribed: false,
+        isVerified: true,
+        trialBlocked: false,
+        error: null,
+      };
+    }
 
     // Check if user has active subscription (bypasses hardware check)
     if (userData.ascendSubscription?.active) {
@@ -1179,6 +1194,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
           hasAccess: true,
           daysRemaining: -1,
           isSubscribed: true,
+          isVerified: false,
           trialBlocked: false,
           error: null,
         };
@@ -1198,6 +1214,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
               hasAccess: false,
               daysRemaining: 0,
               isSubscribed: false,
+              isVerified: false,
               trialBlocked: true,
               error: "Trial already used on this device",
             };
@@ -1215,6 +1232,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
               hasAccess: false,
               daysRemaining: 0,
               isSubscribed: false,
+              isVerified: false,
               trialBlocked: true,
               error: "Trial already used on this device",
             };
@@ -1254,6 +1272,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
       hasAccess: daysRemaining > 0,
       daysRemaining: Math.max(0, daysRemaining),
       isSubscribed: false,
+      isVerified: false,
       trialBlocked: false,
       error: null,
     };
@@ -1263,6 +1282,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
       hasAccess: false,
       daysRemaining: 0,
       isSubscribed: false,
+      isVerified: false,
       trialBlocked: false,
       error: error.message,
     };

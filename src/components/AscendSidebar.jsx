@@ -39,9 +39,10 @@ const AscendSidebar = ({
   const [customMessage, setCustomMessage] = useState("");
 
   // Use server-verified access data
-  const trialDaysRemaining = ascendAccess?.isSubscribed
-    ? -1
-    : (ascendAccess?.daysRemaining ?? 7);
+  const trialDaysRemaining =
+    ascendAccess?.isSubscribed || ascendAccess?.isVerified
+      ? -1
+      : (ascendAccess?.daysRemaining ?? 7);
 
   const statusOptions = [
     {
@@ -186,9 +187,22 @@ const AscendSidebar = ({
         ))}
       </div>
 
-      {/* Trial/Subscription Status */}
+      {/* Trial/Subscription/Verified Status */}
       <div className="shrink-0 px-3 pb-2">
-        {ascendAccess?.isSubscribed ? (
+        {ascendAccess?.isVerified ? (
+          // Verified user - show verified status
+          <div className="rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 p-3">
+            <div className="flex items-center gap-2">
+              <BadgeCheck className="h-4 w-4 text-blue-500" />
+              <span className="hidden text-xs font-medium text-blue-600 dark:text-blue-400 lg:block">
+                {t("ascend.subscription.verified")}
+              </span>
+              <span className="text-xs font-bold text-blue-500 lg:hidden">
+                {t("ascend.subscription.verifiedShort")}
+              </span>
+            </div>
+          </div>
+        ) : ascendAccess?.isSubscribed ? (
           // Subscribed user - show active status
           <div className="rounded-xl border border-green-500/30 bg-gradient-to-r from-green-500/20 to-emerald-500/20 p-3">
             <div className="flex items-center gap-2">

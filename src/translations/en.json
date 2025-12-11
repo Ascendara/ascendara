@@ -274,6 +274,7 @@
     "profile": {
       "achievements": "Achievements",
       "back": "Back to Search",
+      "cloudSynced": "Cloud Synced",
       "error": "Error loading profile",
       "games": "Games",
       "gamesPlayed": "Games Played",
@@ -341,6 +342,7 @@
       "title": "Search Users"
     },
     "settings": {
+      "accessType": "Access Type",
       "active": "Active",
       "activeSubscription": "Your subscription is active",
       "addCard": "Add Card",
@@ -381,6 +383,7 @@
       "freeTrial": "Free Trial",
       "githubPlaceholder": "Your GitHub username",
       "joinAscend": "Join Ascend",
+      "lifetime": "Lifetime",
       "linkDescription": "Link by Stripe lets you save your payment info and check out with one click across thousands of sites.",
       "manageBilling": "Manage Billing",
       "manageSubscription": "Manage Subscription",
@@ -428,6 +431,10 @@
       "upgradeToPro": "Step Up. Connect. Join Ascend.",
       "upgradeToProDescription": "Get unlimited access to all Ascend features and support the solo developer.",
       "upgradeToProTitle": "Subscribe to keep Ascend forever",
+      "verifiedDescription": "You have full access to all Ascend features",
+      "verifiedThankYou": "Thank you for being part of Ascendara!",
+      "verifiedThankYouSub": "Your contributions help make this possible",
+      "verifiedUser": "Verified User",
       "verifyCheckoutError": "Failed to verify payment. Please contact support if you were charged.",
       "welcomeToAscend": "Welcome to Ascend!"
     },
@@ -451,7 +458,9 @@
       "trialDays": "{{days}} days left in trial",
       "trialExpired": "Trial expired",
       "upgrade": "Add Payment Method",
-      "upgradeShort": "Upgrade"
+      "upgradeShort": "Upgrade",
+      "verified": "Verified User",
+      "verifiedShort": "✓"
     },
     "welcome": "Welcome back, {{name}}!"
   },

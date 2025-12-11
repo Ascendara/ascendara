@@ -217,6 +217,7 @@ const Ascend = () => {
     hasAccess: true,
     daysRemaining: 7,
     isSubscribed: false,
+    isVerified: false,
     verified: false,
   });
   const [verifyingAccess, setVerifyingAccess] = useState(true);
@@ -422,6 +423,7 @@ const Ascend = () => {
         hasAccess: true,
         daysRemaining: 7,
         isSubscribed: false,
+        isVerified: false,
         trialBlocked: false,
         verified: true,
       });
@@ -3148,38 +3150,132 @@ const Ascend = () => {
 
               {/* Subscription Management - Premium Card Design */}
               <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/50">
-                {/* Animated background effects for subscribed users */}
-                {ascendAccess.isSubscribed && (
+                {/* Animated background effects for subscribed/verified users */}
+                {(ascendAccess.isSubscribed || ascendAccess.isVerified) && (
                   <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/10 blur-3xl" />
-                    <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/20 to-violet-500/10 blur-3xl" />
-                    <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
+                    <div
+                      className={`absolute -right-20 -top-20 h-64 w-64 rounded-full blur-3xl ${ascendAccess.isVerified ? "bg-gradient-to-br from-blue-500/20 to-cyan-500/10" : "bg-gradient-to-br from-yellow-500/20 to-amber-500/10"}`}
+                    />
+                    <div
+                      className={`absolute -bottom-20 -left-20 h-64 w-64 rounded-full blur-3xl ${ascendAccess.isVerified ? "bg-gradient-to-br from-violet-500/20 to-blue-500/10" : "bg-gradient-to-br from-primary/20 to-violet-500/10"}`}
+                    />
+                    <div
+                      className={`absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent to-transparent ${ascendAccess.isVerified ? "via-blue-500/50" : "via-yellow-500/50"}`}
+                    />
                   </div>
                 )}
 
                 <div className="relative flex items-center justify-between border-b border-border/50 p-5">
                   <div className="flex items-center gap-2">
                     <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${ascendAccess.isSubscribed ? "bg-gradient-to-br from-yellow-500/20 to-amber-500/20" : "bg-primary/10"}`}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${ascendAccess.isVerified ? "bg-gradient-to-br from-blue-500/20 to-cyan-500/20" : ascendAccess.isSubscribed ? "bg-gradient-to-br from-yellow-500/20 to-amber-500/20" : "bg-primary/10"}`}
                     >
-                      <BadgeDollarSign
-                        className={`h-4 w-4 ${ascendAccess.isSubscribed ? "text-yellow-500" : "text-primary"}`}
-                      />
+                      {ascendAccess.isVerified ? (
+                        <BadgeCheck className="h-4 w-4 text-blue-500" />
+                      ) : (
+                        <BadgeDollarSign
+                          className={`h-4 w-4 ${ascendAccess.isSubscribed ? "text-yellow-500" : "text-primary"}`}
+                        />
+                      )}
                     </div>
                     <h2 className="font-semibold">{t("ascend.settings.subscription")}</h2>
                   </div>
-                  {ascendAccess.isSubscribed && (
+                  {ascendAccess.isVerified ? (
+                    <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-3 py-1">
+                      <BadgeCheck className="h-3.5 w-3.5 text-blue-500" />
+                      <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                        VERIFIED
+                      </span>
+                    </div>
+                  ) : ascendAccess.isSubscribed ? (
                     <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-500/20 to-amber-500/20 px-3 py-1">
                       <Sparkle className="h-3.5 w-3.5 text-yellow-500" />
                       <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
                         PRO
                       </span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="relative p-5">
-                  {ascendAccess.isSubscribed ? (
+                  {ascendAccess.isVerified ? (
+                    // Verified User - Special Design
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/25">
+                            <BadgeCheck className="h-8 w-8 text-white" />
+                          </div>
+                          <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-background">
+                            <Check className="h-4 w-4 text-white" />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="bg-gradient-to-r from-blue-500 to-cyan-600 bg-clip-text text-xl font-bold text-transparent">
+                              {t("ascend.settings.verifiedUser") || "Verified User"}
+                            </h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {t("ascend.settings.verifiedDescription") ||
+                              "You have full access to all Ascend features"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 p-4 ring-1 ring-emerald-500/20"
+                        >
+                          <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-emerald-500/10 blur-xl transition-all group-hover:bg-emerald-500/20" />
+                          <p className="mb-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                            {t("ascend.settings.status")}
+                          </p>
+                          <p className="flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span className="relative flex h-2.5 w-2.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                            </span>
+                            {t("ascend.settings.active")}
+                          </p>
+                        </motion.div>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 }}
+                          className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 p-4 ring-1 ring-blue-500/20"
+                        >
+                          <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-blue-500/10 blur-xl transition-all group-hover:bg-blue-500/20" />
+                          <p className="mb-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                            {t("ascend.settings.accessType") || "Access Type"}
+                          </p>
+                          <p className="font-semibold text-blue-600 dark:text-blue-400">
+                            {t("ascend.settings.lifetime") || "Lifetime"}
+                          </p>
+                        </motion.div>
+                      </div>
+
+                      <div className="rounded-xl bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-violet-500/10 p-4 ring-1 ring-blue-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20">
+                            <Heart className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {t("ascend.settings.verifiedThankYou") ||
+                                "Thank you for being part of Ascendara!"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t("ascend.settings.verifiedThankYouSub") ||
+                                "Your contributions help make this possible"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : ascendAccess.isSubscribed ? (
                     // Active Subscription - Premium Design
                     <div className="space-y-6">
                       <div className="flex items-center gap-4">
