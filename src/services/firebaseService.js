@@ -1403,27 +1403,33 @@ export const getUserPublicProfile = async userId => {
     const cloudLibrary = userData.cloudLibrary || null;
     const games = cloudLibrary?.games || [];
 
-    // Calculate stats from cloud library games
-    let totalPlaytime = 0;
-    let gamesPlayed = games.length;
-    games.forEach(game => {
-      totalPlaytime += game.playTime || 0;
-    });
+    // Get profile stats (level, xp, etc.)
+    const profileStats = userData.profileStats || {};
 
-    // Get all game achievements
-    let achievements = [];
-    try {
-      const achievementsRef = collection(db, "gameAchievements", userId, "games");
-      const achievementsSnapshot = await getDocs(achievementsRef);
-      achievementsSnapshot.forEach(doc => {
-        achievements.push({
-          gameName: doc.id,
-          ...doc.data(),
-        });
+    // Calculate stats from cloud library games
+    let totalPlaytime = profileStats.totalPlaytime || 0;
+    let gamesPlayed = profileStats.gamesPlayed || games.length;
+
+    // If no profileStats playtime, calculate from games
+    if (!profileStats.totalPlaytime) {
+      games.forEach(game => {
+        totalPlaytime += game.playTime || 0;
       });
-    } catch (e) {
-      console.warn("Failed to get achievements for user:", userId);
     }
+
+    // Get achievement counts from cloudLibrary (subcollection has permission restrictions for other users)
+    const totalAchievements = cloudLibrary?.totalAchievements || 0;
+    const unlockedAchievements = cloudLibrary?.unlockedAchievements || 0;
+
+    // Build achievements array from games data for display purposes
+    let achievements = games
+      .map(game => ({
+        gameName: game.name,
+        totalAchievements: game.totalAchievements || 0,
+        unlockedAchievements: game.unlockedAchievements || 0,
+        achievements: [], // Individual achievements not accessible for other users due to permissions
+      }))
+      .filter(g => g.totalAchievements > 0);
 
     // Check if we're friends with this user
     let isFriend = false;
@@ -1435,6 +1441,9 @@ export const getUserPublicProfile = async userId => {
     } catch (e) {
       console.warn("Failed to check friend status");
     }
+
+    // Check if profile is private
+    const isPrivate = userData.private || false;
 
     return {
       data: {
@@ -1448,15 +1457,18 @@ export const getUserPublicProfile = async userId => {
         contributor: userData.contributor || false,
         socials: userData.socials || null,
         status,
-        level: 1, // TODO: Calculate level from XP if needed
-        xp: 0,
+        level: profileStats.level || 1,
+        xp: profileStats.xp || 0,
         totalPlaytime,
         gamesPlayed,
         totalGames: gamesPlayed,
         joinDate: userData.createdAt || null,
         games,
         achievements,
+        totalAchievements,
+        unlockedAchievements,
         isFriend,
+        private: isPrivate,
       },
       error: null,
     };
@@ -1686,6 +1698,9 @@ export const getFriendsList = async () => {
           photoURL: userData.photoURL,
           status: status.status,
           customMessage: status.customMessage,
+          owner: userData.owner || false,
+          contributor: userData.contributor || false,
+          verified: userData.verified || false,
         });
       }
     }
@@ -1850,6 +1865,9 @@ export const getConversations = async () => {
           displayName: userData.displayName,
           photoURL: userData.photoURL,
           status,
+          owner: userData.owner || false,
+          contributor: userData.contributor || false,
+          verified: userData.verified || false,
         },
         lastMessage: data.lastMessage,
         lastMessageSenderId: data.lastMessageSenderId,

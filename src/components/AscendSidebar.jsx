@@ -21,6 +21,7 @@ import {
   BadgeCheck,
   Crown,
   Hammer,
+  BadgeDollarSign,
 } from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ const AscendSidebar = ({
   userData,
   onStatusChange,
   ascendAccess,
+  onSubscribe,
 }) => {
   const { t } = useTranslation();
   const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -103,15 +105,15 @@ const AscendSidebar = ({
 
   const mainNavItems = [
     { id: "home", icon: Home, label: t("ascend.nav.home") },
-    { id: "search", icon: Search, label: t("ascend.nav.search") },
-    { id: "friends", icon: Users, label: t("ascend.nav.friends"), badge: 0 },
-    { id: "requests", icon: UserPlus, label: t("ascend.nav.requests"), badge: 0 },
-    { id: "messages", icon: MessageCircle, label: t("ascend.nav.messages"), badge: 0 },
     {
       id: "cloudlibrary",
       icon: CloudIcon,
       label: t("ascend.nav.cloudLibrary") || "Cloud Library",
     },
+    { id: "search", icon: Search, label: t("ascend.nav.search") },
+    { id: "friends", icon: Users, label: t("ascend.nav.friends"), badge: 0 },
+    { id: "requests", icon: UserPlus, label: t("ascend.nav.requests"), badge: 0 },
+    { id: "messages", icon: MessageCircle, label: t("ascend.nav.messages"), badge: 0 },
   ];
 
   const bottomNavItems = [
@@ -238,12 +240,10 @@ const AscendSidebar = ({
             </div>
             {trialDaysRemaining <= 3 && (
               <button
-                onClick={() =>
-                  window.electron?.openURL("https://ascendara.app/ascend/subscribe")
-                }
-                className="text-primary-foreground mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-1.5 text-xs font-medium transition-colors hover:bg-primary/90"
+                onClick={onSubscribe}
+                className="text-primary-foreground mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-primary/90"
               >
-                <CreditCard className="h-3 w-3" />
+                <BadgeDollarSign className="h-3 w-3" />
                 <span className="hidden lg:inline">
                   {t("ascend.subscription.upgrade")}
                 </span>
