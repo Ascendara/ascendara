@@ -66,15 +66,18 @@ const AscendSidebar = ({
     },
   ];
 
-  // Load current status on mount
+  // Load current status on mount with delay to ensure status service has initialized
   useEffect(() => {
     if (user?.uid) {
-      getUserStatus(user.uid).then(result => {
-        if (result.data) {
-          setCurrentStatus(result.data.status || "online");
-          setCustomMessage(result.data.customMessage || "");
-        }
-      });
+      const timeout = setTimeout(() => {
+        getUserStatus(user.uid).then(result => {
+          if (result.data) {
+            setCurrentStatus(result.data.status || "online");
+            setCustomMessage(result.data.customMessage || "");
+          }
+        });
+      }, 500);
+      return () => clearTimeout(timeout);
     }
   }, [user?.uid]);
 

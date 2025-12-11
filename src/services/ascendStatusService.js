@@ -4,6 +4,7 @@ let previousStatus = "online";
 let isInitialized = false;
 let statusChangeCallback = null;
 let currentUserId = null;
+let initializationTime = 0;
 
 /**
  * Initialize the status service - sets user to their preferred status
@@ -38,16 +39,19 @@ export const initializeStatusService = async (onStatusChange, userId) => {
     await updateUserStatus(previousStatus);
     if (statusChangeCallback) statusChangeCallback(previousStatus);
     isInitialized = true;
+    initializationTime = Date.now();
 
-    // Set up beforeunload handler for browser/app close
+    // Set up close handlers
     if (typeof window !== "undefined") {
-      window.addEventListener("beforeunload", handleAppClose);
-
-      // Listen for Electron app events
+      // In Electron, use the app-closing IPC event (beforeunload fires during HMR reloads)
+      // Only use beforeunload for non-Electron environments (pure browser)
       if (window.electron?.onAppClose) {
         window.electron.onAppClose(() => {
           handleAppClose();
         });
+      } else {
+        // Fallback for non-Electron environments
+        window.addEventListener("beforeunload", handleAppClose);
       }
 
       // Listen for app hidden (minimized to tray)
@@ -91,6 +95,13 @@ const handleAppClose = async () => {
  */
 const handleAppHidden = async () => {
   if (!currentUserId) return;
+
+  // Ignore hidden events that fire within 2 seconds of initialization
+  // This prevents race conditions during app startup
+  if (Date.now() - initializationTime < 2000) {
+    console.log("[AscendStatus] Ignoring early hidden event");
+    return;
+  }
 
   try {
     await updateUserStatus("invisible");

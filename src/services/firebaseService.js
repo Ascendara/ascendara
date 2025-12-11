@@ -576,6 +576,11 @@ export const reloadCurrentUser = async () => {
  * @returns {Promise<{success: boolean, error: string|null}>}
  */
 export const updateUserStatus = async (status, customMessage = "") => {
+  // Debug: trace what's setting status to invisible
+  if (status === "invisible") {
+    console.log("[updateUserStatus] Setting to invisible, stack:", new Error().stack);
+  }
+
   try {
     const user = auth.currentUser;
     if (!user) {

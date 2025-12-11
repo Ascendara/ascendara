@@ -289,12 +289,18 @@ const Ascend = () => {
       verifyAccess();
       loadFriendsData();
       loadRequestsData();
-      loadUserStatus();
+      // Delay loading user status to ensure the status service has initialized
+      // and updated the status to online first
+      const statusTimeout = setTimeout(() => {
+        loadUserStatus();
+      }, 500);
       loadConversations();
       loadProfileStats();
       loadLocalStats();
       loadCloudLibrary();
       loadNotifications();
+
+      return () => clearTimeout(statusTimeout);
     }
   }, [user?.uid, showDisplayNamePrompt]);
 

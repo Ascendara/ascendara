@@ -74,8 +74,12 @@ export const setActivity = async (activityType, context = null) => {
     const customMessage = getActivityMessage(activityType, context);
 
     // Get current status to preserve it
+    // Use preferredStatus if current status is invisible (from previous session)
     const currentStatus = await getCurrentUserStatus(user.uid);
-    const status = currentStatus?.status || "online";
+    let status = currentStatus?.status || "online";
+    if (status === "invisible" && currentStatus?.preferredStatus) {
+      status = currentStatus.preferredStatus;
+    }
 
     // Update with the current status and new activity message
     const result = await updateUserStatus(status, customMessage);
