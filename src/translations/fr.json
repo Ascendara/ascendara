@@ -40,6 +40,7 @@
       "displayNamePlaceholder": "Comment devrions-nous vous appeler ?",
       "email": "E-mail",
       "emailPlaceholder": "Entrez votre email",
+      "linkWithPC": "Associer définitivement ce compte à ce PC",
       "orContinueWith": "ou continuez avec l'e-mail",
       "password": "Mot de passe",
       "passwordPlaceholder": "Créer un mot de passe",
@@ -228,14 +229,23 @@
     },
     "friends": {
       "addFriend": "Ajouter un ami",
+      "away": "Loin",
+      "awayOrBusy": "Absent/Occupé",
       "empty": "Pas encore d'amis",
       "emptyHint": "Rechercher des utilisateurs pour les ajouter comme amis",
       "findFriends": "Trouver des amis",
+      "offline": "Hors ligne",
+      "offlineSection": "Hors ligne",
+      "online": "En ligne",
+      "onlineNow": "En ligne maintenant",
       "removed": "Ami supprimé",
       "requestAccepted": "Demande d'ami acceptée !",
       "requestDenied": "Demande d'ami refusée",
       "requestSent": "Demande d'ami envoyée !",
-      "title": "Amis"
+      "subtitle": "Connectez-vous et jouez avec vos amis",
+      "title": "Amis",
+      "totalFriends": "Amis totaux",
+      "viewProfile": "Voir le profil"
     },
     "homeSubtitle": "Voici ce qui se passe dans votre réseau",
     "messages": {
@@ -289,6 +299,8 @@
       "noGames": "Pas encore de jeux",
       "noGamesHint": "Cet utilisateur n'a pas encore synchronisé sa bibliothèque",
       "playtime": "Récréation",
+      "privateAccount": "Compte privé",
+      "privateAccountMessage": "Cet utilisateur a défini son compte comme privé. Les détails de leur profil, leurs jeux et leurs réalisations sont masqués.",
       "recentAchievements": "Réalisations récentes",
       "resync": "Resynchroniser",
       "stats": "Vos statistiques de jeu",
@@ -347,6 +359,8 @@
     },
     "settings": {
       "accessType": "Type d'accès",
+      "accountNowPrivate": "Votre compte est désormais privé",
+      "accountNowPublic": "Votre compte est maintenant public",
       "active": "Actif",
       "activeSubscription": "Votre abonnement est actif",
       "addCard": "Ajouter une carte",
@@ -405,6 +419,10 @@
       "photoURLHint": "Entrez une URL vers une image (par exemple, depuis Imgur, Discord CDN, etc.)",
       "photoURLPlaceholder": "https://example.com/your-photo.jpg",
       "portalError": "Échec de l'ouverture de la gestion des abonnements. Veuillez réessayer.",
+      "privacy": "Confidentialité",
+      "privacyUpdateFailed": "Échec de la mise à jour des paramètres de confidentialité",
+      "privateAccount": "Compte privé",
+      "privateAccountDescription": "Lorsqu'il est activé, les autres utilisateurs ne pourront pas voir les détails de votre profil, vos jeux ou vos réalisations.",
       "processing": "Traitement...",
       "profile": "Profil",
       "profileUpdated": "Profil mis à jour avec succès !",
@@ -461,8 +479,8 @@
       "active": "Ascension active",
       "trialDays": "Il reste {{days}} jours d'essai",
       "trialExpired": "Essai expiré",
-      "upgrade": "Ajouter un mode de paiement",
-      "upgradeShort": "Mise à niveau",
+      "upgrade": "Rejoignez Ascend",
+      "upgradeShort": "Rejoindre",
       "verified": "Utilisateur vérifié",
       "verifiedShort": "✓"
     },
@@ -1903,7 +1921,7 @@
     "mainDescription": "Collez les liens des éléments de l'atelier ici pour les télécharger. Ascendara les ajoutera à un répertoire que vous pourrez gérer vous-même.",
     "mainTitle": "Télécharger les éléments de l'atelier",
     "waitingForLogs": "En attente du démarrage du téléchargement...",
-    "welcome": "--",
+    "welcome": "Bienvenue dans le téléchargeur d'atelier d'Ascendara",
     "welcomeDescription": "Ici, vous pouvez télécharger des éléments du Steam Workshop sans avoir besoin d’avoir un compte."
   }
 }
