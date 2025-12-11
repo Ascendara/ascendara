@@ -513,10 +513,11 @@ const AppRoutes = () => {
             setShowWatcherWarn(true);
             return;
           }
-
-          await ensureMinLoadingTime();
-          setIsLoading(false);
         }
+
+        // Always ensure loading is set to false after initialization completes
+        await ensureMinLoadingTime();
+        setIsLoading(false);
       } catch (error) {
         console.error("Error in app initialization:", error);
         await ensureMinLoadingTime();
