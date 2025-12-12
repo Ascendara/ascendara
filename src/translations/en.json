@@ -180,6 +180,7 @@
       "empty": "No recent activity. Start playing games or add friends to see updates here!",
       "title": "Recent Activity"
     },
+    "checkingVersion": "Checking version...",
     "cloudLibrary": {
       "achievementDetailsNotSynced": "Achievement details not synced yet",
       "achievementSync": "Achievement Sync",
@@ -251,6 +252,18 @@
       "viewProfile": "View Profile"
     },
     "homeSubtitle": "Here's what's happening in your network",
+    "leaderboard": {
+      "blocked": "You are not eligible for the leaderboard",
+      "blockedDefault": "Your account has been restricted from appearing on the leaderboard.",
+      "empty": "No leaderboard data yet",
+      "emptyDescription": "Sync your profile to appear on the leaderboard and compete with other players!",
+      "loading": "Loading leaderboard...",
+      "refresh": "Refresh",
+      "runnerUps": "Runner-ups",
+      "subtitle": "Top players in the Ascendara community",
+      "syncProfile": "Sync Your Profile",
+      "title": "Leaderboard"
+    },
     "messages": {
       "cleanedUp": "Cleaned up old messages",
       "cleanup": "Cleanup",
@@ -279,6 +292,7 @@
       "cloudLibrary": "Cloud Library",
       "friends": "Friends",
       "home": "Home",
+      "leaderboard": "Leaderboard",
       "menu": "Menu",
       "messages": "Messages",
       "notifications": "Notifications",
@@ -489,6 +503,12 @@
       "upgradeShort": "Join",
       "verified": "Verified User",
       "verifiedShort": "✓"
+    },
+    "updateRequired": {
+      "description": "Please update Ascendara to the latest version to access Ascend features.",
+      "download": "Download Latest Version",
+      "info": "Ascend requires the latest version of Ascendara to ensure security and compatibility.",
+      "title": "Update Required"
     },
     "welcome": "Welcome back, {{name}}!"
   },

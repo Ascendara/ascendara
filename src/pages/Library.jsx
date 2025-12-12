@@ -40,6 +40,7 @@ import {
   ChevronUp,
   Cloud,
   CloudDownload,
+  CloudUpload,
   Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -67,7 +68,12 @@ import igdbService from "@/services/gameInfoService";
 import { useIgdbConfig } from "@/services/gameInfoConfig";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
-import { getCloudLibrary, getGameAchievements } from "@/services/firebaseService";
+import {
+  getCloudLibrary,
+  getGameAchievements,
+  syncCloudLibrary,
+  syncGameAchievements,
+} from "@/services/firebaseService";
 
 import NewFolderDialog from "@/components/NewFolderDialog";
 import FolderCard from "@/components/FolderCard";
@@ -148,6 +154,7 @@ const Library = () => {
   const [loadingCloudGames, setLoadingCloudGames] = useState(false);
   const [restoringGame, setRestoringGame] = useState(null);
   const [cloudGameImages, setCloudGameImages] = useState({});
+  const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -642,6 +649,85 @@ const Library = () => {
     }
   };
 
+  const handleCloudSync = async () => {
+    if (!user) {
+      navigate("/ascend");
+      return;
+    }
+
+    setIsSyncingLibrary(true);
+    try {
+      const installedGames = (await window.electron?.getGames?.()) || [];
+      const customGames = (await window.electron?.getCustomGames?.()) || [];
+
+      const allGames = [
+        ...(installedGames || []).filter(
+          g => !g.downloadingData?.downloading && !g.downloadingData?.extracting
+        ),
+        ...(customGames || []).map(g => ({ ...g, isCustom: true })),
+      ];
+
+      const gamesWithAchievements = await Promise.all(
+        allGames.map(async game => {
+          try {
+            const gameName = game.game || game.name;
+            const isCustom = game.isCustom || game.custom || false;
+
+            let achievementData = null;
+
+            if (isCustom && game.achievementWatcher?.achievements) {
+              achievementData = game.achievementWatcher;
+            } else {
+              achievementData = await window.electron?.readGameAchievements?.(
+                gameName,
+                isCustom
+              );
+            }
+
+            if (achievementData?.achievements?.length > 0) {
+              const totalAchievements = achievementData.achievements.length;
+              const unlockedAchievements = achievementData.achievements.filter(
+                a => a.achieved
+              ).length;
+
+              await syncGameAchievements(gameName, isCustom, achievementData);
+
+              return {
+                ...game,
+                achievementStats: {
+                  total: totalAchievements,
+                  unlocked: unlockedAchievements,
+                  percentage: Math.round(
+                    (unlockedAchievements / totalAchievements) * 100
+                  ),
+                },
+              };
+            }
+          } catch (e) {
+            console.warn(
+              `Failed to fetch/sync achievements for ${game.game || game.name}:`,
+              e
+            );
+          }
+          return { ...game, achievementStats: null };
+        })
+      );
+
+      const result = await syncCloudLibrary(gamesWithAchievements);
+      if (result.success) {
+        toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
+      } else {
+        toast.error(
+          result.error || t("ascend.cloudLibrary.syncFailed") || "Failed to sync library"
+        );
+      }
+    } catch (e) {
+      console.error("Failed to sync library:", e);
+      toast.error(t("ascend.cloudLibrary.syncFailed") || "Failed to sync library");
+    }
+    setIsSyncingLibrary(false);
+  };
+
   const handlePlayGame = async game => {
     navigate("/gamescreen", {
       state: {
@@ -910,6 +996,33 @@ const Library = () => {
                     >
                       <FolderPlus className="h-5 w-5" />
                     </button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={cn(
+                              "rounded p-2 hover:bg-secondary/50",
+                              isSyncingLibrary && "cursor-not-allowed opacity-50"
+                            )}
+                            type="button"
+                            aria-label={t("library.cloudSync") || "Cloud Sync"}
+                            onClick={handleCloudSync}
+                            disabled={isSyncingLibrary}
+                          >
+                            {isSyncingLibrary ? (
+                              <Loader className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <CloudUpload className="h-5 w-5" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-secondary">
+                          {user
+                            ? t("library.cloudSync") || "Cloud Sync"
+                            : t("library.signInToSync") || "Sign in to sync"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <NewFolderDialog
                       open={isNewFolderOpen}
                       onOpenChange={setIsNewFolderOpen}

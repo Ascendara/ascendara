@@ -22,6 +22,7 @@ import {
   Crown,
   Hammer,
   BadgeDollarSign,
+  Trophy,
 } from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
@@ -109,6 +110,11 @@ const AscendSidebar = ({
       id: "cloudlibrary",
       icon: CloudIcon,
       label: t("ascend.nav.cloudLibrary") || "Cloud Library",
+    },
+    {
+      id: "leaderboard",
+      icon: Trophy,
+      label: t("ascend.nav.leaderboard") || "Leaderboard",
     },
     { id: "search", icon: Search, label: t("ascend.nav.search") },
     { id: "friends", icon: Users, label: t("ascend.nav.friends"), badge: 0 },
