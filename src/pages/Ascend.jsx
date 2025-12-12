@@ -224,6 +224,8 @@ const Ascend = () => {
     isSubscribed: false,
     isVerified: false,
     verified: false,
+    noTrial: false,
+    noTrialReason: null,
   });
   const [verifyingAccess, setVerifyingAccess] = useState(true);
   const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
@@ -442,6 +444,8 @@ const Ascend = () => {
         isSubscribed: false,
         isVerified: false,
         trialBlocked: false,
+        noTrial: false,
+        noTrialReason: null,
         verified: true,
       });
     }
@@ -1672,6 +1676,41 @@ const Ascend = () => {
     // Show access denied if trial expired/blocked and not subscribed
     if (ascendAccess.verified && !ascendAccess.hasAccess) {
       const isTrialBlocked = ascendAccess.trialBlocked;
+      const isNoTrial = ascendAccess.noTrial;
+
+      // Special screen for users blocked from free trial
+      if (isNoTrial) {
+        return (
+          <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+            <div className="mx-auto max-w-md space-y-6 p-8 text-center">
+              <div className="bg-destructive/10 mx-auto flex h-20 w-20 items-center justify-center rounded-full">
+                <LockIcon className="text-destructive h-10 w-10" />
+              </div>
+              <h1 className="text-2xl font-bold">{t("ascend.access.noTrialTitle")}</h1>
+              <p className="text-muted-foreground">{t("ascend.access.noTrialMessage")}</p>
+              {ascendAccess.noTrialReason && (
+                <div className="rounded-lg bg-muted/50 p-4">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("ascend.access.reason")}:
+                  </p>
+                  <p className="mt-1 text-sm">{ascendAccess.noTrialReason}</p>
+                </div>
+              )}
+              <Button onClick={handleSubscribe} className="w-full text-secondary">
+                <BadgeDollarSign className="mr-2 h-4 w-4" />
+                {t("ascend.settings.subscribe")}
+              </Button>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                {t("account.signOut")}
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
           <div className="mx-auto max-w-md space-y-6 p-8 text-center">
@@ -4698,78 +4737,82 @@ const Ascend = () => {
                             )}
                           </div>
 
-                          {/* Level Badge */}
-                          <div className="mb-3 flex items-center gap-3">
-                            <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5">
-                              <Star className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-semibold text-primary">
-                                Level {viewingProfile.level}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <div
-                                className={`h-2.5 w-2.5 rounded-full ${
-                                  viewingProfile.status === "online"
-                                    ? "bg-green-500"
+                          {/* Level Badge & Status - only show if not private */}
+                          {!viewingProfile.private && (
+                            <div className="mb-3 flex items-center gap-3">
+                              <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5">
+                                <Star className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-semibold text-primary">
+                                  Level {viewingProfile.level}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <div
+                                  className={`h-2.5 w-2.5 rounded-full ${
+                                    viewingProfile.status === "online"
+                                      ? "bg-green-500"
+                                      : viewingProfile.status === "away"
+                                        ? "bg-yellow-500"
+                                        : viewingProfile.status === "busy"
+                                          ? "bg-red-500"
+                                          : "bg-gray-500"
+                                  }`}
+                                />
+                                <span className="capitalize">
+                                  {viewingProfile.status === "online"
+                                    ? t("ascend.status.online")
                                     : viewingProfile.status === "away"
-                                      ? "bg-yellow-500"
+                                      ? t("ascend.status.away")
                                       : viewingProfile.status === "busy"
-                                        ? "bg-red-500"
-                                        : "bg-gray-500"
-                                }`}
-                              />
-                              <span className="capitalize">
-                                {viewingProfile.status === "online"
-                                  ? t("ascend.status.online")
-                                  : viewingProfile.status === "away"
-                                    ? t("ascend.status.away")
-                                    : viewingProfile.status === "busy"
-                                      ? t("ascend.status.busy")
-                                      : t("ascend.status.offline")}
-                              </span>
+                                        ? t("ascend.status.busy")
+                                        : t("ascend.status.offline")}
+                                </span>
+                              </div>
                             </div>
-                          </div>
+                          )}
 
-                          {/* Bio */}
-                          {viewingProfile.bio && (
+                          {/* Bio - only show if not private */}
+                          {!viewingProfile.private && viewingProfile.bio && (
                             <p className="mb-4 max-w-lg text-muted-foreground">
                               {viewingProfile.bio}
                             </p>
                           )}
 
-                          {/* Country & Socials */}
-                          <div className="flex flex-wrap items-center gap-3">
-                            {viewingProfile.country && (
-                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                <Globe className="h-4 w-4 text-blue-500" />
-                                <span>{viewingProfile.country}</span>
-                              </div>
-                            )}
-                            {viewingProfile.socials?.discord && (
-                              <div className="flex items-center gap-1.5 rounded-lg bg-[#5865F2]/10 px-2.5 py-1 text-sm">
-                                <svg
-                                  className="h-4 w-4 text-[#5865F2]"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-                                </svg>
-                                <span>{viewingProfile.socials.discord}</span>
-                              </div>
-                            )}
-                            {viewingProfile.socials?.github && (
-                              <div className="flex items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-1 text-sm">
-                                <Github className="h-4 w-4" />
-                                <span>{viewingProfile.socials.github}</span>
-                              </div>
-                            )}
-                            {viewingProfile.socials?.steam && (
-                              <div className="flex items-center gap-1.5 rounded-lg bg-[#1b2838]/10 px-2.5 py-1 text-sm">
-                                <Gamepad2 className="h-4 w-4" />
-                                <span>{viewingProfile.socials.steam}</span>
-                              </div>
-                            )}
-                          </div>
+                          {/* Country & Socials - only show if not private */}
+                          {!viewingProfile.private && (
+                            <div className="flex flex-wrap items-center gap-3">
+                              {viewingProfile.country && (
+                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                  <Globe className="h-4 w-4 text-blue-500" />
+                                  <span>{viewingProfile.country}</span>
+                                </div>
+                              )}
+                              {viewingProfile.socials?.discord && (
+                                <div className="flex items-center gap-1.5 rounded-lg bg-[#5865F2]/10 px-2.5 py-1 text-sm">
+                                  <svg
+                                    className="h-4 w-4 text-[#5865F2]"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                                  </svg>
+                                  <span>{viewingProfile.socials.discord}</span>
+                                </div>
+                              )}
+                              {viewingProfile.socials?.github && (
+                                <div className="flex items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-1 text-sm">
+                                  <Github className="h-4 w-4" />
+                                  <span>{viewingProfile.socials.github}</span>
+                                </div>
+                              )}
+                              {viewingProfile.socials?.steam && (
+                                <div className="flex items-center gap-1.5 rounded-lg bg-[#1b2838]/10 px-2.5 py-1 text-sm">
+                                  <Gamepad2 className="h-4 w-4" />
+                                  <span>{viewingProfile.socials.steam}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Action Buttons */}
@@ -4911,71 +4954,73 @@ const Ascend = () => {
                     </div>
                   </div>
 
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                      <div className="mb-2 flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                          <Clock className="h-5 w-5 text-primary" />
+                  {/* Stats Grid - only show if not private */}
+                  {!viewingProfile.private && (
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                      <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
+                        <div className="mb-2 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                            <Clock className="h-5 w-5 text-primary" />
+                          </div>
                         </div>
+                        <p className="text-2xl font-bold">
+                          {Math.floor(viewingProfile.totalPlaytime / 3600)}h
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {t("ascend.profile.totalPlaytime") || "Total Playtime"}
+                        </p>
                       </div>
-                      <p className="text-2xl font-bold">
-                        {Math.floor(viewingProfile.totalPlaytime / 3600)}h
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {t("ascend.profile.totalPlaytime") || "Total Playtime"}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                      <div className="mb-2 flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
-                          <Gamepad2 className="h-5 w-5 text-violet-500" />
+                      <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
+                        <div className="mb-2 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
+                            <Gamepad2 className="h-5 w-5 text-violet-500" />
+                          </div>
                         </div>
+                        <p className="text-2xl font-bold">{viewingProfile.gamesPlayed}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t("ascend.profile.gamesPlayed") || "Games Played"}
+                        </p>
                       </div>
-                      <p className="text-2xl font-bold">{viewingProfile.gamesPlayed}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t("ascend.profile.gamesPlayed") || "Games Played"}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                      <div className="mb-2 flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
-                          <Trophy className="h-5 w-5 text-amber-500" />
+                      <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
+                        <div className="mb-2 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
+                            <Trophy className="h-5 w-5 text-amber-500" />
+                          </div>
                         </div>
+                        <p className="text-2xl font-bold">
+                          {viewingProfile.unlockedAchievements ||
+                            viewingProfile.achievements?.reduce(
+                              (acc, game) =>
+                                acc +
+                                (game.unlockedAchievements ||
+                                  game.achievements?.filter(a => a.achieved)?.length ||
+                                  0),
+                              0
+                            ) ||
+                            0}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {t("ascend.profile.achievements") || "Achievements"}
+                        </p>
                       </div>
-                      <p className="text-2xl font-bold">
-                        {viewingProfile.unlockedAchievements ||
-                          viewingProfile.achievements?.reduce(
-                            (acc, game) =>
-                              acc +
-                              (game.unlockedAchievements ||
-                                game.achievements?.filter(a => a.achieved)?.length ||
-                                0),
-                            0
-                          ) ||
-                          0}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {t("ascend.profile.achievements") || "Achievements"}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                      <div className="mb-2 flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-                          <Star className="h-5 w-5 text-emerald-500" />
+                      <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
+                        <div className="mb-2 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
+                            <Star className="h-5 w-5 text-emerald-500" />
+                          </div>
                         </div>
+                        <p className="text-2xl font-bold">
+                          {viewingProfile.xp?.toLocaleString() || 0}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {t("ascend.profile.totalXP") || "Total XP"}
+                        </p>
                       </div>
-                      <p className="text-2xl font-bold">
-                        {viewingProfile.xp?.toLocaleString() || 0}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {t("ascend.profile.totalXP") || "Total XP"}
-                      </p>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Top Games */}
-                  {viewingProfile.games?.length > 0 && (
+                  {/* Top Games - only show if not private */}
+                  {!viewingProfile.private && viewingProfile.games?.length > 0 && (
                     <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
                       <div className="flex items-center justify-between border-b border-border/50 p-5">
                         <div className="flex items-center gap-2">
@@ -5033,49 +5078,50 @@ const Ascend = () => {
                     </div>
                   )}
 
-                  {/* Recent Achievements */}
-                  {viewingProfile.achievements?.some(g =>
-                    g.achievements?.some(a => a.achieved)
-                  ) && (
-                    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
-                      <div className="flex items-center gap-2 border-b border-border/50 p-5">
-                        <Trophy className="h-5 w-5 text-amber-500" />
-                        <h2 className="font-semibold">
-                          {t("ascend.profile.recentAchievements") ||
-                            "Recent Achievements"}
-                        </h2>
-                      </div>
-                      <div className="p-5">
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          {viewingProfile.achievements
-                            .flatMap(game =>
-                              (game.achievements || [])
-                                .filter(a => a.achieved)
-                                .map(a => ({ ...a, gameName: game.gameName }))
-                            )
-                            .slice(0, 6)
-                            .map((achievement, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center gap-3 rounded-xl bg-muted/30 p-3"
-                              >
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                                  <Award className="h-5 w-5 text-amber-500" />
+                  {/* Recent Achievements - only show if not private */}
+                  {!viewingProfile.private &&
+                    viewingProfile.achievements?.some(g =>
+                      g.achievements?.some(a => a.achieved)
+                    ) && (
+                      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+                        <div className="flex items-center gap-2 border-b border-border/50 p-5">
+                          <Trophy className="h-5 w-5 text-amber-500" />
+                          <h2 className="font-semibold">
+                            {t("ascend.profile.recentAchievements") ||
+                              "Recent Achievements"}
+                          </h2>
+                        </div>
+                        <div className="p-5">
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {viewingProfile.achievements
+                              .flatMap(game =>
+                                (game.achievements || [])
+                                  .filter(a => a.achieved)
+                                  .map(a => ({ ...a, gameName: game.gameName }))
+                              )
+                              .slice(0, 6)
+                              .map((achievement, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-3 rounded-xl bg-muted/30 p-3"
+                                >
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
+                                    <Award className="h-5 w-5 text-amber-500" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium">
+                                      {achievement.name}
+                                    </p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {achievement.gameName}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium">
-                                    {achievement.name}
-                                  </p>
-                                  <p className="truncate text-xs text-muted-foreground">
-                                    {achievement.gameName}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Empty state if no games */}
                   {(!viewingProfile.games || viewingProfile.games.length === 0) && (

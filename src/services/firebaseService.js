@@ -1143,7 +1143,7 @@ export const updateAscendSubscription = async subscriptionData => {
  * Verify user's Ascend access (subscription only - trial removed)
  * This checks server-side data that can't be manipulated client-side
  * @param {string} hardwareId - Optional hardware ID (kept for compatibility)
- * @returns {Promise<{hasAccess: boolean, daysRemaining: number, isSubscribed: boolean, isVerified: boolean, trialBlocked: boolean, error: string|null}>}
+ * @returns {Promise<{hasAccess: boolean, daysRemaining: number, isSubscribed: boolean, isVerified: boolean, trialBlocked: boolean, noTrial: boolean, noTrialReason: string|null, error: string|null}>}
  */
 export const verifyAscendAccess = async (hardwareId = null) => {
   try {
@@ -1155,6 +1155,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
         isSubscribed: false,
         isVerified: false,
         trialBlocked: false,
+        noTrial: false,
+        noTrialReason: null,
         error: "Not authenticated",
       };
     }
@@ -1172,6 +1174,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
         isSubscribed: false,
         isVerified: false,
         trialBlocked: false,
+        noTrial: false,
+        noTrialReason: null,
         error: null,
       };
     }
@@ -1187,11 +1191,13 @@ export const verifyAscendAccess = async (hardwareId = null) => {
         isSubscribed: false,
         isVerified: true,
         trialBlocked: false,
+        noTrial: false,
+        noTrialReason: null,
         error: null,
       };
     }
 
-    // Check if user has active subscription (bypasses hardware check)
+    // Check if user has active subscription (bypasses hardware check and noTrial)
     if (userData.ascendSubscription?.active) {
       const expiresAt = userData.ascendSubscription.expiresAt?.toDate();
       if (expiresAt && expiresAt > new Date()) {
@@ -1201,9 +1207,25 @@ export const verifyAscendAccess = async (hardwareId = null) => {
           isSubscribed: true,
           isVerified: false,
           trialBlocked: false,
+          noTrial: false,
+          noTrialReason: null,
           error: null,
         };
       }
+    }
+
+    // Check if user is blocked from free trial
+    if (userData.noTrial === true) {
+      return {
+        hasAccess: false,
+        daysRemaining: 0,
+        isSubscribed: false,
+        isVerified: false,
+        trialBlocked: false,
+        noTrial: true,
+        noTrialReason: userData.noTrialReason || null,
+        error: null,
+      };
     }
 
     // Check hardware ID for trial abuse (non-blocking - don't fail access check if this fails)
@@ -1221,6 +1243,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
               isSubscribed: false,
               isVerified: false,
               trialBlocked: true,
+              noTrial: false,
+              noTrialReason: null,
               error: "Trial already used on this device",
             };
           }
@@ -1239,6 +1263,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
               isSubscribed: false,
               isVerified: false,
               trialBlocked: true,
+              noTrial: false,
+              noTrialReason: null,
               error: "Trial already used on this device",
             };
           }
@@ -1279,6 +1305,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
       isSubscribed: false,
       isVerified: false,
       trialBlocked: false,
+      noTrial: false,
+      noTrialReason: null,
       error: null,
     };
   } catch (error) {
@@ -1289,6 +1317,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
       isSubscribed: false,
       isVerified: false,
       trialBlocked: false,
+      noTrial: false,
+      noTrialReason: null,
       error: error.message,
     };
   }
@@ -1445,6 +1475,23 @@ export const getUserPublicProfile = async userId => {
     // Check if profile is private
     const isPrivate = userData.private || false;
 
+    // If profile is private, only return minimal public info
+    if (isPrivate) {
+      return {
+        data: {
+          uid: userId,
+          displayName: userData.displayName,
+          photoURL: userData.photoURL,
+          verified: userData.verified || false,
+          owner: userData.owner || false,
+          contributor: userData.contributor || false,
+          isFriend,
+          private: true,
+        },
+        error: null,
+      };
+    }
+
     return {
       data: {
         uid: userId,
@@ -1468,7 +1515,7 @@ export const getUserPublicProfile = async userId => {
         totalAchievements,
         unlockedAchievements,
         isFriend,
-        private: isPrivate,
+        private: false,
       },
       error: null,
     };
