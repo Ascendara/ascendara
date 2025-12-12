@@ -174,7 +174,10 @@
       "noTrialTitle": "Subscription Required",
       "reason": "Reason",
       "trialBlocked": "Trial Already Used",
-      "trialBlockedMessage": "A trial has already been used on this device. Subscribe to access Ascend features."
+      "trialBlockedMessage": "A trial has already been used on this device. Subscribe to access Ascend features.",
+      "trialEndingSoon": "Trial Ending Soon",
+      "trialEndingSoonAction": "Subscribe now to keep your data safe and continue enjoying Ascend features.",
+      "trialEndingSoonMessage": "Your Ascend trial ends in {{days}} days. After your trial expires, your cloud library and synced data will be deleted within a few days."
     },
     "activity": {
       "empty": "No recent activity. Start playing games or add friends to see updates here!",

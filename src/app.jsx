@@ -19,7 +19,7 @@ import {
   cleanupStatusService,
 } from "@/services/ascendStatusService";
 import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
-import { getUnreadMessageCount } from "@/services/firebaseService";
+import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
@@ -55,7 +55,95 @@ import Welcome from "./pages/Welcome";
 import i18n from "./i18n";
 import "./index.css";
 import "./styles/scrollbar.css";
-import { AlertTriangle, BugIcon, RefreshCwIcon } from "lucide-react";
+import { AlertTriangle, BugIcon, RefreshCwIcon, Clock } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+
+// Check for trial expiration warning and show dialog
+const TrialWarningChecker = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [showTrialWarning, setShowTrialWarning] = useState(false);
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState(0);
+  const hasCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (!user?.uid || hasCheckedRef.current) return;
+
+    const checkTrialStatus = async () => {
+      try {
+        const accessStatus = await verifyAscendAccess();
+
+        // Only show warning if user is on trial (not subscribed, not verified)
+        // and has less than 7 days remaining
+        if (
+          !accessStatus.isSubscribed &&
+          !accessStatus.isVerified &&
+          accessStatus.daysRemaining > 0 &&
+          accessStatus.daysRemaining <= 7
+        ) {
+          setTrialDaysRemaining(accessStatus.daysRemaining);
+          setShowTrialWarning(true);
+          hasCheckedRef.current = true;
+        }
+      } catch (error) {
+        console.error("[TrialWarningChecker] Error checking trial status:", error);
+      }
+    };
+
+    // Delay the check to let the app initialize
+    const timeout = setTimeout(checkTrialStatus, 5000);
+    return () => clearTimeout(timeout);
+  }, [user?.uid]);
+
+  const handleSubscribe = () => {
+    setShowTrialWarning(false);
+    navigate("/ascend");
+  };
+
+  return (
+    <AlertDialog open={showTrialWarning} onOpenChange={setShowTrialWarning}>
+      <AlertDialogContent className="border-border">
+        <AlertDialogHeader>
+          <div className="flex items-center gap-4">
+            <Clock className="mb-2 h-10 w-10 text-yellow-500" />
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("ascend.access.trialEndingSoon")}
+            </AlertDialogTitle>
+          </div>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4">
+              <div className="text-foreground">
+                {t("ascend.access.trialEndingSoonMessage", { days: trialDaysRemaining })}
+              </div>
+              <div className="text-muted-foreground">
+                {t("ascend.access.trialEndingSoonAction")}
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter className="gap-3 sm:justify-end">
+          <AlertDialogCancel className="text-foreground">
+            {t("common.close")}
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleSubscribe}>
+            {t("ascend.subscription.upgrade")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -1073,6 +1161,7 @@ function App() {
                   <AscendStatusInitializer />
                   <UserActivityTracker />
                   <MessageNotificationChecker />
+                  <TrialWarningChecker />
                   <AppRoutes />
                   <MiniPlayer
                     expanded={playerExpanded}
