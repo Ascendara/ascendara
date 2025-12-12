@@ -170,13 +170,20 @@
     "access": {
       "expired": "试用期已过",
       "expiredMessage": "您的 7 天 Ascend 试用期已结束。订阅即可继续使用好友、云同步等 Ascend 功能。",
+      "noTrialMessage": "您没有资格获得免费试用。请订阅以访问 Ascend 功能。",
+      "noTrialTitle": "需要订阅",
+      "reason": "原因",
       "trialBlocked": "试用版已使用",
-      "trialBlockedMessage": "该设备已进行试用。订阅以访问 Ascend 功能。"
+      "trialBlockedMessage": "该设备已进行试用。订阅以访问 Ascend 功能。",
+      "trialEndingSoon": "审判即将结束",
+      "trialEndingSoonAction": "立即订阅以确保您的数据安全并继续享受 Ascend 功能。",
+      "trialEndingSoonMessage": "您的 Ascend 试用将在 {{days}} 天后结束。试用期满后，您的云库和同步数据将在几天内删除。"
     },
     "activity": {
       "empty": "最近没有活动。开始玩游戏或添加好友以在此处查看更新！",
       "title": "最近的活动"
     },
+    "checkingVersion": "正在检查版本...",
     "cloudLibrary": {
       "achievementDetailsNotSynced": "成就详情尚未同步",
       "achievementSync": "成就同步",
@@ -248,6 +255,18 @@
       "viewProfile": "查看资料"
     },
     "homeSubtitle": "这是您的网络中发生的情况",
+    "leaderboard": {
+      "blocked": "您没有资格进入排行榜",
+      "blockedDefault": "您的帐户已被限制出现在排行榜上。",
+      "empty": "还没有排行榜数据",
+      "emptyDescription": "同步您的个人资料以出现在排行榜上并与其他玩家竞争！",
+      "loading": "正在加载排行榜...",
+      "refresh": "刷新",
+      "runnerUps": "亚军",
+      "subtitle": "Ascendara 社区的顶尖玩家",
+      "syncProfile": "同步您的个人资料",
+      "title": "排行榜"
+    },
     "messages": {
       "cleanedUp": "清理了旧消息",
       "cleanup": "清理",
@@ -276,6 +295,7 @@
       "cloudLibrary": "云图书馆",
       "friends": "朋友们",
       "home": "家",
+      "leaderboard": "排行榜",
       "menu": "菜单",
       "messages": "留言",
       "notifications": "通知",
@@ -483,6 +503,12 @@
       "upgradeShort": "加入",
       "verified": "已验证用户",
       "verifiedShort": "✓"
+    },
+    "updateRequired": {
+      "description": "请将 Ascendara 更新到最新版本以访问 Ascend 功能。",
+      "download": "下载最新版本",
+      "info": "Ascend 需要最新版本的 Ascendara 以确保安全性和兼容性。",
+      "title": "需要更新"
     },
     "welcome": "欢迎回来，{{name}}！"
   },

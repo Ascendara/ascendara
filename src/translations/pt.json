@@ -170,13 +170,20 @@
     "access": {
       "expired": "Avaliação expirada",
       "expiredMessage": "Seu teste de 7 dias do Ascend terminou. Assine para continuar usando os recursos do Ascend, como amigos, sincronização na nuvem e muito mais.",
+      "noTrialMessage": "Você não está qualificado para um teste gratuito. Por favor, inscreva-se para acessar os recursos do Ascend.",
+      "noTrialTitle": "Assinatura necessária",
+      "reason": "Razão",
       "trialBlocked": "Teste já usado",
-      "trialBlockedMessage": "Uma avaliação já foi usada neste dispositivo. Assine para acessar os recursos do Ascend."
+      "trialBlockedMessage": "Uma avaliação já foi usada neste dispositivo. Assine para acessar os recursos do Ascend.",
+      "trialEndingSoon": "O teste terminará em breve",
+      "trialEndingSoonAction": "Assine agora para manter seus dados seguros e continuar aproveitando os recursos do Ascend.",
+      "trialEndingSoonMessage": "Sua avaliação do Ascend termina em {{days}} dias. Após o término da avaliação, sua biblioteca na nuvem e os dados sincronizados serão excluídos em alguns dias."
     },
     "activity": {
       "empty": "Nenhuma atividade recente. Comece a jogar ou adicione amigos para ver as atualizações aqui!",
       "title": "Atividade recente"
     },
+    "checkingVersion": "Verificando versão...",
     "cloudLibrary": {
       "achievementDetailsNotSynced": "Detalhes da conquista ainda não sincronizados",
       "achievementSync": "Sincronização de conquistas",
@@ -248,6 +255,18 @@
       "viewProfile": "Ver perfil"
     },
     "homeSubtitle": "Aqui está o que está acontecendo na sua rede",
+    "leaderboard": {
+      "blocked": "Você não está qualificado para a tabela de classificação",
+      "blockedDefault": "Sua conta foi impedida de aparecer na tabela de classificação.",
+      "empty": "Ainda não há dados da tabela de classificação",
+      "emptyDescription": "Sincronize seu perfil para aparecer na tabela de classificação e competir com outros jogadores!",
+      "loading": "Carregando placar...",
+      "refresh": "Atualizar",
+      "runnerUps": "Vice-campeões",
+      "subtitle": "Melhores jogadores da comunidade Ascendara",
+      "syncProfile": "Sincronize seu perfil",
+      "title": "Tabela de classificação"
+    },
     "messages": {
       "cleanedUp": "Limpei mensagens antigas",
       "cleanup": "Limpar",
@@ -276,6 +295,7 @@
       "cloudLibrary": "Biblioteca na nuvem",
       "friends": "Amigos",
       "home": "Lar",
+      "leaderboard": "Tabela de classificação",
       "menu": "Menu",
       "messages": "Mensagens",
       "notifications": "Notificações",
@@ -483,6 +503,12 @@
       "upgradeShort": "Juntar",
       "verified": "Usuário verificado",
       "verifiedShort": "✓"
+    },
+    "updateRequired": {
+      "description": "Atualize o Ascendara para a versão mais recente para acessar os recursos do Ascend.",
+      "download": "Baixe a versão mais recente",
+      "info": "Ascend requer a versão mais recente do Ascendara para garantir segurança e compatibilidade.",
+      "title": "Atualização necessária"
     },
     "welcome": "Bem-vindo de volta, {{name}}!"
   },

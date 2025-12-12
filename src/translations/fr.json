@@ -170,13 +170,20 @@
     "access": {
       "expired": "Essai expiré",
       "expiredMessage": "Votre essai Ascend de 7 jours est terminé. Abonnez-vous pour continuer à utiliser les fonctionnalités d'Ascend telles que les amis, la synchronisation dans le cloud et bien plus encore.",
+      "noTrialMessage": "Vous n'êtes pas éligible à un essai gratuit. Veuillez vous abonner pour accéder aux fonctionnalités d'Ascend.",
+      "noTrialTitle": "Abonnement requis",
+      "reason": "Raison",
       "trialBlocked": "Essai déjà utilisé",
-      "trialBlockedMessage": "Un essai a déjà été utilisé sur cet appareil. Abonnez-vous pour accéder aux fonctionnalités d'Ascend."
+      "trialBlockedMessage": "Un essai a déjà été utilisé sur cet appareil. Abonnez-vous pour accéder aux fonctionnalités d'Ascend.",
+      "trialEndingSoon": "L'essai se termine bientôt",
+      "trialEndingSoonAction": "Abonnez-vous maintenant pour protéger vos données et continuer à profiter des fonctionnalités d'Ascend.",
+      "trialEndingSoonMessage": "Votre essai Ascend se termine dans {{days}} jours. Après l'expiration de votre essai, votre bibliothèque cloud et vos données synchronisées seront supprimées dans quelques jours."
     },
     "activity": {
       "empty": "Aucune activité récente. Commencez à jouer à des jeux ou ajoutez des amis pour voir les mises à jour ici !",
       "title": "Activité récente"
     },
+    "checkingVersion": "Vérification de la version...",
     "cloudLibrary": {
       "achievementDetailsNotSynced": "Les détails des réalisations ne sont pas encore synchronisés",
       "achievementSync": "Synchronisation des réalisations",
@@ -248,6 +255,18 @@
       "viewProfile": "Voir le profil"
     },
     "homeSubtitle": "Voici ce qui se passe dans votre réseau",
+    "leaderboard": {
+      "blocked": "Vous n'êtes pas éligible au classement",
+      "blockedDefault": "Votre compte n'a pas été autorisé à apparaître dans le classement.",
+      "empty": "Aucune donnée de classement pour l'instant",
+      "emptyDescription": "Synchronisez votre profil pour apparaître dans le classement et rivaliser avec d'autres joueurs !",
+      "loading": "Chargement du classement...",
+      "refresh": "Rafraîchir",
+      "runnerUps": "Finalistes",
+      "subtitle": "Meilleurs joueurs de la communauté Ascendara",
+      "syncProfile": "Synchronisez votre profil",
+      "title": "Classement"
+    },
     "messages": {
       "cleanedUp": "Nettoyé les anciens messages",
       "cleanup": "Nettoyage",
@@ -276,6 +295,7 @@
       "cloudLibrary": "Bibliothèque cloud",
       "friends": "Amis",
       "home": "Maison",
+      "leaderboard": "Classement",
       "menu": "Menu",
       "messages": "Messages",
       "notifications": "Notifications",
@@ -483,6 +503,12 @@
       "upgradeShort": "Rejoindre",
       "verified": "Utilisateur vérifié",
       "verifiedShort": "✓"
+    },
+    "updateRequired": {
+      "description": "Veuillez mettre à jour Ascendara vers la dernière version pour accéder aux fonctionnalités d'Ascend.",
+      "download": "Télécharger la dernière version",
+      "info": "Ascend nécessite la dernière version d'Ascendara pour garantir la sécurité et la compatibilité.",
+      "title": "Mise à jour requise"
     },
     "welcome": "Bon retour, {{name}} !"
   },

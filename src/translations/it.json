@@ -170,13 +170,20 @@
     "access": {
       "expired": "Prova scaduta",
       "expiredMessage": "La tua prova di Ascend di 7 giorni è terminata. Iscriviti per continuare a utilizzare le funzionalità di Ascend come amici, sincronizzazione cloud e altro ancora.",
+      "noTrialMessage": "Non hai diritto a una prova gratuita. Iscriviti per accedere alle funzionalità Ascend.",
+      "noTrialTitle": "Abbonamento richiesto",
+      "reason": "Motivo",
       "trialBlocked": "Prova già utilizzata",
-      "trialBlockedMessage": "È già stata utilizzata una prova su questo dispositivo. Iscriviti per accedere alle funzionalità Ascend."
+      "trialBlockedMessage": "È già stata utilizzata una prova su questo dispositivo. Iscriviti per accedere alle funzionalità Ascend.",
+      "trialEndingSoon": "La prova terminerà presto",
+      "trialEndingSoonAction": "Iscriviti ora per mantenere i tuoi dati al sicuro e continuare a usufruire delle funzionalità di Ascend.",
+      "trialEndingSoonMessage": "La tua prova di Ascend termina tra {{days}} giorni. Alla scadenza del periodo di prova, la libreria cloud e i dati sincronizzati verranno eliminati entro pochi giorni."
     },
     "activity": {
       "empty": "Nessuna attività recente. Inizia a giocare o aggiungi amici per vedere gli aggiornamenti qui!",
       "title": "Attività recente"
     },
+    "checkingVersion": "Controllo della versione...",
     "cloudLibrary": {
       "achievementDetailsNotSynced": "Dettagli dell'obiettivo non ancora sincronizzati",
       "achievementSync": "Sincronizzazione degli obiettivi",
@@ -248,6 +255,18 @@
       "viewProfile": "Visualizza profilo"
     },
     "homeSubtitle": "Ecco cosa sta succedendo nella tua rete",
+    "leaderboard": {
+      "blocked": "Non sei idoneo per la classifica",
+      "blockedDefault": "Al tuo account è stata impedita la visualizzazione nella classifica.",
+      "empty": "Nessun dato sulla classifica ancora",
+      "emptyDescription": "Sincronizza il tuo profilo per apparire nella classifica e competere con altri giocatori!",
+      "loading": "Caricamento classifica...",
+      "refresh": "Aggiorna",
+      "runnerUps": "Secondi classificati",
+      "subtitle": "I migliori giocatori della community di Ascendara",
+      "syncProfile": "Sincronizza il tuo profilo",
+      "title": "Classifica"
+    },
     "messages": {
       "cleanedUp": "Ripuliti i vecchi messaggi",
       "cleanup": "Ripulire",
@@ -276,6 +295,7 @@
       "cloudLibrary": "Libreria cloud",
       "friends": "Amici",
       "home": "Casa",
+      "leaderboard": "Classifica",
       "menu": "Menu",
       "messages": "Messaggi",
       "notifications": "Notifiche",
@@ -483,6 +503,12 @@
       "upgradeShort": "Giuntura",
       "verified": "Utente verificato",
       "verifiedShort": "✓"
+    },
+    "updateRequired": {
+      "description": "Aggiorna Ascendara alla versione più recente per accedere alle funzionalità di Ascend.",
+      "download": "Scarica l'ultima versione",
+      "info": "Ascend richiede l'ultima versione di Ascendara per garantire sicurezza e compatibilità.",
+      "title": "Aggiornamento richiesto"
     },
     "welcome": "Bentornato, {{name}}!"
   },

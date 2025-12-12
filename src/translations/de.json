@@ -170,13 +170,20 @@
     "access": {
       "expired": "Testversion abgelaufen",
       "expiredMessage": "Ihre 7-tägige Ascend-Testversion ist beendet. Abonnieren Sie, um weiterhin Ascend-Funktionen wie Freunde, Cloud-Synchronisierung und mehr zu nutzen.",
+      "noTrialMessage": "Sie haben keinen Anspruch auf eine kostenlose Testversion. Bitte abonnieren Sie, um auf Ascend-Funktionen zugreifen zu können.",
+      "noTrialTitle": "Abonnement erforderlich",
+      "reason": "Grund",
       "trialBlocked": "Testversion bereits verwendet",
-      "trialBlockedMessage": "Auf diesem Gerät wurde bereits eine Testversion verwendet. Abonnieren Sie, um auf Ascend-Funktionen zuzugreifen."
+      "trialBlockedMessage": "Auf diesem Gerät wurde bereits eine Testversion verwendet. Abonnieren Sie, um auf Ascend-Funktionen zuzugreifen.",
+      "trialEndingSoon": "Testversion endet bald",
+      "trialEndingSoonAction": "Abonnieren Sie jetzt, um Ihre Daten zu schützen und weiterhin die Ascend-Funktionen zu nutzen.",
+      "trialEndingSoonMessage": "Ihre Ascend-Testversion endet in {{days}} Tagen. Nach Ablauf Ihrer Testversion werden Ihre Cloud-Bibliothek und die synchronisierten Daten innerhalb weniger Tage gelöscht."
     },
     "activity": {
       "empty": "Keine aktuelle Aktivität. Beginnen Sie mit dem Spielen oder fügen Sie Freunde hinzu, um hier Updates zu sehen!",
       "title": "Letzte Aktivität"
     },
+    "checkingVersion": "Version wird geprüft...",
     "cloudLibrary": {
       "achievementDetailsNotSynced": "Die Leistungsdetails wurden noch nicht synchronisiert",
       "achievementSync": "Erfolgssynchronisierung",
@@ -248,6 +255,18 @@
       "viewProfile": "Profil anzeigen"
     },
     "homeSubtitle": "Hier erfahren Sie, was in Ihrem Netzwerk passiert",
+    "leaderboard": {
+      "blocked": "Sie haben keinen Anspruch auf die Bestenliste",
+      "blockedDefault": "Die Anzeige Ihres Kontos in der Bestenliste wurde gesperrt.",
+      "empty": "Noch keine Bestenlistendaten",
+      "emptyDescription": "Synchronisieren Sie Ihr Profil, um in der Bestenliste zu erscheinen und mit anderen Spielern zu konkurrieren!",
+      "loading": "Bestenliste wird geladen...",
+      "refresh": "Aktualisieren",
+      "runnerUps": "Zweitplatzierte",
+      "subtitle": "Top-Spieler in der Ascendara-Community",
+      "syncProfile": "Synchronisieren Sie Ihr Profil",
+      "title": "Bestenliste"
+    },
     "messages": {
       "cleanedUp": "Alte Nachrichten bereinigt",
       "cleanup": "Aufräumen",
@@ -276,6 +295,7 @@
       "cloudLibrary": "Cloud-Bibliothek",
       "friends": "Freunde",
       "home": "Heim",
+      "leaderboard": "Bestenliste",
       "menu": "Speisekarte",
       "messages": "Nachrichten",
       "notifications": "Benachrichtigungen",
@@ -486,6 +506,12 @@
       "upgradeShort": "Verbinden",
       "verified": "Verifizierter Benutzer",
       "verifiedShort": "✓"
+    },
+    "updateRequired": {
+      "description": "Bitte aktualisieren Sie Ascendara auf die neueste Version, um auf die Ascend-Funktionen zugreifen zu können.",
+      "download": "Laden Sie die neueste Version herunter",
+      "info": "Ascend benötigt die neueste Version von Ascendara, um Sicherheit und Kompatibilität zu gewährleisten.",
+      "title": "Aktualisierung erforderlich"
     },
     "welcome": "Willkommen zurück, {{name}}!"
   },

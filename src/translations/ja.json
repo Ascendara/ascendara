@@ -170,13 +170,20 @@
     "access": {
       "expired": "トライアル期間が終了しました",
       "expiredMessage": "7 日間の Ascend トライアルが終了しました。購読して、フレンド、クラウド同期などの Ascend 機能を引き続き使用してください。",
+      "noTrialMessage": "無料トライアルを利用する資格はありません。 Ascend の機能にアクセスするには購読してください。",
+      "noTrialTitle": "購読が必要です",
+      "reason": "理由",
       "trialBlocked": "試用版はすでに使用されています",
-      "trialBlockedMessage": "このデバイスではすでに試用版が使用されています。購読して Ascend の機能にアクセスします。"
+      "trialBlockedMessage": "このデバイスではすでに試用版が使用されています。購読して Ascend の機能にアクセスします。",
+      "trialEndingSoon": "トライアルがまもなく終了します",
+      "trialEndingSoonAction": "今すぐ購読してデータを安全に保ち、引き続き Ascend の機能をお楽しみください。",
+      "trialEndingSoonMessage": "Ascend トライアルはあと {{days}} 日で終了します。試用期間が終了すると、クラウド ライブラリと同期されたデータは数日以内に削除されます。"
     },
     "activity": {
       "empty": "最近の活動はありません。ここでゲームのプレイを開始したり、友達を追加して最新情報を確認してください!",
       "title": "最近の活動"
     },
+    "checkingVersion": "バージョンを確認中...",
     "cloudLibrary": {
       "achievementDetailsNotSynced": "実績の詳細はまだ同期されていません",
       "achievementSync": "実績の同期",
@@ -248,6 +255,18 @@
       "viewProfile": "プロフィールを見る"
     },
     "homeSubtitle": "ネットワーク内で何が起こっているのか",
+    "leaderboard": {
+      "blocked": "あなたにはリーダーボードに参加する資格がありません",
+      "blockedDefault": "あなたのアカウントはリーダーボードへの表示が制限されています。",
+      "empty": "リーダーボード データはまだありません",
+      "emptyDescription": "プロフィールを同期してリーダーボードに表示し、他のプレイヤーと競いましょう!",
+      "loading": "リーダーボードを読み込んでいます...",
+      "refresh": "リフレッシュ",
+      "runnerUps": "準優勝",
+      "subtitle": "Ascendara コミュニティのトッププレイヤー",
+      "syncProfile": "プロフィールを同期する",
+      "title": "リーダーボード"
+    },
     "messages": {
       "cleanedUp": "古いメッセージをクリーンアップしました",
       "cleanup": "掃除",
@@ -276,6 +295,7 @@
       "cloudLibrary": "クラウドライブラリ",
       "friends": "友達",
       "home": "家",
+      "leaderboard": "リーダーボード",
       "menu": "メニュー",
       "messages": "メッセージ",
       "notifications": "通知",
@@ -483,6 +503,12 @@
       "upgradeShort": "参加する",
       "verified": "認証済みユーザー",
       "verifiedShort": "✓"
+    },
+    "updateRequired": {
+      "description": "Ascend の機能にアクセスするには、Ascendara を最新バージョンに更新してください。",
+      "download": "最新バージョンをダウンロード",
+      "info": "Ascend では、セキュリティと互換性を確保するために、最新バージョンの Ascendara が必要です。",
+      "title": "アップデートが必要です"
     },
     "welcome": "おかえりなさい、{{name}}!"
   },
