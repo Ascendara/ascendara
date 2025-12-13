@@ -1,7 +1,22 @@
 {
   "account": {
+    "actions": "账户操作",
     "almostThere": "快到了！",
     "chooseDisplayName": "选择您帐户的显示名称",
+    "deletion": {
+      "confirmed": "请求已提交",
+      "deleting": "正在提交...",
+      "description": "这将提交删除您的帐户和所有相关数据的请求。您的请求将得到处理，并将通过电子邮件通知您。",
+      "enterPassword": "输入您的密码进行确认",
+      "failed": "提交删除请求失败",
+      "holdButton": "长按3秒请求",
+      "holdToDelete": "保留请求",
+      "passwordRequired": "请输入您的密码",
+      "pendingWarning": "您的帐户有一个待处理的删除请求。如果这是一个错误，请加入我们的 Discord 来恢复您的帐户。",
+      "success": "删除请求提交成功",
+      "title": "请求删除帐户"
+    },
+    "deletionWarning": "您的请求将在几天内得到处理",
     "displayNameHint": "这就是其他用户看到您的方式。至少 4 个字符。",
     "errors": {
       "accountExists": "帐户已存在",
@@ -19,14 +34,22 @@
       "updateFailed": "更新个人资料失败"
     },
     "features": {
-      "autoUpdate": "自动更新",
-      "autoUpdateDesc": "可以检查游戏更新并自动安装",
+      "autoUpdate": "自动游戏更新",
+      "autoUpdateDesc": "游戏会自动检查更新并安装",
+      "chat": "实时聊天",
+      "chatDesc": "游戏时向朋友发送消息并保持联系",
       "cloudSync": "云同步",
-      "cloudSyncDesc": "跨设备同步您的库和设置",
-      "friends": "好友与聊天",
-      "friendsDesc": "与朋友联系并在游戏时聊天",
-      "profiles": "公开资料",
-      "profilesDesc": "查看其他人的游戏时间、成就和统计数据"
+      "cloudSyncDesc": "跨设备同步您的个人资料、库和游戏数据",
+      "friends": "好友系统",
+      "friendsDesc": "发送好友请求、添加好友并建立您的网络",
+      "leaderboard": "公共排行榜",
+      "leaderboardDesc": "竞争并看看你与其他玩家的排名如何",
+      "moreComing": "还有更多即将推出",
+      "moreComingDesc": "Ascend 不断添加新功能",
+      "profiles": "个人资料和统计数据",
+      "profilesDesc": "设置您的个人简介、查看统计数据并自定义您的公开个人资料",
+      "upcomingUpdates": "即将更新一览",
+      "upcomingUpdatesDesc": "预览下一个 Ascendara 更新中的所有更改"
     },
     "featuresIntro": "以下是您将通过 Ascend 获得的功能：",
     "forgotPassword": "忘记您的帐户信息？加入不和谐",
@@ -58,8 +81,10 @@
     "noAccount": "没有帐户？今天免费加入",
     "pricingDetails": "从 7 天免费试用开始。之后，每月只需 2 美元即可同步和备份所有数据。",
     "pricingFriendly": "无需付款即可开始！",
+    "requestDeletion": "请求删除帐户",
     "setUp": "加紧。连接。",
     "signOut": "登出",
+    "signOutDescription": "退出您的帐户",
     "success": {
       "loggedIn": "欢迎回来！",
       "loggedOut": "退出成功",
@@ -173,6 +198,7 @@
       "noTrialMessage": "您没有资格获得免费试用。请订阅以访问 Ascend 功能。",
       "noTrialTitle": "需要订阅",
       "reason": "原因",
+      "trial": "我了解我有 7 天免费试用期",
       "trialBlocked": "试用版已使用",
       "trialBlockedMessage": "该设备已进行试用。订阅以访问 Ascend 功能。",
       "trialEndingSoon": "审判即将结束",
@@ -293,6 +319,7 @@
     },
     "nav": {
       "cloudLibrary": "云图书馆",
+      "discover": "发现",
       "friends": "朋友们",
       "home": "家",
       "leaderboard": "排行榜",
@@ -302,9 +329,11 @@
       "online": "在线的",
       "requests": "要求",
       "search": "搜索",
-      "settings": "设置"
+      "settings": "设置",
+      "social": "社会的",
+      "upcoming": "即将更新"
     },
-    "notifications": { "empty": "没有通知", "title": "通知" },
+    "notifications": { "empty": "无通知", "title": "通知" },
     "profile": {
       "achievements": "成就",
       "back": "返回搜索",
@@ -319,6 +348,7 @@
       "noGames": "还没有游戏",
       "noGamesHint": "该用户尚未同步其库",
       "playtime": "游戏时间",
+      "private": "私人的",
       "privateAccount": "私人账户",
       "privateAccountMessage": "该用户已将其帐户设置为私人。他们的个人资料详细信息、游戏和成就都是隐藏的。",
       "recentAchievements": "近期成果",
@@ -422,7 +452,7 @@
       "githubPlaceholder": "您的 GitHub 用户名",
       "joinAscend": "加入奥升德",
       "lifetime": "寿命",
-      "linkDescription": "Link by Stripe 可让您保存付款信息，并在数千个网站上一键结帐。",
+      "linkDescription": "Link by Stripe 可让您保存付款信息，并在数千个网站上一键结账。",
       "manageBilling": "管理账单",
       "manageSubscription": "管理订阅",
       "monthly": "每月",
@@ -503,6 +533,18 @@
       "upgradeShort": "加入",
       "verified": "已验证用户",
       "verifiedShort": "✓"
+    },
+    "upcoming": {
+      "additions": "新功能",
+      "fixes": "错误修复",
+      "improvements": "改进",
+      "loading": "正在加载即将发生的更改...",
+      "noUpcoming": "目前没有即将发布的更新。请稍后再回来查看！",
+      "refresh": "刷新",
+      "removals": "已删除",
+      "subtitle": "查看下一个版本中的内容",
+      "title": "即将更新",
+      "upToDate": "你是最新的！"
     },
     "updateRequired": {
       "description": "请将 Ascendara 更新到最新版本以访问 Ascend 功能。",
@@ -840,7 +882,7 @@
     "loading": "正在获取游戏详细信息...",
     "online": "在线的",
     "ratingTooltip": "这是在 Ascendara 上下载并玩过该游戏的其他人的平均评分。",
-    "showLess": "显示更少",
+    "showLess": "显示较少",
     "size": "尺寸",
     "update": "更新",
     "version": "版本"
@@ -993,6 +1035,7 @@
       "noGameId": "该游戏无法恢复 - 未找到游戏 ID",
       "restored": "云数据已恢复！您的游戏时间和统计数据又回来了。"
     },
+    "cloudSync": "云同步",
     "confirmDelete": "哇哦！",
     "confirmRemoveFolderDesc": "您确定要删除该文件夹吗？里面的所有游戏都将移回您的主库。",
     "confirmRemoveFolderTitle": "删除文件夹？",
@@ -1070,6 +1113,24 @@
     "launching": "发射...",
     "lessThanMinute": "这场比赛不到一分钟",
     "lessThanMinute2": "不到一分钟",
+    "libraryValue": {
+      "ascendPromo": {
+        "cta": "了解登高",
+        "message": "如果按每月 2 美元计算，Ascend 将需要 {{months}} 个月才能达到您节省的金额。这就是 {{years}} 年的云同步、朋友等等。",
+        "title": "你省了一大笔钱！"
+      },
+      "breakdown": "价格细目",
+      "calculate": "计算图书馆价值",
+      "calculating": "正在计算...",
+      "description1": "您的游戏库的估计零售价值基于",
+      "description2": "廉价鲨鱼 API",
+      "error": "无法计算图书馆价值",
+      "gamesFound": "找到 {{count}} 个游戏",
+      "notFound": "未找到 {{count}} 个游戏",
+      "recalculate": "重新计算",
+      "title": "图书馆价值",
+      "totalValue": "图书馆总价值"
+    },
     "loadingLibrary": "收集你的游戏",
     "loadingLibraryMessage": "Ascendara 正在为您收集所有游戏。如果您能够阅读此消息，则说明花费的时间比预期要长一些。",
     "minute": "分钟",
@@ -1393,7 +1454,7 @@
     "behaviorAfterDownloadDescription": "选择下载完成后您的计算机应发生的情况。",
     "behaviors": {
       "lock": "锁",
-      "none": "什么都不做",
+      "none": "什么也不做",
       "shutdown": "关闭",
       "sleep": "睡觉"
     },
@@ -1571,7 +1632,7 @@
       "accentButton": "口音",
       "badge": "徽章",
       "cardDescription": "这是一些无声的描述文字。",
-      "cardTitle": "卡牌名称",
+      "cardTitle": "卡牌标题",
       "error": "错误",
       "info": "信息",
       "inputPlaceholder": "输入字段预览",

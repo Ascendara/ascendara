@@ -1,7 +1,22 @@
 {
   "account": {
+    "actions": "Azioni dell'account",
     "almostThere": "Ci siamo quasi!",
     "chooseDisplayName": "Scegli un nome visualizzato per il tuo account",
+    "deletion": {
+      "confirmed": "Richiesta inviata",
+      "deleting": "Invio...",
+      "description": "Verrà inviata una richiesta per eliminare il tuo account e tutti i dati associati. La tua richiesta verrà elaborata e sarai avvisato via email.",
+      "enterPassword": "Inserisci la tua password per confermare",
+      "failed": "Impossibile inviare la richiesta di eliminazione",
+      "holdButton": "Tieni premuto per 3 secondi per richiedere",
+      "holdToDelete": "Tieni premuto per richiedere",
+      "passwordRequired": "Inserisci la tua password",
+      "pendingWarning": "Il tuo account ha una richiesta di eliminazione in sospeso. Unisciti al nostro Discord per ripristinare il tuo account se si è trattato di un errore.",
+      "success": "Richiesta di eliminazione inviata correttamente",
+      "title": "Richiedi la cancellazione dell'account"
+    },
+    "deletionWarning": "La tua richiesta verrà elaborata entro pochi giorni",
     "displayNameHint": "Ecco come ti vedranno gli altri utenti. Minimo 4 caratteri.",
     "errors": {
       "accountExists": "L'account esiste già",
@@ -19,14 +34,22 @@
       "updateFailed": "Impossibile aggiornare il profilo"
     },
     "features": {
-      "autoUpdate": "Aggiornamenti automatici",
-      "autoUpdateDesc": "I giochi possono essere controllati per un aggiornamento e installati automaticamente",
+      "autoUpdate": "Aggiornamenti automatici del gioco",
+      "autoUpdateDesc": "I giochi vengono automaticamente controllati per gli aggiornamenti e installati",
+      "chat": "Chat in tempo reale",
+      "chatDesc": "Invia messaggi agli amici e rimani connesso mentre giochi",
       "cloudSync": "Sincronizzazione nel cloud",
-      "cloudSyncDesc": "Sincronizza la tua libreria e le impostazioni su tutti i dispositivi",
-      "friends": "Amici e chat",
-      "friendsDesc": "Connettiti con gli amici e chatta mentre giochi",
-      "profiles": "Profili pubblici",
-      "profilesDesc": "Visualizza il tempo di gioco, i risultati e le statistiche degli altri"
+      "cloudSyncDesc": "Sincronizza il tuo profilo, la libreria e i dati di gioco su tutti i dispositivi",
+      "friends": "Sistema degli amici",
+      "friendsDesc": "Invia richieste di amicizia, aggiungi amici e costruisci la tua rete",
+      "leaderboard": "Classifica pubblica",
+      "leaderboardDesc": "Competi e scopri come ti classifichi rispetto agli altri giocatori",
+      "moreComing": "E altro ancora in arrivo",
+      "moreComingDesc": "Nuove funzionalità vengono costantemente aggiunte ad Ascend",
+      "profiles": "Profilo e statistiche",
+      "profilesDesc": "Imposta la tua biografia, visualizza le statistiche e personalizza il tuo profilo pubblico",
+      "upcomingUpdates": "Prossimi aggiornamenti",
+      "upcomingUpdatesDesc": "Visualizza in anteprima tutte le modifiche in arrivo nel prossimo aggiornamento di Ascendara"
     },
     "featuresIntro": "Ecco cosa otterrai con Ascend:",
     "forgotPassword": "Hai dimenticato le informazioni del tuo account? Unisciti alla Discordia",
@@ -58,8 +81,10 @@
     "noAccount": "Non hai un account? Iscriviti oggi gratuitamente",
     "pricingDetails": "Inizia con una prova gratuita di 7 giorni. Dopodiché, ti costeranno solo $ 2 al mese per mantenere tutti i tuoi dati sincronizzati e sottoposti a backup.",
     "pricingFriendly": "Nessun pagamento richiesto per iniziare!",
+    "requestDeletion": "Richiedi la cancellazione dell'account",
     "setUp": "Fai un passo avanti. Collegare.",
     "signOut": "Disconnessione",
+    "signOutDescription": "Esci dal tuo account",
     "success": {
       "loggedIn": "Bentornato!",
       "loggedOut": "Disconnessione riuscita",
@@ -173,6 +198,7 @@
       "noTrialMessage": "Non hai diritto a una prova gratuita. Iscriviti per accedere alle funzionalità Ascend.",
       "noTrialTitle": "Abbonamento richiesto",
       "reason": "Motivo",
+      "trial": "Capisco che ho una prova gratuita di 7 giorni",
       "trialBlocked": "Prova già utilizzata",
       "trialBlockedMessage": "È già stata utilizzata una prova su questo dispositivo. Iscriviti per accedere alle funzionalità Ascend.",
       "trialEndingSoon": "La prova terminerà presto",
@@ -207,7 +233,7 @@
       "loadingAchievements": "Caricamento obiettivi...",
       "localGames": "Giochi locali",
       "neverSynced": "Mai",
-      "noAchievements": "Nessun risultato registrato per questo gioco",
+      "noAchievements": "Nessun risultato tracciato per questo gioco",
       "noResults": "Nessun gioco trovato",
       "percentUnlocked": "% sbloccato",
       "playtimeTracking": "Monitoraggio del tempo di riproduzione",
@@ -293,6 +319,7 @@
     },
     "nav": {
       "cloudLibrary": "Libreria cloud",
+      "discover": "Scoprire",
       "friends": "Amici",
       "home": "Casa",
       "leaderboard": "Classifica",
@@ -302,7 +329,9 @@
       "online": "In linea",
       "requests": "Richieste",
       "search": "Ricerca",
-      "settings": "Impostazioni"
+      "settings": "Impostazioni",
+      "social": "Sociale",
+      "upcoming": "Prossimo aggiornamento"
     },
     "notifications": { "empty": "Nessuna notifica", "title": "Notifiche" },
     "profile": {
@@ -319,6 +348,7 @@
       "noGames": "Nessun gioco ancora",
       "noGamesHint": "Questo utente non ha ancora sincronizzato la propria libreria",
       "playtime": "Tempo di gioco",
+      "private": "Privato",
       "privateAccount": "Conto privato",
       "privateAccountMessage": "Questo utente ha impostato il proprio account come privato. I dettagli del profilo, i giochi e gli obiettivi sono nascosti.",
       "recentAchievements": "Risultati recenti",
@@ -466,7 +496,7 @@
       "subtitle": "Gestisci il tuo account e profilo",
       "supportMessage": "Stai aiutando a mantenere in vita Ascendara",
       "supportMessageSub": "Il tuo supporto significa tutto per questo sviluppatore solista",
-      "thankYouSubscriber": "Grazie per aver supportato Ascendara!",
+      "thankYouSubscriber": "Grazie per supportare Ascendara!",
       "title": "Impostazioni dell'account",
       "trialDaysRemaining": "{{days}} giorni rimanenti nel periodo di prova",
       "trialProgress": "Avanzamento della prova",
@@ -503,6 +533,18 @@
       "upgradeShort": "Giuntura",
       "verified": "Utente verificato",
       "verifiedShort": "✓"
+    },
+    "upcoming": {
+      "additions": "Nuove funzionalità",
+      "fixes": "Correzioni di bug",
+      "improvements": "Miglioramenti",
+      "loading": "Caricamento delle modifiche imminenti...",
+      "noUpcoming": "Non ci sono aggiornamenti imminenti in questo momento. Ricontrolla più tardi!",
+      "refresh": "Aggiorna",
+      "removals": "RIMOSSO",
+      "subtitle": "Scopri cosa accadrà nella prossima versione",
+      "title": "Prossimo aggiornamento",
+      "upToDate": "Sei aggiornato!"
     },
     "updateRequired": {
       "description": "Aggiorna Ascendara alla versione più recente per accedere alle funzionalità di Ascend.",
@@ -546,7 +588,7 @@
       "cancel": "Cancellare",
       "couldNotReport": "Il rapporto non è stato inviato.",
       "couldNotReportDesc": "La tua segnalazione non è stata inviata. Per favore riprova più tardi.",
-      "description": "Aiuta a migliorare Ascendara segnalando eventuali problemi riscontrati.",
+      "description": "Aiutaci a migliorare Ascendara segnalando eventuali problemi riscontrati.",
       "detailsLabel": "Dettagli",
       "detailsPlaceholder": "Si prega di fornire maggiori dettagli sul problema...",
       "error": "Impossibile inviare il rapporto",
@@ -633,7 +675,7 @@
         "noTorrent": "Non è possibile accedere a qBittorrent WebUI. Controlla le impostazioni per ulteriori informazioni.",
         "title": "Scarica tramite Torrent"
       },
-      "waitingForBrowser": "In attesa che il tuo browser invii il download..."
+      "waitingForBrowser": "In attesa che il browser invii il download..."
     },
     "failedToLoadSpecs": "Impossibile caricare le specifiche di sistema",
     "firstReleasedOn": "Gioco rilasciato",
@@ -925,7 +967,7 @@
     "availableSpace": "Spazio disponibile",
     "backToLibrary": "Ritorno alla Biblioteca",
     "backups": {
-      "autoBackupDesc": "Esegui automaticamente il backup dei dati di salvataggio alla chiusura del gioco",
+      "autoBackupDesc": "Effettua il backup automatico dei dati di salvataggio alla chiusura del gioco",
       "autoBackupDisabled": "Backup automatico disabilitato",
       "autoBackupDisabledDesc": "Backup automatico disabilitato per {{game}}",
       "autoBackupEnabled": "Backup automatico abilitato",
@@ -993,6 +1035,7 @@
       "noGameId": "Questo gioco non può essere ripristinato: nessun ID gioco trovato",
       "restored": "Dati cloud ripristinati! Il tempo di gioco e le statistiche sono tornati."
     },
+    "cloudSync": "Sincronizzazione nel cloud",
     "confirmDelete": "Woah!",
     "confirmRemoveFolderDesc": "Sei sicuro di voler rimuovere questa cartella? Tutti i giochi all'interno verranno spostati nella libreria principale.",
     "confirmRemoveFolderTitle": "Rimuovere la cartella?",
@@ -1070,6 +1113,24 @@
     "launching": "Lancio...",
     "lessThanMinute": "Meno di un minuto su questo gioco",
     "lessThanMinute2": "Meno di un minuto",
+    "libraryValue": {
+      "ascendPromo": {
+        "cta": "Scopri di più su Ascend",
+        "message": "A $ 2 al mese, Ascend impiegherebbe {{months}} mesi per eguagliare ciò che hai risparmiato. Sono {{years}} anni di sincronizzazione cloud, amici e altro ancora.",
+        "title": "Hai risparmiato una fortuna!"
+      },
+      "breakdown": "Ripartizione dei prezzi",
+      "calculate": "Calcola il valore della libreria",
+      "calculating": "Calcolo...",
+      "description1": "Valore al dettaglio stimato della tua libreria di giochi in base a",
+      "description2": "API CheapShark",
+      "error": "Impossibile calcolare il valore della libreria",
+      "gamesFound": "{{count}} giochi trovati",
+      "notFound": "{{count}} giochi non trovati",
+      "recalculate": "Ricalcolare",
+      "title": "Valore della libreria",
+      "totalValue": "Valore totale della libreria"
+    },
     "loadingLibrary": "Raccogliere i tuoi giochi",
     "loadingLibraryMessage": "Ascendara sta raccogliendo tutti i tuoi giochi per te. Se riesci a leggere questo messaggio, significa che sta impiegando più tempo del previsto.",
     "minute": "minuto",
@@ -1252,7 +1313,7 @@
     "notreallol": "Questo livello si basa sul tempo di gioco e sui lanci. È completamente locale e non caricato su nessun server.",
     "orUploadImage": "Carica un'immagine da modificare",
     "perGameAvg": "Di tempo di gioco per partita",
-    "playTimeDistribution": "Distribuzione del tempo di gioco tra i tuoi primi 5 giochi giocati",
+    "playTimeDistribution": "Distribuzione del tempo di gioco tra i primi 5 giochi giocati",
     "switchToEmoji": "Fai clic su un'emoji per cambiare",
     "topGames": "I tuoi migliori giochi",
     "totalPlaytime": "Tempo di riproduzione totale",
@@ -1693,7 +1754,7 @@
     "cooldown": "Raffreddare",
     "data": "Dati",
     "data_refreshed": "Dati TorBox aggiornati",
-    "data_size": "{{size}} GB",
+    "data_size": "{{size}}GB",
     "delete_download": "Elimina download",
     "delete_download_confirm": "Sei sicuro di voler rimuovere {{name}} dai download memorizzati nella cache?",
     "download_deleted_desc": "{{name}} è stato eliminato.",
@@ -1739,7 +1800,7 @@
   },
   "tour": {
     "downloads": {
-      "content": "Questa è la tua area Download. Puoi tenere traccia dei download correnti, verificare l'avanzamento e gestire i download qui.",
+      "content": "Questa è la tua area Download. Puoi tenere traccia dei tuoi download correnti, controllare l'avanzamento e gestire i download qui.",
       "title": "Download"
     },
     "final": {
@@ -1894,7 +1955,7 @@
     "requiredForModernGames": "Richiesto per i giochi moderni",
     "restart": "Ricomincia",
     "runtimeComponents": "Componenti di esecuzione",
-    "sayHelloTo": "Salutami",
+    "sayHelloTo": "Salutalo",
     "securityPatchesDesc": "Rimani protetto con importanti aggiornamenti di sicurezza",
     "securityPatchesTitle": "Patch di sicurezza",
     "seeEntireList": "Visualizza l'elenco completo di 105 lingue",

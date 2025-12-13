@@ -1,7 +1,22 @@
 {
   "account": {
+    "actions": "Kontoaktionen",
     "almostThere": "Fast geschafft!",
     "chooseDisplayName": "Wählen Sie einen Anzeigenamen für Ihr Konto",
+    "deletion": {
+      "confirmed": "Anfrage eingereicht",
+      "deleting": "Einreichen...",
+      "description": "Dadurch wird eine Anfrage zur Löschung Ihres Kontos und aller damit verbundenen Daten gesendet. Ihre Anfrage wird bearbeitet und Sie werden per E-Mail benachrichtigt.",
+      "enterPassword": "Geben Sie zur Bestätigung Ihr Passwort ein",
+      "failed": "Löschanforderung konnte nicht übermittelt werden",
+      "holdButton": "Zum Anfordern 3 Sekunden lang gedrückt halten",
+      "holdToDelete": "Zum Anfordern warten",
+      "passwordRequired": "Bitte geben Sie Ihr Passwort ein",
+      "pendingWarning": "Für Ihr Konto liegt eine ausstehende Löschanfrage vor. Treten Sie unserem Discord bei, um Ihr Konto wiederherzustellen, wenn dies ein Fehler war.",
+      "success": "Löschanforderung erfolgreich übermittelt",
+      "title": "Fordern Sie die Löschung des Kontos an"
+    },
+    "deletionWarning": "Ihre Anfrage wird innerhalb weniger Tage bearbeitet",
     "displayNameHint": "So werden Sie von anderen Benutzern gesehen. Mindestens 4 Zeichen.",
     "errors": {
       "accountExists": "Konto existiert bereits",
@@ -19,14 +34,22 @@
       "updateFailed": "Profil konnte nicht aktualisiert werden"
     },
     "features": {
-      "autoUpdate": "Automatische Updates",
-      "autoUpdateDesc": "Spiele können auf ein Update überprüft und automatisch installiert werden",
+      "autoUpdate": "Automatische Spielaktualisierungen",
+      "autoUpdateDesc": "Spiele werden automatisch auf Updates überprüft und installiert",
+      "chat": "Echtzeit-Chat",
+      "chatDesc": "Nachrichten an Freunde senden und beim Spielen in Verbindung bleiben",
       "cloudSync": "Cloud-Synchronisierung",
-      "cloudSyncDesc": "Synchronisieren Sie Ihre Bibliothek und Einstellungen geräteübergreifend",
-      "friends": "Freunde & Chat",
-      "friendsDesc": "Vernetzen Sie sich mit Freunden und chatten Sie beim Spielen",
-      "profiles": "Öffentliche Profile",
-      "profilesDesc": "Sehen Sie sich die Spielzeit, Erfolge und Statistiken anderer an"
+      "cloudSyncDesc": "Synchronisieren Sie Ihr Profil, Ihre Bibliothek und Ihre Spieldaten geräteübergreifend",
+      "friends": "Freundessystem",
+      "friendsDesc": "Senden Sie Freundschaftsanfragen, fügen Sie Freunde hinzu und bauen Sie Ihr Netzwerk auf",
+      "leaderboard": "Öffentliche Bestenliste",
+      "leaderboardDesc": "Treten Sie gegeneinander an und sehen Sie, wie Sie im Vergleich zu anderen Spielern abschneiden",
+      "moreComing": "Und es kommen noch mehr",
+      "moreComingDesc": "Ascend wird ständig um neue Funktionen erweitert",
+      "profiles": "Profil & Statistiken",
+      "profilesDesc": "Richten Sie Ihre Biografie ein, sehen Sie sich Statistiken an und passen Sie Ihr öffentliches Profil an",
+      "upcomingUpdates": "Kommende Updates – Vorschau",
+      "upcomingUpdatesDesc": "Sehen Sie sich alle Änderungen an, die mit dem nächsten Ascendara-Update einhergehen"
     },
     "featuresIntro": "Folgendes erhalten Sie mit Ascend:",
     "forgotPassword": "Kontoinformationen vergessen? Treten Sie dem Discord bei",
@@ -58,8 +81,10 @@
     "noAccount": "Sie haben noch kein Konto? Treten Sie noch heute kostenlos bei",
     "pricingDetails": "Beginnen Sie mit einer kostenlosen 7-Tage-Testversion. Danach kostet es nur noch 2 US-Dollar pro Monat, alle Ihre Daten zu synchronisieren und zu sichern.",
     "pricingFriendly": "Für den Start ist keine Zahlung erforderlich!",
+    "requestDeletion": "Fordern Sie die Löschung des Kontos an",
     "setUp": "Steigen Sie auf. Verbinden.",
     "signOut": "Abmelden",
+    "signOutDescription": "Melden Sie sich von Ihrem Konto ab",
     "success": {
       "loggedIn": "Willkommen zurück!",
       "loggedOut": "Erfolgreich abgemeldet",
@@ -90,7 +115,7 @@
       }
     },
     "brokenVersion": {
-      "description": "Diese Version von Ascendara weist bekannte kritische Probleme mit der Funktionalität auf, z. B. beim Herunterladen, Aktualisieren und anderen Kernfunktionen.",
+      "description": "Diese Version von Ascendara weist bekannte kritische Probleme mit ihrer Funktionalität auf, wie z. B. Downloads, Aktualisierungen und anderen Kernfunktionen.",
       "development": "Bei der Verwendung dieser Version kann es zu Problemen oder Abstürzen kommen. Bitte aktualisieren Sie Ascendara auf der Website auf die neueste Version.",
       "title": "Sie verwenden eine defekte Version",
       "understand": "Ich verstehe die Probleme, fahren Sie fort",
@@ -98,7 +123,7 @@
     },
     "crashScreen": {
       "checkConnection": "Überprüfen Sie Ihre Internetverbindung",
-      "clearCache": "Leeren Sie Ihren Browser-Cache und Ihre Cookies",
+      "clearCache": "Löschen Sie Ihren Browser-Cache und Ihre Cookies",
       "contactSupport": "Wenn das Problem weiterhin besteht, melden Sie es bitte dem Support",
       "description": "Ascendara gefiel nicht, was gerade passiert war. Keine Sorge, wenn Sie die Analyse aktiviert haben, wurde dieser Fehler verfolgt und der Entwickler wird ihn beheben lassen.",
       "reload": "Ascendara neu laden",
@@ -173,6 +198,7 @@
       "noTrialMessage": "Sie haben keinen Anspruch auf eine kostenlose Testversion. Bitte abonnieren Sie, um auf Ascend-Funktionen zugreifen zu können.",
       "noTrialTitle": "Abonnement erforderlich",
       "reason": "Grund",
+      "trial": "Ich verstehe, dass ich eine 7-tägige kostenlose Testversion habe",
       "trialBlocked": "Testversion bereits verwendet",
       "trialBlockedMessage": "Auf diesem Gerät wurde bereits eine Testversion verwendet. Abonnieren Sie, um auf Ascend-Funktionen zuzugreifen.",
       "trialEndingSoon": "Testversion endet bald",
@@ -293,6 +319,7 @@
     },
     "nav": {
       "cloudLibrary": "Cloud-Bibliothek",
+      "discover": "Entdecken",
       "friends": "Freunde",
       "home": "Heim",
       "leaderboard": "Bestenliste",
@@ -302,7 +329,9 @@
       "online": "Online",
       "requests": "Anfragen",
       "search": "Suchen",
-      "settings": "Einstellungen"
+      "settings": "Einstellungen",
+      "social": "Sozial",
+      "upcoming": "Kommendes Update"
     },
     "notifications": {
       "empty": "Keine Benachrichtigungen",
@@ -322,6 +351,7 @@
       "noGames": "Noch keine Spiele",
       "noGamesHint": "Dieser Benutzer hat seine Bibliothek noch nicht synchronisiert",
       "playtime": "Spielzeit",
+      "private": "Privat",
       "privateAccount": "Privatkonto",
       "privateAccountMessage": "Dieser Benutzer hat sein Konto auf privat gesetzt. Ihre Profildetails, Spiele und Erfolge werden ausgeblendet.",
       "recentAchievements": "Aktuelle Erfolge",
@@ -500,12 +530,24 @@
     },
     "subscription": {
       "active": "Aufstieg aktiv",
-      "trialDays": "Noch {{days}} Tage in der Testphase",
+      "trialDays": "Noch {{days}} Tage in der Testversion",
       "trialExpired": "Testversion abgelaufen",
       "upgrade": "Treten Sie Ascend bei",
       "upgradeShort": "Verbinden",
       "verified": "Verifizierter Benutzer",
       "verifiedShort": "✓"
+    },
+    "upcoming": {
+      "additions": "Neue Funktionen",
+      "fixes": "Fehlerbehebungen",
+      "improvements": "Verbesserungen",
+      "loading": "Anstehende Änderungen werden geladen...",
+      "noUpcoming": "Derzeit stehen keine Updates an. Schauen Sie später noch einmal vorbei!",
+      "refresh": "Aktualisieren",
+      "removals": "ENTFERNT",
+      "subtitle": "Sehen Sie, was in der nächsten Version kommt",
+      "title": "Kommendes Update",
+      "upToDate": "Du bist auf dem Laufenden!"
     },
     "updateRequired": {
       "description": "Bitte aktualisieren Sie Ascendara auf die neueste Version, um auf die Ascend-Funktionen zugreifen zu können.",
@@ -679,7 +721,7 @@
     "online": "ONLINE",
     "onlineFixWarningDescription": "Dieses Spiel wird mit installiertem Online-Fix geliefert. Wenn Sie es starten, werden Sie in einer Meldung darauf hingewiesen, dass es vom Online-Fix-Team erstellt wurde. Das ist normal und sollte nur einmal bei jedem Spiel damit angezeigt werden.",
     "onlineFixWarningTitle": "Online-Fix-Eingabeaufforderung beim Start",
-    "onlineTooltip": "Online-Multiplayer-Funktionen aktiviert durch online-fix.me",
+    "onlineTooltip": "Online-Multiplayer-Funktionen durch online-fix.me aktiviert",
     "openCriticBetaWarning": "Dieser API-Endpunkt befindet sich in der Betaphase und es können Probleme auftreten. Wenn OpenCritic ein anderes Spiel anzeigt, melden Sie das Spiel bitte, indem Sie rechts neben dem Titel auf „Melden“ klicken.",
     "platforms": "Plattformen",
     "pressEscToGoBack": "Klicken Sie auf „Ich“ oder die ESC-Taste, um zurückzugehen",
@@ -736,7 +778,7 @@
       "cancel": "Stornieren",
       "description": "Wählen Sie eine frühere Version von {game}",
       "loadError": "Der Versionsverlauf konnte nicht geladen werden",
-      "loading": "Frühere Versionen werden geladen...",
+      "loading": "Vorherige Versionen werden geladen...",
       "noVersions": "Keine früheren Versionen gefunden",
       "title": "Ascendara-Zeitmaschine",
       "unknownDate": "Unbekanntes Datum",
@@ -996,6 +1038,7 @@
       "noGameId": "Dieses Spiel kann nicht wiederhergestellt werden – keine Spiel-ID gefunden",
       "restored": "Cloud-Daten wiederhergestellt! Deine Spielzeit und Statistiken sind zurück."
     },
+    "cloudSync": "Cloud-Synchronisierung",
     "confirmDelete": "Woah!",
     "confirmRemoveFolderDesc": "Möchten Sie diesen Ordner wirklich entfernen? Alle darin enthaltenen Spiele werden zurück in Ihre Hauptbibliothek verschoben.",
     "confirmRemoveFolderTitle": "Ordner entfernen?",
@@ -1069,10 +1112,28 @@
     "importingGamesDesc": "Bitte warten Sie, während Ihre Steam-Spiele importiert werden. Dies kann je nach Größe Ihrer Bibliothek einige Minuten dauern.",
     "includesAllDLCs": "Enthält alle DLCs",
     "launchError": "Startfehler",
-    "launchErrorMessage": "{{game}} konnte nicht ausgeführt werden. Manchmal werden ausführbare Spieledateien nicht mit dem Namen des Spiels identisch benannt. Bitte stellen Sie sicher, dass Ascendara versucht, die richtige Datei auszuführen.",
+    "launchErrorMessage": "{{game}} konnte nicht ausgeführt werden. Manchmal werden ausführbare Spieldateien nicht mit dem Namen des Spiels identisch benannt. Bitte stellen Sie sicher, dass Ascendara versucht, die richtige Datei auszuführen.",
     "launching": "Start...",
     "lessThanMinute": "Weniger als eine Minute für dieses Spiel",
     "lessThanMinute2": "Weniger als eine Minute",
+    "libraryValue": {
+      "ascendPromo": {
+        "cta": "Erfahren Sie mehr über Ascend",
+        "message": "Bei einem Preis von 2 $/Monat würde Ascend {{months}} Monate brauchen, um die von Ihnen gesparte Summe zu erreichen. Das sind {{years}} Jahre Cloud-Synchronisierung, Freunde und mehr.",
+        "title": "Sie haben ein Vermögen gespart!"
+      },
+      "breakdown": "Preisaufschlüsselung",
+      "calculate": "Berechnen Sie den Bibliothekswert",
+      "calculating": "Berechnen...",
+      "description1": "Geschätzter Verkaufswert Ihrer Spielebibliothek basierend auf",
+      "description2": "CheapShark-API",
+      "error": "Der Bibliothekswert konnte nicht berechnet werden",
+      "gamesFound": "{{count}} Spiele gefunden",
+      "notFound": "{{count}} Spiele nicht gefunden",
+      "recalculate": "Neu berechnen",
+      "title": "Bibliothekswert",
+      "totalValue": "Gesamtwert der Bibliothek"
+    },
     "loadingLibrary": "Sammeln Sie Ihre Spiele",
     "loadingLibraryMessage": "Ascendara sammelt alle Ihre Spiele für Sie. Wenn Sie diese Nachricht lesen können, dauert es etwas länger als erwartet.",
     "minute": "Minute",
@@ -1301,7 +1362,7 @@
     "startRefresh": "Starten Sie die Aktualisierung",
     "startingRefresh": "Aktualisierung wird gestartet...",
     "step1Description": "Zuerst müssen Sie den SteamRIP-Beitragslink öffnen und die Verifizierungsherausforderung von Cloudflare abschließen.",
-    "step1Note": "Füllen Sie das Captcha/die Verifizierung aus und klicken Sie dann auf Weiter, um fortzufahren.",
+    "step1Note": "Schließen Sie das Captcha/die Verifizierung ab und klicken Sie dann auf Weiter, um fortzufahren.",
     "step1Title": "Schließen Sie die Cloudflare-Verifizierung ab",
     "step2Description": "Die Download-Handler-Erweiterung von Ascendara kann die Verifizierung automatisch an Ascendara senden.",
     "step2Title": "Haben Sie die Ascendara-Erweiterung?",
@@ -1369,8 +1430,8 @@
     "achievementWatcher": {
       "addDir": "Verzeichnis hinzufügen",
       "defaultDirs": "Standardüberwachungsverzeichnisse",
-      "defaultDirsNote": "Diese Verzeichnisse werden stets auf Erfolge überprüft. Sie können unten weitere Verzeichnisse hinzufügen.",
-      "description": "Dies sind die Ordner, die auf Erfolge überprüft werden. Alle gefundenen Erfolge werden Ihrer Bibliothek hinzugefügt. Der Achievement Watcher basiert auf dem Original von xan105 und wurde für Ascendara modifiziert.",
+      "defaultDirsNote": "Diese Verzeichnisse werden stets auf Erfolge überwacht. Sie können unten weitere Verzeichnisse hinzufügen.",
+      "description": "Dies sind die Ordner, die auf Erfolge überwacht werden. Alle gefundenen Erfolge werden Ihrer Bibliothek hinzugefügt. Der Achievement Watcher basiert auf dem Original von xan105 und wurde für Ascendara modifiziert.",
       "noDirs": "Keine Verzeichnisse ausgewählt",
       "title": "Leistungsbeobachter"
     },
@@ -1446,7 +1507,7 @@
       "status": "Status und Benachrichtigungen",
       "text": "Textfarben"
     },
-    "comingSoon": "Demnächst erhältlich",
+    "comingSoon": "Demnächst verfügbar",
     "communityThemes": "Community-Themen",
     "communityThemesDescription": "Durchsuchen Sie die von der Community erstellten Themen und wenden Sie sie an. Möchten Sie Ihre eigenen einreichen?",
     "components": "Anwendungskomponenten",
@@ -1507,7 +1568,7 @@
         "custom": "Brauch",
         "five": "5 Sicherungen",
         "ten": "10 Sicherungen",
-        "three": "3 Backups"
+        "three": "3 Sicherungen"
       },
       "backupsToKeep": "Zu behaltende Backups pro Spiel",
       "compressionBzip2": "BZip2 (bessere Komprimierung, langsamer)",
@@ -1650,9 +1711,9 @@
     "timeMachineDisabledFitgirl": "Ascendara Timemachine ist nicht verfügbar, wenn FitGirl Repacks als Spielquelle verwendet wird.",
     "title": "Ascendara-Einstellungen",
     "torboxApiKey": "Torbox-API-Schlüssel",
-    "torboxApiKeyDescription": "Mit den Debrid-Diensten können Sie Datei-Host-Links in Premium-Direkt-Download-Links umwandeln und so Geschwindigkeitsbegrenzungen und Wartezeiten umgehen. Geben Sie hier Ihren Torbox-API-Schlüssel ein, um diese Funktion zu aktivieren.",
+    "torboxApiKeyDescription": "Debrid-Dienste ermöglichen es Ihnen, Datei-Host-Links in Premium-Direkt-Download-Links umzuwandeln und so Geschwindigkeitsbegrenzungen und Wartezeiten zu umgehen. Geben Sie hier Ihren Torbox-API-Schlüssel ein, um diese Funktion zu aktivieren.",
     "torboxApiKeyLearnHowtoGet": "Erfahren Sie, wie Sie Ihren API-Schlüssel erhalten",
-    "torboxApiKeyPlaceholder": "Fügen Sie den Torbox-API-Schlüssel ein",
+    "torboxApiKeyPlaceholder": "Torbox-API-Schlüssel einfügen",
     "torrentDescription": "Aktivieren Sie die Torrent-Funktionalität von Ascendara. Für diese Funktion muss qBittorrent installiert sein und wird nur erfahrenen Benutzern empfohlen.",
     "torrentOnAscendara": "Torrent auf Ascendara",
     "torrentWarningDialog": {
@@ -1660,7 +1721,7 @@
       "continue": "Ich verstehe die Risiken",
       "description": "Bitte lesen Sie dies sorgfältig durch, bevor Sie die Torrent-Funktionalität aktivieren:",
       "legalWarning": "Das Herunterladen urheberrechtlich geschützter Inhalte ist in Ihrer Region möglicherweise illegal. Sie sind für Ihr eigenes Handeln verantwortlich.",
-      "qbitWarning": "Für diese Funktion ist qBittorrent erforderlich. Stellen Sie sicher, dass Ihr VPN ordnungsgemäß konfiguriert ist.",
+      "qbitWarning": "Für diese Funktion ist qBittorrent erforderlich. Stellen Sie sicher, dass es richtig mit Ihrem VPN konfiguriert ist.",
       "title": "Aktivieren Sie die Torrent-Unterstützung",
       "vpnWarning": "Ihre IP-Adresse ist für andere Peers sichtbar. Verwenden Sie ein VPN, um Ihre Privatsphäre zu schützen und mögliche rechtliche Probleme zu vermeiden."
     },
@@ -1832,7 +1893,7 @@
     "howItWorks": "So funktioniert es:",
     "iHaveReadAndAgreeTo": "Ich habe die Erklärung von Ascendara gelesen und stimme ihr zu",
     "iHaveTheseTakeMeToTheTour": "Ich habe diese, bring mich zur Tour",
-    "improvedUXDesc": "Die Inhalte sind auf mehr Seiten aufgeteilt und besser organisiert, um sicherzustellen, dass Sie finden, was Sie brauchen",
+    "improvedUXDesc": "Die Inhalte sind auf mehrere Seiten aufgeteilt und besser organisiert, um sicherzustellen, dass Sie finden, was Sie brauchen",
     "improvedUXTitle": "Verbesserte Benutzererfahrung",
     "influenceFutureFeatures": "Beeinflussen Sie zukünftige Funktionen",
     "influenceFutureFeaturesDesc": "Helfen Sie Ascendara, Ihre Bedürfnisse zu verstehen und zukünftige Updates zu beeinflussen",
@@ -1921,7 +1982,7 @@
     "thisIsWhereAllYourDownloadedGamesWillBeStored": "Hier werden alle Ihre heruntergeladenen Spiele gespeichert",
     "welcomeTo": "Willkommen bei",
     "welcomeToAscendaraDescription": "Sie sind fast bereit, Ascendara zu verwenden. Wir gehen gemeinsam den Onboarding-Prozess durch und richten dann Ihren Spielindex ein. Bitte lesen Sie jedoch zuerst die Nutzungsbedingungen und die Datenschutzrichtlinie.",
-    "whenYouClickADownloadLink": "Wenn Sie einen Download von einem bekannten Anbieter starten, stoppt die Erweiterung den Download automatisch in Ihrem Browser und startet ihn für Sie in Ascendara",
+    "whenYouClickADownloadLink": "Wenn Sie einen Download von einem bekannten Anbieter starten, stoppt die Erweiterung automatisch den Download in Ihrem Browser und startet ihn für Sie in Ascendara",
     "wineIsRequired": "Spielen Sie mit Wein",
     "wineMustBeInstalled": "Wine, DXVK und andere Tools müssen auf Ihrem Computer installiert und eingerichtet werden, um Windows-Spiele auszuführen. Aber keine Sorge, Ascendara kann alles nur für Sie installieren und einrichten",
     "youCanAddMoreLater": "Sie können später in den Einstellungen weitere Verzeichnisse hinzufügen",

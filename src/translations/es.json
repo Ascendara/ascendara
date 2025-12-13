@@ -1,7 +1,22 @@
 {
   "account": {
+    "actions": "Acciones de cuenta",
     "almostThere": "¡Casi llegamos!",
     "chooseDisplayName": "Elija un nombre para mostrar para su cuenta",
+    "deletion": {
+      "confirmed": "Solicitud enviada",
+      "deleting": "Sumisión...",
+      "description": "Esto enviará una solicitud para eliminar su cuenta y todos los datos asociados. Su solicitud será procesada y se le notificará por correo electrónico.",
+      "enterPassword": "Ingrese su contraseña para confirmar",
+      "failed": "No se pudo enviar la solicitud de eliminación",
+      "holdButton": "Mantenga presionado durante 3 segundos para solicitar",
+      "holdToDelete": "Espera para solicitar",
+      "passwordRequired": "Por favor ingrese su contraseña",
+      "pendingWarning": "Su cuenta tiene una solicitud de eliminación pendiente. Únase a nuestro Discord para restaurar su cuenta si esto fue un error.",
+      "success": "Solicitud de eliminación enviada correctamente",
+      "title": "Solicitar eliminación de cuenta"
+    },
+    "deletionWarning": "Su solicitud será procesada dentro de unos días.",
     "displayNameHint": "Así te verán los demás usuarios. Mínimo 4 caracteres.",
     "errors": {
       "accountExists": "La cuenta ya existe",
@@ -19,14 +34,22 @@
       "updateFailed": "No se pudo actualizar el perfil"
     },
     "features": {
-      "autoUpdate": "Actualizaciones automáticas",
-      "autoUpdateDesc": "Los juegos se pueden buscar en busca de actualizaciones e instalarse automáticamente",
+      "autoUpdate": "Actualizaciones automáticas de juegos",
+      "autoUpdateDesc": "Los juegos se comprueban automáticamente en busca de actualizaciones y se instalan",
+      "chat": "Chat en tiempo real",
+      "chatDesc": "Envía mensajes a tus amigos y mantente conectado mientras juegas",
       "cloudSync": "Sincronización en la nube",
-      "cloudSyncDesc": "Sincroniza tu biblioteca y configuraciones entre dispositivos",
-      "friends": "Amigos y chat",
-      "friendsDesc": "Conéctate con amigos y chatea mientras juegas",
-      "profiles": "Perfiles públicos",
-      "profilesDesc": "Ver tiempo de juego, logros y estadísticas de otros"
+      "cloudSyncDesc": "Sincroniza tu perfil, biblioteca y datos de juegos en todos los dispositivos",
+      "friends": "Sistema de amigos",
+      "friendsDesc": "Envía solicitudes de amistad, agrega amigos y construye tu red",
+      "leaderboard": "Tabla de clasificación pública",
+      "leaderboardDesc": "Compite y mira cómo te clasificas frente a otros jugadores.",
+      "moreComing": "Y más por venir",
+      "moreComingDesc": "Constantemente se agregan nuevas funciones a Ascend",
+      "profiles": "Perfil y estadísticas",
+      "profilesDesc": "Configure su biografía, vea estadísticas y personalice su perfil público",
+      "upcomingUpdates": "Próximas actualizaciones",
+      "upcomingUpdatesDesc": "Obtenga una vista previa de todos los cambios que se producirán en la próxima actualización de Ascendara"
     },
     "featuresIntro": "Esto es lo que obtendrás con Ascend:",
     "forgotPassword": "¿Olvidó la información de su cuenta? Únete a la discordia",
@@ -56,10 +79,12 @@
     "loginSubtitle": "Inicia sesión en tu cuenta",
     "manageAccount": "Administrar cuenta",
     "noAccount": "¿No tienes una cuenta? Únase hoy gratis",
-    "pricingDetails": "Comience con una prueba gratuita de 7 días. Después de eso, solo cuesta $2 al mes mantener todos tus datos sincronizados y respaldados.",
+    "pricingDetails": "Comience con una prueba gratuita de 7 días. Después de eso, cuesta solo $2 al mes mantener todos tus datos sincronizados y respaldados.",
     "pricingFriendly": "¡No se requiere pago para comenzar!",
+    "requestDeletion": "Solicitar eliminación de cuenta",
     "setUp": "Aumentar. Conectar.",
     "signOut": "Desconectar",
+    "signOutDescription": "Cerrar sesión en su cuenta",
     "success": {
       "loggedIn": "¡Bienvenido de nuevo!",
       "loggedOut": "Cerró sesión correctamente",
@@ -173,6 +198,7 @@
       "noTrialMessage": "No eres elegible para una prueba gratuita. Suscríbase para acceder a las funciones de Ascend.",
       "noTrialTitle": "Se requiere suscripción",
       "reason": "Razón",
+      "trial": "Entiendo que tengo una prueba gratuita de 7 días",
       "trialBlocked": "Prueba ya utilizada",
       "trialBlockedMessage": "Ya se ha utilizado una prueba en este dispositivo. Suscríbete para acceder a las funciones de Ascend.",
       "trialEndingSoon": "La prueba terminará pronto",
@@ -180,7 +206,7 @@
       "trialEndingSoonMessage": "Tu prueba de Ascend finaliza en {{days}} días. Una vez que expire la prueba, su biblioteca en la nube y los datos sincronizados se eliminarán en unos días."
     },
     "activity": {
-      "empty": "Ninguna actividad reciente. ¡Empiece a jugar o agregue amigos para ver actualizaciones aquí!",
+      "empty": "Ninguna actividad reciente. ¡Empieza a jugar o agrega amigos para ver actualizaciones aquí!",
       "title": "Actividad reciente"
     },
     "checkingVersion": "Comprobando versión...",
@@ -293,6 +319,7 @@
     },
     "nav": {
       "cloudLibrary": "Biblioteca en la nube",
+      "discover": "Descubrir",
       "friends": "Amigos",
       "home": "Hogar",
       "leaderboard": "Tabla de clasificación",
@@ -302,7 +329,9 @@
       "online": "En línea",
       "requests": "Solicitudes",
       "search": "Buscar",
-      "settings": "Ajustes"
+      "settings": "Ajustes",
+      "social": "Social",
+      "upcoming": "Próxima actualización"
     },
     "notifications": { "empty": "Sin notificaciones", "title": "Notificaciones" },
     "profile": {
@@ -319,6 +348,7 @@
       "noGames": "Aún no hay juegos",
       "noGamesHint": "Este usuario aún no ha sincronizado su biblioteca",
       "playtime": "Recreo",
+      "private": "Privado",
       "privateAccount": "Cuenta Privada",
       "privateAccountMessage": "Este usuario ha configurado su cuenta como privada. Los detalles de su perfil, juegos y logros están ocultos.",
       "recentAchievements": "Logros recientes",
@@ -503,6 +533,18 @@
       "upgradeShort": "Unirse",
       "verified": "Usuario verificado",
       "verifiedShort": "✓"
+    },
+    "upcoming": {
+      "additions": "Nuevas características",
+      "fixes": "Corrección de errores",
+      "improvements": "Mejoras",
+      "loading": "Cargando próximos cambios...",
+      "noUpcoming": "No hay actualizaciones próximas en este momento. ¡Vuelve a consultar más tarde!",
+      "refresh": "Refrescar",
+      "removals": "Remoto",
+      "subtitle": "Vea lo que viene en la próxima versión",
+      "title": "Próxima actualización",
+      "upToDate": "¡Estás al día!"
     },
     "updateRequired": {
       "description": "Actualice Ascendara a la última versión para acceder a las funciones de Ascend.",
@@ -993,13 +1035,14 @@
       "noGameId": "Este juego no se puede restaurar: no se encontró ningún ID del juego",
       "restored": "¡Datos en la nube restaurados! Tu tiempo de juego y tus estadísticas han vuelto."
     },
+    "cloudSync": "Sincronización en la nube",
     "confirmDelete": "¡Guau!",
     "confirmRemoveFolderDesc": "¿Está seguro de que desea eliminar esta carpeta? Todos los juegos que contiene volverán a su biblioteca principal.",
     "confirmRemoveFolderTitle": "¿Quitar carpeta?",
     "coverSearchError": "Error al buscar imagen",
     "createShortcut": "Crear acceso directo en el escritorio",
     "delete": "Eliminar {{game}}",
-    "deleteConfirmMessage": "¿Estás seguro de que deseas eliminar {{game}} de tu biblioteca? Esto eliminará el juego de tu biblioteca de Ascendara y eliminará todos los archivos asociados. Esta acción no se puede deshacer.",
+    "deleteConfirmMessage": "¿Está seguro de que desea eliminar {{game}} de su biblioteca? Esto eliminará el juego de tu biblioteca de Ascendara y eliminará todos los archivos asociados. Esta acción no se puede deshacer.",
     "deleteFolder": "Quitar carpeta",
     "deleteGame": "Eliminar juego",
     "deleting": "Eliminando...",
@@ -1070,6 +1113,24 @@
     "launching": "Lanzamiento...",
     "lessThanMinute": "Menos de un minuto en este juego.",
     "lessThanMinute2": "menos de un minuto",
+    "libraryValue": {
+      "ascendPromo": {
+        "cta": "Más información sobre Ascender",
+        "message": "A $2/mes, Ascend tardaría {{months}} meses en igualar lo que has ahorrado. Son {{years}} años de sincronización en la nube, amigos y más.",
+        "title": "¡Has ahorrado una fortuna!"
+      },
+      "breakdown": "Desglose de precios",
+      "calculate": "Calcular el valor de la biblioteca",
+      "calculating": "Calculador...",
+      "description1": "Valor minorista estimado de su biblioteca de juegos según",
+      "description2": "API barata de Shark",
+      "error": "No se pudo calcular el valor de la biblioteca",
+      "gamesFound": "{{count}} juegos encontrados",
+      "notFound": "{{count}} juegos no encontrados",
+      "recalculate": "Recalcular",
+      "title": "Valor de la biblioteca",
+      "totalValue": "Valor total de la biblioteca"
+    },
     "loadingLibrary": "Reuniendo tus juegos",
     "loadingLibraryMessage": "Ascendara está reuniendo todos tus juegos para ti. Si puedes leer este mensaje, está tardando un poco más de lo esperado.",
     "minute": "minuto",
@@ -1693,7 +1754,7 @@
     "cooldown": "Enfriarse",
     "data": "Datos",
     "data_refreshed": "Datos de TorBox actualizados",
-    "data_size": "{{size}}GB",
+    "data_size": "{{size}} GB",
     "delete_download": "Eliminar Descargar",
     "delete_download_confirm": "¿Estás seguro de que deseas eliminar {{name}} de tus descargas en caché?",
     "download_deleted_desc": "{{name}} ha sido eliminado.",
