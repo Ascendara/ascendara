@@ -6459,22 +6459,26 @@ const Ascend = () => {
   return (
     <div className="container mx-auto flex min-h-[80vh] max-w-5xl items-center px-6 py-8">
       <div className="grid w-full items-center gap-12 lg:grid-cols-2 lg:gap-20">
-        {/* Left side - Branding & Info */}
+        {/* Left side - Branding & Features Showcase */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
           className="space-y-8"
         >
-          <div className="space-y-2">
-            <motion.p
+          {/* Header */}
+          <div className="space-y-4">
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-sm font-medium uppercase tracking-wider text-muted-foreground"
+              className="inline-flex items-center gap-2.5 rounded-full bg-primary/10 px-4 py-1.5"
             >
-              {isLogin ? t("account.welcomeBack") : t("account.setUp")}
-            </motion.p>
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">
+                {isLogin ? t("account.welcomeBack") : t("account.setUp")}
+              </span>
+            </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -6483,96 +6487,138 @@ const Ascend = () => {
             >
               {isLogin ? t("account.loginSubtitle") : t("account.joinAscend")}
             </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="text-base text-muted-foreground"
+            >
+              {isLogin ? t("account.welcomeBackIntro") : t("account.featuresIntro")}
+            </motion.p>
           </div>
 
-          {/* Features */}
+          {/* Features Grid */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="space-y-5"
+            className="grid grid-cols-2 gap-4"
           >
-            {!isLogin && (
-              <p className="text-sm text-muted-foreground">
-                {t("account.featuresIntro")}
-              </p>
-            )}
-            {isLogin && (
-              <p className="text-sm text-muted-foreground">
-                {t("account.welcomeBackIntro")}
-              </p>
-            )}
             {[
               {
-                icon: Zap,
-                label: t("account.features.autoUpdate"),
-                desc: t("account.features.autoUpdateDesc"),
-              },
-              {
-                icon: Users,
+                icon: UserPlus,
                 label: t("account.features.friends"),
-                desc: t("account.features.friendsDesc"),
+                color: "from-blue-500/20 to-blue-600/10",
               },
               {
-                icon: BarChart3,
+                icon: MessageCircle,
+                label: t("account.features.chat"),
+                color: "from-green-500/20 to-green-600/10",
+              },
+              {
+                icon: User,
                 label: t("account.features.profiles"),
-                desc: t("account.features.profilesDesc"),
+                color: "from-purple-500/20 to-purple-600/10",
               },
               {
                 icon: Cloud,
                 label: t("account.features.cloudSync"),
-                desc: t("account.features.cloudSyncDesc"),
+                color: "from-cyan-500/20 to-cyan-600/10",
+              },
+              {
+                icon: Trophy,
+                label: t("account.features.leaderboard"),
+                color: "from-yellow-500/20 to-yellow-600/10",
+              },
+              {
+                icon: Zap,
+                label: t("account.features.autoUpdate"),
+                color: "from-orange-500/20 to-orange-600/10",
               },
             ].map((feature, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + index * 0.1 }}
-                className="flex items-start gap-4"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.35 + index * 0.05 }}
+                className={`group relative overflow-hidden rounded-xl bg-gradient-to-br ${feature.color} border border-border/30 p-4 transition-all hover:border-primary/30 hover:shadow-lg`}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <feature.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">{feature.label}</p>
-                  <p className="text-sm text-muted-foreground">{feature.desc}</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background/50">
+                    <feature.icon className="h-5 w-5 text-foreground" />
+                  </div>
+                  <span className="text-sm font-medium">{feature.label}</span>
                 </div>
               </motion.div>
             ))}
+          </motion.div>
 
-            {/* Pricing notice - only on signup */}
-            {!isLogin && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
-                className="relative mt-4 overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5"
-              >
-                <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
-                <div className="relative">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-semibold text-primary">
-                      {t("account.pricingFriendly")}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {t("account.pricingDetails")}&nbsp;
+          {/* Highlight Features */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="space-y-3"
+          >
+            <div className="flex items-center gap-4 rounded-xl bg-muted/30 p-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Bell className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">
+                  {t("account.features.upcomingUpdates")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t("account.features.upcomingUpdatesDesc")}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 rounded-xl bg-muted/30 p-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{t("account.features.moreComing")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("account.features.moreComingDesc")}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Pricing notice - only on signup */}
+          {!isLogin && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5"
+            >
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
+              <div className="relative flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20">
+                  <Gift className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-semibold text-primary">
+                    {t("account.pricingFriendly")}
+                  </span>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {t("account.pricingDetails")}{" "}
                     <a
                       onClick={() =>
                         window.electron.openURL("https://ascendara.app/ascend")
                       }
-                      className="cursor inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                      className="inline-flex cursor-pointer items-center text-primary hover:underline"
                     >
                       {t("common.learnMore")}
                       <ExternalLink className="ml-1 inline-block h-3 w-3" />
                     </a>
                   </p>
                 </div>
-              </motion.div>
-            )}
-          </motion.div>
+              </div>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Right side - Form */}
