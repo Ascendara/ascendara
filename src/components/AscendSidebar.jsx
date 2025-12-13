@@ -23,6 +23,7 @@ import {
   Hammer,
   BadgeDollarSign,
   Trophy,
+  Rocket,
 } from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
@@ -104,99 +105,123 @@ const AscendSidebar = ({
     return status?.color || "bg-green-500";
   };
 
-  const mainNavItems = [
+  // Quick access items (icon grid at top)
+  const quickAccessItems = [
     { id: "home", icon: Home, label: t("ascend.nav.home") },
     {
       id: "cloudlibrary",
       icon: CloudIcon,
       label: t("ascend.nav.cloudLibrary") || "Cloud Library",
     },
+    { id: "friends", icon: Users, label: t("ascend.nav.friends"), badge: 0 },
+    { id: "messages", icon: MessageCircle, label: t("ascend.nav.messages"), badge: 0 },
+  ];
+
+  // Main nav items (list below)
+  const mainNavItems = [
+    { id: "search", icon: Search, label: t("ascend.nav.search") },
+    { id: "requests", icon: UserPlus, label: t("ascend.nav.requests"), badge: 0 },
     {
       id: "leaderboard",
       icon: Trophy,
       label: t("ascend.nav.leaderboard") || "Leaderboard",
     },
-    { id: "search", icon: Search, label: t("ascend.nav.search") },
-    { id: "friends", icon: Users, label: t("ascend.nav.friends"), badge: 0 },
-    { id: "requests", icon: UserPlus, label: t("ascend.nav.requests"), badge: 0 },
-    { id: "messages", icon: MessageCircle, label: t("ascend.nav.messages"), badge: 0 },
-  ];
-
-  const bottomNavItems = [
+    {
+      id: "upcoming",
+      icon: Rocket,
+      label: t("ascend.nav.upcoming") || "Upcoming Update",
+    },
     { id: "notifications", icon: Bell, label: t("ascend.nav.notifications"), badge: 0 },
     { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
   ];
 
-  const NavButton = ({ item, isActive }) => (
+  // Quick access icon button
+  const QuickAccessButton = ({ item, isActive }) => (
     <motion.button
       onClick={() => onSectionChange(item.id)}
-      className={`group relative ml-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ${
+      className={`group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 ${
         isActive
-          ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary shadow-sm"
-          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          ? "bg-primary shadow-lg shadow-primary/25"
+          : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
-      whileHover={{ x: 4 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      title={item.label}
     >
-      {/* Icon with glow effect when active */}
-      <div className={`relative ${isActive ? "text-primary" : ""}`}>
-        <item.icon className="h-5 w-5 shrink-0 transition-transform group-hover:scale-110" />
-        {isActive && (
-          <div className="absolute inset-0 opacity-50 blur-md">
-            <item.icon className="h-5 w-5 text-primary" />
-          </div>
-        )}
-      </div>
-
-      <span className="hidden text-sm font-medium lg:block">{item.label}</span>
-
-      {/* Badge */}
+      <item.icon
+        className={`h-5 w-5 transition-colors duration-300 ${isActive ? "text-secondary" : ""}`}
+      />
       {item.badge > 0 && (
-        <span className="text-primary-foreground ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold">
-          {item.badge > 99 ? "99+" : item.badge}
+        <span className="absolute -right-1 -top-1 z-20 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          {item.badge > 9 ? "9+" : item.badge}
         </span>
       )}
     </motion.button>
   );
 
+  const NavButton = ({ item, isActive }) => (
+    <button
+      onClick={() => onSectionChange(item.id)}
+      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200 ${
+        isActive
+          ? "text-primary"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      }`}
+    >
+      <div className="flex w-full items-center gap-3 transition-all duration-150 ease-out group-hover:translate-x-0.5 group-active:translate-x-0 group-active:scale-[0.97]">
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 ${
+            isActive ? "bg-primary/20" : "group-hover:bg-muted"
+          }`}
+        >
+          <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+        </div>
+        <span className="hidden text-sm font-medium lg:block">{item.label}</span>
+        {item.badge > 0 && (
+          <span className="text-primary-foreground ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold">
+            {item.badge > 99 ? "99+" : item.badge}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+
+  // Get the index of active item in mainNavItems for the sliding indicator
+  const activeNavIndex = mainNavItems.findIndex(item => item.id === activeSection);
+
   return (
     <div className="flex h-full w-16 shrink-0 flex-col overflow-hidden bg-background/60 backdrop-blur-xl lg:w-60">
-      {/* Main Navigation */}
+      {/* Quick Access Grid */}
+      <div className="shrink-0 p-3 pb-2">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {quickAccessItems.map(item => (
+            <QuickAccessButton
+              key={item.id}
+              item={item}
+              isActive={activeSection === item.id}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="mx-3 h-px bg-border/50" />
+
+      {/* Main Navigation List */}
       <nav className="relative flex-1 space-y-1 overflow-y-auto p-3">
-        <p className="mb-2 hidden px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 lg:block">
-          {t("ascend.nav.menu") || "Menu"}
-        </p>
-        {mainNavItems.map((item, index) => (
-          <div key={item.id} className="relative">
-            {activeSection === item.id && (
-              <motion.div
-                layoutId="activeNavIndicator"
-                className="absolute top-0 h-full w-1 rounded-full bg-gradient-to-b from-primary to-primary/60"
-                initial={false}
-                transition={{ type: "spring", stiffness: 500, damping: 35 }}
-              />
-            )}
-            <NavButton item={item} isActive={activeSection === item.id} />
-          </div>
+        {/* Sliding highlight indicator */}
+        {activeNavIndex >= 0 && (
+          <motion.div
+            className="pointer-events-none absolute left-3 right-3 h-[56px] rounded-xl bg-gradient-to-r from-primary/20 to-primary/10"
+            initial={false}
+            animate={{ y: activeNavIndex * 56 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          />
+        )}
+        {mainNavItems.map(item => (
+          <NavButton key={item.id} item={item} isActive={activeSection === item.id} />
         ))}
       </nav>
-
-      {/* Bottom Navigation */}
-      <div className="relative shrink-0 space-y-1 p-3">
-        {bottomNavItems.map((item, index) => (
-          <div key={item.id} className="relative">
-            {activeSection === item.id && (
-              <motion.div
-                layoutId="activeNavIndicator"
-                className="absolute left-0 top-0 h-full w-1 rounded-full bg-gradient-to-b from-primary to-primary/60"
-                initial={false}
-                transition={{ type: "spring", stiffness: 500, damping: 35 }}
-              />
-            )}
-            <NavButton item={item} isActive={activeSection === item.id} />
-          </div>
-        ))}
-      </div>
 
       {/* Trial/Subscription/Verified Status */}
       <div className="shrink-0 px-3 pb-2">

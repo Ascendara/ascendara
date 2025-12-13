@@ -294,6 +294,7 @@
     },
     "nav": {
       "cloudLibrary": "Cloud Library",
+      "discover": "Discover",
       "friends": "Friends",
       "home": "Home",
       "leaderboard": "Leaderboard",
@@ -303,7 +304,9 @@
       "online": "Online",
       "requests": "Requests",
       "search": "Search",
-      "settings": "Settings"
+      "settings": "Settings",
+      "social": "Social",
+      "upcoming": "Upcoming Update"
     },
     "notifications": {
       "empty": "No notifications",
@@ -508,6 +511,18 @@
       "upgradeShort": "Join",
       "verified": "Verified User",
       "verifiedShort": "✓"
+    },
+    "upcoming": {
+      "additions": "New Features",
+      "fixes": "Bug Fixes",
+      "improvements": "Improvements",
+      "loading": "Loading upcoming changes...",
+      "noUpcoming": "There are no upcoming updates at this time. Check back later!",
+      "refresh": "Refresh",
+      "removals": "Removed",
+      "subtitle": "See what's coming in the next release",
+      "title": "Upcoming Update",
+      "upToDate": "You're up to date!"
     },
     "updateRequired": {
       "description": "Please update Ascendara to the latest version to access Ascend features.",

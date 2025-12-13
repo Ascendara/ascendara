@@ -179,6 +179,7 @@ const Ascend = () => {
     updateData,
     resendVerificationEmail,
     reloadUser,
+    removeAccount,
     error,
     clearError,
   } = useAuth();
@@ -217,6 +218,14 @@ const Ascend = () => {
   const [editGithub, setEditGithub] = useState("");
   const [editSteam, setEditSteam] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Account deletion state
+  const [deleteHoldProgress, setDeleteHoldProgress] = useState(0);
+  const [isHoldingDelete, setIsHoldingDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
   // User status state
   const [userStatus, setUserStatus] = useState("online");
@@ -299,6 +308,10 @@ const Ascend = () => {
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState(null);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+
+  // Upcoming update state
+  const [upcomingChangelog, setUpcomingChangelog] = useState(null);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
 
   // Check if app is on latest version
   useEffect(() => {
@@ -593,6 +606,24 @@ const Ascend = () => {
       console.error("Failed to load leaderboard:", e);
     }
     setLoadingLeaderboard(false);
+  };
+
+  // Upcoming update functions
+  const loadUpcomingChangelog = async () => {
+    setLoadingUpcoming(true);
+    try {
+      const response = await fetch("https://api.ascendara.app/json/changelog");
+      if (response.ok) {
+        const data = await response.json();
+        // Filter to only show entries where release is false (unreleased)
+        const unreleasedEntries =
+          data.entries?.filter(entry => entry.release === false) || [];
+        setUpcomingChangelog(unreleasedEntries);
+      }
+    } catch (e) {
+      console.error("Failed to load upcoming changelog:", e);
+    }
+    setLoadingUpcoming(false);
   };
 
   // Cloud Library functions
@@ -1560,6 +1591,74 @@ const Ascend = () => {
     if (result.success) {
       toast.success(t("account.success.loggedOut"));
     }
+  };
+
+  // Account deletion with hold-to-confirm
+  const deleteHoldDuration = 3000; // 3 seconds
+  const deleteIntervalRef = React.useRef(null);
+
+  const handleDeleteMouseDown = () => {
+    if (!deletePassword.trim()) {
+      toast.error(t("account.deletion.passwordRequired") || "Please enter your password");
+      return;
+    }
+    setIsHoldingDelete(true);
+    const startTime = Date.now();
+
+    deleteIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / deleteHoldDuration) * 100, 100);
+      setDeleteHoldProgress(progress);
+
+      if (progress >= 100) {
+        clearInterval(deleteIntervalRef.current);
+        setDeleteConfirmed(true);
+        // Brief pause to show the confirmed state before deletion
+        setTimeout(() => {
+          handleAccountDeletion();
+        }, 800);
+      }
+    }, 16);
+  };
+
+  const handleDeleteMouseUp = () => {
+    setIsHoldingDelete(false);
+    if (deleteIntervalRef.current) {
+      clearInterval(deleteIntervalRef.current);
+    }
+    // Animate progress back to 0
+    const currentProgress = deleteHoldProgress;
+    const startTime = Date.now();
+    const animateDown = () => {
+      const elapsed = Date.now() - startTime;
+      const newProgress = Math.max(
+        currentProgress - (elapsed / 500) * currentProgress,
+        0
+      );
+      setDeleteHoldProgress(newProgress);
+      if (newProgress > 0) {
+        requestAnimationFrame(animateDown);
+      }
+    };
+    requestAnimationFrame(animateDown);
+  };
+
+  const handleAccountDeletion = async () => {
+    setIsDeletingAccount(true);
+    const result = await removeAccount(deletePassword);
+    if (result.success) {
+      toast.success(t("account.deletion.success") || "Account deleted successfully");
+      setShowDeleteDialog(false);
+      setDeletePassword("");
+    } else {
+      toast.error(
+        result.error || t("account.deletion.failed") || "Failed to delete account"
+      );
+    }
+    setIsDeletingAccount(false);
+    setDeleteHoldProgress(0);
+    setIsHoldingDelete(false);
+    setDeleteConfirmed(false);
   };
 
   const toggleMode = () => {
@@ -4354,17 +4453,195 @@ const Ascend = () => {
                 </AlertDialogContent>
               </AlertDialog>
 
-              {/* Sign out */}
-              <button
-                onClick={handleLogout}
-                className="bg-destructive/10 text-destructive hover:bg-destructive/20 flex w-full items-center justify-between rounded-2xl p-5 text-left transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <LogOut className="h-5 w-5" />
-                  <span className="font-medium">{t("account.signOut")}</span>
-                </div>
-                <ChevronRight className="h-5 w-5" />
-              </button>
+              {/* Account Actions */}
+              <div className="mt-8 space-y-4 border-t border-border/50 pt-8">
+                <h3 className="mb-4 text-sm font-medium text-muted-foreground">
+                  {t("account.actions") || "Account Actions"}
+                </h3>
+
+                {/* Sign out button */}
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={handleLogout}
+                  className="group flex w-full items-center justify-between rounded-xl border border-border/50 bg-card/50 p-4 text-left backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-card"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 transition-colors group-hover:bg-primary/10">
+                      <LogOut className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </div>
+                    <div>
+                      <span className="font-medium">{t("account.signOut")}</span>
+                      <p className="text-xs text-muted-foreground">
+                        {t("account.signOutDescription") || "Sign out of your account"}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                </motion.button>
+
+                {/* Request Account Deletion */}
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <AlertDialogTrigger asChild>
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      className="group flex w-full items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4 text-left backdrop-blur-sm transition-all hover:border-primary/40 hover:bg-primary/10"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                          <Trash2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">
+                            {t("account.requestDeletion") || "Request Account Deletion"}
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            {t("account.deletionWarning") ||
+                              "This action cannot be undone"}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                    </motion.button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="sm:max-w-md">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2 text-foreground">
+                        <Trash2 className="h-5 w-5 text-primary" />
+                        {t("account.deletion.title") || "Delete Account"}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-3">
+                        <p>
+                          {t("account.deletion.description") ||
+                            "This will permanently delete your account and all associated data. This action cannot be undone."}
+                        </p>
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="delete-password"
+                            className="text-sm font-medium"
+                          >
+                            {t("account.deletion.enterPassword") ||
+                              "Enter your password to confirm"}
+                          </Label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="delete-password"
+                              type="password"
+                              value={deletePassword}
+                              onChange={e => setDeletePassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="pl-10"
+                              disabled={isDeletingAccount}
+                            />
+                          </div>
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
+                      {/* Hold to delete button */}
+                      <div className="relative w-full overflow-hidden rounded-lg">
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-primary to-secondary"
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: deleteHoldProgress / 100 }}
+                          style={{ transformOrigin: "left" }}
+                          transition={{ duration: 0.05 }}
+                        />
+                        <button
+                          onMouseDown={handleDeleteMouseDown}
+                          onMouseUp={handleDeleteMouseUp}
+                          onMouseLeave={handleDeleteMouseUp}
+                          onTouchStart={handleDeleteMouseDown}
+                          onTouchEnd={handleDeleteMouseUp}
+                          disabled={isDeletingAccount || deleteConfirmed}
+                          className="relative flex h-12 w-full items-center justify-center gap-2 rounded-lg border-2 border-primary bg-primary/10 font-medium text-primary transition-all hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <AnimatePresence mode="wait">
+                            {deleteConfirmed ? (
+                              <motion.div
+                                key="confirmed"
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 500,
+                                  damping: 30,
+                                }}
+                                className="flex items-center gap-2 text-secondary"
+                              >
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: [0, 1.2, 1] }}
+                                  transition={{ duration: 0.4, times: [0, 0.6, 1] }}
+                                >
+                                  <Check className="h-5 w-5" />
+                                </motion.div>
+                                <span>
+                                  {t("account.deletion.confirmed") || "Confirmed"}
+                                </span>
+                              </motion.div>
+                            ) : isDeletingAccount ? (
+                              <motion.div
+                                key="deleting"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="flex items-center gap-2"
+                              >
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{
+                                    duration: 1,
+                                    repeat: Infinity,
+                                    ease: "linear",
+                                  }}
+                                >
+                                  <Loader2 className="h-4 w-4" />
+                                </motion.div>
+                                <span>
+                                  {t("account.deletion.deleting") || "Deleting..."}
+                                </span>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                key="hold"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="flex items-center gap-2"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span
+                                  className={
+                                    deleteHoldProgress > 0 ? "text-secondary" : ""
+                                  }
+                                >
+                                  {deleteHoldProgress > 0
+                                    ? `${t("account.deletion.holdToDelete") || "Hold to delete"} (${Math.round(deleteHoldProgress)}%)`
+                                    : t("account.deletion.holdButton") ||
+                                      "Hold for 3 seconds to delete"}
+                                </span>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </button>
+                      </div>
+                      <AlertDialogCancel
+                        className="w-full"
+                        onClick={() => {
+                          setDeletePassword("");
+                          setDeleteHoldProgress(0);
+                        }}
+                      >
+                        {t("common.cancel") || "Cancel"}
+                      </AlertDialogCancel>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           );
 
@@ -5357,6 +5634,265 @@ const Ascend = () => {
                       {t("ascend.leaderboard.syncProfile") || "Sync Your Profile"}
                     </Button>
                   </div>
+                </motion.div>
+              )}
+            </div>
+          );
+
+        case "upcoming":
+          // Load upcoming changelog when section is accessed
+          if (!upcomingChangelog && !loadingUpcoming) {
+            loadUpcomingChangelog();
+          }
+
+          const upcomingEntry = upcomingChangelog?.[0];
+
+          return (
+            <div className="mb-24 space-y-6">
+              {loadingUpcoming ? (
+                <div className="flex flex-col items-center justify-center py-32">
+                  <div className="relative">
+                    <div className="h-20 w-20 rounded-full border-4 border-violet-500/20" />
+                    <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-violet-500" />
+                  </div>
+                  <p className="mt-6 text-muted-foreground">
+                    {t("ascend.upcoming.loading") || "Loading upcoming changes..."}
+                  </p>
+                </div>
+              ) : upcomingEntry ? (
+                <>
+                  {/* Hero Header with Version Info */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-500/20 via-purple-500/10 to-fuchsia-500/10 p-8"
+                  >
+                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
+                    <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-purple-500/20 blur-3xl" />
+                    <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
+
+                    <div className="relative">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-xl shadow-violet-500/30">
+                            <Sparkles className="h-8 w-8 text-white" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <h1 className="text-3xl font-bold">
+                                {upcomingEntry.title ||
+                                  t("ascend.upcoming.title") ||
+                                  "Upcoming Update"}
+                              </h1>
+                              {upcomingEntry.major && (
+                                <span className="rounded-full bg-gradient-to-r from-violet-500 to-purple-500 px-3 py-1 text-xs font-semibold text-white shadow-lg shadow-violet-500/30">
+                                  Major Update
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                              <span className="rounded-md bg-violet-500/10 px-2.5 py-1 font-mono text-violet-600 dark:text-violet-400">
+                                v{upcomingEntry.version}
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                <Calendar className="h-4 w-4" />
+                                {new Date(upcomingEntry.date).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  }
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={loadUpcomingChangelog}
+                          disabled={loadingUpcoming}
+                          className="gap-2"
+                        >
+                          {loadingUpcoming ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          {t("ascend.upcoming.refresh") || "Refresh"}
+                        </Button>
+                      </div>
+
+                      {upcomingEntry.description && (
+                        <p className="mt-4 text-muted-foreground">
+                          {upcomingEntry.description}
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+
+                  {/* Changes Sections - Full Width Stacked */}
+                  <div className="space-y-4">
+                    {/* Additions */}
+                    {upcomingEntry.changes?.additions?.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-6"
+                      >
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
+                            <Zap className="h-5 w-5 text-emerald-500" />
+                          </div>
+                          <h2 className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                            {t("ascend.upcoming.additions") || "New Features"}
+                          </h2>
+                          <span className="ml-auto rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                            {upcomingEntry.changes.additions.length} new
+                          </span>
+                        </div>
+                        <ul className="grid gap-3 md:grid-cols-2">
+                          {upcomingEntry.changes.additions.map((item, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                            >
+                              <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+                              <span className="text-sm">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </motion.div>
+                    )}
+
+                    {/* Fixes */}
+                    {upcomingEntry.changes?.fixes?.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6"
+                      >
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
+                            <Shield className="h-5 w-5 text-amber-500" />
+                          </div>
+                          <h2 className="text-lg font-semibold text-amber-600 dark:text-amber-400">
+                            {t("ascend.upcoming.fixes") || "Bug Fixes"}
+                          </h2>
+                          <span className="ml-auto rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                            {upcomingEntry.changes.fixes.length} fixed
+                          </span>
+                        </div>
+                        <ul className="grid gap-3 md:grid-cols-2">
+                          {upcomingEntry.changes.fixes.map((item, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                            >
+                              <Check className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                              <span className="text-sm">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </motion.div>
+                    )}
+
+                    {/* Improvements */}
+                    {upcomingEntry.changes?.improvements?.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-6"
+                      >
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
+                            <Star className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <h2 className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                            {t("ascend.upcoming.improvements") || "Improvements"}
+                          </h2>
+                          <span className="ml-auto rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                            {upcomingEntry.changes.improvements.length} improved
+                          </span>
+                        </div>
+                        <ul className="grid gap-3 md:grid-cols-2">
+                          {upcomingEntry.changes.improvements.map((item, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                            >
+                              <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
+                              <span className="text-sm">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </motion.div>
+                    )}
+
+                    {/* Removals */}
+                    {upcomingEntry.changes?.removals?.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6"
+                      >
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10">
+                            <X className="h-5 w-5 text-red-500" />
+                          </div>
+                          <h2 className="text-lg font-semibold text-red-600 dark:text-red-400">
+                            {t("ascend.upcoming.removals") || "Removed"}
+                          </h2>
+                          <span className="ml-auto rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                            {upcomingEntry.changes.removals.length} removed
+                          </span>
+                        </div>
+                        <ul className="grid gap-3 md:grid-cols-2">
+                          {upcomingEntry.changes.removals.map((item, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                            >
+                              <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                              <span className="text-sm">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </motion.div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="rounded-3xl border border-dashed border-border/50 bg-card/30 p-16 text-center"
+                >
+                  <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500/20 to-purple-500/20">
+                    <Check className="h-12 w-12 text-violet-500" />
+                  </div>
+                  <h2 className="mb-3 text-2xl font-bold">
+                    {t("ascend.upcoming.upToDate") || "You're up to date!"}
+                  </h2>
+                  <p className="mx-auto max-w-md text-muted-foreground">
+                    {t("ascend.upcoming.noUpcoming") ||
+                      "There are no upcoming updates at this time. Check back later!"}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadUpcomingChangelog}
+                    disabled={loadingUpcoming}
+                    className="mt-6 gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    {t("ascend.upcoming.refresh") || "Refresh"}
+                  </Button>
                 </motion.div>
               )}
             </div>
