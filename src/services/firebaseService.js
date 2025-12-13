@@ -1376,19 +1376,23 @@ export const searchUsers = async searchQuery => {
         totalPlaytime += game.playTime || 0;
       });
 
+      // If user is private, don't include their stats
+      const isPrivate = data.private || false;
+
       users.push({
         uid,
         displayName: data.displayName,
         photoURL: data.photoURL,
-        bio: data.bio || null,
-        country: data.country || null,
+        bio: isPrivate ? null : data.bio || null,
+        country: isPrivate ? null : data.country || null,
         verified: data.verified || false,
         owner: data.owner || false,
         contributor: data.contributor || false,
+        private: isPrivate,
         status,
-        level: 1,
-        totalPlaytime,
-        gamesPlayed: games.length,
+        level: isPrivate ? 0 : 1,
+        totalPlaytime: isPrivate ? 0 : totalPlaytime,
+        gamesPlayed: isPrivate ? 0 : games.length,
       });
     }
 

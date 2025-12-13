@@ -322,6 +322,7 @@
       "noGames": "No games yet",
       "noGamesHint": "This user hasn't synced their library yet",
       "playtime": "Playtime",
+      "private": "Private",
       "privateAccount": "Private Account",
       "privateAccountMessage": "This user has set their account to private. Their profile details, games, and achievements are hidden.",
       "recentAchievements": "Recent Achievements",
@@ -996,6 +997,7 @@
       "noGameId": "This game cannot be restored - no game ID found",
       "restored": "Cloud data restored! Your playtime and stats are back."
     },
+    "cloudSync": "Cloud Sync",
     "confirmDelete": "Woah!",
     "confirmRemoveFolderDesc": "Are you sure you want to remove this folder? All games inside will be moved back to your main library.",
     "confirmRemoveFolderTitle": "Remove Folder?",

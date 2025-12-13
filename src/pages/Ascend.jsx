@@ -580,7 +580,13 @@ const Ascend = () => {
       );
       if (response.ok) {
         const data = await response.json();
-        setLeaderboardData(data);
+        // Filter out private accounts from leaderboard
+        const filteredData = {
+          ...data,
+          topThree: data.topThree?.filter(user => !user.private) || [],
+          runnerUps: data.runnerUps?.filter(user => !user.private) || [],
+        };
+        setLeaderboardData(filteredData);
       }
     } catch (e) {
       console.error("Failed to load leaderboard:", e);
@@ -2363,15 +2369,21 @@ const Ascend = () => {
                               {result.verified && (
                                 <BadgeCheck className="h-5 w-5 shrink-0 text-blue-500" />
                               )}
-                              {result.level > 1 && (
+                              {!result.private && result.level > 1 && (
                                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                   Lv. {result.level}
+                                </span>
+                              )}
+                              {result.private && (
+                                <span className="flex items-center gap-1 rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-400">
+                                  <LockIcon className="h-3 w-3" />
+                                  {t("ascend.profile.private") || "Private"}
                                 </span>
                               )}
                             </div>
 
                             {/* Bio */}
-                            {result.bio && (
+                            {!result.private && result.bio && (
                               <p className="mb-2 line-clamp-1 text-sm text-muted-foreground">
                                 {result.bio}
                               </p>
@@ -2401,7 +2413,7 @@ const Ascend = () => {
                                         : t("ascend.status.offline")}
                                 </span>
                               </div>
-                              {result.totalPlaytime > 0 && (
+                              {!result.private && result.totalPlaytime > 0 && (
                                 <div className="flex items-center gap-1.5">
                                   <Clock className="h-3.5 w-3.5" />
                                   <span>
@@ -2409,13 +2421,13 @@ const Ascend = () => {
                                   </span>
                                 </div>
                               )}
-                              {result.gamesPlayed > 0 && (
+                              {!result.private && result.gamesPlayed > 0 && (
                                 <div className="flex items-center gap-1.5">
                                   <Gamepad2 className="h-3.5 w-3.5" />
                                   <span>{result.gamesPlayed} games</span>
                                 </div>
                               )}
-                              {result.country && (
+                              {!result.private && result.country && (
                                 <div className="flex items-center gap-1.5">
                                   <Globe className="h-3.5 w-3.5" />
                                   <span>{result.country}</span>
