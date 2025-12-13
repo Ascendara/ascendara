@@ -398,8 +398,9 @@ export default function DownloadPage() {
         return;
       }
     }
-    // Determine if this provider should use Torbox
-    const shouldUseTorbox = () => torboxProviders.includes(selectedProvider);
+    // Determine if this provider should use Torbox (only if API key is configured)
+    const shouldUseTorbox = () =>
+      torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings);
     if (
       !directUrl &&
       (selectedProvider === "gofile" || selectedProvider === "buzzheavier") &&
