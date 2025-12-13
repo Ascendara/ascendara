@@ -42,6 +42,7 @@ import {
   CloudDownload,
   CloudUpload,
   Clock,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -74,6 +75,7 @@ import {
   syncCloudLibrary,
   syncGameAchievements,
 } from "@/services/firebaseService";
+import { calculateLibraryValue } from "@/services/cheapsharkService";
 
 import NewFolderDialog from "@/components/NewFolderDialog";
 import FolderCard from "@/components/FolderCard";
@@ -155,6 +157,16 @@ const Library = () => {
   const [restoringGame, setRestoringGame] = useState(null);
   const [cloudGameImages, setCloudGameImages] = useState({});
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
+  const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
+  const [libraryValueData, setLibraryValueData] = useState(() => {
+    const cached = localStorage.getItem("library-value-cache");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [cachedGameCount, setCachedGameCount] = useState(() => {
+    return parseInt(localStorage.getItem("library-value-game-count") || "0", 10);
+  });
+  const [isCalculatingValue, setIsCalculatingValue] = useState(false);
+  const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -736,6 +748,66 @@ const Library = () => {
     });
   };
 
+  // Get current library game count
+  const getCurrentGameCount = () => {
+    return games.filter(g => !g.isFolder).length + getGamesInFolders().length;
+  };
+
+  // Check if library has changed since last calculation
+  const libraryHasChanged = () => {
+    const currentCount = getCurrentGameCount();
+    return currentCount !== cachedGameCount;
+  };
+
+  const handleCalculateLibraryValue = async (forceRecalculate = false) => {
+    setIsLibraryValueOpen(true);
+
+    // If we have cached data and library hasn't changed, just show it
+    if (!forceRecalculate && libraryValueData && !libraryHasChanged()) {
+      return;
+    }
+
+    setIsCalculatingValue(true);
+    setValueProgress({ current: 0, total: 0, game: "" });
+
+    try {
+      // Get all game titles from library (including games in folders)
+      const allGameTitles = [
+        ...games.filter(g => !g.isFolder).map(g => g.game || g.name),
+        ...getGamesInFolders().map(g => g.game || g.name),
+      ];
+
+      if (allGameTitles.length === 0) {
+        const emptyResult = { totalValue: 0, games: [], notFound: [] };
+        setLibraryValueData(emptyResult);
+        localStorage.setItem("library-value-cache", JSON.stringify(emptyResult));
+        localStorage.setItem("library-value-game-count", "0");
+        setCachedGameCount(0);
+        setIsCalculatingValue(false);
+        return;
+      }
+
+      setValueProgress({ current: 0, total: allGameTitles.length, game: "" });
+
+      const result = await calculateLibraryValue(
+        allGameTitles,
+        (current, total, game, price) => {
+          setValueProgress({ current, total, game });
+        }
+      );
+
+      // Cache the result
+      setLibraryValueData(result);
+      localStorage.setItem("library-value-cache", JSON.stringify(result));
+      localStorage.setItem("library-value-game-count", String(allGameTitles.length));
+      setCachedGameCount(allGameTitles.length);
+    } catch (error) {
+      console.error("Error calculating library value:", error);
+      toast.error(t("library.libraryValue.error") || "Failed to calculate library value");
+    }
+    setIsCalculatingValue(false);
+  };
+
   const searchGameCovers = React.useCallback(async query => {
     if (!query.trim()) {
       setCoverSearchResults([]);
@@ -805,7 +877,7 @@ const Library = () => {
             <div className="flex flex-row items-start justify-between">
               {/* Left side: Title and Search */}
               <div className="flex-1">
-                <div className="mb-4 mt-6 flex items-center">
+                <div className="mb-2 mt-6 flex items-center">
                   <h1 className="text-4xl font-bold tracking-tight text-primary">
                     {t("library.pageTitle")}
                   </h1>
@@ -868,6 +940,21 @@ const Library = () => {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
+
+                {/* Library Value Button */}
+                <button
+                  onClick={() => handleCalculateLibraryValue()}
+                  className="mb-4 flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/20"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  {libraryValueData && !libraryHasChanged() ? (
+                    <span>${libraryValueData.totalValue.toFixed(2)}</span>
+                  ) : (
+                    <span>
+                      {t("library.libraryValue.calculate") || "Calculate Library Value"}
+                    </span>
+                  )}
+                </button>
 
                 <div className="relative mr-12 flex items-center gap-2">
                   <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -1514,6 +1601,178 @@ const Library = () => {
           )}
         </div>
       </div>
+
+      {/* Library Value Dialog */}
+      <AlertDialog open={isLibraryValueOpen} onOpenChange={setIsLibraryValueOpen}>
+        <AlertDialogContent className="flex max-h-[80vh] max-w-lg flex-col overflow-hidden">
+          <AlertDialogHeader className="shrink-0">
+            <AlertDialogTitle className="flex items-center gap-2">
+              {t("library.libraryValue.title") || "Library Value"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.libraryValue.description1")}&nbsp;
+              <a
+                className="cursor-pointer text-primary hover:underline"
+                onClick={() => window.electron.openURL("https://apidocs.cheapshark.com/")}
+              >
+                {t("library.libraryValue.description2")}{" "}
+                <ExternalLink className="mb-1 inline-block h-3 w-3" />
+              </a>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4">
+            {/* Ascend Promo for non-subscribers */}
+            {!user && libraryValueData?.totalValue > 0 && (
+              <div className="mb-4 rounded-lg border border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/20 p-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-primary">
+                      {t("library.libraryValue.ascendPromo.title") ||
+                        "You've saved a fortune!"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("library.libraryValue.ascendPromo.message", {
+                        months: Math.floor(
+                          libraryValueData.totalValue / 2
+                        ).toLocaleString(),
+                        years: Math.floor(
+                          libraryValueData.totalValue / 2 / 12
+                        ).toLocaleString(),
+                      })}
+                    </p>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="mt-2 h-auto p-0 text-xs text-primary"
+                      onClick={() => {
+                        setIsLibraryValueOpen(false);
+                        navigate("/ascend");
+                      }}
+                    >
+                      {t("library.libraryValue.ascendPromo.cta") || "Learn about Ascend"}{" "}
+                      →
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {isCalculatingValue ? (
+              <div className="flex flex-col items-center justify-center space-y-4 py-8">
+                <Loader className="h-8 w-8 animate-spin text-primary" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">
+                    {t("library.libraryValue.calculating") || "Calculating..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {valueProgress.current} / {valueProgress.total}
+                  </p>
+                  {valueProgress.game && (
+                    <p className="mt-1 max-w-[300px] truncate text-xs text-muted-foreground">
+                      {valueProgress.game}
+                    </p>
+                  )}
+                </div>
+                <div className="w-full max-w-xs">
+                  <div className="h-2 w-full rounded-full bg-muted">
+                    <div
+                      className="h-2 rounded-full bg-primary transition-all duration-300"
+                      style={{
+                        width: `${valueProgress.total > 0 ? (valueProgress.current / valueProgress.total) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : libraryValueData ? (
+              <div className="space-y-4">
+                {/* Total Value */}
+                <div className="rounded-lg bg-primary/10 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.libraryValue.totalValue") || "Total Library Value"}
+                  </p>
+                  <p className="text-3xl font-bold text-primary">
+                    ${libraryValueData.totalValue.toFixed(2)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("library.libraryValue.gamesFound", {
+                      count: libraryValueData.games.length,
+                    }) || `${libraryValueData.games.length} games found`}
+                  </p>
+                </div>
+
+                {/* Games List */}
+                {libraryValueData.games.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-primary">
+                      {t("library.libraryValue.breakdown") || "Price Breakdown"}
+                    </p>
+                    <div className="max-h-[200px] space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                      {libraryValueData.games
+                        .sort((a, b) => b.price - a.price)
+                        .map((game, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50"
+                          >
+                            <span
+                              className="truncate pr-2 text-primary"
+                              title={game.title}
+                            >
+                              {game.title}
+                            </span>
+                            <span className="shrink-0 font-medium text-primary">
+                              ${game.price.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Not Found Games */}
+                {libraryValueData.notFound.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {t("library.libraryValue.notFound", {
+                        count: libraryValueData.notFound.length,
+                      }) || `${libraryValueData.notFound.length} games not found`}
+                    </p>
+                    <div className="max-h-[100px] space-y-1 overflow-y-auto rounded-lg border border-border/50 p-2">
+                      {libraryValueData.notFound.map((game, index) => (
+                        <div
+                          key={index}
+                          className="truncate px-2 py-1 text-xs text-muted-foreground"
+                          title={game}
+                        >
+                          {game}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <AlertDialogFooter className="flex justify-between sm:justify-between">
+            {libraryValueData && !isCalculatingValue && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCalculateLibraryValue(true)}
+                className="mr-auto text-primary"
+              >
+                {t("library.libraryValue.recalculate") || "Recalculate"}
+              </Button>
+            )}
+            <AlertDialogCancel>{t("common.close") || "Close"}</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1076,6 +1076,24 @@
     "launching": "Launching...",
     "lessThanMinute": "Less than a minute on this game",
     "lessThanMinute2": "Less than a minute",
+    "libraryValue": {
+      "ascendPromo": {
+        "cta": "Learn about Ascend",
+        "message": "At $2/month, Ascend would take {{months}} months to equal what you've saved. That's {{years}} years of cloud sync, friends, and more.",
+        "title": "You've saved a fortune!"
+      },
+      "breakdown": "Price Breakdown",
+      "calculate": "Calculate Library Value",
+      "calculating": "Calculating...",
+      "description1": "Estimated retail value of your game library based on",
+      "description2": "CheapShark API",
+      "error": "Failed to calculate library value",
+      "gamesFound": "{{count}} games found",
+      "notFound": "{{count}} games not found",
+      "recalculate": "Recalculate",
+      "title": "Library Value",
+      "totalValue": "Total Library Value"
+    },
     "loadingLibrary": "Gathering your games",
     "loadingLibraryMessage": "Ascendara is gathering up all your games for you. If you are able to read this message, it is taking a little longer than expected.",
     "minute": "minute",
