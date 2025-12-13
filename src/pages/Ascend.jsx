@@ -190,6 +190,7 @@ const Ascend = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [linkWithPC, setLinkWithPC] = useState(false);
+  const [startFreeTrial, setStartFreeTrial] = useState(false);
   const [showDisplayNamePrompt, setShowDisplayNamePrompt] = useState(false);
   const [googleDisplayName, setGoogleDisplayName] = useState("");
   const [activeSection, setActiveSection] = useState("home");
@@ -6166,6 +6167,23 @@ const Ascend = () => {
                         </a>
                       </label>
                     </div>
+
+                    {/* Free trial checkbox */}
+                    <div className="flex items-start gap-2.5">
+                      <Checkbox
+                        id="freetrial"
+                        checked={startFreeTrial}
+                        onCheckedChange={setStartFreeTrial}
+                        disabled={isSubmitting}
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+                      />
+                      <label
+                        htmlFor="freetrial"
+                        className="cursor-pointer text-xs leading-relaxed text-muted-foreground"
+                      >
+                        {t("ascend.access.trial")}
+                      </label>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -6179,7 +6197,7 @@ const Ascend = () => {
                 disabled={
                   isGoogleLoading ||
                   isSubmitting ||
-                  (!isLogin && (!agreedToTerms || !linkWithPC))
+                  (!isLogin && (!agreedToTerms || !linkWithPC || !startFreeTrial))
                 }
               >
                 {isGoogleLoading ? (
@@ -6372,7 +6390,7 @@ const Ascend = () => {
                   disabled={
                     isSubmitting ||
                     isGoogleLoading ||
-                    (!isLogin && (!agreedToTerms || !linkWithPC))
+                    (!isLogin && (!agreedToTerms || !linkWithPC || !startFreeTrial))
                   }
                 >
                   {isSubmitting ? (

@@ -173,6 +173,7 @@
       "noTrialMessage": "You are not eligible for a free trial. Please subscribe to access Ascend features.",
       "noTrialTitle": "Subscription Required",
       "reason": "Reason",
+      "trial": "I understand I have a 7 day free trial",
       "trialBlocked": "Trial Already Used",
       "trialBlockedMessage": "A trial has already been used on this device. Subscribe to access Ascend features.",
       "trialEndingSoon": "Trial Ending Soon",
