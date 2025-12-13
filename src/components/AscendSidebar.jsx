@@ -174,11 +174,11 @@ const AscendSidebar = ({
             isActive ? "bg-primary/20" : "group-hover:bg-muted"
           }`}
         >
-          <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+          <item.icon className={`mb-1 h-4 w-4 ${isActive ? "text-primary" : ""}`} />
         </div>
-        <span className="hidden text-sm font-medium lg:block">{item.label}</span>
+        <span className="mb-1 hidden text-sm font-medium lg:block">{item.label}</span>
         {item.badge > 0 && (
-          <span className="text-primary-foreground ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold">
+          <span className="text-primary-foreground mb-1 ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold">
             {item.badge > 99 ? "99+" : item.badge}
           </span>
         )}

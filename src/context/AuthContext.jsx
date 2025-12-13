@@ -64,13 +64,25 @@ export const AuthProvider = ({ children }) => {
     try {
       unsubscribe = subscribeToAuthChanges(async firebaseUser => {
         try {
-          setUser(firebaseUser);
-
           if (firebaseUser) {
             // Fetch additional user data from Firestore
             const { data } = await getUserData(firebaseUser.uid);
+
+            // Check if account has pending deletion request
+            if (data?.reqDelete) {
+              // Sign out and show warning
+              await logoutUser();
+              setUser(null);
+              setUserData(null);
+              setError("ACCOUNT_PENDING_DELETION");
+              setLoading(false);
+              return;
+            }
+
+            setUser(firebaseUser);
             setUserData(data);
           } else {
+            setUser(null);
             setUserData(null);
           }
         } catch (err) {
@@ -158,12 +170,15 @@ export const AuthProvider = ({ children }) => {
     return result;
   };
 
-  // Delete account
+  // Delete account (request deletion and sign out)
   const removeAccount = async password => {
     setError(null);
     const result = await deleteAccount(password);
     if (result.error) {
       setError(result.error);
+    } else if (result.success) {
+      // Sign out after successful deletion request
+      await logoutUser();
     }
     return result;
   };

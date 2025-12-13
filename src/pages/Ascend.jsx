@@ -328,6 +328,18 @@ const Ascend = () => {
     checkVersion();
   }, []);
 
+  // Handle account pending deletion error
+  useEffect(() => {
+    if (error === "ACCOUNT_PENDING_DELETION") {
+      toast.error(
+        t("account.deletion.pendingWarning") ||
+          "Your account has a pending deletion request. Join our Discord to restore your account if this was a mistake.",
+        { duration: 10000 }
+      );
+      clearError();
+    }
+  }, [error, clearError, t]);
+
   // Verify Ascend access and load data when user is logged in
   useEffect(() => {
     if (user?.uid && !showDisplayNamePrompt) {

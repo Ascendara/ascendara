@@ -394,7 +394,7 @@ export const changePassword = async (currentPassword, newPassword) => {
 };
 
 /**
- * Delete user account
+ * Request account deletion (sends request to API for manual processing)
  * @param {string} password - Current password for reauthentication
  * @returns {Promise<{success: boolean, error: string|null}>}
  */
@@ -405,20 +405,43 @@ export const deleteAccount = async password => {
       return { success: false, error: "No user logged in" };
     }
 
-    // Reauthenticate user
+    // Reauthenticate user to verify password
     const credential = EmailAuthProvider.credential(user.email, password);
     await reauthenticateWithCredential(user, credential);
 
-    // Delete Firestore document
-    await deleteDoc(doc(db, "users", user.uid));
+    // Get user data for the request
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const userData = userDoc.exists() ? userDoc.data() : {};
 
-    // Delete user account
-    await deleteUser(user);
+    // Send deletion request to API
+    const response = await fetch("https://api.ascendara.app/account/request-deletion", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: user.uid,
+        email: user.email,
+        displayName: userData.displayName || user.displayName || "Unknown",
+      }),
+    });
 
-    return { success: true, error: null };
+    const result = await response.json();
+
+    if (result.success) {
+      return { success: true, error: null };
+    } else {
+      return {
+        success: false,
+        error: result.error || "Failed to submit deletion request",
+      };
+    }
   } catch (error) {
-    console.error("Account deletion error:", error);
-    return { success: false, error: getErrorMessage(error.code) };
+    console.error("Account deletion request error:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error.code) || "Failed to submit request",
+    };
   }
 };
 

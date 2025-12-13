@@ -1,7 +1,22 @@
 {
   "account": {
+    "actions": "Account Actions",
     "almostThere": "Almost there!",
     "chooseDisplayName": "Choose a display name for your account",
+    "deletion": {
+      "confirmed": "Request Submitted",
+      "deleting": "Submitting...",
+      "description": "This will submit a request to delete your account and all associated data. Your request will be processed and you will be notified via email.",
+      "enterPassword": "Enter your password to confirm",
+      "failed": "Failed to submit deletion request",
+      "holdButton": "Hold for 3 seconds to request",
+      "holdToDelete": "Hold to request",
+      "passwordRequired": "Please enter your password",
+      "pendingWarning": "Your account has a pending deletion request. Join our Discord to restore your account if this was a mistake.",
+      "success": "Deletion request submitted successfully",
+      "title": "Request Account Deletion"
+    },
+    "deletionWarning": "Your request will be processed within a few days",
     "displayNameHint": "This is how other users will see you. Minimum 4 characters.",
     "errors": {
       "accountExists": "Account Already Exists",
@@ -58,8 +73,10 @@
     "noAccount": "Don't have an account? Join today for free",
     "pricingDetails": "Start with a free 7-day trial. After that, it's just $2/month to keep all your data synced and backed up.",
     "pricingFriendly": "No payment required to start!",
+    "requestDeletion": "Request Account Deletion",
     "setUp": "Step Up. Connect.",
     "signOut": "Sign Out",
+    "signOutDescription": "Sign out of your account",
     "success": {
       "loggedIn": "Welcome back!",
       "loggedOut": "Signed out successfully",
