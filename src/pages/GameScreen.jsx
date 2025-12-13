@@ -689,6 +689,13 @@ export default function GameScreen() {
     };
   }, [game, navigate]);
 
+  // Re-fetch IGDB data when API config becomes available
+  useEffect(() => {
+    if (game && (igdbConfig.enabled || settings.giantBombKey)) {
+      fetchIgdbData(game.game || game.name);
+    }
+  }, [igdbConfig.enabled, settings.giantBombKey]);
+
   // Set up event listeners
   useEffect(() => {
     if (!isInitialized) return; // Don't set up listeners until initialized

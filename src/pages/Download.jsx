@@ -229,12 +229,12 @@ export default function DownloadPage() {
     console.log("Received game data:", gameData);
   }, [gameData, navigate]);
 
-  // Fetch IGDB data when game data changes
+  // Fetch IGDB data when game data changes or when API config becomes available
   useEffect(() => {
-    if (gameData && gameData.game) {
+    if (gameData && gameData.game && (igdbConfig.enabled || settings.giantBombKey)) {
       fetchIgdbData(gameData.game);
     }
-  }, [gameData]);
+  }, [gameData, igdbConfig.enabled, settings.giantBombKey]);
 
   // State declarations
   const [selectedProvider, setSelectedProvider] = useState("");
