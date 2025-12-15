@@ -1014,9 +1014,33 @@ class GofileDownloader:
                             shutil.move(src, dst)
                         shutil.rmtree(entry_path, ignore_errors=True)
                         logging.info(f"[AscendaraGofileHelper] Moved files from nested '{entry_path}' (matched by first word) to '{self.download_dir}'.")
+                        moved = True
                         break
             except Exception as e:
                 logging.error(f"[AscendaraGofileHelper] Error during first-word flattening: {e}")
+        
+        # Rebuild filemap after first-word flattening if files were moved
+        if moved:
+            watching_data = {}
+            archive_exts = {'.rar', '.zip', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso'}
+            if os.path.exists(self.download_dir):
+                for dirpath, _, filenames in os.walk(self.download_dir):
+                    rel_dir = os.path.relpath(dirpath, self.download_dir)
+                    for fname in filenames:
+                        if fname.endswith('.url') or '_CommonRedist' in dirpath:
+                            continue
+                        if os.path.splitext(fname)[1].lower() in archive_exts:
+                            continue
+                        if fname.endswith('.ascendara.json'):
+                            continue
+                        full_path = os.path.join(dirpath, fname)
+                        if os.path.exists(full_path):
+                            rel_path = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != '.' else fname
+                            rel_path = rel_path.replace('\\', '/')
+                            watching_data[rel_path] = {"size": os.path.getsize(full_path)}
+                logging.info(f"[AscendaraGofileHelper] Rebuilt filemap after first-word flattening with {len(watching_data)} files")
+                safe_write_json(watching_path, watching_data)
+        
         # Remove archive files from watching_data (if not already rebuilt)
         archive_exts = {'.rar', '.zip', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso'}
         watching_data = {k: v for k, v in watching_data.items() if os.path.splitext(k)[1].lower() not in archive_exts}
