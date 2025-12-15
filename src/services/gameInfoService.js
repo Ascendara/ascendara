@@ -52,25 +52,32 @@ const getTwitchToken = async (clientId, clientSecret) => {
  */
 const searchGameIGDB = async (gameName, clientId, accessToken) => {
   try {
-    const headers = {
-      Accept: "application/json",
-      "Client-ID": clientId,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    };
+    const body = `search "${gameName}"; fields name,summary,storyline,rating,cover.url,screenshots.url,genres.name,platforms.name,release_dates.human,involved_companies.company.name,involved_companies.developer,involved_companies.publisher; limit 1;`;
 
-    if (!isDev) {
-      headers["Access-Control-Allow-Origin"] = "*";
+    // In production (Electron), use IPC to bypass CORS
+    if (!isDev && window.electron?.igdbRequest) {
+      const result = await window.electron.igdbRequest(
+        "games",
+        body,
+        clientId,
+        accessToken
+      );
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      return result.data.length > 0 ? result.data[0] : null;
     }
 
-    // Ensure we're using a properly formed URL
-    const url = `${IGDB_API_URL}/games`;
-    console.log("IGDB API URL:", url); // Debug log
-
-    const response = await fetch(url, {
+    // In dev mode, use Vite proxy
+    const response = await fetch(`${IGDB_API_URL}/games`, {
       method: "POST",
-      headers,
-      body: `search "${gameName}"; fields name,summary,storyline,rating,cover.url,screenshots.url,genres.name,platforms.name,release_dates.human,involved_companies.company.name,involved_companies.developer,involved_companies.publisher; limit 1;`,
+      headers: {
+        Accept: "application/json",
+        "Client-ID": clientId,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body,
     });
 
     if (!response.ok) {
@@ -94,25 +101,32 @@ const searchGameIGDB = async (gameName, clientId, accessToken) => {
  */
 const getGameScreenshotsIGDB = async (gameId, clientId, accessToken) => {
   try {
-    const headers = {
-      Accept: "application/json",
-      "Client-ID": clientId,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    };
+    const body = `fields *; where game = ${gameId}; limit 10;`;
 
-    // In production, we need to add CORS headers
-    if (!isDev) {
-      headers["Access-Control-Allow-Origin"] = "*";
+    // In production (Electron), use IPC to bypass CORS
+    if (!isDev && window.electron?.igdbRequest) {
+      const result = await window.electron.igdbRequest(
+        "screenshots",
+        body,
+        clientId,
+        accessToken
+      );
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      return result.data;
     }
 
-    // Ensure we're using a properly formed URL
-    const url = `${IGDB_API_URL}/screenshots`;
-
-    const response = await fetch(url, {
+    // In dev mode, use Vite proxy
+    const response = await fetch(`${IGDB_API_URL}/screenshots`, {
       method: "POST",
-      headers,
-      body: `fields *; where game = ${gameId}; limit 10;`,
+      headers: {
+        Accept: "application/json",
+        "Client-ID": clientId,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body,
     });
 
     if (!response.ok) {

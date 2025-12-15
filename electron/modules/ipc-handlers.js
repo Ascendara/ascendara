@@ -107,6 +107,23 @@ function registerMiscHandlers() {
   // Is dev mode
   ipcMain.handle("is-dev", () => isDev);
 
+  // IGDB API request handler (bypasses CORS)
+  ipcMain.handle("igdb-request", async (_, { endpoint, body, clientId, accessToken }) => {
+    try {
+      const response = await axios.post(`https://api.igdb.com/v4/${endpoint}`, body, {
+        headers: {
+          "Client-ID": clientId,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "text/plain",
+        },
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("IGDB request error:", error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Is experiment
   let experiment = false;
   ipcMain.handle("is-experiment", () => experiment);
