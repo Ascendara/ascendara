@@ -47,6 +47,7 @@ export function SettingsProvider({ children }) {
     localIndex: "",
     blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
     usingLocalIndex: false,
+    shareLocalIndex: true,
     fetchPageCount: 50,
     localRefreshWorkers: 8,
     ludusavi: {
@@ -205,6 +206,7 @@ const defaultSettings = {
   localIndex: "",
   blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
   usingLocalIndex: false,
+  shareLocalIndex: true,
   fetchPageCount: 50,
   localRefreshWorkers: 8,
   ludusavi: {

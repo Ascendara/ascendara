@@ -7,13 +7,268 @@ const fs = require("fs-extra");
 const path = require("path");
 const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow, Notification, app } = require("electron");
-const { isDev, isWindows, appDirectory } = require("./config");
+const { isDev, isWindows, appDirectory, APIKEY } = require("./config");
 const { getSettingsManager } = require("./settings");
+const archiver = require("archiver");
+const https = require("https");
+const http = require("http");
 
 let localRefreshProcess = null;
 let localRefreshProgressInterval = null;
 let localRefreshShouldMonitor = false;
 let localRefreshStarting = false;
+
+/**
+ * Create a zip file containing the local index data (JSON + images)
+ * Uses chunked upload to bypass Cloudflare's 100MB limit
+ * @param {string} indexPath - Path to the local index directory
+ * @returns {Promise<string>} - Path to the created zip file
+ */
+async function createIndexZip(indexPath) {
+  const zipPath = path.join(indexPath, "shared_index.zip");
+  const gamesJsonPath = path.join(indexPath, "ascendara_games.json");
+  const imgsDir = path.join(indexPath, "imgs");
+
+  // Remove existing zip if present
+  if (fs.existsSync(zipPath)) {
+    fs.unlinkSync(zipPath);
+  }
+
+  return new Promise((resolve, reject) => {
+    const output = fs.createWriteStream(zipPath);
+    // Use good compression to minimize size
+    const archive = archiver("zip", { zlib: { level: 6 } });
+
+    output.on("close", () => {
+      console.log(`Index zip created: ${archive.pointer()} bytes`);
+      resolve(zipPath);
+    });
+
+    archive.on("error", err => {
+      reject(err);
+    });
+
+    archive.pipe(output);
+
+    // Add the games JSON file
+    if (fs.existsSync(gamesJsonPath)) {
+      archive.file(gamesJsonPath, { name: "ascendara_games.json" });
+    } else {
+      reject(new Error("ascendara_games.json not found"));
+      return;
+    }
+
+    // Add the imgs directory if it exists
+    if (fs.existsSync(imgsDir)) {
+      archive.directory(imgsDir, "imgs");
+    }
+
+    archive.finalize();
+  });
+}
+
+/**
+ * Get an auth token from the API
+ * @returns {Promise<string>} - The auth token
+ */
+async function getAuthToken() {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "api.ascendara.app",
+      port: 443,
+      path: "/auth/token",
+      method: "GET",
+      headers: {
+        Authorization: APIKEY,
+      },
+    };
+
+    const req = https.request(options, res => {
+      let data = "";
+      res.on("data", chunk => {
+        data += chunk;
+      });
+      res.on("end", () => {
+        if (res.statusCode === 200) {
+          try {
+            const parsed = JSON.parse(data);
+            resolve(parsed.token);
+          } catch (e) {
+            reject(new Error("Failed to parse auth token response"));
+          }
+        } else {
+          reject(new Error(`Failed to get auth token: ${res.statusCode}`));
+        }
+      });
+    });
+
+    req.on("error", err => {
+      reject(err);
+    });
+
+    req.end();
+  });
+}
+
+/**
+ * Upload a single chunk to the API
+ * @param {Buffer} chunkBuffer - The chunk data
+ * @param {string} sessionId - Upload session ID
+ * @param {number} chunkIndex - Index of this chunk
+ * @param {number} totalChunks - Total number of chunks
+ * @param {string} authToken - Auth token
+ * @returns {Promise<object>} - Response from server
+ */
+async function uploadChunk(chunkBuffer, sessionId, chunkIndex, totalChunks, authToken) {
+  const boundary = "----AscendaraChunk" + Date.now();
+
+  const header = `--${boundary}\r\nContent-Disposition: form-data; name="chunk"; filename="chunk_${chunkIndex}.bin"\r\nContent-Type: application/octet-stream\r\n\r\n`;
+  const footer = `\r\n--${boundary}--\r\n`;
+
+  const bodyBuffer = Buffer.concat([
+    Buffer.from(header),
+    chunkBuffer,
+    Buffer.from(footer),
+  ]);
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "api.ascendara.app",
+      port: 443,
+      path: `/localindex/upload-chunk?sessionId=${sessionId}&chunkIndex=${chunkIndex}&totalChunks=${totalChunks}`,
+      method: "POST",
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": bodyBuffer.length,
+        Authorization: `Bearer ${authToken}`,
+      },
+    };
+
+    const req = https.request(options, res => {
+      let data = "";
+      res.on("data", chunk => {
+        data += chunk;
+      });
+      res.on("end", () => {
+        if (res.statusCode === 200) {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            resolve({ success: true });
+          }
+        } else {
+          reject(new Error(`Chunk upload failed with status ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+
+    req.on("error", err => {
+      reject(err);
+    });
+
+    req.write(bodyBuffer);
+    req.end();
+  });
+}
+
+/**
+ * Upload the local index zip to the API using chunked uploads
+ * @param {string} indexPath - Path to the local index directory
+ */
+async function uploadLocalIndex(indexPath) {
+  const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB chunks (under Cloudflare's 100MB limit)
+
+  // Get auth token first
+  const authToken = await getAuthToken();
+
+  // Create the zip file (with images)
+  const zipPath = await createIndexZip(indexPath);
+
+  // Read the zip file
+  const zipBuffer = fs.readFileSync(zipPath);
+  const totalSize = zipBuffer.length;
+  const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+
+  console.log(`Uploading ${totalSize} bytes in ${totalChunks} chunks...`);
+
+  // Generate a unique session ID for this upload
+  const sessionId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  try {
+    // Upload chunks in parallel (3 at a time for speed while not overwhelming the server)
+    const PARALLEL_UPLOADS = 3;
+    const chunks = [];
+
+    // Prepare all chunks
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, totalSize);
+      chunks.push({
+        index: i,
+        buffer: zipBuffer.slice(start, end),
+      });
+    }
+
+    // Upload in batches
+    let assembled = false;
+    for (let batchStart = 0; batchStart < totalChunks; batchStart += PARALLEL_UPLOADS) {
+      const batch = chunks.slice(batchStart, batchStart + PARALLEL_UPLOADS);
+
+      console.log(
+        `Uploading batch: chunks ${batchStart + 1}-${Math.min(batchStart + PARALLEL_UPLOADS, totalChunks)} of ${totalChunks}...`
+      );
+
+      const results = await Promise.all(
+        batch.map(chunk => {
+          console.log(
+            `  Uploading chunk ${chunk.index + 1}/${totalChunks} (${chunk.buffer.length} bytes)...`
+          );
+          return uploadChunk(
+            chunk.buffer,
+            sessionId,
+            chunk.index,
+            totalChunks,
+            authToken
+          );
+        })
+      );
+
+      // Check if any result indicates assembly complete
+      for (const result of results) {
+        if (result.assembled) {
+          assembled = true;
+          console.log("All chunks assembled successfully!");
+        }
+      }
+    }
+
+    if (!assembled) {
+      console.log("All chunks uploaded, waiting for assembly confirmation...");
+    }
+
+    // Clean up the zip file
+    try {
+      if (fs.existsSync(zipPath)) {
+        fs.unlinkSync(zipPath);
+      }
+    } catch (e) {
+      console.error("Failed to clean up zip file:", e);
+    }
+
+    console.log("Index uploaded successfully!");
+    return { success: true };
+  } catch (error) {
+    // Clean up the zip file on error
+    try {
+      if (fs.existsSync(zipPath)) {
+        fs.unlinkSync(zipPath);
+      }
+    } catch (e) {
+      console.error("Failed to clean up zip file:", e);
+    }
+    throw error;
+  }
+}
 
 /**
  * Register local refresh IPC handlers
@@ -202,7 +457,7 @@ function registerLocalRefreshHandlers() {
           console.error(`LocalRefresh stderr: ${data}`);
         });
 
-        localRefreshProcess.on("close", code => {
+        localRefreshProcess.on("close", async code => {
           console.log(`LocalRefresh process exited with code ${code}`);
           localRefreshProcess = null;
           localRefreshStarting = false;
@@ -213,6 +468,46 @@ function registerLocalRefreshHandlers() {
           }
 
           const mainWindow = BrowserWindow.getAllWindows().find(win => win);
+
+          // If successful (code 0), check if we should upload the index
+          if (code === 0) {
+            try {
+              const currentSettings = settingsManager.getSettings();
+              console.log(
+                "Checking shareLocalIndex setting:",
+                currentSettings.shareLocalIndex
+              );
+              if (currentSettings.shareLocalIndex) {
+                console.log(
+                  "ShareLocalIndex is enabled, uploading index to:",
+                  outputPath
+                );
+                if (mainWindow) {
+                  mainWindow.webContents.send("local-refresh-uploading");
+                }
+                try {
+                  await uploadLocalIndex(outputPath);
+                  console.log("Index upload completed successfully");
+                  if (mainWindow) {
+                    mainWindow.webContents.send("local-refresh-upload-complete");
+                  }
+                } catch (uploadErr) {
+                  console.error("Upload function error:", uploadErr);
+                  throw uploadErr;
+                }
+              } else {
+                console.log("ShareLocalIndex is disabled, skipping upload");
+              }
+            } catch (uploadError) {
+              console.error("Failed to upload local index:", uploadError);
+              if (mainWindow) {
+                mainWindow.webContents.send("local-refresh-upload-error", {
+                  error: uploadError.message,
+                });
+              }
+            }
+          }
+
           if (mainWindow) {
             mainWindow.webContents.send("local-refresh-complete", { code });
           }
@@ -440,6 +735,136 @@ function registerLocalRefreshHandlers() {
       return { isRunning, progress: progressData };
     } catch (error) {
       return { isRunning: false, progress: null };
+    }
+  });
+
+  ipcMain.handle("download-shared-index", async (_, outputPath) => {
+    try {
+      const AdmZip = require("adm-zip");
+
+      // Ensure output directory exists
+      if (!fs.existsSync(outputPath)) {
+        fs.mkdirSync(outputPath, { recursive: true });
+      }
+
+      const zipPath = path.join(outputPath, "downloaded_index.zip");
+
+      // Get auth token first
+      console.log("Getting auth token for download...");
+      const authToken = await getAuthToken();
+
+      // Download the latest shared index with auth
+      console.log("Downloading shared index from API...");
+
+      await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(zipPath);
+
+        const options = {
+          hostname: "api.ascendara.app",
+          port: 443,
+          path: "/localindex/latest",
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        };
+
+        const req = https.request(options, response => {
+          if (response.statusCode === 302 || response.statusCode === 301) {
+            // Handle redirect (follow with auth header)
+            const redirectOptions = {
+              ...require("url").parse(response.headers.location),
+              headers: { Authorization: `Bearer ${authToken}` },
+            };
+            https
+              .get(redirectOptions, redirectResponse => {
+                redirectResponse.pipe(file);
+                file.on("finish", () => {
+                  file.close();
+                  resolve();
+                });
+              })
+              .on("error", err => {
+                fs.unlink(zipPath, () => {});
+                reject(err);
+              });
+          } else if (response.statusCode === 200) {
+            response.pipe(file);
+            file.on("finish", () => {
+              file.close();
+              resolve();
+            });
+          } else if (response.statusCode === 429) {
+            reject(
+              new Error("Rate limit exceeded. You can only download once per hour.")
+            );
+          } else if (response.statusCode === 401 || response.statusCode === 403) {
+            reject(new Error("Authentication failed. Please try again."));
+          } else {
+            reject(new Error(`Failed to download: ${response.statusCode}`));
+          }
+        });
+
+        req.on("error", err => {
+          fs.unlink(zipPath, () => {});
+          reject(err);
+        });
+
+        req.end();
+      });
+
+      console.log("Download complete, extracting...");
+
+      // Backup existing files
+      const gamesFile = path.join(outputPath, "ascendara_games.json");
+      const imgsDir = path.join(outputPath, "imgs");
+      const gamesBackup = path.join(outputPath, "ascendara_games_backup.json");
+      const imgsBackup = path.join(outputPath, "imgs_backup");
+
+      if (fs.existsSync(gamesFile)) {
+        fs.copyFileSync(gamesFile, gamesBackup);
+      }
+      if (fs.existsSync(imgsDir)) {
+        if (fs.existsSync(imgsBackup)) {
+          fs.rmSync(imgsBackup, { recursive: true, force: true });
+        }
+        fs.cpSync(imgsDir, imgsBackup, { recursive: true });
+      }
+
+      // Extract the zip
+      const zip = new AdmZip(zipPath);
+      zip.extractAllTo(outputPath, true);
+
+      // Clean up
+      fs.unlinkSync(zipPath);
+      if (fs.existsSync(gamesBackup)) {
+        fs.unlinkSync(gamesBackup);
+      }
+      if (fs.existsSync(imgsBackup)) {
+        fs.rmSync(imgsBackup, { recursive: true, force: true });
+      }
+
+      console.log("Shared index set up successfully");
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to download shared index:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Debug handler to manually trigger upload (for testing)
+  ipcMain.handle("debug-upload-local-index", async (_, outputPath) => {
+    try {
+      console.log("Manual upload triggered for path:", outputPath);
+      const currentSettings = settingsManager.getSettings();
+      console.log("Current shareLocalIndex setting:", currentSettings.shareLocalIndex);
+
+      await uploadLocalIndex(outputPath);
+      console.log("Manual upload completed successfully");
+      return { success: true };
+    } catch (error) {
+      console.error("Manual upload failed:", error);
+      return { success: false, error: error.message };
     }
   });
 }

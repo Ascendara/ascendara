@@ -55,6 +55,7 @@ class SettingsManager {
       localIndex: "",
       blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
       usingLocalIndex: false,
+      shareLocalIndex: true,
       fetchPageCount: 50,
       localRefreshWorkers: 8,
       ludusavi: {

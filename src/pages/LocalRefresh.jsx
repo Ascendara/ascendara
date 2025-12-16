@@ -29,6 +29,10 @@ import {
   Cpu,
   Zap,
   LoaderIcon,
+  Share2,
+  Upload,
+  Download,
+  Cloud,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -104,6 +108,9 @@ const LocalRefresh = () => {
   const cookieSubmittedRef = useRef(false);
   const lastCookieToastTimeRef = useRef(0);
   const cookieDialogOpenRef = useRef(false);
+  const [sharedIndexes, setSharedIndexes] = useState([]);
+  const [loadingSharedIndexes, setLoadingSharedIndexes] = useState(false);
+  const [downloadingIndex, setDownloadingIndex] = useState(null);
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -207,6 +214,23 @@ const LocalRefresh = () => {
       }
     };
     initializeSettings();
+
+    // Load community shared indexes on mount
+    const loadSharedIndexes = async () => {
+      setLoadingSharedIndexes(true);
+      try {
+        const response = await fetch("https://api.ascendara.app/localindex/list");
+        const data = await response.json();
+        if (data.success) {
+          setSharedIndexes(data.indexes);
+        }
+      } catch (e) {
+        console.error("Failed to fetch shared indexes:", e);
+      } finally {
+        setLoadingSharedIndexes(false);
+      }
+    };
+    loadSharedIndexes();
   }, [t]);
 
   // Listen for refresh progress updates from the backend
@@ -633,6 +657,90 @@ const LocalRefresh = () => {
         </div>
 
         <div className="space-y-6">
+          {/* Most Recent Public Index Card */}
+          {sharedIndexes.length > 0 && (
+            <Card className="border-2 border-border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-xl bg-primary/10 p-3">
+                    <Cloud className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold">
+                        {t("localRefresh.publicIndex") || "Public Game Index"}
+                      </h3>
+                      <Badge variant="secondary" className="text-xs">
+                        {t("localRefresh.skipRefresh") || "Skip Manual Refresh"}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {sharedIndexes[0].gameCount.toLocaleString()}{" "}
+                      {t("localRefresh.games") || "games"} •{" "}
+                      {t("localRefresh.updated") || "Updated"}{" "}
+                      {new Date(sharedIndexes[0].date).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  className="gap-2 text-secondary"
+                  onClick={async () => {
+                    if (downloadingIndex || isRefreshing) return;
+                    setDownloadingIndex(sharedIndexes[0].filename);
+                    try {
+                      const result =
+                        await window.electron.downloadSharedIndex(localIndexPath);
+                      if (result.success) {
+                        toast.success(
+                          t("localRefresh.indexDownloaded") ||
+                            "Public index downloaded and ready!"
+                        );
+                        if (window.electron?.setTimestampValue) {
+                          await window.electron.setTimestampValue("hasIndexBefore", true);
+                        }
+                        setHasIndexBefore(true);
+                        // Clear image cache to load new images
+                        imageCacheService.clearCache();
+                      } else {
+                        toast.error(
+                          result.error ||
+                            t("localRefresh.indexDownloadFailed") ||
+                            "Failed to download index"
+                        );
+                      }
+                    } catch (e) {
+                      console.error("Failed to download shared index:", e);
+                      toast.error(
+                        t("localRefresh.indexDownloadFailed") ||
+                          "Failed to download index"
+                      );
+                    } finally {
+                      setDownloadingIndex(null);
+                    }
+                  }}
+                  disabled={downloadingIndex || isRefreshing}
+                >
+                  {downloadingIndex ? (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin" />
+                      {t("localRefresh.downloading") || "Downloading..."}
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      {t("localRefresh.usePublicIndex") || "Use Public Index"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {/* Main Action Card */}
           <Card className="relative overflow-hidden border-border p-6">
             <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
@@ -867,6 +975,48 @@ const LocalRefresh = () => {
               </div>
             </Card>
           )}
+
+          {/* Share Local Index Card */}
+          <Card className="border-2 border-border border-primary/30 bg-primary/5 p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="rounded-lg bg-primary/20 p-2.5">
+                  <Share2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">
+                      {t("localRefresh.shareIndex") || "Share Your Index"}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {t("localRefresh.shareIndexDesc") ||
+                      "Automatically upload your index after refresh to help other users"}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant={settings?.shareLocalIndex ? "default" : "outline"}
+                className={settings?.shareLocalIndex ? "gap-2 text-secondary" : "gap-2"}
+                onClick={() =>
+                  updateSetting("shareLocalIndex", !settings?.shareLocalIndex)
+                }
+                disabled={isRefreshing}
+              >
+                {settings?.shareLocalIndex ? (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    {t("localRefresh.sharingEnabled") || "Sharing On"}
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-4 w-4" />
+                    {t("localRefresh.enableSharing") || "Enable Sharing"}
+                  </>
+                )}
+              </Button>
+            </div>
+          </Card>
 
           {/* Settings Accordion */}
           <Card className="border-border">

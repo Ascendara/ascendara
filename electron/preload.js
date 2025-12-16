@@ -150,6 +150,8 @@ contextBridge.exposeInMainWorld("electron", {
   offLocalRefreshError: () => ipcRenderer.removeAllListeners("local-refresh-error"),
   offLocalRefreshCookieNeeded: () =>
     ipcRenderer.removeAllListeners("local-refresh-cookie-needed"),
+  downloadSharedIndex: outputPath =>
+    ipcRenderer.invoke("download-shared-index", outputPath),
 
   //===========================================================================
   // GAME MANAGEMENT
