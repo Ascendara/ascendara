@@ -546,6 +546,20 @@ function registerLocalRefreshHandlers() {
                 if (mainWindow) {
                   mainWindow.webContents.send("local-refresh-progress", progressData);
                 }
+                // Check if completed/failed and stop monitoring
+                if (
+                  progressData.status === "completed" ||
+                  progressData.status === "failed"
+                ) {
+                  console.log(
+                    `Progress shows status: ${progressData.status}, stopping monitor`
+                  );
+                  localRefreshShouldMonitor = false;
+                  clearInterval(intervalId);
+                  if (localRefreshProgressInterval === intervalId) {
+                    localRefreshProgressInterval = null;
+                  }
+                }
               }
             } catch (err) {}
           }, 500);

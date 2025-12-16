@@ -111,6 +111,8 @@ const LocalRefresh = () => {
   const [sharedIndexes, setSharedIndexes] = useState([]);
   const [loadingSharedIndexes, setLoadingSharedIndexes] = useState(false);
   const [downloadingIndex, setDownloadingIndex] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -255,6 +257,7 @@ const LocalRefresh = () => {
             t("localRefresh.waitingForCookie") ||
             "Cookie expired - waiting for new cookie...",
           saving: t("localRefresh.saving") || "Saving data...",
+          swapping: t("localRefresh.swapping") || "Finalizing...",
           done: t("localRefresh.done") || "Done",
         };
         setCurrentStep(phaseMessages[data.phase] || data.phase);
@@ -386,6 +389,26 @@ const LocalRefresh = () => {
       setShowCookieRefreshDialog(true);
     };
 
+    const handleUploading = () => {
+      console.log("Upload started");
+      setIsUploading(true);
+      setUploadError(null);
+      setCurrentStep(t("localRefresh.uploading") || "Uploading index...");
+    };
+
+    const handleUploadComplete = () => {
+      console.log("Upload complete");
+      setIsUploading(false);
+      toast.success(t("localRefresh.uploadComplete") || "Index uploaded successfully!");
+    };
+
+    const handleUploadError = data => {
+      console.log("Upload error:", data);
+      setIsUploading(false);
+      setUploadError(data?.error || "Upload failed");
+      toast.error(t("localRefresh.uploadFailed") || "Failed to upload index");
+    };
+
     // Subscribe to IPC events
     if (window.electron?.onLocalRefreshProgress) {
       window.electron.onLocalRefreshProgress(handleProgressUpdate);
@@ -393,11 +416,27 @@ const LocalRefresh = () => {
       window.electron.onLocalRefreshError(handleError);
       window.electron.onLocalRefreshCookieNeeded?.(handleCookieNeeded);
 
+      // Upload events
+      window.electron.ipcRenderer.on("local-refresh-uploading", handleUploading);
+      window.electron.ipcRenderer.on(
+        "local-refresh-upload-complete",
+        handleUploadComplete
+      );
+      window.electron.ipcRenderer.on("local-refresh-upload-error", (_, data) =>
+        handleUploadError(data)
+      );
+
       return () => {
         window.electron.offLocalRefreshProgress?.();
         window.electron.offLocalRefreshComplete?.();
         window.electron.offLocalRefreshError?.();
         window.electron.offLocalRefreshCookieNeeded?.();
+        window.electron.ipcRenderer.off("local-refresh-uploading", handleUploading);
+        window.electron.ipcRenderer.off(
+          "local-refresh-upload-complete",
+          handleUploadComplete
+        );
+        window.electron.ipcRenderer.off("local-refresh-upload-error", handleUploadError);
       };
     }
   }, [t]);
@@ -627,7 +666,7 @@ const LocalRefresh = () => {
 
   return (
     <div className={`${welcomeStep ? "mt-0 pt-10" : "mt-6"} min-h-screen bg-background`}>
-      <div className="container mx-auto max-w-4xl px-4 py-8">
+      <div className="container mx-auto max-w-5xl px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Button
@@ -639,250 +678,287 @@ const LocalRefresh = () => {
             <ArrowLeft className="h-4 w-4" />
             {t("common.back") || "Back"}
           </Button>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-primary">
-              {t("localRefresh.title") || "Local Game Index"}
-            </h1>
-            {isRefreshing && (
-              <Badge variant="secondary" className="gap-1">
-                <Loader className="h-3 w-3 animate-spin" />
-                {t("localRefresh.statusRunning") || "Refreshing..."}
-              </Badge>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold">
+                  {t("localRefresh.title") || "Local Game Index"}
+                </h1>
+                {settings?.usingLocalIndex && (
+                  <Badge className="gap-1 bg-green-500/10 text-green-600 dark:text-green-400">
+                    <Zap className="h-3 w-3" />
+                    {t("localRefresh.usingLocalIndex") || "Active"}
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-1 text-muted-foreground">
+                {t("localRefresh.description") ||
+                  "Manage your local game index for faster browsing and offline access"}
+              </p>
+            </div>
+            {lastRefreshTime && (
+              <div className="hidden text-right text-sm text-muted-foreground sm:block">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" />
+                  <span>{t("localRefresh.lastRefresh") || "Last refresh"}</span>
+                </div>
+                <span className="font-medium">
+                  {formatLastRefreshTime(lastRefreshTime)}
+                </span>
+              </div>
             )}
           </div>
-          <p className="mt-2 text-muted-foreground">
-            {t("localRefresh.description") ||
-              "Manage your local game index for faster browsing and offline access"}
-          </p>
         </div>
 
-        <div className="space-y-6">
-          {/* Most Recent Public Index Card */}
-          {sharedIndexes.length > 0 && (
-            <Card className="border-2 border-border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-xl bg-primary/10 p-3">
-                    <Cloud className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">
-                        {t("localRefresh.publicIndex") || "Public Game Index"}
-                      </h3>
-                      <Badge variant="secondary" className="text-xs">
-                        {t("localRefresh.skipRefresh") || "Skip Manual Refresh"}
-                      </Badge>
+        {/* Two Column Layout */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column - Main Actions */}
+          <div className="space-y-4 lg:col-span-2">
+            {/* Public Index Card */}
+            {sharedIndexes.length > 0 && (
+              <Card className="p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                      <Cloud className="h-5 w-5 text-blue-500" />
                     </div>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      {sharedIndexes[0].gameCount.toLocaleString()}{" "}
-                      {t("localRefresh.games") || "games"} •{" "}
-                      {t("localRefresh.updated") || "Updated"}{" "}
-                      {new Date(sharedIndexes[0].date).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  className="gap-2 text-secondary"
-                  onClick={async () => {
-                    if (downloadingIndex || isRefreshing) return;
-                    setDownloadingIndex(sharedIndexes[0].filename);
-                    try {
-                      const result =
-                        await window.electron.downloadSharedIndex(localIndexPath);
-                      if (result.success) {
-                        toast.success(
-                          t("localRefresh.indexDownloaded") ||
-                            "Public index downloaded and ready!"
-                        );
-                        if (window.electron?.setTimestampValue) {
-                          await window.electron.setTimestampValue("hasIndexBefore", true);
-                        }
-                        setHasIndexBefore(true);
-                        // Clear image cache to load new images
-                        imageCacheService.clearCache();
-                      } else {
-                        toast.error(
-                          result.error ||
-                            t("localRefresh.indexDownloadFailed") ||
-                            "Failed to download index"
-                        );
-                      }
-                    } catch (e) {
-                      console.error("Failed to download shared index:", e);
-                      toast.error(
-                        t("localRefresh.indexDownloadFailed") ||
-                          "Failed to download index"
-                      );
-                    } finally {
-                      setDownloadingIndex(null);
-                    }
-                  }}
-                  disabled={downloadingIndex || isRefreshing}
-                >
-                  {downloadingIndex ? (
-                    <>
-                      <Loader className="h-4 w-4 animate-spin" />
-                      {t("localRefresh.downloading") || "Downloading..."}
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      {t("localRefresh.usePublicIndex") || "Use Public Index"}
-                    </>
-                  )}
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {/* Main Action Card */}
-          <Card className="relative overflow-hidden border-border p-6">
-            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
-            <div className="relative">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-xl bg-primary/10 p-3">
-                    {isRefreshing ? (
-                      <LoaderIcon className="h-7 w-7 animate-spin text-primary" />
-                    ) : refreshStatus === "completed" ? (
-                      <CircleCheck className="h-7 w-7 text-green-500" />
-                    ) : refreshStatus === "error" ? (
-                      <XCircle className="h-7 w-7 text-red-500" />
-                    ) : (
-                      <Database className="h-7 w-7 text-primary" />
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <h2 className="text-xl font-semibold">
-                      {isRefreshing
-                        ? t("localRefresh.statusRunning") || "Refreshing Index..."
-                        : refreshStatus === "completed"
-                          ? t("localRefresh.statusCompleted") || "Refresh Complete"
-                          : refreshStatus === "error"
-                            ? t("localRefresh.statusError") || "Refresh Failed"
-                            : t("localRefresh.statusIdle") || "Ready to Refresh"}
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {currentStep ||
-                        t("localRefresh.readyToStart") ||
-                        "Click start to update your local game index"}
-                    </p>
-                    <div className="flex items-center gap-4 pt-1 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span>{formatLastRefreshTime(lastRefreshTime)}</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">
+                          {t("localRefresh.publicIndex") || "Public Index"}
+                        </h3>
+                        {!hasIndexBefore && (
+                          <Badge variant="secondary" className="text-xs">
+                            {t("localRefresh.recommended") || "Recommended"}
+                          </Badge>
+                        )}
                       </div>
-                      {settings?.usingLocalIndex && (
-                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
-                          <Zap className="h-3.5 w-3.5" />
-                          <span>
-                            {t("localRefresh.usingLocalIndex") || "Using Local Index"}
-                          </span>
-                        </div>
-                      )}
+                      <p className="text-sm text-muted-foreground">
+                        {sharedIndexes[0].gameCount.toLocaleString()}{" "}
+                        {t("localRefresh.games") || "games"} •{" "}
+                        {t("localRefresh.updated") || "Updated"}{" "}
+                        {new Date(sharedIndexes[0].date).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
                     </div>
                   </div>
+                  <Button
+                    size="sm"
+                    className="gap-2 text-secondary"
+                    onClick={async () => {
+                      if (downloadingIndex || isRefreshing || isUploading) return;
+                      setDownloadingIndex(sharedIndexes[0].filename);
+                      try {
+                        const result =
+                          await window.electron.downloadSharedIndex(localIndexPath);
+                        if (result.success) {
+                          toast.success(
+                            t("localRefresh.indexDownloaded") ||
+                              "Public index downloaded!"
+                          );
+                          if (window.electron?.setTimestampValue) {
+                            await window.electron.setTimestampValue(
+                              "hasIndexBefore",
+                              true
+                            );
+                          }
+                          setHasIndexBefore(true);
+                          imageCacheService.clearCache();
+                        } else {
+                          toast.error(
+                            result.error ||
+                              t("localRefresh.indexDownloadFailed") ||
+                              "Failed to download"
+                          );
+                        }
+                      } catch (e) {
+                        console.error("Failed to download shared index:", e);
+                        toast.error(
+                          t("localRefresh.indexDownloadFailed") || "Failed to download"
+                        );
+                      } finally {
+                        setDownloadingIndex(null);
+                      }
+                    }}
+                    disabled={downloadingIndex || isRefreshing || isUploading}
+                  >
+                    {downloadingIndex ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        {t("localRefresh.downloading") || "Downloading..."}
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4" />
+                        {t("localRefresh.usePublicIndex") || "Download"}
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div className="flex flex-col gap-2">
-                  {!isRefreshing ? (
-                    <Button
-                      onClick={handleOpenRefreshDialog}
-                      size="lg"
-                      className="gap-2 text-secondary"
-                    >
-                      {refreshStatus === "completed" ? (
-                        <>
-                          <RefreshCw className="h-4 w-4" />
-                          {t("localRefresh.refreshAgain") || "Refresh Again"}
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4" />
-                          {t("localRefresh.startRefresh") || "Start Refresh"}
-                        </>
-                      )}
-                    </Button>
+              </Card>
+            )}
+
+            {/* Manual Refresh Card */}
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isUploading ? (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                      <Upload className="h-5 w-5 animate-pulse text-blue-500" />
+                    </div>
+                  ) : isRefreshing ? (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <LoaderIcon className="h-5 w-5 animate-spin text-primary" />
+                    </div>
+                  ) : refreshStatus === "completed" ? (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
+                      <CircleCheck className="h-5 w-5 text-green-500" />
+                    </div>
+                  ) : refreshStatus === "error" || uploadError ? (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    </div>
                   ) : (
-                    <Button
-                      variant="destructive"
-                      size="lg"
-                      onClick={() => setShowStopDialog(true)}
-                      className="gap-2"
-                    >
-                      <StopCircle className="h-4 w-4" />
-                      {t("localRefresh.stopRefresh") || "Stop"}
-                    </Button>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <RefreshCw className="h-5 w-5 text-primary" />
+                    </div>
                   )}
+                  <div>
+                    <h3 className="font-medium">
+                      {isUploading
+                        ? t("localRefresh.uploading") || "Uploading..."
+                        : isRefreshing
+                          ? t("localRefresh.statusRunning") || "Refreshing..."
+                          : refreshStatus === "completed"
+                            ? t("localRefresh.statusCompleted") || "Complete"
+                            : refreshStatus === "error" || uploadError
+                              ? t("localRefresh.statusError") || "Failed"
+                              : t("localRefresh.manualRefresh") || "Manual Refresh"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {uploadError ||
+                        currentStep ||
+                        t("localRefresh.manualRefreshDesc") ||
+                        "Scrape games directly from SteamRIP"}
+                    </p>
+                  </div>
                 </div>
+                {!isRefreshing && !isUploading ? (
+                  <Button
+                    size="sm"
+                    onClick={handleOpenRefreshDialog}
+                    className="gap-2 text-secondary"
+                  >
+                    {refreshStatus === "completed" ? (
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        {t("localRefresh.refreshAgain") || "Refresh"}
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4" />
+                        {t("localRefresh.startRefresh") || "Start"}
+                      </>
+                    )}
+                  </Button>
+                ) : isUploading ? (
+                  <Badge variant="secondary" className="gap-1.5">
+                    <Loader className="h-3 w-3 animate-spin" />
+                    {t("localRefresh.sharing") || "Sharing"}
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setShowStopDialog(true)}
+                    className="gap-2"
+                  >
+                    <StopCircle className="h-4 w-4" />
+                    {t("localRefresh.stopRefresh") || "Stop"}
+                  </Button>
+                )}
               </div>
 
               {/* Progress Section */}
               <AnimatePresence>
-                {(isRefreshing || refreshStatus === "completed") && (
+                {(isRefreshing || isUploading || refreshStatus === "completed") && (
                   <motion.div
                     initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                    animate={{ opacity: 1, height: "auto", marginTop: 24 }}
+                    animate={{ opacity: 1, height: "auto", marginTop: 16 }}
                     exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                    className="space-y-3 rounded-lg bg-muted/50 p-4"
+                    className="rounded-lg bg-muted/50 p-3"
                   >
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {t("localRefresh.progress") || "Progress"}
-                      </span>
-                      {currentPhase !== "fetching_posts" &&
-                        currentPhase !== "fetching_categories" &&
-                        currentPhase !== "initializing" &&
-                        currentPhase !== "starting" &&
-                        currentPhase !== "waiting_for_cookie" && (
-                          <span className="font-medium">{Math.round(progress)}%</span>
-                        )}
-                      {currentPhase === "waiting_for_cookie" && (
-                        <span className="font-medium text-orange-500">
-                          {t("localRefresh.waitingForCookieShort") || "Waiting..."}
-                        </span>
-                      )}
-                    </div>
-                    {currentPhase === "waiting_for_cookie" ? (
-                      <div className="relative h-2 w-full overflow-hidden rounded-full bg-orange-200 dark:bg-orange-900/30">
-                        <div
-                          className="absolute h-full rounded-full bg-orange-500"
-                          style={{
-                            animation: "progress-loading 2s ease-in-out infinite",
-                          }}
-                        />
-                      </div>
-                    ) : (currentPhase === "fetching_posts" ||
-                        currentPhase === "fetching_categories" ||
-                        currentPhase === "initializing" ||
-                        currentPhase === "starting") &&
-                      isRefreshing ? (
-                      <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className="absolute h-full rounded-full bg-primary"
-                          style={{
-                            animation: "progress-loading 1.5s ease-in-out infinite",
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <Progress value={progress} className="h-2" />
-                    )}
-                    {currentPhase === "processing_posts" && totalGames > 0 && (
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                          {t("localRefresh.gamesProcessed") || "Games Processed"}
+                          {t("localRefresh.progress") || "Progress"}
                         </span>
-                        <span className="font-medium">
-                          {processedGames} / {totalGames}
-                        </span>
+                        {isUploading ? (
+                          <span className="font-medium text-blue-500">
+                            {t("localRefresh.sharing") || "Sharing..."}
+                          </span>
+                        ) : currentPhase !== "fetching_posts" &&
+                          currentPhase !== "fetching_categories" &&
+                          currentPhase !== "initializing" &&
+                          currentPhase !== "starting" &&
+                          currentPhase !== "waiting_for_cookie" ? (
+                          <span className="font-medium">{Math.round(progress)}%</span>
+                        ) : currentPhase === "waiting_for_cookie" ? (
+                          <span className="font-medium text-orange-500">
+                            {t("localRefresh.waitingForCookieShort") || "Waiting..."}
+                          </span>
+                        ) : null}
                       </div>
-                    )}
+                      {isUploading ? (
+                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-900/30">
+                          <div
+                            className="absolute h-full rounded-full bg-blue-500"
+                            style={{
+                              animation: "progress-loading 1.5s ease-in-out infinite",
+                            }}
+                          />
+                        </div>
+                      ) : currentPhase === "waiting_for_cookie" ? (
+                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-orange-200 dark:bg-orange-900/30">
+                          <div
+                            className="absolute h-full rounded-full bg-orange-500"
+                            style={{
+                              animation: "progress-loading 2s ease-in-out infinite",
+                            }}
+                          />
+                        </div>
+                      ) : (currentPhase === "fetching_posts" ||
+                          currentPhase === "fetching_categories" ||
+                          currentPhase === "initializing" ||
+                          currentPhase === "starting") &&
+                        isRefreshing ? (
+                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className="absolute h-full rounded-full bg-primary"
+                            style={{
+                              animation: "progress-loading 1.5s ease-in-out infinite",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <Progress value={progress} className="h-2" />
+                      )}
+                      {currentPhase === "processing_posts" &&
+                        totalGames > 0 &&
+                        !isUploading && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {t("localRefresh.gamesProcessed") || "Games"}
+                            </span>
+                            <span className="font-medium">
+                              {processedGames.toLocaleString()} /{" "}
+                              {totalGames.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -891,25 +967,24 @@ const LocalRefresh = () => {
               <AnimatePresence>
                 {errors.length > 0 && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-4"
+                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                    animate={{ opacity: 1, height: "auto", marginTop: 16 }}
+                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
                   >
                     <button
                       onClick={() => setShowErrors(!showErrors)}
-                      className="border-destructive/30 bg-destructive/5 hover:bg-destructive/10 flex w-full items-center justify-between rounded-lg border p-3 transition-colors"
+                      className="bg-destructive/10 flex w-full items-center justify-between rounded-lg p-3 text-sm"
                     >
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="text-destructive h-4 w-4" />
-                        <span className="text-destructive text-sm font-medium">
+                      <div className="text-destructive flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="font-medium">
                           {t("localRefresh.errors") || "Errors"} ({errors.length})
                         </span>
                       </div>
                       {showErrors ? (
-                        <ChevronUp className="text-destructive h-4 w-4" />
+                        <ChevronUp className="text-destructive/60 h-4 w-4" />
                       ) : (
-                        <ChevronDown className="text-destructive h-4 w-4" />
+                        <ChevronDown className="text-destructive/60 h-4 w-4" />
                       )}
                     </button>
                     <AnimatePresence>
@@ -918,7 +993,7 @@ const LocalRefresh = () => {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="border-destructive/20 bg-destructive/5 mt-2 max-h-32 space-y-1 overflow-y-auto rounded-lg border p-2"
+                          className="mt-2 max-h-24 space-y-1 overflow-y-auto"
                         >
                           {errors.map((error, index) => (
                             <div
@@ -939,236 +1014,208 @@ const LocalRefresh = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-          </Card>
-
-          {/* Enable Local Index Card - Only show if not using local index */}
-          {!settings?.usingLocalIndex && (
-            <Card className="border-border p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-lg bg-primary/10 p-2.5">
-                    <ToggleRight className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">
-                      {t("localRefresh.switchToLocal") || "Enable Local Index"}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {hasIndexBefore
-                        ? t("localRefresh.switchToLocalReady") ||
-                          "Your local index is ready to use"
-                        : t("localRefresh.switchToLocalNotReady") ||
-                          "Refresh the index first to enable"}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant={hasIndexBefore ? "default" : "outline"}
-                  className={hasIndexBefore ? "gap-2 text-secondary" : "gap-2"}
-                  disabled={!hasIndexBefore || isRefreshing}
-                  onClick={handleEnableLocalIndex}
-                >
-                  <ToggleRight className="h-4 w-4" />
-                  {t("localRefresh.enableLocalIndex") || "Enable"}
-                </Button>
-              </div>
             </Card>
-          )}
 
-          {/* Share Local Index Card */}
-          <Card className="border-2 border-border border-primary/30 bg-primary/5 p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="rounded-lg bg-primary/20 p-2.5">
-                  <Share2 className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">
-                      {t("localRefresh.shareIndex") || "Share Your Index"}
-                    </h3>
+            {/* Action Row */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Enable Local Index */}
+              {!settings?.usingLocalIndex && (
+                <Card className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${hasIndexBefore ? "bg-green-500/10" : "bg-muted"}`}
+                      >
+                        <ToggleRight
+                          className={`h-5 w-5 ${hasIndexBefore ? "text-green-500" : "text-muted-foreground"}`}
+                        />
+                      </div>
+                      <div>
+                        <h3 className="font-medium">
+                          {t("localRefresh.switchToLocal") || "Enable Index"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {hasIndexBefore
+                            ? t("localRefresh.switchToLocalReady") || "Ready to use"
+                            : t("localRefresh.switchToLocalNotReady") || "Refresh first"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={hasIndexBefore ? "default" : "outline"}
+                      className={hasIndexBefore ? "text-secondary" : ""}
+                      disabled={!hasIndexBefore || isRefreshing}
+                      onClick={handleEnableLocalIndex}
+                    >
+                      {t("localRefresh.enableLocalIndex") || "Enable"}
+                    </Button>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {t("localRefresh.shareIndexDesc") ||
-                      "Automatically upload your index after refresh to help other users"}
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant={settings?.shareLocalIndex ? "default" : "outline"}
-                className={settings?.shareLocalIndex ? "gap-2 text-secondary" : "gap-2"}
-                onClick={() =>
-                  updateSetting("shareLocalIndex", !settings?.shareLocalIndex)
-                }
-                disabled={isRefreshing}
-              >
-                {settings?.shareLocalIndex ? (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    {t("localRefresh.sharingEnabled") || "Sharing On"}
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="h-4 w-4" />
-                    {t("localRefresh.enableSharing") || "Enable Sharing"}
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
+                </Card>
+              )}
 
-          {/* Settings Accordion */}
-          <Card className="border-border">
-            <Accordion type="single" collapsible className="w-full">
-              {/* Storage Location */}
-              <AccordionItem value="storage" className="border-b-0 px-6">
-                <AccordionTrigger className="py-4 hover:no-underline">
+              {/* Share Index Toggle */}
+              <Card className={`p-4 ${settings?.usingLocalIndex ? "sm:col-span-2" : ""}`}>
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <Folder className="h-5 w-5 text-muted-foreground" />
-                    <div className="text-left">
-                      <span className="font-medium">
-                        {t("localRefresh.storageLocation") || "Storage Location"}
-                      </span>
-                      <p className="text-xs font-normal text-muted-foreground">
-                        {t("localRefresh.storageLocationDesc") ||
-                          "Where the local index is stored"}
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${settings?.shareLocalIndex ? "bg-primary/10" : "bg-muted"}`}
+                    >
+                      <Share2
+                        className={`h-4 w-4 ${settings?.shareLocalIndex ? "text-primary" : "text-muted-foreground"}`}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-medium">
+                        {t("localRefresh.shareIndex") || "Share Index"}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {t("localRefresh.shareIndexDesc") ||
+                          "Help others by sharing your index"}
                       </p>
                     </div>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-4">
+                  <Button
+                    size="sm"
+                    variant={settings?.shareLocalIndex ? "default" : "outline"}
+                    className={
+                      settings?.shareLocalIndex
+                        ? "shrink-0 gap-1.5 text-secondary"
+                        : "shrink-0 gap-1.5"
+                    }
+                    onClick={() =>
+                      updateSetting("shareLocalIndex", !settings?.shareLocalIndex)
+                    }
+                    disabled={isRefreshing}
+                  >
+                    {settings?.shareLocalIndex ? (
+                      <>
+                        <Upload className="h-3.5 w-3.5" />
+                        {t("localRefresh.sharingEnabled") || "On"}
+                      </>
+                    ) : (
+                      t("localRefresh.enableSharing") || "Enable"
+                    )}
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Right Column - Settings */}
+          <div className="space-y-4">
+            {/* Settings Card */}
+            <Card>
+              <div className="border-b border-border px-4 py-3">
+                <h3 className="flex items-center gap-2 font-medium">
+                  <Settings2 className="h-4 w-4 text-muted-foreground" />
+                  {t("localRefresh.settings") || "Settings"}
+                </h3>
+              </div>
+              <div className="divide-y divide-border">
+                {/* Storage Location */}
+                <div className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Folder className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">
+                      {t("localRefresh.storageLocation") || "Storage"}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Input
                       value={localIndexPath}
                       readOnly
-                      className="flex-1 bg-muted/50 text-sm"
+                      className="h-8 flex-1 bg-muted/50 text-xs"
                     />
                     <Button
                       variant="outline"
                       size="sm"
-                      className="shrink-0 gap-2"
+                      className="h-8 shrink-0 px-2"
                       onClick={handleChangeLocation}
                       disabled={isRefreshing}
                     >
-                      <FolderOpen className="h-4 w-4" />
-                      {t("settings.selectDirectory") || "Browse"}
+                      <FolderOpen className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                </div>
 
-              {/* Performance Settings */}
-              <AccordionItem
-                value="performance"
-                className="border-b-0 border-t border-border/50 px-6"
-              >
-                <AccordionTrigger className="py-4 hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <Cpu className="h-5 w-5 text-muted-foreground" />
-                    <div className="text-left">
-                      <span className="font-medium">
-                        {t("localRefresh.performanceSettings") || "Performance"}
-                      </span>
-                      <p className="text-xs font-normal text-muted-foreground">
-                        {t("localRefresh.performanceSettingsDesc") ||
-                          "Configure refresh speed and resources"}
-                      </p>
-                    </div>
+                {/* Performance */}
+                <div className="p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Cpu className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">
+                      {t("localRefresh.performanceSettings") || "Performance"}
+                    </span>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-4 pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="worker-count" className="text-sm font-medium">
-                        {t("localRefresh.workerCount") || "Worker Threads"}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">
+                        {t("localRefresh.workerCount") || "Workers"}
                       </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {t("localRefresh.workerCountDesc") ||
-                          "Parallel processing threads (1-16)"}
-                      </p>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={16}
+                        value={workerCount}
+                        onChange={e => {
+                          const val = parseInt(e.target.value, 10);
+                          if (val >= 1 && val <= 16) {
+                            setWorkerCount(val);
+                            window.electron?.updateSetting("localRefreshWorkers", val);
+                          }
+                        }}
+                        disabled={isRefreshing}
+                        className="h-7 w-16 text-center text-xs"
+                      />
                     </div>
-                    <Input
-                      id="worker-count"
-                      type="number"
-                      min={1}
-                      max={16}
-                      value={workerCount}
-                      onChange={e => {
-                        const val = parseInt(e.target.value, 10);
-                        if (val >= 1 && val <= 16) {
-                          setWorkerCount(val);
-                          window.electron?.updateSetting("localRefreshWorkers", val);
-                        }
-                      }}
-                      disabled={isRefreshing}
-                      className="w-20 text-center"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium">
-                        {t("localRefresh.gamesPerPage") || "Games per Page"}
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">
+                        {t("localRefresh.gamesPerPage") || "Per Page"}
                       </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {t("localRefresh.gamesPerPageHint") ||
-                          "Higher values are faster but may timeout (10-100)"}
-                      </p>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={100}
+                        value={fetchPageCount}
+                        onChange={e => {
+                          const value = Math.min(
+                            100,
+                            Math.max(10, parseInt(e.target.value) || 50)
+                          );
+                          setFetchPageCount(value);
+                          window.electron?.updateSetting("fetchPageCount", value);
+                        }}
+                        disabled={isRefreshing}
+                        className="h-7 w-16 text-center text-xs"
+                      />
                     </div>
-                    <Input
-                      type="number"
-                      min={10}
-                      max={100}
-                      value={fetchPageCount}
-                      onChange={e => {
-                        const value = Math.min(
-                          100,
-                          Math.max(10, parseInt(e.target.value) || 50)
-                        );
-                        setFetchPageCount(value);
-                        window.electron?.updateSetting("fetchPageCount", value);
-                      }}
-                      disabled={isRefreshing}
-                      className="w-20 text-center"
-                    />
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                </div>
 
-              {/* Blacklist */}
-              <AccordionItem
-                value="blacklist"
-                className="border-0 border-t border-border/50 px-6"
-              >
-                <AccordionTrigger className="py-4 hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <Ban className="h-5 w-5 text-muted-foreground" />
-                    <div className="text-left">
-                      <span className="font-medium">
-                        {t("localRefresh.blacklist") || "Blacklisted Games"}
-                      </span>
-                      <p className="text-xs font-normal text-muted-foreground">
-                        {t("localRefresh.blacklistDesc") ||
-                          "Exclude specific games from the index"}
-                      </p>
-                    </div>
+                {/* Blacklist */}
+                <div className="p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Ban className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">
+                      {t("localRefresh.blacklist") || "Blacklist"}
+                    </span>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-3 pb-4">
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
-                      placeholder={t("localRefresh.enterGameId") || "Enter game ID"}
+                      placeholder="Game ID"
                       value={newBlacklistId}
                       onChange={e => setNewBlacklistId(e.target.value)}
-                      className="w-32 bg-muted/50 text-sm"
+                      className="h-7 flex-1 text-xs"
                       disabled={isRefreshing}
                       onKeyDown={e => {
                         if (e.key === "Enter" && newBlacklistId) {
                           const id = parseInt(newBlacklistId);
                           if (!isNaN(id) && !settings?.blacklistIDs?.includes(id)) {
-                            const newList = [...(settings?.blacklistIDs || []), id];
-                            updateSetting("blacklistIDs", newList);
+                            updateSetting("blacklistIDs", [
+                              ...(settings?.blacklistIDs || []),
+                              id,
+                            ]);
                             setNewBlacklistId("");
                           }
                         }
@@ -1177,63 +1224,66 @@ const LocalRefresh = () => {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-7 px-2"
                       disabled={isRefreshing || !newBlacklistId}
                       onClick={() => {
                         const id = parseInt(newBlacklistId);
                         if (!isNaN(id) && !settings?.blacklistIDs?.includes(id)) {
-                          const newList = [...(settings?.blacklistIDs || []), id];
-                          updateSetting("blacklistIDs", newList);
+                          updateSetting("blacklistIDs", [
+                            ...(settings?.blacklistIDs || []),
+                            id,
+                          ]);
                           setNewBlacklistId("");
                         }
                       }}
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                   {settings?.blacklistIDs?.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap gap-1">
                       {settings.blacklistIDs.map(id => (
                         <div
                           key={id}
-                          className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-sm"
+                          className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs"
                         >
                           <span className="font-mono">{id}</span>
                           <button
-                            onClick={() => {
-                              const newList = settings.blacklistIDs.filter(i => i !== id);
-                              updateSetting("blacklistIDs", newList);
-                            }}
+                            onClick={() =>
+                              updateSetting(
+                                "blacklistIDs",
+                                settings.blacklistIDs.filter(i => i !== id)
+                              )
+                            }
                             disabled={isRefreshing}
-                            className="hover:bg-destructive/20 hover:text-destructive ml-0.5 rounded p-0.5 disabled:opacity-50"
+                            className="hover:bg-destructive/20 hover:text-destructive rounded p-0.5 disabled:opacity-50"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-2.5 w-2.5" />
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </Card>
+                </div>
+              </div>
+            </Card>
 
-          {/* Info Card */}
-          <Card className="border-border bg-muted/30 p-5">
-            <div className="flex items-start gap-4">
-              <div className="rounded-lg bg-primary/10 p-2">
-                <Database className="h-5 w-5 text-primary" />
+            {/* Info Card */}
+            <Card className="bg-muted/30 p-4">
+              <div className="flex gap-3">
+                <Database className="h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <h3 className="text-sm font-medium">
+                    {t("localRefresh.whatThisDoes") || "About"}
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {t("localRefresh.whatThisDoesDescription") ||
+                      "Store game data locally for faster browsing and offline access."}
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h3 className="font-semibold">
-                  {t("localRefresh.whatThisDoes") || "What does this do?"}
-                </h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {t("localRefresh.whatThisDoesDescription") ||
-                    "The local index stores game data on your device for faster browsing and offline access. Refreshing updates the index with the latest games from SteamRIP."}
-                </p>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          </div>
         </div>
 
         {/* Stop Confirmation Dialog */}
