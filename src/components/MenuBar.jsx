@@ -42,10 +42,10 @@ const MenuBar = () => {
   const [showTorrentWarning, setShowTorrentWarning] = useState(false);
   const [isLatest, setIsLatest] = useState(true);
   const [isExperiment, setIsExperiment] = useState(false);
-  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(true);
+  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [leftSideActions, setLeftSideActions] = useState(false);
   const [isDev, setIsDev] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(50);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mainContentRef = useRef(null);
 
