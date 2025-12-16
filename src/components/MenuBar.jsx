@@ -42,10 +42,10 @@ const MenuBar = () => {
   const [showTorrentWarning, setShowTorrentWarning] = useState(false);
   const [isLatest, setIsLatest] = useState(true);
   const [isExperiment, setIsExperiment] = useState(false);
-  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
+  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(true);
   const [leftSideActions, setLeftSideActions] = useState(false);
   const [isDev, setIsDev] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadProgress, setDownloadProgress] = useState(50);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mainContentRef = useRef(null);
 
@@ -305,27 +305,30 @@ const MenuBar = () => {
         {isDownloadingUpdate && (
           <div className="ml-2 flex items-center gap-2">
             <span className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1 py-0.5 text-[14px] text-green-500">
-              <div className="relative h-4 w-4">
+              <div className="relative h-5 w-5 flex-shrink-0">
                 {/* Track circle */}
-                <svg className="absolute inset-0 h-full w-full -rotate-90">
+                <svg
+                  className="absolute inset-0 h-full w-full -rotate-90"
+                  viewBox="0 0 16 16"
+                >
                   <circle
                     cx="8"
                     cy="8"
-                    r="6"
+                    r="5"
                     fill="none"
-                    strokeWidth="3"
+                    strokeWidth="2"
                     className="stroke-green-500/20"
                   />
-                  {/* Progress circle - circumference = 2 * PI * r = 2 * 3.14159 * 6 ≈ 37.7 */}
+                  {/* Progress circle - circumference = 2 * PI * r = 2 * 3.14159 * 5 ≈ 31.4 */}
                   <circle
                     cx="8"
                     cy="8"
-                    r="6"
+                    r="5"
                     fill="none"
-                    strokeWidth="3"
+                    strokeWidth="2"
                     className="stroke-green-500"
-                    strokeDasharray="37.7"
-                    strokeDashoffset={37.7 - (downloadProgress / 100) * 37.7}
+                    strokeDasharray="31.4"
+                    strokeDashoffset={31.4 - (downloadProgress / 100) * 31.4}
                     strokeLinecap="round"
                   />
                 </svg>
