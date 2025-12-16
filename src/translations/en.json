@@ -210,6 +210,12 @@
       "title": "Recent Activity"
     },
     "checkingVersion": "Checking version...",
+    "cloudBackups": {
+      "comingSoon": "Coming Soon",
+      "comingSoonDesc": "Cloud backup features for your game saves are currently in development. Stay tuned!",
+      "subtitle": "Backup and restore your game saves",
+      "title": "Cloud Backups"
+    },
     "cloudLibrary": {
       "achievementDetailsNotSynced": "Achievement details not synced yet",
       "achievementSync": "Achievement Sync",
@@ -259,6 +265,12 @@
       "totalLaunches": "Total Launches",
       "totalPlaytime": "Total Playtime",
       "tryDifferentSearch": "Try a different search term or clear your search"
+    },
+    "community": {
+      "comingSoon": "Coming Soon",
+      "comingSoonDesc": "Community features are currently in development. Stay tuned for updates!",
+      "subtitle": "Connect with other Ascendara users",
+      "title": "Community"
     },
     "friends": {
       "addFriend": "Add Friend",
@@ -318,7 +330,10 @@
       "you": "You"
     },
     "nav": {
+      "cloud": "Cloud",
+      "cloudBackups": "Cloud Backups",
       "cloudLibrary": "Cloud Library",
+      "community": "Community",
       "discover": "Discover",
       "friends": "Friends",
       "home": "Home",

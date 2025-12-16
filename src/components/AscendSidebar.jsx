@@ -15,6 +15,7 @@ import {
   MinusCircle,
   EyeOff,
   ChevronUp,
+  ChevronDown,
   Clock,
   CreditCard,
   CloudIcon,
@@ -24,6 +25,9 @@ import {
   BadgeDollarSign,
   Trophy,
   Rocket,
+  Gamepad2,
+  HardDrive,
+  UsersRound,
 } from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
@@ -110,16 +114,42 @@ const AscendSidebar = ({
     return status?.color || "bg-green-500";
   };
 
+  // Expandable section states
+  const [expandedSections, setExpandedSections] = useState({
+    cloud: true,
+  });
+
+  const toggleSection = section => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
   // Quick access items (icon grid at top)
   const quickAccessItems = [
     { id: "home", icon: Home, label: t("ascend.nav.home") },
     {
-      id: "cloudlibrary",
-      icon: CloudIcon,
-      label: t("ascend.nav.cloudLibrary") || "Cloud Library",
+      id: "community",
+      icon: UsersRound,
+      label: t("ascend.nav.community") || "Community",
     },
     { id: "friends", icon: Users, label: t("ascend.nav.friends"), badge: 0 },
     { id: "messages", icon: MessageCircle, label: t("ascend.nav.messages"), badge: 0 },
+  ];
+
+  // Cloud section items
+  const cloudItems = [
+    {
+      id: "cloudlibrary",
+      icon: Gamepad2,
+      label: t("ascend.nav.cloudLibrary") || "Cloud Library",
+    },
+    {
+      id: "cloudbackups",
+      icon: HardDrive,
+      label: t("ascend.nav.cloudBackups") || "Cloud Backups",
+    },
   ];
 
   // Main nav items (list below)
@@ -214,15 +244,49 @@ const AscendSidebar = ({
 
       {/* Main Navigation List */}
       <nav className="relative flex-1 space-y-1 overflow-y-auto p-3">
-        {/* Sliding highlight indicator */}
-        {activeNavIndex >= 0 && (
-          <motion.div
-            className="pointer-events-none absolute left-3 right-3 h-[56px] rounded-xl bg-gradient-to-r from-primary/20 to-primary/10"
-            initial={false}
-            animate={{ y: activeNavIndex * 56 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          />
-        )}
+        {/* Cloud Section */}
+        <div className="mb-2">
+          <button
+            onClick={() => toggleSection("cloud")}
+            className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
+          >
+            <div className="flex items-center gap-2">
+              <CloudIcon className="h-3.5 w-3.5" />
+              <span className="hidden lg:inline">{t("ascend.nav.cloud") || "Cloud"}</span>
+            </div>
+            {expandedSections.cloud ? (
+              <ChevronUp className="hidden h-3.5 w-3.5 lg:block" />
+            ) : (
+              <ChevronDown className="hidden h-3.5 w-3.5 lg:block" />
+            )}
+          </button>
+          <AnimatePresence initial={false}>
+            {expandedSections.cloud && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-1 space-y-0.5 pl-1">
+                  {cloudItems.map(item => (
+                    <NavButton
+                      key={item.id}
+                      item={item}
+                      isActive={activeSection === item.id}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-2 my-2 h-px bg-border/30" />
+
+        {/* Main nav items */}
         {mainNavItems.map(item => (
           <NavButton key={item.id} item={item} isActive={activeSection === item.id} />
         ))}
