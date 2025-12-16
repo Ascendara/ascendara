@@ -3,9 +3,8 @@
  * Handles authentication and debrid operations with the Torbox API
  */
 
-// Use proxy in development mode to avoid CORS issues
-const isDev = import.meta.env.DEV;
-const API_BASE_URL = isDev ? "/api/torbox" : "https://api.torbox.app/v1/api";
+// Always use proxy to avoid CORS issues (works in both dev and production)
+const API_BASE_URL = "/api/torbox";
 
 /**
  * Check if the Torbox service is enabled by verifying if an API key exists
