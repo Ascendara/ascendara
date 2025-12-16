@@ -76,8 +76,13 @@ const AscendSidebar = ({
       const timeout = setTimeout(() => {
         getUserStatus(user.uid).then(result => {
           if (result.data) {
-            setCurrentStatus(result.data.status || "online");
+            const status = result.data.status || "online";
+            setCurrentStatus(status);
             setCustomMessage(result.data.customMessage || "");
+            // Sync status with parent component
+            if (onStatusChange) {
+              onStatusChange(status);
+            }
           }
         });
       }, 500);
