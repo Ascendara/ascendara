@@ -313,13 +313,13 @@ async function initializeApp() {
           });
       });
 
-      // Handle server errors silently (e.g., port in use, connection reset on close)
+      // Handle server errors (e.g., port in use)
       localServer.on("error", err => {
         console.error("Local server error:", err.message);
       });
 
-      localServer.listen(5432, "127.0.0.1", () => {
-        console.log("Local server running at http://localhost:5432");
+      localServer.listen(46859, "127.0.0.1", () => {
+        console.log("Local server running at http://localhost:46859");
       });
     }
 

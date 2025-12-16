@@ -54,8 +54,35 @@ function createWindow() {
     // Load from localhost:5173 in development
     mainWindow.loadURL("http://localhost:5173");
   } else {
-    mainWindow.loadURL("http://localhost:5432");
+    mainWindow.loadURL("http://localhost:46859");
   }
+
+  // Handle load failures (e.g., local server not running)
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+    console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
+    // Show a helpful error page instead of white screen
+    mainWindow.loadURL(`data:text/html,
+      <html>
+        <head>
+          <style>
+            body { background: #09090b; color: #fff; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
+            h1 { color: #ef4444; margin-bottom: 16px; }
+            p { color: #a1a1aa; max-width: 500px; text-align: center; line-height: 1.6; }
+            code { background: #27272a; padding: 2px 6px; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <h1>Failed to Load Ascendara</h1>
+          <p>Error: ${errorDescription} (${errorCode})</p>
+          <p>This may be caused by:</p>
+          <p>• Missing Visual C++ Redistributables - <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color: #3b82f6;">Download here</a></p>
+          <p>• Antivirus blocking the app</p>
+          <p>• Port 46859 being used by another application</p>
+          <p>Try restarting Ascendara or your computer.</p>
+        </body>
+      </html>
+    `);
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Allow Firebase/Google auth popups
