@@ -298,6 +298,7 @@ contextBridge.exposeInMainWorld("electron", {
   checkFileExists: filePath => ipcRenderer.invoke("check-file-exists", filePath),
   getDriveSpace: path => ipcRenderer.invoke("get-drive-space", path),
   getAssetPath: filename => ipcRenderer.invoke("get-asset-path", filename),
+  getAudioAsset: filename => ipcRenderer.invoke("get-audio-asset", filename),
   onDirectorySizeStatus: callback => {
     ipcRenderer.on("directory-size-status", (_, status) => callback(status));
     return () => ipcRenderer.removeListener("directory-size-status", callback);
