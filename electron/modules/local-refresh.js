@@ -17,6 +17,7 @@ let localRefreshProcess = null;
 let localRefreshProgressInterval = null;
 let localRefreshShouldMonitor = false;
 let localRefreshStarting = false;
+let publicIndexDownloading = false;
 
 /**
  * Create a zip file containing the local index data (JSON + images)
@@ -752,9 +753,22 @@ function registerLocalRefreshHandlers() {
     }
   });
 
+  // Handler to check if public index download is in progress
+  ipcMain.handle("get-public-index-download-status", async () => {
+    return { isDownloading: publicIndexDownloading };
+  });
+
   ipcMain.handle("download-shared-index", async (_, outputPath) => {
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+
     try {
       const AdmZip = require("adm-zip");
+
+      // Set downloading flag and notify renderer
+      publicIndexDownloading = true;
+      if (mainWindow) {
+        mainWindow.webContents.send("public-index-download-started");
+      }
 
       // Ensure output directory exists
       if (!fs.existsSync(outputPath)) {
@@ -859,9 +873,19 @@ function registerLocalRefreshHandlers() {
       }
 
       console.log("Shared index set up successfully");
+      publicIndexDownloading = false;
+      if (mainWindow) {
+        mainWindow.webContents.send("public-index-download-complete");
+      }
       return { success: true };
     } catch (error) {
       console.error("Failed to download shared index:", error);
+      publicIndexDownloading = false;
+      if (mainWindow) {
+        mainWindow.webContents.send("public-index-download-error", {
+          error: error.message,
+        });
+      }
       return { success: false, error: error.message };
     }
   });

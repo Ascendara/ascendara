@@ -211,6 +211,15 @@ const LocalRefresh = () => {
             }
           }
         }
+
+        // Check if public index download is in progress
+        if (window.electron?.getPublicIndexDownloadStatus) {
+          const downloadStatus = await window.electron.getPublicIndexDownloadStatus();
+          if (downloadStatus.isDownloading) {
+            console.log("Public index download is in progress, restoring UI state");
+            setDownloadingIndex("public");
+          }
+        }
       } catch (error) {
         console.error("Failed to initialize settings:", error);
       }
@@ -409,6 +418,31 @@ const LocalRefresh = () => {
       toast.error(t("localRefresh.uploadFailed") || "Failed to upload index");
     };
 
+    // Public index download event handlers
+    const handlePublicDownloadStarted = () => {
+      console.log("Public index download started");
+      setDownloadingIndex("public");
+    };
+
+    const handlePublicDownloadComplete = async () => {
+      console.log("Public index download complete");
+      setDownloadingIndex(null);
+      toast.success(t("localRefresh.indexDownloaded") || "Public index downloaded!");
+      if (window.electron?.setTimestampValue) {
+        await window.electron.setTimestampValue("hasIndexBefore", true);
+      }
+      setHasIndexBefore(true);
+      imageCacheService.clearCache();
+    };
+
+    const handlePublicDownloadError = data => {
+      console.log("Public index download error:", data);
+      setDownloadingIndex(null);
+      toast.error(
+        data?.error || t("localRefresh.indexDownloadFailed") || "Failed to download"
+      );
+    };
+
     // Subscribe to IPC events
     if (window.electron?.onLocalRefreshProgress) {
       window.electron.onLocalRefreshProgress(handleProgressUpdate);
@@ -426,6 +460,11 @@ const LocalRefresh = () => {
         handleUploadError(data)
       );
 
+      // Public index download events
+      window.electron.onPublicIndexDownloadStarted?.(handlePublicDownloadStarted);
+      window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
+      window.electron.onPublicIndexDownloadError?.(handlePublicDownloadError);
+
       return () => {
         window.electron.offLocalRefreshProgress?.();
         window.electron.offLocalRefreshComplete?.();
@@ -437,6 +476,9 @@ const LocalRefresh = () => {
           handleUploadComplete
         );
         window.electron.ipcRenderer.off("local-refresh-upload-error", handleUploadError);
+        window.electron.offPublicIndexDownloadStarted?.();
+        window.electron.offPublicIndexDownloadComplete?.();
+        window.electron.offPublicIndexDownloadError?.();
       };
     }
   }, [t]);
