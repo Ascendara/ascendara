@@ -364,16 +364,19 @@ export default function DownloadPage() {
         cacheDownloadData(sanitizedGameName, gameData);
 
         try {
+          const isVrGame = gameData.category?.includes("Virtual Reality");
           await window.electron.downloadFile(
             torrentLink,
             sanitizedGameName,
             gameData.online || false,
             gameData.dlc || false,
-            false,
+            isVrGame || false, // isVr
+            gameData.isUpdating || false, // updateFlow
             gameData.version || "",
             gameData.imgID,
             gameData.size || "",
-            dir
+            dir,
+            gameData.gameID || ""
           );
 
           // Keep isStarting true until download actually begins

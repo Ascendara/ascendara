@@ -318,11 +318,13 @@ const TorboxDownloads = () => {
               fileName,
               false, // online
               false, // dlc
-              false, // update
+              false, // isVr
+              false, // updateFlow
               "", // version
               storedData?.imgUrl || null, // imgID
               download.size ? formatBytes(download.size) : "", // size
-              0 // dir (default)
+              0, // additionalDirIndex
+              "" // gameID
             );
 
             toast.success(t("torbox.download_started", { name: fileName }));
@@ -407,7 +409,8 @@ const TorboxDownloads = () => {
         gameData.version || "",
         gameData.imgID || null,
         gameData.size || "",
-        0 // dir (default)
+        0, // additionalDirIndex
+        gameData.gameID || "" // gameID
       );
 
       toast.success(t("torbox.download_started", { name: gameData.game }));
