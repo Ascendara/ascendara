@@ -1,22 +1,57 @@
 // Create two audio elements per sound for gapless looping
-const createAudioPair = src => ({
-  a: new Audio(src),
-  b: new Audio(src),
+const createAudioPair = () => ({
+  a: new Audio(),
+  b: new Audio(),
   current: "a",
+  loaded: false,
 });
 
 const sounds = {
-  ascend1: createAudioPair("/sounds/ascend1.mp3"),
-  ascend2: createAudioPair("/sounds/ascend2.mp3"),
-  ascend3: createAudioPair("/sounds/ascend3.mp3"),
-  ascend4: createAudioPair("/sounds/ascend4.mp3"),
+  ascend1: createAudioPair(),
+  ascend2: createAudioPair(),
+  ascend3: createAudioPair(),
+  ascend4: createAudioPair(),
 };
 
-// Preload all sounds
-Object.values(sounds).forEach(pair => {
-  pair.a.preload = "auto";
-  pair.b.preload = "auto";
-});
+// Track loading state
+let soundsLoaded = false;
+let loadingPromise = null;
+
+// Load sounds via Electron IPC (base64 data URLs work in production)
+const loadSounds = async () => {
+  if (soundsLoaded) return;
+  if (loadingPromise) return loadingPromise;
+
+  loadingPromise = (async () => {
+    const soundFiles = {
+      ascend1: "sounds/ascend1.mp3",
+      ascend2: "sounds/ascend2.mp3",
+      ascend3: "sounds/ascend3.mp3",
+      ascend4: "sounds/ascend4.mp3",
+    };
+
+    for (const [name, path] of Object.entries(soundFiles)) {
+      try {
+        const dataUrl = await window.electron.getAudioAsset(path);
+        if (dataUrl) {
+          sounds[name].a.src = dataUrl;
+          sounds[name].b.src = dataUrl;
+          sounds[name].a.preload = "auto";
+          sounds[name].b.preload = "auto";
+          sounds[name].loaded = true;
+        }
+      } catch (err) {
+        console.error(`Failed to load sound ${name}:`, err);
+      }
+    }
+    soundsLoaded = true;
+  })();
+
+  return loadingPromise;
+};
+
+// Initialize sounds on load
+loadSounds();
 
 let currentSound = null;
 let currentSoundName = null;
@@ -91,9 +126,10 @@ const scheduleGaplessLoop = (soundName, volume) => {
 };
 
 export const soundService = {
-  play: (soundName, volume = 0.3, loop = false) => {
+  play: async (soundName, volume = 0.3, loop = false) => {
+    await loadSounds();
     const pair = sounds[soundName];
-    if (!pair) return;
+    if (!pair || !pair.loaded) return;
 
     stopLoopTimeout();
 
@@ -161,9 +197,10 @@ export const soundService = {
     }, stepDuration);
   },
 
-  crossfadeTo: (soundName, volume = 0.3, loop = false, fadeDuration = 500) => {
+  crossfadeTo: async (soundName, volume = 0.3, loop = false, fadeDuration = 500) => {
+    await loadSounds();
     const pair = sounds[soundName];
-    if (!pair) return;
+    if (!pair || !pair.loaded) return;
 
     stopLoopTimeout();
 

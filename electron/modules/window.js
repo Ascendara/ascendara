@@ -320,6 +320,27 @@ function registerWindowHandlers() {
     const imageBuffer = fs.readFileSync(assetPath);
     return `data:image/png;base64,${imageBuffer.toString("base64")}`;
   });
+
+  // Get audio asset as base64 data URL
+  ipcMain.handle("get-audio-asset", (_, filename) => {
+    const fs = require("fs-extra");
+    let assetPath;
+    if (!app.isPackaged) {
+      // In development
+      assetPath = path.join(__dirname, "../../src/public", filename);
+    } else {
+      // In production
+      assetPath = path.join(process.resourcesPath, "public", filename);
+    }
+
+    if (!fs.existsSync(assetPath)) {
+      console.error(`Audio asset not found: ${assetPath}`);
+      return null;
+    }
+
+    const audioBuffer = fs.readFileSync(assetPath);
+    return `data:audio/mpeg;base64,${audioBuffer.toString("base64")}`;
+  });
 }
 
 module.exports = {
