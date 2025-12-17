@@ -108,9 +108,11 @@ const LocalRefresh = () => {
   const cookieSubmittedRef = useRef(false);
   const lastCookieToastTimeRef = useRef(0);
   const cookieDialogOpenRef = useRef(false);
-  const [sharedIndexes, setSharedIndexes] = useState([]);
-  const [loadingSharedIndexes, setLoadingSharedIndexes] = useState(false);
+  const [checkingApi, setCheckingApi] = useState(false);
+  const [apiAvailable, setApiAvailable] = useState(false);
+  const [indexInfo, setIndexInfo] = useState(null); // { gameCount, date, size }
   const [downloadingIndex, setDownloadingIndex] = useState(null);
+  const [indexDownloadProgress, setIndexDownloadProgress] = useState(null); // { progress, phase, downloaded, total }
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
 
@@ -226,22 +228,39 @@ const LocalRefresh = () => {
     };
     initializeSettings();
 
-    // Load community shared indexes on mount
-    const loadSharedIndexes = async () => {
-      setLoadingSharedIndexes(true);
+    // Check API health and fetch index info on mount
+    const checkApiHealth = async () => {
+      setCheckingApi(true);
       try {
-        const response = await fetch("https://api.ascendara.app/localindex/list");
-        const data = await response.json();
-        if (data.success) {
-          setSharedIndexes(data.indexes);
+        const healthResponse = await fetch("https://api.ascendara.app/health");
+        const healthData = await healthResponse.json();
+        const isHealthy = healthData.status === "healthy";
+        setApiAvailable(isHealthy);
+
+        // If API is healthy, fetch index metadata
+        if (isHealthy) {
+          try {
+            const infoResponse = await fetch("https://api.ascendara.app/localindex/info");
+            const infoData = await infoResponse.json();
+            if (infoData.success) {
+              setIndexInfo({
+                gameCount: infoData.gameCount,
+                date: infoData.date,
+                size: infoData.size,
+              });
+            }
+          } catch (infoErr) {
+            console.error("Failed to fetch index info:", infoErr);
+          }
         }
       } catch (e) {
-        console.error("Failed to fetch shared indexes:", e);
+        console.error("Failed to check API health:", e);
+        setApiAvailable(false);
       } finally {
-        setLoadingSharedIndexes(false);
+        setCheckingApi(false);
       }
     };
-    loadSharedIndexes();
+    checkApiHealth();
   }, [t]);
 
   // Listen for refresh progress updates from the backend
@@ -422,11 +441,18 @@ const LocalRefresh = () => {
     const handlePublicDownloadStarted = () => {
       console.log("Public index download started");
       setDownloadingIndex("public");
+      setIndexDownloadProgress({
+        progress: 0,
+        phase: "downloading",
+        downloaded: 0,
+        total: 0,
+      });
     };
 
     const handlePublicDownloadComplete = async () => {
       console.log("Public index download complete");
       setDownloadingIndex(null);
+      setIndexDownloadProgress(null);
       toast.success(t("localRefresh.indexDownloaded") || "Public index downloaded!");
       if (window.electron?.setTimestampValue) {
         await window.electron.setTimestampValue("hasIndexBefore", true);
@@ -438,9 +464,14 @@ const LocalRefresh = () => {
     const handlePublicDownloadError = data => {
       console.log("Public index download error:", data);
       setDownloadingIndex(null);
+      setIndexDownloadProgress(null);
       toast.error(
         data?.error || t("localRefresh.indexDownloadFailed") || "Failed to download"
       );
+    };
+
+    const handlePublicDownloadProgress = data => {
+      setIndexDownloadProgress(data);
     };
 
     // Subscribe to IPC events
@@ -464,6 +495,7 @@ const LocalRefresh = () => {
       window.electron.onPublicIndexDownloadStarted?.(handlePublicDownloadStarted);
       window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
       window.electron.onPublicIndexDownloadError?.(handlePublicDownloadError);
+      window.electron.onPublicIndexDownloadProgress?.(handlePublicDownloadProgress);
 
       return () => {
         window.electron.offLocalRefreshProgress?.();
@@ -479,6 +511,7 @@ const LocalRefresh = () => {
         window.electron.offPublicIndexDownloadStarted?.();
         window.electron.offPublicIndexDownloadComplete?.();
         window.electron.offPublicIndexDownloadError?.();
+        window.electron.offPublicIndexDownloadProgress?.();
       };
     }
   }, [t]);
@@ -757,7 +790,7 @@ const LocalRefresh = () => {
           {/* Left Column - Main Actions */}
           <div className="space-y-4 lg:col-span-2">
             {/* Public Index Card */}
-            {sharedIndexes.length > 0 && (
+            {apiAvailable && (
               <Card className="p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -776,14 +809,20 @@ const LocalRefresh = () => {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {sharedIndexes[0].gameCount.toLocaleString()}{" "}
-                        {t("localRefresh.games") || "games"} •{" "}
-                        {t("localRefresh.updated") || "Updated"}{" "}
-                        {new Date(sharedIndexes[0].date).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {t("localRefresh.usePublicIndexDesc") ||
+                          "Download the latest index shared by another user instead of refreshing manually"}
                       </p>
+                      {indexInfo && (
+                        <p className="text-xs text-muted-foreground/70">
+                          {indexInfo.gameCount?.toLocaleString()}{" "}
+                          {t("localRefresh.games") || "games"} •{" "}
+                          {t("localRefresh.updated") || "Updated"}{" "}
+                          {new Date(indexInfo.date).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Button
@@ -791,7 +830,7 @@ const LocalRefresh = () => {
                     className="gap-2 text-secondary"
                     onClick={async () => {
                       if (downloadingIndex || isRefreshing || isUploading) return;
-                      setDownloadingIndex(sharedIndexes[0].filename);
+                      setDownloadingIndex("public");
                       try {
                         const result =
                           await window.electron.downloadSharedIndex(localIndexPath);
@@ -829,7 +868,11 @@ const LocalRefresh = () => {
                     {downloadingIndex ? (
                       <>
                         <Loader className="h-4 w-4 animate-spin" />
-                        {t("localRefresh.downloading") || "Downloading..."}
+                        {indexDownloadProgress?.phase === "extracting"
+                          ? t("localRefresh.extracting") || "Extracting..."
+                          : indexDownloadProgress?.progress > 0
+                            ? `${Math.round(indexDownloadProgress.progress)}%`
+                            : t("localRefresh.downloading") || "Downloading..."}
                       </>
                     ) : (
                       <>
@@ -1140,6 +1183,19 @@ const LocalRefresh = () => {
                     )}
                   </Button>
                 </div>
+                {/* Warning if user has custom blacklisted games */}
+                {settings?.shareLocalIndex &&
+                  settings?.blacklistIDs?.some(
+                    id => !["ABSXUc", "AWBgqf", "ATaHuq"].includes(id)
+                  ) && (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg bg-orange-500/10 p-2.5 text-xs text-orange-600 dark:text-orange-400">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        {t("localRefresh.blacklistWarning") ||
+                          "Your index won't be shared because you have custom blacklisted games. Remove them to share your index with the community."}
+                      </span>
+                    </div>
+                  )}
               </Card>
             </div>
           </div>
@@ -1244,16 +1300,16 @@ const LocalRefresh = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Input
-                      type="number"
+                      type="text"
                       placeholder="Game ID"
                       value={newBlacklistId}
-                      onChange={e => setNewBlacklistId(e.target.value)}
+                      onChange={e => setNewBlacklistId(e.target.value.trim())}
                       className="h-7 flex-1 text-xs"
                       disabled={isRefreshing}
                       onKeyDown={e => {
                         if (e.key === "Enter" && newBlacklistId) {
-                          const id = parseInt(newBlacklistId);
-                          if (!isNaN(id) && !settings?.blacklistIDs?.includes(id)) {
+                          const id = newBlacklistId.trim();
+                          if (id && !settings?.blacklistIDs?.includes(id)) {
                             updateSetting("blacklistIDs", [
                               ...(settings?.blacklistIDs || []),
                               id,
@@ -1269,8 +1325,8 @@ const LocalRefresh = () => {
                       className="h-7 px-2"
                       disabled={isRefreshing || !newBlacklistId}
                       onClick={() => {
-                        const id = parseInt(newBlacklistId);
-                        if (!isNaN(id) && !settings?.blacklistIDs?.includes(id)) {
+                        const id = newBlacklistId.trim();
+                        if (id && !settings?.blacklistIDs?.includes(id)) {
                           updateSetting("blacklistIDs", [
                             ...(settings?.blacklistIDs || []),
                             id,

@@ -479,22 +479,35 @@ function registerLocalRefreshHandlers() {
                 currentSettings.shareLocalIndex
               );
               if (currentSettings.shareLocalIndex) {
-                console.log(
-                  "ShareLocalIndex is enabled, uploading index to:",
-                  outputPath
+                // Check if user has custom blacklisted games (only allow upload if blacklist is default or empty)
+                const DEFAULT_BLACKLIST_IDS = ["ABSXUc", "AWBgqf", "ATaHuq"];
+                const userBlacklist = currentSettings.blacklistIDs || [];
+                const hasCustomBlacklist = userBlacklist.some(
+                  id => !DEFAULT_BLACKLIST_IDS.includes(id)
                 );
-                if (mainWindow) {
-                  mainWindow.webContents.send("local-refresh-uploading");
-                }
-                try {
-                  await uploadLocalIndex(outputPath);
-                  console.log("Index upload completed successfully");
+
+                if (hasCustomBlacklist) {
+                  console.log(
+                    "User has custom blacklisted games, skipping upload to preserve index completeness"
+                  );
+                } else {
+                  console.log(
+                    "ShareLocalIndex is enabled, uploading index to:",
+                    outputPath
+                  );
                   if (mainWindow) {
-                    mainWindow.webContents.send("local-refresh-upload-complete");
+                    mainWindow.webContents.send("local-refresh-uploading");
                   }
-                } catch (uploadErr) {
-                  console.error("Upload function error:", uploadErr);
-                  throw uploadErr;
+                  try {
+                    await uploadLocalIndex(outputPath);
+                    console.log("Index upload completed successfully");
+                    if (mainWindow) {
+                      mainWindow.webContents.send("local-refresh-upload-complete");
+                    }
+                  } catch (uploadErr) {
+                    console.error("Upload function error:", uploadErr);
+                    throw uploadErr;
+                  }
                 }
               } else {
                 console.log("ShareLocalIndex is disabled, skipping upload");
@@ -781,12 +794,9 @@ function registerLocalRefreshHandlers() {
       console.log("Getting auth token for download...");
       const authToken = await getAuthToken();
 
-      // Download the latest shared index with auth
-      console.log("Downloading shared index from API...");
-
-      await new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(zipPath);
-
+      // First, get the download URL from the API
+      console.log("Getting download URL from API...");
+      const apiResponse = await new Promise((resolve, reject) => {
         const options = {
           hostname: "api.ascendara.app",
           port: 443,
@@ -798,36 +808,134 @@ function registerLocalRefreshHandlers() {
         };
 
         const req = https.request(options, response => {
-          if (response.statusCode === 302 || response.statusCode === 301) {
-            // Handle redirect (follow with auth header)
-            const redirectOptions = {
-              ...require("url").parse(response.headers.location),
-              headers: { Authorization: `Bearer ${authToken}` },
-            };
-            https
-              .get(redirectOptions, redirectResponse => {
-                redirectResponse.pipe(file);
-                file.on("finish", () => {
-                  file.close();
-                  resolve();
+          let data = "";
+          response.on("data", chunk => {
+            data += chunk;
+          });
+          response.on("end", () => {
+            if (response.statusCode === 200) {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                // Not JSON, might be direct file (legacy)
+                resolve({ legacy: true, statusCode: response.statusCode });
+              }
+            } else if (response.statusCode === 429) {
+              reject(
+                new Error("Rate limit exceeded. You can only download once per hour.")
+              );
+            } else if (response.statusCode === 401 || response.statusCode === 403) {
+              reject(new Error("Authentication failed. Please try again."));
+            } else {
+              reject(new Error(`Failed to get download URL: ${response.statusCode}`));
+            }
+          });
+        });
+        req.on("error", reject);
+        req.end();
+      });
+
+      // Determine download URL
+      let downloadUrl;
+      if (apiResponse.download_url) {
+        // R2 URL provided
+        downloadUrl = apiResponse.download_url;
+        console.log("Using R2 download URL:", downloadUrl);
+      } else {
+        // Fallback to direct API download (legacy)
+        downloadUrl = "https://api.ascendara.app/localindex/latest";
+        console.log("Using legacy API download");
+      }
+
+      // Delete existing zip if it exists (avoid EPERM issues)
+      if (fs.existsSync(zipPath)) {
+        try {
+          fs.unlinkSync(zipPath);
+        } catch (e) {
+          console.log("Could not delete existing zip:", e.message);
+        }
+      }
+
+      // Download from the URL (R2 or API)
+      console.log("Downloading shared index...");
+      await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(zipPath);
+        const urlObj = new URL(downloadUrl);
+
+        const options = {
+          hostname: urlObj.hostname,
+          port: 443,
+          path: urlObj.pathname + urlObj.search,
+          method: "GET",
+          headers: apiResponse.download_url
+            ? {}
+            : { Authorization: `Bearer ${authToken}` },
+        };
+
+        // Helper to handle response with progress tracking
+        const handleResponseWithProgress = (response, totalSize) => {
+          let downloadedSize = 0;
+          let lastProgressUpdate = 0;
+
+          response.on("data", chunk => {
+            downloadedSize += chunk.length;
+            file.write(chunk);
+
+            // Send progress updates (throttle to every 100ms)
+            const now = Date.now();
+            if (now - lastProgressUpdate > 100) {
+              lastProgressUpdate = now;
+              const progress = totalSize > 0 ? (downloadedSize / totalSize) * 100 : -1;
+              if (mainWindow) {
+                mainWindow.webContents.send("public-index-download-progress", {
+                  downloaded: downloadedSize,
+                  total: totalSize,
+                  progress: progress,
+                  phase: "downloading",
                 });
+              }
+            }
+          });
+
+          response.on("end", () => {
+            // Send extracting phase
+            if (mainWindow) {
+              mainWindow.webContents.send("public-index-download-progress", {
+                downloaded: downloadedSize,
+                total: totalSize,
+                progress: 100,
+                phase: "extracting",
+              });
+            }
+            // Wait for file to be fully closed before resolving
+            file.end(() => {
+              resolve();
+            });
+          });
+
+          response.on("error", err => {
+            fs.unlink(zipPath, () => {});
+            reject(err);
+          });
+        };
+
+        const req = https.request(options, response => {
+          const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+
+          if (response.statusCode === 302 || response.statusCode === 301) {
+            // Handle redirect
+            https
+              .get(response.headers.location, redirectResponse => {
+                const redirectTotalSize =
+                  parseInt(redirectResponse.headers["content-length"], 10) || totalSize;
+                handleResponseWithProgress(redirectResponse, redirectTotalSize);
               })
               .on("error", err => {
                 fs.unlink(zipPath, () => {});
                 reject(err);
               });
           } else if (response.statusCode === 200) {
-            response.pipe(file);
-            file.on("finish", () => {
-              file.close();
-              resolve();
-            });
-          } else if (response.statusCode === 429) {
-            reject(
-              new Error("Rate limit exceeded. You can only download once per hour.")
-            );
-          } else if (response.statusCode === 401 || response.statusCode === 403) {
-            reject(new Error("Authentication failed. Please try again."));
+            handleResponseWithProgress(response, totalSize);
           } else {
             reject(new Error(`Failed to download: ${response.statusCode}`));
           }
@@ -842,6 +950,18 @@ function registerLocalRefreshHandlers() {
       });
 
       console.log("Download complete, extracting...");
+
+      // Verify the downloaded file exists and has content
+      if (!fs.existsSync(zipPath)) {
+        throw new Error("Downloaded file not found");
+      }
+      const fileStats = fs.statSync(zipPath);
+      if (fileStats.size < 1000) {
+        throw new Error(
+          `Downloaded file is too small (${fileStats.size} bytes), likely corrupted`
+        );
+      }
+      console.log(`Downloaded file size: ${fileStats.size} bytes`);
 
       // Backup existing files
       const gamesFile = path.join(outputPath, "ascendara_games.json");

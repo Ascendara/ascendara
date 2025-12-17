@@ -160,12 +160,16 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("public-index-download-complete", () => callback()),
   onPublicIndexDownloadError: callback =>
     ipcRenderer.on("public-index-download-error", (_, data) => callback(data)),
+  onPublicIndexDownloadProgress: callback =>
+    ipcRenderer.on("public-index-download-progress", (_, data) => callback(data)),
   offPublicIndexDownloadStarted: () =>
     ipcRenderer.removeAllListeners("public-index-download-started"),
   offPublicIndexDownloadComplete: () =>
     ipcRenderer.removeAllListeners("public-index-download-complete"),
   offPublicIndexDownloadError: () =>
     ipcRenderer.removeAllListeners("public-index-download-error"),
+  offPublicIndexDownloadProgress: () =>
+    ipcRenderer.removeAllListeners("public-index-download-progress"),
 
   //===========================================================================
   // GAME MANAGEMENT
