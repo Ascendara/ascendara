@@ -148,13 +148,13 @@ const LocalRefresh = () => {
           setHasIndexBefore(hasIndexed === true);
         }
 
-        // Load last refresh time from progress.json timestamp
+        // Load last refresh time from progress.json lastSuccessfulTimestamp
         if (indexPath && window.electron?.getLocalRefreshProgress) {
           try {
             const progress = await window.electron.getLocalRefreshProgress(indexPath);
-            if (progress?.timestamp) {
-              // timestamp is in seconds (Unix epoch), convert to milliseconds
-              setLastRefreshTime(new Date(progress.timestamp * 1000));
+            // Use lastSuccessfulTimestamp which persists across refresh attempts
+            if (progress?.lastSuccessfulTimestamp) {
+              setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
             }
           } catch (e) {
             console.log("No progress file found for last refresh time");
@@ -339,9 +339,9 @@ const LocalRefresh = () => {
         setRefreshStatus("completed");
         setIsRefreshing(false);
         setHasIndexBefore(true); // Update UI immediately after successful refresh
-        // Use timestamp from progress data if available
-        if (data.timestamp) {
-          setLastRefreshTime(new Date(data.timestamp * 1000));
+        // Use lastSuccessfulTimestamp from progress data if available
+        if (data.lastSuccessfulTimestamp) {
+          setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
         } else {
           setLastRefreshTime(new Date());
         }
@@ -378,11 +378,11 @@ const LocalRefresh = () => {
         setIsRefreshing(false);
         setHasIndexBefore(true); // Update UI immediately after successful refresh
         manuallyStoppedRef.current = false;
-        // Read timestamp from progress.json
+        // Read lastSuccessfulTimestamp from progress.json
         try {
           const progress = await window.electron.getLocalRefreshProgress(localIndexPath);
-          if (progress?.timestamp) {
-            setLastRefreshTime(new Date(progress.timestamp * 1000));
+          if (progress?.lastSuccessfulTimestamp) {
+            setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
           } else {
             setLastRefreshTime(new Date());
           }
