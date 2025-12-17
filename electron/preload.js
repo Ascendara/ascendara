@@ -152,6 +152,20 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.removeAllListeners("local-refresh-cookie-needed"),
   downloadSharedIndex: outputPath =>
     ipcRenderer.invoke("download-shared-index", outputPath),
+  getPublicIndexDownloadStatus: () =>
+    ipcRenderer.invoke("get-public-index-download-status"),
+  onPublicIndexDownloadStarted: callback =>
+    ipcRenderer.on("public-index-download-started", () => callback()),
+  onPublicIndexDownloadComplete: callback =>
+    ipcRenderer.on("public-index-download-complete", () => callback()),
+  onPublicIndexDownloadError: callback =>
+    ipcRenderer.on("public-index-download-error", (_, data) => callback(data)),
+  offPublicIndexDownloadStarted: () =>
+    ipcRenderer.removeAllListeners("public-index-download-started"),
+  offPublicIndexDownloadComplete: () =>
+    ipcRenderer.removeAllListeners("public-index-download-complete"),
+  offPublicIndexDownloadError: () =>
+    ipcRenderer.removeAllListeners("public-index-download-error"),
 
   //===========================================================================
   // GAME MANAGEMENT

@@ -1846,6 +1846,10 @@
     "title": "TorBox Downloads"
   },
   "tour": {
+    "ascend": {
+      "content": "This is Ascend — you can join right now, today, after the tutorial! Connect with friends, sync your data across devices, and unlock exclusive features.",
+      "title": "Ascend"
+    },
     "downloads": {
       "content": "This is your Downloads area. You can track your current downloads, check progress, and manage the downloads here.",
       "title": "Downloads"
@@ -1881,6 +1885,13 @@
     "settings": {
       "content": "Make Ascendara yours — adjust themes, choose your download folder, add download folders, and fine-tune other preferences here. There are also some useful features you can toggle on and off, check back after the tour to see what you may want.",
       "title": "Your Preferences"
+    },
+    "sound": {
+      "almostThere": "You're almost there...",
+      "gettingCloser": "Getting closer...",
+      "musicBy": "Effects by kinflo",
+      "readyForLiftoff": "Ready to Ascend?",
+      "soClose": "So close now..."
     },
     "title": "Welcome to Ascendara",
     "welcome": "Let's take a quick tour to get you comfortable with Ascendara and show you some tricks."
@@ -1968,9 +1979,9 @@
     "next": "Next",
     "notEnoughSpaceWarning": "Woah! You have less than 40 GB of free space on the selected drive. Consider clearing some space or selecting a different drive.",
     "noticeAppIsFree": {
-      "point1": "You should never pay for anything related to Ascendara or any games available for testing",
-      "point2": "No account will ever need to be created to use Ascendara",
-      "point3": "Ascendara will never ask for any personal details",
+      "point1": "Downloads and everything related to games on Ascendara will always be free",
+      "point2": "Ascendara won't ask for any personal details to download or play games",
+      "point3": "If you choose to join Ascend, you'll need to create an account for those features",
       "point4": "Anonymous data is only shared if you opt in, and you can change this anytime in Settings",
       "subtitle": "If you paid for Ascendara, you were scammed. Please contact your bank immediately.",
       "title": "Ascendara is completely free to use"

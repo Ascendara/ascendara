@@ -27,7 +27,6 @@ import {
   Database,
   AlertTriangle,
 } from "lucide-react";
-import RefreshIndexDialog from "@/components/RefreshIndexDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -253,7 +252,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [showAnalyticsStep, setShowAnalyticsStep] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [referralSource, setReferralSource] = useState("");
-  const [showRefreshDialog, setShowRefreshDialog] = useState(false);
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(restoredRefreshState);
   const [indexRefreshStarted, setIndexRefreshStarted] = useState(restoredRefreshState);
   const [indexComplete, setIndexComplete] = useState(restoredIndexComplete);
@@ -748,48 +746,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
       };
     }
   }, [indexRefreshStarted]);
-
-  const handleStartLocalRefresh = async refreshData => {
-    try {
-      setIsIndexRefreshing(true);
-      setIndexRefreshStarted(true);
-
-      // Get default local index path
-      const defaultPath = await window.electron.getDefaultLocalIndexPath();
-
-      // Update settings to enable local index
-      const currentSettings = await window.electron.getSettings();
-      const updatedSettings = {
-        ...currentSettings,
-        usingLocalIndex: true,
-        localIndex: defaultPath,
-      };
-      await window.electron.saveSettings(updatedSettings);
-
-      // Start the refresh
-      await window.electron.startLocalRefresh({
-        outputPath: defaultPath,
-        cfClearance: refreshData.cfClearance || "",
-      });
-
-      // Listen for completion
-      const handleComplete = () => {
-        setIsIndexRefreshing(false);
-        window.electron.offLocalRefreshComplete();
-      };
-
-      const handleError = () => {
-        setIsIndexRefreshing(false);
-        window.electron.offLocalRefreshError();
-      };
-
-      window.electron.onLocalRefreshComplete(handleComplete);
-      window.electron.onLocalRefreshError(handleError);
-    } catch (error) {
-      console.error("Error starting local refresh:", error);
-      setIsIndexRefreshing(false);
-    }
-  };
 
   if (welcomeData.isV7Welcome) {
     if (showAnalyticsStep) {
@@ -1420,19 +1376,20 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 <motion.div variants={itemVariants}>
                   <Button
                     size="lg"
-                    onClick={() => setShowRefreshDialog(true)}
+                    onClick={() =>
+                      navigate("/localrefresh", {
+                        state: {
+                          fromWelcome: true,
+                          welcomeStep: step,
+                        },
+                      })
+                    }
                     className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
                   >
                     {t("welcome.localIndex.setupIndex")}
                   </Button>
                 </motion.div>
               )}
-
-              <RefreshIndexDialog
-                open={showRefreshDialog}
-                onOpenChange={setShowRefreshDialog}
-                onStartRefresh={handleStartLocalRefresh}
-              />
             </motion.div>
           )}
 
