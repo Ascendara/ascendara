@@ -287,7 +287,7 @@ class ImageCacheService {
    * Load image from local disk (for local index) - always high quality
    */
   async _loadLocalImage(imgID, localIndexPath) {
-    const localImagePath = `${localIndexPath}\\imgs\\${imgID}.jpg`;
+    const localImagePath = `${localIndexPath}/imgs/${imgID}.jpg`;
     const localImageUrl = await window.electron.getLocalImageUrl(localImagePath);
     if (localImageUrl) {
       this._setMemoryCache(imgID, localImageUrl, "high");
