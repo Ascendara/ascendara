@@ -33,6 +33,7 @@ import {
   Upload,
   Download,
   Cloud,
+  ExternalLink,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -767,8 +768,18 @@ const LocalRefresh = () => {
                 )}
               </div>
               <p className="mt-1 text-muted-foreground">
-                {t("localRefresh.description") ||
-                  "Manage your local game index for faster browsing and offline access"}
+                {t("localRefresh.description")}&nbsp;
+                <a
+                  onClick={() =>
+                    window.electron.openURL(
+                      "https://ascendara.app/docs/features/refreshing-index"
+                    )
+                  }
+                  className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                >
+                  {t("common.learnMore")}
+                  <ExternalLink className="ml-1 h-3 w-3" />
+                </a>
               </p>
             </div>
             {lastRefreshTime && (
@@ -809,8 +820,18 @@ const LocalRefresh = () => {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {t("localRefresh.usePublicIndexDesc") ||
-                          "Download the latest index shared by another user instead of refreshing manually"}
+                        {t("localRefresh.usePublicIndexDesc")}
+                        <a
+                          onClick={() =>
+                            window.electron.openURL(
+                              "https://ascendara.app/docs/features/refreshing-index"
+                            )
+                          }
+                          className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                        >
+                          {t("common.learnMore")}
+                          <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
                       </p>
                       {indexInfo && (
                         <p className="text-xs text-muted-foreground/70">
@@ -827,7 +848,7 @@ const LocalRefresh = () => {
                   </div>
                   <Button
                     size="sm"
-                    className="gap-2 text-secondary"
+                    className="gap-2 whitespace-nowrap text-secondary"
                     onClick={async () => {
                       if (downloadingIndex || isRefreshing || isUploading) return;
                       setDownloadingIndex("public");
