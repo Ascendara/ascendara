@@ -210,6 +210,12 @@
       "title": "最近的活动"
     },
     "checkingVersion": "正在检查版本...",
+    "cloudBackups": {
+      "comingSoon": "即将推出",
+      "comingSoonDesc": "用于游戏保存的云备份功能目前正在开发中。敬请关注！",
+      "subtitle": "备份和恢复您的游戏保存",
+      "title": "云备份"
+    },
     "cloudLibrary": {
       "achievementDetailsNotSynced": "成就详情尚未同步",
       "achievementSync": "成就同步",
@@ -259,6 +265,12 @@
       "totalLaunches": "总发布次数",
       "totalPlaytime": "总游戏时间",
       "tryDifferentSearch": "尝试不同的搜索词或清除搜索"
+    },
+    "community": {
+      "comingSoon": "即将推出",
+      "comingSoonDesc": "社区功能目前正在开发中。请继续关注更新！",
+      "subtitle": "与其他 Ascendara 用户联系",
+      "title": "社区"
     },
     "friends": {
       "addFriend": "添加好友",
@@ -318,7 +330,10 @@
       "you": "你"
     },
     "nav": {
+      "cloud": "云",
+      "cloudBackups": "云备份",
       "cloudLibrary": "云图书馆",
+      "community": "社区",
       "discover": "发现",
       "friends": "朋友们",
       "home": "家",
@@ -494,8 +509,8 @@
       "subscriptionSuccessMessage": "您现在可以完全访问所有高级功能。感谢您的支持！",
       "subscriptionUpdateError": "无法更新订阅状态。请重新启动应用程序。",
       "subtitle": "管理您的帐户和个人资料",
-      "supportMessage": "你正在帮助阿森达拉保持活力",
-      "supportMessageSub": "您的支持对于这位独立开发者来说意味着一切",
+      "supportMessage": "加紧。连接。加入登高。",
+      "supportMessageSub": "您已订阅 Ascend。感谢您的支持！",
       "thankYouSubscriber": "感谢您对阿森达拉的支持！",
       "title": "账户设置",
       "trialDaysRemaining": "试用期还剩 {{days}} 天",
@@ -882,7 +897,7 @@
     "loading": "正在获取游戏详细信息...",
     "online": "在线的",
     "ratingTooltip": "这是在 Ascendara 上下载并玩过该游戏的其他人的平均评分。",
-    "showLess": "显示较少",
+    "showLess": "显示更少",
     "size": "尺寸",
     "update": "更新",
     "version": "版本"
@@ -1218,13 +1233,17 @@
   "localRefresh": {
     "blacklist": "列入黑名单的游戏",
     "blacklistDesc": "从索引中排除特定游戏",
+    "communityIndexes": "社区共享索引",
+    "communityIndexesDesc": "其他人在 Ascendara 上的最新索引",
     "cookieRefreshFailed": "刷新cookie失败",
     "cookieRefreshed": "Cookie 已刷新，正在继续...",
     "dayAgo": "天前",
     "daysAgo": "几天前",
     "description": "刷新您的游戏索引以查看最新的可用游戏",
     "done": "完毕",
+    "downloading": "正在下载...",
     "enableLocalIndex": "使能够",
+    "enableSharing": "启用共享",
     "enterGameId": "输入游戏ID",
     "errors": "错误",
     "fetchSettings": "获取设置",
@@ -1232,31 +1251,46 @@
     "fetchingCategories": "正在获取类别...",
     "fetchingPosts": "正在获取游戏帖子...",
     "fetchingViews": "正在获取观看次数...",
+    "games": "游戏",
     "gamesPerPage": "每页游戏数",
     "gamesPerPageHint": "较低的值有助于避免超时 (10-100)",
     "gamesProcessed": "游戏处理",
     "hourAgo": "小时前",
     "hoursAgo": "几小时前",
+    "indexDownloadFailed": "下载索引失败",
+    "indexDownloaded": "公共索引已下载并准备就绪！",
     "initializing": "正在初始化...",
     "justNow": "现在",
     "lastRefresh": "上次刷新",
     "locationChangeFailed": "更改位置失败",
     "locationChanged": "存储位置已更新",
     "logs": "活动日志",
+    "manualRefresh": "手动刷新",
+    "manualRefreshDesc": "直接从 SteamRIP 抓取游戏",
     "minuteAgo": "分钟前",
     "minutesAgo": "分钟前",
     "never": "绝不",
+    "noSharedIndexes": "点击刷新加载共享索引",
     "performanceSettings": "表现",
     "performanceSettingsDesc": "配置刷新速度和资源",
     "processingPosts": "处理游戏...",
     "progress": "进步",
+    "publicIndex": "公开游戏指数",
+    "rateLimitExceeded": "您每小时只能下载一次。请稍后重试。",
     "readyToStart": "点击开始更新您本地的游戏索引",
+    "recommended": "受到推崇的",
     "refreshAgain": "再次刷新",
     "refreshComplete": "游戏列表刷新完成！",
     "refreshFailed": "游戏列表刷新失败",
     "refreshFirst": "首先刷新索引",
     "refreshStopped": "游戏列表刷新停止",
     "saving": "正在保存数据...",
+    "settings": "设置",
+    "shareIndex": "分享您的索引",
+    "shareIndexDesc": "刷新后自动上传您的索引以帮助其他用户",
+    "sharing": "分享...",
+    "sharingEnabled": "分享开启",
+    "skipRefresh": "跳过手动刷新",
     "startFailed": "无法开始刷新",
     "startRefresh": "开始刷新",
     "statusCompleted": "刷新完成",
@@ -1271,11 +1305,18 @@
     "storageLocation": "存放地点",
     "storageLocationDesc": "本地索引存储的位置",
     "storageLocationInfo": "Ascendara 在此目录中至少需要 400 MB 的可用空间来存储本地索引和游戏图像。",
+    "swapping": "正在敲定...",
     "switchToLocal": "启用本地索引",
     "switchToLocalNotReady": "先刷新索引才能启用",
     "switchToLocalReady": "您的本地索引已可供使用",
     "switchedToLocal": "切换到本地索引成功！",
     "title": "本地游戏索引",
+    "updateFromPublic": "更新",
+    "updated": "已更新",
+    "uploadComplete": "索引上传成功！",
+    "uploadFailed": "索引上传失败",
+    "uploading": "正在上传索引...",
+    "usePublicIndex": "使用公共索引",
     "usingLocalIndex": "使用本地索引",
     "usingLocalIndexDesc": "您当前正在使用本地游戏索引。游戏是从您的本地存储加载的。",
     "viewProgress": "查看进度",
@@ -1796,6 +1837,10 @@
     "title": "TorBox 下载"
   },
   "tour": {
+    "ascend": {
+      "content": "这是 Ascend——您可以在今天、教程结束后立即加入！与朋友联系、跨设备同步数据并解锁专属功能。",
+      "title": "登高"
+    },
     "downloads": {
       "content": "这是您的下载区域。您可以在此处跟踪当前的下载、检查进度并管理下载。",
       "title": "下载"
@@ -1831,6 +1876,13 @@
     "settings": {
       "content": "让 Ascendara 成为您的 — 调整主题、选择下载文件夹、添加下载文件夹并在此处微调其他首选项。您还可以打开和关闭一些有用的功能，请在游览后回来查看您可能需要什么。",
       "title": "您的偏好"
+    },
+    "sound": {
+      "almostThere": "你快到了...",
+      "gettingCloser": "越来越近了...",
+      "musicBy": "kinflo 的效果",
+      "readyForLiftoff": "准备好扬升了吗？",
+      "soClose": "现在这么近了..."
     },
     "title": "欢迎来到阿森达拉",
     "welcome": "让我们快速浏览一下，让您熟悉 Ascendara 并向您展示一些技巧。"
@@ -1918,9 +1970,9 @@
     "next": "下一个",
     "notEnoughSpaceWarning": "哇哦！您所选驱动器上的可用空间少于 40 GB。考虑清理一些空间或选择不同的驱动器。",
     "noticeAppIsFree": {
-      "point1": "您永远不应该为与 Ascendara 或任何可供测试的游戏相关的任何内容付费",
-      "point2": "无需创建帐户即可使用 Ascendara",
-      "point3": "Ascendara 绝不会询问任何个人详细信息",
+      "point1": "Ascendara 上与游戏相关的下载和所有内容将始终免费",
+      "point2": "Ascendara 不会要求您提供任何个人详细信息来下载或玩游戏",
+      "point3": "如果您选择加入 Ascend，则需要为这些功能创建一个帐户",
       "point4": "仅当您选择加入时才会共享匿名数据，并且您可以随时在“设置”中更改此设置",
       "subtitle": "如果您为 Ascendara 付费，那么您就被骗了。请立即联系您的银行。",
       "title": "Ascendara 完全免费使用"

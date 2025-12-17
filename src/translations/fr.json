@@ -47,7 +47,7 @@
       "moreComing": "Et bien plus à venir",
       "moreComingDesc": "De nouvelles fonctionnalités sont constamment ajoutées à Ascend",
       "profiles": "Profil et statistiques",
-      "profilesDesc": "Configurez votre biographie, affichez les statistiques et personnalisez votre profil public",
+      "profilesDesc": "Configurez votre biographie, consultez les statistiques et personnalisez votre profil public",
       "upcomingUpdates": "Aperçu des mises à jour à venir",
       "upcomingUpdatesDesc": "Prévisualisez tous les changements à venir dans la prochaine mise à jour d'Ascendara"
     },
@@ -210,6 +210,12 @@
       "title": "Activité récente"
     },
     "checkingVersion": "Vérification de la version...",
+    "cloudBackups": {
+      "comingSoon": "À venir",
+      "comingSoonDesc": "Les fonctionnalités de sauvegarde dans le cloud pour vos sauvegardes de jeu sont actuellement en développement. Restez à l'écoute!",
+      "subtitle": "Sauvegardez et restaurez vos sauvegardes de jeu",
+      "title": "Sauvegardes cloud"
+    },
     "cloudLibrary": {
       "achievementDetailsNotSynced": "Les détails des réalisations ne sont pas encore synchronisés",
       "achievementSync": "Synchronisation des réalisations",
@@ -259,6 +265,12 @@
       "totalLaunches": "Total des lancements",
       "totalPlaytime": "Durée totale de jeu",
       "tryDifferentSearch": "Essayez un autre terme de recherche ou effacez votre recherche"
+    },
+    "community": {
+      "comingSoon": "À venir",
+      "comingSoonDesc": "Les fonctionnalités communautaires sont actuellement en développement. Restez à l'écoute des mises à jour !",
+      "subtitle": "Connectez-vous avec d'autres utilisateurs d'Ascendara",
+      "title": "Communauté"
     },
     "friends": {
       "addFriend": "Ajouter un ami",
@@ -318,7 +330,10 @@
       "you": "Toi"
     },
     "nav": {
+      "cloud": "Nuage",
+      "cloudBackups": "Sauvegardes cloud",
       "cloudLibrary": "Bibliothèque cloud",
+      "community": "Communauté",
       "discover": "Découvrir",
       "friends": "Amis",
       "home": "Maison",
@@ -494,8 +509,8 @@
       "subscriptionSuccessMessage": "Vous avez désormais un accès complet à toutes les fonctionnalités premium. Merci pour votre soutien !",
       "subscriptionUpdateError": "Échec de la mise à jour du statut de l'abonnement. Veuillez redémarrer l'application.",
       "subtitle": "Gérez votre compte et votre profil",
-      "supportMessage": "Vous aidez à garder Ascendara en vie",
-      "supportMessageSub": "Votre soutien compte tout pour ce développeur solo",
+      "supportMessage": "Intensifier. Connecter. Rejoignez Ascend.",
+      "supportMessageSub": "Vous êtes abonné à Ascend. Merci pour votre soutien !",
       "thankYouSubscriber": "Merci de soutenir Ascendara !",
       "title": "Paramètres du compte",
       "trialDaysRemaining": "{{days}} jours restants pour votre essai",
@@ -683,7 +698,7 @@
     "gameNeedsVR": "La VR peut être requise pour ce jeu.",
     "gameNotRated": "Ce jeu n'a pas été évalué par les critiques",
     "gameSize": "Taille du jeu",
-    "genres": "Genre",
+    "genres": "Genres",
     "hours": "heures",
     "igdbLoading": "Chargement des informations sur le jeu...",
     "igdbRating": "Ce jeu est classé {{rating}} pommes. Les notes Apple sont différentes des notes Star sur Ascendara et constituent davantage une note générale du jeu.",
@@ -713,7 +728,7 @@
       "title": "Téléchargement avec Ascendara"
     },
     "noGameInfoAvailable": "Configurez Ascendara Xtra dans les Préférences pour voir plus d'informations sur ce jeu.",
-    "noReviewsExplanation": "Ce jeu ne dispose d'aucune critique professionnelle disponible sur OpenCritic. Cela peut être dû au fait qu'il s'agit d'une nouvelle version, d'un titre indépendant ou qu'il n'a tout simplement pas encore été évalué.",
+    "noReviewsExplanation": "Ce jeu n'a pas de critiques professionnelles disponibles sur OpenCritic. Cela peut être dû au fait qu'il s'agit d'une nouvelle version, d'un titre indépendant ou qu'il n'a tout simplement pas encore été évalué.",
     "notExactMatch": "Le nom du jeu ne correspondait pas exactement. Signalez le jeu si nécessaire.",
     "online": "EN LIGNE",
     "onlineFixWarningDescription": "Ce jeu est livré avec Online-Fix installé, lorsque vous le lancez, vous verrez une invite vous indiquant qu'il a été créé par l'équipe Online-Fix. Ceci est normal et ne devrait s'afficher qu'une seule fois pour chaque jeu avec.",
@@ -835,7 +850,7 @@
     "extracting": "Extraction des fichiers du jeu...",
     "extractingDescription": "L'extraction des fichiers du jeu peut prendre jusqu'à 30 minutes selon la taille du fichier.",
     "firstTimeDownload": {
-      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton \"Arrêter le téléchargement\".",
+      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton « Arrêter le téléchargement ».",
       "title": "Téléchargement sur Ascendara",
       "understand": "Je comprends"
     },
@@ -868,7 +883,7 @@
   "game": {
     "metadata": {
       "developer": "Promoteur",
-      "genres": "Genre",
+      "genres": "Genres",
       "platforms": "Plateformes",
       "publisher": "Éditeur",
       "releaseDate": "Date de sortie",
@@ -1221,13 +1236,17 @@
   "localRefresh": {
     "blacklist": "Jeux sur liste noire",
     "blacklistDesc": "Exclure des jeux spécifiques de l'index",
+    "communityIndexes": "Index partagés par la communauté",
+    "communityIndexesDesc": "Index récents d’autres personnes sur Ascendara",
     "cookieRefreshFailed": "Échec de l'actualisation du cookie",
     "cookieRefreshed": "Cookie rafraîchi, reprise...",
     "dayAgo": "il y a un jour",
     "daysAgo": "il y a quelques jours",
     "description": "Actualisez votre index de jeux pour voir les derniers jeux disponibles",
     "done": "Fait",
+    "downloading": "Téléchargement...",
     "enableLocalIndex": "Activer",
+    "enableSharing": "Activer le partage",
     "enterGameId": "Entrez l'identifiant du jeu",
     "errors": "Erreurs",
     "fetchSettings": "Récupérer les paramètres",
@@ -1235,31 +1254,46 @@
     "fetchingCategories": "Récupération des catégories...",
     "fetchingPosts": "Récupération des messages de jeu...",
     "fetchingViews": "La récupération des vues compte...",
+    "games": "jeux",
     "gamesPerPage": "Jeux par page",
     "gamesPerPageHint": "Des valeurs inférieures permettent d'éviter les délais d'attente (10-100)",
     "gamesProcessed": "Jeux traités",
     "hourAgo": "il y a une heure",
     "hoursAgo": "il y a des heures",
+    "indexDownloadFailed": "Échec du téléchargement de l'index",
+    "indexDownloaded": "Index public téléchargé et prêt !",
     "initializing": "Initialisation...",
     "justNow": "Tout à l' heure",
     "lastRefresh": "Dernière actualisation",
     "locationChangeFailed": "Échec du changement d'emplacement",
     "locationChanged": "Emplacement de stockage mis à jour",
     "logs": "Journal d'activité",
+    "manualRefresh": "Actualisation manuelle",
+    "manualRefreshDesc": "Scrapez des jeux directement depuis SteamRIP",
     "minuteAgo": "il y a une minute",
     "minutesAgo": "il y a quelques minutes",
     "never": "Jamais",
+    "noSharedIndexes": "Cliquez sur Actualiser pour charger les index partagés",
     "performanceSettings": "Performance",
     "performanceSettingsDesc": "Configurer la vitesse de rafraîchissement et les ressources",
     "processingPosts": "Traitement des jeux...",
     "progress": "Progrès",
+    "publicIndex": "Index des jeux publics",
+    "rateLimitExceeded": "Vous ne pouvez télécharger qu'une fois par heure. Veuillez réessayer plus tard.",
     "readyToStart": "Cliquez sur Démarrer pour mettre à jour votre index de jeu local",
+    "recommended": "Recommandé",
     "refreshAgain": "Actualiser à nouveau",
     "refreshComplete": "Actualisation de la liste de jeux terminée !",
     "refreshFailed": "Échec de l'actualisation de la liste de jeux",
     "refreshFirst": "Actualiser d'abord l'index",
     "refreshStopped": "L'actualisation de la liste de jeux s'est arrêtée",
     "saving": "Sauvegarde des données...",
+    "settings": "Paramètres",
+    "shareIndex": "Partagez votre indice",
+    "shareIndexDesc": "Téléchargez automatiquement votre index après l'actualisation pour aider les autres utilisateurs",
+    "sharing": "Partage...",
+    "sharingEnabled": "Partage activé",
+    "skipRefresh": "Ignorer l'actualisation manuelle",
     "startFailed": "Échec du démarrage de l'actualisation",
     "startRefresh": "Démarrer l'actualisation",
     "statusCompleted": "Actualisation terminée",
@@ -1274,11 +1308,18 @@
     "storageLocation": "Emplacement de stockage",
     "storageLocationDesc": "Où l'index local est stocké",
     "storageLocationInfo": "Ascendara a besoin d'au moins 400 Mo d'espace libre dans ce répertoire pour stocker l'index local et les images du jeu.",
+    "swapping": "Finalisation...",
     "switchToLocal": "Activer l'index local",
     "switchToLocalNotReady": "Actualisez d'abord l'index pour activer",
     "switchToLocalReady": "Votre index local est prêt à être utilisé",
     "switchedToLocal": "Passage à l'index local avec succès !",
     "title": "Index du jeu local",
+    "updateFromPublic": "Mise à jour",
+    "updated": "Mis à jour",
+    "uploadComplete": "Index téléchargé avec succès !",
+    "uploadFailed": "Échec du téléchargement de l'index",
+    "uploading": "Téléchargement de l'index...",
+    "usePublicIndex": "Utiliser l'index public",
     "usingLocalIndex": "Utilisation de l'index local",
     "usingLocalIndexDesc": "Vous utilisez actuellement votre index de jeu local. Les jeux sont chargés depuis votre stockage local.",
     "viewProgress": "Afficher la progression",
@@ -1319,7 +1360,7 @@
     "totalPlaytime": "Durée totale de jeu",
     "totalXP": "XP totale : {{xp}}",
     "uploadImage": "Télécharger une image",
-    "usingEmoji": "Utiliser des émoticônes",
+    "usingEmoji": "Utiliser des émojis",
     "yourLevel": "Votre niveau"
   },
   "refreshDialog": {
@@ -1594,7 +1635,7 @@
     "giantBombLearnHowtoGet": "Découvrez comment obtenir la clé API",
     "hideOnGameLaunch": "Masquer au lancement du jeu",
     "hideOnGameLaunchDescription": "Masquer Ascendara lorsqu'un jeu est lancé à partir de celui-ci.",
-    "highThreadWarning": "L'utilisation de plus de 32 threads est considérée comme extrême et peut entraîner une instabilité, des bannissements ou des problèmes de réseau. A utiliser avec prudence.",
+    "highThreadWarning": "L'utilisation de plus de 32 threads est considérée comme extrême et peut entraîner une instabilité, des bannissements ou des problèmes de réseau. A utiliser avec prudence.",
     "igdbApiKeyDescription": "IGDB fournit des informations plus détaillées sur le jeu avec une base de données soutenue par les développeurs et des entrées de jeu officielles. Vous devez avoir un compte Twitch et obtenir un identifiant client et un secret.",
     "igdbLearnHowtoGet": "Apprenez à configurer cela",
     "importTheme": "Importer",
@@ -1689,7 +1730,7 @@
     "singleStream": "Téléchargement d'un seul flux",
     "singleStreamDescription": "Utilisez une seule connexion pour les téléchargements. Plus stable pour les fichiers volumineux mais peut être plus lent.",
     "smoothTransitions": "Transitions fluides",
-    "smoothTransitionsDescription": "Le passage d’une page à l’autre dans l’application présente une animation fluide pour le rendre plus naturel.",
+    "smoothTransitionsDescription": "Le basculement entre les pages de l'application présente une animation fluide pour le rendre plus naturel.",
     "sourceChangeReload": "Vous devez recharger Ascendara après avoir changé la source du jeu. Toutes les données mises en cache seront effacées lorsque vous changerez de source.",
     "sourceInactive": "Inactif",
     "steamripDescription": "SteamRIP est la principale source d'Ascendara, fournissant une collection de jeux sécurisée et fiable avec des mises à jour régulières.",
@@ -1743,7 +1784,7 @@
       "usernameError": "Échec de l'enregistrement du nom d'utilisateur"
     },
     "viewComponentsPage": "Afficher la page des composants",
-    "warningDescription": "Ascendara est conçu comme une plateforme de test pour les jeux vidéo, permettant aux utilisateurs d'évaluer le gameplay, les performances et la compatibilité avant de prendre une décision d'achat. Ascendara encourage fortement les utilisateurs à soutenir les développeurs de jeux en achetant les jeux qu'ils apprécient.",
+    "warningDescription": "Ascendara est conçu comme une plate-forme de test pour les jeux vidéo, permettant aux utilisateurs d'évaluer le gameplay, les performances et la compatibilité avant de prendre une décision d'achat. Ascendara encourage fortement les utilisateurs à soutenir les développeurs de jeux en achetant les jeux qu'ils apprécient.",
     "warningSupportDevelopers": "Les développeurs de jeux investissent beaucoup de temps, de ressources et de créativité pour créer les expériences que nous apprécions tous. Votre achat soutient directement leur capacité à continuer à créer d’excellents jeux et à soutenir l’industrie du jeu vidéo.",
     "warningSupportDevelopersCallToAction": "Veuillez soutenir les développeurs en achetant des jeux que vous appréciez.",
     "warningTitle": "Salut, s'il te plaît, lis ceci !"
@@ -1799,6 +1840,10 @@
     "title": "Téléchargements TorBox"
   },
   "tour": {
+    "ascend": {
+      "content": "Ici Ascend — vous pouvez nous rejoindre dès maintenant, aujourd'hui, après le didacticiel ! Connectez-vous avec vos amis, synchronisez vos données sur tous les appareils et débloquez des fonctionnalités exclusives.",
+      "title": "Monter"
+    },
     "downloads": {
       "content": "Ceci est votre zone de téléchargement. Vous pouvez suivre vos téléchargements en cours, vérifier la progression et gérer les téléchargements ici.",
       "title": "Téléchargements"
@@ -1834,6 +1879,13 @@
     "settings": {
       "content": "Personnalisez Ascendara : ajustez les thèmes, choisissez votre dossier de téléchargement, ajoutez des dossiers de téléchargement et affinez d'autres préférences ici. Il existe également des fonctionnalités utiles que vous pouvez activer et désactiver. Revenez après la visite pour voir ce que vous pourriez vouloir.",
       "title": "Vos préférences"
+    },
+    "sound": {
+      "almostThere": "Vous y êtes presque...",
+      "gettingCloser": "On se rapproche...",
+      "musicBy": "Effets par kinflo",
+      "readyForLiftoff": "Prêt à Ascensionner ?",
+      "soClose": "Si proche maintenant..."
     },
     "title": "Bienvenue à Ascendara",
     "welcome": "Faisons un rapide tour d'horizon pour vous familiariser avec Ascendara et vous montrons quelques astuces."
@@ -1885,7 +1937,7 @@
     "havePython": "J'ai Python",
     "haveWine": "J'ai ça, emmène-moi faire le tour",
     "helpIdentifyAndFix": "Aide à identifier et à résoudre les problèmes plus rapidement",
-    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées à Analytics avec un indicateur urgent, les plaçant en haut de la liste",
+    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées aux analyses avec un indicateur urgent, les plaçant en haut de la liste",
     "helpImprove": "Aidez à améliorer Ascendara",
     "howItWorks": "Comment ça marche :",
     "iHaveReadAndAgreeTo": "J'ai lu et j'accepte les conditions d'Ascendara",
@@ -1921,9 +1973,9 @@
     "next": "Suivant",
     "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d’espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
     "noticeAppIsFree": {
-      "point1": "Vous ne devriez jamais payer pour quoi que ce soit lié à Ascendara ou à tout jeu disponible pour les tests.",
-      "point2": "Aucun compte ne devra jamais être créé pour utiliser Ascendara",
-      "point3": "Ascendara ne demandera jamais de données personnelles",
+      "point1": "Les téléchargements et tout ce qui concerne les jeux sur Ascendara seront toujours gratuits",
+      "point2": "Ascendara ne demandera aucune information personnelle pour télécharger ou jouer à des jeux",
+      "point3": "Si vous choisissez de rejoindre Ascend, vous devrez créer un compte pour ces fonctionnalités",
       "point4": "Les données anonymes ne sont partagées que si vous vous inscrivez, et vous pouvez modifier cela à tout moment dans les paramètres",
       "subtitle": "Si vous avez payé pour Ascendara, vous avez été victime d’une arnaque. Veuillez contacter votre banque immédiatement.",
       "title": "Ascendara est totalement gratuit"
