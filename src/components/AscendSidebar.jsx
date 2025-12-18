@@ -74,22 +74,35 @@ const AscendSidebar = ({
     },
   ];
 
-  // Load current status on mount with delay to ensure status service has initialized
+  // Load custom message on mount (status is managed by ascendStatusService)
+  // Don't override status here - ascendStatusService sets it to online on app open
   useEffect(() => {
     if (user?.uid) {
       const timeout = setTimeout(() => {
         getUserStatus(user.uid).then(result => {
           if (result.data) {
-            const status = result.data.status || "online";
-            setCurrentStatus(status);
+            // Only load custom message, don't override status
+            // Status is managed by ascendStatusService which sets it to online on app open
             setCustomMessage(result.data.customMessage || "");
-            // Sync status with parent component
-            if (onStatusChange) {
-              onStatusChange(status);
+
+            // Only use fetched status if it's a valid user-chosen status (not offline from API timeout)
+            const validStatuses = ["online", "away", "busy"];
+            const fetchedStatus = result.data.status;
+            if (fetchedStatus && validStatuses.includes(fetchedStatus)) {
+              setCurrentStatus(fetchedStatus);
+              if (onStatusChange) {
+                onStatusChange(fetchedStatus);
+              }
+            } else {
+              // Default to online if status is offline (from API timeout) or invalid
+              setCurrentStatus("online");
+              if (onStatusChange) {
+                onStatusChange("online");
+              }
             }
           }
         });
-      }, 500);
+      }, 800);
       return () => clearTimeout(timeout);
     }
   }, [user?.uid]);

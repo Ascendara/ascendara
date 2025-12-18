@@ -26,11 +26,21 @@ export const initializeStatusService = async (onStatusChange, userId) => {
     const result = await getUserStatus(userId);
     console.log("[AscendStatus] Fetched status:", result.data);
 
-    if (result.data?.preferredStatus) {
+    // Only restore user-chosen statuses (online, away, busy)
+    // "offline" is set by API inactivity timeout, not user choice - ignore it
+    // "invisible" should also not be restored on app open
+    const validStatuses = ["online", "away", "busy"];
+    if (
+      result.data?.preferredStatus &&
+      validStatuses.includes(result.data.preferredStatus)
+    ) {
       previousStatus = result.data.preferredStatus;
-    } else if (result.data?.status && result.data.status !== "invisible") {
-      // Fallback to current status if no preferred status saved
+    } else if (result.data?.status && validStatuses.includes(result.data.status)) {
+      // Fallback to current status if no valid preferred status saved
       previousStatus = result.data.status;
+    } else {
+      // Default to online if no valid status found
+      previousStatus = "online";
     }
 
     console.log("[AscendStatus] Restoring status to:", previousStatus);

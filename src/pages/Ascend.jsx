@@ -346,18 +346,12 @@ const Ascend = () => {
       verifyAccess();
       loadFriendsData();
       loadRequestsData();
-      // Delay loading user status to ensure the status service has initialized
-      // and updated the status to online first
-      const statusTimeout = setTimeout(() => {
-        loadUserStatus();
-      }, 500);
+      // Note: User status is loaded by AscendSidebar and synced via onStatusChange prop
       loadConversations();
       loadProfileStats();
       loadLocalStats();
       loadCloudLibrary();
       loadNotifications();
-
-      return () => clearTimeout(statusTimeout);
     }
   }, [user?.uid, showDisplayNamePrompt]);
 
