@@ -2295,7 +2295,7 @@ export default function DownloadPage() {
           ) : (
             /* Manual Download */
             <div className="rounded-xl border border-border/30 bg-card p-6">
-              <div className="mx-auto max-w-2xl">
+              <div className="mx-auto max-w-4xl">
                 {/* Header */}
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="text-xl font-semibold">
@@ -2476,8 +2476,8 @@ export default function DownloadPage() {
 
                         {/* Status / Download Button */}
                         {useAscendara ? (
-                          <div className="flex items-center justify-center gap-2 rounded-lg border border-border/50 bg-muted/30 py-4 text-muted-foreground">
-                            <Loader className="h-4 w-4 animate-spin" />
+                          <div className="flex items-center justify-center gap-3 rounded-lg border border-border/50 bg-muted/30 px-4 py-4 text-muted-foreground">
+                            <Loader className="h-4 w-4 shrink-0 animate-spin" />
                             <span className="text-sm">
                               {isStartingDownload
                                 ? t("download.downloadOptions.startingDownload")
@@ -2520,15 +2520,15 @@ export default function DownloadPage() {
                     {/* Security Warning */}
                     {selectedProvider && selectedProvider !== "gofile" && (
                       <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
-                        <div className="flex gap-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-500/20">
-                            <TriangleAlert className="h-4 w-4 text-yellow-600" />
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-yellow-500/20">
+                            <TriangleAlert className="h-3.5 w-3.5 text-yellow-600" />
                           </div>
-                          <div>
-                            <h3 className="text-sm font-semibold text-foreground">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-semibold leading-tight text-foreground">
                               {t("download.protectYourself.warningTitle")}
                             </h3>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                               {t("download.protectYourself.warning")}
                             </p>
                             <button
@@ -2537,7 +2537,7 @@ export default function DownloadPage() {
                                   "https://ascendara.app/protect-yourself"
                                 )
                               }
-                              className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              className="mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
                             >
                               {t("download.protectYourself.learnHow")}
                               <ExternalLink className="h-3 w-3" />
@@ -2550,50 +2550,92 @@ export default function DownloadPage() {
                     {/* Instructions */}
                     {selectedProvider ? (
                       <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                        <h4 className="mb-3 text-sm font-medium">
+                        <h4 className="mb-3 text-sm font-semibold">
                           {t("download.downloadOptions.downloadOptions")}
                         </h4>
-                        <ol className="space-y-2 text-xs text-muted-foreground">
+                        <ol className="space-y-2.5 text-xs text-muted-foreground">
                           {useAscendara ? (
                             <>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">1.</span>
-                                {t("download.downloadOptions.handlerInstructions.step1")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  1.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t(
+                                    "download.downloadOptions.handlerInstructions.step1"
+                                  )}
+                                </span>
                               </li>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">2.</span>
-                                {t("download.downloadOptions.handlerInstructions.step2")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  2.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t(
+                                    "download.downloadOptions.handlerInstructions.step2"
+                                  )}
+                                </span>
                               </li>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">3.</span>
-                                {t("download.downloadOptions.handlerInstructions.step3")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  3.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t(
+                                    "download.downloadOptions.handlerInstructions.step3"
+                                  )}
+                                </span>
                               </li>
                             </>
                           ) : (
                             <>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">1.</span>
-                                {t("download.downloadOptions.manualInstructions.step1")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  1.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t("download.downloadOptions.manualInstructions.step1")}
+                                </span>
                               </li>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">2.</span>
-                                {t("download.downloadOptions.manualInstructions.step2")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  2.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t("download.downloadOptions.manualInstructions.step2")}
+                                </span>
                               </li>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">3.</span>
-                                {t("download.downloadOptions.manualInstructions.step3")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  3.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t("download.downloadOptions.manualInstructions.step3")}
+                                </span>
                               </li>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">4.</span>
-                                {t("download.downloadOptions.manualInstructions.step4")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  4.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t("download.downloadOptions.manualInstructions.step4")}
+                                </span>
                               </li>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">5.</span>
-                                {t("download.downloadOptions.manualInstructions.step5")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  5.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t("download.downloadOptions.manualInstructions.step5")}
+                                </span>
                               </li>
-                              <li className="flex gap-2">
-                                <span className="font-medium text-primary">6.</span>
-                                {t("download.downloadOptions.manualInstructions.step6")}
+                              <li className="flex items-start gap-2">
+                                <span className="mt-px shrink-0 font-semibold text-primary">
+                                  6.
+                                </span>
+                                <span className="leading-relaxed">
+                                  {t("download.downloadOptions.manualInstructions.step6")}
+                                </span>
                               </li>
                             </>
                           )}
