@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import imageCacheService from "@/services/imageCacheService";
 import openCriticService from "@/services/openCriticService";
@@ -44,6 +45,8 @@ import {
   Loader,
   MessageSquareWarning,
   TriangleAlert,
+  Cloud,
+  Puzzle,
   History,
   Zap,
   AlertTriangle,
@@ -105,6 +108,7 @@ export default function DownloadPage() {
   const [criticCache, setCriticCache] = useState({});
   const { t } = useLanguage();
   const { settings, setSettings } = useSettings();
+  const { isAuthenticated } = useAuth();
   const igdbConfig = useIgdbConfig();
 
   useEffect(() => {
@@ -315,7 +319,7 @@ export default function DownloadPage() {
   const isActive = useRef(false);
   const igdbSectionRef = useRef(null);
   const mainContentRef = useRef(null);
-  const scrollThreshold = 30; // Even lower threshold for quicker response
+  const scrollThreshold = 220;
   const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
   const VERIFIED_PROVIDERS = ["megadb", "gofile", "buzzheavier", "pixeldrain"];
 
@@ -1276,413 +1280,495 @@ export default function DownloadPage() {
         </div>
 
         <div className="mt-4 flex flex-col gap-4">
-          {/* Game Header Section */}
-          <div className="flex items-start gap-4">
-            <img
-              src={cachedImage || `https://api.ascendara.app/v3/image/${gameData.gameID}`}
-              alt={gameData.game}
-              className="h-36 w-64 rounded-lg object-cover"
+          {/* Hero Game Header Section */}
+          <div className="relative overflow-hidden rounded-xl border border-border/30 bg-gradient-to-br from-card to-card/80">
+            {/* Background Image Overlay */}
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage: `url(${cachedImage || `https://api.ascendara.app/v3/image/${gameData.gameID}`})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                filter: "blur(20px)",
+              }}
             />
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between">
-                <h1 className="flex items-center gap-2 text-2xl font-bold">
-                  {gameData.game}
-                  {gameRating > 0 && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="ml-2 flex cursor-help">
-                            {[...Array(Math.round(gameRating))].map((_, i) => (
-                              <Star
-                                key={i}
-                                className="h-5 w-5 fill-current text-yellow-400"
-                              />
-                            ))}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          <p className="max-w-[300px] font-semibold text-secondary">
-                            {t("download.ratingTooltip", { rating: gameRating })}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </h1>
-                {settings.gameSource !== "fitgirl" && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button className="fixed right-8" variant="outline" size="sm">
-                        {t("download.reportBroken")}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <form
-                        onSubmit={e => {
-                          e.preventDefault();
-                          handleSubmitReport();
-                        }}
-                      >
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                            {t("download.reportBroken")}: {gameData.game}
-                          </AlertDialogTitle>
-                          <AlertDialogDescription className="space-y-4">
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">
-                                {t("download.reportReason")}
-                              </label>
-                              <Select
-                                value={reportReason}
-                                onValueChange={setReportReason}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue
-                                    placeholder={t("download.reportReasons.placeholder")}
-                                  />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="gamedetails">
-                                    {t("download.reportReasons.gameDetails")}
-                                  </SelectItem>
-                                  <SelectItem value="filesnotdownloading">
-                                    {t("download.reportReasons.filesNotDownloading")}
-                                  </SelectItem>
-                                  <SelectItem value="notagame">
-                                    {t("download.reportReasons.notAGame")}
-                                  </SelectItem>
-                                  <SelectItem value="linksnotworking">
-                                    {t("download.reportReasons.linksNotWorking")}
-                                  </SelectItem>
-                                  <SelectItem value="image-error">
-                                    {t("download.reportReasons.imageError")}
-                                  </SelectItem>
-                                  <SelectItem value="image-bad">
-                                    {t("download.reportReasons.imageBad")}
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">
-                                {t("download.reportDescription")}
-                              </label>
-                              <Textarea
-                                placeholder={t("download.reportDescription")}
-                                value={reportDetails}
-                                onChange={e => setReportDetails(e.target.value)}
-                                className="min-h-[100px]"
-                              />
-                            </div>
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
 
-                        <AlertDialogFooter className="mt-4 gap-2">
-                          <AlertDialogCancel
-                            className="text-primary"
-                            onClick={() => {
-                              setReportReason("");
-                              setReportDetails("");
-                            }}
-                          >
-                            {t("common.cancel")}
-                          </AlertDialogCancel>
-                          <Button
-                            type="submit"
-                            className="text-secondary"
-                            disabled={isReporting}
-                          >
-                            {isReporting ? (
-                              <>
-                                <Loader className="mr-2 h-4 w-4 animate-spin" />
-                                {t("download.submitting")}
-                              </>
-                            ) : (
-                              t("download.submitReport")
-                            )}
-                          </Button>
-                        </AlertDialogFooter>
-                      </form>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                {gameData.emulator && (
-                  <span className="mb-2 flex items-center gap-1 rounded bg-yellow-500/10 px-2 py-0.5 text-sm text-yellow-500">
-                    <CircleSlash className="mr-1 h-4 w-4" />{" "}
-                    {t("download.gameNeedsEmulator")}&nbsp;
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/troubleshooting/emulators"
-                        )
-                      }
-                      className="cursor-pointer hover:underline"
-                    >
-                      {t("common.learnMore")}{" "}
-                      <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                    </a>
-                  </span>
-                )}
-                {gameData.category?.includes("Virtual Reality") && (
-                  <span className="mb-2 flex items-center rounded bg-purple-500/10 px-2 py-0.5 text-sm text-foreground">
-                    <svg
-                      className="p-0.5 text-foreground"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                      <path
-                        d="M3.81253 6.7812C4.5544 5.6684 5.80332 5 7.14074 5H16.8593C18.1967 5 19.4456 5.6684 20.1875 6.7812L21 8H3L3.81253 6.7812Z"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                    <span className="ml-1text-foreground">
-                      &nbsp;{t("download.gameNeedsVR")}
-                    </span>
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                {gameData.version && (
-                  <span className="flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-sm text-primary">
-                    {gameData.version}
-                    {timemachineSetting && (
-                      <History
-                        onClick={() => setShowTimemachineSelection(true)}
-                        className="h-4 w-4 cursor-pointer"
-                      />
-                    )}
-                  </span>
-                )}
-                {gameData.online && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex cursor-help items-center gap-1 rounded bg-green-500/10 px-2 py-0.5 text-sm text-green-500">
-                          {t("download.online")}
-                          <InfoIcon className="h-4 w-4" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-secondary">{t("download.onlineTooltip")}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {gameData.dlc && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex cursor-help items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-sm text-blue-500">
-                          {t("download.allDlc")}
-                          <InfoIcon className="h-4 w-4" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-secondary">{t("download.allDlcTooltip")}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-              {gameData.size &&
-                (() => {
-                  const match = gameData.size
-                    .trim()
-                    .toLowerCase()
-                    .match(/^([\d.]+)\s*(gb|mb)$/);
-                  if (!match)
-                    return (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {t("download.installSize")}: {gameData.size}
-                      </p>
-                    );
-                  let [, num, unit] = match;
-                  num = parseFloat(num);
-                  let newNum, newUnit;
-                  if (unit === "gb") {
-                    newNum = num * 2.1;
-                    newUnit = "GB";
-                  } else {
-                    newNum = num * 2.1;
-                    newUnit = "MB";
+            <div className="relative z-10 p-5">
+              {/* Top Row: Game Image + Info + Actions */}
+              <div className="flex gap-5">
+                {/* Game Cover Image */}
+                <img
+                  src={
+                    cachedImage || `https://api.ascendara.app/v3/image/${gameData.gameID}`
                   }
-                  const formatted =
-                    newUnit === "GB" ? newNum.toFixed(1) : Math.round(newNum);
-                  return (
-                    <p className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
-                      {t("download.installSize")}: ~{formatted} {newUnit}
+                  alt={gameData.game}
+                  className="h-44 w-80 shrink-0 rounded-lg object-cover shadow-lg ring-1 ring-white/10"
+                />
+
+                {/* Game Info Column */}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  {/* Title + Rating */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <h1 className="flex items-center gap-3 text-2xl font-bold leading-tight">
+                        <span className="truncate">{gameData.game}</span>
+                        {gameRating > 0 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex shrink-0 cursor-help">
+                                  {[...Array(Math.round(gameRating))].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className="h-4 w-4 fill-current text-yellow-400"
+                                    />
+                                  ))}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <p className="max-w-[300px] font-semibold text-secondary">
+                                  {t("download.ratingTooltip", { rating: gameRating })}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </h1>
+
+                      {/* Version + Tags Row */}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {gameData.version && (
+                          <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
+                            {gameData.version}
+                            {timemachineSetting && (
+                              <History
+                                onClick={() => setShowTimemachineSelection(true)}
+                                className="h-3.5 w-3.5 cursor-pointer hover:text-primary/80"
+                              />
+                            )}
+                          </span>
+                        )}
+                        {gameData.online && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex cursor-help items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-500">
+                                  {t("download.online")}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-secondary">
+                                  {t("download.onlineTooltip")}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {gameData.dlc && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex cursor-help items-center gap-1 rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-500">
+                                  {t("download.allDlc")}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-secondary">
+                                  {t("download.allDlcTooltip")}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {gameData.emulator && (
+                          <span className="flex items-center gap-1 rounded-full bg-yellow-500/15 px-2.5 py-1 text-xs font-medium text-yellow-500">
+                            <CircleSlash className="h-3 w-3" />
+                            {t("download.gameNeedsEmulator")}
+                          </span>
+                        )}
+                        {gameData.category?.includes("Virtual Reality") && (
+                          <span className="flex items-center gap-1 rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-400">
+                            <svg
+                              className="h-3 w-3"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            {t("download.gameNeedsVR")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Report Button */}
+                    {settings.gameSource !== "fitgirl" && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <FileQuestion className="h-3.5 w-3.5 cursor-pointer text-muted-foreground hover:text-foreground" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 text-muted-foreground hover:text-foreground"
+                          >
+                            <TriangleAlert className="mr-1.5 h-4 w-4" />
+                            {t("download.reportBroken")}
+                          </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              {t("download.installSizeInfo.title")}
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {t("download.installSizeInfo.description")}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <p className="text-sm text-muted-foreground">
-                            {t("download.installSizeInfo.note")}
-                          </p>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
-                          </AlertDialogFooter>
+                          <form
+                            onSubmit={e => {
+                              e.preventDefault();
+                              handleSubmitReport();
+                            }}
+                          >
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                                {t("download.reportBroken")}: {gameData.game}
+                              </AlertDialogTitle>
+                              <AlertDialogDescription className="space-y-4">
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">
+                                    {t("download.reportReason")}
+                                  </label>
+                                  <Select
+                                    value={reportReason}
+                                    onValueChange={setReportReason}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue
+                                        placeholder={t(
+                                          "download.reportReasons.placeholder"
+                                        )}
+                                      />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="gamedetails">
+                                        {t("download.reportReasons.gameDetails")}
+                                      </SelectItem>
+                                      <SelectItem value="filesnotdownloading">
+                                        {t("download.reportReasons.filesNotDownloading")}
+                                      </SelectItem>
+                                      <SelectItem value="notagame">
+                                        {t("download.reportReasons.notAGame")}
+                                      </SelectItem>
+                                      <SelectItem value="linksnotworking">
+                                        {t("download.reportReasons.linksNotWorking")}
+                                      </SelectItem>
+                                      <SelectItem value="image-error">
+                                        {t("download.reportReasons.imageError")}
+                                      </SelectItem>
+                                      <SelectItem value="image-bad">
+                                        {t("download.reportReasons.imageBad")}
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">
+                                    {t("download.reportDescription")}
+                                  </label>
+                                  <Textarea
+                                    placeholder={t("download.reportDescription")}
+                                    value={reportDetails}
+                                    onChange={e => setReportDetails(e.target.value)}
+                                    className="min-h-[100px]"
+                                  />
+                                </div>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="mt-4 gap-2">
+                              <AlertDialogCancel
+                                className="text-primary"
+                                onClick={() => {
+                                  setReportReason("");
+                                  setReportDetails("");
+                                }}
+                              >
+                                {t("common.cancel")}
+                              </AlertDialogCancel>
+                              <Button
+                                type="submit"
+                                className="text-secondary"
+                                disabled={isReporting}
+                              >
+                                {isReporting ? (
+                                  <>
+                                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                                    {t("download.submitting")}
+                                  </>
+                                ) : (
+                                  t("download.submitReport")
+                                )}
+                              </Button>
+                            </AlertDialogFooter>
+                          </form>
                         </AlertDialogContent>
                       </AlertDialog>
-                      &nbsp;{t("download.gameSize")}: {gameData.size}
-                    </p>
-                  );
-                })()}
-              <p className="mt-2 text-sm text-muted-foreground">
-                {t("download.latestUpdate")}: {formatLatestUpdate(gameData.latest_update)}
-              </p>
-
-              {/* OpenCritic Reviews Button */}
-              <div className="mt-3 flex justify-start">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="inline-flex items-center gap-1.5"
-                  onClick={() => handleOpenCriticDialog(gameData.game)}
-                >
-                  <Eye className="h-4 w-4 text-primary" />
-                  {t("download.viewCriticReviews")}
-                </Button>
-              </div>
-
-              {/* OpenCritic Beta Warning Dialog */}
-              <AlertDialog
-                open={showOpenCriticWarning}
-                onOpenChange={setShowOpenCriticWarning}
-              >
-                <AlertDialogContent className="max-h-[85vh] max-w-md overflow-y-auto border-border bg-background/95 p-4 backdrop-blur-sm">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center gap-2 text-xl font-bold text-primary">
-                      <AlertTriangle className="text-warning h-5 w-5" />
-                      {t("download.betaFeature")}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="mt-3 text-sm" asChild>
-                      <div className="p-3">{t("download.openCriticBetaWarning")}</div>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="mt-4">
-                    <Button
-                      className="w-full text-secondary"
-                      onClick={() => {
-                        setShowOpenCriticWarning(false);
-                        localStorage.setItem("openCriticBetaWarningShown", "1");
-                        handleOpenCriticDialog(gameData.game);
-                      }}
-                    >
-                      {t("download.understand")}
-                    </Button>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-
-            {/* System Requirements Section - Right Column */}
-            {gameData.minReqs && (
-              <div className="ml-auto mr-24 w-72 shrink-0">
-                <p className="mb-1.5 text-xs font-medium text-primary">
-                  {t("download.systemRequirements")}
-                </p>
-                <div className="rounded-md border border-border/30 bg-card/60 p-2 text-xs">
-                  <div className="grid gap-1">
-                    {gameData.minReqs.os && (
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">
-                          {t("download.specs.os")}
-                        </span>
-                        <span className="text-right text-foreground">
-                          {gameData.minReqs.os}
-                        </span>
-                      </div>
-                    )}
-                    {gameData.minReqs.cpu && (
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">
-                          {t("download.specs.cpu")}
-                        </span>
-                        <span className="text-right text-foreground">
-                          {gameData.minReqs.cpu}
-                        </span>
-                      </div>
-                    )}
-                    {gameData.minReqs.ram && (
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">
-                          {t("download.specs.ram")}
-                        </span>
-                        <span className="text-right text-foreground">
-                          {gameData.minReqs.ram}
-                        </span>
-                      </div>
-                    )}
-                    {gameData.minReqs.gpu && (
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">
-                          {t("download.specs.gpu")}
-                        </span>
-                        <span className="text-right text-foreground">
-                          {gameData.minReqs.gpu}
-                        </span>
-                      </div>
-                    )}
-                    {gameData.minReqs.directx && (
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">
-                          {t("download.specs.directx")}
-                        </span>
-                        <span className="text-right text-foreground">
-                          {gameData.minReqs.directx}
-                        </span>
-                      </div>
                     )}
                   </div>
-                  <div className="mt-2 flex justify-center">
-                    <button
-                      className="text-xs text-primary hover:underline"
-                      onClick={async () => {
-                        setShowCompareDialog(true);
-                        setSystemSpecsLoading(true);
-                        try {
-                          const specs = await window.electron.fetchSystemSpecs();
-                          setSystemSpecs(specs);
-                        } catch (err) {
-                          console.error("Failed to fetch system specs:", err);
-                        } finally {
-                          setSystemSpecsLoading(false);
-                        }
-                      }}
+
+                  {/* Game Details Row */}
+                  <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                    {gameData.size &&
+                      (() => {
+                        const match = gameData.size
+                          .trim()
+                          .toLowerCase()
+                          .match(/^([\d.]+)\s*(gb|mb)$/);
+                        if (!match)
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium text-foreground">
+                                {t("download.installSize")}:
+                              </span>
+                              <span className="text-muted-foreground">
+                                {gameData.size}
+                              </span>
+                            </div>
+                          );
+                        let [, num, unit] = match;
+                        num = parseFloat(num);
+                        const newNum = num * 2.1;
+                        const newUnit = unit === "gb" ? "GB" : "MB";
+                        const formatted =
+                          newUnit === "GB" ? newNum.toFixed(1) : Math.round(newNum);
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-foreground">
+                              {t("download.installSize")}:
+                            </span>
+                            <span className="text-muted-foreground">
+                              ~{formatted} {newUnit}
+                            </span>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <FileQuestion className="h-3.5 w-3.5 cursor-pointer text-muted-foreground hover:text-foreground" />
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    {t("download.installSizeInfo.title")}
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {t("download.installSizeInfo.description")}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <p className="text-sm text-muted-foreground">
+                                  {t("download.installSizeInfo.note")}
+                                </p>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>
+                                    {t("common.close")}
+                                  </AlertDialogCancel>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            <span className="text-muted-foreground/50">
+                              ({t("download.gameSize")}: {gameData.size})
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-foreground">
+                        {t("download.latestUpdate")}:
+                      </span>
+                      <span className="text-muted-foreground">
+                        {formatLatestUpdate(gameData.latest_update)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Row */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => handleOpenCriticDialog(gameData.game)}
                     >
-                      {t("download.compareYourPC")}
-                    </button>
+                      <Eye className="h-4 w-4" />
+                      {t("download.viewCriticReviews")}
+                    </Button>
+                    {gameData.emulator && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-yellow-500 hover:text-yellow-400"
+                        onClick={() =>
+                          window.electron.openURL(
+                            "https://ascendara.app/docs/troubleshooting/emulators"
+                          )
+                        }
+                      >
+                        {t("common.learnMore")}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
+
+                {/* System Requirements Card - Right Side */}
+                {gameData.minReqs && (
+                  <div className="w-64 shrink-0">
+                    <div className="rounded-lg border border-border/40 bg-card p-3">
+                      <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                        {t("download.systemRequirements")}
+                      </p>
+                      <div className="space-y-1.5 text-xs">
+                        {gameData.minReqs.os && (
+                          <div className="flex justify-between gap-2">
+                            <span className="text-muted-foreground">
+                              {t("download.specs.os")}
+                            </span>
+                            <span className="text-right font-medium text-foreground">
+                              {gameData.minReqs.os}
+                            </span>
+                          </div>
+                        )}
+                        {gameData.minReqs.cpu && (
+                          <div className="flex justify-between gap-2">
+                            <span className="text-muted-foreground">
+                              {t("download.specs.cpu")}
+                            </span>
+                            <span className="text-right font-medium text-foreground">
+                              {gameData.minReqs.cpu}
+                            </span>
+                          </div>
+                        )}
+                        {gameData.minReqs.ram && (
+                          <div className="flex justify-between gap-2">
+                            <span className="text-muted-foreground">
+                              {t("download.specs.ram")}
+                            </span>
+                            <span className="text-right font-medium text-foreground">
+                              {gameData.minReqs.ram}
+                            </span>
+                          </div>
+                        )}
+                        {gameData.minReqs.gpu && (
+                          <div className="flex justify-between gap-2">
+                            <span className="text-muted-foreground">
+                              {t("download.specs.gpu")}
+                            </span>
+                            <span className="text-right font-medium text-foreground">
+                              {gameData.minReqs.gpu}
+                            </span>
+                          </div>
+                        )}
+                        {gameData.minReqs.directx && (
+                          <div className="flex justify-between gap-2">
+                            <span className="text-muted-foreground">
+                              {t("download.specs.directx")}
+                            </span>
+                            <span className="text-right font-medium text-foreground">
+                              {gameData.minReqs.directx}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="mt-3 w-full rounded-md bg-primary/10 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                        onClick={async () => {
+                          setShowCompareDialog(true);
+                          setSystemSpecsLoading(true);
+                          try {
+                            const specs = await window.electron.fetchSystemSpecs();
+                            setSystemSpecs(specs);
+                          } catch (err) {
+                            console.error("Failed to fetch system specs:", err);
+                          } finally {
+                            setSystemSpecsLoading(false);
+                          }
+                        }}
+                      >
+                        {t("download.compareYourPC")}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Ascend Features Banner - Bottom of Hero */}
+              {(() => {
+                const supportsModManaging = false; // TODO: Set this based on game support
+                return (
+                  <div className="mt-4 flex items-center justify-between rounded-lg border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-2.5">
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
+                          <Cloud className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium">
+                          {t("download.cloudSavingSupported")}
+                        </span>
+                      </div>
+                      {supportsModManaging && (
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
+                            <Puzzle className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="text-sm font-medium">
+                            {t("download.modManagingSupported")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {!isAuthenticated && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-primary hover:bg-primary/10"
+                        onClick={() =>
+                          window.electron.openURL("https://ascendara.app/ascend")
+                        }
+                      >
+                        {t("download.getAscend")}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
+
+          {/* OpenCritic Beta Warning Dialog */}
+          <AlertDialog
+            open={showOpenCriticWarning}
+            onOpenChange={setShowOpenCriticWarning}
+          >
+            <AlertDialogContent className="max-h-[85vh] max-w-md overflow-y-auto border-border bg-background/95 p-4 backdrop-blur-sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-xl font-bold text-primary">
+                  <AlertTriangle className="text-warning h-5 w-5" />
+                  {t("download.betaFeature")}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="mt-3 text-sm" asChild>
+                  <div className="p-3">{t("download.openCriticBetaWarning")}</div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-4">
+                <Button
+                  className="w-full text-secondary"
+                  onClick={() => {
+                    setShowOpenCriticWarning(false);
+                    localStorage.setItem("openCriticBetaWarningShown", "1");
+                    handleOpenCriticDialog(gameData.game);
+                  }}
+                >
+                  {t("download.understand")}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Compare Your PC Dialog */}
           <AlertDialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
@@ -2047,74 +2133,31 @@ export default function DownloadPage() {
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* DMCA / Local Notice Banner */}
-          {settings?.usingLocalIndex ? (
-            <div
-              className="w-full cursor-pointer rounded-lg border border-green-500/30 bg-green-500/10 p-3 transition-colors hover:bg-green-500/20"
-              onClick={() => window.electron.openURL("https://ascendara.app/support")}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <InfoIcon className="h-5 w-5 text-green-600" />
-                  <span className="text-sm font-medium text-green-700">
-                    {t("download.localSourceMsg")}
-                  </span>
-                </div>
-                <span className="flex items-center gap-1 text-sm text-green-700">
-                  {t("common.learnMore")}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div
-              className="w-full cursor-pointer rounded-lg border border-primary/20 bg-primary/10 p-3 transition-colors hover:bg-primary/15"
-              onClick={() => window.electron.openURL("https://ascendara.app/dmca")}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquareWarning className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-medium">{t("download.dmcaNotice")}</span>
-                </div>
-                <span className="flex items-center gap-1 text-sm text-primary hover:underline">
-                  {t("common.learnMore")} <ExternalLink size={16} />
-                </span>
-              </div>
-            </div>
-          )}
-
-          <Separator className="my-1" />
-
           {/* Download Options Section */}
           {settings.gameSource === "fitgirl" && gameData.torrentLink ? (
-            <div className="mx-auto max-w-xl">
-              <div className="flex flex-col items-center space-y-8 py-2">
-                <div className="flex w-full items-center justify-between">
-                  <h2 className="flex items-center gap-2 text-xl font-semibold">
-                    <span className="flex items-center gap-1">FitGirl Repacks</span>
-                  </h2>
-                </div>
-
-                <div className="w-full max-w-md space-y-4 text-center">
-                  <h3 className="text-2xl font-semibold">
-                    {t("download.downloadOptions.torrentInstructions.title")}
-                  </h3>
-                  <p className="text-muted-foreground">
+            /* FitGirl Torrent Download */
+            <div className="rounded-xl border border-border/30 bg-card p-6">
+              <div className="mx-auto max-w-lg">
+                <div className="flex flex-col items-center text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                    <ArrowDownCircle className="h-7 w-7 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-semibold">FitGirl Repacks</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
                     {t("download.downloadOptions.torrentInstructions.description")}
                   </p>
-                </div>
 
-                {!torrentRunning && (
-                  <p className="text-muted-foreground">
-                    <AlertTriangle className="mr-2 inline-block h-4 w-4" />
-                    {t("download.downloadOptions.torrentInstructions.noTorrent")}
-                  </p>
-                )}
+                  {!torrentRunning && (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-600">
+                      <AlertTriangle className="h-4 w-4" />
+                      {t("download.downloadOptions.torrentInstructions.noTorrent")}
+                    </div>
+                  )}
 
-                <div className="w-full max-w-md">
                   <Button
                     onClick={() => whereToDownload()}
                     disabled={isStartingDownload || !gameData || !torrentRunning}
-                    className="h-12 w-full text-lg text-secondary"
+                    className="mt-6 h-12 w-full max-w-xs text-lg text-secondary"
                   >
                     {isStartingDownload ? (
                       <>
@@ -2132,129 +2175,105 @@ export default function DownloadPage() {
               torboxService.isEnabled(settings) &&
               torboxService.getApiKey(settings)) ||
             seamlessProviders.includes(selectedProvider) ? (
-            <div className="mx-auto max-w-xl">
-              <div className="flex flex-col items-center space-y-8 py-6">
-                <div className="flex w-full items-center justify-between">
+            /* Seamless / Torbox Download */
+            <div className="rounded-xl border border-border/30 bg-card p-6">
+              <div className="mx-auto max-w-lg">
+                <div className="flex flex-col items-center text-center">
+                  {/* Icon based on type */}
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                    {torboxProviders.includes(selectedProvider) &&
+                    torboxService.isEnabled(settings) &&
+                    torboxService.getApiKey(settings) ? (
+                      <TorboxIcon className="h-7 w-7 text-primary" />
+                    ) : (
+                      <Zap fill="currentColor" className="h-7 w-7 text-primary" />
+                    )}
+                  </div>
+
+                  {/* Title */}
                   <h2 className="flex items-center gap-2 text-xl font-semibold">
-                    <span className="flex items-center gap-1">
-                      {torboxProviders.includes(selectedProvider) &&
-                      torboxService.isEnabled(settings) &&
-                      torboxService.getApiKey(settings) ? (
-                        <>
-                          Torbox <TorboxIcon className="h-4 w-4 text-primary" />
-                        </>
-                      ) : seamlessProviders.includes(selectedProvider) ? (
-                        <>
-                          Seamless{" "}
-                          <Zap fill="currentColor" className="h-4 w-4 text-primary" />
-                        </>
-                      ) : (
-                        <>{selectedProvider}</>
-                      )}
-                    </span>
+                    {torboxProviders.includes(selectedProvider) &&
+                    torboxService.isEnabled(settings) &&
+                    torboxService.getApiKey(settings)
+                      ? t("download.downloadOptions.torboxInstructions.title")
+                      : t("download.downloadOptions.seamlessInstructions.title")}
                   </h2>
-                  <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder={t("download.switchProvider")} />
-                    </SelectTrigger>
-                    <SelectContent className="border-border bg-background">
-                      {providers.map(provider => {
-                        let displayName;
-                        switch (provider.toLowerCase()) {
-                          case "gofile":
-                            displayName = !settings.prioritizeTorboxOverSeamless
-                              ? "Seamless (GoFile)"
-                              : "GoFile";
-                            break;
-                          case "megadb":
-                            displayName = "MegaDB";
-                            break;
-                          case "buzzheavier":
-                            displayName = !settings.prioritizeTorboxOverSeamless
-                              ? "Seamless (BuzzHeavier)"
-                              : "BuzzHeavier";
-                            break;
-                          case "pixeldrain":
-                            displayName = !settings.prioritizeTorboxOverSeamless
-                              ? "Seamless (PixelDrain)"
-                              : "PixelDrain";
-                            break;
-                          case "qiwi":
-                            displayName = "QIWI";
-                            break;
-                          case "datanodes":
-                            displayName = "DataNodes";
-                            break;
-                          default:
-                            displayName =
-                              provider.charAt(0).toUpperCase() + provider.slice(1);
-                        }
-                        const isVerified = VERIFIED_PROVIDERS.includes(
-                          provider.toLowerCase()
-                        );
-                        return (
-                          <SelectItem
-                            key={provider}
-                            value={provider}
-                            className="hover:bg-muted focus:bg-muted"
-                          >
-                            <div className="flex items-center gap-2">
-                              {displayName}
-                              {isVerified && <BadgeCheckIcon className="h-4 w-4" />}
-                              {provider === "1fichier" &&
-                                torboxService.isEnabled(settings) && (
-                                  <TorboxIcon className="h-4 w-4 text-primary" />
-                                )}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                <div className="w-full max-w-md space-y-4 text-center">
-                  <h3 className="text-2xl font-semibold">
-                    {(() => {
-                      const isTorbox =
-                        torboxProviders.includes(selectedProvider) &&
-                        torboxService.isEnabled(settings) &&
-                        torboxService.getApiKey(settings);
-                      const isSeamless = seamlessProviders.includes(selectedProvider);
-
-                      if (isTorbox)
-                        return t("download.downloadOptions.torboxInstructions.title");
-                      if (isSeamless)
-                        return t("download.downloadOptions.seamlessInstructions.title");
-                      return selectedProvider;
-                    })()}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {(() => {
-                      const isTorbox =
-                        torboxProviders.includes(selectedProvider) &&
-                        torboxService.isEnabled(settings) &&
-                        torboxService.getApiKey(settings);
-                      const isSeamless = seamlessProviders.includes(selectedProvider);
-
-                      if (isTorbox)
-                        return t(
-                          "download.downloadOptions.torboxInstructions.description"
-                        );
-                      if (isSeamless)
-                        return t(
-                          "download.downloadOptions.seamlessInstructions.description"
-                        );
-                      return "";
-                    })()}
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {torboxProviders.includes(selectedProvider) &&
+                    torboxService.isEnabled(settings) &&
+                    torboxService.getApiKey(settings)
+                      ? t("download.downloadOptions.torboxInstructions.description")
+                      : t("download.downloadOptions.seamlessInstructions.description")}
                   </p>
-                </div>
 
-                <div className="w-full max-w-md">
+                  {/* Provider Selector */}
+                  <div className="mt-4 w-full max-w-xs">
+                    <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t("download.switchProvider")} />
+                      </SelectTrigger>
+                      <SelectContent className="border-border bg-background">
+                        {providers.map(provider => {
+                          let displayName;
+                          switch (provider.toLowerCase()) {
+                            case "gofile":
+                              displayName = !settings.prioritizeTorboxOverSeamless
+                                ? "Seamless (GoFile)"
+                                : "GoFile";
+                              break;
+                            case "megadb":
+                              displayName = "MegaDB";
+                              break;
+                            case "buzzheavier":
+                              displayName = !settings.prioritizeTorboxOverSeamless
+                                ? "Seamless (BuzzHeavier)"
+                                : "BuzzHeavier";
+                              break;
+                            case "pixeldrain":
+                              displayName = !settings.prioritizeTorboxOverSeamless
+                                ? "Seamless (PixelDrain)"
+                                : "PixelDrain";
+                              break;
+                            case "qiwi":
+                              displayName = "QIWI";
+                              break;
+                            case "datanodes":
+                              displayName = "DataNodes";
+                              break;
+                            default:
+                              displayName =
+                                provider.charAt(0).toUpperCase() + provider.slice(1);
+                          }
+                          const isVerified = VERIFIED_PROVIDERS.includes(
+                            provider.toLowerCase()
+                          );
+                          return (
+                            <SelectItem
+                              key={provider}
+                              value={provider}
+                              className="hover:bg-muted focus:bg-muted"
+                            >
+                              <div className="flex items-center gap-2">
+                                {displayName}
+                                {isVerified && <BadgeCheckIcon className="h-4 w-4" />}
+                                {provider === "1fichier" &&
+                                  torboxService.isEnabled(settings) && (
+                                    <TorboxIcon className="h-4 w-4 text-primary" />
+                                  )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Download Button */}
                   <Button
                     onClick={() => whereToDownload()}
                     disabled={isStartingDownload || !gameData}
-                    className="h-12 w-full text-lg text-secondary"
+                    className="mt-6 h-12 w-full max-w-xs text-lg text-secondary"
                   >
                     {isStartingDownload ? (
                       <>
@@ -2267,33 +2286,40 @@ export default function DownloadPage() {
                         <ArrowUpFromLine className="ml-2 h-5 w-5 stroke-[3]" />
                       </>
                     ) : (
-                      <>{t("download.downloadOptions.downloadNow")}</>
+                      t("download.downloadOptions.downloadNow")
                     )}
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Left Column - Download Options */}
-              <div className="space-y-6">
-                <div className="space-y-3">
+            /* Manual Download */
+            <div className="rounded-xl border border-border/30 bg-card p-6">
+              <div className="mx-auto max-w-2xl">
+                {/* Header */}
+                <div className="mb-6 flex items-center justify-between">
                   <h2 className="text-xl font-semibold">
                     {t("download.downloadOptions.downloadOptions")}
                   </h2>
                   {isDev && (
                     <Button
-                      onClick={() => {
-                        window.electron.openURL(gameData.dirlink);
-                      }}
-                      className="h-12 w-full text-lg text-secondary"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.electron.openURL(gameData.dirlink)}
                     >
-                      (DEV) Open Direct Link
+                      (DEV) Direct Link
                     </Button>
                   )}
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Left: Download Controls */}
                   <div className="space-y-4">
+                    {/* Provider Selection */}
                     <div className="space-y-2">
-                      <Label>{t("download.downloadOptions.downloadSource")}</Label>
+                      <Label className="text-sm font-medium">
+                        {t("download.downloadOptions.downloadSource")}
+                      </Label>
                       {providers.length > 0 ? (
                         <Select
                           value={selectedProvider}
@@ -2344,7 +2370,7 @@ export default function DownloadPage() {
                                     {isVerified && <BadgeCheckIcon className="h-4 w-4" />}
                                     {provider === "1fichier" &&
                                       torboxService.isEnabled(settings) && (
-                                        <TorboxIcon className="h-7 w-7" />
+                                        <TorboxIcon className="h-5 w-5" />
                                       )}
                                   </div>
                                 </SelectItem>
@@ -2353,65 +2379,70 @@ export default function DownloadPage() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p>{t("download.downloadOptions.noProviders")}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t("download.downloadOptions.noProviders")}
+                        </p>
                       )}
                     </div>
 
                     {selectedProvider && (
-                      <div className="space-y-3">
-                        <div>
-                          <Label>{t("download.downloadOptions.downloadLink")}</Label>
-                          <div className="mt-1 flex items-center gap-2">
+                      <>
+                        {/* Download Link Display */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">
+                            {t("download.downloadOptions.downloadLink")}
+                          </Label>
+                          <div className="flex items-center gap-2">
                             <div
-                              className="group flex flex-1 cursor-pointer items-center justify-between rounded-md bg-muted p-2 text-sm transition-colors hover:bg-muted/80"
+                              className="group flex flex-1 cursor-pointer items-center justify-between rounded-lg border border-border/50 bg-muted/50 px-3 py-2 text-sm transition-colors hover:bg-muted"
                               onClick={handleCopyLink}
                             >
-                              <span>
-                                {downloadLinks[selectedProvider] &&
-                                downloadLinks[selectedProvider][0]
+                              <span className="truncate text-muted-foreground">
+                                {downloadLinks[selectedProvider]?.[0]
                                   ? downloadLinks[selectedProvider][0].startsWith("//")
                                     ? `https:${downloadLinks[selectedProvider][0]}`
                                     : downloadLinks[selectedProvider][0]
                                   : t("download.downloadOptions.noDownloadLink")}
                               </span>
                               {showCopySuccess ? (
-                                <CheckIcon className="h-4 w-4 text-green-500" />
+                                <CheckIcon className="ml-2 h-4 w-4 shrink-0 text-green-500" />
                               ) : (
-                                <CopyIcon className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
+                                <CopyIcon className="ml-2 h-4 w-4 shrink-0 opacity-50 transition-opacity group-hover:opacity-100" />
                               )}
                             </div>
                             <Button
                               size="sm"
-                              onClick={handleOpenInBrowser}
                               variant="outline"
+                              onClick={handleOpenInBrowser}
+                              className="shrink-0"
                             >
-                              {t("download.downloadOptions.openInBrowser")}
+                              <ExternalLink className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
 
-                        {!useAscendara && (
-                          <div>
-                            <Input
-                              placeholder={t("download.downloadOptions.pasteLink")}
-                              value={inputLink}
-                              onChange={handleInputChange}
-                              className={!isValidLink ? "border-red-500" : ""}
-                            />
-                            {!isValidLink && (
-                              <p className="mt-1 text-sm text-red-500">
-                                {t("download.downloadOptions.invalidLink")}{" "}
-                                {selectedProvider}
+                        {/* Ascendara Handler Toggle */}
+                        <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
+                          <div className="space-y-0.5">
+                            <Label
+                              htmlFor="ascendara-handler"
+                              className="text-sm font-medium"
+                            >
+                              {t("download.downloadOptions.ascendaraHandler")}
+                            </Label>
+                            {!useAscendara && (
+                              <p
+                                className="cursor-pointer text-xs text-primary hover:underline"
+                                onClick={() =>
+                                  window.electron.openURL(
+                                    "https://ascendara.app/extension"
+                                  )
+                                }
+                              >
+                                {t("download.downloadOptions.getExtension")}
                               </p>
                             )}
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    {selectedProvider && (
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
                           <Switch
                             id="ascendara-handler"
                             checked={useAscendara}
@@ -2423,124 +2454,160 @@ export default function DownloadPage() {
                               );
                             }}
                           />
-                          <Label htmlFor="ascendara-handler" className="text-sm">
-                            {t("download.downloadOptions.ascendaraHandler")}
-                          </Label>
                         </div>
+
+                        {/* Manual Link Input (when handler is off) */}
                         {!useAscendara && (
-                          <p
-                            className="cursor-pointer text-xs text-muted-foreground hover:underline"
-                            onClick={() =>
-                              window.electron.openURL("https://ascendara.app/extension")
-                            }
-                          >
-                            {t("download.downloadOptions.getExtension")}
-                          </p>
+                          <div className="space-y-2">
+                            <Input
+                              placeholder={t("download.downloadOptions.pasteLink")}
+                              value={inputLink}
+                              onChange={handleInputChange}
+                              className={!isValidLink ? "border-red-500" : ""}
+                            />
+                            {!isValidLink && (
+                              <p className="text-xs text-red-500">
+                                {t("download.downloadOptions.invalidLink")}{" "}
+                                {selectedProvider}
+                              </p>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    )}
 
-                    {selectedProvider && useAscendara && (
-                      <div className="flex items-center justify-center space-x-2 py-2 text-muted-foreground">
-                        <Loader className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">
-                          {isStartingDownload
-                            ? t("download.downloadOptions.startingDownload")
-                            : t("download.downloadOptions.waitingForBrowser")}
-                        </span>
-                      </div>
-                    )}
-
-                    {!useAscendara && (
-                      <Button
-                        onClick={() => whereToDownload()}
-                        disabled={
-                          isStartingDownload ||
-                          !selectedProvider ||
-                          !inputLink ||
-                          !isValidLink ||
-                          !gameData
-                        }
-                        className="w-full text-secondary"
-                      >
-                        {isStartingDownload ? (
-                          <>
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                            {t("download.downloadOptions.downloading")}
-                          </>
-                        ) : gameData.isUpdating ? (
-                          <>
-                            <ArrowUpFromLine className="mr-2 h-4 w-4" />
-                            {t("gameCard.update")}
-                          </>
+                        {/* Status / Download Button */}
+                        {useAscendara ? (
+                          <div className="flex items-center justify-center gap-2 rounded-lg border border-border/50 bg-muted/30 py-4 text-muted-foreground">
+                            <Loader className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">
+                              {isStartingDownload
+                                ? t("download.downloadOptions.startingDownload")
+                                : t("download.downloadOptions.waitingForBrowser")}
+                            </span>
+                          </div>
                         ) : (
-                          t("download.downloadOptions.downloadNow")
+                          <Button
+                            onClick={() => whereToDownload()}
+                            disabled={
+                              isStartingDownload ||
+                              !selectedProvider ||
+                              !inputLink ||
+                              !isValidLink ||
+                              !gameData
+                            }
+                            className="h-11 w-full text-secondary"
+                          >
+                            {isStartingDownload ? (
+                              <>
+                                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                                {t("download.downloadOptions.downloading")}
+                              </>
+                            ) : gameData.isUpdating ? (
+                              <>
+                                <ArrowUpFromLine className="mr-2 h-4 w-4" />
+                                {t("gameCard.update")}
+                              </>
+                            ) : (
+                              t("download.downloadOptions.downloadNow")
+                            )}
+                          </Button>
                         )}
-                      </Button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Right: Instructions & Warning */}
+                  <div className="space-y-4">
+                    {/* Security Warning */}
+                    {selectedProvider && selectedProvider !== "gofile" && (
+                      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+                        <div className="flex gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-500/20">
+                            <TriangleAlert className="h-4 w-4 text-yellow-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-foreground">
+                              {t("download.protectYourself.warningTitle")}
+                            </h3>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("download.protectYourself.warning")}
+                            </p>
+                            <button
+                              onClick={() =>
+                                window.electron.openURL(
+                                  "https://ascendara.app/protect-yourself"
+                                )
+                              }
+                              className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              {t("download.protectYourself.learnHow")}
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Instructions */}
+                    {selectedProvider ? (
+                      <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                        <h4 className="mb-3 text-sm font-medium">
+                          {t("download.downloadOptions.downloadOptions")}
+                        </h4>
+                        <ol className="space-y-2 text-xs text-muted-foreground">
+                          {useAscendara ? (
+                            <>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">1.</span>
+                                {t("download.downloadOptions.handlerInstructions.step1")}
+                              </li>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">2.</span>
+                                {t("download.downloadOptions.handlerInstructions.step2")}
+                              </li>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">3.</span>
+                                {t("download.downloadOptions.handlerInstructions.step3")}
+                              </li>
+                            </>
+                          ) : (
+                            <>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">1.</span>
+                                {t("download.downloadOptions.manualInstructions.step1")}
+                              </li>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">2.</span>
+                                {t("download.downloadOptions.manualInstructions.step2")}
+                              </li>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">3.</span>
+                                {t("download.downloadOptions.manualInstructions.step3")}
+                              </li>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">4.</span>
+                                {t("download.downloadOptions.manualInstructions.step4")}
+                              </li>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">5.</span>
+                                {t("download.downloadOptions.manualInstructions.step5")}
+                              </li>
+                              <li className="flex gap-2">
+                                <span className="font-medium text-primary">6.</span>
+                                {t("download.downloadOptions.manualInstructions.step6")}
+                              </li>
+                            </>
+                          )}
+                        </ol>
+                      </div>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border/50 p-8 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          {t("download.downloadOptions.selectProviderPrompt")}
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
-
-              {/* Right Column - Instructions */}
-              <div className="space-y-3">
-                {selectedProvider && selectedProvider !== "gofile" && (
-                  <Card className="relative overflow-hidden border-border bg-card/50">
-                    <div
-                      className={`absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent opacity-50`}
-                    />
-                    <CardContent className="relative space-y-4 p-4">
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                          <TriangleAlert className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-semibold text-foreground">
-                            {t("download.protectYourself.warningTitle")}
-                          </h3>
-                          <p className="mt-1.5 text-sm text-muted-foreground">
-                            {t("download.protectYourself.warning")}
-                          </p>
-                          <a
-                            onClick={() =>
-                              window.electron.openURL(
-                                "https://ascendara.app/protect-yourself"
-                              )
-                            }
-                            className="mt-3 inline-flex cursor-pointer items-center gap-1.5 text-sm text-primary/80 transition-colors hover:text-primary"
-                          >
-                            {t("download.protectYourself.learnHow")}
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {selectedProvider ? (
-                  <div>
-                    {useAscendara ? (
-                      <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
-                        <li>{t("download.downloadOptions.handlerInstructions.step1")}</li>
-                        <li>{t("download.downloadOptions.handlerInstructions.step2")}</li>
-                        <li>{t("download.downloadOptions.handlerInstructions.step3")}</li>
-                      </ol>
-                    ) : (
-                      <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
-                        <li>{t("download.downloadOptions.manualInstructions.step1")}</li>
-                        <li>{t("download.downloadOptions.manualInstructions.step2")}</li>
-                        <li>{t("download.downloadOptions.manualInstructions.step3")}</li>
-                        <li>{t("download.downloadOptions.manualInstructions.step4")}</li>
-                        <li>{t("download.downloadOptions.manualInstructions.step5")}</li>
-                        <li>{t("download.downloadOptions.manualInstructions.step6")}</li>
-                      </ol>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {t("download.downloadOptions.selectProviderPrompt")}
-                  </p>
-                )}
               </div>
             </div>
           )}

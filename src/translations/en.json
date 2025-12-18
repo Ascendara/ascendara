@@ -643,6 +643,7 @@
     "betaFeature": "Woah... this is still in beta!",
     "by": "by",
     "categories": "Categories",
+    "cloudSavingSupported": "Cloud Saving Supported",
     "companies": "Companies",
     "compareYourPC": "Compare Your PC",
     "completionist": "Completionist",
@@ -702,6 +703,7 @@
     "gameNotRated": "This game has not been reviewed by critics",
     "gameSize": "Game Size",
     "genres": "Genres",
+    "getAscend": "Get Ascend",
     "hours": "hours",
     "igdbLoading": "Loading game information...",
     "igdbRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",
@@ -718,6 +720,7 @@
     "mainPlusExtras": "Main + Extras",
     "mainStory": "Main Story",
     "medianScore": "Median Score",
+    "modManagingSupported": "Mod Managing Supported",
     "newUserGuide": {
       "close": "Close",
       "description": "You haven't installed a game before, so Ascendara will guide you through the setup process.",
