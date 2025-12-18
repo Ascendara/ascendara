@@ -76,6 +76,7 @@ import {
   fetchProviderPatterns,
   getProviderPattern,
 } from "@/services/providerPatternService";
+import nexusModsService from "@/services/nexusModsService";
 
 // Async validation using API patterns
 const isValidURL = async (url, provider, patterns) => {
@@ -290,6 +291,8 @@ export default function DownloadPage() {
   const [systemSpecs, setSystemSpecs] = useState(null);
   const [systemSpecsLoading, setSystemSpecsLoading] = useState(false);
   const [gameRating, setGameRating] = useState(gameData?.rating || 0);
+  const [supportsModManaging, setSupportsModManaging] = useState(false);
+  const [nexusGameData, setNexusGameData] = useState(null);
 
   // Fetch rating from new API when using local index
   useEffect(() => {
@@ -313,6 +316,24 @@ export default function DownloadPage() {
 
     fetchRating();
   }, [gameData?.gameID, settings.usingLocalIndex]);
+
+  // Check Nexus Mods support for the game
+  useEffect(() => {
+    const checkNexusModSupport = async () => {
+      if (gameData?.game) {
+        try {
+          const result = await nexusModsService.checkModSupport(gameData.game);
+          setSupportsModManaging(result.supported);
+          setNexusGameData(result.gameData);
+        } catch (error) {
+          console.error("Error checking Nexus Mods support:", error);
+          setSupportsModManaging(false);
+        }
+      }
+    };
+
+    checkNexusModSupport();
+  }, [gameData?.game]);
 
   // Use a ref to track the event handler and active status
   const urlHandlerRef = useRef(null);
@@ -1697,46 +1718,41 @@ export default function DownloadPage() {
               </div>
 
               {/* Ascend Features Banner - Bottom of Hero */}
-              {(() => {
-                const supportsModManaging = false; // TODO: Set this based on game support
-                return (
-                  <div className="mt-4 flex items-center justify-between rounded-lg border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-2.5">
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
-                          <Cloud className="h-4 w-4 text-primary" />
-                        </div>
-                        <span className="text-sm font-medium">
-                          {t("download.cloudSavingSupported")}
-                        </span>
-                      </div>
-                      {supportsModManaging && (
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
-                            <Puzzle className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="text-sm font-medium">
-                            {t("download.modManagingSupported")}
-                          </span>
-                        </div>
-                      )}
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-2.5">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
+                      <Cloud className="h-4 w-4 text-primary" />
                     </div>
-                    {!isAuthenticated && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1.5 text-primary hover:bg-primary/10"
-                        onClick={() =>
-                          window.electron.openURL("https://ascendara.app/ascend")
-                        }
-                      >
-                        {t("download.getAscend")}
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                    <span className="text-sm font-medium">
+                      {t("download.cloudSavingSupported")}
+                    </span>
                   </div>
-                );
-              })()}
+                  {supportsModManaging && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
+                        <Puzzle className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium">
+                        {t("download.modManagingSupported")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {!isAuthenticated && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-primary hover:bg-primary/10"
+                    onClick={() =>
+                      window.electron.openURL("https://ascendara.app/ascend")
+                    }
+                  >
+                    {t("download.getAscend")}
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
