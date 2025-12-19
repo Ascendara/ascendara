@@ -10,6 +10,8 @@ import {
   ArrowUpFromLine,
   ArrowDown,
   Calendar,
+  Clock,
+  Check,
 } from "lucide-react";
 import {
   TooltipProvider,
@@ -34,6 +36,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
   const navigate = useNavigate();
   const [showAllTags, setShowAllTags] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isPlayLater, setIsPlayLater] = useState(false);
   const cardRef = useRef(null);
   const { cachedImage, loading, error } = useImageLoader(game?.imgID, {
     quality: isVisible ? "high" : "low",
@@ -47,6 +50,14 @@ const GameCard = memo(function GameCard({ game, compact }) {
   const isMounted = useRef(true);
   const { t } = useLanguage();
   const { settings } = useSettings();
+
+  // Check if game is in Play Later list
+  useEffect(() => {
+    if (!game?.game) return;
+    const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+    const isInList = playLaterGames.some(g => g.game === game.game);
+    setIsPlayLater(isInList);
+  }, [game?.game]);
 
   // Setup intersection observer for lazy loading
   useEffect(() => {
@@ -147,6 +158,52 @@ const GameCard = memo(function GameCard({ game, compact }) {
       });
     });
   }, [navigate, game, isInstalled, needsUpdate, t]);
+
+  const handlePlayLater = useCallback(
+    e => {
+      e.stopPropagation();
+      const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+
+      if (isPlayLater) {
+        // Remove from list and cached image
+        const updatedList = playLaterGames.filter(g => g.game !== game.game);
+        localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+        localStorage.removeItem(`play-later-image-${game.game}`);
+        setIsPlayLater(false);
+      } else {
+        // Add to list with essential game data
+        const gameToSave = {
+          game: game.game,
+          gameID: game.gameID,
+          imgID: game.imgID,
+          version: game.version,
+          size: game.size,
+          category: game.category,
+          dlc: game.dlc,
+          online: game.online,
+          download_links: game.download_links,
+          desc: game.desc,
+          addedAt: Date.now(),
+        };
+        playLaterGames.push(gameToSave);
+        localStorage.setItem("play-later-games", JSON.stringify(playLaterGames));
+
+        // Cache the image if available
+        if (cachedImage) {
+          try {
+            localStorage.setItem(`play-later-image-${game.game}`, cachedImage);
+          } catch (e) {
+            console.warn("Could not cache play later image:", e);
+          }
+        }
+
+        setIsPlayLater(true);
+      }
+      // Dispatch event so Library can update
+      window.dispatchEvent(new CustomEvent("play-later-updated"));
+    },
+    [game, isPlayLater, cachedImage]
+  );
 
   if (compact) {
     return (
@@ -311,7 +368,28 @@ const GameCard = memo(function GameCard({ game, compact }) {
           )}
         </div>
       </CardContent>
-      <CardFooter className="flex items-center justify-between p-4">
+      <CardFooter className="flex flex-col gap-2 p-4">
+        {/* Play Later Button */}
+        {!isInstalled && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`w-full gap-2 ${isPlayLater ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={handlePlayLater}
+          >
+            {isPlayLater ? (
+              <>
+                <Check className="h-4 w-4" />
+                {t("gameCard.addedToPlayLater")}
+              </>
+            ) : (
+              <>
+                <Clock className="h-4 w-4" />
+                {t("gameCard.playLater")}
+              </>
+            )}
+          </Button>
+        )}
         {(() => {
           // Determine button state and provider
           const buttonState = isLoading

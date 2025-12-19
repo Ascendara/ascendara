@@ -924,11 +924,13 @@
     }
   },
   "gameCard": {
+    "addedToPlayLater": "Added to Play Later",
     "dlc": "ALL DLCs",
     "download": "Download",
     "installed": "Installed",
     "loading": "Fetching Game Details...",
     "online": "ONLINE",
+    "playLater": "Play Later",
     "ratingTooltip": "This is an average rating from others who have downloaded and played this game on Ascendara.",
     "showLess": "Show Less",
     "size": "Size",
@@ -1249,6 +1251,14 @@
     "openGameDirectory": "Open Game Directory",
     "pageTitle": "Your Library",
     "play": "Play",
+    "playLater": {
+      "addedOn": "Added",
+      "badge": "Later",
+      "download": "Download Now",
+      "remove": "Remove from Play Later",
+      "subtitle": "Games you've saved to download later",
+      "title": "Play Later"
+    },
     "playTime": "Play Time",
     "rateGame": {
       "commentPlaceholder": "e.g., I had a good time playing but...",

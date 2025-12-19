@@ -43,6 +43,7 @@ import {
   CloudUpload,
   Clock,
   DollarSign,
+  ArrowDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -156,6 +157,8 @@ const Library = () => {
   const [loadingCloudGames, setLoadingCloudGames] = useState(false);
   const [restoringGame, setRestoringGame] = useState(null);
   const [cloudGameImages, setCloudGameImages] = useState({});
+  // Play Later games state
+  const [playLaterGames, setPlayLaterGames] = useState([]);
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
   const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
   const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
@@ -371,6 +374,46 @@ const Library = () => {
     };
     init();
   }, []);
+
+  // Load Play Later games from localStorage
+  useEffect(() => {
+    const loadPlayLaterGames = () => {
+      const savedGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+      setPlayLaterGames(savedGames);
+    };
+
+    loadPlayLaterGames();
+
+    // Listen for updates from GameCard
+    const handlePlayLaterUpdate = () => {
+      loadPlayLaterGames();
+    };
+    window.addEventListener("play-later-updated", handlePlayLaterUpdate);
+
+    return () => {
+      window.removeEventListener("play-later-updated", handlePlayLaterUpdate);
+    };
+  }, []);
+
+  // Handle removing a game from Play Later list
+  const handleRemoveFromPlayLater = gameName => {
+    const updatedList = playLaterGames.filter(g => g.game !== gameName);
+    localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+    localStorage.removeItem(`play-later-image-${gameName}`);
+    setPlayLaterGames(updatedList);
+  };
+
+  // Handle navigating to download page for Play Later game
+  const handleDownloadPlayLater = game => {
+    // Remove from Play Later list and cached image
+    handleRemoveFromPlayLater(game.game);
+
+    navigate("/download", {
+      state: {
+        gameData: game,
+      },
+    });
+  };
 
   // Check for game updates when games are loaded
   useEffect(() => {
@@ -1631,7 +1674,7 @@ const Library = () => {
                   <Cloud className="h-5 w-5 text-blue-500" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold">
+                  <h2 className="!mb-0 text-xl font-semibold">
                     {t("library.cloudOnly.title")}
                   </h2>
                   <p className="text-sm text-muted-foreground">
@@ -1647,6 +1690,35 @@ const Library = () => {
                     imageData={cloudGameImages[game.name]}
                     onRestore={() => handleRestoreFromCloud(game)}
                     isRestoring={restoringGame === game.name}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Play Later Games Section */}
+          {playLaterGames.length > 0 && (
+            <div className="mt-10">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
+                  <Clock className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <h2 className="!mb-0 text-xl font-semibold">
+                    {t("library.playLater.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.playLater.subtitle")}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {playLaterGames.map(game => (
+                  <PlayLaterGameCard
+                    key={game.game}
+                    game={game}
+                    onDownload={() => handleDownloadPlayLater(game)}
+                    onRemove={() => handleRemoveFromPlayLater(game.game)}
                   />
                 ))}
               </div>
@@ -2381,6 +2453,139 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
 });
 
 CloudOnlyGameCard.displayName = "CloudOnlyGameCard";
+
+// Play Later game card
+const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
+  const { t } = useLanguage();
+  const [imageData, setImageData] = useState(null);
+
+  // Load game image from cache first, then fallback to API
+  useEffect(() => {
+    let isMounted = true;
+    const loadImage = async () => {
+      // Try cached image first
+      const cachedImage = localStorage.getItem(`play-later-image-${game.game}`);
+      if (cachedImage) {
+        if (isMounted) setImageData(cachedImage);
+        return;
+      }
+
+      // Fallback to API if no cached image
+      if (game.imgID) {
+        try {
+          const response = await fetch(
+            `https://api.ascendara.app/v2/image/${game.imgID}`
+          );
+          if (response.ok && isMounted) {
+            const blob = await response.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (isMounted) {
+                setImageData(reader.result);
+                // Cache for future use
+                try {
+                  localStorage.setItem(`play-later-image-${game.game}`, reader.result);
+                } catch (e) {
+                  console.warn("Could not cache play later image:", e);
+                }
+              }
+            };
+            reader.readAsDataURL(blob);
+          }
+        } catch (error) {
+          console.error("Error loading play later game image:", error);
+        }
+      }
+    };
+    loadImage();
+    return () => {
+      isMounted = false;
+    };
+  }, [game.game, game.imgID]);
+
+  const formatAddedDate = timestamp => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <Card
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+        "hover:-translate-y-1 hover:shadow-xl"
+      )}
+    >
+      <CardContent className="p-0">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          {/* Amber overlay with shimmer animation */}
+          <div className="absolute inset-0 z-10 bg-gradient-to-br from-amber-400/40 via-orange-500/30 to-amber-600/40">
+            <div
+              className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+              }}
+            />
+          </div>
+          {imageData ? (
+            <img
+              src={imageData}
+              alt={game.game}
+              className="h-full w-full border-b border-border object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-muted">
+              <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+            </div>
+          )}
+          {/* Play Later badge */}
+          <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded bg-amber-500/90 px-2 py-0.5 text-xs font-medium text-white">
+            <Clock className="h-3 w-3" />
+            {t("library.playLater.badge")}
+          </span>
+          {/* Remove button */}
+          <button
+            onClick={e => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/70 group-hover:opacity-100"
+            title={t("library.playLater.remove")}
+          >
+            <Plus className="h-3 w-3 rotate-45" />
+          </button>
+        </div>
+      </CardContent>
+      <CardFooter className="flex flex-col items-start gap-3 p-4 pt-3">
+        <div className="flex w-full items-center gap-2">
+          <h3 className="flex-1 truncate text-lg font-semibold text-foreground">
+            {game.game}
+          </h3>
+          {game.online && <Gamepad2 className="h-4 w-4 text-muted-foreground" />}
+          {game.dlc && <Gift className="h-4 w-4 text-muted-foreground" />}
+        </div>
+        <div className="flex w-full items-center justify-between text-sm text-muted-foreground">
+          {game.size && <span>{game.size}</span>}
+          {game.addedAt && (
+            <span className="text-xs">
+              {t("library.playLater.addedOn")} {formatAddedDate(game.addedAt)}
+            </span>
+          )}
+        </div>
+        <Button
+          onClick={onDownload}
+          className="w-full gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600"
+        >
+          <ArrowDown className="h-4 w-4" />
+          {t("library.playLater.download")}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+});
+
+PlayLaterGameCard.displayName = "PlayLaterGameCard";
 
 const AddGameForm = ({ onSuccess }) => {
   const { t } = useLanguage();
