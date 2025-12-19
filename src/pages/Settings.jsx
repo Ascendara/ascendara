@@ -357,8 +357,15 @@ function Settings() {
       };
       window.electron.onLocalRefreshProgress(handleProgress);
 
+      // Listen for public index download complete
+      const handlePublicDownloadComplete = () => {
+        setLastRefreshTime(new Date());
+      };
+      window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
+
       return () => {
         window.electron.offLocalRefreshProgress?.();
+        window.electron.offPublicIndexDownloadComplete?.();
       };
     }
   }, []);

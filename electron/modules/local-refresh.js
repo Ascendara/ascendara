@@ -993,6 +993,17 @@ function registerLocalRefreshHandlers() {
       }
 
       console.log("Shared index set up successfully");
+
+      // Write lastSuccessfulTimestamp to progress.json so Settings shows correct last refresh time
+      const progressFilePath = path.join(outputPath, "progress.json");
+      const progressData = {
+        status: "completed",
+        phase: "done",
+        progress: 1,
+        lastSuccessfulTimestamp: Math.floor(Date.now() / 1000),
+      };
+      fs.writeFileSync(progressFilePath, JSON.stringify(progressData, null, 2));
+
       publicIndexDownloading = false;
       if (mainWindow) {
         mainWindow.webContents.send("public-index-download-complete");

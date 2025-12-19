@@ -478,6 +478,7 @@ const LocalRefresh = () => {
         wasFirstIndexRef.current = false;
       }
       setHasIndexBefore(true);
+      setLastRefreshTime(new Date()); // Set last refresh time to now
       imageCacheService.clearCache();
     };
 
