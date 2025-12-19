@@ -35,6 +35,7 @@ import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import imageCacheService from "@/services/imageCacheService";
 import openCriticService from "@/services/openCriticService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
+import { addToQueue, hasActiveDownloads } from "@/services/downloadQueueService";
 import {
   BadgeCheckIcon,
   CheckIcon,
@@ -92,6 +93,48 @@ const isValidURL = async (url, provider, patterns) => {
 
 const sanitizeGameName = name => {
   return sanitizeText(name);
+};
+
+// Helper function to check if there are active downloads
+const checkActiveDownloads = async () => {
+  try {
+    // Check for pending download lock (prevents race condition when navigating quickly)
+    const pendingDownload = localStorage.getItem("pendingDownloadLock");
+    if (pendingDownload) {
+      const lockTime = parseInt(pendingDownload, 10);
+      // Lock expires after 10 seconds (in case of crash/error)
+      if (Date.now() - lockTime < 10000) {
+        return 1; // Treat as active download
+      } else {
+        localStorage.removeItem("pendingDownloadLock");
+      }
+    }
+
+    const games = await window.electron.getGames();
+    const activeDownloads = games.filter(game => {
+      const { downloadingData } = game;
+      return (
+        downloadingData &&
+        (downloadingData.downloading ||
+          downloadingData.extracting ||
+          downloadingData.updating)
+      );
+    });
+    return activeDownloads.length;
+  } catch (error) {
+    console.error("Error checking active downloads:", error);
+    return 0;
+  }
+};
+
+// Set download lock before starting download
+const setDownloadLock = () => {
+  localStorage.setItem("pendingDownloadLock", Date.now().toString());
+};
+
+// Clear download lock (called when download actually starts or fails)
+const clearDownloadLock = () => {
+  localStorage.removeItem("pendingDownloadLock");
 };
 
 export default function DownloadPage() {
@@ -283,6 +326,8 @@ export default function DownloadPage() {
   const [lastProcessedUrl, setLastProcessedUrl] = useState(null);
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const [showQueuePrompt, setShowQueuePrompt] = useState(false);
+  const [pendingDownloadData, setPendingDownloadData] = useState(null);
   const [igdbData, setIgdbData] = useState(null);
   const [igdbError, setIgdbError] = useState(null);
   const [igdbLoading, setIgdbLoading] = useState(false);
@@ -362,7 +407,7 @@ export default function DownloadPage() {
     }
   }
 
-  async function handleDownload(directUrl = null, dir = null) {
+  async function handleDownload(directUrl = null, dir = null, forceStart = false) {
     const sanitizedGameName = sanitizeText(gameData.game);
     if (showNoDownloadPath) {
       return;
@@ -371,6 +416,37 @@ export default function DownloadPage() {
     if (!gameData) {
       console.error("No game data available");
       toast.error(t("download.toast.noGameData"));
+      return;
+    }
+
+    // Check if there's an active download
+    const hasActive = await hasActiveDownloads();
+
+    if (hasActive && !forceStart) {
+      // Non-Ascend users can only have 1 download at a time - show error toast
+      if (!isAuthenticated) {
+        toast.error(t("download.toast.downloadQueueLimit"));
+        return;
+      }
+
+      // Ascend users get the queue dialog with options
+      const isVrGame = gameData.category?.includes("Virtual Reality");
+      setPendingDownloadData({
+        url: directUrl || gameData.download_links?.[selectedProvider]?.[0] || "",
+        gameName: sanitizedGameName,
+        online: gameData.online || false,
+        dlc: gameData.dlc || false,
+        isVr: isVrGame || false,
+        updateFlow: gameData.isUpdating || false,
+        version: gameData.version || "",
+        imgID: gameData.imgID,
+        size: gameData.size || "",
+        additionalDirIndex: dir || 0,
+        gameID: gameData.gameID || "",
+        directUrl: directUrl,
+        dir: dir,
+      });
+      setShowQueuePrompt(true);
       return;
     }
 
@@ -422,6 +498,7 @@ export default function DownloadPage() {
           console.error("Download failed:", error);
           toast.error(t("download.toast.downloadFailed"));
           setIsStartingDownload(false);
+          clearDownloadLock();
         }
         return;
       }
@@ -665,6 +742,7 @@ export default function DownloadPage() {
       console.error("Download failed:", error);
       toast.error(t("download.toast.downloadFailed"));
       setIsStartingDownload(false);
+      clearDownloadLock();
     }
   }
 
@@ -3053,6 +3131,67 @@ export default function DownloadPage() {
             >
               {t("common.ok")}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Download Queue Prompt Dialog */}
+      <AlertDialog open={showQueuePrompt} onOpenChange={setShowQueuePrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("download.queue.title", "Download in Progress")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4 text-muted-foreground">
+              {t(
+                "download.queue.description",
+                "Another download is currently in progress. Would you like to add this game to the queue or start it now?"
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => {
+                setShowQueuePrompt(false);
+                setPendingDownloadData(null);
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => {
+                if (pendingDownloadData) {
+                  addToQueue(pendingDownloadData);
+                  toast.success(t("download.toast.downloadQueued"));
+                }
+                setShowQueuePrompt(false);
+                setPendingDownloadData(null);
+              }}
+            >
+              {t("download.queue.addToQueue", "Add to Queue")}
+            </Button>
+            {isAuthenticated && (
+              <Button
+                className="text-secondary"
+                onClick={() => {
+                  setShowQueuePrompt(false);
+                  if (pendingDownloadData) {
+                    handleDownload(
+                      pendingDownloadData.directUrl,
+                      pendingDownloadData.dir,
+                      true
+                    );
+                  }
+                  setPendingDownloadData(null);
+                }}
+              >
+                {t("download.queue.startNow", "Start Now")}
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -66,7 +66,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useSettings } from "@/context/SettingsContext";
-import * as torboxService from "../services/torboxService";
+import {
+  processNextInQueue,
+  getDownloadQueue,
+  removeFromQueue,
+} from "@/services/downloadQueueService";
 import { cn } from "@/lib/utils";
 
 // Helper function to check if download speed is above 50 MB/s
@@ -165,6 +169,7 @@ const SpeedIndicator = memo(({ speed, isHigh }) => (
 
 const Downloads = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   useEffect(() => {
     window.electron.switchRPC("downloading");
@@ -176,10 +181,12 @@ const Downloads = () => {
   const [completedGames, setCompletedGames] = useState(new Set()); // Track games that just completed
   const [fadingGames, setFadingGames] = useState(new Set()); // Track games that are fading out
   const [torboxStates, setTorboxStates] = useState({}); // webdownloadId -> state
+  const [queuedDownloads, setQueuedDownloads] = useState([]);
   // Refs to always access the latest values inside polling
   const downloadingGamesRef = React.useRef(downloadingGames);
   const completedGamesRef = React.useRef(new Set());
   const fadingGamesRef = React.useRef(new Set());
+  const prevActiveCountRef = React.useRef(0);
   useEffect(() => {
     downloadingGamesRef.current = downloadingGames;
   }, [downloadingGames]);
@@ -213,7 +220,6 @@ const Downloads = () => {
     const savedPeak = localStorage.getItem("peakSpeed");
     return savedPeak ? parseFloat(savedPeak) : 0;
   });
-  const { t } = useLanguage();
 
   const normalizeSpeed = speed => {
     const [value, unit] = speed.split(" ");
@@ -312,6 +318,16 @@ const Downloads = () => {
           setCompletedGames(
             prev => new Set([...prev, ...newlyCompleted.map(g => g.game)])
           );
+
+          // Process next queued download when a game completes
+          // This triggers immediately when the "Download Complete" card shows
+          processNextInQueue().then(nextItem => {
+            if (nextItem) {
+              toast.success(
+                t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+              );
+            }
+          });
         }
 
         // Build the display list: current downloads + completed/fading games
@@ -362,7 +378,20 @@ const Downloads = () => {
         if (activeCount === 0) {
           setPeakSpeed(0);
           localStorage.setItem("peakSpeed", "0");
+
+          // Process next queued download when transitioning from active to no active downloads
+          // This handles stopped downloads and other cases where games don't go through "completed" state
+          if (prevActiveCountRef.current > 0) {
+            processNextInQueue().then(nextItem => {
+              if (nextItem) {
+                toast.success(
+                  t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+                );
+              }
+            });
+          }
         }
+        prevActiveCountRef.current = activeCount;
 
         // Update speed history
         setSpeedHistory(prevHistory => {
@@ -386,6 +415,17 @@ const Downloads = () => {
     const intervalId = setInterval(fetchDownloadingGames, 1000);
     // Only run this effect on mount/unmount (not on downloadingGames change)
     return () => clearInterval(intervalId);
+  }, []);
+
+  // Poll queued downloads
+  useEffect(() => {
+    const fetchQueuedDownloads = () => {
+      const queue = getDownloadQueue();
+      setQueuedDownloads(queue);
+    };
+    fetchQueuedDownloads();
+    const queueIntervalId = setInterval(fetchQueuedDownloads, 1000);
+    return () => clearInterval(queueIntervalId);
   }, []);
 
   useEffect(() => {
@@ -482,7 +522,7 @@ const Downloads = () => {
 
   return (
     <div className="container mx-auto px-4 pb-8">
-      {downloadingGames.length === 0 ? (
+      {downloadingGames.length === 0 && queuedDownloads.length === 0 ? (
         /* Empty State - Clean centered design */
         <div className="flex min-h-[85vh] flex-col items-center justify-center">
           <div className="space-y-8 text-center">
@@ -529,8 +569,14 @@ const Downloads = () => {
                       {t("downloads.activeDownloads")}
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                      {activeDownloads} {activeDownloads === 1 ? "download" : "downloads"}{" "}
-                      in progress
+                      {t("downloads.downloadsInProgress", { count: activeDownloads })}
+                      {queuedDownloads.length > 0 && (
+                        <span>
+                          {" "}
+                          ·{" "}
+                          {t("downloads.queuedCount", { count: queuedDownloads.length })}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -669,6 +715,62 @@ const Downloads = () => {
               />
             ))}
           </div>
+
+          {/* Queued Downloads Section */}
+          {queuedDownloads.length > 0 && (
+            <div className={downloadingGames.length === 0 ? "" : "mt-8"}>
+              <h2 className="mb-4 text-xl font-semibold text-foreground">
+                {t("downloads.queuedDownloads", "Queued Downloads")} (
+                {queuedDownloads.length})
+              </h2>
+              <div className="space-y-3">
+                {queuedDownloads.map((item, index) => (
+                  <Card
+                    key={item.id}
+                    className={cn(
+                      "border-border/50",
+                      index === 0 && downloadingGames.length === 0
+                        ? "border-primary/50 bg-primary/5"
+                        : "bg-card/50"
+                    )}
+                  >
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-4">
+                        {index === 0 && downloadingGames.length === 0 ? (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20">
+                            <Loader className="h-4 w-4 animate-spin text-primary" />
+                          </div>
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
+                            {index + 1}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-foreground">{item.gameName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {index === 0 && downloadingGames.length === 0
+                              ? t("downloads.startingSoon", "Starting soon...")
+                              : t("downloads.waitingInQueue", "Waiting in queue")}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => {
+                          removeFromQueue(item.id);
+                          setQueuedDownloads(prev => prev.filter(q => q.id !== item.id));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
