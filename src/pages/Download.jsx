@@ -1833,9 +1833,7 @@ export default function DownloadPage() {
                     variant="ghost"
                     size="sm"
                     className="gap-1.5 text-primary hover:bg-primary/10"
-                    onClick={() =>
-                      window.electron.openURL("https://ascendara.app/ascend")
-                    }
+                    onClick={() => navigate("/ascend")}
                   >
                     {t("download.getAscend")}
                     <ExternalLink className="h-3.5 w-3.5" />
