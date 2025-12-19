@@ -1044,6 +1044,30 @@ export const checkHardwareIdAccount = async hardwareId => {
 };
 
 /**
+ * Check if hardware ID belongs to a deleted account
+ * @param {string} hardwareId - The hardware ID to check
+ * @returns {Promise<{isDeleted: boolean, error: string|null}>}
+ */
+export const checkDeletedAccount = async hardwareId => {
+  try {
+    if (!hardwareId) {
+      return { isDeleted: false, error: null };
+    }
+
+    const hwDoc = await getDoc(doc(db, "hardwareIds", hardwareId));
+    if (!hwDoc.exists()) {
+      return { isDeleted: false, error: null };
+    }
+
+    const data = hwDoc.data();
+    return { isDeleted: data.deletedAcc === true, error: null };
+  } catch (error) {
+    console.error("Check deleted account error:", error);
+    return { isDeleted: false, error: error.message };
+  }
+};
+
+/**
  * Check if hardware ID has been used for a trial before
  * @param {string} hardwareId - The hardware ID to check
  * @returns {Promise<{used: boolean, trialExpired: boolean, linkedUserId: string|null}>}

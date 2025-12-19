@@ -19,6 +19,8 @@
     "deletionWarning": "Your request will be processed within a few days",
     "displayNameHint": "This is how other users will see you. Minimum 4 characters.",
     "errors": {
+      "accountDeleted": "Account Deleted",
+      "accountDeletedMessage": "This account was deleted by an administrator and cannot be recovered. All associated data has been permanently removed.",
       "accountExists": "Account Already Exists",
       "accountExistsNoEmail": "An account has already been created on this device. You can only have one Ascend account per device.",
       "accountExistsWithEmail": "An account has already been created on this device ({{email}}). You can only have one Ascend account per device.",

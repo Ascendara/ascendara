@@ -43,6 +43,7 @@ import {
   syncProfileToAscend,
   getProfileStats,
   checkHardwareIdAccount,
+  checkDeletedAccount,
   deleteNewAccount,
   registerHardwareId,
   syncCloudLibrary,
@@ -201,6 +202,7 @@ const Ascend = () => {
   const [activeSection, setActiveSection] = useState("home");
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [accountExistsError, setAccountExistsError] = useState(null); // { email: string | null }
+  const [deletedAccountWarning, setDeletedAccountWarning] = useState(false);
 
   // Friend system state
   const [searchQuery, setSearchQuery] = useState("");
@@ -1587,6 +1589,17 @@ const Ascend = () => {
       // Login
       const result = await login(formData.email, formData.password);
       if (result.user) {
+        // Check if this hardware ID belongs to a deleted account
+        let hardwareId = null;
+        if (window.electron?.getHardwareId) {
+          hardwareId = await window.electron.getHardwareId();
+        }
+        if (hardwareId) {
+          const deletedCheck = await checkDeletedAccount(hardwareId);
+          if (deletedCheck.isDeleted) {
+            setDeletedAccountWarning(true);
+          }
+        }
         toast.success(t("account.success.loggedIn"));
       } else if (result.error) {
         toast.error(result.error);
@@ -6817,6 +6830,49 @@ const Ascend = () => {
                           }
                         >
                           {t("account.errors.getSupport")}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Deleted Account Warning */}
+              {deletedAccountWarning && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="border-destructive/30 bg-destructive/10 rounded-xl border p-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="bg-destructive/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                      <Shield className="text-destructive h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-destructive text-sm font-semibold">
+                        {t("account.errors.accountDeleted")}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {t("account.errors.accountDeletedMessage")}
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() =>
+                            window.electron?.openURL("https://discord.gg/ascendara")
+                          }
+                        >
+                          {t("account.errors.getSupport")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => setDeletedAccountWarning(false)}
+                        >
+                          {t("common.dismiss")}
                         </Button>
                       </div>
                     </div>
