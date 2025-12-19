@@ -86,6 +86,7 @@ import igdbService from "@/services/gameInfoService";
 import GameRate from "@/components/GameRate";
 import EditCoverDialog from "@/components/EditCoverDialog";
 import nexusModsService from "@/services/nexusModsService";
+import flingTrainerService from "@/services/flingTrainerService";
 import { useAuth } from "@/context/AuthContext";
 import { getCloudLibrary } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
@@ -603,6 +604,10 @@ export default function GameScreen() {
   const [showOldVersions, setShowOldVersions] = useState(false);
   const modsPerPage = 12;
 
+  // FLiNG Trainer state
+  const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
+  const [flingTrainerData, setFlingTrainerData] = useState(null);
+
   // Cloud library state
   const [isInCloudLibrary, setIsInCloudLibrary] = useState(false);
   const [cloudLibraryLoading, setCloudLibraryLoading] = useState(true);
@@ -996,6 +1001,25 @@ export default function GameScreen() {
 
     checkNexusModSupport();
   }, [game?.game, game?.name, isAuthenticated]);
+
+  // Check FLiNG Trainer support for the game
+  useEffect(() => {
+    const checkFlingTrainerSupport = async () => {
+      if (game?.game || game?.name) {
+        const gameName = game.game || game.name;
+        try {
+          const result = await flingTrainerService.checkTrainerSupport(gameName);
+          setSupportsFlingTrainer(result.supported);
+          setFlingTrainerData(result.trainerData);
+        } catch (error) {
+          console.error("Error checking FLiNG Trainer support:", error);
+          setSupportsFlingTrainer(false);
+        }
+      }
+    };
+
+    checkFlingTrainerSupport();
+  }, [game?.game, game?.name]);
 
   // Check if game is in cloud library
   useEffect(() => {
@@ -1793,6 +1817,12 @@ export default function GameScreen() {
                   <TabsTrigger value="mods">
                     <Puzzle className="mr-2 h-4 w-4" />
                     {t("gameScreen.mods")}
+                  </TabsTrigger>
+                )}
+                {supportsFlingTrainer && (
+                  <TabsTrigger value="trainers">
+                    <Bolt className="mr-2 h-4 w-4" />
+                    {t("gameScreen.trainers")}
                   </TabsTrigger>
                 )}
               </TabsList>
@@ -2665,6 +2695,119 @@ export default function GameScreen() {
                             </div>
                           )}
                         </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
+
+              {/* Trainers tab - FLiNG Trainer */}
+              {supportsFlingTrainer && (
+                <TabsContent value="trainers" className="space-y-6">
+                  <Card>
+                    <CardContent className="p-6">
+                      {!isAuthenticated ? (
+                        /* Ascend promotion for non-authenticated users */
+                        <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
+                          <div className="rounded-full bg-primary/10 p-6">
+                            <Bolt className="h-16 w-16 text-primary" />
+                          </div>
+                          <div className="space-y-3">
+                            <h2 className="text-2xl font-bold">
+                              {t("gameScreen.trainersTitle")}
+                            </h2>
+                            <p className="text-lg text-muted-foreground">
+                              {t("gameScreen.trainerAvailable")}
+                            </p>
+                            <p className="max-w-md text-sm text-muted-foreground">
+                              {t("gameScreen.trainersAscendPromo")}
+                            </p>
+                          </div>
+                          <Button
+                            className="gap-2 text-secondary"
+                            onClick={() => navigate("/ascend")}
+                          >
+                            <Gem className="h-4 w-4" />
+                            {t("gameScreen.getAscend")}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center space-y-6 py-8 text-center">
+                          {flingTrainerData?.imageUrl && (
+                            <div className="overflow-hidden rounded-lg">
+                              <img
+                                src={flingTrainerData.imageUrl}
+                                alt={flingTrainerData.title}
+                                className="h-32 w-auto object-contain"
+                              />
+                            </div>
+                          )}
+                          {!flingTrainerData?.imageUrl && (
+                            <div className="rounded-full bg-primary/10 p-6">
+                              <Bolt className="h-16 w-16 text-primary" />
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <h2 className="text-2xl font-bold">
+                              {flingTrainerData?.title || t("gameScreen.trainersTitle")}
+                            </h2>
+                            {flingTrainerData?.options && (
+                              <p className="text-lg text-primary">
+                                {flingTrainerData.options} Options
+                              </p>
+                            )}
+                            {flingTrainerData?.version && (
+                              <p className="text-sm text-muted-foreground">
+                                {flingTrainerData.version}
+                              </p>
+                            )}
+                            <p className="max-w-md text-sm text-muted-foreground">
+                              {t("gameScreen.trainersDescription")}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-3 sm:flex-row">
+                            {flingTrainerData?.downloadUrl ? (
+                              <Button
+                                className="gap-2 text-secondary"
+                                onClick={async () => {
+                                  const success =
+                                    await flingTrainerService.downloadTrainer(
+                                      flingTrainerData,
+                                      game?.game || game?.name
+                                    );
+                                  if (success) {
+                                    toast.success(t("gameScreen.trainerDownloadStarted"));
+                                  } else {
+                                    toast.error(t("gameScreen.trainerDownloadFailed"));
+                                  }
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
+                                {t("gameScreen.downloadTrainer")}
+                              </Button>
+                            ) : (
+                              <Button
+                                className="gap-2 text-secondary"
+                                onClick={() =>
+                                  flingTrainerService.openTrainerPage(flingTrainerData)
+                                }
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                {t("gameScreen.downloadTrainer")}
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() =>
+                                flingTrainerService.openTrainerPage(flingTrainerData)
+                              }
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              {t("gameScreen.viewOnFling")}
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </CardContent>
                   </Card>

@@ -99,6 +99,16 @@ export default defineConfig({
           });
         },
       },
+      "/api/flingtrainer": {
+        target: "https://flingtrainer.com",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/flingtrainer/, ""),
+        configure: (proxy, _options) => {
+          proxy.on("error", (err, _req, _res) => {
+            console.log("FlingTrainer proxy error", err);
+          });
+        },
+      },
     },
   },
   resolve: {

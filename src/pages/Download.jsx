@@ -79,6 +79,7 @@ import {
   getProviderPattern,
 } from "@/services/providerPatternService";
 import nexusModsService from "@/services/nexusModsService";
+import flingTrainerService from "@/services/flingTrainerService";
 
 // Async validation using API patterns
 const isValidURL = async (url, provider, patterns) => {
@@ -339,6 +340,8 @@ export default function DownloadPage() {
   const [gameRating, setGameRating] = useState(gameData?.rating || 0);
   const [supportsModManaging, setSupportsModManaging] = useState(false);
   const [nexusGameData, setNexusGameData] = useState(null);
+  const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
+  const [flingTrainerData, setFlingTrainerData] = useState(null);
 
   // Fetch rating from new API when using local index
   useEffect(() => {
@@ -379,6 +382,24 @@ export default function DownloadPage() {
     };
 
     checkNexusModSupport();
+  }, [gameData?.game]);
+
+  // Check FLiNG Trainer support for the game
+  useEffect(() => {
+    const checkFlingTrainerSupport = async () => {
+      if (gameData?.game) {
+        try {
+          const result = await flingTrainerService.checkTrainerSupport(gameData.game);
+          setSupportsFlingTrainer(result.supported);
+          setFlingTrainerData(result.trainerData);
+        } catch (error) {
+          console.error("Error checking FLiNG Trainer support:", error);
+          setSupportsFlingTrainer(false);
+        }
+      }
+    };
+
+    checkFlingTrainerSupport();
   }, [gameData?.game]);
 
   // Use a ref to track the event handler and active status
@@ -1821,6 +1842,16 @@ export default function DownloadPage() {
                       </div>
                       <span className="text-sm font-medium">
                         {t("download.modManagingSupported")}
+                      </span>
+                    </div>
+                  )}
+                  {supportsFlingTrainer && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
+                        <Zap className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium">
+                        {t("download.trainerAvailable")}
                       </span>
                     </div>
                   )}
