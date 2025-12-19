@@ -109,6 +109,7 @@ const LocalRefresh = () => {
   const cookieSubmittedRef = useRef(false);
   const lastCookieToastTimeRef = useRef(0);
   const cookieDialogOpenRef = useRef(false);
+  const wasFirstIndexRef = useRef(false);
   const [checkingApi, setCheckingApi] = useState(false);
   const [apiAvailable, setApiAvailable] = useState(false);
   const [indexInfo, setIndexInfo] = useState(null); // { gameCount, date, size }
@@ -147,6 +148,8 @@ const LocalRefresh = () => {
         if (window.electron?.getTimestampValue) {
           const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
           setHasIndexBefore(hasIndexed === true);
+          // Track if this is the user's first index for auto-enabling
+          wasFirstIndexRef.current = hasIndexed !== true;
         }
 
         // Load last refresh time from progress.json lastSuccessfulTimestamp
@@ -361,6 +364,12 @@ const LocalRefresh = () => {
           t("localRefresh.refreshComplete") || "Game list refresh completed!"
         );
 
+        // Auto-enable local index if this was the user's first index
+        if (wasFirstIndexRef.current) {
+          await updateSetting("usingLocalIndex", true);
+          wasFirstIndexRef.current = false;
+        }
+
         // Reload the page after a short delay to ensure all components get fresh data
         // This is necessary because components may have cached old imgIDs in their state
         setTimeout(() => {
@@ -393,6 +402,11 @@ const LocalRefresh = () => {
         toast.success(
           t("localRefresh.refreshComplete") || "Game list refresh completed!"
         );
+        // Auto-enable local index if this was the user's first index
+        if (wasFirstIndexRef.current) {
+          await updateSetting("usingLocalIndex", true);
+          wasFirstIndexRef.current = false;
+        }
       } else {
         // Don't show error if user manually stopped
         setIsRefreshing(false);
@@ -457,6 +471,11 @@ const LocalRefresh = () => {
       toast.success(t("localRefresh.indexDownloaded") || "Public index downloaded!");
       if (window.electron?.setTimestampValue) {
         await window.electron.setTimestampValue("hasIndexBefore", true);
+      }
+      // Auto-enable local index if this was the user's first index
+      if (wasFirstIndexRef.current) {
+        await updateSetting("usingLocalIndex", true);
+        wasFirstIndexRef.current = false;
       }
       setHasIndexBefore(true);
       imageCacheService.clearCache();
