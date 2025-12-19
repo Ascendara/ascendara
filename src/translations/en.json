@@ -829,6 +829,7 @@
       "invalidLink": "Please enter a valid download link",
       "invalidProtocolUrl": "Sent URL is invalid. Please try again",
       "linkProcessed": "Link processed successfully",
+      "noDownloadDirectory": "Please set a download directory in Preferences first",
       "noGameData": "No game data was passed down",
       "processingLink": "Processing download link...",
       "reportFailed": "Failed to submit report",

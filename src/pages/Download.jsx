@@ -414,6 +414,13 @@ export default function DownloadPage() {
       return;
     }
 
+    // Check if download directory is set and valid
+    if (!settings.downloadDirectory || settings.downloadDirectory.trim() === "") {
+      setShowNoDownloadPath(true);
+      toast.error(t("download.toast.noDownloadDirectory"));
+      return;
+    }
+
     if (!gameData) {
       console.error("No game data available");
       toast.error(t("download.toast.noGameData"));
