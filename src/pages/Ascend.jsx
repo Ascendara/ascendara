@@ -119,6 +119,10 @@ import {
   BadgeDollarSign,
   UserCheck,
   Inbox,
+  Download,
+  ListOrdered,
+  Puzzle,
+  Infinity,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -6565,84 +6569,151 @@ const Ascend = () => {
             </motion.p>
           </div>
 
-          {/* Features Grid */}
+          {/* Premium Features Showcase */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="grid grid-cols-2 gap-4"
+            className="space-y-4"
           >
-            {[
-              {
-                icon: UserPlus,
-                label: t("account.features.friends"),
-                color: "from-blue-500/20 to-blue-600/10",
-              },
-              {
-                icon: MessageCircle,
-                label: t("account.features.chat"),
-                color: "from-green-500/20 to-green-600/10",
-              },
-              {
-                icon: User,
-                label: t("account.features.profiles"),
-                color: "from-purple-500/20 to-purple-600/10",
-              },
-              {
-                icon: Cloud,
-                label: t("account.features.cloudSync"),
-                color: "from-cyan-500/20 to-cyan-600/10",
-              },
-              {
-                icon: Trophy,
-                label: t("account.features.leaderboard"),
-                color: "from-yellow-500/20 to-yellow-600/10",
-              },
-              {
-                icon: Zap,
-                label: t("account.features.autoUpdate"),
-                color: "from-orange-500/20 to-orange-600/10",
-              },
-            ].map((feature, index) => (
+            {/* Top 3 Hero Features */}
+            <div className="space-y-3">
+              {/* Cloud Sync */}
               <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.35 + index * 0.05 }}
-                className={`group relative overflow-hidden rounded-xl bg-gradient-to-br ${feature.color} border border-border/30 p-4 transition-all hover:border-primary/30 hover:shadow-lg`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="group relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/20 via-cyan-600/10 to-transparent p-5"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background/50">
-                    <feature.icon className="h-5 w-5 text-foreground" />
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="relative flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 ring-1 ring-cyan-500/30">
+                    <Cloud className="h-6 w-6 text-cyan-400" />
                   </div>
-                  <span className="text-sm font-medium">{feature.label}</span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-semibold text-foreground">
+                      {t("account.features.cloudSync")}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("account.features.cloudSyncDesc")}
+                    </p>
+                  </div>
                 </div>
               </motion.div>
-            ))}
-          </motion.div>
 
-          {/* Highlight Features */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="space-y-3"
-          >
-            <div className="flex items-center gap-4 rounded-xl bg-muted/30 p-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Bell className="h-5 w-5 text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">
-                  {t("account.features.upcomingUpdates")}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {t("account.features.upcomingUpdatesDesc")}
-                </p>
+              {/* Two Column - Profiles & Mods */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Profiles */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="group relative overflow-hidden rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/20 to-purple-600/10 p-4"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                  <div className="relative flex flex-col gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20 ring-1 ring-purple-500/30">
+                      <User className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold">
+                        {t("account.features.profiles")}
+                      </h4>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {t("account.features.profilesDesc")}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Nexus Mods */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.45 }}
+                  className="group relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 p-4"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                  <div className="relative flex flex-col gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20 ring-1 ring-emerald-500/30">
+                      <Puzzle className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold">
+                        {t("account.features.nexusMods")}
+                      </h4>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {t("account.features.nexusModsDesc")}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
               </div>
             </div>
-            <div className="flex items-center gap-4 rounded-xl bg-muted/30 p-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+
+            {/* Additional Features Grid */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                {
+                  icon: UserPlus,
+                  labelKey: "account.features.friends",
+                  bgClass: "bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/15",
+                  iconClass: "text-blue-400",
+                },
+                {
+                  icon: MessageCircle,
+                  labelKey: "account.features.chat",
+                  bgClass: "bg-green-500/10 border-green-500/20 hover:bg-green-500/15",
+                  iconClass: "text-green-400",
+                },
+                {
+                  icon: Trophy,
+                  labelKey: "account.features.leaderboard",
+                  bgClass: "bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/15",
+                  iconClass: "text-yellow-400",
+                },
+                {
+                  icon: Infinity,
+                  labelKey: "account.features.unlimitedDownloads",
+                  bgClass: "bg-violet-500/10 border-violet-500/20 hover:bg-violet-500/15",
+                  iconClass: "text-violet-400",
+                },
+                {
+                  icon: ListOrdered,
+                  labelKey: "account.features.downloadQueues",
+                  bgClass: "bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15",
+                  iconClass: "text-amber-400",
+                },
+                {
+                  icon: Zap,
+                  labelKey: "account.features.autoUpdate",
+                  bgClass: "bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15",
+                  iconClass: "text-orange-400",
+                },
+              ].map((feature, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 + index * 0.03 }}
+                  className={`group relative overflow-hidden rounded-lg border p-3 transition-colors ${feature.bgClass}`}
+                >
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <feature.icon className={`h-4 w-4 ${feature.iconClass}`} />
+                    <span className="text-xs font-medium">{t(feature.labelKey)}</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Coming Soon Banner */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="flex items-center gap-3 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20">
                 <Sparkles className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
@@ -6651,7 +6722,7 @@ const Ascend = () => {
                   {t("account.features.moreComingDesc")}
                 </p>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
 
           {/* Pricing notice - only on signup */}
