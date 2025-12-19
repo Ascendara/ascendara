@@ -844,7 +844,7 @@ const LocalRefresh = () => {
                         <a
                           onClick={() =>
                             window.electron.openURL(
-                              "https://ascendara.app/docs/features/refreshing-index"
+                              "https://ascendara.app/docs/features/refreshing-index#community-shared-index"
                             )
                           }
                           className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
