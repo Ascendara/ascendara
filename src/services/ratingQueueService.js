@@ -11,7 +11,49 @@ class RatingQueueService {
     this.cache = new Map();
     this.subscribers = new Map(); // gameID -> Set of callbacks
     this.delayBetweenRequests = 150; // ms between each request
-    this.cacheExpiry = 5 * 60 * 1000; // 5 minutes cache
+    this.cacheExpiry = 30 * 60 * 1000; // 30 minutes cache
+    this.storageKey = "ascendara-ratings-cache";
+    this.loadFromStorage();
+  }
+
+  /**
+   * Load cached ratings from localStorage
+   */
+  loadFromStorage() {
+    try {
+      const stored = localStorage.getItem(this.storageKey);
+      if (stored) {
+        const data = JSON.parse(stored);
+        const now = Date.now();
+        // Only load non-expired entries
+        Object.entries(data).forEach(([gameID, entry]) => {
+          if (now - entry.timestamp < this.cacheExpiry) {
+            this.cache.set(gameID, entry);
+          }
+        });
+      }
+    } catch (error) {
+      console.warn("Error loading ratings cache from storage:", error);
+    }
+  }
+
+  /**
+   * Save cached ratings to localStorage
+   */
+  saveToStorage() {
+    try {
+      const data = {};
+      const now = Date.now();
+      this.cache.forEach((entry, gameID) => {
+        // Only save non-expired entries with valid ratings
+        if (now - entry.timestamp < this.cacheExpiry && entry.rating > 0) {
+          data[gameID] = entry;
+        }
+      });
+      localStorage.setItem(this.storageKey, JSON.stringify(data));
+    } catch (error) {
+      console.warn("Error saving ratings cache to storage:", error);
+    }
   }
 
   /**
@@ -88,6 +130,9 @@ class RatingQueueService {
             rating,
             timestamp: Date.now(),
           });
+
+          // Persist to localStorage
+          this.saveToStorage();
 
           // Notify all subscribers
           const subs = this.subscribers.get(gameID);

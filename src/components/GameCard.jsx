@@ -113,16 +113,23 @@ const GameCard = memo(function GameCard({ game, compact }) {
     };
   }, [game.game, game.version]);
 
-  // Fetch rating from queue service when using local index
+  // Fetch rating from queue service
   // This ensures ratings are fetched one at a time to prevent API flooding
+  // and cached persistently in localStorage
   useEffect(() => {
-    if (!settings.usingLocalIndex || !game.gameID) return;
+    if (!game.gameID) return;
 
-    // Check for cached rating first
+    // If game already has a rating from the API response, use it
+    if (game.rating && game.rating > 0) {
+      setGameRating(game.rating);
+      return;
+    }
+
+    // Check for cached rating first (loads immediately from localStorage)
     const cachedRating = ratingQueueService.getCachedRating(game.gameID);
     if (cachedRating !== null && cachedRating > 0) {
       setGameRating(cachedRating);
-      return;
+      // Don't return - still subscribe to get fresh rating in background
     }
 
     // Subscribe to rating updates - will be processed in queue
@@ -133,7 +140,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
     });
 
     return () => unsubscribe();
-  }, [game.gameID, settings.usingLocalIndex]);
+  }, [game.gameID, game.rating]);
 
   const handleDownload = useCallback(() => {
     if (isInstalled && !needsUpdate) return;
