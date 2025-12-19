@@ -238,6 +238,10 @@ class GofileDownloader:
             if 'downloadingData' not in self.game_info:
                 self.game_info['downloadingData'] = {}
             self.game_info['downloadingData']['updating'] = True
+            # Update version to the new version being downloaded
+            if version:
+                logging.info(f"[AscendaraGofileHelper] Updating version from {self.game_info.get('version', 'unknown')} to {version}")
+                self.game_info['version'] = version
         else:
             self.game_info = {
                 "game": game,

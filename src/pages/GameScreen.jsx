@@ -88,6 +88,7 @@ import EditCoverDialog from "@/components/EditCoverDialog";
 import nexusModsService from "@/services/nexusModsService";
 import { useAuth } from "@/context/AuthContext";
 import { getCloudLibrary } from "@/services/firebaseService";
+import gameService from "@/services/gameService";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
@@ -610,6 +611,12 @@ export default function GameScreen() {
   const [achievements, setAchievements] = useState(null);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
 
+  // Game update state
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [isStartingUpdate, setIsStartingUpdate] = useState(false);
+
   // Achievements pagination state
   const [achievementsPage, setAchievementsPage] = useState(0);
   const perPage = 12; // 3 rows x 4 columns
@@ -726,6 +733,54 @@ export default function GameScreen() {
       clearInterval(gameStatusInterval);
     };
   }, [game, navigate]);
+
+  // Check for game updates
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      console.log(
+        "[GameScreen] checkForUpdates called, game:",
+        game?.game,
+        "gameID:",
+        game?.gameID,
+        "version:",
+        game?.version,
+        "isCustom:",
+        game?.isCustom
+      );
+
+      if (!game || game.isCustom || !game.gameID) {
+        console.log(
+          "[GameScreen] Skipping update check - no game, custom game, or no gameID"
+        );
+        setUpdateInfo(null);
+        return;
+      }
+
+      setUpdateCheckLoading(true);
+      try {
+        console.log(
+          `[GameScreen] Checking update for ${game.game} (${game.gameID}), version: ${game.version}`
+        );
+        const result = await gameService.checkGameUpdate(game.gameID, game.version);
+        console.log("[GameScreen] Update check result:", result);
+        setUpdateInfo(result);
+        if (result?.updateAvailable) {
+          console.log(
+            "[GameScreen] UPDATE AVAILABLE! Latest:",
+            result.latestVersion,
+            "Local:",
+            result.localVersion
+          );
+        }
+      } catch (error) {
+        console.error("[GameScreen] Error checking for game update:", error);
+        setUpdateInfo(null);
+      }
+      setUpdateCheckLoading(false);
+    };
+
+    checkForUpdates();
+  }, [game]);
 
   // Re-fetch IGDB data when API config becomes available
   useEffect(() => {
@@ -1414,7 +1469,25 @@ export default function GameScreen() {
                 <div className="flex items-center gap-1 text-sm text-primary/80">
                   <Tag className="h-4 w-4" />
                   <span>{game.version}</span>
+                  {updateInfo?.updateAvailable && (
+                    <button
+                      onClick={() => setShowUpdateDialog(true)}
+                      className="ml-1 flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
+                    >
+                      <Download className="h-3 w-3" />
+                      {t("gameScreen.updateBadge")}
+                    </button>
+                  )}
                 </div>
+              )}
+              {!game.version && updateInfo?.updateAvailable && (
+                <button
+                  onClick={() => setShowUpdateDialog(true)}
+                  className="flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
+                >
+                  <Download className="h-3 w-3" />
+                  {t("gameScreen.updateBadge")}
+                </button>
               )}
               {game.size && (
                 <div className="flex items-center gap-1 text-sm text-primary/80">
@@ -2996,6 +3069,166 @@ export default function GameScreen() {
         onClose={() => setShowSteamNotRunningWarning(false)}
         t={t}
       />
+
+      {/* Game Update Available Dialog */}
+      <AlertDialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("gameScreen.updateAvailable")}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-muted-foreground">
+                <p>
+                  {isAuthenticated
+                    ? t("gameScreen.updateAvailableDescription")
+                    : t("gameScreen.updateAvailableDescriptionNoAuth")}
+                </p>
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">{t("gameScreen.currentVersion")}</span>
+                    <span className="font-mono text-sm font-medium text-foreground">
+                      {updateInfo?.localVersion || game?.version || "-"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-sm">{t("gameScreen.latestVersion")}</span>
+                    <span className="font-mono text-sm font-medium text-primary">
+                      {updateInfo?.latestVersion || "-"}
+                    </span>
+                  </div>
+                </div>
+                {!isAuthenticated && (
+                  <p className="text-xs text-muted-foreground/80">
+                    {t("gameScreen.updateManualHint")}
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => setShowUpdateDialog(false)}
+            >
+              {t("common.later")}
+            </Button>
+            <Button
+              className="text-secondary"
+              disabled={isStartingUpdate}
+              onClick={async () => {
+                // Check if user is authenticated - if not, promote Ascend
+                if (!isAuthenticated) {
+                  setShowUpdateDialog(false);
+                  navigate("/ascend");
+                  return;
+                }
+
+                if (!updateInfo?.autoUpdateSupported) {
+                  // No seamless provider, navigate to download page
+                  setShowUpdateDialog(false);
+                  navigate("/download", {
+                    state: {
+                      gameData: {
+                        game: updateInfo?.gameName || game?.game,
+                        gameID: updateInfo?.gameID || game?.gameID,
+                        version: updateInfo?.latestVersion,
+                        download_links: updateInfo?.downloadLinks,
+                        imgID: game?.imgID,
+                        isUpdate: true,
+                      },
+                    },
+                  });
+                  return;
+                }
+
+                // Try seamless providers: gofile first, then buzzheavier, then pixeldrain
+                const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
+                const downloadLinks = updateInfo?.downloadLinks || {};
+
+                let downloadUrl = null;
+                for (const provider of seamlessProviders) {
+                  const links = downloadLinks[provider];
+                  if (Array.isArray(links) && links.length > 0) {
+                    const validLink = links.find(
+                      link => link && typeof link === "string"
+                    );
+                    if (validLink) {
+                      downloadUrl = validLink.replace(/^(?:https?:)?\/\//, "https://");
+                      console.log(
+                        `[GameScreen] Found seamless link from ${provider}:`,
+                        downloadUrl
+                      );
+                      break;
+                    }
+                  }
+                }
+
+                if (!downloadUrl) {
+                  // Fallback to download page if no seamless link found
+                  setShowUpdateDialog(false);
+                  navigate("/download", {
+                    state: {
+                      gameData: {
+                        game: updateInfo?.gameName || game?.game,
+                        gameID: updateInfo?.gameID || game?.gameID,
+                        version: updateInfo?.latestVersion,
+                        download_links: updateInfo?.downloadLinks,
+                        imgID: game?.imgID,
+                        isUpdate: true,
+                      },
+                    },
+                  });
+                  return;
+                }
+
+                // Start the seamless download directly
+                setIsStartingUpdate(true);
+                try {
+                  const gameName = game?.game || game?.name;
+                  const dir = await window.electron.getDownloadDirectory();
+
+                  console.log(`[GameScreen] Starting update download for ${gameName}`);
+                  await window.electron.downloadFile(
+                    downloadUrl,
+                    gameName,
+                    game?.online || false,
+                    game?.dlc || false,
+                    game?.isVr || false,
+                    true, // isUpdating
+                    updateInfo?.latestVersion || "",
+                    game?.imgID,
+                    game?.size || "",
+                    dir,
+                    game?.gameID || ""
+                  );
+
+                  toast.success(t("gameScreen.updateStarted"));
+                  setShowUpdateDialog(false);
+                  navigate("/downloads");
+                } catch (error) {
+                  console.error("[GameScreen] Error starting update:", error);
+                  toast.error(t("gameScreen.updateFailed"));
+                } finally {
+                  setIsStartingUpdate(false);
+                }
+              }}
+            >
+              {isStartingUpdate ? (
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isAuthenticated
+                ? isStartingUpdate
+                  ? t("gameScreen.startingUpdate")
+                  : t("gameScreen.downloadUpdate")
+                : t("gameScreen.getAscendToUpdate")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Launch Options Dialog */}
       <AlertDialog

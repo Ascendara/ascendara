@@ -157,6 +157,7 @@ const Library = () => {
   const [restoringGame, setRestoringGame] = useState(null);
   const [cloudGameImages, setCloudGameImages] = useState({});
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
+  const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
   const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
   const [libraryValueData, setLibraryValueData] = useState(() => {
     const cached = localStorage.getItem("library-value-cache");
@@ -370,6 +371,57 @@ const Library = () => {
     };
     init();
   }, []);
+
+  // Check for game updates when games are loaded
+  useEffect(() => {
+    const checkGameUpdates = async () => {
+      console.log("[Library] checkGameUpdates called, games:", games.length);
+
+      // Only check for non-custom games with gameID
+      const gamesWithId = games.filter(g => !g.isFolder && !g.isCustom && g.gameID);
+      console.log(
+        "[Library] Games with gameID:",
+        gamesWithId.length,
+        gamesWithId.map(g => ({ name: g.game, gameID: g.gameID, version: g.version }))
+      );
+      if (gamesWithId.length === 0) {
+        console.log("[Library] No games with gameID found, skipping update check");
+        return;
+      }
+
+      const updates = {};
+      // Check updates in parallel but limit concurrency
+      const checkPromises = gamesWithId.map(async game => {
+        try {
+          console.log(
+            `[Library] Checking update for ${game.game} (${game.gameID}), version: ${game.version}`
+          );
+          const result = await gameService.checkGameUpdate(game.gameID, game.version);
+          console.log(`[Library] Update result for ${game.game}:`, result);
+          if (result?.updateAvailable) {
+            console.log(`[Library] Update available for ${game.game}!`);
+            updates[game.gameID] = result;
+          }
+        } catch (error) {
+          console.error(`[Library] Error checking update for ${game.game}:`, error);
+        }
+      });
+
+      await Promise.all(checkPromises);
+      console.log("[Library] All updates checked, updates found:", updates);
+      setGameUpdates(updates);
+    };
+
+    if (isInitialized && games.length > 0) {
+      console.log(
+        "[Library] Triggering update check, isInitialized:",
+        isInitialized,
+        "games.length:",
+        games.length
+      );
+      checkGameUpdates();
+    }
+  }, [isInitialized, games]);
 
   // Load cloud-only games (games in cloud but not installed locally)
   useEffect(() => {
@@ -1537,6 +1589,7 @@ const Library = () => {
                           selectionMode={selectionMode}
                           isSelected={selectedGames.includes(game.game)}
                           onSelectCheckbox={() => handleSelectGame(game)}
+                          updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
                         />
                       </DraggableGameCard>
                     )}
@@ -1810,6 +1863,7 @@ const InstalledGameCard = memo(
     onToggleFavorite,
     selectionMode,
     onSelectCheckbox,
+    updateInfo,
   }) => {
     const { t } = useLanguage();
     const { settings } = useSettings();
@@ -2116,6 +2170,12 @@ const InstalledGameCard = memo(
               {typeof game.launchCount === "undefined" && !game.isCustom && (
                 <span className="pointer-events-none absolute left-2 top-2 z-20 select-none rounded bg-secondary px-2 py-0.5 text-xs font-bold text-primary">
                   {t("library.newBadge")}
+                </span>
+              )}
+              {updateInfo?.updateAvailable && (
+                <span className="pointer-events-none absolute right-2 top-2 z-20 flex select-none items-center gap-1 rounded bg-primary px-2 py-0.5 text-xs font-bold text-secondary">
+                  <Import className="h-3 w-3" />
+                  {t("gameScreen.updateBadge")}
                 </span>
               )}
               {/* Floating action bar for buttons */}

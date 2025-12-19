@@ -99,17 +99,23 @@ function registerDownloadHandlers() {
             gameDirectory = testPath;
             console.log(`Found existing game directory at: ${gameDirectory}`);
 
-            // Delete all contents except game.ascendara.json
+            // Delete all contents except .ascendara.json and header.ascendara files
             const files = await fs.promises.readdir(gameDirectory);
             for (const file of files) {
-              if (file !== `${sanitizedGame}.ascendara.json`) {
-                const filePath = path.join(gameDirectory, file);
-                const stat = await fs.promises.stat(filePath);
-                if (stat.isDirectory()) {
-                  await fs.promises.rm(filePath, { recursive: true });
-                } else {
-                  await fs.promises.unlink(filePath);
-                }
+              // Preserve the game's ascendara.json file and header image
+              if (
+                file.endsWith(".ascendara.json") ||
+                file.startsWith("header.ascendara")
+              ) {
+                console.log(`Update flow: preserving file: ${file}`);
+                continue;
+              }
+              const filePath = path.join(gameDirectory, file);
+              const stat = await fs.promises.stat(filePath);
+              if (stat.isDirectory()) {
+                await fs.promises.rm(filePath, { recursive: true });
+              } else {
+                await fs.promises.unlink(filePath);
               }
             }
             break;
@@ -143,47 +149,66 @@ function registerDownloadHandlers() {
           return;
         }
 
-        // Download game header image
+        // Download game header image (skip if updateFlow and header already exists, or if imgID is undefined)
         let headerImagePath;
         let imageBuffer;
 
-        if (settings.usingLocalIndex && settings.localIndex && imgID) {
-          const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
-          if (fs.existsSync(localImagePath)) {
-            imageBuffer = await fs.promises.readFile(localImagePath);
-            headerImagePath = path.join(gameDirectory, `header.ascendara.jpg`);
-            await fs.promises.writeFile(headerImagePath, imageBuffer);
+        // Check if header image already exists (for update flow)
+        const existingHeaders = await fs.promises.readdir(gameDirectory).catch(() => []);
+        const existingHeader = existingHeaders.find(f =>
+          f.startsWith("header.ascendara")
+        );
+
+        if (updateFlow && existingHeader) {
+          console.log(`Update flow: keeping existing header image: ${existingHeader}`);
+          headerImagePath = path.join(gameDirectory, existingHeader);
+        } else if (imgID) {
+          // Only try to download image if imgID is defined
+          if (settings.usingLocalIndex && settings.localIndex) {
+            const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+            if (fs.existsSync(localImagePath)) {
+              imageBuffer = await fs.promises.readFile(localImagePath);
+              headerImagePath = path.join(gameDirectory, `header.ascendara.jpg`);
+              await fs.promises.writeFile(headerImagePath, imageBuffer);
+            }
           }
-        }
 
-        if (!headerImagePath) {
-          const imageLink =
-            settings.gameSource === "fitgirl"
-              ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
-              : `https://api.ascendara.app/v2/image/${imgID}`;
+          if (!headerImagePath) {
+            const imageLink =
+              settings.gameSource === "fitgirl"
+                ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
+                : `https://api.ascendara.app/v2/image/${imgID}`;
 
-          const timestamp = Math.floor(Date.now() / 1000);
-          const signature = crypto
-            .createHmac("sha256", imageKey)
-            .update(timestamp.toString())
-            .digest("hex");
+            const timestamp = Math.floor(Date.now() / 1000);
+            const signature = crypto
+              .createHmac("sha256", imageKey)
+              .update(timestamp.toString())
+              .digest("hex");
 
-          const response = await axios({
-            url: imageLink,
-            method: "GET",
-            responseType: "arraybuffer",
-            headers: {
-              "X-Timestamp": timestamp.toString(),
-              "X-Signature": signature,
-              "Cache-Control": "no-store",
-            },
-          });
+            try {
+              const response = await axios({
+                url: imageLink,
+                method: "GET",
+                responseType: "arraybuffer",
+                headers: {
+                  "X-Timestamp": timestamp.toString(),
+                  "X-Signature": signature,
+                  "Cache-Control": "no-store",
+                },
+              });
 
-          imageBuffer = Buffer.from(response.data);
-          const mimeType = response.headers["content-type"];
-          const extension = getExtensionFromMimeType(mimeType);
-          headerImagePath = path.join(gameDirectory, `header.ascendara${extension}`);
-          await fs.promises.writeFile(headerImagePath, imageBuffer);
+              imageBuffer = Buffer.from(response.data);
+              const mimeType = response.headers["content-type"];
+              const extension = getExtensionFromMimeType(mimeType);
+              headerImagePath = path.join(gameDirectory, `header.ascendara${extension}`);
+              await fs.promises.writeFile(headerImagePath, imageBuffer);
+            } catch (imgError) {
+              console.error(`Failed to download header image: ${imgError.message}`);
+              // Continue without header image
+            }
+          }
+        } else {
+          console.log(`No imgID provided, skipping header image download`);
         }
 
         let executablePath;

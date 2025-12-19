@@ -531,6 +531,49 @@ const gameService = {
       return null;
     }
   },
+
+  async checkGameUpdate(gameID, localVersion) {
+    console.log("[GameService] checkGameUpdate called with:", { gameID, localVersion });
+    try {
+      if (!gameID) {
+        console.warn("[GameService] No gameID provided for update check");
+        return null;
+      }
+
+      const encodedVersion = encodeURIComponent(localVersion || "");
+      const url = `${API_URL}/v3/game/checkupdate/${gameID}?local_version=${encodedVersion}`;
+      console.log("[GameService] Fetching update from:", url);
+
+      const response = await fetch(url);
+      console.log("[GameService] Response status:", response.status);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`[GameService] Game not found in index: ${gameID}`);
+          return null;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("[GameService] Update check response:", data);
+
+      const result = {
+        gameID: data.gameID,
+        gameName: data.gameName,
+        latestVersion: data.latestVersion,
+        localVersion: data.localVersion,
+        updateAvailable: data.updateAvailable,
+        autoUpdateSupported: data.autoUpdateSupported,
+        downloadLinks: data.downloadLinks || {},
+      };
+      console.log("[GameService] Returning result:", result);
+      return result;
+    } catch (error) {
+      console.error("[GameService] Error checking game update:", error);
+      return null;
+    }
+  },
 };
 
 export default gameService;

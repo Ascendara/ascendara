@@ -50,6 +50,7 @@ import {
   Puzzle,
   History,
   Zap,
+  RefreshCw,
   AlertTriangle,
   Star,
   FolderIcon,
@@ -1813,6 +1814,16 @@ export default function DownloadPage() {
                       </div>
                       <span className="text-sm font-medium">
                         {t("download.modManagingSupported")}
+                      </span>
+                    </div>
+                  )}
+                  {providers.some(p => seamlessProviders.includes(p)) && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
+                        <RefreshCw className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium">
+                        {t("download.autoUpdatesSupported")}
                       </span>
                     </div>
                   )}
