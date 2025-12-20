@@ -3,6 +3,15 @@
     "actions": "アカウントのアクション",
     "almostThere": "もうすぐそこです！",
     "chooseDisplayName": "アカウントの表示名を選択してください",
+    "confirmEmail": {
+      "confirm": "はい、アカウントを作成します",
+      "creating": "アカウントを作成しています...",
+      "emailLabel": "電子メールアドレス：",
+      "goBack": "戻って編集する",
+      "message": "メールアドレスが正しいことを確認してください。アカウントの作成後は、メール アドレスを変更することはできません。",
+      "title": "メールを確認してください",
+      "warning": "このメールアドレスはアカウント作成後に変更することはできません。"
+    },
     "deletion": {
       "confirmed": "リクエストが送信されました",
       "deleting": "送信中...",
@@ -24,6 +33,8 @@
       "accountExists": "アカウントはすでに存在します",
       "accountExistsNoEmail": "このデバイスにはアカウントがすでに作成されています。デバイスごとに持つことができる Ascend アカウントは 1 つだけです。",
       "accountExistsWithEmail": "このデバイス ({{email}}) にはアカウントがすでに作成されています。デバイスごとに持つことができる Ascend アカウントは 1 つだけです。",
+      "cannotCreateAccount": "アカウントを作成できません",
+      "deletedAccountMessage": "このアカウントは管理者によって削除されたため、復元できません。関連するデータはすべて完全に削除されました。",
       "displayNameTooShort": "表示名は 4 文字以上である必要があります",
       "emailRequired": "メールアドレスを入力してください",
       "getSupport": "Discord でサポートを受ける",
@@ -350,13 +361,81 @@
       "messages": "メッセージ",
       "notifications": "通知",
       "online": "オンライン",
+      "premium": "プレミアム機能",
       "requests": "リクエスト",
       "search": "検索",
       "settings": "設定",
       "social": "社交",
       "upcoming": "今後のアップデート"
     },
-    "notifications": { "empty": "通知はありません", "title": "通知" },
+    "notifications": {
+      "empty": "通知はありません",
+      "emptyDescription": "皆さんも追いついてきました！新しい更新情報については、後でもう一度確認してください。",
+      "loading": "通知を読み込んでいます...",
+      "subtitle": "重要なお知らせや最新情報を常に入手してください",
+      "title": "通知"
+    },
+    "premium": {
+      "autoUpdate": {
+        "description": "ゲームのアップデートをバックグラウンドで自動的にチェックします。アップデートが利用可能になったときに通知を受け取り、ワンクリックでインストールできます。",
+        "title": "ゲームの自動アップデートチェック"
+      },
+      "chat": {
+        "description": "Ascendara 内で友達と直接チャットできます。ゲームのおすすめを共有し、プレイ セッションを調整し、ゲーム サークルとのつながりを保ちます。",
+        "title": "リアルタイムチャット"
+      },
+      "cloudBackups": {
+        "description": "ゲームのセーブデータをクラウドに自動的にバックアップします。進行状況を失うことはなく、どのデバイスでも保存を復元できます。",
+        "title": "クラウドバックアップ"
+      },
+      "cloudSync": {
+        "description": "プロフィール、実績、ゲームデータは自動的にクラウドに同期されます。どこからでも、どのデバイスからでも、完全なゲーム履歴にアクセスできます。",
+        "title": "クラウド同期"
+      },
+      "communities": {
+        "description": "ゲーム固有のコミュニティで一緒にプレイする人を見つけます。興味を共有するプレイヤーとつながり、マルチプレイヤー セッションを調整します。",
+        "title": "ゲームコミュニティ"
+      },
+      "downloadQueue": {
+        "description": "複数のダウンロードをキューに入れ、Ascendara に自動的に処理させます。ダウンロードを開始し、すべての準備ができたら戻ってください。",
+        "title": "ダウンロードキュー"
+      },
+      "flingTrainer": {
+        "description": "ゲーム用の FLiNG トレーナーを自動的にダウンロードして実行します。手動での検索や設定は必要ありません。",
+        "title": "FLiNGトレーナー"
+      },
+      "friends": {
+        "description": "友達リクエストを送信および承認し、ゲーム ネットワークを構築し、友達がいつオンラインになっているかを確認します。他の Ascendara ユーザーとつながり、コミュニティを成長させましょう。",
+        "title": "フレンドシステム"
+      },
+      "leaderboard": {
+        "description": "公開リーダーボードでコミュニティと競争しましょう。他のプレイヤーと比べて自分の統計がどのように積み重なるかを確認し、ランクを上げてください。",
+        "title": "公開リーダーボード"
+      },
+      "moreComing": {
+        "description": "Ascend サブスクライバー向けには常に新しい機能が提供されています。サブスクリプションは、エキサイティングな新機能の開発に資金を提供するのに役立ちます。",
+        "title": "さらに今後も"
+      },
+      "nexusMods": {
+        "description": "サポートされているゲームの Nexus Mod をシームレスに管理します。 Ascendara 内で MOD を直接参照、インストール、整理できます。",
+        "title": "Nexus Mod の管理"
+      },
+      "planned": "計画済み",
+      "profile": {
+        "description": "カスタムプロフィールを使用してパーソナライズされたプロフィールを設定し、ゲームの好みを紹介して、他の人に自分の魅力を知らせましょう。あなたのプロフィールをあなただけのものにしましょう。",
+        "title": "プロフィールと略歴"
+      },
+      "subtitle": "これらは、Ascend でアクセスできる現在利用可能な機能です。",
+      "title": "プレミアム機能",
+      "unlimitedDownloads": {
+        "description": "制限なく、好きなだけゲームをダウンロードできます。 Ascend はダウンロード制限をすべて撤廃するので、ライブラリを自由に構築できるようになります。",
+        "title": "無制限のダウンロード"
+      },
+      "upcoming": {
+        "description": "次回の Ascendara アップデートで何が起こるかについての独占プレビューを入手してください。時代の先を行き、今後どのような新機能が登場するかを把握してください。",
+        "title": "今後のアップデートのピーク"
+      }
+    },
     "profile": {
       "achievements": "業績",
       "back": "検索に戻る",
@@ -960,6 +1039,7 @@
     "downloadComplete": "ダウンロード完了！",
     "downloadFailed": "ダウンロードに失敗しました。",
     "downloadFile": "ダウンロード",
+    "downloadStandalone": "デスクトップにダウンロード",
     "downloadStarted": "ダウンロードが開始されました。",
     "downloadTrack": "トラックをダウンロード",
     "downloadTrainer": "トレーナーをダウンロード",
@@ -973,11 +1053,15 @@
     "getAscendToUpdate": "Ascend を入手してアップデートする",
     "helpOthers": "このゲームを 5 つ星のうちで評価してレビューしてください。あなたのフィードバックは、他の人がゲームの品質と信頼性を理解するのに役立ちます。",
     "inCloudLibrary": "クラウドライブラリに保存されました",
+    "installTrainer": "トレーナーのインストール",
+    "installingTrainer": "インストール中...",
     "latestVersion": "最新バージョン",
     "launchCommandPlaceholder": "起動コマンドを入力してください",
     "launchOptions": "起動オプション",
     "launchOptionsDescription": "このゲームの起動コマンドを入力します。これらの引数はゲームの実行可能ファイルに渡されます。",
     "launchOptionsSaved": "起動オプションが保存されました!",
+    "launchWithTrainer": "トレーナーと一緒に起動する",
+    "launchWithTrainerDescription": "このゲームをプレイするときにトレーナーを自動的に起動します",
     "loadingAchievements": "実績を読み込んでいます...",
     "loadingGameInfo": "ゲーム情報を読み込んでいます",
     "loadingMods": "MODをロード中...",
@@ -1026,11 +1110,19 @@
     "trackNameCopied": "トラック名をコピーしました!",
     "trackTitle": "トラックタイトル",
     "trainerAvailable": "このゲームにはトレーナーが用意されています",
+    "trainerDisabledToast": "トレーナーの自動起動が無効になっています",
     "trainerDownloadFailed": "トレーナーのダウンロードに失敗しました",
-    "trainerDownloadStarted": "トレーナーのダウンロードが始まりました！",
+    "trainerDownloadStarted": "トレーナーのダウンロードが開始されました",
+    "trainerDownloadStartedDescription": "トレーナーがデスクトップにダウンロードされます。",
+    "trainerEnabledToast": "トレーナーはゲームとともに自動的に起動します",
+    "trainerInstallFailed": "トレーナーのインストールに失敗しました",
+    "trainerInstallFailedDescription": "トレーナーをインストールできません。もう一度試すか、手動でダウンロードしてください。",
+    "trainerInstalled": "インストール済み",
+    "trainerInstalledDescription": "これで、トレーナーがゲーム フォルダーで利用できるようになりました。ゲームで使用するには、「Launch with Trainer」を切り替えます。",
+    "trainerInstalledSuccess": "トレーナーは正常にインストールされました",
     "trainers": "トレーナー",
     "trainersAscendPromo": "Ascend を使用して、Ascendara でゲーム トレーナーを直接ダウンロードして使用します。アプリを離れることなく FLiNG Trainer からトレーナーにアクセスできます。",
-    "trainersDescription": "ゲーム トレーナーを使用すると、無限の体力、無制限の弾薬などのチートを使用してゲームプレイを変更できます。トレーナーは FLiNG Trainer によって提供されます。",
+    "trainersDescription": "ゲーム トレーナーを使用すると、無限の体力、無制限の弾薬などのチートを使用してゲームプレイを変更できます。トレーナーをゲーム フォルダーにインストールし、ゲームとともに自動的に起動します。",
     "trainersTitle": "FLiNGトレーナー",
     "updateAvailable": "利用可能なアップデート",
     "updateAvailableDescription": "このゲームの新しいバージョンが利用可能です。このゲームをアップデートしますか?",
@@ -1896,7 +1988,7 @@
   },
   "torbox": {
     "account": "TorBox アカウント",
-    "completed": "完了しました",
+    "completed": "完了",
     "cooldown": "クールダウン",
     "data": "データ",
     "data_refreshed": "TorBox データが更新されました",

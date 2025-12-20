@@ -3,6 +3,15 @@
     "actions": "Ações da conta",
     "almostThere": "Quase lá!",
     "chooseDisplayName": "Escolha um nome de exibição para sua conta",
+    "confirmEmail": {
+      "confirm": "Sim, criar conta",
+      "creating": "Criando conta...",
+      "emailLabel": "Endereço de email:",
+      "goBack": "Volte e edite",
+      "message": "Por favor, confirme se o seu endereço de e-mail está correto. Depois que sua conta for criada, você NÃO poderá alterar seu endereço de e-mail.",
+      "title": "Confirme seu e-mail",
+      "warning": "Este e-mail não pode ser alterado após a criação da conta!"
+    },
     "deletion": {
       "confirmed": "Solicitação enviada",
       "deleting": "Enviando...",
@@ -24,6 +33,8 @@
       "accountExists": "A conta já existe",
       "accountExistsNoEmail": "Uma conta já foi criada neste dispositivo. Você só pode ter uma conta Ascend por dispositivo.",
       "accountExistsWithEmail": "Uma conta já foi criada neste dispositivo ({{email}}). Você só pode ter uma conta Ascend por dispositivo.",
+      "cannotCreateAccount": "Não é possível criar conta",
+      "deletedAccountMessage": "Esta conta foi excluída por um administrador e não pode ser recuperada. Todos os dados associados foram removidos permanentemente.",
       "displayNameTooShort": "O nome de exibição deve ter pelo menos quatro caracteres",
       "emailRequired": "Por favor insira seu endereço de e-mail",
       "getSupport": "Obtenha suporte no Discord",
@@ -350,13 +361,81 @@
       "messages": "Mensagens",
       "notifications": "Notificações",
       "online": "On-line",
+      "premium": "Recursos premium",
       "requests": "Solicitações",
       "search": "Procurar",
       "settings": "Configurações",
       "social": "Social",
       "upcoming": "Próxima atualização"
     },
-    "notifications": { "empty": "Sem notificações", "title": "Notificações" },
+    "notifications": {
+      "empty": "Sem notificações",
+      "emptyDescription": "Vocês estão todos atualizados! Volte mais tarde para novas atualizações.",
+      "loading": "Carregando notificações...",
+      "subtitle": "Mantenha-se atualizado com anúncios e atualizações importantes",
+      "title": "Notificações"
+    },
+    "premium": {
+      "autoUpdate": {
+        "description": "Verifique automaticamente se há atualizações do jogo em segundo plano. Seja notificado quando atualizações estiverem disponíveis e instale-as com um único clique.",
+        "title": "Verificação automática de atualização do jogo"
+      },
+      "chat": {
+        "description": "Converse diretamente com seus amigos no Ascendara. Compartilhe recomendações de jogos, coordene sessões de jogo e fique conectado com seu círculo de jogos.",
+        "title": "Bate-papo em tempo real"
+      },
+      "cloudBackups": {
+        "description": "Faça backup automático dos seus jogos salvos na nuvem. Nunca perca seu progresso e restaure seus salvamentos em qualquer dispositivo.",
+        "title": "Backups na nuvem"
+      },
+      "cloudSync": {
+        "description": "Seu perfil, conquistas e dados do jogo são sincronizados automaticamente com a nuvem. Acesse seu histórico completo de jogos de qualquer lugar, em qualquer dispositivo.",
+        "title": "Sincronização na nuvem"
+      },
+      "communities": {
+        "description": "Encontre outras pessoas para jogar em comunidades específicas de jogos. Conecte-se com jogadores que compartilham seus interesses e coordene sessões multijogador.",
+        "title": "Comunidades de jogos"
+      },
+      "downloadQueue": {
+        "description": "Coloque vários downloads na fila e deixe o Ascendara lidar com eles automaticamente. Inicie os downloads e volte quando estiverem todos prontos.",
+        "title": "Fila de download"
+      },
+      "flingTrainer": {
+        "description": "Baixa e executa o FLiNG trainer automaticamente para o seu jogo, sem necessidade de pesquisa ou configuração manual.",
+        "title": "Treinador FLiNG"
+      },
+      "friends": {
+        "description": "Envie e aceite pedidos de amizade, construa sua rede de jogos e veja quando seus amigos estão online. Conecte-se com outros usuários do Ascendara e aumente sua comunidade.",
+        "title": "Sistema de amigos"
+      },
+      "leaderboard": {
+        "description": "Competir com a comunidade na tabela de classificação pública. Veja como suas estatísticas se comparam às de outros jogadores e suba na classificação.",
+        "title": "Tabela de classificação pública"
+      },
+      "moreComing": {
+        "description": "Há constantemente novos recursos para assinantes do Ascend. Sua assinatura ajuda a financiar o desenvolvimento de novos recursos interessantes.",
+        "title": "E mais vindo"
+      },
+      "nexusMods": {
+        "description": "Gerencie perfeitamente seus mods Nexus para jogos compatíveis. Navegue, instale e organize mods diretamente no Ascendara.",
+        "title": "Gerenciamento de Mod Nexus"
+      },
+      "planned": "PLANEJADO",
+      "profile": {
+        "description": "Configure seu perfil personalizado com uma biografia personalizada, mostre suas preferências de jogo e conte aos outros sobre você. Torne seu perfil exclusivamente seu.",
+        "title": "Perfil e biografia"
+      },
+      "subtitle": "Estes são os recursos disponíveis atualmente aos quais você tem acesso com o Ascend",
+      "title": "Recursos premium",
+      "unlimitedDownloads": {
+        "description": "Baixe quantos jogos quiser sem restrições. Ascend remove todos os limites de download para que você possa construir sua biblioteca livremente.",
+        "title": "Downloads ilimitados"
+      },
+      "upcoming": {
+        "description": "Obtenha uma prévia exclusiva do que está por vir na próxima atualização do Ascendara. Fique à frente da curva e saiba quais novos recursos estão por vir.",
+        "title": "Próximas atualizações"
+      }
+    },
     "profile": {
       "achievements": "Conquistas",
       "back": "Voltar à pesquisa",
@@ -960,6 +1039,7 @@
     "downloadComplete": "Download concluído!",
     "downloadFailed": "Falha no download.",
     "downloadFile": "Download",
+    "downloadStandalone": "Baixar para a área de trabalho",
     "downloadStarted": "Download iniciado.",
     "downloadTrack": "Baixar faixa",
     "downloadTrainer": "Baixar treinador",
@@ -973,11 +1053,15 @@
     "getAscendToUpdate": "Obtenha o Ascend para atualizar",
     "helpOthers": "Reserve um momento para avaliar e comentar este jogo com 5 estrelas. Seu feedback ajuda outras pessoas a compreender a qualidade e a confiabilidade do jogo.",
     "inCloudLibrary": "Salvo na Biblioteca em Nuvem",
+    "installTrainer": "Instalar o treinador",
+    "installingTrainer": "Instalando...",
     "latestVersion": "Versão mais recente",
     "launchCommandPlaceholder": "Digite o comando de lançamento",
     "launchOptions": "Opções de inicialização",
     "launchOptionsDescription": "Digite o comando de inicialização deste jogo. Esses argumentos serão passados ​​para o executável do jogo.",
     "launchOptionsSaved": "Opções de lançamento salvas!",
+    "launchWithTrainer": "Lançar com o instrutor",
+    "launchWithTrainerDescription": "Inicie automaticamente o treinador ao jogar este jogo",
     "loadingAchievements": "Carregando conquistas...",
     "loadingGameInfo": "Carregando informações do jogo",
     "loadingMods": "Carregando mods...",
@@ -1026,11 +1110,19 @@
     "trackNameCopied": "Nome da faixa copiado!",
     "trackTitle": "Título da faixa",
     "trainerAvailable": "Um treinador está disponível para este jogo",
+    "trainerDisabledToast": "Inicialização automática do treinador desativada",
     "trainerDownloadFailed": "Falha ao baixar o treinador",
-    "trainerDownloadStarted": "O download do treinador começou!",
+    "trainerDownloadStarted": "Download do treinador iniciado",
+    "trainerDownloadStartedDescription": "O treinador será baixado para sua área de trabalho.",
+    "trainerEnabledToast": "O Trainer será iniciado automaticamente com o jogo",
+    "trainerInstallFailed": "Falha na instalação do instrutor",
+    "trainerInstallFailedDescription": "Não foi possível instalar o treinador. Por favor, tente novamente ou baixe manualmente.",
+    "trainerInstalled": "Instalado",
+    "trainerInstalledDescription": "O treinador agora está disponível na pasta do jogo. Alterne 'Iniciar com treinador' para usá-lo em seu jogo.",
+    "trainerInstalledSuccess": "Treinador instalado com sucesso",
     "trainers": "Treinadores",
     "trainersAscendPromo": "Baixe e use treinadores de jogos diretamente no Ascendara com Ascend. Obtenha acesso aos treinadores do FLiNG Trainer sem sair do aplicativo.",
-    "trainersDescription": "Os treinadores de jogo permitem modificar a jogabilidade com truques como saúde infinita, munição ilimitada e muito mais. Os treinadores são fornecidos pelo FLiNG Trainer.",
+    "trainersDescription": "Os treinadores de jogo permitem modificar a jogabilidade com truques como saúde infinita, munição ilimitada e muito mais. Instale o treinador na pasta do jogo e inicie-o automaticamente com o jogo.",
     "trainersTitle": "Treinador FLiNG",
     "updateAvailable": "Atualização disponível",
     "updateAvailableDescription": "Uma versão mais recente deste jogo está disponível. Gostaria de atualizar este jogo?",

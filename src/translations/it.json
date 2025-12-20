@@ -3,6 +3,15 @@
     "actions": "Azioni dell'account",
     "almostThere": "Ci siamo quasi!",
     "chooseDisplayName": "Scegli un nome visualizzato per il tuo account",
+    "confirmEmail": {
+      "confirm": "Sì, crea un account",
+      "creating": "Creazione dell'account...",
+      "emailLabel": "Indirizzo e-mail:",
+      "goBack": "Torna indietro e modifica",
+      "message": "Per favore conferma che il tuo indirizzo email è corretto. Una volta creato il tuo account, NON potrai modificare il tuo indirizzo email.",
+      "title": "Conferma la tua e-mail",
+      "warning": "Questa email non può essere modificata dopo la creazione dell'account!"
+    },
     "deletion": {
       "confirmed": "Richiesta inviata",
       "deleting": "Invio...",
@@ -24,6 +33,8 @@
       "accountExists": "L'account esiste già",
       "accountExistsNoEmail": "È già stato creato un account su questo dispositivo. Puoi avere un solo account Ascend per dispositivo.",
       "accountExistsWithEmail": "È già stato creato un account su questo dispositivo ({{email}}). Puoi avere un solo account Ascend per dispositivo.",
+      "cannotCreateAccount": "Impossibile creare un account",
+      "deletedAccountMessage": "Questo account è stato eliminato da un amministratore e non può essere recuperato. Tutti i dati associati sono stati rimossi definitivamente.",
       "displayNameTooShort": "Il nome visualizzato deve contenere almeno 4 caratteri",
       "emailRequired": "Inserisci il tuo indirizzo email",
       "getSupport": "Ottieni supporto su Discord",
@@ -53,7 +64,7 @@
       "nexusMods": "Integrazione di mod e trainer",
       "nexusModsDesc": "Gestisci e installa mod di gioco e trainer direttamente in Ascendara con l'integrazione con un clic.",
       "profiles": "Profili",
-      "profilesDesc": "Set up your bio, public profile, and stats. Visualizza anche i profili e le statistiche di altri utenti su Ascend.",
+      "profilesDesc": "Imposta la tua biografia, il profilo pubblico e le statistiche. Visualizza anche i profili e le statistiche di altri utenti su Ascend.",
       "unlimitedDownloads": "Download illimitati",
       "unlimitedDownloadsDesc": "Nessun limite, nessuna restrizione",
       "upcomingUpdates": "Prossimi aggiornamenti",
@@ -350,13 +361,81 @@
       "messages": "Messaggi",
       "notifications": "Notifiche",
       "online": "In linea",
+      "premium": "Funzionalità premium",
       "requests": "Richieste",
       "search": "Ricerca",
       "settings": "Impostazioni",
       "social": "Sociale",
       "upcoming": "Prossimo aggiornamento"
     },
-    "notifications": { "empty": "Nessuna notifica", "title": "Notifiche" },
+    "notifications": {
+      "empty": "Nessuna notifica",
+      "emptyDescription": "Siete tutti presi! Ricontrolla più tardi per nuovi aggiornamenti.",
+      "loading": "Caricamento notifiche...",
+      "subtitle": "Rimani aggiornato con annunci e aggiornamenti importanti",
+      "title": "Notifiche"
+    },
+    "premium": {
+      "autoUpdate": {
+        "description": "Controlla automaticamente gli aggiornamenti del gioco in background. Ricevi una notifica quando sono disponibili aggiornamenti e installali con un solo clic.",
+        "title": "Controllo automatico dell'aggiornamento del gioco"
+      },
+      "chat": {
+        "description": "Chatta direttamente con i tuoi amici all'interno di Ascendara. Condividi consigli sui giochi, coordina le sessioni di gioco e rimani in contatto con la tua cerchia di giocatori.",
+        "title": "Chat in tempo reale"
+      },
+      "cloudBackups": {
+        "description": "Esegui automaticamente il backup dei salvataggi del gioco sul cloud. Non perdere mai i tuoi progressi e ripristina i tuoi salvataggi su qualsiasi dispositivo.",
+        "title": "Backup nel cloud"
+      },
+      "cloudSync": {
+        "description": "Il tuo profilo, i risultati e i dati di gioco vengono automaticamente sincronizzati sul cloud. Accedi alla tua cronologia di gioco completa da qualsiasi luogo, su qualsiasi dispositivo.",
+        "title": "Sincronizzazione nel cloud"
+      },
+      "communities": {
+        "description": "Trova altri con cui giocare nelle community specifiche del gioco. Connettiti con giocatori che condividono i tuoi interessi e coordina sessioni multiplayer.",
+        "title": "Comunità di gioco"
+      },
+      "downloadQueue": {
+        "description": "Metti in coda più download e lascia che Ascendara li gestisca automaticamente. Avvia i download e torna quando sono tutti pronti.",
+        "title": "Scarica coda"
+      },
+      "flingTrainer": {
+        "description": "Scarica ed esegue automaticamente il trainer FLiNG per il tuo gioco, non è richiesta alcuna ricerca o configurazione manuale.",
+        "title": "Allenatore di FLiNG"
+      },
+      "friends": {
+        "description": "Invia e accetta richieste di amicizia, costruisci la tua rete di gioco e vedi quando i tuoi amici sono online. Connettiti con altri utenti Ascendara e fai crescere la tua community.",
+        "title": "Sistema degli amici"
+      },
+      "leaderboard": {
+        "description": "Competi con la community nella classifica pubblica. Scopri come si confrontano le tue statistiche con quelle degli altri giocatori e scala le classifiche.",
+        "title": "Classifica pubblica"
+      },
+      "moreComing": {
+        "description": "Ci sono costantemente nuove funzionalità per gli abbonati Ascend. Il tuo abbonamento aiuta a finanziare lo sviluppo di nuove entusiasmanti funzionalità.",
+        "title": "E altro ancora in arrivo"
+      },
+      "nexusMods": {
+        "description": "Gestisci senza problemi le mod del tuo Nexus per i giochi supportati. Sfoglia, installa e organizza le mod direttamente in Ascendara.",
+        "title": "Gestione mod Nexus"
+      },
+      "planned": "PIANIFICATO",
+      "profile": {
+        "description": "Imposta il tuo profilo personalizzato con una biografia personalizzata, mostra le tue preferenze di gioco e fai sapere agli altri di cosa ti occupi. Rendi il tuo profilo unicamente tuo.",
+        "title": "Profilo e Biografia"
+      },
+      "subtitle": "Queste sono le funzionalità attualmente disponibili a cui hai accesso con Ascend",
+      "title": "Funzionalità premium",
+      "unlimitedDownloads": {
+        "description": "Scarica tutti i giochi che vuoi senza restrizioni. Ascend rimuove tutti i limiti di download così puoi creare liberamente la tua libreria.",
+        "title": "Download illimitati"
+      },
+      "upcoming": {
+        "description": "Ottieni un'anteprima esclusiva di ciò che accadrà nel prossimo aggiornamento di Ascendara. Resta al passo con i tempi e scopri quali nuove funzionalità sono all'orizzonte.",
+        "title": "Prossimi aggiornamenti"
+      }
+    },
     "profile": {
       "achievements": "Risultati",
       "back": "Torna alla ricerca",
@@ -960,6 +1039,7 @@
     "downloadComplete": "Download completo!",
     "downloadFailed": "Download non riuscito.",
     "downloadFile": "Scaricamento",
+    "downloadStandalone": "Scarica sul desktop",
     "downloadStarted": "Download avviato.",
     "downloadTrack": "Scarica traccia",
     "downloadTrainer": "Scarica Allenatore",
@@ -973,11 +1053,15 @@
     "getAscendToUpdate": "Ottieni Asces per aggiornare",
     "helpOthers": "Prenditi un momento per valutare e recensire questo gioco su 5 stelle. Il tuo feedback aiuta gli altri a comprendere la qualità e l'affidabilità del gioco.",
     "inCloudLibrary": "Salvato nella libreria cloud",
+    "installTrainer": "Installa Allenatore",
+    "installingTrainer": "Installazione...",
     "latestVersion": "Ultima versione",
     "launchCommandPlaceholder": "Immettere il comando di avvio",
     "launchOptions": "Opzioni di avvio",
     "launchOptionsDescription": "Inserisci il comando di avvio per questo gioco. Questi argomenti verranno passati all'eseguibile del gioco.",
     "launchOptionsSaved": "Opzioni di avvio salvate!",
+    "launchWithTrainer": "Avvia con Trainer",
+    "launchWithTrainerDescription": "Avvia automaticamente il trainer quando giochi a questo gioco",
     "loadingAchievements": "Caricamento obiettivi...",
     "loadingGameInfo": "Caricamento delle informazioni sul gioco",
     "loadingMods": "Caricamento mod...",
@@ -1026,11 +1110,19 @@
     "trackNameCopied": "Nome della traccia copiato!",
     "trackTitle": "Titolo della traccia",
     "trainerAvailable": "Per questo gioco è disponibile un allenatore",
+    "trainerDisabledToast": "Avvio automatico del trainer disabilitato",
     "trainerDownloadFailed": "Impossibile scaricare il trainer",
-    "trainerDownloadStarted": "È iniziato il download del formatore!",
+    "trainerDownloadStarted": "Download del formatore avviato",
+    "trainerDownloadStartedDescription": "Il trainer verrà scaricato sul tuo desktop.",
+    "trainerEnabledToast": "Il Trainer si avvierà automaticamente con il gioco",
+    "trainerInstallFailed": "Installazione del trainer non riuscita",
+    "trainerInstallFailedDescription": "Impossibile installare il trainer. Riprova o scarica manualmente.",
+    "trainerInstalled": "Installato",
+    "trainerInstalledDescription": "Il trainer è ora disponibile nella cartella del gioco. Attiva \"Avvia con Trainer\" per utilizzarlo con il tuo gioco.",
+    "trainerInstalledSuccess": "Trainer installato correttamente",
     "trainers": "Formatori",
     "trainersAscendPromo": "Scarica e utilizza i trainer di gioco direttamente in Ascendara con Ascend. Ottieni l'accesso ai trainer da FLiNG Trainer senza uscire dall'app.",
-    "trainersDescription": "I trainer di gioco ti consentono di modificare il gameplay con trucchi come salute infinita, munizioni illimitate e altro ancora. I formatori sono forniti da FLiNG Trainer.",
+    "trainersDescription": "I trainer di gioco ti consentono di modificare il gameplay con trucchi come salute infinita, munizioni illimitate e altro ancora. Installa il trainer nella cartella del gioco e avvialo automaticamente con il gioco.",
     "trainersTitle": "Allenatore di FLiNG",
     "updateAvailable": "Aggiornamento disponibile",
     "updateAvailableDescription": "È disponibile una versione più recente di questo gioco. Vuoi aggiornare questo gioco?",

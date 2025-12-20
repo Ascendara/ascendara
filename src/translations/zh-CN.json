@@ -3,6 +3,15 @@
     "actions": "账户操作",
     "almostThere": "快到了！",
     "chooseDisplayName": "选择您帐户的显示名称",
+    "confirmEmail": {
+      "confirm": "是的，创建帐户",
+      "creating": "创建帐户...",
+      "emailLabel": "电子邮件：",
+      "goBack": "返回并编辑",
+      "message": "请确认您的电子邮件地址正确。创建帐户后，您将无法更改您的电子邮件地址。",
+      "title": "确认您的电子邮件",
+      "warning": "创建帐户后此电子邮件将无法更改！"
+    },
     "deletion": {
       "confirmed": "请求已提交",
       "deleting": "正在提交...",
@@ -24,6 +33,8 @@
       "accountExists": "帐户已存在",
       "accountExistsNoEmail": "已在此设备上创建帐户。每台设备只能拥有一个 Ascend 帐户。",
       "accountExistsWithEmail": "已在此设备 ({{email}}) 上创建帐户。每台设备只能拥有一个 Ascend 帐户。",
+      "cannotCreateAccount": "无法创建帐户",
+      "deletedAccountMessage": "该帐户已被管理员删除且无法恢复。所有相关数据已被永久删除。",
       "displayNameTooShort": "显示名称必须至少包含 4 个字符",
       "emailRequired": "请输入您的电子邮件地址",
       "getSupport": "在 Discord 上获取支持",
@@ -350,13 +361,81 @@
       "messages": "留言",
       "notifications": "通知",
       "online": "在线的",
+      "premium": "高级功能",
       "requests": "要求",
       "search": "搜索",
       "settings": "设置",
       "social": "社会的",
       "upcoming": "即将更新"
     },
-    "notifications": { "empty": "无通知", "title": "通知" },
+    "notifications": {
+      "empty": "无通知",
+      "emptyDescription": "你们都被抓住了！稍后回来查看新的更新。",
+      "loading": "正在加载通知...",
+      "subtitle": "随时了解重要公告和更新",
+      "title": "通知"
+    },
+    "premium": {
+      "autoUpdate": {
+        "description": "在后台自动检查游戏更新。当有可用更新时收到通知并只需单击一下即可安装它们。",
+        "title": "自动游戏更新检查"
+      },
+      "chat": {
+        "description": "在 Ascendara 中直接与您的朋友聊天。分享游戏推荐、协调游戏会话并与您的游戏圈保持联系。",
+        "title": "实时聊天"
+      },
+      "cloudBackups": {
+        "description": "自动将您的游戏保存备份到云端。永远不会丢失您的进度并在任何设备上恢复您的保存。",
+        "title": "云备份"
+      },
+      "cloudSync": {
+        "description": "您的个人资料、成就和游戏数据会自动同步到云端。随时随地在任何设备上访问您的完整游戏历史记录。",
+        "title": "云同步"
+      },
+      "communities": {
+        "description": "在特定于游戏的社区中寻找其他人一起玩。与与您有共同兴趣的玩家联系并协调多人游戏会话。",
+        "title": "游戏社区"
+      },
+      "downloadQueue": {
+        "description": "对多个下载进行排队并让 Ascendara 自动处理它们。开始下载并在准备就绪后返回。",
+        "title": "下载队列"
+      },
+      "flingTrainer": {
+        "description": "自动下载并运行适合您游戏的 FLiNG 训练器，无需手动搜索或设置。",
+        "title": "飞行训练器"
+      },
+      "friends": {
+        "description": "发送和接受好友请求，建立您的游戏网络，并查看您的好友何时在线。与其他 Ascendara 用户联系并发展您的社区。",
+        "title": "好友系统"
+      },
+      "leaderboard": {
+        "description": "在公共排行榜上与社区竞争。查看您的统计数据与其他玩家相比如何并提升排名。",
+        "title": "公共排行榜"
+      },
+      "moreComing": {
+        "description": "不断为 Ascend 订阅者提供新功能。您的订阅有助于资助令人兴奋的新功能的开发。",
+        "title": "还有更多即将推出"
+      },
+      "nexusMods": {
+        "description": "无缝管理支持游戏的 Nexus mod。直接在 Ascendara 中浏览、安装和组织模组。",
+        "title": "Nexus Mod 管理"
+      },
+      "planned": "计划",
+      "profile": {
+        "description": "使用自定义个人简介设置您的个性化个人资料，展示您的游戏偏好，并让其他人了解您的全部情况。让您的个人资料独一无二。",
+        "title": "个人简介和简历"
+      },
+      "subtitle": "这些是您可以通过 Ascend 访问的当前可用功能",
+      "title": "高级功能",
+      "unlimitedDownloads": {
+        "description": "下载任意数量的游戏，没有任何限制。 Ascend 消除了所有下载限制，因此您可以自由构建您的库。",
+        "title": "无限下载"
+      },
+      "upcoming": {
+        "description": "独家预览下一次 Ascendara 更新中的内容。保持领先地位并了解即将推出的新功能。",
+        "title": "即将更新一览"
+      }
+    },
     "profile": {
       "achievements": "成就",
       "back": "返回搜索",
@@ -960,6 +1039,7 @@
     "downloadComplete": "下载完成！",
     "downloadFailed": "下载失败。",
     "downloadFile": "下载",
+    "downloadStandalone": "下载到桌面",
     "downloadStarted": "下载开始。",
     "downloadTrack": "下载曲目",
     "downloadTrainer": "下载培训师",
@@ -973,11 +1053,15 @@
     "getAscendToUpdate": "获取升级更新",
     "helpOthers": "花点时间对这款游戏进行评分和评论（满分 5 星）。您的反馈有助于其他人了解游戏的质量和可靠性。",
     "inCloudLibrary": "已保存至云图书馆",
+    "installTrainer": "安装训练器",
+    "installingTrainer": "正在安装...",
     "latestVersion": "最新版本",
     "launchCommandPlaceholder": "输入启动命令",
     "launchOptions": "启动选项",
     "launchOptionsDescription": "输入该游戏的启动命令。这些参数将传递给游戏可执行文件。",
     "launchOptionsSaved": "启动选项已保存！",
+    "launchWithTrainer": "与培训师一起启动",
+    "launchWithTrainerDescription": "玩这个游戏时自动启动训练器",
     "loadingAchievements": "正在加载成就...",
     "loadingGameInfo": "加载游戏信息",
     "loadingMods": "正在加载模组...",
@@ -1026,11 +1110,19 @@
     "trackNameCopied": "曲目名称已复制！",
     "trackTitle": "曲目标题",
     "trainerAvailable": "此游戏有教练",
+    "trainerDisabledToast": "训练器自动启动已禁用",
     "trainerDownloadFailed": "培训师下载失败",
-    "trainerDownloadStarted": "训练师下载开始！",
+    "trainerDownloadStarted": "培训师下载开始",
+    "trainerDownloadStartedDescription": "培训师将下载到您的桌面。",
+    "trainerEnabledToast": "训练师将随游戏自动启动",
+    "trainerInstallFailed": "训练器安装失败",
+    "trainerInstallFailedDescription": "无法安装训练器。请重试或手动下载。",
+    "trainerInstalled": "已安装",
+    "trainerInstalledDescription": "该训练器现在可以在您的游戏文件夹中找到。切换“使用 Trainer 启动”以将其用于您的游戏。",
+    "trainerInstalledSuccess": "训练器安装成功",
     "trainers": "运动鞋",
     "trainersAscendPromo": "通过 Ascend，直接在 Ascendara 中下载并使用游戏训练器。无需离开应用程序即可通过 FLiNG Trainer 访问培训师。",
-    "trainersDescription": "游戏训练器可让您使用无限生命值、无限弹药等作弊修改游戏玩法。培训师由 FLiNG Trainer 提供。",
+    "trainersDescription": "游戏训练器可让您使用无限生命值、无限弹药等作弊修改游戏玩法。将训练器安装到您的游戏文件夹并随您的游戏自动启动。",
     "trainersTitle": "飞行训练器",
     "updateAvailable": "可用更新",
     "updateAvailableDescription": "该游戏有新版本可用。你想更新这个游戏吗？",
