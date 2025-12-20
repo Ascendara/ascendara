@@ -170,6 +170,11 @@ const AscendSidebar = ({
     { id: "search", icon: Search, label: t("ascend.nav.search") },
     { id: "requests", icon: UserPlus, label: t("ascend.nav.requests"), badge: 0 },
     {
+      id: "premium",
+      icon: Crown,
+      label: t("ascend.nav.premium") || "Premium Features",
+    },
+    {
       id: "leaderboard",
       icon: Trophy,
       label: t("ascend.nav.leaderboard") || "Leaderboard",

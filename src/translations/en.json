@@ -361,6 +361,7 @@
       "messages": "Messages",
       "notifications": "Notifications",
       "online": "Online",
+      "premium": "Premium Features",
       "requests": "Requests",
       "search": "Search",
       "settings": "Settings",
@@ -369,7 +370,71 @@
     },
     "notifications": {
       "empty": "No notifications",
+      "emptyDescription": "You're all caught up! Check back later for new updates.",
+      "loading": "Loading notifications...",
+      "subtitle": "Stay updated with important announcements and updates",
       "title": "Notifications"
+    },
+    "premium": {
+      "autoUpdate": {
+        "description": "Automatically check for game updates in the background. Get notified when updates are available and install them with a single click.",
+        "title": "Auto Game Update Checking"
+      },
+      "chat": {
+        "description": "Chat directly with your friends within Ascendara. Share game recommendations, coordinate play sessions, and stay connected with your gaming circle.",
+        "title": "Real-Time Chat"
+      },
+      "cloudBackups": {
+        "description": "Automatically back up your game saves to the cloud. Never lose your progress and restore your saves on any device.",
+        "title": "Cloud Backups"
+      },
+      "cloudSync": {
+        "description": "Your profile, achievements, and game data are automatically synced to the cloud. Access your complete gaming history from anywhere, on any device.",
+        "title": "Cloud Sync"
+      },
+      "communities": {
+        "description": "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions.",
+        "title": "Game Communities"
+      },
+      "downloadQueue": {
+        "description": "Queue multiple downloads and let Ascendara handle them automatically. Start downloads and come back when they're all ready.",
+        "title": "Download Queue"
+      },
+      "flingTrainer": {
+        "description": "Automatically downloads and runs FLiNG trainer for your game, no manual searching or setup required.",
+        "title": "FLiNG Trainer"
+      },
+      "friends": {
+        "description": "Send and accept friend requests, build your gaming network, and see when your friends are online. Connect with other Ascendara users and grow your community.",
+        "title": "Friends System"
+      },
+      "leaderboard": {
+        "description": "Compete with the community on the public leaderboard. See how your stats stack up against other players and climb the ranks.",
+        "title": "Public Leaderboard"
+      },
+      "moreComing": {
+        "description": "There are constantly new features for Ascend subscribers. Your subscription helps fund development of exciting new capabilities.",
+        "title": "And More Coming"
+      },
+      "nexusMods": {
+        "description": "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
+        "title": "Nexus Mod Managing"
+      },
+      "planned": "PLANNED",
+      "profile": {
+        "description": "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours.",
+        "title": "Profile & Bio"
+      },
+      "subtitle": "These are the current available features you have access to with Ascend",
+      "title": "Premium Features",
+      "unlimitedDownloads": {
+        "description": "Download as many games as you want with no restrictions. Ascend removes all download limits so you can build your library freely.",
+        "title": "Unlimited Downloads"
+      },
+      "upcoming": {
+        "description": "Get an exclusive preview of what's coming in the next Ascendara update. Stay ahead of the curve and know what new features are on the horizon.",
+        "title": "Upcoming Updates Peek"
+      }
     },
     "profile": {
       "achievements": "Achievements",
