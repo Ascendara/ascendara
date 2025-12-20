@@ -46,6 +46,7 @@ import {
   Cloud,
   CloudOff,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
 import { cn } from "@/lib/utils";
@@ -613,6 +614,12 @@ export default function GameScreen() {
   // FLiNG Trainer state
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
   const [flingTrainerData, setFlingTrainerData] = useState(null);
+  const [isDownloadingTrainer, setIsDownloadingTrainer] = useState(false);
+  const [trainerExists, setTrainerExists] = useState(false);
+  const [launchWithTrainerEnabled, setLaunchWithTrainerEnabled] = useState(() => {
+    const saved = localStorage.getItem(`launch-with-trainer-${game?.game || game?.name}`);
+    return saved === "true";
+  });
 
   // Cloud library state
   const [isInCloudLibrary, setIsInCloudLibrary] = useState(false);
@@ -700,7 +707,7 @@ export default function GameScreen() {
 
   // Load game data
   useEffect(() => {
-    const loadGame = async () => {
+    const launchGame = async (withTrainer = false) => {
       try {
         // If we don't have game data from location state, navigate back to library
         if (!game) {
@@ -727,6 +734,149 @@ export default function GameScreen() {
       } catch (error) {
         console.error("Error loading game:", error);
         setLoading(false);
+      }
+    };
+
+    const handlePlay = async (withTrainer = false) => {
+      if (!game) return;
+
+      const gameName = game.game || game.name;
+      const isCustom = !!game.isCustom;
+
+      setIsLaunching(true);
+
+      try {
+        // Check if Steam is required and running
+        if (game.requiresSteam) {
+          const steamRunning = await window.electron.isSteamRunning();
+          if (!steamRunning) {
+            setShowSteamNotRunningWarning(true);
+            setIsLaunching(false);
+            return;
+          }
+        }
+
+        // Check for VR warning
+        if (game.vr && settings.showVrWarning !== false) {
+          setShowVrWarning(true);
+          setIsLaunching(false);
+          return;
+        }
+
+        // Check for online fix warning
+        if (game.online && settings.showOnlineFixWarning !== false) {
+          setShowOnlineFixWarning(true);
+          setIsLaunching(false);
+          return;
+        }
+
+        // Launch the game
+        await launchGame(withTrainer);
+      } catch (error) {
+        console.error("Error in handlePlay:", error);
+        setIsLaunching(false);
+      }
+    };
+
+    const loadGame = async () => {
+      try {
+        // First check if game is already running
+        const isRunning = await window.electron.isGameRunning(game.game || game.name);
+        if (isRunning) {
+          toast.error(t("library.alreadyRunning", { game: game.game || game.name }));
+          setIsLaunching(false);
+          return;
+        }
+
+        // Check if Steam is running for onlinefix
+        if (game.online) {
+          if (!(await window.electron.isSteamRunning())) {
+            toast.error(t("library.steamNotRunning"));
+            setIsLaunching(false);
+            setShowSteamNotRunningWarning(true);
+            return;
+          }
+        }
+
+        // Check if game is VR and show warning
+        if (game.isVr && !withTrainer) {
+          setShowVrWarning(true);
+          setIsLaunching(false);
+          return;
+        }
+
+        if (game.online && (game.launchCount < 1 || !game.launchCount)) {
+          // Check if warning has been shown before
+          const onlineFixWarningShown = localStorage.getItem("onlineFixWarningShown");
+          if (!onlineFixWarningShown) {
+            setShowOnlineFixWarning(true);
+            // Save that warning has been shown
+            localStorage.setItem("onlineFixWarningShown", "true");
+            setIsLaunching(false);
+            return;
+          }
+        }
+
+        // Check for multiple executables if no specific one was provided
+        if (!specificExecutable) {
+          const executables = await gameUpdateService.getGameExecutables(
+            gameName,
+            game.isCustom
+          );
+          if (executables.length > 1) {
+            // Store launch options and show selection dialog
+            setPendingLaunchOptions({
+              forcePlay,
+              adminLaunch: isShiftKeyPressed,
+            });
+            setAvailableExecutables(executables);
+            setShowExecutableSelect(true);
+            setIsLaunching(false);
+            return;
+          }
+        }
+
+        console.log("Launching game: ", gameName);
+        // Launch the game
+        killAudioAndMiniplayer();
+        // Use the tracked shift key state for admin privileges
+        if (isShiftKeyPressed) {
+          console.log("Launching game with admin privileges");
+        }
+        await window.electron.playGame(
+          gameName,
+          isCustom,
+          backupOnClose,
+          launchWithAdmin,
+          null,
+          withTrainer
+        );
+
+        // Get and cache the game image before saving to recently played
+        const imageBase64 = await window.electron.getGameImage(gameName);
+        if (imageBase64) {
+          await imageCacheService.getImage(game.imgID);
+        }
+
+        // Save to recently played games
+        recentGamesService.addRecentGame({
+          game: gameName,
+          name: game.name,
+          imgID: game.imgID,
+          version: game.version,
+          isCustom: game.isCustom,
+          online: game.online,
+          dlc: game.dlc,
+        });
+
+        analytics.trackGameButtonClick(game.game, "play", {
+          isLaunching,
+          isRunning,
+        });
+        setIsLaunching(false);
+      } catch (error) {
+        console.error("Error launching game:", error);
+        setIsLaunching(false);
       }
     };
 
@@ -1022,6 +1172,13 @@ export default function GameScreen() {
           const result = await flingTrainerService.checkTrainerSupport(gameName);
           setSupportsFlingTrainer(result.supported);
           setFlingTrainerData(result.trainerData);
+
+          // Check if trainer file exists in game directory
+          const exists = await window.electron.checkTrainerExists(
+            gameName,
+            game?.isCustom || false
+          );
+          setTrainerExists(exists);
         } catch (error) {
           console.error("Error checking FLiNG Trainer support:", error);
           setSupportsFlingTrainer(false);
@@ -1030,7 +1187,7 @@ export default function GameScreen() {
     };
 
     checkFlingTrainerSupport();
-  }, [game?.game, game?.name]);
+  }, [game?.game, game?.name, game?.isCustom]);
 
   // Verify Ascend access
   useEffect(() => {
@@ -1277,7 +1434,8 @@ export default function GameScreen() {
         game.isCustom,
         game.backups ?? false,
         isShiftKeyPressed,
-        specificExecutable
+        specificExecutable,
+        trainerExists && launchWithTrainerEnabled
       );
 
       // Get and cache the game image before saving to recently played
@@ -1689,29 +1847,61 @@ export default function GameScreen() {
                 {/* Main actions */}
                 <div className="space-y-3">
                   {executableExists ? (
-                    <Button
-                      className="w-full gap-2 py-6 text-lg text-secondary"
-                      size="lg"
-                      onClick={handlePlayGame}
-                      disabled={isLaunching || isRunning}
-                    >
-                      {isLaunching ? (
-                        <>
-                          <Loader className="h-5 w-5 animate-spin" />
-                          {t("library.launching")}
-                        </>
-                      ) : isRunning ? (
-                        <>
-                          <StopCircle className="h-5 w-5" />
-                          {t("library.running")}
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-5 w-5" />
-                          {t("library.play")}
-                        </>
+                    <>
+                      <Button
+                        className="w-full gap-2 py-6 text-lg text-secondary"
+                        size="lg"
+                        onClick={handlePlayGame}
+                        disabled={isLaunching || isRunning}
+                      >
+                        {isLaunching ? (
+                          <>
+                            <Loader className="h-5 w-5 animate-spin" />
+                            {t("library.launching")}
+                          </>
+                        ) : isRunning ? (
+                          <>
+                            <StopCircle className="h-5 w-5" />
+                            {t("library.running")}
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-5 w-5" />
+                            {t("library.play")}
+                          </>
+                        )}
+                      </Button>
+                      {trainerExists && (
+                        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3">
+                          <div className="flex items-center gap-3">
+                            <Bolt className="h-5 w-5 text-primary" />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">
+                                {t("gameScreen.launchWithTrainer")}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {t("gameScreen.launchWithTrainerDescription")}
+                              </span>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={launchWithTrainerEnabled}
+                            onCheckedChange={enabled => {
+                              setLaunchWithTrainerEnabled(enabled);
+                              localStorage.setItem(
+                                `launch-with-trainer-${game?.game || game?.name}`,
+                                enabled.toString()
+                              );
+                              toast.success(
+                                enabled
+                                  ? t("gameScreen.trainerEnabledToast")
+                                  : t("gameScreen.trainerDisabledToast")
+                              );
+                            }}
+                          />
+                        </div>
                       )}
-                    </Button>
+                    </>
                   ) : (
                     <Button
                       className="w-full gap-2 py-6 text-lg text-secondary"
@@ -2819,30 +3009,114 @@ export default function GameScreen() {
                                 {flingTrainerData.version}
                               </p>
                             )}
+                            {trainerExists && (
+                              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-green-500/10 px-4 py-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+                                <FileCheck2 className="h-4 w-4" />
+                                {t("gameScreen.trainerInstalled")}
+                              </div>
+                            )}
                             <p className="max-w-md text-sm text-muted-foreground">
                               {t("gameScreen.trainersDescription")}
                             </p>
                           </div>
                           <div className="flex flex-col gap-3 sm:flex-row">
                             {flingTrainerData?.downloadUrl ? (
-                              <Button
-                                className="gap-2 text-secondary"
-                                onClick={async () => {
-                                  const success =
-                                    await flingTrainerService.downloadTrainer(
-                                      flingTrainerData,
-                                      game?.game || game?.name
-                                    );
-                                  if (success) {
-                                    toast.success(t("gameScreen.trainerDownloadStarted"));
-                                  } else {
-                                    toast.error(t("gameScreen.trainerDownloadFailed"));
-                                  }
-                                }}
-                              >
-                                <Download className="h-4 w-4" />
-                                {t("gameScreen.downloadTrainer")}
-                              </Button>
+                              <>
+                                <Button
+                                  className="gap-2 text-secondary"
+                                  onClick={async () => {
+                                    setIsDownloadingTrainer(true);
+                                    try {
+                                      const result =
+                                        await flingTrainerService.downloadTrainerToGame(
+                                          flingTrainerData,
+                                          game?.game || game?.name,
+                                          game?.isCustom || false
+                                        );
+                                      if (result.success) {
+                                        toast.success(
+                                          t("gameScreen.trainerInstalledSuccess"),
+                                          {
+                                            description: t(
+                                              "gameScreen.trainerInstalledDescription"
+                                            ),
+                                          }
+                                        );
+                                        // Check if trainer now exists
+                                        const exists =
+                                          await window.electron.checkTrainerExists(
+                                            game?.game || game?.name,
+                                            game?.isCustom || false
+                                          );
+                                        setTrainerExists(exists);
+                                      } else {
+                                        toast.error(
+                                          t("gameScreen.trainerInstallFailed"),
+                                          {
+                                            description:
+                                              result.error ||
+                                              t(
+                                                "gameScreen.trainerInstallFailedDescription"
+                                              ),
+                                          }
+                                        );
+                                      }
+                                    } catch (error) {
+                                      toast.error(t("gameScreen.trainerInstallFailed"), {
+                                        description: t(
+                                          "gameScreen.trainerInstallFailedDescription"
+                                        ),
+                                      });
+                                    } finally {
+                                      setIsDownloadingTrainer(false);
+                                    }
+                                  }}
+                                  disabled={isDownloadingTrainer || trainerExists}
+                                >
+                                  {isDownloadingTrainer ? (
+                                    <>
+                                      <Loader className="h-4 w-4 animate-spin" />
+                                      {t("gameScreen.installingTrainer")}
+                                    </>
+                                  ) : trainerExists ? (
+                                    <>
+                                      <FileCheck2 className="h-4 w-4" />
+                                      {t("gameScreen.trainerInstalled")}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="h-4 w-4" />
+                                      {t("gameScreen.installTrainer")}
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="gap-2"
+                                  onClick={async () => {
+                                    const success =
+                                      await flingTrainerService.downloadTrainer(
+                                        flingTrainerData,
+                                        game?.game || game?.name
+                                      );
+                                    if (success) {
+                                      toast.success(
+                                        t("gameScreen.trainerDownloadStarted"),
+                                        {
+                                          description: t(
+                                            "gameScreen.trainerDownloadStartedDescription"
+                                          ),
+                                        }
+                                      );
+                                    } else {
+                                      toast.error(t("gameScreen.trainerDownloadFailed"));
+                                    }
+                                  }}
+                                >
+                                  <Download className="h-4 w-4" />
+                                  {t("gameScreen.downloadStandalone")}
+                                </Button>
+                              </>
                             ) : (
                               <Button
                                 className="gap-2 text-secondary"

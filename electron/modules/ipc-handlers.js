@@ -1126,6 +1126,170 @@ function registerMiscHandlers() {
     console.log(`Download finished for game: ${game}`);
     return true;
   });
+
+  // Check if trainer exists for game
+  ipcMain.handle("check-trainer-exists", async (_, gameName, isCustom) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory) {
+        return false;
+      }
+
+      let gameDirectory;
+
+      if (isCustom) {
+        const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+        if (!fs.existsSync(gamesFilePath)) {
+          return false;
+        }
+
+        const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+        const customGame = gamesData.games.find(g => g.game === gameName);
+
+        if (!customGame || !customGame.executable) {
+          return false;
+        }
+
+        gameDirectory = path.dirname(customGame.executable);
+      } else {
+        const allDirectories = [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ];
+
+        const sanitizedGame = sanitizeText(gameName);
+
+        for (const directory of allDirectories) {
+          const testGameDir = path.join(directory, sanitizedGame);
+          const testGameInfoPath = path.join(
+            testGameDir,
+            `${sanitizedGame}.ascendara.json`
+          );
+
+          if (fs.existsSync(testGameInfoPath)) {
+            gameDirectory = testGameDir;
+            break;
+          }
+        }
+
+        if (!gameDirectory) {
+          return false;
+        }
+      }
+
+      const trainerPath = path.join(gameDirectory, "ascendaraFlingTrainer.exe");
+      return fs.existsSync(trainerPath);
+    } catch (error) {
+      console.error("Error checking trainer existence:", error);
+      return false;
+    }
+  });
+
+  // Download trainer to game directory
+  ipcMain.handle(
+    "download-trainer-to-game",
+    async (_, downloadUrl, gameName, isCustom) => {
+      try {
+        const settings = settingsManager.getSettings();
+        if (!settings.downloadDirectory) {
+          throw new Error("Download directory not set");
+        }
+
+        let gameDirectory;
+
+        if (isCustom) {
+          // For custom games, use the games.json to find the executable path
+          const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+          if (!fs.existsSync(gamesFilePath)) {
+            throw new Error("Custom games file not found");
+          }
+
+          const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+          const customGame = gamesData.games.find(g => g.game === gameName);
+
+          if (!customGame || !customGame.executable) {
+            throw new Error("Custom game executable not found");
+          }
+
+          // Get directory from executable path
+          gameDirectory = path.dirname(customGame.executable);
+        } else {
+          // For downloaded games, search in all download directories
+          const allDirectories = [
+            settings.downloadDirectory,
+            ...(settings.additionalDirectories || []),
+          ];
+
+          const sanitizedGame = sanitizeText(gameName);
+
+          for (const directory of allDirectories) {
+            const testGameDir = path.join(directory, sanitizedGame);
+            const testGameInfoPath = path.join(
+              testGameDir,
+              `${sanitizedGame}.ascendara.json`
+            );
+
+            if (fs.existsSync(testGameInfoPath)) {
+              gameDirectory = testGameDir;
+              break;
+            }
+          }
+
+          if (!gameDirectory) {
+            throw new Error(`Game directory not found for ${gameName}`);
+          }
+        }
+
+        // Ensure game directory exists
+        if (!fs.existsSync(gameDirectory)) {
+          throw new Error(`Game directory does not exist: ${gameDirectory}`);
+        }
+
+        // Download the trainer file
+        const trainerPath = path.join(gameDirectory, "ascendaraFlingTrainer.exe");
+
+        console.log(`Downloading trainer to: ${trainerPath}`);
+
+        // Use axios with proper headers to avoid 403 errors
+        const response = await axios({
+          method: "GET",
+          url: downloadUrl,
+          responseType: "stream",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            Referer: "https://flingtrainer.com/",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+          },
+          maxRedirects: 5,
+          timeout: 60000,
+        });
+
+        const writer = fs.createWriteStream(trainerPath);
+        response.data.pipe(writer);
+
+        return new Promise((resolve, reject) => {
+          writer.on("finish", () => {
+            console.log(`Trainer downloaded successfully to: ${trainerPath}`);
+            resolve({ success: true, path: trainerPath });
+          });
+          writer.on("error", err => {
+            console.error("Error writing trainer file:", err);
+            reject(err);
+          });
+        });
+      } catch (error) {
+        console.error("Error downloading trainer to game directory:", error);
+        throw error;
+      }
+    }
+  );
 }
 
 module.exports = {

@@ -224,15 +224,25 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // GAME EXECUTION
   //===========================================================================
-  playGame: (game, isCustom, backupOnClose, launchWithAdmin, specificExecutable) =>
+  playGame: (
+    game,
+    isCustom,
+    backupOnClose,
+    launchWithAdmin,
+    specificExecutable,
+    launchWithTrainer
+  ) =>
     ipcRenderer.invoke(
       "play-game",
       game,
       isCustom,
       backupOnClose,
       launchWithAdmin,
-      specificExecutable
+      specificExecutable,
+      launchWithTrainer
     ),
+  checkTrainerExists: (gameName, isCustom) =>
+    ipcRenderer.invoke("check-trainer-exists", gameName, isCustom),
   isGameRunning: game => ipcRenderer.invoke("is-game-running", game),
   startSteam: () => ipcRenderer.invoke("start-steam"),
   isSteamRunning: () => ipcRenderer.invoke("is-steam-running"),
@@ -277,6 +287,8 @@ contextBridge.exposeInMainWorld("electron", {
   downloadItem: url => ipcRenderer.invoke("download-item", url),
   downloadSoundtrack: (track, game) =>
     ipcRenderer.invoke("download-soundtrack", track, game),
+  downloadTrainerToGame: (downloadUrl, gameName, isCustom) =>
+    ipcRenderer.invoke("download-trainer-to-game", downloadUrl, gameName, isCustom),
   isDownloaderRunning: () => ipcRenderer.invoke("is-downloader-running"),
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
 
