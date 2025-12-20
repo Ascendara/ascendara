@@ -3,6 +3,15 @@
     "actions": "Account Actions",
     "almostThere": "Almost there!",
     "chooseDisplayName": "Choose a display name for your account",
+    "confirmEmail": {
+      "confirm": "Yes, Create Account",
+      "creating": "Creating Account...",
+      "emailLabel": "Email Address:",
+      "goBack": "Go Back & Edit",
+      "message": "Please confirm that your email address is correct. Once your account is created, you will NOT be able to change your email address.",
+      "title": "Confirm Your Email",
+      "warning": "This email cannot be changed after account creation!"
+    },
     "deletion": {
       "confirmed": "Request Submitted",
       "deleting": "Submitting...",
@@ -24,6 +33,8 @@
       "accountExists": "Account Already Exists",
       "accountExistsNoEmail": "An account has already been created on this device. You can only have one Ascend account per device.",
       "accountExistsWithEmail": "An account has already been created on this device ({{email}}). You can only have one Ascend account per device.",
+      "cannotCreateAccount": "Cannot create account",
+      "deletedAccountMessage": "This account was deleted by an administrator and cannot be recovered. All associated data has been permanently removed.",
       "displayNameTooShort": "Display name must be at least 4 characters",
       "emailRequired": "Please enter your email address",
       "getSupport": "Get Support on Discord",

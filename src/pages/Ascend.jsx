@@ -74,7 +74,7 @@ import {
   LogOut,
   Settings,
   ChevronRight,
-  BarChart3,
+  AlertTriangle,
   Search,
   MessageCircle,
   UserPlus,
@@ -203,6 +203,8 @@ const Ascend = () => {
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [accountExistsError, setAccountExistsError] = useState(null); // { email: string | null }
   const [deletedAccountWarning, setDeletedAccountWarning] = useState(false);
+  const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
+  const [pendingSignupData, setPendingSignupData] = useState(null);
 
   // Friend system state
   const [searchQuery, setSearchQuery] = useState("");
@@ -1277,6 +1279,50 @@ const Ascend = () => {
   // Subscribe to Ascend via Stripe Checkout
   const handleSubscribe = async () => {
     try {
+      // Validate account exists and is not deleted
+      if (!user || !user.uid) {
+        toast.error(t("account.errors.notLoggedIn") || "Please log in to subscribe");
+        return;
+      }
+
+      // Check if hardware ID is associated with a deleted account
+      let hardwareId = null;
+      if (window.electron?.getHardwareId) {
+        hardwareId = await window.electron.getHardwareId();
+      }
+
+      if (hardwareId) {
+        const deletedCheck = await checkDeletedAccount(hardwareId);
+        if (deletedCheck.isDeleted) {
+          toast.error(
+            t("account.errors.cannotSubscribeDeleted") ||
+              "Cannot subscribe - this device is associated with a deleted account. Please contact support."
+          );
+          setDeletedAccountWarning(true);
+          return;
+        }
+      }
+
+      // Verify the user account still exists in Firebase
+      try {
+        const authToken = await getAuthToken();
+        if (!authToken) {
+          toast.error(
+            t("account.errors.authenticationFailed") ||
+              "Authentication failed. Please log in again."
+          );
+          await handleLogout();
+          return;
+        }
+      } catch (authError) {
+        console.error("Authentication error:", authError);
+        toast.error(
+          t("account.errors.accountNotFound") || "Account not found. Please log in again."
+        );
+        await handleLogout();
+        return;
+      }
+
       const productResponse = await fetch(
         "https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW"
       );
@@ -1471,11 +1517,21 @@ const Ascend = () => {
       if (result.isNewUser) {
         // Check if hardware ID already has an account
         if (hardwareId) {
+          // First check if this hardware ID is associated with a deleted account
+          const deletedCheck = await checkDeletedAccount(hardwareId);
+          if (deletedCheck.isDeleted) {
+            // Delete the newly created account and show deleted account error
+            await deleteNewAccount();
+            setAccountExistsError({ email: deletedCheck.email, isDeleted: true });
+            setIsGoogleLoading(false);
+            return;
+          }
+
           const hwCheck = await checkHardwareIdAccount(hardwareId);
           if (hwCheck.hasAccount) {
             // Delete the newly created account and show error
             await deleteNewAccount();
-            setAccountExistsError({ email: hwCheck.email });
+            setAccountExistsError({ email: hwCheck.email, isDeleted: false });
             setIsGoogleLoading(false);
             return;
           }
@@ -1559,32 +1615,11 @@ const Ascend = () => {
         return;
       }
 
-      // Check if this hardware already has an account
-      let hardwareId = null;
-      if (window.electron?.getHardwareId) {
-        hardwareId = await window.electron.getHardwareId();
-      }
-      if (hardwareId) {
-        const hwCheck = await checkHardwareIdAccount(hardwareId);
-        if (hwCheck.hasAccount) {
-          setAccountExistsError({ email: hwCheck.email });
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      // Pass hardware ID to register so it gets linked to the account
-      const result = await register(
-        formData.email,
-        formData.password,
-        formData.displayName,
-        hardwareId
-      );
-      if (result.user) {
-        toast.success(t("account.success.registered"));
-      } else if (result.error) {
-        toast.error(result.error);
-      }
+      // Show email confirmation dialog before proceeding with signup
+      setPendingSignupData({ ...formData });
+      setShowEmailConfirmDialog(true);
+      setIsSubmitting(false);
+      return;
     } else {
       // Login
       const result = await login(formData.email, formData.password);
@@ -1607,6 +1642,57 @@ const Ascend = () => {
     }
 
     setIsSubmitting(false);
+  };
+
+  // Proceed with signup after email confirmation
+  const handleConfirmSignup = async () => {
+    setShowEmailConfirmDialog(false);
+    setIsSubmitting(true);
+
+    if (!pendingSignupData) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Check if this hardware already has an account
+    let hardwareId = null;
+    if (window.electron?.getHardwareId) {
+      hardwareId = await window.electron.getHardwareId();
+    }
+    if (hardwareId) {
+      // First check if this hardware ID is associated with a deleted account
+      const deletedCheck = await checkDeletedAccount(hardwareId);
+      if (deletedCheck.isDeleted) {
+        setAccountExistsError({ email: deletedCheck.email, isDeleted: true });
+        setIsSubmitting(false);
+        setPendingSignupData(null);
+        return;
+      }
+
+      const hwCheck = await checkHardwareIdAccount(hardwareId);
+      if (hwCheck.hasAccount) {
+        setAccountExistsError({ email: hwCheck.email, isDeleted: false });
+        setIsSubmitting(false);
+        setPendingSignupData(null);
+        return;
+      }
+    }
+
+    // Pass hardware ID to register so it gets linked to the account
+    const result = await register(
+      pendingSignupData.email,
+      pendingSignupData.password,
+      pendingSignupData.displayName,
+      hardwareId
+    );
+    if (result.user) {
+      toast.success(t("account.success.registered"));
+    } else if (result.error) {
+      toast.error(result.error);
+    }
+
+    setIsSubmitting(false);
+    setPendingSignupData(null);
   };
 
   const handleLogout = async () => {
@@ -1840,15 +1926,6 @@ const Ascend = () => {
               )}
               {t("account.verification.resend")}
             </Button>
-
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              className="h-11 w-full text-muted-foreground"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              {t("account.verification.useAnother")}
-            </Button>
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
@@ -1936,10 +2013,18 @@ const Ascend = () => {
                   <p className="mt-1 text-sm">{ascendAccess.noTrialReason}</p>
                 </div>
               )}
-              <Button onClick={handleSubscribe} className="w-full text-secondary">
-                <BadgeDollarSign className="mr-2 h-4 w-4" />
-                {t("ascend.settings.subscribe")}
-              </Button>
+              {!deletedAccountWarning && (
+                <Button onClick={handleSubscribe} className="w-full text-secondary">
+                  <BadgeDollarSign className="mr-2 h-4 w-4" />
+                  {t("ascend.settings.subscribe")}
+                </Button>
+              )}
+              {deletedAccountWarning && (
+                <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-sm">
+                  {t("account.errors.cannotSubscribeDeleted") ||
+                    "Cannot subscribe - account deleted"}
+                </div>
+              )}
               <button
                 onClick={handleLogout}
                 className="text-sm text-muted-foreground hover:text-foreground"
@@ -1967,10 +2052,18 @@ const Ascend = () => {
                 ? t("ascend.access.trialBlockedMessage")
                 : t("ascend.access.expiredMessage")}
             </p>
-            <Button onClick={handleSubscribe} className="w-full text-secondary">
-              <BadgeDollarSign className="mr-2 h-4 w-4" />
-              {t("ascend.settings.subscribe")}
-            </Button>
+            {!deletedAccountWarning && (
+              <Button onClick={handleSubscribe} className="w-full text-secondary">
+                <BadgeDollarSign className="mr-2 h-4 w-4" />
+                {t("ascend.settings.subscribe")}
+              </Button>
+            )}
+            {deletedAccountWarning && (
+              <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-sm">
+                {t("account.errors.cannotSubscribeDeleted") ||
+                  "Cannot subscribe - account deleted"}
+              </div>
+            )}
             <button
               onClick={handleLogout}
               className="text-sm text-muted-foreground hover:text-foreground"
@@ -4351,13 +4444,20 @@ const Ascend = () => {
                           <p className="mb-4 text-sm text-muted-foreground">
                             {t("ascend.settings.upgradeToProDescription")}
                           </p>
-                          <Button
-                            className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
-                            onClick={handleSubscribe}
-                          >
-                            <BadgeDollarSign className="h-4 w-4" />
-                            {t("ascend.settings.upgradeToPro")}
-                          </Button>
+                          {!deletedAccountWarning ? (
+                            <Button
+                              className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
+                              onClick={handleSubscribe}
+                            >
+                              <BadgeDollarSign className="h-4 w-4" />
+                              {t("ascend.settings.upgradeToPro")}
+                            </Button>
+                          ) : (
+                            <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">
+                              {t("account.errors.cannotSubscribeDeleted") ||
+                                "Cannot subscribe - account deleted"}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -4398,13 +4498,20 @@ const Ascend = () => {
                         ))}
                       </div>
 
-                      <Button
-                        className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
-                        onClick={handleSubscribe}
-                      >
-                        <BadgeDollarSign className="h-4 w-4" />
-                        {t("ascend.settings.subscribe")}
-                      </Button>
+                      {!deletedAccountWarning ? (
+                        <Button
+                          className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
+                          onClick={handleSubscribe}
+                        >
+                          <BadgeDollarSign className="h-4 w-4" />
+                          {t("ascend.settings.subscribe")}
+                        </Button>
+                      ) : (
+                        <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">
+                          {t("account.errors.cannotSubscribeDeleted") ||
+                            "Cannot subscribe - this device is associated with a deleted account"}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -6800,27 +6907,35 @@ const Ascend = () => {
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
                       <h3 className="text-destructive text-sm font-semibold">
-                        {t("account.errors.accountExists")}
+                        {accountExistsError.isDeleted
+                          ? t("account.errors.cannotCreateAccount") ||
+                            "Cannot Create Account"
+                          : t("account.errors.accountExists")}
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        {accountExistsError.email
-                          ? t("account.errors.accountExistsWithEmail", {
-                              email: accountExistsError.email,
-                            })
-                          : t("account.errors.accountExistsNoEmail")}
+                        {accountExistsError.isDeleted
+                          ? t("account.errors.deletedAccountMessage") ||
+                            "This device is associated with a deleted account. You cannot create another account. Please contact support for assistance."
+                          : accountExistsError.email
+                            ? t("account.errors.accountExistsWithEmail", {
+                                email: accountExistsError.email,
+                              })
+                            : t("account.errors.accountExistsNoEmail")}
                       </p>
                       <div className="flex flex-wrap gap-2 pt-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          onClick={() => {
-                            setAccountExistsError(null);
-                            setIsLogin(true);
-                          }}
-                        >
-                          {t("account.errors.signInInstead")}
-                        </Button>
+                        {!accountExistsError.isDeleted && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setAccountExistsError(null);
+                              setIsLogin(true);
+                            }}
+                          >
+                            {t("account.errors.signInInstead")}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -7218,6 +7333,66 @@ const Ascend = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Email Confirmation Dialog */}
+      <AlertDialog open={showEmailConfirmDialog} onOpenChange={setShowEmailConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              {t("account.confirmEmail.title") || "Confirm Your Email"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  {t("account.confirmEmail.message") ||
+                    "Please confirm that your email address is correct. Once your account is created, you will NOT be able to change your email address."}
+                </p>
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {t("account.confirmEmail.emailLabel") || "Email Address:"}
+                  </p>
+                  <p className="mt-1 font-mono text-sm font-semibold text-foreground">
+                    {pendingSignupData?.email}
+                  </p>
+                </div>
+                <p className="text-destructive text-xs">
+                  <AlertTriangle className="mr-1 inline h-3 w-3" />
+                  {t("account.confirmEmail.warning") ||
+                    "This email cannot be changed after account creation!"}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowEmailConfirmDialog(false);
+                setPendingSignupData(null);
+              }}
+            >
+              {t("account.confirmEmail.goBack") || "Go Back & Edit"}
+            </AlertDialogCancel>
+            <Button
+              onClick={handleConfirmSignup}
+              disabled={isSubmitting}
+              className="text-secondary"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t("account.confirmEmail.creating") || "Creating Account..."}
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  {t("account.confirmEmail.confirm") || "Yes, Create Account"}
+                </>
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
