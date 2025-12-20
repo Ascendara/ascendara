@@ -274,6 +274,42 @@ async function initializeApp() {
           return;
         }
 
+        // Handle FLiNG Trainer proxy requests
+        if (req.url.startsWith("/api/flingtrainer")) {
+          const targetPath = req.url.replace(/^\/api\/flingtrainer/, "");
+          const targetUrl = `https://flingtrainer.com${targetPath}`;
+
+          const parsedUrl = new URL(targetUrl);
+          const proxyOptions = {
+            hostname: parsedUrl.hostname,
+            port: 443,
+            path: parsedUrl.pathname + parsedUrl.search,
+            method: req.method,
+            headers: { ...req.headers, host: parsedUrl.hostname },
+          };
+
+          delete proxyOptions.headers["host"];
+          delete proxyOptions.headers["connection"];
+
+          const proxyReq = https.request(proxyOptions, proxyRes => {
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            proxyRes.pipe(res);
+          });
+
+          proxyReq.on("error", err => {
+            console.error("FlingTrainer proxy error:", err);
+            res.writeHead(502);
+            res.end("Proxy error");
+          });
+
+          proxyReq.end();
+          return;
+        }
+
         // Handle CORS preflight for API routes
         if (req.method === "OPTIONS" && req.url.startsWith("/api/")) {
           res.setHeader("Access-Control-Allow-Origin", "*");
