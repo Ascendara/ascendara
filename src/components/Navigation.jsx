@@ -13,6 +13,9 @@ import {
   Package,
   User,
   ServerIcon,
+  ArrowBigDown,
+  CircleArrowDown,
+  AtSign,
 } from "lucide-react";
 
 const Navigation = memo(({ items }) => {
@@ -78,9 +81,12 @@ const Navigation = memo(({ items }) => {
       }
       if (
         path === "/settings" &&
-        ["/settings", "/extralanguages", "/sidecaranddependencies"].includes(
-          location.pathname
-        )
+        [
+          "/settings",
+          "/extralanguages",
+          "/sidecaranddependencies",
+          "/localrefresh",
+        ].includes(location.pathname)
       ) {
         return true;
       }
@@ -119,7 +125,7 @@ const Navigation = memo(({ items }) => {
       {
         path: "/downloads",
         label: t("common.downloads"),
-        icon: Download,
+        icon: CircleArrowDown,
         color: "from-orange-500 to-amber-400",
       },
       {
@@ -136,6 +142,13 @@ const Navigation = memo(({ items }) => {
       label: t("common.profile"),
       icon: User,
       color: "from-red-500 to-pink-400",
+    });
+
+    items.push({
+      path: "/ascend",
+      label: t("common.ascend"),
+      icon: AtSign,
+      color: "from-pink-200 to-purple-500",
     });
 
     if (settings.viewWorkshopPage) {
@@ -236,7 +249,13 @@ const Navigation = memo(({ items }) => {
   return (
     <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 select-none p-6">
       <div className="nav-container relative mx-auto max-w-xl" style={navStyle}>
-        <div className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border bg-background/80 p-3 shadow-lg backdrop-blur-lg">
+        <div
+          className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border p-3 shadow-lg backdrop-blur-lg"
+          style={{
+            backgroundColor:
+              "rgb(var(--color-nav-background, var(--color-background)) / 0.8)",
+          }}
+        >
           <div
             className="pointer-events-auto absolute -left-2 -top-2 h-4 w-4 cursor-nw-resize"
             onMouseDown={e => handleMouseDown(e, true)}
@@ -270,9 +289,9 @@ const Navigation = memo(({ items }) => {
                     }`}
                   >
                     <item.icon className="h-5 w-5" />
-                    {item.icon === Download && downloadCount > 0 && (
-                      <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                        <span className="mb-0.5">{downloadCount}</span>
+                    {item.icon === CircleArrowDown && downloadCount > 0 && (
+                      <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
+                        {downloadCount}
                       </div>
                     )}
                   </div>

@@ -83,16 +83,16 @@ const GameRate = ({ game, isOpen, onClose }) => {
       // Get a fresh token for each request to ensure timestamp validity
       const freshToken = await getToken();
 
-      const response = await fetch("https://api.ascendara.app/app/gamerate", {
+      const response = await fetch("https://api.ascendara.app/app/v2/gamerate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${freshToken}`,
         },
         body: JSON.stringify({
-          gameName: game.game,
+          gameID: game.gameID,
           rating: rating,
-          ...(comments.trim() && { comments: comments.trim() }), // Only include comments if non-empty
+          ...(comments.trim() && { comments: comments.trim() }),
         }),
       });
 
@@ -164,12 +164,17 @@ const GameRate = ({ game, isOpen, onClose }) => {
                   >
                     <Star
                       size={32}
-                      className={cn(
-                        "transition-colors",
-                        (hoveredRating || rating) >= value
-                          ? "fill-yellow-400 stroke-yellow-400"
-                          : "fill-none stroke-muted-foreground"
-                      )}
+                      className="transition-colors"
+                      style={{
+                        fill:
+                          (hoveredRating || rating) >= value
+                            ? "rgb(var(--color-star-filled, 250 204 21))"
+                            : "transparent",
+                        stroke:
+                          (hoveredRating || rating) >= value
+                            ? "rgb(var(--color-star-filled, 250 204 21))"
+                            : "rgb(var(--color-star-empty, 148 163 184))",
+                      }}
                     />
                   </motion.button>
                 ))}

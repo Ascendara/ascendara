@@ -73,6 +73,14 @@ const ALL_SIDECARS = [
       "https://github.com/Ascendara/ascendara/tree/main/binaries/AscendaraDownloader/src",
   },
   {
+    id: "localrefresh",
+    name: "Index Refresh Tool",
+    description: "Refresh Ascendara's index with the custom scraper",
+    builtIn: true,
+    source:
+      "https://github.com/Ascendara/ascendara/tree/main/binaries/AscendaraLocalRefresh/src",
+  },
+  {
     id: "gofilehelper",
     name: "GoFile Helper",
     description: "Download and manage files from the GoFile provider",

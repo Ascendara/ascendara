@@ -41,9 +41,8 @@ import {
   ArrowRight,
   Download,
   Scale,
-  ClockAlert,
+  Clock,
   FlaskConical,
-  ChevronUp,
   ChevronLeft,
   ChevronRight,
   Zap,
@@ -52,17 +51,25 @@ import {
   BatteryLow,
   BatteryFull,
   SquareTerminal,
-  ChevronDown,
   Package,
   AlertTriangle,
-  Car,
-  MonitorDot,
-  CircleCheck,
-  MinusCircle,
-  Code,
-  SquareCode,
   CpuIcon,
   CornerDownRight,
+  Database,
+  LoaderIcon,
+  Palette,
+  Download as DownloadIcon,
+  UploadIcon,
+  Globe,
+  MessageCircleQuestion,
+  Star,
+  Home,
+  Bell,
+  CheckCircle,
+  Info,
+  Search,
+  Library,
+  Settings2,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -202,7 +209,7 @@ function createDebouncedFunction(func, wait) {
 function Settings() {
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
-  const { settings, setSettings } = useSettings();
+  const { settings, setSettings, setSettingsLocal } = useSettings();
   const navigate = useNavigate();
   const [isInitialized, setIsInitialized] = useState(false);
   const initialSettingsRef = useRef(null);
@@ -210,7 +217,6 @@ function Settings() {
   const [currentScreen, setCurrentScreen] = useState("none");
   const [isTriggering, setIsTriggering] = useState(false);
   const [apiMetadata, setApiMetadata] = useState(null);
-  const [fitgirlMetadata, setFitgirlMetadata] = useState(null);
   const [torboxApiKey, setTorboxApiKey] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isOnWindows, setIsOnWindows] = useState(null);
@@ -223,15 +229,57 @@ function Settings() {
   const [showNoLudusaviDialog, setShowNoLudusaviDialog] = useState(false);
   const [twitchSecret, setTwitchSecret] = useState("");
   const [twitchClientId, setTwitchClientId] = useState("");
-  const [showReloadDialog, setShowReloadDialog] = useState(false);
-  const [reloadMessage, setReloadMessage] = useState("");
-  const [pendingSourceChange, setPendingSourceChange] = useState(null);
   const [availableLanguages, setAvailableLanguages] = useState([]);
   const [isExperiment, setIsExperiment] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isDev, setIsDev] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [exclusionLoading, setExclusionLoading] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
+  const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
+  const [customColors, setCustomColors] = useState({
+    background: "255 255 255",
+    foreground: "15 23 42",
+    primary: "124 58 237",
+    secondary: "221 214 254",
+    muted: "221 214 254",
+    mutedForeground: "88 28 135",
+    accent: "221 214 254",
+    accentForeground: "88 28 135",
+    border: "167 139 250",
+    input: "167 139 250",
+    ring: "88 28 135",
+    card: "255 255 255",
+    cardForeground: "15 23 42",
+    popover: "255 255 255",
+    popoverForeground: "15 23 42",
+    // Navigation colors
+    navBackground: "255 255 255",
+    navActive: "124 58 237",
+    navActiveText: "255 255 255",
+    navHover: "221 214 254",
+    // Status colors
+    success: "34 197 94",
+    warning: "234 179 8",
+    error: "239 68 68",
+    info: "59 130 246",
+    // Star rating
+    starFilled: "250 204 21",
+    starEmpty: "148 163 184",
+    // Startup/Welcome screen
+    startupBackground: "255 255 255",
+    startupAccent: "124 58 237",
+  });
+  const [originalColorsOnOpen, setOriginalColorsOnOpen] = useState(null);
+  const [showPublicThemesDialog, setShowPublicThemesDialog] = useState(false);
+  const [publicThemes, setPublicThemes] = useState([]);
+  const [loadingPublicThemes, setLoadingPublicThemes] = useState(false);
+  const [selectedThemeVersion, setSelectedThemeVersion] = useState(null);
+  const [showSupportDialog, setShowSupportDialog] = useState(false);
+  const [showSupportConfirmDialog, setShowSupportConfirmDialog] = useState(false);
+  const [supportCode, setSupportCode] = useState(["", "", "", "", "", ""]);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const supportInputRefs = useRef([]);
 
   // Use a ref to track if this is the first mount
   const isFirstMount = useRef(true);
@@ -260,6 +308,67 @@ function Settings() {
       setTwitchClientId(settings.twitchClientId);
     }
   }, [settings]);
+
+  // Load last refresh time and check if refresh is running
+  useEffect(() => {
+    const loadRefreshStatus = async () => {
+      try {
+        const currentSettings = await window.electron.getSettings();
+        const indexPath = currentSettings?.localIndex;
+        if (indexPath) {
+          // Check if refresh is currently running
+          if (window.electron?.getLocalRefreshStatus) {
+            const status = await window.electron.getLocalRefreshStatus(indexPath);
+            setIsIndexRefreshing(status.isRunning);
+            // Use lastSuccessfulTimestamp which persists across refresh attempts
+            if (status.progress?.lastSuccessfulTimestamp) {
+              setLastRefreshTime(
+                new Date(status.progress.lastSuccessfulTimestamp * 1000)
+              );
+            }
+          } else if (window.electron?.getLocalRefreshProgress) {
+            const progress = await window.electron.getLocalRefreshProgress(indexPath);
+            // Use lastSuccessfulTimestamp which persists across refresh attempts
+            if (progress?.lastSuccessfulTimestamp) {
+              setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
+            }
+            // Check status from progress file
+            setIsIndexRefreshing(progress?.status === "running");
+          }
+        }
+      } catch (e) {
+        console.log("No progress file found for last refresh time");
+      }
+    };
+    loadRefreshStatus();
+
+    // Listen for refresh progress updates
+    if (window.electron?.onLocalRefreshProgress) {
+      const handleProgress = data => {
+        if (data.status === "running") {
+          setIsIndexRefreshing(true);
+        } else if (data.status === "completed" || data.status === "failed") {
+          setIsIndexRefreshing(false);
+          // Use lastSuccessfulTimestamp which only updates on successful completion
+          if (data.lastSuccessfulTimestamp) {
+            setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
+          }
+        }
+      };
+      window.electron.onLocalRefreshProgress(handleProgress);
+
+      // Listen for public index download complete
+      const handlePublicDownloadComplete = () => {
+        setLastRefreshTime(new Date());
+      };
+      window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
+
+      return () => {
+        window.electron.offLocalRefreshProgress?.();
+        window.electron.offPublicIndexDownloadComplete?.();
+      };
+    }
+  }, []);
 
   useEffect(() => {
     const checkExperiment = async () => {
@@ -360,14 +469,8 @@ function Settings() {
   }, []); // Run only once on mount
 
   const handleSettingChange = async (key, value, ludusavi = false) => {
-    if (key === "gameSource") {
-      setPendingSourceChange(value);
-      setShowReloadDialog(true);
-      return;
-    }
-
     if (key === "sideScrollBar") {
-      setSettings(prev => ({
+      setSettingsLocal(prev => ({
         ...prev,
         [key]: value,
       }));
@@ -390,7 +493,7 @@ function Settings() {
         })
         .then(success => {
           if (success) {
-            setSettings(prev => ({
+            setSettingsLocal(prev => ({
               ...prev,
               ludusavi: {
                 ...(prev.ludusavi || {}),
@@ -404,7 +507,7 @@ function Settings() {
 
     window.electron.updateSetting(key, value).then(success => {
       if (success) {
-        setSettings(prev => ({
+        setSettingsLocal(prev => ({
           ...prev,
           [key]: value,
         }));
@@ -448,9 +551,49 @@ function Settings() {
     }
   }, [handleSettingChange, t]);
 
+  // Helper to clear custom theme CSS variables
+  const clearCustomThemeStyles = () => {
+    const root = document.documentElement;
+    root.style.removeProperty("--color-background");
+    root.style.removeProperty("--color-foreground");
+    root.style.removeProperty("--color-primary");
+    root.style.removeProperty("--color-secondary");
+    root.style.removeProperty("--color-muted");
+    root.style.removeProperty("--color-muted-foreground");
+    root.style.removeProperty("--color-accent");
+    root.style.removeProperty("--color-accent-foreground");
+    root.style.removeProperty("--color-border");
+    root.style.removeProperty("--color-input");
+    root.style.removeProperty("--color-ring");
+    root.style.removeProperty("--color-card");
+    root.style.removeProperty("--color-card-foreground");
+    root.style.removeProperty("--color-popover");
+    root.style.removeProperty("--color-popover-foreground");
+    // Navigation colors
+    root.style.removeProperty("--color-nav-background");
+    root.style.removeProperty("--color-nav-active");
+    root.style.removeProperty("--color-nav-active-text");
+    root.style.removeProperty("--color-nav-hover");
+    // Status colors
+    root.style.removeProperty("--color-success");
+    root.style.removeProperty("--color-warning");
+    root.style.removeProperty("--color-error");
+    root.style.removeProperty("--color-info");
+    // Star rating
+    root.style.removeProperty("--color-star-filled");
+    root.style.removeProperty("--color-star-empty");
+    // Startup screen
+    root.style.removeProperty("--color-startup-background");
+    root.style.removeProperty("--color-startup-accent");
+  };
+
   // Theme handling
   const handleThemeChange = useCallback(
     newTheme => {
+      // Clear custom theme styles when switching away from custom
+      if (newTheme !== "custom") {
+        clearCustomThemeStyles();
+      }
       setTheme(newTheme);
       localStorage.setItem("ascendara-theme", newTheme);
       handleSettingChange("theme", newTheme);
@@ -474,6 +617,280 @@ function Settings() {
   const groupedThemes = {
     light: themes.filter(t => t.group === "light"),
     dark: themes.filter(t => t.group === "dark"),
+  };
+
+  // Default custom colors for merging with saved themes (handles missing new properties)
+  const defaultCustomColors = {
+    background: "255 255 255",
+    foreground: "15 23 42",
+    primary: "124 58 237",
+    secondary: "221 214 254",
+    muted: "221 214 254",
+    mutedForeground: "88 28 135",
+    accent: "221 214 254",
+    accentForeground: "88 28 135",
+    border: "167 139 250",
+    input: "167 139 250",
+    ring: "88 28 135",
+    card: "255 255 255",
+    cardForeground: "15 23 42",
+    popover: "255 255 255",
+    popoverForeground: "15 23 42",
+    navBackground: "255 255 255",
+    navActive: "124 58 237",
+    navActiveText: "255 255 255",
+    navHover: "221 214 254",
+    success: "34 197 94",
+    warning: "234 179 8",
+    error: "239 68 68",
+    info: "59 130 246",
+    starFilled: "250 204 21",
+    starEmpty: "148 163 184",
+    startupBackground: "255 255 255",
+    startupAccent: "124 58 237",
+  };
+
+  // Load custom colors from settings
+  useEffect(() => {
+    if (
+      settings.customTheme &&
+      Array.isArray(settings.customTheme) &&
+      settings.customTheme.length > 0
+    ) {
+      const customThemeObj = settings.customTheme[0];
+      if (customThemeObj) {
+        // Merge with defaults to ensure all properties exist (handles old saved themes)
+        setCustomColors(prev => ({ ...defaultCustomColors, ...customThemeObj }));
+      }
+    }
+  }, [settings.customTheme]);
+
+  // Apply custom theme CSS variables when custom theme is active
+  useEffect(() => {
+    if (theme === "custom" && customColors) {
+      const root = document.documentElement;
+      root.style.setProperty("--color-background", customColors.background);
+      root.style.setProperty("--color-foreground", customColors.foreground);
+      root.style.setProperty("--color-primary", customColors.primary);
+      root.style.setProperty("--color-secondary", customColors.secondary);
+      root.style.setProperty("--color-muted", customColors.muted);
+      root.style.setProperty("--color-muted-foreground", customColors.mutedForeground);
+      root.style.setProperty("--color-accent", customColors.accent);
+      root.style.setProperty("--color-accent-foreground", customColors.accentForeground);
+      root.style.setProperty("--color-border", customColors.border);
+      root.style.setProperty("--color-input", customColors.input);
+      root.style.setProperty("--color-ring", customColors.ring);
+      root.style.setProperty("--color-card", customColors.card);
+      root.style.setProperty("--color-card-foreground", customColors.cardForeground);
+      root.style.setProperty("--color-popover", customColors.popover);
+      root.style.setProperty(
+        "--color-popover-foreground",
+        customColors.popoverForeground
+      );
+      // Navigation colors
+      root.style.setProperty(
+        "--color-nav-background",
+        customColors.navBackground || customColors.background
+      );
+      root.style.setProperty(
+        "--color-nav-active",
+        customColors.navActive || customColors.primary
+      );
+      root.style.setProperty(
+        "--color-nav-active-text",
+        customColors.navActiveText || customColors.secondary
+      );
+      root.style.setProperty(
+        "--color-nav-hover",
+        customColors.navHover || customColors.secondary
+      );
+      // Status colors
+      root.style.setProperty("--color-success", customColors.success || "34 197 94");
+      root.style.setProperty("--color-warning", customColors.warning || "234 179 8");
+      root.style.setProperty("--color-error", customColors.error || "239 68 68");
+      root.style.setProperty("--color-info", customColors.info || "59 130 246");
+      // Star rating
+      root.style.setProperty(
+        "--color-star-filled",
+        customColors.starFilled || "250 204 21"
+      );
+      root.style.setProperty(
+        "--color-star-empty",
+        customColors.starEmpty || "148 163 184"
+      );
+      // Startup screen
+      root.style.setProperty(
+        "--color-startup-background",
+        customColors.startupBackground || customColors.background
+      );
+      root.style.setProperty(
+        "--color-startup-accent",
+        customColors.startupAccent || customColors.primary
+      );
+    }
+  }, [theme, customColors]);
+
+  // Helper to convert RGB string to hex
+  const rgbToHex = rgbString => {
+    if (!rgbString || typeof rgbString !== "string") return "#000000";
+    const parts = rgbString.split(" ").map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return "#000000";
+    return (
+      "#" +
+      parts
+        .map(x => {
+          const hex = x.toString(16);
+          return hex.length === 1 ? "0" + hex : hex;
+        })
+        .join("")
+    );
+  };
+
+  // Helper to convert hex to RGB string
+  const hexToRgb = hex => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!result) return "0 0 0";
+    return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`;
+  };
+
+  // Handle custom color change - only called on blur/change complete
+  const handleCustomColorChange = (colorKey, hexValue) => {
+    const rgbValue = hexToRgb(hexValue);
+    setCustomColors(prev => ({
+      ...prev,
+      [colorKey]: rgbValue,
+    }));
+  };
+
+  // ColorPickerInput component - native color picker with local state for smooth dragging
+  const ColorPickerInput = ({ colorKey, label, value }) => {
+    const safeValue = value || "128 128 128"; // Default gray if undefined
+    const [localColor, setLocalColor] = useState(rgbToHex(safeValue));
+    const [localRgb, setLocalRgb] = useState(safeValue);
+
+    // Sync local state when parent value changes (e.g., on import)
+    useEffect(() => {
+      const syncValue = value || "128 128 128";
+      setLocalColor(rgbToHex(syncValue));
+      setLocalRgb(syncValue);
+    }, [value]);
+
+    return (
+      <div className="flex items-center gap-3">
+        <input
+          type="color"
+          value={localColor}
+          onChange={e => {
+            setLocalColor(e.target.value);
+            setLocalRgb(hexToRgb(e.target.value));
+          }}
+          onBlur={() => handleCustomColorChange(colorKey, localColor)}
+          style={{
+            width: "56px",
+            height: "40px",
+            padding: 0,
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        />
+        <div className="min-w-0 flex-1">
+          <Label className="block truncate text-xs text-foreground">{label}</Label>
+          <p className="truncate text-xs text-foreground/60">{localRgb}</p>
+        </div>
+      </div>
+    );
+  };
+
+  // Save custom colors and apply theme
+  const handleSaveCustomColors = async () => {
+    // Create the theme array
+    const themeArray = [{ ...customColors }];
+    console.log("Saving custom theme:", themeArray);
+
+    // Save custom theme array first using dedicated function
+    const success = await window.electron.saveCustomThemeColors(themeArray);
+    console.log("Save success:", success);
+
+    if (success) {
+      // Also save theme to "custom"
+      await window.electron.updateSetting("theme", "custom");
+
+      // Update React state without triggering full save
+      setTheme("custom");
+      localStorage.setItem("ascendara-theme", "custom");
+
+      setShowCustomColorsDialog(false);
+      toast.success(t("settings.customColorsSaved") || "Custom colors saved!");
+    } else {
+      toast.error("Failed to save custom theme");
+    }
+  };
+
+  // Export custom theme to file
+  const handleExportTheme = async () => {
+    const result = await window.electron.exportCustomTheme([customColors]);
+    if (result.success) {
+      toast.success(t("settings.themeExported") || "Theme exported successfully!");
+    } else if (!result.canceled) {
+      toast.error(
+        result.error || t("settings.themeExportFailed") || "Failed to export theme"
+      );
+    }
+  };
+
+  // Import custom theme from file
+  const handleImportTheme = async () => {
+    const result = await window.electron.importCustomTheme();
+    if (result.success && result.customTheme) {
+      setCustomColors(result.customTheme[0]);
+      toast.success(t("settings.themeImported") || "Theme imported successfully!");
+    } else if (!result.canceled) {
+      toast.error(
+        result.error || t("settings.themeImportFailed") || "Failed to import theme"
+      );
+    }
+  };
+
+  // Browse public themes
+  const handleBrowsePublicThemes = async () => {
+    setShowCustomColorsDialog(false);
+    setShowPublicThemesDialog(true);
+    setLoadingPublicThemes(true);
+    try {
+      const response = await fetch("https://api.ascendara.app/json/publicthemes");
+      const data = await response.json();
+      // Ensure we always have an array
+      let themesArray = [];
+      if (Array.isArray(data)) {
+        themesArray = data;
+      } else if (data && Array.isArray(data.themes)) {
+        themesArray = data.themes;
+      } else if (data && typeof data === "object") {
+        // If it's an object with theme entries, convert to array
+        themesArray = Object.values(data).filter(
+          item => item && typeof item === "object"
+        );
+      }
+      setPublicThemes(themesArray);
+    } catch (error) {
+      console.error("Error fetching public themes:", error);
+      toast.error(t("settings.publicThemesFailed") || "Failed to load public themes");
+      setPublicThemes([]);
+    } finally {
+      setLoadingPublicThemes(false);
+    }
+  };
+
+  // Apply a public theme
+  const handleApplyPublicTheme = (themeColors, themeVersion) => {
+    setCustomColors(themeColors);
+    setSelectedThemeVersion(themeVersion);
+    setShowPublicThemesDialog(false);
+    setShowCustomColorsDialog(true);
+    toast.success(
+      t("settings.publicThemeApplied") || "Theme applied! Click Apply Colors to save."
+    );
   };
 
   // Check if in development mode
@@ -535,19 +952,6 @@ function Settings() {
     fetchMetadata();
   }, []);
 
-  useEffect(() => {
-    const loadFitgirlMetadata = async () => {
-      if (!settings.torrentEnabled) return;
-      try {
-        const data = await gameService.getAllGames();
-        setApiMetadata(data.metadata);
-      } catch (error) {
-        console.error("Failed to load Fitgirl metadata:", error);
-      }
-    };
-    loadFitgirlMetadata();
-  }, [settings.torrentEnabled]);
-
   const handleRefreshIndex = async () => {
     setIsRefreshing(true);
     try {
@@ -572,27 +976,6 @@ function Settings() {
     };
     loadLanguages();
   }, []);
-
-  // Auto-show advanced section when torrent is enabled
-  useEffect(() => {
-    if (settings.torrentEnabled) {
-      setShowAdvanced(true);
-    }
-  }, [settings.torrentEnabled]);
-
-  // Switch back to SteamRip if torrent is disabled while using Fitgirl
-  useEffect(() => {
-    if (!settings.torrentEnabled && settings.gameSource === "fitgirl") {
-      handleSettingChange("gameSource", "steamrip");
-    }
-  }, [settings.torrentEnabled]);
-
-  // Disable Time Machine when using Fitgirl source
-  useEffect(() => {
-    if (settings.gameSource === "fitgirl" && settings.showOldDownloadLinks) {
-      handleSettingChange("showOldDownloadLinks", false);
-    }
-  }, [settings.gameSource]);
 
   // Show loading state
   if (isLoading) {
@@ -689,228 +1072,346 @@ function Settings() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Left Column - Core Settings */}
           <div className="space-y-6 lg:col-span-8">
-            {/* General Settings Card */}
+            {/* Local Game Index Card */}
             <Card className="border-border p-6">
-              <h2 className="mb-2 text-xl font-semibold text-primary">
-                {t("settings.general")}
-              </h2>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="mb-4">
-                    <Label>{t("settings.theme")}</Label>
-                    <Accordion
-                      type="single"
-                      collapsible
-                      className="mt-2 w-full rounded-lg border-border bg-background text-card-foreground shadow-sm"
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-lg bg-primary/10 p-3">
+                    {isIndexRefreshing ? (
+                      <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
+                    ) : (
+                      <Database className="h-6 w-6 text-primary" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-semibold text-primary">
+                        {t("settings.localIndex") || "Local Game Index"}
+                      </h2>
+                      {isIndexRefreshing && (
+                        <Badge variant="secondary" className="mb-2.5 text-xs">
+                          {t("localRefresh.statusRunning") || "Refreshing..."}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="max-w-[500px] text-sm text-muted-foreground">
+                      {t("settings.localIndexDescription")}
+                    </p>
+                    <div
+                      className={`flex items-center gap-2 pt-2 text-sm ${lastRefreshTime ? "text-muted-foreground" : "font-bold text-yellow-500"}`}
                     >
-                      <AccordionItem value="light-themes" className="border-0 px-1">
-                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {t("settings.lightThemes")}
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            {groupedThemes.light.map(t => (
-                              <ThemeButton
-                                key={t.id}
-                                theme={t}
-                                currentTheme={theme}
-                                onSelect={handleThemeChange}
-                              />
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-
-                      <AccordionItem
-                        value="dark-themes"
-                        className="border-0 border-t border-t-border/20 px-1"
-                      >
-                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {t("settings.darkThemes")}
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            {groupedThemes.dark.map(t => (
-                              <ThemeButton
-                                key={t.id}
-                                theme={t}
-                                currentTheme={theme}
-                                onSelect={handleThemeChange}
-                              />
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.defaultLandingPage")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.defaultLandingPageDescription")}
-                      </p>
+                      {lastRefreshTime ? (
+                        <Clock className="h-4 w-4" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4" />
+                      )}
+                      <span>
+                        {t("settings.lastIndexRefresh") || "Last refresh"}:{" "}
+                        {lastRefreshTime
+                          ? lastRefreshTime.toLocaleDateString()
+                          : t("localRefresh.never") || "Never"}
+                      </span>
                     </div>
-                    <Select
-                      value={settings.defaultOpenPage || "home"}
-                      onValueChange={value =>
-                        handleSettingChange("defaultOpenPage", value)
-                      }
-                    >
-                      <SelectTrigger className="w-[180px] bg-background">
-                        <SelectValue placeholder="Home" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="home">{t("common.home")}</SelectItem>
-                        <SelectItem value="search">{t("common.search")}</SelectItem>
-                        <SelectItem value="library">{t("common.library")}</SelectItem>
-                        <SelectItem value="downloads">{t("common.downloads")}</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.ascendaraUpdates")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.ascendaraUpdatesDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.autoUpdate}
-                      onCheckedChange={() =>
-                        handleSettingChange("autoUpdate", !settings.autoUpdate)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.discordRPC")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.discordRPCDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.rpcEnabled}
-                      onCheckedChange={() =>
-                        handleSettingChange("rpcEnabled", !settings.rpcEnabled)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.notifications")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.notificationsDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.notifications}
-                      onCheckedChange={() =>
-                        handleSettingChange("notifications", !settings.notifications)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.quickLaunch")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.quickLaunchDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={!settings.endOnClose}
-                      onCheckedChange={() =>
-                        handleSettingChange("endOnClose", !settings.endOnClose)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.smoothTransitions")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.smoothTransitionsDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.smoothTransitions}
-                      onCheckedChange={() =>
-                        handleSettingChange(
-                          "smoothTransitions",
-                          !settings.smoothTransitions
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.sideScrollBar")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.sideScrollBarDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.sideScrollBar}
-                      onCheckedChange={() =>
-                        handleSettingChange("sideScrollBar", !settings.sideScrollBar)
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.matureContent")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.matureContentDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.seeInappropriateContent}
-                      onCheckedChange={() =>
-                        handleSettingChange(
-                          "seeInappropriateContent",
-                          !settings.seeInappropriateContent
-                        )
-                      }
-                    />
-                  </div>
-
-                  {isOnWindows && (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>{t("settings.autoCreateShortcuts")}</Label>
-                        <p className="text-sm text-muted-foreground">
-                          {t("settings.autoCreateShortcutsDescription")}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={settings.autoCreateShortcuts}
-                        onCheckedChange={() =>
-                          handleSettingChange(
-                            "autoCreateShortcuts",
-                            !settings.autoCreateShortcuts
-                          )
-                        }
-                      />
-                    </div>
-                  )}
                 </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="shrink-0 gap-2 text-secondary"
+                  onClick={() => navigate("/localrefresh")}
+                >
+                  {isIndexRefreshing
+                    ? t("localRefresh.viewProgress") || "View Progress"
+                    : t("settings.manageIndex") || "Manage Index"}
+                </Button>
               </div>
             </Card>
 
+            {/* General Settings Card */}
+            <Card className="border-border p-6">
+              <h2 className="mb-4 text-xl font-semibold text-primary">
+                {t("settings.general")}
+              </h2>
+
+              {/* Appearance Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("settings.appearance")}
+                </h3>
+                <div>
+                  <Label>{t("settings.themes")}</Label>
+
+                  {/* Custom Colors Button */}
+                  <div
+                    className={`mt-3 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent/50 ${theme === "custom" ? "border-primary bg-primary/5" : "border-border"}`}
+                    onClick={() => {
+                      setOriginalColorsOnOpen({ ...customColors });
+                      setSelectedThemeVersion(null);
+                      setShowCustomColorsDialog(true);
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-primary/20 to-accent/20">
+                        <Palette className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {t("settings.customColors") || "Custom Colors"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("settings.customColorsSubtitle") || "Create your own theme"}
+                        </p>
+                      </div>
+                    </div>
+                    {theme === "custom" ? (
+                      <div className="flex items-center gap-2 rounded-full bg-primary/10 px-2 py-1">
+                        <div className="h-2 w-2 rounded-full bg-primary" />
+                        <span className="text-xs font-medium text-primary">
+                          {t("settings.active") || "Active"}
+                        </span>
+                      </div>
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <Accordion
+                    type="single"
+                    collapsible
+                    className="mt-2 w-full rounded-lg border-border bg-background text-card-foreground shadow-sm"
+                  >
+                    <AccordionItem value="light-themes" className="border-0 px-1">
+                      <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {t("settings.lightThemes")}
+                          </span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {groupedThemes.light.map(t => (
+                            <ThemeButton
+                              key={t.id}
+                              theme={t}
+                              currentTheme={theme}
+                              onSelect={handleThemeChange}
+                            />
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem
+                      value="dark-themes"
+                      className="border-0 border-t border-t-border/20 px-1"
+                    >
+                      <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {t("settings.darkThemes")}
+                          </span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {groupedThemes.dark.map(t => (
+                            <ThemeButton
+                              key={t.id}
+                              theme={t}
+                              currentTheme={theme}
+                              onSelect={handleThemeChange}
+                            />
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.smoothTransitions")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.smoothTransitionsDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.smoothTransitions}
+                    onCheckedChange={() =>
+                      handleSettingChange(
+                        "smoothTransitions",
+                        !settings.smoothTransitions
+                      )
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.sideScrollBar")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.sideScrollBarDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.sideScrollBar}
+                    onCheckedChange={() =>
+                      handleSettingChange("sideScrollBar", !settings.sideScrollBar)
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Application Section */}
+              <div className="mt-8 space-y-4">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("settings.application")}
+                </h3>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.defaultLandingPage")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.defaultLandingPageDescription")}
+                    </p>
+                  </div>
+                  <Select
+                    value={settings.defaultOpenPage || "home"}
+                    onValueChange={value => handleSettingChange("defaultOpenPage", value)}
+                  >
+                    <SelectTrigger className="w-[180px] bg-background">
+                      <SelectValue placeholder="Home" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="home">{t("common.home")}</SelectItem>
+                      <SelectItem value="search">{t("common.search")}</SelectItem>
+                      <SelectItem value="library">{t("common.library")}</SelectItem>
+                      <SelectItem value="downloads">{t("common.downloads")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.ascendaraUpdates")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.ascendaraUpdatesDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.autoUpdate}
+                    onCheckedChange={() =>
+                      handleSettingChange("autoUpdate", !settings.autoUpdate)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.notifications")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.notificationsDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.notifications}
+                    onCheckedChange={() =>
+                      handleSettingChange("notifications", !settings.notifications)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.quickLaunch")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.quickLaunchDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!settings.endOnClose}
+                    onCheckedChange={() =>
+                      handleSettingChange("endOnClose", !settings.endOnClose)
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Gaming Section */}
+              <div className="mt-8 space-y-4">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("settings.gaming")}
+                </h3>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.discordRPC")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.discordRPCDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.rpcEnabled}
+                    onCheckedChange={() =>
+                      handleSettingChange("rpcEnabled", !settings.rpcEnabled)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.hideOnGameLaunch")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.hideOnGameLaunchDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.hideOnGameLaunch}
+                    onCheckedChange={() =>
+                      handleSettingChange("hideOnGameLaunch", !settings.hideOnGameLaunch)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.matureContent")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.matureContentDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.seeInappropriateContent}
+                    onCheckedChange={() =>
+                      handleSettingChange(
+                        "seeInappropriateContent",
+                        !settings.seeInappropriateContent
+                      )
+                    }
+                  />
+                </div>
+
+                {isOnWindows && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.autoCreateShortcuts")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.autoCreateShortcutsDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.autoCreateShortcuts}
+                      onCheckedChange={() =>
+                        handleSettingChange(
+                          "autoCreateShortcuts",
+                          !settings.autoCreateShortcuts
+                        )
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            </Card>
             <Card className="mb-6 border-border">
               <div className="space-y-3 p-6">
                 <h3 className="mb-2 text-xl font-semibold text-primary">
@@ -1040,18 +1541,43 @@ function Settings() {
                   />
                 </div>
 
+                {/* Single Stream Download Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="singleStream">
+                      {t("settings.singleStream", "Single Stream Download")}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        "settings.singleStreamDescription",
+                        "Use a single connection for downloads. More stable for large files but may be slower."
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    id="singleStream"
+                    checked={settings.singleStream}
+                    onCheckedChange={checked =>
+                      handleSettingChange("singleStream", checked)
+                    }
+                    disabled={isDownloaderRunning}
+                  />
+                </div>
+
                 {/* Download Threads Config */}
-                <div className="space-y-2">
+                <div className={`space-y-2 ${settings.singleStream ? "opacity-50" : ""}`}>
                   <Label
                     htmlFor="threadCount"
-                    className={isDownloaderRunning ? "opacity-50" : ""}
+                    className={
+                      isDownloaderRunning || settings.singleStream ? "opacity-50" : ""
+                    }
                   >
                     {t("settings.downloadThreads")}
                   </Label>
                   <p className="mb-4 text-sm font-normal text-muted-foreground">
                     {t("settings.downloadThreadsDescription")}
                   </p>
-                  {settings.threadCount > 32 && (
+                  {settings.threadCount > 32 && !settings.singleStream && (
                     <div className="mb-4 flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
                       <CircleAlert size={14} />
                       <p className="text-sm">{t("settings.highThreadWarning")}</p>
@@ -1068,7 +1594,11 @@ function Settings() {
                       <Button
                         variant="outline"
                         size="icon"
-                        disabled={isDownloaderRunning || settings.threadCount <= 2}
+                        disabled={
+                          isDownloaderRunning ||
+                          settings.singleStream ||
+                          settings.threadCount <= 2
+                        }
                         onClick={() => {
                           // For decrement, use the value we're going to
                           const currentValue = settings.threadCount;
@@ -1187,7 +1717,11 @@ function Settings() {
                       <Button
                         variant="outline"
                         size="icon"
-                        disabled={isDownloaderRunning || settings.threadCount >= 64}
+                        disabled={
+                          isDownloaderRunning ||
+                          settings.singleStream ||
+                          settings.threadCount >= 64
+                        }
                         onClick={() => {
                           // For increment, use the value we're coming from
                           const currentValue = settings.threadCount;
@@ -1632,44 +2166,48 @@ function Settings() {
                       "Default directories always tracked:"}
                   </span>
                 </div>
-                <ul className="ml-6 space-y-1 text-xs text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>Public/Documents/Steam/CODEX</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>AppData/Roaming/Steam/CODEX</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>AppData/Roaming/Goldberg SteamEmu Saves</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>AppData/Roaming/EMPRESS</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>Public/Documents/Steam/RUNE</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>Public/Documents/EMPRESS</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>Public/Documents/OnlineFix</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>ProgramData/Steam</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>LocalAppData/SKIDROW</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/Steam/CODEX</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/EMPRESS</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/Goldberg SteamEmu Saves</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>AppData/Roaming/SmartSteamEmu</span>
-                  </li>
-                </ul>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>ProgramData/Steam</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>LocalAppData/SKIDROW</span>
+                  </div>
+                </div>
                 <div className="mt-2 text-xs italic text-muted-foreground">
                   {t("settings.achievementWatcher.defaultDirsNote") ||
                     "These directories and files are always tracked by default and cannot be removed."}
@@ -1903,285 +2441,98 @@ function Settings() {
               </Tabs>
             </Card>
 
-            {/* Game Sources Card */}
+            {/* Torrenting Card */}
             <Card className="border-border p-6">
               <div className="mb-6 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-primary">
-                    {t("settings.gameSources")}
+                    {t("settings.torrenting")}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {t("settings.gameSourcesDescription")}
+                    {t("settings.torrentingDescription")}
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshIndex}
-                  disabled={isRefreshing}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                  />
-                  {isRefreshing ? t("search.refreshingIndex") : t("search.refreshIndex")}
-                </Button>
               </div>
 
               <div className="space-y-6">
-                {/* Main Source Info */}
+                {/* Torrent Support */}
                 <div className="rounded-lg border bg-card">
                   <div className="p-6">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-semibold">SteamRIP</h3>
-                          <Badge
-                            variant={
-                              settings.gameSource === "steamrip" ? "success" : "secondary"
-                            }
-                            className="text-xs"
-                          >
-                            {settings.gameSource === "steamrip"
-                              ? t("settings.currentSource")
-                              : t("settings.sourceInactive")}
+                          <h3 className="text-lg font-semibold">
+                            {t("settings.torrentOnAscendara")}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">
+                            <FlaskConical className="mr-1 h-4 w-4" />
+                            {t("settings.experimental")}
                           </Badge>
                         </div>
                         <p className="max-w-[600px] text-sm text-muted-foreground">
-                          {t("settings.steamripDescription")}
+                          {t("settings.torrentDescription")}
                         </p>
                       </div>
-                      {settings.gameSource !== "steamrip" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0"
-                          onClick={() => handleSettingChange("gameSource", "steamrip")}
-                        >
-                          {t("settings.switchSource")}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0"
-                          onClick={() =>
-                            window.electron.openURL(
-                              "https://ascendara.app/sources/steamrip"
-                            )
-                          }
-                        >
-                          {t("common.learnMore")}{" "}
-                          <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                        </Button>
-                      )}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Switch
+                                checked={settings.torrentEnabled}
+                                onCheckedChange={handleTorrentToggle}
+                                disabled={!isOnWindows}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          {!isOnWindows && (
+                            <TooltipContent>
+                              <p className="text-secondary">
+                                {t("settings.onlyWindowsSupported")}
+                              </p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
 
-                    {settings.gameSource === "steamrip" && (
-                      <div className="mt-6 grid grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            {t("settings.lastUpdated")}
-                          </Label>
-                          <p className="text-sm font-medium">
-                            {apiMetadata?.getDate || "-"}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            {t("settings.totalGames")}
-                          </Label>
-                          <p className="text-sm font-medium">
-                            {apiMetadata?.games?.toLocaleString() || "-"}
-                          </p>
+                    {settings.torrentEnabled && (
+                      <div className="mt-6">
+                        <div className="rounded-lg bg-muted/30 p-4">
+                          <div className="flex items-center gap-2 text-sm">
+                            <QbittorrentStatus />
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
-
-                {settings.torrentEnabled && (
-                  <div className="mt-6 rounded-lg border bg-card duration-300 animate-in fade-in slide-in-from-top-4">
-                    <div className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">FitGirl Repacks</h3>
-                            <Badge
-                              variant={
-                                settings.gameSource === "fitgirl"
-                                  ? "success"
-                                  : "secondary"
-                              }
-                              className="text-xs"
-                            >
-                              {settings.gameSource === "fitgirl"
-                                ? t("settings.currentSource")
-                                : t("settings.sourceInactive")}
-                            </Badge>
-                          </div>
-                          <p className="max-w-[600px] text-sm text-muted-foreground">
-                            {t("settings.fitgirlRepacksDescription")}
-                          </p>
-                        </div>
-                        {settings.gameSource !== "fitgirl" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={() => handleSettingChange("gameSource", "fitgirl")}
-                          >
-                            {t("settings.switchSource")}
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={() =>
-                              window.electron.openURL(
-                                "https://ascendara.app/sources/fitgirl"
-                              )
-                            }
-                          >
-                            {t("common.learnMore")}{" "}
-                            <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {settings.gameSource === "fitgirl" && (
-                        <div className="mt-6 grid grid-cols-3 gap-4">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">
-                              {t("settings.lastUpdated")}
-                            </Label>
-                            <p className="text-sm font-medium">
-                              {apiMetadata?.getDate || "-"}
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">
-                              {t("settings.totalGames")}
-                            </Label>
-                            <p className="text-sm font-medium">
-                              {apiMetadata?.games?.toLocaleString() || "-"}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Advanced Section Toggle */}
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center px-2">
-                    <div className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-background"
-                      onClick={() => setShowAdvanced(!showAdvanced)}
-                      disabled={settings.torrentEnabled}
-                    >
-                      {t("settings.advanced")}{" "}
-                      {showAdvanced ? (
-                        <ChevronUp className="ml-2 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-2 h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Advanced Settings */}
-                {showAdvanced && (
-                  <div className="space-y-6 duration-300 animate-in fade-in slide-in-from-top-4">
-                    {/* Torrent Support */}
-                    <div className="rounded-lg border bg-card">
-                      <div className="p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-lg font-semibold">
-                                {t("settings.torrentOnAscendara")}
-                              </h3>
-                              <Badge variant="secondary" className="text-xs">
-                                <FlaskConical className="mr-1 h-4 w-4" />
-                                {t("settings.experimental")}
-                              </Badge>
-                            </div>
-                            <p className="max-w-[600px] text-sm text-muted-foreground">
-                              {t("settings.torrentDescription")}
-                            </p>
-                          </div>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div>
-                                  <Switch
-                                    checked={settings.torrentEnabled}
-                                    onCheckedChange={handleTorrentToggle}
-                                    disabled={
-                                      settings.gameSource === "fitgirl" || !isOnWindows
-                                    }
-                                  />
-                                </div>
-                              </TooltipTrigger>
-                              {settings.gameSource === "fitgirl" && (
-                                <TooltipContent>
-                                  <p className="text-secondary">
-                                    {t("settings.cannotDisableTorrent")}
-                                  </p>
-                                </TooltipContent>
-                              )}
-                              {!isOnWindows && (
-                                <TooltipContent>
-                                  <p className="text-secondary">
-                                    {t("settings.onlyWindowsSupported")}
-                                  </p>
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-
-                        {settings.torrentEnabled && (
-                          <div className="mt-6">
-                            <div className="rounded-lg bg-muted/30 p-4">
-                              <div className="flex items-center gap-2 text-sm">
-                                <QbittorrentStatus />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Additional Features */}
-                    <div className="rounded-lg border bg-muted/30 p-4">
-                      <div className="mb-2 flex items-center gap-2">
-                        <ClockAlert className="h-4 w-4 text-muted-foreground" />
-                        <h4 className="font-medium">{t("settings.customSources")}</h4>
-                      </div>
-                      <p className="mb-3 text-sm text-muted-foreground">
-                        {t("settings.customSourcesDescription")}
-                      </p>
-                      <Badge variant="secondary" className="text-xs">
-                        {t("settings.comingSoon")}
-                      </Badge>
-                    </div>
-                  </div>
-                )}
               </div>
             </Card>
           </div>
 
           {/* Right Column - Additional Settings */}
           <div className="space-y-6 lg:col-span-4">
+            <Card className="border-border p-6">
+              <div className="mb-2 flex items-center gap-2">
+                <MessageCircleQuestion className="mb-2 h-5 w-5 text-primary" />
+                <h2 className="text-xl font-semibold text-primary">
+                  {t("settings.quickSupport")}
+                </h2>
+              </div>
+              <p className="mb-4 text-sm text-muted-foreground">
+                {t("settings.supportDesc")}
+              </p>
+              <Button
+                className="flex w-full items-center gap-2 text-secondary"
+                onClick={() => {
+                  setSupportCode(["", "", "", "", "", ""]);
+                  setShowSupportDialog(true);
+                }}
+              >
+                {t("settings.getHelp")}
+              </Button>
+            </Card>
+
             {/* Analytics Card */}
             <Card className="border-border p-6">
               <div className="mb-2 flex items-center gap-2">
@@ -2259,16 +2610,8 @@ function Settings() {
                           enabled: value,
                         });
                       }}
-                      disabled={settings.gameSource === "fitgirl"}
                     />
                   </div>
-                  {settings.gameSource === "fitgirl" && (
-                    <div className="mt-2 flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
-                      <p className="text-sm">
-                        {t("settings.timeMachineDisabledFitgirl")}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </Card>
@@ -2623,38 +2966,935 @@ function Settings() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reload Required Dialog */}
-      <AlertDialog open={showReloadDialog} onOpenChange={setShowReloadDialog}>
-        <AlertDialogContent>
+      {/* Custom Colors Dialog */}
+      <AlertDialog open={showCustomColorsDialog}>
+        <AlertDialogContent className="max-h-[95vh] max-w-6xl overflow-y-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("settings.reloadRequired")}
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <Palette />
+              {t("settings.customColors") || "Customize Theme"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              {reloadMessage || t("settings.sourceChangeReload")}
+              {t("settings.customColorsDescription") ||
+                "Customize each color in your theme."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {(selectedThemeVersion === 1 || selectedThemeVersion === "1") && (
+            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-500">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>
+                {t("settings.legacyThemeWarning") ||
+                  "This theme uses an older format and may be missing some color options. Some colors will use default values."}
+              </span>
+            </div>
+          )}
+
+          <div className="space-y-4 py-4">
+            {/* Core Colors */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Core
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="background"
+                  label="Background"
+                  value={customColors.background}
+                />
+                <ColorPickerInput
+                  colorKey="foreground"
+                  label="Text"
+                  value={customColors.foreground}
+                />
+                <ColorPickerInput
+                  colorKey="primary"
+                  label="Primary"
+                  value={customColors.primary}
+                />
+                <ColorPickerInput
+                  colorKey="secondary"
+                  label="Secondary"
+                  value={customColors.secondary}
+                />
+                <ColorPickerInput
+                  colorKey="accent"
+                  label="Accent"
+                  value={customColors.accent}
+                />
+                <ColorPickerInput
+                  colorKey="accentForeground"
+                  label="Accent Text"
+                  value={customColors.accentForeground}
+                />
+                <ColorPickerInput
+                  colorKey="muted"
+                  label="Muted"
+                  value={customColors.muted}
+                />
+                <ColorPickerInput
+                  colorKey="mutedForeground"
+                  label="Muted Text"
+                  value={customColors.mutedForeground}
+                />
+              </div>
+            </div>
+
+            {/* Cards & Surfaces */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Surfaces
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="card"
+                  label="Card"
+                  value={customColors.card}
+                />
+                <ColorPickerInput
+                  colorKey="cardForeground"
+                  label="Card Text"
+                  value={customColors.cardForeground}
+                />
+                <ColorPickerInput
+                  colorKey="popover"
+                  label="Popover"
+                  value={customColors.popover}
+                />
+                <ColorPickerInput
+                  colorKey="popoverForeground"
+                  label="Popover Text"
+                  value={customColors.popoverForeground}
+                />
+                <ColorPickerInput
+                  colorKey="border"
+                  label="Border"
+                  value={customColors.border}
+                />
+                <ColorPickerInput
+                  colorKey="input"
+                  label="Input"
+                  value={customColors.input}
+                />
+                <ColorPickerInput
+                  colorKey="ring"
+                  label="Focus Ring"
+                  value={customColors.ring}
+                />
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Navigation
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="navBackground"
+                  label="Background"
+                  value={customColors.navBackground}
+                />
+              </div>
+            </div>
+
+            {/* Status & Feedback */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Status
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="success"
+                  label="Success"
+                  value={customColors.success}
+                />
+                <ColorPickerInput
+                  colorKey="warning"
+                  label="Warning"
+                  value={customColors.warning}
+                />
+                <ColorPickerInput
+                  colorKey="error"
+                  label="Error"
+                  value={customColors.error}
+                />
+                <ColorPickerInput
+                  colorKey="info"
+                  label="Info"
+                  value={customColors.info}
+                />
+                <ColorPickerInput
+                  colorKey="starFilled"
+                  label="Star Filled"
+                  value={customColors.starFilled}
+                />
+                <ColorPickerInput
+                  colorKey="starEmpty"
+                  label="Star Empty"
+                  value={customColors.starEmpty}
+                />
+              </div>
+            </div>
+
+            {/* Startup Screen */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                Startup
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+                <ColorPickerInput
+                  colorKey="startupBackground"
+                  label="Background"
+                  value={customColors.startupBackground}
+                />
+                <ColorPickerInput
+                  colorKey="startupAccent"
+                  label="Accent"
+                  value={customColors.startupAccent}
+                />
+              </div>
+            </div>
+
+            {/* Live Preview */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground">
+                {t("settings.colorSection.preview") || "Live Preview"}
+              </h4>
+              <div
+                className="rounded-lg border p-4"
+                style={{
+                  backgroundColor: `rgb(${customColors.background})`,
+                  borderColor: `rgb(${customColors.border})`,
+                }}
+              >
+                {/* Card Preview */}
+                <div
+                  className="rounded-md border p-4"
+                  style={{
+                    backgroundColor: `rgb(${customColors.card})`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="text-base font-semibold"
+                    style={{ color: `rgb(${customColors.cardForeground})` }}
+                  >
+                    {t("settings.preview.cardTitle")}
+                  </p>
+                  <p
+                    className="mt-1 text-sm"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.cardDescription")}
+                  </p>
+
+                  {/* Buttons */}
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      className="rounded-md px-3 py-1.5 text-sm font-medium"
+                      style={{
+                        backgroundColor: `rgb(${customColors.primary})`,
+                        color: `rgb(${customColors.secondary})`,
+                      }}
+                    >
+                      {t("settings.preview.primaryButton")}
+                    </button>
+                    <button
+                      className="rounded-md border px-3 py-1.5 text-sm font-medium"
+                      style={{
+                        backgroundColor: `rgb(${customColors.secondary})`,
+                        borderColor: `rgb(${customColors.border})`,
+                        color: `rgb(${customColors.foreground})`,
+                      }}
+                    >
+                      {t("settings.preview.secondaryButton")}
+                    </button>
+                    <button
+                      className="rounded-md px-3 py-1.5 text-sm font-medium"
+                      style={{
+                        backgroundColor: `rgb(${customColors.accent})`,
+                        color: `rgb(${customColors.accentForeground})`,
+                      }}
+                    >
+                      {t("settings.preview.accentButton")}
+                    </button>
+                  </div>
+
+                  {/* Toggle Preview */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <div
+                      className="h-5 w-9 rounded-full p-0.5"
+                      style={{ backgroundColor: `rgb(${customColors.primary})` }}
+                    >
+                      <div
+                        className="h-4 w-4 rounded-full"
+                        style={{
+                          backgroundColor: `rgb(${customColors.card})`,
+                          marginLeft: "auto",
+                        }}
+                      />
+                    </div>
+                    <span
+                      style={{
+                        color: `rgb(${customColors.foreground})`,
+                        fontSize: "14px",
+                      }}
+                    >
+                      {t("settings.preview.toggleEnabled")}
+                    </span>
+                  </div>
+
+                  {/* Input Preview */}
+                  <div className="mt-4">
+                    <div
+                      className="rounded-md border px-3 py-2 text-sm"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background})`,
+                        borderColor: `rgb(${customColors.input})`,
+                        color: `rgb(${customColors.foreground})`,
+                      }}
+                    >
+                      {t("settings.preview.inputPlaceholder")}
+                    </div>
+                  </div>
+
+                  {/* Badge/Muted Preview */}
+                  <div className="mt-4 flex gap-2">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs"
+                      style={{
+                        backgroundColor: `rgb(${customColors.muted})`,
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      {t("settings.preview.badge")}
+                    </span>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs"
+                      style={{
+                        backgroundColor: `rgb(${customColors.accent})`,
+                        color: `rgb(${customColors.accentForeground})`,
+                      }}
+                    >
+                      {t("settings.preview.accentBadge")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Popover Preview */}
+                <div
+                  className="mt-3 rounded-md border p-3 shadow-sm"
+                  style={{
+                    backgroundColor: `rgb(${customColors.popover})`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: `rgb(${customColors.popoverForeground})` }}
+                  >
+                    {t("settings.preview.popoverTitle")}
+                  </p>
+                  <p
+                    className="text-xs"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.popoverDescription")}
+                  </p>
+                </div>
+
+                {/* Navigation Bar Preview */}
+                <div
+                  className="mt-3 rounded-xl border p-2"
+                  style={{
+                    backgroundColor: `rgb(${customColors.navBackground} / 0.8)`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="mb-2 text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.navBar") || "Navigation Bar"}
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 text-white">
+                      <Home className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      <Search className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      <Library className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg"
+                      style={{
+                        color: `rgb(${customColors.mutedForeground})`,
+                      }}
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Star Rating Preview */}
+                <div className="mt-3">
+                  <p
+                    className="mb-2 text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.starRating") || "Star Rating"}
+                  </p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <Star
+                        key={i}
+                        className="h-5 w-5"
+                        style={{
+                          fill:
+                            i <= 3 ? `rgb(${customColors.starFilled})` : "transparent",
+                          color:
+                            i <= 3
+                              ? `rgb(${customColors.starFilled})`
+                              : `rgb(${customColors.starEmpty})`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Toast/Notification Previews */}
+                <div className="mt-3 space-y-2">
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.notifications") || "Notifications"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.success} / 0.5)`,
+                      }}
+                    >
+                      <CheckCircle
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.success})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.success") || "Success"}
+                      </span>
+                    </div>
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.warning} / 0.5)`,
+                      }}
+                    >
+                      <AlertTriangle
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.warning})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.warning") || "Warning"}
+                      </span>
+                    </div>
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.error} / 0.5)`,
+                      }}
+                    >
+                      <X
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.error})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.error") || "Error"}
+                      </span>
+                    </div>
+                    <div
+                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
+                      style={{
+                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
+                        borderColor: `rgb(${customColors.info} / 0.5)`,
+                      }}
+                    >
+                      <Info
+                        className="h-3 w-3"
+                        style={{ color: `rgb(${customColors.info})` }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: `rgb(${customColors.foreground})` }}
+                      >
+                        {t("settings.preview.info") || "Info"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Startup Screen Preview */}
+                <div
+                  className="mt-3 rounded-lg border p-3"
+                  style={{
+                    backgroundColor: `rgb(${customColors.startupBackground})`,
+                    borderColor: `rgb(${customColors.border})`,
+                  }}
+                >
+                  <p
+                    className="mb-2 text-xs font-medium"
+                    style={{ color: `rgb(${customColors.mutedForeground})` }}
+                  >
+                    {t("settings.preview.startupScreen") || "Startup Screen"}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-6 w-6 rounded-full"
+                      style={{ backgroundColor: `rgb(${customColors.startupAccent})` }}
+                    />
+                    <div className="flex-1">
+                      <div
+                        className="mb-1 h-2 w-16 rounded"
+                        style={{ backgroundColor: `rgb(${customColors.startupAccent})` }}
+                      />
+                      <div
+                        className="h-1.5 w-24 rounded opacity-50"
+                        style={{ backgroundColor: `rgb(${customColors.foreground})` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Browse Public Themes Button */}
+              <Button
+                variant="outline"
+                className="mt-3 w-full gap-2 text-primary"
+                onClick={handleBrowsePublicThemes}
+              >
+                <Globe className="h-4 w-4" />
+                {t("settings.browsePublicThemes") || "Browse Community Themes"}
+              </Button>
+            </div>
+          </div>
+
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImportTheme}
+                className="gap-1 text-primary"
+              >
+                <DownloadIcon className="h-4 w-4" />
+                {t("settings.importTheme") || "Import"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportTheme}
+                className="gap-1 text-primary"
+              >
+                <UploadIcon className="h-4 w-4" />
+                {t("settings.exportTheme") || "Export"}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={() => {
+                  if (originalColorsOnOpen) {
+                    setCustomColors(originalColorsOnOpen);
+                  }
+                  setShowCustomColorsDialog(false);
+                }}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button className="text-secondary" onClick={handleSaveCustomColors}>
+                {t("settings.applyCustomColors") || "Apply Colors"}
+              </Button>
+            </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Public Themes Dialog */}
+      <AlertDialog open={showPublicThemesDialog} onOpenChange={setShowPublicThemesDialog}>
+        <AlertDialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <Palette />
+              {t("settings.communityThemes") || "Community Themes"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {t("settings.communityThemesDescription")}&nbsp;
+              <a
+                className="cursor-pointer text-primary hover:underline"
+                onClick={() => window.electron.openURL("https://ascendara.app/discord")}
+              >
+                {t("settings.joinDiscord")}
+                <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
+              </a>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-4">
+            {loadingPublicThemes ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : publicThemes.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                {t("settings.noPublicThemes") || "No community themes available yet."}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {publicThemes.map((theme, index) => (
+                  <div
+                    key={index}
+                    className="cursor-pointer rounded-lg border border-border p-3 transition-all hover:border-primary hover:shadow-md"
+                    onClick={() =>
+                      handleApplyPublicTheme(theme.colors || theme, theme.version)
+                    }
+                  >
+                    {/* Theme Preview */}
+                    <div
+                      className="mb-2 rounded-md p-3"
+                      style={{
+                        backgroundColor: `rgb(${theme.colors?.background || theme.background})`,
+                      }}
+                    >
+                      <div
+                        className="rounded p-2"
+                        style={{
+                          backgroundColor: `rgb(${theme.colors?.card || theme.card})`,
+                        }}
+                      >
+                        <div
+                          className="mb-1 h-2 w-16 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.primary || theme.primary})`,
+                          }}
+                        />
+                        <div
+                          className="h-1.5 w-10 rounded opacity-50"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.foreground || theme.foreground})`,
+                          }}
+                        />
+                      </div>
+                      <div className="mt-2 flex gap-1">
+                        <div
+                          className="h-4 w-4 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.primary || theme.primary})`,
+                          }}
+                        />
+                        <div
+                          className="h-4 w-4 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.accent || theme.accent})`,
+                          }}
+                        />
+                        <div
+                          className="h-4 w-4 rounded"
+                          style={{
+                            backgroundColor: `rgb(${theme.colors?.secondary || theme.secondary})`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground">
+                        {theme.name || `Theme ${index + 1}`}
+                      </p>
+                      {(theme.version === 1 || theme.version === "1") && (
+                        <span className="flex items-center gap-1 rounded bg-yellow-500/20 px-1.5 py-0.5 text-xs text-yellow-500">
+                          <AlertTriangle className="h-3 w-3" />
+                          OUTDATED
+                        </span>
+                      )}
+                    </div>
+                    {theme.author && (
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.themeBy") || "by"} {theme.author}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <AlertDialogFooter>
-            <AlertDialogCancel
+            <Button
+              variant="outline"
               className="text-primary"
               onClick={() => {
-                setShowReloadDialog(false);
-                setPendingSourceChange(null);
+                setShowPublicThemesDialog(false);
+                setShowCustomColorsDialog(true);
               }}
+            >
+              {t("common.back") || "Back"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Support Code Dialog */}
+      <AlertDialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <MessageCircleQuestion className="h-6 w-6" />
+              {t("settings.quickSupport")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {t("settings.supportCodeDesc")}&nbsp;
+              <a
+                className="cursor-pointer text-primary hover:underline"
+                onClick={() => window.electron.openURL("https://ascendara.app/discord")}
+              >
+                {t("settings.joinDiscord")}
+                <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
+              </a>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-6">
+            <div className="flex justify-center gap-3">
+              {supportCode.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={el => (supportInputRefs.current[index] = el)}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={e => {
+                    const value = e.target.value.replace(/[^0-9]/g, "");
+                    if (value.length <= 1) {
+                      const newCode = [...supportCode];
+                      newCode[index] = value;
+                      setSupportCode(newCode);
+                      // Auto-focus next input
+                      if (value && index < 5) {
+                        supportInputRefs.current[index + 1]?.focus();
+                      }
+                    }
+                  }}
+                  onKeyDown={e => {
+                    // Handle backspace to go to previous input
+                    if (e.key === "Backspace" && !digit && index > 0) {
+                      supportInputRefs.current[index - 1]?.focus();
+                    }
+                  }}
+                  onPaste={e => {
+                    e.preventDefault();
+                    const pastedData = e.clipboardData
+                      .getData("text")
+                      .replace(/[^0-9]/g, "")
+                      .slice(0, 6);
+                    if (pastedData) {
+                      const newCode = [...supportCode];
+                      for (let i = 0; i < pastedData.length && i < 6; i++) {
+                        newCode[i] = pastedData[i];
+                      }
+                      setSupportCode(newCode);
+                      // Focus the next empty input or the last one
+                      const nextEmptyIndex = newCode.findIndex(d => !d);
+                      supportInputRefs.current[
+                        nextEmptyIndex !== -1 ? nextEmptyIndex : 5
+                      ]?.focus();
+                    }
+                  }}
+                  className="h-14 w-12 rounded-lg border-2 border-border bg-background text-center text-2xl font-bold text-foreground transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              ))}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={supportLoading}
+              onClick={() => setSupportCode(["", "", "", "", "", ""])}
             >
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              className="text-secondary"
-              onClick={() => {
-                setSettings(prev => ({ ...prev, gameSource: pendingSourceChange }));
-                const newSettings = { ...settings, gameSource: pendingSourceChange };
-                window.electron.saveSettings(newSettings);
-                window.electron.clearCache();
-                window.electron.reload();
+              disabled={supportCode.some(d => !d) || supportLoading}
+              onClick={e => {
+                e.preventDefault();
+                setShowSupportDialog(false);
+                setShowSupportConfirmDialog(true);
               }}
             >
-              {t("settings.reload")}
+              {t("common.submit") || "Submit"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Support Log Upload Confirmation Dialog */}
+      <AlertDialog
+        open={showSupportConfirmDialog}
+        onOpenChange={setShowSupportConfirmDialog}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-xl font-bold text-foreground">
+              <ShieldAlert className="h-5 w-5 text-yellow-500" />
+              {t("settings.logUploadWarningTitle") || "Log Upload Notice"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-muted-foreground">
+              <p>
+                {t("settings.logUploadWarningDesc") ||
+                  "The logs you're about to upload may contain:"}
+              </p>
+              <ul className="ml-4 list-disc space-y-1 text-sm">
+                <li>{t("settings.logWarningUsername") || "Your Windows username"}</li>
+                <li>
+                  {t("settings.logWarningDirectories") ||
+                    "Download directories and file paths"}
+                </li>
+                <li>
+                  {t("settings.logWarningActivity") ||
+                    "Ascendara, Downloader, and Game Handler activity"}
+                </li>
+              </ul>
+              <p className="text-sm">
+                {t("settings.logUploadPurpose") ||
+                  "This information helps us assist you with your issue. Your data will be deleted after support is complete."}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={supportLoading}
+              onClick={() => {
+                setShowSupportConfirmDialog(false);
+                setShowSupportDialog(true);
+              }}
+            >
+              {t("common.back") || "Back"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={supportLoading}
+              onClick={async e => {
+                e.preventDefault();
+                const code = supportCode.join("");
+                setSupportLoading(true);
+
+                try {
+                  // Step 1: Validate the support code
+                  const validateResponse = await fetch(
+                    "https://api.ascendara.app/support/validate",
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ code }),
+                    }
+                  );
+
+                  const validateData = await validateResponse.json();
+
+                  if (!validateData.valid) {
+                    toast.error(
+                      t("settings.invalidSupportCode") ||
+                        "Invalid or expired support code"
+                    );
+                    setSupportLoading(false);
+                    setShowSupportConfirmDialog(false);
+                    setShowSupportDialog(true);
+                    return;
+                  }
+
+                  const sessionToken = validateData.session_token;
+
+                  // Step 2: Get app token
+                  const AUTHORIZATION = await window.electron.getAPIKey();
+                  const tokenResponse = await fetch(
+                    "https://api.ascendara.app/auth/token",
+                    {
+                      headers: { Authorization: AUTHORIZATION },
+                    }
+                  );
+
+                  if (!tokenResponse.ok) {
+                    throw new Error("Failed to obtain token");
+                  }
+
+                  const tokenData = await tokenResponse.json();
+                  const appToken = tokenData.token;
+
+                  // Step 3: Upload logs
+                  const uploadResult = await window.electron.uploadSupportLogs(
+                    sessionToken,
+                    appToken
+                  );
+
+                  if (uploadResult.success) {
+                    toast.success(
+                      t("settings.logsUploaded") || "Logs uploaded successfully!"
+                    );
+                    setShowSupportConfirmDialog(false);
+                    setShowSupportDialog(false);
+                    setSupportCode(["", "", "", "", "", ""]);
+                  } else {
+                    throw new Error(uploadResult.error || "Upload failed");
+                  }
+                } catch (error) {
+                  console.error("Support code error:", error);
+                  toast.error(
+                    t("settings.supportError") ||
+                      "Failed to upload logs. Please try again."
+                  );
+                } finally {
+                  setSupportLoading(false);
+                }
+              }}
+            >
+              {supportLoading ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                t("settings.uploadLogs") || "Upload Logs"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

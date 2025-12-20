@@ -113,11 +113,17 @@ const SupportDialog = ({ onClose }) => {
                 >
                   <Star
                     size={32}
-                    className={`${
-                      value <= (hoveredStar || rating)
-                        ? "fill-yellow-400 stroke-yellow-400"
-                        : "stroke-muted-foreground"
-                    } transition-colors`}
+                    className="transition-colors"
+                    style={{
+                      fill:
+                        value <= (hoveredStar || rating)
+                          ? "rgb(var(--color-star-filled, 250 204 21))"
+                          : "transparent",
+                      stroke:
+                        value <= (hoveredStar || rating)
+                          ? "rgb(var(--color-star-filled, 250 204 21))"
+                          : "rgb(var(--color-star-empty, 148 163 184))",
+                    }}
                   />
                 </button>
               ))}

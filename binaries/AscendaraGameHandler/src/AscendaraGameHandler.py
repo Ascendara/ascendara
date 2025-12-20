@@ -33,7 +33,7 @@ import psutil
 if sys.platform == 'darwin':
     ascendara_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
 else:
-    ascendara_dir = os.path.join(os.environ.get('APPDATA', ''), 'ascendara')
+    ascendara_dir = os.path.join(os.environ.get('APPDATA', ''), 'Ascendara by tagoWorks')
 
 log_file_path = os.path.join(ascendara_dir, 'gamehandler.log')
 
@@ -256,8 +256,8 @@ def run_ludusavi_backup(game_name):
         logging.info("[EXIT] run_ludusavi_backup() - Exception")
         return False
 
-def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=False):
-    logging.info(f"[ENTRY] execute(game_path={game_path}, is_custom_game={is_custom_game}, admin={admin}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi})")
+def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=False, game_launch_cmd=None):
+    logging.info(f"[ENTRY] execute(game_path={game_path}, is_custom_game={is_custom_game}, admin={admin}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, game_launch_cmd={game_launch_cmd})")
     rpc = None  # Discord RPC client
     logging.debug("Initialized rpc=None for Discord Rich Presence")
     if is_shortcut:
@@ -435,6 +435,13 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             # Regular game execution (no wrapping)
             logging.info(f"Launching executable directly: {exe_path}")
             
+            launch_cmd = None
+            if game_launch_cmd:
+                logging.info(f"Game launch command provided: {game_launch_cmd}")
+                # Build full command string with exe path quoted and args appended
+                launch_cmd = f'"{exe_path}" {game_launch_cmd}'
+                logging.info(f"Resolved launch command: {launch_cmd}")
+            
             # Check if admin launch is requested and we're on Windows
             if admin and platform.system().lower() == 'windows':
                 logging.info(f"Launching with admin privileges: {exe_path}")
@@ -442,11 +449,14 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     # Use ShellExecute with 'runas' verb to prompt for admin
                     exe_dir = os.path.dirname(exe_path)
                     exe_file = os.path.basename(exe_path)
+                    # Build parameters string for ShellExecute if custom launch command provided
+                    shell_params = game_launch_cmd if game_launch_cmd else None
+                    
                     ctypes.windll.shell32.ShellExecuteW(
                         None,  # hwnd
                         "runas",  # operation (runas = run as administrator)
                         exe_path,  # file
-                        None,  # parameters
+                        shell_params,  # parameters
                         exe_dir,  # directory
                         1  # show command (1 = normal window)
                     )
@@ -467,7 +477,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     # Fall back to regular launch
                     logging.info("Falling back to regular launch")
                     try:
-                        process = subprocess.Popen(exe_path)
+                        process = subprocess.Popen(launch_cmd if launch_cmd else exe_path, shell=True if launch_cmd else False)
                     except OSError as e:
                         if getattr(e, "winerror", None) == 740:
                             logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")
@@ -483,7 +493,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                             raise
             else:
                 try:
-                    process = subprocess.Popen(exe_path)
+                    process = subprocess.Popen(launch_cmd if launch_cmd else exe_path, shell=True if launch_cmd else False)
                 except OSError as e:
                     if getattr(e, "winerror", None) == 740:
                         logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")
@@ -599,7 +609,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
 if __name__ == "__main__":
     try:
         print("[DEBUG] Script started.")
-        # The script is called with: [script] [game_path] [is_custom_game] [--shortcut] [--ludusavi]
+        # The script is called with: [script] [game_path] [is_custom_game] [admin] [--shortcut] [--ludusavi] [--gameLaunchCmd "command"]
         # Skip the first argument (script name)
         args = sys.argv[1:]
         print(f"[DEBUG] Arguments received: {args}")
@@ -619,7 +629,7 @@ if __name__ == "__main__":
         logging.info(f"Arguments received: {args}")
         
         if len(args) < 2:
-            error_msg = "Error: Not enough arguments\nUsage: AscendaraGameHandler.exe [game_path] [is_custom_game] [admin] [--shortcut] [--ludusavi]"
+            error_msg = "Error: Not enough arguments\nUsage: AscendaraGameHandler.exe [game_path] [is_custom_game] [admin] [--shortcut] [--ludusavi] [--gameLaunchCmd \"command\"]"
             logging.error(error_msg)
             print(error_msg)
             sys.exit(1)
@@ -629,12 +639,18 @@ if __name__ == "__main__":
         admin = args[2] == '1' or args[2].lower() == 'true'
         is_shortcut = "--shortcut" in args
         use_ludusavi = "--ludusavi" in args
+        game_launch_cmd = None
+        if "--gameLaunchCmd" in args:
+            cmd_index = args.index("--gameLaunchCmd")
+            if cmd_index + 1 < len(args):
+                game_launch_cmd = args[cmd_index + 1]
+                logging.info(f"Custom game launch command: {game_launch_cmd}")
         
         logging.info(f"Initializing with: game_path={game_path}, is_custom_game={is_custom_game}, "  
-                     f"is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}")
-        print(f"[DEBUG] Initializing with: game_path={game_path}, is_custom_game={is_custom_game}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}")
+                     f"is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}, game_launch_cmd={game_launch_cmd}")
+        print(f"[DEBUG] Initializing with: game_path={game_path}, is_custom_game={is_custom_game}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}, game_launch_cmd={game_launch_cmd}")
 
-        execute(game_path, is_custom_game, admin, is_shortcut, use_ludusavi)
+        execute(game_path, is_custom_game, admin, is_shortcut, use_ludusavi, game_launch_cmd)
         print("[DEBUG] execute() finished.")
     except Exception as e:
         logging.error(f"Failed to execute game: {e}")

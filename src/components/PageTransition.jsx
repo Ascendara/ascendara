@@ -1,27 +1,29 @@
-import { motion } from "framer-motion";
-import React from "react";
-import { useSettings } from "@/context/SettingsContext";
+import React, { useContext, useRef, useEffect } from "react";
+import { SettingsContext } from "@/context/SettingsContext";
 
 const PageTransition = ({ children }) => {
-  const { settings } = useSettings();
+  const context = useContext(SettingsContext);
+  const smoothTransitions = context?.settings?.smoothTransitions ?? true;
+  const divRef = useRef(null);
 
-  if (!settings.smoothTransitions) {
-    return children;
+  useEffect(() => {
+    if (smoothTransitions && divRef.current) {
+      const el = divRef.current;
+      // Start invisible
+      el.style.opacity = "0";
+      // Force reflow
+      el.offsetHeight;
+      // Then animate to visible
+      el.style.transition = "opacity 0.2s ease-out";
+      el.style.opacity = "1";
+    }
+  }, [smoothTransitions]);
+
+  if (!smoothTransitions) {
+    return <div>{children}</div>;
   }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{
-        duration: 0.2,
-        ease: "easeInOut",
-      }}
-    >
-      {children}
-    </motion.div>
-  );
+  return <div ref={divRef}>{children}</div>;
 };
 
 export default PageTransition;

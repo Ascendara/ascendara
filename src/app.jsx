@@ -6,17 +6,24 @@ import SupportDialog from "@/components/SupportDialog";
 import PlatformWarningDialog from "@/components/PlatformWarningDialog";
 import WatcherWarnDialog from "@/components/WatcherWarnDialog";
 import BrokenVersionDialog from "@/components/BrokenVersionDialog";
-import PageTransition from "@/components/PageTransition";
+import FirstIndexDialog from "@/components/FirstIndexDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { analytics } from "@/services/analyticsService";
+import {
+  initializeStatusService,
+  cleanupStatusService,
+} from "@/services/ascendStatusService";
+import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
+import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AdminWarningScreen from "@/components/AdminWarningScreen";
@@ -38,15 +45,105 @@ import SidecarAndDependencies from "./pages/SidecarAndDependencies";
 import TorboxDownloads from "./pages/TorboxDownloads";
 import GameScreen from "./pages/GameScreen";
 import Profile from "./pages/Profile";
+import Ascend from "./pages/Ascend";
 import Library from "./pages/Library";
 import FolderView from "./pages/FolderView";
+import LocalRefresh from "./pages/LocalRefresh";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 import Welcome from "./pages/Welcome";
 import i18n from "./i18n";
 import "./index.css";
 import "./styles/scrollbar.css";
-import { AlertTriangle, BugIcon, RefreshCwIcon } from "lucide-react";
+import { AlertTriangle, BugIcon, RefreshCwIcon, Clock } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+
+// Check for trial expiration warning and show dialog
+const TrialWarningChecker = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [showTrialWarning, setShowTrialWarning] = useState(false);
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState(0);
+  const hasCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (!user?.uid || hasCheckedRef.current) return;
+
+    const checkTrialStatus = async () => {
+      try {
+        const accessStatus = await verifyAscendAccess();
+
+        // Only show warning if user is on trial (not subscribed, not verified)
+        // and has less than 7 days remaining
+        if (
+          !accessStatus.isSubscribed &&
+          !accessStatus.isVerified &&
+          accessStatus.daysRemaining > 0 &&
+          accessStatus.daysRemaining <= 7
+        ) {
+          setTrialDaysRemaining(accessStatus.daysRemaining);
+          setShowTrialWarning(true);
+          hasCheckedRef.current = true;
+        }
+      } catch (error) {
+        console.error("[TrialWarningChecker] Error checking trial status:", error);
+      }
+    };
+
+    // Delay the check to let the app initialize
+    const timeout = setTimeout(checkTrialStatus, 5000);
+    return () => clearTimeout(timeout);
+  }, [user?.uid]);
+
+  const handleSubscribe = () => {
+    setShowTrialWarning(false);
+    navigate("/ascend");
+  };
+
+  return (
+    <AlertDialog open={showTrialWarning} onOpenChange={setShowTrialWarning}>
+      <AlertDialogContent className="border-border">
+        <AlertDialogHeader>
+          <div className="flex items-center gap-4">
+            <Clock className="mb-2 h-10 w-10 text-yellow-500" />
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("ascend.access.trialEndingSoon")}
+            </AlertDialogTitle>
+          </div>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4">
+              <div className="text-foreground">
+                {t("ascend.access.trialEndingSoonMessage", { days: trialDaysRemaining })}
+              </div>
+              <div className="text-muted-foreground">
+                {t("ascend.access.trialEndingSoonAction")}
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter className="gap-3 sm:justify-end">
+          <AlertDialogCancel className="text-foreground">
+            {t("common.close")}
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleSubscribe}>
+            {t("ascend.subscription.upgrade")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -59,10 +156,225 @@ const ScrollToTop = () => {
   return null;
 };
 
+// Track user activity and update Firebase customMessage
+const UserActivityTracker = () => {
+  const { pathname, state } = useLocation();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // Map routes to activity types
+    const updateActivity = async () => {
+      switch (pathname) {
+        case "/":
+          await setActivity(ActivityType.BROWSING_LIBRARY);
+          break;
+        case "/search":
+          await setActivity(ActivityType.SEARCHING_GAMES);
+          break;
+        case "/library":
+          await setActivity(ActivityType.BROWSING_LIBRARY);
+          break;
+        case "/downloads":
+        case "/torboxdownloads":
+          await setActivity(ActivityType.BROWSING_DOWNLOADS);
+          break;
+        case "/settings":
+          await setActivity(ActivityType.IN_SETTINGS);
+          break;
+        case "/ascend":
+          await setActivity(ActivityType.IN_ASCEND);
+          break;
+        case "/download":
+          // When viewing a specific game's download page
+          const gameName = state?.gameData?.game || state?.gameData?.name;
+          if (gameName) {
+            await setActivity(ActivityType.VIEWING_GAME, gameName);
+          } else {
+            await setActivity(ActivityType.SEARCHING_GAMES);
+          }
+          break;
+        case "/gamescreen":
+          // When viewing a game's details
+          const gameScreenName = state?.game?.game || state?.game?.name;
+          if (gameScreenName) {
+            await setActivity(ActivityType.VIEWING_GAME, gameScreenName);
+          }
+          break;
+        default:
+          await setActivity(ActivityType.IDLE);
+          break;
+      }
+    };
+
+    updateActivity();
+  }, [pathname, state, user?.uid]);
+
+  // Listen for game launch/close events
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const handleGameLaunch = (_, data) => {
+      const gameName = data?.game || "a game";
+      setActivity(ActivityType.PLAYING_GAME, gameName);
+    };
+
+    const handleGameClosed = (_, data) => {
+      // Restore to browsing library when game closes
+      setActivity(ActivityType.BROWSING_LIBRARY);
+    };
+
+    // Listen for game events from Electron
+    window.electron?.ipcRenderer?.on("game-launch-success", handleGameLaunch);
+    window.electron?.ipcRenderer?.on("game-closed", handleGameClosed);
+
+    return () => {
+      window.electron?.ipcRenderer?.off("game-launch-success", handleGameLaunch);
+      window.electron?.ipcRenderer?.off("game-closed", handleGameClosed);
+    };
+  }, [user?.uid]);
+
+  // Listen for download events
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    let currentDownloadGame = null;
+
+    const handleDownloadProgress = data => {
+      // Only update if the game name changed to avoid spamming Firebase
+      if (data?.game && data.game !== currentDownloadGame) {
+        currentDownloadGame = data.game;
+        setActivity(ActivityType.DOWNLOADING, data.game);
+      }
+    };
+
+    const handleDownloadComplete = data => {
+      currentDownloadGame = null;
+      // Return to browsing after download completes
+      setActivity(ActivityType.BROWSING_LIBRARY);
+    };
+
+    const unsubProgress = window.electron?.onDownloadProgress?.(handleDownloadProgress);
+    const unsubComplete = window.electron?.onDownloadComplete?.(handleDownloadComplete);
+
+    return () => {
+      if (typeof unsubProgress === "function") unsubProgress();
+      if (typeof unsubComplete === "function") unsubComplete();
+    };
+  }, [user?.uid]);
+
+  // Clear activity when app closes
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const handleAppClose = () => {
+      clearActivity();
+    };
+
+    window.electron?.onAppClose?.(handleAppClose);
+
+    return () => {
+      clearActivity();
+    };
+  }, [user?.uid]);
+
+  return null;
+};
+
+// Initialize Ascend status service when user is authenticated
+const AscendStatusInitializer = () => {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.uid) {
+      console.log("[App] Initializing Ascend status service for user:", user.uid);
+      initializeStatusService(null, user.uid).catch(err => {
+        console.error("[App] Failed to initialize status service:", err);
+      });
+
+      return () => {
+        cleanupStatusService();
+      };
+    }
+  }, [user?.uid]);
+
+  return null;
+};
+
+// Check for new messages and show notifications
+const MessageNotificationChecker = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const lastCheckedRef = useRef({});
+  const checkIntervalRef = useRef(null);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      // Clear interval if user logs out
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+      lastCheckedRef.current = {};
+      return;
+    }
+
+    const checkForNewMessages = async () => {
+      try {
+        const result = await getUnreadMessageCount();
+        if (result.error || result.newMessages.length === 0) return;
+
+        // Check for new messages we haven't notified about
+        result.newMessages.forEach(msg => {
+          const lastNotified = lastCheckedRef.current[msg.conversationId] || 0;
+
+          // Only notify if this is a new message (more unread than before)
+          if (msg.unreadCount > lastNotified) {
+            // Show toast notification
+            toast(t("ascend.messages.newMessage", { name: msg.senderName }), {
+              description:
+                msg.messageText?.substring(0, 50) +
+                (msg.messageText?.length > 50 ? "..." : ""),
+              action: {
+                label: t("common.view"),
+                onClick: () => navigate("/ascend"),
+              },
+              duration: 5000,
+            });
+          }
+
+          // Update last checked count
+          lastCheckedRef.current[msg.conversationId] = msg.unreadCount;
+        });
+      } catch (e) {
+        console.error("[MessageNotificationChecker] Error:", e);
+      }
+    };
+
+    // Initial check after a short delay
+    const initialTimeout = setTimeout(checkForNewMessages, 3000);
+
+    // Check every 30 seconds
+    checkIntervalRef.current = setInterval(checkForNewMessages, 30000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+    };
+  }, [user?.uid, t, navigate]);
+
+  return null;
+};
+
 const AppRoutes = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [showWelcome, setShowWelcome] = useState(null);
   const [isNewInstall, setIsNewInstall] = useState(false);
@@ -74,6 +386,7 @@ const AppRoutes = () => {
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
+  const [showFirstIndexDialog, setShowFirstIndexDialog] = useState(false);
   const location = useLocation();
   const hasChecked = useRef(false);
   const loadStartTime = useRef(Date.now());
@@ -171,20 +484,20 @@ const AppRoutes = () => {
 
       try {
         // Set up game protocol URL listener
-        const handleGameProtocol = async (event, { imageId }) => {
-          console.log("Received game protocol URL with imageId:", imageId);
-          if (!imageId) {
-            console.error("No imageId received in game protocol URL");
+        const handleGameProtocol = async (event, { gameID }) => {
+          console.log("Received game protocol URL with gameID:", gameID);
+          if (!gameID) {
+            console.error("No gameID received in game protocol URL");
             return;
           }
 
           try {
-            // Clean the imageId by removing any query parameters or slashes
-            const cleanImageId = imageId.replace(/[?/]/g, "");
-            console.log("Looking up game with cleaned imageId:", cleanImageId);
+            // Clean the gameID by removing any query parameters or slashes
+            const cleanGameID = gameID.replace(/[?/]/g, "");
+            console.log("Looking up game with cleaned gameID:", cleanGameID);
 
             // Find the game using the efficient lookup service
-            const game = await gameService.findGameByImageId(cleanImageId);
+            const game = await gameService.findGameByGameID(cleanGameID);
             console.log("Found game:", game);
 
             if (!game) {
@@ -288,10 +601,11 @@ const AppRoutes = () => {
             setShowWatcherWarn(true);
             return;
           }
-
-          await ensureMinLoadingTime();
-          setIsLoading(false);
         }
+
+        // Always ensure loading is set to false after initialization completes
+        await ensureMinLoadingTime();
+        setIsLoading(false);
       } catch (error) {
         console.error("Error in app initialization:", error);
         await ensureMinLoadingTime();
@@ -359,6 +673,30 @@ const AppRoutes = () => {
     };
     checkVersion();
   }, []);
+
+  // Check if user needs to set up game index for the first time
+  useEffect(() => {
+    const checkFirstIndex = async () => {
+      // Only check after loading is done and welcome is not showing
+      if (isLoading || showWelcome) return;
+
+      try {
+        const hasIndexBefore = await window.electron.getTimestampValue("hasIndexBefore");
+        console.log("Has indexed before:", hasIndexBefore);
+
+        // If hasIndexBefore doesn't exist or is false, show the dialog
+        if (!hasIndexBefore) {
+          // Small delay to let other dialogs settle
+          setTimeout(() => {
+            setShowFirstIndexDialog(true);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error("Error checking first index status:", error);
+      }
+    };
+    checkFirstIndex();
+  }, [isLoading, showWelcome]);
 
   const handleInstallAndRestart = async () => {
     setIsInstalling(true);
@@ -490,7 +828,7 @@ const AppRoutes = () => {
           width: "100%",
           height: "100%",
           background:
-            "linear-gradient(135deg, rgb(var(--color-primary) / 0.1) 0%, rgb(var(--color-background)) 100%)",
+            "linear-gradient(135deg, rgb(var(--color-startup-accent, var(--color-primary)) / 0.1) 0%, rgb(var(--color-startup-background, var(--color-background))) 100%)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
@@ -515,17 +853,20 @@ const AppRoutes = () => {
     );
   }
 
-  if (showWelcome === null) {
-    console.log("Rendering null - showWelcome is null");
+  if (showWelcome === null && isLoading) {
+    console.log("Rendering null - showWelcome is null and still loading");
     return null;
   }
 
-  if (location.pathname === "/welcome" && !showWelcome) {
+  // If showWelcome is null but we're not loading, default to false to prevent blank screen
+  const effectiveShowWelcome = showWelcome ?? false;
+
+  if (location.pathname === "/welcome" && !effectiveShowWelcome) {
     console.log("Redirecting from welcome to home");
     return <Navigate to="/" replace />;
   }
 
-  if (location.pathname === "/" && showWelcome) {
+  if (location.pathname === "/" && effectiveShowWelcome) {
     console.log("Redirecting from home to welcome");
     return <Navigate to="/welcome" replace />;
   }
@@ -535,9 +876,10 @@ const AppRoutes = () => {
   return (
     <>
       <MenuBar />
-      {showWelcome ? (
+      {effectiveShowWelcome ? (
         <Routes>
           <Route path="/extralanguages" element={<ExtraLanguages />} />
+          <Route path="/localrefresh" element={<LocalRefresh />} />
           <Route
             path="*"
             element={
@@ -550,138 +892,23 @@ const AppRoutes = () => {
           />
         </Routes>
       ) : (
-        <Routes location={location}>
+        <Routes location={location} key={user?.uid || "logged-out"}>
           <Route path="/" element={<Layout />}>
-            <Route
-              index
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="home">
-                    <Home />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="search"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="search">
-                    <Search />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="library"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="library">
-                    <Library />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="folderview/:folderName"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="folderview">
-                    <FolderView />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="gamescreen"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="gamescreen">
-                    <GameScreen />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="downloads"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="downloads">
-                    <Downloads />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="torboxdownloads"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="torboxdownloads">
-                    <TorboxDownloads />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="settings">
-                    <Settings />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="sidecaranddependencies"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="sidecaranddependencies">
-                    <SidecarAndDependencies />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="profile"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="profile">
-                    <Profile />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="workshopdownloader"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="workshopdownloader">
-                    <WorkshopDownloader />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="download"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="download">
-                    <DownloadPage />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
-            <Route
-              path="extralanguages"
-              element={
-                <AnimatePresence mode="wait">
-                  <PageTransition key="extralanguages">
-                    <ExtraLanguages />
-                  </PageTransition>
-                </AnimatePresence>
-              }
-            />
+            <Route index element={<Home />} />
+            <Route path="search" element={<Search />} />
+            <Route path="library" element={<Library />} />
+            <Route path="folderview/:folderName" element={<FolderView />} />
+            <Route path="gamescreen" element={<GameScreen />} />
+            <Route path="downloads" element={<Downloads />} />
+            <Route path="torboxdownloads" element={<TorboxDownloads />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="sidecaranddependencies" element={<SidecarAndDependencies />} />
+            <Route path="localrefresh" element={<LocalRefresh />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="ascend" element={<Ascend />} />
+            <Route path="workshopdownloader" element={<WorkshopDownloader />} />
+            <Route path="download" element={<DownloadPage />} />
+            <Route path="extralanguages" element={<ExtraLanguages />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
@@ -692,6 +919,9 @@ const AppRoutes = () => {
       )}
       {isBrokenVersion && (
         <BrokenVersionDialog onClose={() => setIsBrokenVersion(false)} />
+      )}
+      {showFirstIndexDialog && (
+        <FirstIndexDialog onClose={() => setShowFirstIndexDialog(false)} />
       )}
       <WatcherWarnDialog open={showWatcherWarn} onOpenChange={setShowWatcherWarn} />
     </>
@@ -782,13 +1012,16 @@ function ToasterWithTheme() {
   return (
     <Toaster
       position="top-right"
-      className="!border-border !bg-card !text-card-foreground"
       toastOptions={{
         style: {
-          background: "rgb(var(--color-card))",
-          color: "rgb(var(--color-card-foreground))",
-          border: "1px solid rgb(var(--color-border))",
+          background: "rgb(var(--color-background) / 0.8)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          color: "rgb(var(--color-foreground))",
+          border: "1px solid rgb(var(--color-border) / 0.5)",
+          borderRadius: "12px",
           padding: "16px",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)",
         },
         descriptionStyle: {
           color: "rgb(var(--color-muted-foreground))",
@@ -797,19 +1030,21 @@ function ToasterWithTheme() {
           background: "rgb(var(--color-primary))",
           color: "rgb(var(--color-primary-foreground))",
           border: "none",
+          borderRadius: "8px",
+          fontWeight: "500",
         },
         actionButtonHoverStyle: {
           background: "rgb(var(--color-primary))",
-          opacity: 0.8,
+          opacity: 0.9,
         },
         cancelButtonStyle: {
-          background: "rgb(var(--color-muted))",
+          background: "rgb(var(--color-muted) / 0.5)",
           color: "rgb(var(--color-muted-foreground))",
-          border: "none",
+          border: "1px solid rgb(var(--color-border) / 0.3)",
+          borderRadius: "8px",
         },
         cancelButtonHoverStyle: {
-          background: "rgb(var(--color-muted))",
-          opacity: 0.8,
+          background: "rgb(var(--color-muted) / 0.7)",
         },
       }}
     />
@@ -917,20 +1152,24 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <SettingsProvider>
-            <TourProvider>
-              <Router>
-                <ToasterWithTheme />
-                <ContextMenu />
-                <ScrollToTop />
-                <AnimatePresence mode="wait">
+            <AuthProvider>
+              <TourProvider>
+                <Router>
+                  <ToasterWithTheme />
+                  <ContextMenu />
+                  <ScrollToTop />
+                  <AscendStatusInitializer />
+                  <UserActivityTracker />
+                  <MessageNotificationChecker />
+                  <TrialWarningChecker />
                   <AppRoutes />
-                </AnimatePresence>
-                <MiniPlayer
-                  expanded={playerExpanded}
-                  onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
-                />
-              </Router>
-            </TourProvider>
+                  <MiniPlayer
+                    expanded={playerExpanded}
+                    onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
+                  />
+                </Router>
+              </TourProvider>
+            </AuthProvider>
           </SettingsProvider>
         </LanguageProvider>
       </ThemeProvider>

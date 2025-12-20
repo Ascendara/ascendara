@@ -1,123 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getCachedDownloadData,
   clearCachedDownloadData,
 } from "@/services/retryGameDownloadService";
-
-// Background Speed Animation Component
-const BackgroundSpeedAnimation = () => {
-  const containerStyle = {
-    position: "absolute",
-    top: "0",
-    left: "0",
-    right: "0",
-    bottom: "0",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    overflow: "hidden",
-    pointerEvents: "none",
-    zIndex: "0",
-  };
-
-  const speedLinesStyle = {
-    position: "relative",
-    width: "100px",
-    height: "30px",
-  };
-
-  const baseSpeedLineStyle = {
-    position: "absolute",
-    height: "2px",
-    background:
-      "linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.4) 50%, transparent 100%)",
-    borderRadius: "1px",
-    animation: "speedTrail 1.2s ease-in-out infinite",
-  };
-
-  const speedLineStyles = [
-    {
-      ...baseSpeedLineStyle,
-      top: "6px",
-      width: "35px",
-      left: "10px",
-      animationDelay: "0s",
-    },
-    {
-      ...baseSpeedLineStyle,
-      top: "10px",
-      width: "28px",
-      left: "15px",
-      animationDelay: "0.15s",
-    },
-    {
-      ...baseSpeedLineStyle,
-      top: "14px",
-      width: "40px",
-      left: "8px",
-      animationDelay: "0.3s",
-    },
-    {
-      ...baseSpeedLineStyle,
-      top: "18px",
-      width: "25px",
-      left: "18px",
-      animationDelay: "0.45s",
-    },
-    {
-      ...baseSpeedLineStyle,
-      top: "22px",
-      width: "32px",
-      left: "12px",
-      animationDelay: "0.6s",
-    },
-  ];
-
-  return (
-    <>
-      <style>{`
-        @keyframes speedTrail {
-          0% {
-            transform: translateX(-150%);
-            opacity: 0;
-          }
-          25% {
-            opacity: 0.6;
-          }
-          75% {
-            opacity: 0.6;
-          }
-          100% {
-            transform: translateX(200%);
-            opacity: 0;
-          }
-        }
-      `}</style>
-      <div style={containerStyle}>
-        <div style={speedLinesStyle}>
-          {speedLineStyles.map((style, index) => (
-            <div key={index} style={style}></div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-};
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -135,10 +28,32 @@ import {
   AlertTriangle,
   Download,
   Clock,
+  Clock1,
+  Clock2,
+  Clock3,
+  Clock4,
+  Clock5,
+  Clock6,
+  Clock7,
+  Clock8,
+  Clock9,
+  Clock10,
+  Clock11,
+  Clock12,
   ExternalLink,
   CircleCheck,
   Coffee,
   RefreshCw,
+  Zap,
+  TrendingUp,
+  Activity,
+  HardDrive,
+  Pause,
+  Package,
+  CheckCircle2,
+  XCircle,
+  ArrowDownToLine,
+  Wifi,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -151,32 +66,110 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useSettings } from "@/context/SettingsContext";
-import * as torboxService from "../services/torboxService";
+import {
+  processNextInQueue,
+  getDownloadQueue,
+  removeFromQueue,
+} from "@/services/downloadQueueService";
+import { cn } from "@/lib/utils";
 
 // Helper function to check if download speed is above 50 MB/s
 const isHighSpeed = speedString => {
   if (!speedString) return false;
-
-  // Extract the numeric value and unit from the speed string
   const match = speedString.match(/(\d+(?:\.\d+)?)\s*(MB|KB|GB)\/s/);
   if (!match) return false;
-
   const value = parseFloat(match[1]);
   const unit = match[2];
-
-  // Convert to MB/s for comparison
   let speedInMB = value;
-  if (unit === "KB") {
-    speedInMB = value / 1024;
-  } else if (unit === "GB") {
-    speedInMB = value * 1024;
-  }
-
+  if (unit === "KB") speedInMB = value / 1024;
+  else if (unit === "GB") speedInMB = value * 1024;
   return speedInMB >= 50;
 };
 
+// Animated pulse ring for active downloads
+const PulseRing = memo(({ color = "primary" }) => (
+  <span className="relative flex h-3 w-3">
+    <span
+      className={cn(
+        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+        color === "primary"
+          ? "bg-primary"
+          : color === "success"
+            ? "bg-green-500"
+            : "bg-amber-500"
+      )}
+    />
+    <span
+      className={cn(
+        "relative inline-flex h-3 w-3 rounded-full",
+        color === "primary"
+          ? "bg-primary"
+          : color === "success"
+            ? "bg-green-500"
+            : "bg-amber-500"
+      )}
+    />
+  </span>
+));
+
+// Speed lines animation for high-speed downloads
+const SpeedLines = memo(() => (
+  <div className="absolute inset-0 overflow-hidden rounded-full">
+    {[...Array(5)].map((_, i) => (
+      <div
+        key={i}
+        className="absolute h-[2px] bg-gradient-to-r from-primary/60 to-transparent"
+        style={{
+          top: `${20 + i * 15}%`,
+          left: "-20%",
+          width: `${30 + i * 5}%`,
+          animation: `speedLine 0.8s ease-out infinite`,
+          animationDelay: `${i * 0.15}s`,
+          opacity: 0.7 - i * 0.1,
+        }}
+      />
+    ))}
+    <style>{`
+      @keyframes speedLine {
+        0% { transform: translateX(-100%); opacity: 0; }
+        20% { opacity: 1; }
+        100% { transform: translateX(400%); opacity: 0; }
+      }
+    `}</style>
+  </div>
+));
+
+// Speed indicator with animated gradient
+const SpeedIndicator = memo(({ speed, isHigh }) => (
+  <div
+    className={cn(
+      "relative flex items-center gap-2 rounded-full px-4 py-2 transition-all duration-300",
+      isHigh
+        ? "border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 shadow-lg shadow-primary/25"
+        : "bg-muted/50"
+    )}
+  >
+    {isHigh && <SpeedLines />}
+    <Wifi
+      className={cn(
+        "relative z-10 h-4 w-4 transition-all duration-300",
+        isHigh ? "animate-pulse text-primary" : "text-muted-foreground"
+      )}
+    />
+    <span
+      className={cn(
+        "relative z-10 font-semibold tabular-nums transition-colors duration-300",
+        isHigh ? "text-primary" : "text-foreground"
+      )}
+    >
+      {speed}
+    </span>
+  </div>
+));
+
 const Downloads = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   useEffect(() => {
     window.electron.switchRPC("downloading");
@@ -185,12 +178,24 @@ const Downloads = () => {
     };
   }, []);
   const [downloadingGames, setDownloadingGames] = useState([]);
+  const [completedGames, setCompletedGames] = useState(new Set()); // Track games that just completed
+  const [fadingGames, setFadingGames] = useState(new Set()); // Track games that are fading out
   const [torboxStates, setTorboxStates] = useState({}); // webdownloadId -> state
-  // Ref to always access the latest downloadingGames inside polling
+  const [queuedDownloads, setQueuedDownloads] = useState([]);
+  // Refs to always access the latest values inside polling
   const downloadingGamesRef = React.useRef(downloadingGames);
+  const completedGamesRef = React.useRef(new Set());
+  const fadingGamesRef = React.useRef(new Set());
+  const prevActiveCountRef = React.useRef(0);
   useEffect(() => {
     downloadingGamesRef.current = downloadingGames;
   }, [downloadingGames]);
+  useEffect(() => {
+    completedGamesRef.current = completedGames;
+  }, [completedGames]);
+  useEffect(() => {
+    fadingGamesRef.current = fadingGames;
+  }, [fadingGames]);
   const [selectedGame, setSelectedGame] = useState(null);
   const [totalSpeed, setTotalSpeed] = useState("0.00 MB/s");
   const [activeDownloads, setActiveDownloads] = useState(0);
@@ -210,7 +215,11 @@ const Downloads = () => {
             speed: 0,
           }));
   });
-  const { t } = useLanguage();
+  // Track the actual peak speed separately (persists until page refresh or no active downloads)
+  const [peakSpeed, setPeakSpeed] = useState(() => {
+    const savedPeak = localStorage.getItem("peakSpeed");
+    return savedPeak ? parseFloat(savedPeak) : 0;
+  });
 
   const normalizeSpeed = speed => {
     const [value, unit] = speed.split(" ");
@@ -254,15 +263,94 @@ const Downloads = () => {
           localStorage.setItem("hasDownloadedBefore", "true");
         }
 
-        // Shallow compare by IDs and length to minimize unnecessary updates
-        const prevIds = downloadingGames.map(g => g.id).join(",");
-        const newIds = downloading.map(g => g.id).join(",");
-        if (prevIds !== newIds || downloadingGames.length !== downloading.length) {
-          setDownloadingGames(downloading);
-        } else {
-          // If list is same, still update to reflect internal stage/progress changes
-          setDownloadingGames(downloading);
+        // Detect games that were verifying and are now gone (completed)
+        // Use game.game (name) as the unique identifier since games don't have an id property
+        const currentNames = new Set(downloading.map(g => g.game));
+        const prevGames = downloadingGamesRef.current;
+
+        // Find games that were verifying in the previous poll
+        const newlyCompleted = [];
+        prevGames.forEach(game => {
+          const gameName = game.game;
+          const wasVerifying = game.downloadingData?.verifying;
+          const isGone = !currentNames.has(gameName);
+          const isAlreadyTracked =
+            completedGamesRef.current.has(gameName) ||
+            fadingGamesRef.current.has(gameName);
+
+          if (wasVerifying && isGone && !isAlreadyTracked) {
+            console.log("Game completed:", gameName);
+            newlyCompleted.push(game);
+
+            // Mark as completed immediately in ref
+            completedGamesRef.current = new Set([...completedGamesRef.current, gameName]);
+
+            // Schedule fade out
+            setTimeout(() => {
+              completedGamesRef.current = new Set(
+                [...completedGamesRef.current].filter(n => n !== gameName)
+              );
+              fadingGamesRef.current = new Set([...fadingGamesRef.current, gameName]);
+              setCompletedGames(prev => {
+                const next = new Set(prev);
+                next.delete(gameName);
+                return next;
+              });
+              setFadingGames(prev => new Set([...prev, gameName]));
+
+              // Remove completely after fade
+              setTimeout(() => {
+                fadingGamesRef.current = new Set(
+                  [...fadingGamesRef.current].filter(n => n !== gameName)
+                );
+                setFadingGames(prev => {
+                  const next = new Set(prev);
+                  next.delete(gameName);
+                  return next;
+                });
+              }, 500);
+            }, 2000);
+          }
+        });
+
+        // Update completed games state if we found new ones
+        if (newlyCompleted.length > 0) {
+          setCompletedGames(
+            prev => new Set([...prev, ...newlyCompleted.map(g => g.game)])
+          );
+
+          // Process next queued download when a game completes
+          // This triggers immediately when the "Download Complete" card shows
+          processNextInQueue().then(nextItem => {
+            if (nextItem) {
+              toast.success(
+                t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+              );
+            }
+          });
         }
+
+        // Build the display list: current downloads + completed/fading games
+        const allGames = [...downloading];
+
+        // Add completed games that aren't in the current download list
+        prevGames.forEach(pg => {
+          const isCompleted = completedGamesRef.current.has(pg.game);
+          const isFading = fadingGamesRef.current.has(pg.game);
+          const alreadyInList = allGames.some(g => g.game === pg.game);
+
+          if ((isCompleted || isFading) && !alreadyInList) {
+            allGames.push({
+              ...pg,
+              isCompleted: isCompleted,
+              downloadingData: { ...pg.downloadingData, verifying: false },
+            });
+          }
+        });
+
+        // Update the ref BEFORE setting state to prevent stale reads
+        downloadingGamesRef.current = allGames;
+        setDownloadingGames(allGames);
 
         let totalSpeedNum = 0;
         let activeCount = 0;
@@ -278,6 +366,33 @@ const Downloads = () => {
         setActiveDownloads(activeCount);
         const formattedSpeed = `${totalSpeedNum.toFixed(2)} MB/s`;
         setTotalSpeed(formattedSpeed);
+
+        // Update peak speed if current speed is higher
+        setPeakSpeed(prevPeak => {
+          const newPeak = Math.max(prevPeak, totalSpeedNum);
+          localStorage.setItem("peakSpeed", newPeak.toString());
+          return newPeak;
+        });
+
+        // Reset peak when no active downloads
+        if (activeCount === 0) {
+          setPeakSpeed(0);
+          localStorage.setItem("peakSpeed", "0");
+
+          // Process next queued download when transitioning from active to no active downloads
+          // This handles stopped downloads and other cases where games don't go through "completed" state
+          if (prevActiveCountRef.current > 0) {
+            processNextInQueue().then(nextItem => {
+              if (nextItem) {
+                toast.success(
+                  t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+                );
+              }
+            });
+          }
+        }
+        prevActiveCountRef.current = activeCount;
+
         // Update speed history
         setSpeedHistory(prevHistory => {
           const newHistory = [
@@ -302,6 +417,17 @@ const Downloads = () => {
     return () => clearInterval(intervalId);
   }, []);
 
+  // Poll queued downloads
+  useEffect(() => {
+    const fetchQueuedDownloads = () => {
+      const queue = getDownloadQueue();
+      setQueuedDownloads(queue);
+    };
+    fetchQueuedDownloads();
+    const queueIntervalId = setInterval(fetchQueuedDownloads, 1000);
+    return () => clearInterval(queueIntervalId);
+  }, []);
+
   useEffect(() => {
     if (downloadingGames.length === 0) {
       document.body.style.overflow = "hidden";
@@ -321,7 +447,7 @@ const Downloads = () => {
 
   const executeStopDownload = async (game, deleteContents = false) => {
     console.log("Executing stop download for:", game, "deleteContents:", deleteContents);
-    setStoppingDownloads(prev => new Set([...prev, game.id]));
+    setStoppingDownloads(prev => new Set([...prev, game.game]));
     try {
       const result = await window.electron.stopDownload(game.game, deleteContents);
       console.log("Stop download result:", result);
@@ -340,14 +466,14 @@ const Downloads = () => {
     } finally {
       setStoppingDownloads(prev => {
         const newSet = new Set(prev);
-        newSet.delete(game.id);
+        newSet.delete(game.game);
         return newSet;
       });
       // Optimistically remove the game from the downloads list if deleteContents is true
       if (deleteContents) {
         // Clear the cached download data since the download is being deleted
         clearCachedDownloadData(game.game);
-        setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
+        setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
       }
       setStopModalOpen(false);
       setGameToStop(null);
@@ -362,7 +488,7 @@ const Downloads = () => {
       await window.electron.deleteGameDirectory(game.game);
       clearCachedDownloadData(game.game);
 
-      setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
+      setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
 
       navigate("/download", {
         state: {
@@ -372,7 +498,7 @@ const Downloads = () => {
     } else {
       toast.error(t("downloads.retryDataNotAvailable"));
       await window.electron.deleteGameDirectory(game.game);
-      setDownloadingGames(prev => prev.filter(g => g.id !== game.id));
+      setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
     }
   };
 
@@ -380,32 +506,191 @@ const Downloads = () => {
     await window.electron.openGameDirectory(game.game);
   };
 
+  // Custom tooltip for the chart
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border border-border bg-card/95 px-3 py-2 shadow-xl backdrop-blur-sm">
+          <p className="text-sm font-semibold text-foreground">
+            {payload[0].value.toFixed(2)} MB/s
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <div className="container mx-auto">
-      {downloadingGames.length === 0 ? (
-        <div className="mx-auto flex min-h-[85vh] max-w-md flex-col items-center justify-center text-center">
-          <div className="space-y-6">
-            <div className="mx-auto w-fit rounded-full bg-primary/5 p-6">
+    <div className="container mx-auto px-4 pb-8">
+      {downloadingGames.length === 0 && queuedDownloads.length === 0 ? (
+        /* Empty State - Clean centered design */
+        <div className="flex min-h-[85vh] flex-col items-center justify-center">
+          <div className="space-y-8 text-center">
+            {/* Icon container */}
+            <div className="mx-auto flex items-center justify-center">
               <Coffee className="h-12 w-12 text-primary" />
             </div>
-            <div className="space-y-2">
-              <h3 className="text-2xl font-semibold tracking-tight">
+
+            <div className="space-y-3">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">
                 {t("downloads.noDownloads")}
-              </h3>
-              <p className="text-base leading-relaxed text-muted-foreground">
+              </h2>
+              <p className="mx-auto max-w-sm text-lg text-muted-foreground">
                 {t("downloads.noDownloadsMessage")}
               </p>
+            </div>
+
+            {/* Decorative dots */}
+            <div className="flex items-center justify-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary/40" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary/40" />
             </div>
           </div>
         </div>
       ) : (
-        /* Main Content Grid */
-        <div className="mt-24 grid grid-cols-1 gap-6 sm:mt-8 lg:grid-cols-3">
-          {/* Downloads Section - Takes up 2 columns on large screens */}
-          <div className="space-y-4 lg:col-span-2">
-            <h1 className="text-3xl font-bold text-primary">
-              {t("downloads.activeDownloads")}
-            </h1>
+        /* Main Content - Stunning layout */
+        <div className="mt-6 space-y-6">
+          {/* Header Section with Stats */}
+          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-muted/30 p-6 shadow-xl">
+            {/* Background decoration */}
+            <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/5 blur-3xl" />
+            <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+
+            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              {/* Title and status */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <ArrowDownToLine className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                      {t("downloads.activeDownloads")}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                      {t("downloads.downloadsInProgress", { count: activeDownloads })}
+                      {queuedDownloads.length > 0 && (
+                        <span>
+                          {" "}
+                          ·{" "}
+                          {t("downloads.queuedCount", { count: queuedDownloads.length })}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="flex flex-wrap gap-3">
+                {/* Current Speed */}
+                <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-4 py-3 backdrop-blur-sm">
+                  <div
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                      isHighSpeed(totalSpeed) ? "bg-primary/20" : "bg-muted"
+                    )}
+                  >
+                    <Zap
+                      className={cn(
+                        "h-4 w-4",
+                        isHighSpeed(totalSpeed) ? "text-primary" : "text-muted-foreground"
+                      )}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("downloads.currentTotalSpeed")}
+                    </p>
+                    <p
+                      className={cn(
+                        "text-lg font-bold tabular-nums",
+                        isHighSpeed(totalSpeed) ? "text-primary" : "text-foreground"
+                      )}
+                    >
+                      {totalSpeed}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Peak Speed */}
+                <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-4 py-3 backdrop-blur-sm">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Peak Speed</p>
+                    <p className="text-lg font-bold tabular-nums text-foreground">
+                      {peakSpeed.toFixed(2)} MB/s
+                    </p>
+                  </div>
+                </div>
+
+                {/* Active Downloads */}
+                <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-4 py-3 backdrop-blur-sm">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Active</p>
+                    <p className="text-lg font-bold tabular-nums text-foreground">
+                      {activeDownloads}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Speed Chart */}
+            <div className="relative mt-6">
+              <div className="h-[140px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={speedHistory}
+                    margin={{ top: 10, right: 10, bottom: 0, left: 10 }}
+                  >
+                    <defs>
+                      <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="0%"
+                          stopColor="rgb(var(--color-primary))"
+                          stopOpacity={0.4}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="rgb(var(--color-primary))"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="index" hide />
+                    <YAxis hide domain={[0, "auto"]} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area
+                      type={activeDownloads === 0 ? "linear" : "monotoneX"}
+                      dataKey="speed"
+                      stroke="rgb(var(--color-primary))"
+                      strokeWidth={2.5}
+                      fill="url(#speedGradient)"
+                      isAnimationActive={true}
+                      animationDuration={activeDownloads === 0 ? 1500 : 950}
+                      animationEasing={activeDownloads === 0 ? "ease-out" : "linear"}
+                      connectNulls
+                      dot={false}
+                      baseValue={0}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                {t("downloads.speedHistory")}
+              </p>
+            </div>
+          </div>
+
+          {/* Downloads List */}
+          <div className="space-y-4">
             {downloadingGames.map(game => (
               <DownloadCard
                 key={`${game.game}-${game.executable}`}
@@ -418,86 +703,74 @@ const Downloads = () => {
                 onStop={() => handleStopDownload(game)}
                 onRetry={() => handleRetryDownload(game)}
                 onOpenFolder={() => handleOpenFolder(game)}
-                isStopping={stoppingDownloads.has(game.id)}
+                isStopping={stoppingDownloads.has(game.game)}
+                isCompleted={completedGames.has(game.game)}
+                isFading={fadingGames.has(game.game)}
                 onDelete={deletedGame => {
-                  // Optimistically remove from UI
-                  setDownloadingGames(prev => prev.filter(g => g.id !== deletedGame.id));
+                  setDownloadingGames(prev =>
+                    prev.filter(g => g.game !== deletedGame.game)
+                  );
                 }}
                 onClearCache={clearCachedDownloadData}
               />
             ))}
           </div>
 
-          {/* Charts Section - Takes up 1 column on large screens */}
-          <div className="space-y-4">
-            {/* Speed History Chart */}
-            <Card className="border border-border">
-              <CardHeader>
-                <h3 className="text-lg font-semibold">{t("downloads.speedHistory")}</h3>
-              </CardHeader>
-              <CardContent className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={speedHistory}
-                    margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
+          {/* Queued Downloads Section */}
+          {queuedDownloads.length > 0 && (
+            <div className={downloadingGames.length === 0 ? "" : "mt-8"}>
+              <h2 className="mb-4 text-xl font-semibold text-foreground">
+                {t("downloads.queuedDownloads", "Queued Downloads")} (
+                {queuedDownloads.length})
+              </h2>
+              <div className="space-y-3">
+                {queuedDownloads.map((item, index) => (
+                  <Card
+                    key={item.id}
+                    className={cn(
+                      "border-border/50",
+                      index === 0 && downloadingGames.length === 0
+                        ? "border-primary/50 bg-primary/5"
+                        : "bg-card/50"
+                    )}
                   >
-                    <CartesianGrid
-                      className="text-muted-foreground/20"
-                      strokeDasharray="3 3"
-                    />
-                    <XAxis dataKey="index" hide />
-                    <YAxis
-                      className="text-secondary"
-                      domain={[0, "auto"]}
-                      tickFormatter={value => `${value.toFixed(1)}`}
-                    />
-                    <Tooltip
-                      formatter={value => [`${value.toFixed(2)} MB/s`, "Speed"]}
-                      labelFormatter={() => ""}
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "1px solid rgb(229, 231, 235)",
-                        borderRadius: "0.375rem",
-                        padding: "8px",
-                        fontSize: "0.875rem",
-                      }}
-                      labelStyle={{
-                        color: "rgb(107, 114, 128)",
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="speed"
-                      className="text-primary"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Download Statistics */}
-            <Card className="border border-border">
-              <CardHeader>
-                <h3 className="text-lg font-semibold">{t("downloads.statistics")}</h3>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span>{t("downloads.activeDownloads")}</span>
-                    <span className="font-medium">{activeDownloads}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>{t("downloads.currentTotalSpeed")}</span>
-                    <span className="font-medium">{totalSpeed}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-4">
+                        {index === 0 && downloadingGames.length === 0 ? (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20">
+                            <Loader className="h-4 w-4 animate-spin text-primary" />
+                          </div>
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
+                            {index + 1}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-foreground">{item.gameName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {index === 0 && downloadingGames.length === 0
+                              ? t("downloads.startingSoon", "Starting soon...")
+                              : t("downloads.waitingInQueue", "Waiting in queue")}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => {
+                          removeFromQueue(item.id);
+                          setQueuedDownloads(prev => prev.filter(q => q.id !== item.id));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -559,49 +832,196 @@ const Downloads = () => {
   );
 };
 
+// Status badge component for download cards
+const StatusBadge = memo(({ status, t }) => {
+  const configs = {
+    downloading: {
+      icon: ArrowDownToLine,
+      label: t("downloads.downloading") || "Downloading",
+      className: "bg-primary/10 text-primary border-primary/20",
+      animate: true,
+    },
+    extracting: {
+      icon: Package,
+      label: t("downloads.extracting"),
+      className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+      animate: true,
+    },
+    verifying: {
+      icon: CheckCircle2,
+      label: t("downloads.verifying"),
+      className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+      animate: true,
+    },
+    waiting: {
+      icon: Clock,
+      label: t("downloads.waiting"),
+      className: "bg-muted text-muted-foreground border-border",
+      animate: true,
+    },
+    stopped: {
+      icon: Pause,
+      label: t("downloads.stopped"),
+      className: "bg-muted text-muted-foreground border-border",
+      animate: false,
+    },
+    error: {
+      icon: XCircle,
+      label: t("downloads.downloadError"),
+      className: "bg-red-500/10 text-red-600 border-red-500/20",
+      animate: false,
+    },
+    updating: {
+      icon: RefreshCw,
+      label: t("downloads.updating"),
+      className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+      animate: true,
+    },
+    completed: {
+      icon: CheckCircle2,
+      label: t("downloads.completed") || "Completed",
+      className: "bg-green-500/10 text-green-600 border-green-500/20",
+      animate: false,
+    },
+  };
+
+  const config = configs[status] || configs.downloading;
+  const Icon = config.icon;
+
+  return (
+    <Badge
+      variant="outline"
+      className={cn("gap-1.5 border px-2.5 py-1", config.className)}
+    >
+      <Icon className={cn("h-3 w-3", config.animate && "animate-pulse")} />
+      <span className="text-xs font-medium">{config.label}</span>
+    </Badge>
+  );
+});
+
 const DownloadCard = ({
   game,
   onStop,
   onRetry,
   onOpenFolder,
   isStopping,
+  isCompleted,
+  isFading,
   onDelete,
   onClearCache,
 }) => {
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
+  const fileStartTimeRef = useRef(null);
+  const trackedFileRef = useRef(null);
+  const noticeShownForFileRef = useRef(null);
+  const [clockIndex, setClockIndex] = useState(0);
   const { t } = useLanguage();
   const { settings } = useSettings();
 
+  const { downloadingData } = game;
+
+  // Track extraction time per file to show notice for large files
   useEffect(() => {
-    // Check if the animations already exist to avoid duplicates
-    if (!document.getElementById("download-animations")) {
-      const styleEl = document.createElement("style");
-      styleEl.id = "download-animations";
-      styleEl.textContent = `
-        @keyframes pulse {
-          0% { opacity: 0.3; }
-          50% { opacity: 0.5; }
-          100% { opacity: 0.3; }
-        }
-        
-        @keyframes progress-loading {
-          0% { width: 0%; left: 0; }
-          50% { width: 40%; left: 30%; }
-          100% { width: 0%; left: 100%; }
-        }
-      `;
-      document.head.appendChild(styleEl);
+    const currentFile = downloadingData?.extractionProgress?.currentFile;
+    const isExtracting = downloadingData?.extracting;
+
+    // Reset everything when extraction stops
+    if (!isExtracting) {
+      setShowLargeFileNotice(false);
+      fileStartTimeRef.current = null;
+      trackedFileRef.current = null;
+      noticeShownForFileRef.current = null;
+      return;
     }
-  }, []);
+
+    // New file started - reset tracking for this file
+    if (currentFile && currentFile !== trackedFileRef.current) {
+      trackedFileRef.current = currentFile;
+      fileStartTimeRef.current = Date.now();
+      // Only hide notice if we haven't shown it for this specific file
+      if (noticeShownForFileRef.current !== currentFile) {
+        setShowLargeFileNotice(false);
+      }
+    }
+  }, [downloadingData?.extractionProgress?.currentFile, downloadingData?.extracting]);
+
+  // Separate interval to check if file is taking too long
+  useEffect(() => {
+    if (!downloadingData?.extracting) return;
+
+    const checkInterval = setInterval(() => {
+      const startTime = fileStartTimeRef.current;
+      const currentFile = trackedFileRef.current;
+
+      if (!startTime || !currentFile) return;
+
+      // Skip if we already showed notice for this file
+      if (noticeShownForFileRef.current === currentFile) return;
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 4000) {
+        noticeShownForFileRef.current = currentFile;
+        setShowLargeFileNotice(true);
+      }
+    }, 500);
+
+    return () => clearInterval(checkInterval);
+  }, [downloadingData?.extracting]);
+
+  // Animated clock for large file notice
+  useEffect(() => {
+    if (!showLargeFileNotice) return;
+    const interval = setInterval(() => {
+      setClockIndex(prev => (prev + 1) % 12);
+    }, 250);
+    return () => clearInterval(interval);
+  }, [showLargeFileNotice]);
+
+  const ClockIcons = [
+    Clock12,
+    Clock1,
+    Clock2,
+    Clock3,
+    Clock4,
+    Clock5,
+    Clock6,
+    Clock7,
+    Clock8,
+    Clock9,
+    Clock10,
+    Clock11,
+  ];
+  const AnimatedClockIcon = ClockIcons[clockIndex];
+  const isDownloading = downloadingData?.downloading;
+  const isExtracting = downloadingData?.extracting;
+  const isWaiting = downloadingData?.waiting;
+  const isStopped = downloadingData?.stopped;
+  const isUpdating = downloadingData?.updating;
+  const hasError = downloadingData?.error;
+  const isVerifyingState = downloadingData?.verifying;
+  const hasVerifyError =
+    downloadingData?.verifyError && downloadingData.verifyError.length > 0;
+
+  // Determine current status for badge
+  const getStatus = () => {
+    if (isCompleted) return "completed";
+    if (hasError) return "error";
+    if (isStopped) return "stopped";
+    if (isVerifyingState) return "verifying";
+    if (isExtracting) return "extracting";
+    if (isWaiting) return "waiting";
+    if (isUpdating) return "updating";
+    return "downloading";
+  };
 
   const handleVerifyGame = async () => {
     setIsVerifying(true);
     try {
       const result = await window.electron.verifyGame(game.game);
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+      if (!result.success) throw new Error(result.error);
       toast.success(t("downloads.verificationSuccess"), {
         description: t("downloads.verificationSuccessDesc"),
       });
@@ -613,25 +1033,13 @@ const DownloadCard = ({
     }
   };
 
-  const [isDeleting, setIsDeleting] = useState(false);
-
   const handleRemoveDownload = async game => {
     setIsDeleting(true);
-    // Clear the cached download data since the download is being deleted
     if (onClearCache) onClearCache(game.game);
     await window.electron.deleteGameDirectory(game.game);
     setIsDeleting(false);
-    // Immediately notify parent to refresh downloads list
     if (onDelete) onDelete(game);
   };
-
-  const { downloadingData } = game;
-  const isDownloading = downloadingData?.downloading;
-  const isExtracting = downloadingData?.extracting;
-  const isWaiting = downloadingData?.waiting;
-  const isStopped = downloadingData?.stopped;
-  const isUpdating = downloadingData?.updating;
-  const hasError = downloadingData?.error;
 
   // Check if this error was already reported
   const [wasReported, setWasReported] = useState(() => {
@@ -639,32 +1047,37 @@ const DownloadCard = ({
       const reportedErrors = JSON.parse(localStorage.getItem("reportedErrors") || "{}");
       const errorKey = `${game.game}-${downloadingData?.message || "unknown"}`;
       return reportedErrors[errorKey] || false;
-    } catch (error) {
-      console.error("Failed to load reported errors from cache:", error);
+    } catch {
       return false;
     }
   });
 
+  const predefinedErrorPatterns = [
+    "content_type_error",
+    "no_files_error",
+    "provider_blocked_error",
+    "[Errno 28] No space left on device",
+    "[WinError 225]",
+    "Connection broken",
+    "IncompleteRead",
+  ];
+
+  const isPredefinedError = message => {
+    if (!message) return false;
+    return predefinedErrorPatterns.some(pattern => message.includes(pattern));
+  };
+
   const handleReport = async () => {
     if (wasReported) return;
-
     setIsReporting(true);
     try {
-      // Get auth token
       const AUTHORIZATION = await window.electron.getAPIKey();
       const response = await fetch("https://api.ascendara.app/auth/token", {
-        headers: {
-          Authorization: AUTHORIZATION,
-        },
+        headers: { Authorization: AUTHORIZATION },
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to obtain token");
-      }
-
+      if (!response.ok) throw new Error("Failed to obtain token");
       const { token } = await response.json();
 
-      // Send the report
       const reportResponse = await fetch("https://api.ascendara.app/app/report/feature", {
         method: "POST",
         headers: {
@@ -683,39 +1096,17 @@ const DownloadCard = ({
           Download State:
           • Progress: ${downloadingData.progressCompleted || "0"}%
           • Download Speed: ${downloadingData.progressDownloadSpeeds || "N/A"}
-          • Current File: ${downloadingData.progressCurrentFile || "N/A"}
-          • Total Files: ${downloadingData.progressTotalFiles || "N/A"}
 
           System Info:
           • Timestamp: ${new Date().toISOString()}
           • Platform: ${window.electron.getPlatform() || "Unknown"}
-          • App Version: ${__APP_VERSION__ || "Unknown"}
-
-          Technical Details:
-          \`\`\`json
-          ${JSON.stringify(
-            {
-              downloadState: downloadingData,
-              gameMetadata: {
-                id: game.id,
-                version: game.version,
-                size: game.size,
-                downloadUrl: game.downloadUrl,
-              },
-            },
-            null,
-            2
-          )}
-          \`\`\``,
+          • App Version: ${__APP_VERSION__ || "Unknown"}`,
           gameName: game.game,
         }),
       });
 
-      if (!reportResponse.ok) {
-        throw new Error("Failed to submit report");
-      }
+      if (!reportResponse.ok) throw new Error("Failed to submit report");
 
-      // Save to cache that this error was reported
       const errorKey = `${game.game}-${downloadingData?.message || "unknown"}`;
       const reportedErrors = JSON.parse(localStorage.getItem("reportedErrors") || "{}");
       reportedErrors[errorKey] = true;
@@ -735,367 +1126,480 @@ const DownloadCard = ({
     }
   };
 
-  const predefinedErrorPatterns = [
-    "content_type_error",
-    "no_files_error",
-    "provider_blocked_error",
-    "[Errno 28] No space left on device",
-  ];
-
-  function isPredefinedError(message) {
-    if (!message) return false;
-    return predefinedErrorPatterns.some(pattern => message.includes(pattern));
-  }
-
   useEffect(() => {
     if (hasError && !wasReported && !isPredefinedError(downloadingData.message)) {
       handleReport();
     }
   }, [hasError, wasReported, downloadingData.message]);
 
+  // Get error message based on type
+  const getErrorMessage = () => {
+    const msg = downloadingData.message;
+    if (!msg) return null;
+
+    if (msg.includes("content_type_error")) return t("downloads.contentTypeError");
+    if (msg.includes("no_files_error")) return t("downloads.noFilesError");
+    if (msg.includes("provider_blocked_error"))
+      return t("downloads.connectionResetError");
+    if (msg.includes("[Errno 28] No space left on device"))
+      return t(
+        "downloads.noSpaceLeftError",
+        "No space left on device. Please free up disk space."
+      );
+    if (msg.includes("[WinError 225]"))
+      return t(
+        "downloads.windowsDefenderError",
+        "Windows blocked the download. Add an exclusion in Windows Security."
+      );
+    if (msg.includes("Connection broken") || msg.includes("IncompleteRead"))
+      return t(
+        "downloads.connectionBrokenError",
+        "Connection interrupted. Try Single Stream Download in Settings."
+      );
+    return msg;
+  };
+
+  const progress = parseFloat(downloadingData?.progressCompleted || 0);
+
   return (
-    <Card className="mb-4 w-full border border-border transition-all duration-200 hover:shadow-md">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold leading-none tracking-tight">{game.game}</h3>
-            {downloadingData.updating && (
-              <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                {t("downloads.updating")}
-              </span>
-            )}
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border transition-all duration-500",
+        isFading && "scale-95 opacity-0",
+        isCompleted
+          ? "border-green-500/30 bg-gradient-to-br from-green-500/5 via-card to-card"
+          : hasError
+            ? "border-red-500/30 bg-gradient-to-br from-red-500/5 via-card to-card"
+            : isStopped
+              ? "border-border/50 bg-card"
+              : "border-border/50 bg-gradient-to-br from-card via-card to-muted/20 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+      )}
+    >
+      {/* Animated background for active downloads */}
+      {isDownloading && !hasError && !isStopped && !isCompleted && (
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-y-0 left-0" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+
+      {/* Completed background */}
+      {isCompleted && (
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-green-500/10 to-green-500/5" />
+        </div>
+      )}
+
+      <div className="relative p-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-center gap-3">
+              {/* Game icon placeholder */}
+              <div
+                className={cn(
+                  "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors",
+                  isCompleted
+                    ? "bg-green-500/10"
+                    : hasError
+                      ? "bg-red-500/10"
+                      : "bg-primary/10"
+                )}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : hasError ? (
+                  <AlertCircle className="h-5 w-5 text-red-500" />
+                ) : isExtracting ? (
+                  <Loader className="h-5 w-5 animate-spin text-primary" />
+                ) : (
+                  <Download className="h-5 w-5 text-primary" />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-lg font-semibold text-foreground">
+                  {game.game}
+                </h3>
+                <div className="mt-0.5 flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{game.size}</span>
+                  {!hasError && !isStopped && !hasVerifyError && (
+                    <StatusBadge status={getStatus()} t={t} />
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="text-sm font-medium text-muted-foreground">{game.size}</p>
+
+          {/* Actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl hover:bg-muted/80"
+              >
+                {isStopping || isDeleting ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreVertical className="h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              {hasError || isStopped ? (
+                <>
+                  <DropdownMenuItem onClick={() => onRetry(game)} className="gap-2">
+                    <RefreshCcw className="h-4 w-4" />
+                    {t("downloads.actions.retryDownload")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleRemoveDownload(game)}
+                    className="gap-2 text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t("downloads.actions.cancelAndDelete")}
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem onClick={() => onStop(game)} className="gap-2">
+                  <StopCircle className="h-4 w-4" />
+                  {t("downloads.actions.stopDownload")}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => onOpenFolder(game)} className="gap-2">
+                <FolderOpen className="h-4 w-4" />
+                {t("downloads.actions.openFolder")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-8 w-8 p-0 transition-colors duration-200 hover:bg-muted/80"
-            >
-              {isStopping || isDeleting ? (
-                <Loader className="h-4 w-4 animate-spin" />
-              ) : (
-                <MoreVertical className="h-4 w-4" />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            {hasError || isStopped ? (
-              <>
-                <DropdownMenuItem onClick={() => onRetry(game)} className="gap-2">
-                  <RefreshCcw className="h-4 w-4" />
-                  {t("downloads.actions.retryDownload")}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleRemoveDownload(game)}
-                  className="text-destructive focus:text-destructive gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {t("downloads.actions.cancelAndDelete")}
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <DropdownMenuItem onClick={() => onStop(game)} className="gap-2">
-                <StopCircle className="h-4 w-4" />
-                {t("downloads.actions.stopDownload")}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => onOpenFolder(game)} className="gap-2">
-              <FolderOpen className="h-4 w-4" />
-              {t("downloads.actions.openFolder")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </CardHeader>
+        {/* Content based on state */}
+        <div className="mt-4">
+          {/* Completed State */}
+          {isCompleted && (
+            <div className="flex items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/5 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <p className="font-medium text-green-600">
+                  {t("downloads.completed") || "Download Complete!"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.completedDescription") || "Your game is ready to play"}
+                </p>
+              </div>
+            </div>
+          )}
 
-      <CardContent>
-        {downloadingData.verifying ? (
-          <div className="flex flex-col items-center justify-center rounded-lg bg-muted/40 py-2">
-            <span className="flex items-center gap-2 text-lg font-semibold">
-              <Loader className="h-4 w-4 animate-spin" />
-              {t("downloads.verifying")}
-            </span>
-            <span className="mt-1 text-sm text-muted-foreground">
-              {t("downloads.verifyingDescription")}
-            </span>
-          </div>
-        ) : downloadingData.verifyError && downloadingData.verifyError.length > 0 ? (
-          <div className="mt-2 space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                {downloadingData.verifyError.length === 1
-                  ? t("downloads.verificationFailed1", {
-                      numFailed: downloadingData.verifyError.length,
-                    })
-                  : t("downloads.verificationFailed2", {
-                      numFailed: downloadingData.verifyError.length,
-                    })}
-              </span>
+          {/* Verifying State */}
+          {isVerifyingState && !isCompleted && (
+            <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                <Loader className="h-5 w-5 animate-spin text-blue-500" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">{t("downloads.verifying")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.verifyingDescription")}
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t("downloads.verificationFailedDesc")}&nbsp;
-              <a
-                className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                onClick={() => {
-                  window.electron.openURL(
-                    "https://ascendara.app/docs/troubleshooting/common-issues#verification-issues"
-                  );
-                }}
-              >
-                {t("common.learnMore")} <ExternalLink className="ml-1 h-3 w-3" />
-              </a>
-            </p>
-            <div className="max-h-32 overflow-y-auto rounded-md bg-muted/50 p-2">
-              {downloadingData.verifyError.map((error, index) => (
-                <div key={index} className="text-xs text-muted-foreground">
-                  <span className="font-medium">{error.file}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2">
+          )}
+
+          {/* Verify Error State */}
+          {hasVerifyError && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {downloadingData.verifyError.length === 1
+                    ? t("downloads.verificationFailed1", {
+                        numFailed: downloadingData.verifyError.length,
+                      })
+                    : t("downloads.verificationFailed2", {
+                        numFailed: downloadingData.verifyError.length,
+                      })}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("downloads.verificationFailedDesc")}{" "}
+                <a
+                  className="inline-flex cursor-pointer items-center text-primary hover:underline"
+                  onClick={() =>
+                    window.electron.openURL(
+                      "https://ascendara.app/docs/troubleshooting/common-issues#verification-issues"
+                    )
+                  }
+                >
+                  {t("common.learnMore")} <ExternalLink className="ml-1 h-3 w-3" />
+                </a>
+              </p>
+              <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/50 p-2 text-xs">
+                {downloadingData.verifyError.map((error, index) => (
+                  <div key={index} className="py-0.5 text-muted-foreground">
+                    <span className="font-medium">{error.file}</span>
+                  </div>
+                ))}
+              </div>
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 onClick={handleVerifyGame}
                 disabled={isVerifying}
+                className="w-full"
               >
                 {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
               </Button>
             </div>
-          </div>
-        ) : isStopped ? (
-          <div className="mt-2 space-y-2">
-            <div className="flex flex-col items-center justify-center rounded-lg bg-muted/40 py-2">
-              <span className="flex items-center gap-2 text-lg font-semibold">
-                <StopCircle className="h-4 w-4" />
-                {t("downloads.stopped")}
-              </span>
-              <span className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                {t("downloads.stoppedDescription")}&nbsp;
-                <a
-                  onClick={() =>
-                    window.electron.openURL(
-                      "https://ascendara.app/docs/troubleshooting/common-issues#download-resumability"
-                    )
-                  }
-                  className="cursor-pointer text-primary hover:underline"
-                >
-                  {t("common.learnMore")}{" "}
-                  <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                </a>
-              </span>
-            </div>
-          </div>
-        ) : hasError ? (
-          <div className="bg-destructive/5 border-destructive/20 space-y-4 rounded-lg border p-4 duration-200 animate-in fade-in slide-in-from-top-1">
-            <div className="flex items-start space-x-3">
-              <AlertCircle className="text-destructive mt-0.5 h-5 w-5 flex-shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="text-destructive font-medium">
-                  {t("downloads.downloadError")}
-                </div>
-                {isPredefinedError(downloadingData.message) ? (
-                  downloadingData.message.includes("content_type_error") ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("downloads.contentTypeError")}
-                      <br />
-                      <a
-                        onClick={() =>
-                          window.electron.openURL(
-                            "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
-                          )
-                        }
-                        className="cursor-pointer text-primary hover:underline"
-                      >
-                        {t("common.learnMore")}{" "}
-                        <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                      </a>
-                    </p>
-                  ) : downloadingData.message.includes("no_files_error") ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("downloads.noFilesError")}
-                      <br />
-                      <a
-                        onClick={() =>
-                          window.electron.openURL(
-                            "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
-                          )
-                        }
-                        className="cursor-pointer text-primary hover:underline"
-                      >
-                        {t("common.learnMore")}{" "}
-                        <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                      </a>
-                    </p>
-                  ) : downloadingData.message.includes("provider_blocked_error") ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("downloads.connectionResetError")}
-                      <br />
-                      <a
-                        onClick={() =>
-                          window.electron.openURL(
-                            "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
-                          )
-                        }
-                        className="cursor-pointer text-primary hover:underline"
-                      >
-                        {t("common.learnMore")}{" "}
-                        <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                      </a>
-                    </p>
-                  ) : downloadingData.message.includes(
-                      "[Errno 28] No space left on device"
-                    ) ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t(
-                        "downloads.noSpaceLeftError",
-                        "No space left on device. Please free up disk space to continue the download."
-                      )}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {downloadingData.message}
-                    </p>
-                  )
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {downloadingData.message}
-                  </p>
-                )}
-                <div className="flex items-center space-x-2 pt-1">
-                  {downloadingData.message !== "content_type_error" &&
-                    downloadingData.message !== "no_files_error" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-destructive/30 hover:bg-destructive/10 transition-colors duration-200"
-                        onClick={handleReport}
-                        disabled={isReporting || wasReported}
-                      >
-                        {isReporting ? (
-                          <>
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                            {t("common.reporting")}
-                          </>
-                        ) : wasReported ? (
-                          <>
-                            <CircleCheck className="mr-2 h-4 w-4" />
-                            {t("downloads.alreadyReported")}
-                          </>
-                        ) : (
-                          <>
-                            <AlertTriangle className="mr-2 h-4 w-4" />
-                            {t("common.reportToAscendara")}
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onRetry}
-                    className="border-destructive/30 hover:bg-destructive/10 transition-colors duration-200"
+          )}
+
+          {/* Stopped State */}
+          {isStopped && !hasVerifyError && (
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/50 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                <Pause className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">{t("downloads.stopped")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.stoppedDescription")}{" "}
+                  <a
+                    onClick={() =>
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/troubleshooting/common-issues#download-resumability"
+                      )
+                    }
+                    className="cursor-pointer text-primary hover:underline"
                   >
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    {t("common.retry")}
-                  </Button>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground/80">
-                  {t("downloads.errorHelp")}
+                    {t("common.learnMore")}
+                  </a>
                 </p>
               </div>
             </div>
-          </div>
-        ) : (
-          <>
-            {isDownloading && !isWaiting && !isExtracting && (
-              <div className="space-y-3 duration-200 animate-in fade-in slide-in-from-top-1">
-                <div className="flex items-center space-x-3">
-                  <span className="min-w-[45px] text-sm font-medium text-muted-foreground">
-                    {downloadingData.progressCompleted}%
-                  </span>
-                  <div className="flex-1">
-                    <Progress
-                      value={parseFloat(downloadingData.progressCompleted)}
-                      className="h-2 transition-all duration-300"
-                    />
-                  </div>
+          )}
+
+          {/* Error State */}
+          {hasError && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+                  <AlertCircle className="h-5 w-5 text-red-500" />
                 </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <div className="relative flex items-center space-x-2 rounded-md bg-muted/40 px-3 py-1">
-                    {isHighSpeed(downloadingData.progressDownloadSpeeds) && (
-                      <BackgroundSpeedAnimation />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-red-600">
+                    {t("downloads.downloadError")}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {getErrorMessage()}
+                  </p>
+                  {isPredefinedError(downloadingData.message) && (
+                    <a
+                      onClick={() =>
+                        window.electron.openURL(
+                          "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
+                        )
+                      }
+                      className="mt-2 inline-flex cursor-pointer items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      {t("common.learnMore")} <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {!isPredefinedError(downloadingData.message) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReport}
+                    disabled={isReporting || wasReported}
+                    className="gap-2"
+                  >
+                    {isReporting ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : wasReported ? (
+                      <CircleCheck className="h-4 w-4" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4" />
                     )}
-                    <Download className="relative z-10 h-4 w-4" />
-                    <span className="relative z-10 font-medium">
-                      {downloadingData.progressDownloadSpeeds}
-                      {settings.downloadLimit > 0 &&
-                        ` (${t("downloads.limitedTo")} ${settings.downloadLimit >= 1024 ? `${Math.round(settings.downloadLimit / 1024)} MB` : `${settings.downloadLimit} KB`}/s)`}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 rounded-md bg-muted/40 px-3 py-1">
-                    <Clock className="h-4 w-4" />
-                    <span className="font-medium">
-                      ETA: {downloadingData.timeUntilComplete}
-                    </span>
-                  </div>
+                    {isReporting
+                      ? t("common.reporting")
+                      : wasReported
+                        ? t("downloads.alreadyReported")
+                        : t("common.reportToAscendara")}
+                  </Button>
+                )}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={onRetry}
+                  className="gap-2 text-secondary"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  {t("common.retry")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Active Download State */}
+          {isDownloading && !isWaiting && !isExtracting && !hasError && !isStopped && (
+            <div className="space-y-4">
+              {/* Progress bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">
+                    {progress.toFixed(1)}%
+                  </span>
+                  <span className="text-muted-foreground">
+                    ETA: {downloadingData.timeUntilComplete || "--:--"}
+                  </span>
+                </div>
+                <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/50">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                  {/* Shimmer effect */}
+                  <div
+                    className="absolute inset-y-0 left-0 animate-shimmer rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    style={{ width: `${progress}%` }}
+                  />
                 </div>
               </div>
-            )}
-            {isExtracting && (
-              <div className="mt-2 space-y-2">
-                <div className="relative overflow-hidden rounded-full bg-muted">
-                  <Progress value={undefined} />
-                  <div
-                    className="absolute top-0 h-full rounded-full bg-primary"
-                    style={{
-                      animation: "progress-loading 2.5s ease-in-out infinite",
-                      opacity: 0.5,
-                    }}
-                  />
-                  <div
-                    className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/10 via-primary/30 to-primary/10"
-                    style={{
-                      animation: "pulse 3s ease-in-out infinite",
-                      opacity: 0.4,
-                    }}
-                  />
-                </div>
-                <div className="flex flex-col items-center justify-center rounded-lg bg-muted/40 py-2">
-                  <span className="flex items-center gap-2 text-lg font-semibold">
-                    <Loader className="h-4 w-4 animate-spin" />
-                    {t("downloads.extracting")}
-                  </span>
-                  <span className="mt-1 text-sm text-muted-foreground">
-                    {t("downloads.extractingDescription")}
-                  </span>
-                </div>
+
+              {/* Speed and info */}
+              <div className="flex flex-wrap items-center gap-3">
+                <SpeedIndicator
+                  speed={downloadingData.progressDownloadSpeeds}
+                  isHigh={isHighSpeed(downloadingData.progressDownloadSpeeds)}
+                />
+
+                {settings.downloadLimit > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {t("downloads.limitedTo")}{" "}
+                    {settings.downloadLimit >= 1024
+                      ? `${Math.round(settings.downloadLimit / 1024)} MB/s`
+                      : `${settings.downloadLimit} KB/s`}
+                  </Badge>
+                )}
               </div>
-            )}
-            {isWaiting && (
-              <div className="mt-2 space-y-3 duration-200 animate-in fade-in slide-in-from-top-1">
-                <div className="relative overflow-hidden rounded-full">
-                  <Progress value={undefined} className="h-2 bg-muted/30" />
+            </div>
+          )}
+
+          {/* Extracting State */}
+          {isExtracting && (
+            <div className="space-y-3">
+              {/* Large file notice */}
+              {showLargeFileNotice && (
+                <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-600">
+                  <AnimatedClockIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>{t("downloads.largeFileNotice")}</span>
                 </div>
-                <div className="flex flex-col items-center justify-center rounded-lg bg-muted/40 py-2">
-                  <span className="flex items-center gap-2 text-lg font-semibold">
-                    <Loader className="h-4 w-4 animate-spin" />
-                    {t("downloads.waiting")}
-                  </span>
-                  <span className="mt-1 max-w-[70%] text-center text-sm text-muted-foreground">
+              )}
+              {/* Extraction progress bar */}
+              {downloadingData?.extractionProgress?.totalFiles > 0 ? (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-foreground">
+                        {parseFloat(
+                          downloadingData.extractionProgress.percentComplete || 0
+                        ).toFixed(1)}
+                        %
+                      </span>
+                      <span className="text-muted-foreground">
+                        {downloadingData.extractionProgress.filesExtracted} /{" "}
+                        {downloadingData.extractionProgress.totalFiles} files
+                      </span>
+                    </div>
+                    <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/50">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-300"
+                        style={{
+                          width: `${parseFloat(downloadingData.extractionProgress.percentComplete || 0)}%`,
+                        }}
+                      />
+                      {/* Shimmer effect */}
+                      <div
+                        className="absolute inset-y-0 left-0 animate-shimmer rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                        style={{
+                          width: `${parseFloat(downloadingData.extractionProgress.percentComplete || 0)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                      <Loader className="h-5 w-5 animate-spin text-amber-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-foreground">
+                          {t("downloads.extracting")}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          {downloadingData.extractionProgress.extractionSpeed}
+                        </span>
+                      </div>
+                      <p
+                        className="truncate text-sm text-muted-foreground"
+                        title={downloadingData.extractionProgress.currentFile}
+                      >
+                        {downloadingData.extractionProgress.currentFile ||
+                          t("downloads.extractingDescription")}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="relative h-2 overflow-hidden rounded-full bg-muted/50">
+                    <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-primary/20 via-primary to-primary/20" />
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                      <Loader className="h-5 w-5 animate-spin text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {t("downloads.extracting")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t("downloads.preparingExtraction") || "Preparing extraction..."}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Waiting State */}
+          {isWaiting && (
+            <div className="space-y-3">
+              <div className="relative h-2 overflow-hidden rounded-full bg-muted/30">
+                <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-muted-foreground/30 to-transparent" />
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                  <Clock className="h-5 w-5 animate-pulse text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">{t("downloads.waiting")}</p>
+                  <p className="text-sm text-muted-foreground">
                     {t("downloads.waitingDescription")}
-                  </span>
+                  </p>
                 </div>
               </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

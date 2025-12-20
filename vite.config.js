@@ -12,6 +12,7 @@ plugins.unshift(MillionLint.vite());
 export default defineConfig({
   plugins: plugins,
   publicDir: path.join(__dirname, "src/public"),
+  envDir: __dirname,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_REVISION__: JSON.stringify(execSync("git rev-parse HEAD").toString()),
@@ -95,6 +96,16 @@ export default defineConfig({
           });
           proxy.on("proxyRes", (proxyRes, req, _res) => {
             console.log("Received GiantBomb Response:", proxyRes.statusCode, req.url);
+          });
+        },
+      },
+      "/api/flingtrainer": {
+        target: "https://flingtrainer.com",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/flingtrainer/, ""),
+        configure: (proxy, _options) => {
+          proxy.on("error", (err, _req, _res) => {
+            console.log("FlingTrainer proxy error", err);
           });
         },
       },

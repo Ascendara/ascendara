@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTour } from "@/context/TourContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, ChevronLeft, Rocket } from "lucide-react";
+import { ChevronRight, ChevronLeft, Rocket, Volume2, VolumeX, Music } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import soundService from "@/services/soundService";
 
 const getSteps = t => [
   {
@@ -59,6 +60,13 @@ const getSteps = t => [
     navigateTo: "/profile",
   },
   {
+    title: t("tour.ascend.title"),
+    content: t("tour.ascend.content"),
+    spotlight: "a[href='/ascend']",
+    position: "right",
+    navigateTo: "/ascend",
+  },
+  {
     title: t("tour.settings.title"),
     content: t("tour.settings.content"),
     spotlight: "a[href='/settings']",
@@ -82,7 +90,11 @@ function Tour({ onClose }) {
     if (isTourActive) return;
     setTourActive(true);
     setHasMounted(true);
-    return () => setTourActive(false);
+    return () => {
+      setTourActive(false);
+      // Stop any playing sounds when tour unmounts
+      soundService.stop();
+    };
   }, []);
   if (!hasMounted && isTourActive) return null;
   const { t } = useTranslation();
@@ -102,6 +114,75 @@ function Tour({ onClose }) {
   const rafRef = useRef(null);
   const navigate = useNavigate();
   const [steps] = useState(() => getSteps(t));
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Sound experience for the last 4 steps
+  // Steps: 0-6 = no sound, 7 = ascend1, 8 = ascend2, 9 = ascend3, 10 = ascend4 on finish
+  const soundStepIndex = steps.length - 4; // First step with sound (index 7)
+
+  const getSoundMessage = () => {
+    if (currentStep === soundStepIndex) return t("tour.sound.almostThere");
+    if (currentStep === soundStepIndex + 1) return t("tour.sound.gettingCloser");
+    if (currentStep === soundStepIndex + 2) return t("tour.sound.soClose");
+    if (currentStep === steps.length - 1) return t("tour.sound.readyForLiftoff");
+    return null;
+  };
+
+  const getSoundGlow = () => {
+    if (currentStep < soundStepIndex) return "";
+    if (currentStep === soundStepIndex) return "shadow-[0_0_20px_rgba(168,85,247,0.3)]";
+    if (currentStep === soundStepIndex + 1)
+      return "shadow-[0_0_30px_rgba(168,85,247,0.5)]";
+    if (currentStep === soundStepIndex + 2)
+      return "shadow-[0_0_40px_rgba(168,85,247,0.7)]";
+    if (currentStep === steps.length - 1) return "shadow-[0_0_50px_rgba(168,85,247,0.9)]";
+    return "";
+  };
+
+  // Play sounds on the last 4 steps
+  useEffect(() => {
+    if (isMuted) {
+      soundService.stop();
+      return;
+    }
+
+    const soundMap = {
+      [soundStepIndex]: "ascend1",
+      [soundStepIndex + 1]: "ascend2",
+      [soundStepIndex + 2]: "ascend3",
+      [steps.length - 1]: "ascend4", // Final step plays the drop
+    };
+
+    if (soundMap[currentStep]) {
+      // Final step plays ascend4 once (no loop), others loop
+      const shouldLoop = currentStep !== steps.length - 1;
+      soundService.crossfadeTo(
+        soundMap[currentStep],
+        shouldLoop ? 0.25 : 0.4,
+        shouldLoop
+      );
+    } else {
+      // Stop audio when not on a sound step (including going back)
+      soundService.stop();
+    }
+  }, [currentStep, isMuted, soundStepIndex, steps.length]);
+
+  // Handle mute toggle
+  const toggleMute = () => {
+    if (!isMuted) {
+      soundService.stop();
+    } else if (currentStep >= soundStepIndex && currentStep < steps.length - 1) {
+      const soundMap = {
+        [soundStepIndex]: "ascend1",
+        [soundStepIndex + 1]: "ascend2",
+        [soundStepIndex + 2]: "ascend3",
+      };
+      if (soundMap[currentStep]) {
+        soundService.play(soundMap[currentStep], 0.25, true);
+      }
+    }
+    setIsMuted(!isMuted);
+  };
 
   useEffect(() => {
     const updateSpotlight = () => {
@@ -216,6 +297,7 @@ function Tour({ onClose }) {
         localStorage.setItem("navSize", originalSize.current);
         window.dispatchEvent(new CustomEvent("navResize"));
       }
+      // ascend4 already plays on the final step, just close
       onClose();
       setTimeout(() => {
         navigate("/");
@@ -328,13 +410,48 @@ function Tour({ onClose }) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-md rounded-xl border border-border bg-background p-6 shadow-lg"
+          className={`max-w-md rounded-xl border border-border bg-background p-6 shadow-lg transition-shadow duration-500 ${getSoundGlow()}`}
         >
           <h2 className="mb-2 text-xl font-bold">{steps[currentStep].title}</h2>
           <p
             className="pointer-events-auto mb-4 text-muted-foreground"
             dangerouslySetInnerHTML={{ __html: steps[currentStep].content }}
           />
+
+          {/* Sound indicator for last 4 steps */}
+          <AnimatePresence>
+            {getSoundMessage() && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Music className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-primary">{getSoundMessage()}</span>
+                </div>
+                <button
+                  onClick={toggleMute}
+                  className="rounded-full p-1 transition-colors hover:bg-primary/20"
+                  title={isMuted ? "Unmute" : "Mute"}
+                >
+                  {isMuted ? (
+                    <VolumeX className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Volume2 className="h-4 w-4 text-primary" />
+                  )}
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Sound credit */}
+          {currentStep >= soundStepIndex && (
+            <p className="mb-3 text-center text-xs text-muted-foreground/60">
+              {t("tour.sound.musicBy")}
+            </p>
+          )}
 
           <div className="flex items-center justify-between">
             <button

@@ -22,13 +22,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import {
   Download,
   Server,
   HardDrive,
   Clock,
-  CheckCircle,
+  CircleCheck,
   AlertCircle,
   Loader2,
   MoreVertical,
@@ -48,6 +49,48 @@ import {
   getDirectDownloadLink,
 } from "@/services/torboxService";
 
+// Helper function to check if there are active downloads
+const checkActiveDownloads = async () => {
+  try {
+    // Check for pending download lock (prevents race condition when navigating quickly)
+    const pendingDownload = localStorage.getItem("pendingDownloadLock");
+    if (pendingDownload) {
+      const lockTime = parseInt(pendingDownload, 10);
+      // Lock expires after 10 seconds (in case of crash/error)
+      if (Date.now() - lockTime < 10000) {
+        return 1; // Treat as active download
+      } else {
+        localStorage.removeItem("pendingDownloadLock");
+      }
+    }
+
+    const games = await window.electron.getGames();
+    const activeDownloads = games.filter(game => {
+      const { downloadingData } = game;
+      return (
+        downloadingData &&
+        (downloadingData.downloading ||
+          downloadingData.extracting ||
+          downloadingData.updating)
+      );
+    });
+    return activeDownloads.length;
+  } catch (error) {
+    console.error("Error checking active downloads:", error);
+    return 0;
+  }
+};
+
+// Set download lock before starting download
+const setDownloadLock = () => {
+  localStorage.setItem("pendingDownloadLock", Date.now().toString());
+};
+
+// Clear download lock (called when download actually starts or fails)
+const clearDownloadLock = () => {
+  localStorage.removeItem("pendingDownloadLock");
+};
+
 // Utility function to manage stored game names
 const manageStoredGameNames = () => {
   try {
@@ -63,6 +106,7 @@ const manageStoredGameNames = () => {
 const TorboxDownloads = () => {
   const { t } = useLanguage();
   const { settings } = useSettings();
+  const { isAuthenticated } = useAuth();
 
   // State for TorBox downloads
   const [torboxDownloads, setTorboxDownloads] = useState([]);
@@ -293,6 +337,17 @@ const TorboxDownloads = () => {
       return;
     }
 
+    // Check download queue limit for non-Ascend users
+    if (!isAuthenticated) {
+      const activeCount = await checkActiveDownloads();
+      if (activeCount > 0) {
+        toast.error(t("download.toast.downloadQueueLimit"));
+        return;
+      }
+      // Set lock immediately to prevent race condition
+      setDownloadLock();
+    }
+
     try {
       // First, try to get stored download data from local storage
       const torboxData = manageStoredGameNames();
@@ -318,22 +373,26 @@ const TorboxDownloads = () => {
               fileName,
               false, // online
               false, // dlc
-              false, // update
+              false, // isVr
+              false, // updateFlow
               "", // version
               storedData?.imgUrl || null, // imgID
               download.size ? formatBytes(download.size) : "", // size
-              0 // dir (default)
+              0, // additionalDirIndex
+              "" // gameID
             );
 
             toast.success(t("torbox.download_started", { name: fileName }));
           } catch (error) {
             console.error("[TorboxDownloads] Error starting download:", error);
             toast.error(t("torbox.error_starting_download"));
+            clearDownloadLock();
           }
           return;
         }
 
         toast.error(t("torbox.error_no_download_data"));
+        clearDownloadLock();
         return;
       }
 
@@ -407,7 +466,8 @@ const TorboxDownloads = () => {
         gameData.version || "",
         gameData.imgID || null,
         gameData.size || "",
-        0 // dir (default)
+        0, // additionalDirIndex
+        gameData.gameID || "" // gameID
       );
 
       toast.success(t("torbox.download_started", { name: gameData.game }));
@@ -427,6 +487,7 @@ const TorboxDownloads = () => {
     } catch (error) {
       console.error("[TorboxDownloads] Error downloading to PC:", error);
       toast.error(t("torbox.error_downloading_to_pc"));
+      clearDownloadLock();
     }
   };
 

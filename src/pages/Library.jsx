@@ -38,6 +38,12 @@ import {
   FolderPlus,
   ChevronDown,
   ChevronUp,
+  Cloud,
+  CloudDownload,
+  CloudUpload,
+  Clock,
+  DollarSign,
+  ArrowDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -62,6 +68,15 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import igdbService from "@/services/gameInfoService";
 import { useIgdbConfig } from "@/services/gameInfoConfig";
+import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
+import {
+  getCloudLibrary,
+  getGameAchievements,
+  syncCloudLibrary,
+  syncGameAchievements,
+} from "@/services/firebaseService";
+import { calculateLibraryValue } from "@/services/cheapsharkService";
 
 import NewFolderDialog from "@/components/NewFolderDialog";
 import FolderCard from "@/components/FolderCard";
@@ -137,8 +152,28 @@ const Library = () => {
     const savedFolders = localStorage.getItem("library-folders");
     return savedFolders ? JSON.parse(savedFolders) : [];
   });
+  // Cloud-only games state
+  const [cloudOnlyGames, setCloudOnlyGames] = useState([]);
+  const [loadingCloudGames, setLoadingCloudGames] = useState(false);
+  const [restoringGame, setRestoringGame] = useState(null);
+  const [cloudGameImages, setCloudGameImages] = useState({});
+  // Play Later games state
+  const [playLaterGames, setPlayLaterGames] = useState([]);
+  const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
+  const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
+  const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
+  const [libraryValueData, setLibraryValueData] = useState(() => {
+    const cached = localStorage.getItem("library-value-cache");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [cachedGameCount, setCachedGameCount] = useState(() => {
+    return parseInt(localStorage.getItem("library-value-game-count") || "0", 10);
+  });
+  const [isCalculatingValue, setIsCalculatingValue] = useState(false);
+  const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     localStorage.setItem("game-favorites", JSON.stringify(favorites));
@@ -340,6 +375,308 @@ const Library = () => {
     init();
   }, []);
 
+  // Load Play Later games from localStorage
+  useEffect(() => {
+    const loadPlayLaterGames = () => {
+      const savedGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+      setPlayLaterGames(savedGames);
+    };
+
+    loadPlayLaterGames();
+
+    // Listen for updates from GameCard
+    const handlePlayLaterUpdate = () => {
+      loadPlayLaterGames();
+    };
+    window.addEventListener("play-later-updated", handlePlayLaterUpdate);
+
+    return () => {
+      window.removeEventListener("play-later-updated", handlePlayLaterUpdate);
+    };
+  }, []);
+
+  // Handle removing a game from Play Later list
+  const handleRemoveFromPlayLater = gameName => {
+    const updatedList = playLaterGames.filter(g => g.game !== gameName);
+    localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+    localStorage.removeItem(`play-later-image-${gameName}`);
+    setPlayLaterGames(updatedList);
+  };
+
+  // Handle navigating to download page for Play Later game
+  const handleDownloadPlayLater = game => {
+    // Remove from Play Later list and cached image
+    handleRemoveFromPlayLater(game.game);
+
+    navigate("/download", {
+      state: {
+        gameData: game,
+      },
+    });
+  };
+
+  // Check for game updates when games are loaded
+  useEffect(() => {
+    const checkGameUpdates = async () => {
+      console.log("[Library] checkGameUpdates called, games:", games.length);
+
+      // Only check for non-custom games with gameID
+      const gamesWithId = games.filter(g => !g.isFolder && !g.isCustom && g.gameID);
+      console.log(
+        "[Library] Games with gameID:",
+        gamesWithId.length,
+        gamesWithId.map(g => ({ name: g.game, gameID: g.gameID, version: g.version }))
+      );
+      if (gamesWithId.length === 0) {
+        console.log("[Library] No games with gameID found, skipping update check");
+        return;
+      }
+
+      const updates = {};
+      // Check updates in parallel but limit concurrency
+      const checkPromises = gamesWithId.map(async game => {
+        try {
+          console.log(
+            `[Library] Checking update for ${game.game} (${game.gameID}), version: ${game.version}`
+          );
+          const result = await gameService.checkGameUpdate(game.gameID, game.version);
+          console.log(`[Library] Update result for ${game.game}:`, result);
+          if (result?.updateAvailable) {
+            console.log(`[Library] Update available for ${game.game}!`);
+            updates[game.gameID] = result;
+          }
+        } catch (error) {
+          console.error(`[Library] Error checking update for ${game.game}:`, error);
+        }
+      });
+
+      await Promise.all(checkPromises);
+      console.log("[Library] All updates checked, updates found:", updates);
+      setGameUpdates(updates);
+    };
+
+    if (isInitialized && games.length > 0) {
+      console.log(
+        "[Library] Triggering update check, isInitialized:",
+        isInitialized,
+        "games.length:",
+        games.length
+      );
+      checkGameUpdates();
+    }
+  }, [isInitialized, games]);
+
+  // Load cloud-only games (games in cloud but not installed locally)
+  useEffect(() => {
+    const loadCloudOnlyGames = async () => {
+      if (!user) {
+        setCloudOnlyGames([]);
+        return;
+      }
+
+      setLoadingCloudGames(true);
+      try {
+        const cloudResult = await getCloudLibrary();
+        if (cloudResult.data?.games) {
+          // Get local game names for comparison
+          const installedGames = await window.electron.getGames();
+          const customGames = await window.electron.getCustomGames();
+          const localGameNames = new Set([
+            ...(installedGames || []).map(g => (g.game || g.name)?.toLowerCase()),
+            ...(customGames || []).map(g => (g.game || g.name)?.toLowerCase()),
+          ]);
+
+          // Filter to cloud games that are NOT installed locally
+          // Include both regular games (with gameID) and custom games
+          const cloudOnly = cloudResult.data.games.filter(
+            g => !localGameNames.has(g.name?.toLowerCase()) && (g.gameID || g.isCustom)
+          );
+
+          setCloudOnlyGames(cloudOnly);
+
+          // Load images for cloud-only games (only for non-custom games with gameID)
+          const images = {};
+          for (const game of cloudOnly
+            .filter(g => g.gameID && !g.isCustom)
+            .slice(0, 20)) {
+            try {
+              const localStorageKey = `game-cover-${game.name}`;
+              const cachedImage = localStorage.getItem(localStorageKey);
+              if (cachedImage) {
+                images[game.name] = cachedImage;
+              } else if (game.gameID) {
+                const response = await fetch(
+                  `https://api.ascendara.app/v3/image/${game.gameID}`
+                );
+                if (response.ok) {
+                  const blob = await response.blob();
+                  const dataUrl = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                  });
+                  images[game.name] = dataUrl;
+                  try {
+                    localStorage.setItem(localStorageKey, dataUrl);
+                  } catch (e) {
+                    console.warn("Could not cache cloud game image:", e);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("Error loading cloud game image:", error);
+            }
+          }
+          setCloudGameImages(images);
+        }
+      } catch (e) {
+        console.error("Failed to load cloud library:", e);
+      }
+      setLoadingCloudGames(false);
+    };
+
+    loadCloudOnlyGames();
+  }, [user, games]); // Re-run when user changes or games list changes
+
+  // Restore game from cloud - find in local index and start download
+  const handleRestoreFromCloud = async cloudGame => {
+    // Handle custom games differently - they need to be manually re-added
+    if (cloudGame.isCustom) {
+      // Store cloud data in localStorage to restore after user manually adds the game
+      const cloudRestoreData = {
+        gameName: cloudGame.name,
+        playTime: cloudGame.playTime,
+        launchCount: cloudGame.launchCount,
+        lastPlayed: cloudGame.lastPlayed,
+        favorite: cloudGame.favorite,
+        isCustom: true,
+      };
+      localStorage.setItem(
+        `cloud-restore-${cloudGame.name}`,
+        JSON.stringify(cloudRestoreData)
+      );
+
+      // Show info toast and open add game dialog
+      toast.info(t("library.cloudRestore.customGameInfo"));
+      setIsAddGameOpen(true);
+      return;
+    }
+
+    if (!cloudGame.gameID) {
+      toast.error(t("library.cloudRestore.noGameId"));
+      return;
+    }
+
+    setRestoringGame(cloudGame.name);
+    try {
+      // Find the game in the local index using gameID
+      const gameData = await gameService.findGameByGameID(cloudGame.gameID);
+      if (!gameData) {
+        toast.error(t("library.cloudRestore.gameNotFound"));
+        setRestoringGame(null);
+        return;
+      }
+
+      // Store cloud data in localStorage to restore after download completes
+      const cloudRestoreData = {
+        gameName: cloudGame.name,
+        playTime: cloudGame.playTime,
+        launchCount: cloudGame.launchCount,
+        lastPlayed: cloudGame.lastPlayed,
+        favorite: cloudGame.favorite,
+      };
+      localStorage.setItem(
+        `cloud-restore-${cloudGame.name}`,
+        JSON.stringify(cloudRestoreData)
+      );
+
+      // Navigate to download page with the game data
+      navigate("/download", {
+        state: {
+          gameData: {
+            ...gameData,
+            fromCloudRestore: true,
+          },
+          fromCloudRestore: true,
+        },
+      });
+    } catch (error) {
+      console.error("Error restoring game from cloud:", error);
+      toast.error(t("library.cloudRestore.error"));
+    }
+    setRestoringGame(null);
+  };
+
+  // Check for pending cloud restores when games are loaded
+  // This handles the case where a cloud game was downloaded and we need to restore its data
+  const checkPendingCloudRestores = async installedGames => {
+    // Get all cloud-restore keys from localStorage
+    const keysToCheck = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("cloud-restore-")) {
+        keysToCheck.push(key);
+      }
+    }
+
+    for (const key of keysToCheck) {
+      const gameName = key.replace("cloud-restore-", "");
+      // Check if this game is now installed
+      const isInstalled = installedGames.some(
+        g => (g.game || g.name)?.toLowerCase() === gameName.toLowerCase()
+      );
+
+      if (isInstalled) {
+        try {
+          const cloudRestoreDataStr = localStorage.getItem(key);
+          if (cloudRestoreDataStr) {
+            const cloudRestoreData = JSON.parse(cloudRestoreDataStr);
+            console.log("Restoring cloud data for:", gameName, cloudRestoreData);
+
+            // Restore the cloud data to the game's JSON file
+            const result = await window.electron.restoreCloudGameData(
+              gameName,
+              cloudRestoreData
+            );
+
+            // Also restore achievements from cloud if available
+            if (user) {
+              try {
+                const achievementsResult = await getGameAchievements(gameName);
+                // Check if we have achievement data (could be in .achievements or directly in .data)
+                if (achievementsResult.data) {
+                  console.log(
+                    "Restoring achievements for:",
+                    gameName,
+                    achievementsResult.data
+                  );
+                  await window.electron.writeGameAchievements(
+                    gameName,
+                    achievementsResult.data
+                  );
+                }
+              } catch (achError) {
+                console.error("Error restoring achievements:", achError);
+              }
+            }
+
+            if (result.success) {
+              toast.success(t("library.cloudRestore.restored"));
+            } else {
+              console.error("Failed to restore cloud data:", result.error);
+            }
+
+            // Clean up localStorage
+            localStorage.removeItem(key);
+          }
+        } catch (error) {
+          console.error("Error restoring cloud data:", error);
+          localStorage.removeItem(key);
+        }
+      }
+    }
+  };
+
   const handleCreateFolder = name => {
     // Create new folder using the folderManager library
     const newFolder = createFolder(name);
@@ -358,6 +695,9 @@ const Library = () => {
       // Get games from main process
       const installedGames = await window.electron.getGames();
       const customGames = await window.electron.getCustomGames();
+
+      // Check for pending cloud restores (games that were downloaded from cloud)
+      await checkPendingCloudRestores([...installedGames, ...customGames]);
 
       // Filter out games that are being verified or downloading
       const filteredInstalledGames = installedGames.filter(
@@ -416,12 +756,151 @@ const Library = () => {
     }
   };
 
+  const handleCloudSync = async () => {
+    if (!user) {
+      navigate("/ascend");
+      return;
+    }
+
+    setIsSyncingLibrary(true);
+    try {
+      const installedGames = (await window.electron?.getGames?.()) || [];
+      const customGames = (await window.electron?.getCustomGames?.()) || [];
+
+      const allGames = [
+        ...(installedGames || []).filter(
+          g => !g.downloadingData?.downloading && !g.downloadingData?.extracting
+        ),
+        ...(customGames || []).map(g => ({ ...g, isCustom: true })),
+      ];
+
+      const gamesWithAchievements = await Promise.all(
+        allGames.map(async game => {
+          try {
+            const gameName = game.game || game.name;
+            const isCustom = game.isCustom || game.custom || false;
+
+            let achievementData = null;
+
+            if (isCustom && game.achievementWatcher?.achievements) {
+              achievementData = game.achievementWatcher;
+            } else {
+              achievementData = await window.electron?.readGameAchievements?.(
+                gameName,
+                isCustom
+              );
+            }
+
+            if (achievementData?.achievements?.length > 0) {
+              const totalAchievements = achievementData.achievements.length;
+              const unlockedAchievements = achievementData.achievements.filter(
+                a => a.achieved
+              ).length;
+
+              await syncGameAchievements(gameName, isCustom, achievementData);
+
+              return {
+                ...game,
+                achievementStats: {
+                  total: totalAchievements,
+                  unlocked: unlockedAchievements,
+                  percentage: Math.round(
+                    (unlockedAchievements / totalAchievements) * 100
+                  ),
+                },
+              };
+            }
+          } catch (e) {
+            console.warn(
+              `Failed to fetch/sync achievements for ${game.game || game.name}:`,
+              e
+            );
+          }
+          return { ...game, achievementStats: null };
+        })
+      );
+
+      const result = await syncCloudLibrary(gamesWithAchievements);
+      if (result.success) {
+        toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
+      } else {
+        toast.error(
+          result.error || t("ascend.cloudLibrary.syncFailed") || "Failed to sync library"
+        );
+      }
+    } catch (e) {
+      console.error("Failed to sync library:", e);
+      toast.error(t("ascend.cloudLibrary.syncFailed") || "Failed to sync library");
+    }
+    setIsSyncingLibrary(false);
+  };
+
   const handlePlayGame = async game => {
     navigate("/gamescreen", {
       state: {
         gameData: game,
       },
     });
+  };
+
+  // Get current library game count
+  const getCurrentGameCount = () => {
+    return games.filter(g => !g.isFolder).length + getGamesInFolders().length;
+  };
+
+  // Check if library has changed since last calculation
+  const libraryHasChanged = () => {
+    const currentCount = getCurrentGameCount();
+    return currentCount !== cachedGameCount;
+  };
+
+  const handleCalculateLibraryValue = async (forceRecalculate = false) => {
+    setIsLibraryValueOpen(true);
+
+    // If we have cached data and library hasn't changed, just show it
+    if (!forceRecalculate && libraryValueData && !libraryHasChanged()) {
+      return;
+    }
+
+    setIsCalculatingValue(true);
+    setValueProgress({ current: 0, total: 0, game: "" });
+
+    try {
+      // Get all game titles from library (including games in folders)
+      const allGameTitles = [
+        ...games.filter(g => !g.isFolder).map(g => g.game || g.name),
+        ...getGamesInFolders().map(g => g.game || g.name),
+      ];
+
+      if (allGameTitles.length === 0) {
+        const emptyResult = { totalValue: 0, games: [], notFound: [] };
+        setLibraryValueData(emptyResult);
+        localStorage.setItem("library-value-cache", JSON.stringify(emptyResult));
+        localStorage.setItem("library-value-game-count", "0");
+        setCachedGameCount(0);
+        setIsCalculatingValue(false);
+        return;
+      }
+
+      setValueProgress({ current: 0, total: allGameTitles.length, game: "" });
+
+      const result = await calculateLibraryValue(
+        allGameTitles,
+        (current, total, game, price) => {
+          setValueProgress({ current, total, game });
+        }
+      );
+
+      // Cache the result
+      setLibraryValueData(result);
+      localStorage.setItem("library-value-cache", JSON.stringify(result));
+      localStorage.setItem("library-value-game-count", String(allGameTitles.length));
+      setCachedGameCount(allGameTitles.length);
+    } catch (error) {
+      console.error("Error calculating library value:", error);
+      toast.error(t("library.libraryValue.error") || "Failed to calculate library value");
+    }
+    setIsCalculatingValue(false);
   };
 
   const searchGameCovers = React.useCallback(async query => {
@@ -493,7 +972,7 @@ const Library = () => {
             <div className="flex flex-row items-start justify-between">
               {/* Left side: Title and Search */}
               <div className="flex-1">
-                <div className="mb-4 mt-6 flex items-center">
+                <div className="mb-2 mt-6 flex items-center">
                   <h1 className="text-4xl font-bold tracking-tight text-primary">
                     {t("library.pageTitle")}
                   </h1>
@@ -556,6 +1035,21 @@ const Library = () => {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
+
+                {/* Library Value Button */}
+                <button
+                  onClick={() => handleCalculateLibraryValue()}
+                  className="mb-4 flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/20"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  {libraryValueData && !libraryHasChanged() ? (
+                    <span>${libraryValueData.totalValue.toFixed(2)}</span>
+                  ) : (
+                    <span>
+                      {t("library.libraryValue.calculate") || "Calculate Library Value"}
+                    </span>
+                  )}
+                </button>
 
                 <div className="relative mr-12 flex items-center gap-2">
                   <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -684,6 +1178,33 @@ const Library = () => {
                     >
                       <FolderPlus className="h-5 w-5" />
                     </button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={cn(
+                              "rounded p-2 hover:bg-secondary/50",
+                              isSyncingLibrary && "cursor-not-allowed opacity-50"
+                            )}
+                            type="button"
+                            aria-label={t("library.cloudSync") || "Cloud Sync"}
+                            onClick={handleCloudSync}
+                            disabled={isSyncingLibrary}
+                          >
+                            {isSyncingLibrary ? (
+                              <Loader className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <CloudUpload className="h-5 w-5" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-secondary">
+                          {user
+                            ? t("library.cloudSync") || "Cloud Sync"
+                            : t("library.signInToSync") || "Sign in to sync"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <NewFolderDialog
                       open={isNewFolderOpen}
                       onOpenChange={setIsNewFolderOpen}
@@ -1111,6 +1632,7 @@ const Library = () => {
                           selectionMode={selectionMode}
                           isSelected={selectedGames.includes(game.game)}
                           onSelectCheckbox={() => handleSelectGame(game)}
+                          updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
                         />
                       </DraggableGameCard>
                     )}
@@ -1143,8 +1665,239 @@ const Library = () => {
               </Button>
             </div>
           )}
+
+          {/* Cloud-Only Games Section */}
+          {user && cloudOnlyGames.length > 0 && (
+            <div className="mt-10">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
+                  <Cloud className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <h2 className="!mb-0 text-xl font-semibold">
+                    {t("library.cloudOnly.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.cloudOnly.subtitle")}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {cloudOnlyGames.map(game => (
+                  <CloudOnlyGameCard
+                    key={game.name}
+                    game={game}
+                    imageData={cloudGameImages[game.name]}
+                    onRestore={() => handleRestoreFromCloud(game)}
+                    isRestoring={restoringGame === game.name}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Play Later Games Section */}
+          {playLaterGames.length > 0 && (
+            <div className="mt-10">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
+                  <Clock className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <h2 className="!mb-0 text-xl font-semibold">
+                    {t("library.playLater.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.playLater.subtitle")}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {playLaterGames.map(game => (
+                  <PlayLaterGameCard
+                    key={game.game}
+                    game={game}
+                    onDownload={() => handleDownloadPlayLater(game)}
+                    onRemove={() => handleRemoveFromPlayLater(game.game)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Library Value Dialog */}
+      <AlertDialog open={isLibraryValueOpen} onOpenChange={setIsLibraryValueOpen}>
+        <AlertDialogContent className="flex max-h-[80vh] max-w-lg flex-col overflow-hidden">
+          <AlertDialogHeader className="shrink-0">
+            <AlertDialogTitle className="flex items-center gap-2">
+              {t("library.libraryValue.title") || "Library Value"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.libraryValue.description1")}&nbsp;
+              <a
+                className="cursor-pointer text-primary hover:underline"
+                onClick={() => window.electron.openURL("https://apidocs.cheapshark.com/")}
+              >
+                {t("library.libraryValue.description2")}{" "}
+                <ExternalLink className="mb-1 inline-block h-3 w-3" />
+              </a>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4">
+            {/* Ascend Promo for non-subscribers */}
+            {!user && libraryValueData?.totalValue > 0 && (
+              <div className="mb-4 rounded-lg border border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/20 p-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-primary">
+                      {t("library.libraryValue.ascendPromo.title") ||
+                        "You've saved a fortune!"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("library.libraryValue.ascendPromo.message", {
+                        months: Math.floor(
+                          libraryValueData.totalValue / 2
+                        ).toLocaleString(),
+                        years: Math.floor(
+                          libraryValueData.totalValue / 2 / 12
+                        ).toLocaleString(),
+                      })}
+                    </p>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="mt-2 h-auto p-0 text-xs text-primary"
+                      onClick={() => {
+                        setIsLibraryValueOpen(false);
+                        navigate("/ascend");
+                      }}
+                    >
+                      {t("library.libraryValue.ascendPromo.cta") || "Learn about Ascend"}{" "}
+                      →
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {isCalculatingValue ? (
+              <div className="flex flex-col items-center justify-center space-y-4 py-8">
+                <Loader className="h-8 w-8 animate-spin text-primary" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">
+                    {t("library.libraryValue.calculating") || "Calculating..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {valueProgress.current} / {valueProgress.total}
+                  </p>
+                  {valueProgress.game && (
+                    <p className="mt-1 max-w-[300px] truncate text-xs text-muted-foreground">
+                      {valueProgress.game}
+                    </p>
+                  )}
+                </div>
+                <div className="w-full max-w-xs">
+                  <div className="h-2 w-full rounded-full bg-muted">
+                    <div
+                      className="h-2 rounded-full bg-primary transition-all duration-300"
+                      style={{
+                        width: `${valueProgress.total > 0 ? (valueProgress.current / valueProgress.total) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : libraryValueData ? (
+              <div className="space-y-4">
+                {/* Total Value */}
+                <div className="rounded-lg bg-primary/10 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.libraryValue.totalValue") || "Total Library Value"}
+                  </p>
+                  <p className="text-3xl font-bold text-primary">
+                    ${libraryValueData.totalValue.toFixed(2)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("library.libraryValue.gamesFound", {
+                      count: libraryValueData.games.length,
+                    }) || `${libraryValueData.games.length} games found`}
+                  </p>
+                </div>
+
+                {/* Games List */}
+                {libraryValueData.games.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-primary">
+                      {t("library.libraryValue.breakdown") || "Price Breakdown"}
+                    </p>
+                    <div className="max-h-[200px] space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                      {libraryValueData.games
+                        .sort((a, b) => b.price - a.price)
+                        .map((game, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50"
+                          >
+                            <span
+                              className="truncate pr-2 text-primary"
+                              title={game.title}
+                            >
+                              {game.title}
+                            </span>
+                            <span className="shrink-0 font-medium text-primary">
+                              ${game.price.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Not Found Games */}
+                {libraryValueData.notFound.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {t("library.libraryValue.notFound", {
+                        count: libraryValueData.notFound.length,
+                      }) || `${libraryValueData.notFound.length} games not found`}
+                    </p>
+                    <div className="max-h-[100px] space-y-1 overflow-y-auto rounded-lg border border-border/50 p-2">
+                      {libraryValueData.notFound.map((game, index) => (
+                        <div
+                          key={index}
+                          className="truncate px-2 py-1 text-xs text-muted-foreground"
+                          title={game}
+                        >
+                          {game}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <AlertDialogFooter className="flex justify-between sm:justify-between">
+            {libraryValueData && !isCalculatingValue && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCalculateLibraryValue(true)}
+                className="mr-auto text-primary"
+              >
+                {t("library.libraryValue.recalculate") || "Recalculate"}
+              </Button>
+            )}
+            <AlertDialogCancel>{t("common.close") || "Close"}</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -1182,8 +1935,10 @@ const InstalledGameCard = memo(
     onToggleFavorite,
     selectionMode,
     onSelectCheckbox,
+    updateInfo,
   }) => {
     const { t } = useLanguage();
+    const { settings } = useSettings();
     const [isRunning, setIsRunning] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [imageData, setImageData] = useState(null);
@@ -1376,7 +2131,11 @@ const InstalledGameCard = memo(
                       )}
                     >
                       <img
-                        src={gameService.getImageUrl(cover.imgID)}
+                        src={
+                          settings.usingLocalIndex && cover.gameID
+                            ? gameService.getImageUrlByGameId(cover.gameID)
+                            : gameService.getImageUrl(cover.imgID)
+                        }
                         alt={cover.title}
                         className="h-full w-full object-cover"
                       />
@@ -1412,9 +2171,12 @@ const InstalledGameCard = memo(
                   localStorage.removeItem(localStorageKey);
                   // Fetch new image and save to localStorage
                   try {
-                    const imageUrl = gameService.getImageUrl(
-                      coverSearch.selectedCover.imgID
-                    );
+                    const imageUrl =
+                      settings.usingLocalIndex && coverSearch.selectedCover.gameID
+                        ? gameService.getImageUrlByGameId(
+                            coverSearch.selectedCover.gameID
+                          )
+                        : gameService.getImageUrl(coverSearch.selectedCover.imgID);
                     const response = await fetch(imageUrl);
                     const blob = await response.blob();
                     const reader = new FileReader();
@@ -1480,6 +2242,12 @@ const InstalledGameCard = memo(
               {typeof game.launchCount === "undefined" && !game.isCustom && (
                 <span className="pointer-events-none absolute left-2 top-2 z-20 select-none rounded bg-secondary px-2 py-0.5 text-xs font-bold text-primary">
                   {t("library.newBadge")}
+                </span>
+              )}
+              {updateInfo?.updateAvailable && (
+                <span className="pointer-events-none absolute right-2 top-2 z-20 flex select-none items-center gap-1 rounded bg-primary px-2 py-0.5 text-xs font-bold text-secondary">
+                  <Import className="h-3 w-3" />
+                  {t("gameScreen.updateBadge")}
                 </span>
               )}
               {/* Floating action bar for buttons */}
@@ -1572,8 +2340,256 @@ const InstalledGameCard = memo(
 
 InstalledGameCard.displayName = "InstalledGameCard";
 
+// Cloud-only game card with gray animation effect
+const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => {
+  const { t } = useLanguage();
+
+  const formatPlaytime = seconds => {
+    if (!seconds || seconds < 60) return t("library.neverPlayed");
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours === 0)
+      return `${minutes} ${t("library.minutes")} ${t("library.ofPlaytime")}`;
+    if (hours === 1) return `1 ${t("library.hour")} ${t("library.ofPlaytime")}`;
+    return `${hours} ${t("library.hours")} ${t("library.ofPlaytime")}`;
+  };
+
+  const isCustomGame = game.isCustom;
+
+  return (
+    <Card
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+        "hover:-translate-y-1 hover:shadow-xl"
+      )}
+    >
+      <CardContent className="p-0">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          {/* Gray overlay with shimmer animation */}
+          <div
+            className={cn(
+              "absolute inset-0 z-10",
+              isCustomGame
+                ? "bg-gradient-to-br from-purple-400/60 via-purple-500/50 to-purple-600/60"
+                : "bg-gradient-to-br from-gray-400/60 via-gray-500/50 to-gray-600/60"
+            )}
+          >
+            {/* Animated shimmer effect */}
+            <div
+              className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+              }}
+            />
+          </div>
+          {imageData ? (
+            <img
+              src={imageData}
+              alt={game.name}
+              className="h-full w-full border-b border-border object-cover grayscale"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-muted">
+              <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+            </div>
+          )}
+          {/* Cloud badge - different color for custom games */}
+          <span
+            className={cn(
+              "absolute left-2 top-2 z-20 flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-white",
+              isCustomGame ? "bg-purple-500/90" : "bg-blue-500/90"
+            )}
+          >
+            <Cloud className="h-3 w-3" />
+            {isCustomGame
+              ? t("library.cloudOnly.customBadge")
+              : t("library.cloudOnly.badge")}
+          </span>
+        </div>
+      </CardContent>
+      <CardFooter className="flex flex-col items-start gap-3 p-4 pt-3">
+        <div className="flex w-full items-center gap-2">
+          <h3 className="flex-1 truncate text-lg font-semibold text-foreground">
+            {game.name}
+          </h3>
+          {game.online && <Gamepad2 className="h-4 w-4 text-muted-foreground" />}
+          {game.dlc && <Gift className="h-4 w-4 text-muted-foreground" />}
+        </div>
+        <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span>{formatPlaytime(game.playTime)}</span>
+        </div>
+        <Button
+          onClick={onRestore}
+          disabled={isRestoring}
+          className={cn(
+            "w-full gap-2 text-white",
+            isCustomGame
+              ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              : "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+          )}
+        >
+          {isRestoring ? (
+            <>
+              <Loader className="h-4 w-4 animate-spin" />
+              {t("library.cloudOnly.restoring")}
+            </>
+          ) : isCustomGame ? (
+            <>
+              <Plus className="h-4 w-4" />
+              {t("library.cloudOnly.restoreCustom")}
+            </>
+          ) : (
+            <>
+              <CloudDownload className="h-4 w-4" />
+              {t("library.cloudOnly.restore")}
+            </>
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+});
+
+CloudOnlyGameCard.displayName = "CloudOnlyGameCard";
+
+// Play Later game card
+const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
+  const { t } = useLanguage();
+  const [imageData, setImageData] = useState(null);
+
+  // Load game image from cache first, then fallback to API
+  useEffect(() => {
+    let isMounted = true;
+    const loadImage = async () => {
+      // Try cached image first
+      const cachedImage = localStorage.getItem(`play-later-image-${game.game}`);
+      if (cachedImage) {
+        if (isMounted) setImageData(cachedImage);
+        return;
+      }
+
+      // Fallback to API if no cached image
+      if (game.imgID) {
+        try {
+          const response = await fetch(
+            `https://api.ascendara.app/v2/image/${game.imgID}`
+          );
+          if (response.ok && isMounted) {
+            const blob = await response.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (isMounted) {
+                setImageData(reader.result);
+                // Cache for future use
+                try {
+                  localStorage.setItem(`play-later-image-${game.game}`, reader.result);
+                } catch (e) {
+                  console.warn("Could not cache play later image:", e);
+                }
+              }
+            };
+            reader.readAsDataURL(blob);
+          }
+        } catch (error) {
+          console.error("Error loading play later game image:", error);
+        }
+      }
+    };
+    loadImage();
+    return () => {
+      isMounted = false;
+    };
+  }, [game.game, game.imgID]);
+
+  const formatAddedDate = timestamp => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <Card
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+        "hover:-translate-y-1 hover:shadow-xl"
+      )}
+    >
+      <CardContent className="p-0">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          {/* Amber overlay with shimmer animation */}
+          <div className="absolute inset-0 z-10 bg-gradient-to-br from-amber-400/40 via-orange-500/30 to-amber-600/40">
+            <div
+              className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+              }}
+            />
+          </div>
+          {imageData ? (
+            <img
+              src={imageData}
+              alt={game.game}
+              className="h-full w-full border-b border-border object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-muted">
+              <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+            </div>
+          )}
+          {/* Play Later badge */}
+          <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded bg-amber-500/90 px-2 py-0.5 text-xs font-medium text-white">
+            <Clock className="h-3 w-3" />
+            {t("library.playLater.badge")}
+          </span>
+          {/* Remove button */}
+          <button
+            onClick={e => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/70 group-hover:opacity-100"
+            title={t("library.playLater.remove")}
+          >
+            <Plus className="h-3 w-3 rotate-45" />
+          </button>
+        </div>
+      </CardContent>
+      <CardFooter className="flex flex-col items-start gap-3 p-4 pt-3">
+        <div className="flex w-full items-center gap-2">
+          <h3 className="flex-1 truncate text-lg font-semibold text-foreground">
+            {game.game}
+          </h3>
+          {game.online && <Gamepad2 className="h-4 w-4 text-muted-foreground" />}
+          {game.dlc && <Gift className="h-4 w-4 text-muted-foreground" />}
+        </div>
+        <div className="flex w-full items-center justify-between text-sm text-muted-foreground">
+          {game.size && <span>{game.size}</span>}
+          {game.addedAt && (
+            <span className="text-xs">
+              {t("library.playLater.addedOn")} {formatAddedDate(game.addedAt)}
+            </span>
+          )}
+        </div>
+        <Button
+          onClick={onDownload}
+          className="w-full gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600"
+        >
+          <ArrowDown className="h-4 w-4" />
+          {t("library.playLater.download")}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+});
+
+PlayLaterGameCard.displayName = "PlayLaterGameCard";
+
 const AddGameForm = ({ onSuccess }) => {
   const { t } = useLanguage();
+  const { settings } = useSettings();
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showImportingDialog, setShowImportingDialog] = useState(false);
   const [importSuccess, setImportSuccess] = useState(null);
@@ -1680,13 +2696,18 @@ const AddGameForm = ({ onSuccess }) => {
 
   const handleSubmit = async e => {
     e.preventDefault();
+    // When using local index, pass gameID; otherwise pass imgID
+    const coverImageId =
+      settings.usingLocalIndex && coverSearch.selectedCover?.gameID
+        ? coverSearch.selectedCover.gameID
+        : coverSearch.selectedCover?.imgID;
     await window.electron.addGame(
       formData.name,
       formData.isOnline,
       formData.hasDLC,
       formData.version,
       formData.executable,
-      coverSearch.selectedCover?.imgID
+      coverImageId
     );
     onSuccess();
   };
@@ -1955,7 +2976,11 @@ const AddGameForm = ({ onSuccess }) => {
                   )}
                 >
                   <img
-                    src={gameService.getImageUrl(cover.imgID)}
+                    src={
+                      settings.usingLocalIndex && cover.gameID
+                        ? gameService.getImageUrlByGameId(cover.gameID)
+                        : gameService.getImageUrl(cover.imgID)
+                    }
                     alt={cover.title}
                     className="h-full w-full object-cover"
                   />
@@ -1976,7 +3001,11 @@ const AddGameForm = ({ onSuccess }) => {
             <div className="mt-4 flex justify-center">
               <div className="relative aspect-video w-64 overflow-hidden rounded-lg border-2 border-primary">
                 <img
-                  src={gameService.getImageUrl(coverSearch.selectedCover.imgID)}
+                  src={
+                    settings.usingLocalIndex && coverSearch.selectedCover.gameID
+                      ? gameService.getImageUrlByGameId(coverSearch.selectedCover.gameID)
+                      : gameService.getImageUrl(coverSearch.selectedCover.imgID)
+                  }
                   alt={coverSearch.selectedCover.title}
                   className="h-full w-full object-cover"
                 />

@@ -35,6 +35,16 @@ import {
   BookX,
   LockIcon,
   ImageUp,
+  Bolt,
+  Plus,
+  GripVertical,
+  X,
+  Puzzle,
+  ChevronDown,
+  ChevronUp,
+  Gem,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
 import gameUpdateService from "@/services/gameUpdateService";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
@@ -43,11 +53,19 @@ import { useSettings } from "@/context/SettingsContext";
 import { useIgdbConfig } from "@/services/gameInfoConfig";
 import { useAudioPlayer, killAudioAndMiniplayer } from "@/services/audioPlayerService";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { analytics } from "@/services/analyticsService";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getGameSoundtrack } from "@/services/khinsiderService";
 import { toast } from "sonner";
 import {
@@ -67,8 +85,322 @@ import GameMetadata from "@/components/GameMetadata";
 import igdbService from "@/services/gameInfoService";
 import GameRate from "@/components/GameRate";
 import EditCoverDialog from "@/components/EditCoverDialog";
+import nexusModsService from "@/services/nexusModsService";
+import flingTrainerService from "@/services/flingTrainerService";
+import { useAuth } from "@/context/AuthContext";
+import { getCloudLibrary } from "@/services/firebaseService";
+import gameService from "@/services/gameService";
 
-const ErrorDialog = ({ open, onClose, errorGame, errorMessage, t }) => (
+const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
+  const [executables, setExecutables] = useState([]);
+  const [exeExists, setExeExists] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && gameName) {
+      setLoading(true);
+      gameUpdateService.getGameExecutables(gameName, isCustom).then(async exes => {
+        const exeList = exes.length > 0 ? exes : [""];
+        setExecutables(exeList);
+        // Check which executables exist
+        const existsMap = {};
+        for (const exe of exeList) {
+          if (exe) {
+            existsMap[exe] = await window.electron.checkFileExists(exe);
+          }
+        }
+        setExeExists(existsMap);
+        setLoading(false);
+      });
+    }
+  }, [open, gameName, isCustom]);
+
+  // Update existence check when executables change
+  useEffect(() => {
+    const checkExists = async () => {
+      const newExistsMap = { ...exeExists };
+      let hasChanges = false;
+      for (const exe of executables) {
+        if (exe && !(exe in newExistsMap)) {
+          newExistsMap[exe] = await window.electron.checkFileExists(exe);
+          hasChanges = true;
+        }
+      }
+      if (hasChanges) {
+        setExeExists(newExistsMap);
+      }
+    };
+    if (!loading && executables.length > 0) {
+      checkExists();
+    }
+  }, [executables, loading]);
+
+  const handleAddExecutable = async () => {
+    // Open dialog in the same directory as the first executable
+    const startPath = executables.length > 0 && executables[0] ? executables[0] : null;
+    const exePath = await window.electron.openFileDialog(startPath);
+    if (exePath) {
+      setExecutables(prev => [...prev, exePath]);
+      // Immediately check if the new exe exists
+      const exists = await window.electron.checkFileExists(exePath);
+      setExeExists(prev => ({ ...prev, [exePath]: exists }));
+    }
+  };
+
+  const handleChangeExecutable = async index => {
+    // Pass current executable path to open dialog in that directory
+    const currentExe = executables[index];
+    const exePath = await window.electron.openFileDialog(currentExe || null);
+    if (exePath) {
+      setExecutables(prev => {
+        const updated = [...prev];
+        updated[index] = exePath;
+        return updated;
+      });
+      // Immediately check if the new exe exists
+      const exists = await window.electron.checkFileExists(exePath);
+      setExeExists(prev => ({ ...prev, [exePath]: exists }));
+    }
+  };
+
+  const handleRemoveExecutable = index => {
+    if (executables.length <= 1) return;
+    setExecutables(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMakePrimary = index => {
+    if (index === 0) return;
+    setExecutables(prev => {
+      const updated = [...prev];
+      const [item] = updated.splice(index, 1);
+      updated.unshift(item);
+      return updated;
+    });
+  };
+
+  const handleSave = async () => {
+    const validExecutables = executables.filter(exe => exe && exe.trim() !== "");
+    if (validExecutables.length === 0) {
+      toast.error(t("library.executableManager.atLeastOne"));
+      return;
+    }
+    setSaving(true);
+    const success = await gameUpdateService.updateGameExecutables(
+      gameName,
+      validExecutables,
+      isCustom
+    );
+    setSaving(false);
+    if (success) {
+      toast.success(t("library.executableManager.saved"));
+      if (onSave) {
+        onSave(validExecutables);
+      }
+      onClose();
+    } else {
+      toast.error(t("library.executableManager.saveFailed"));
+    }
+  };
+
+  const getFileName = path => {
+    if (!path) return "";
+    return path.split(/[/\\]/).pop();
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-lg">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            {t("library.executableManager.title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            {t("library.executableManager.description")}
+
+            {executables.some(exe => exe && exeExists[exe] === false) && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    {t("library.executableManager.exeLocationHint")}
+                  </span>
+                  <button
+                    onClick={() =>
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/troubleshooting/common-issues#executable-not-found-launch-error"
+                      )
+                    }
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    {t("library.executableManager.learnMore")}
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="my-2 max-h-64 space-y-2 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            executables.map((exe, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
+              >
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    {exe && exeExists[exe] === false && (
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-500" />
+                    )}
+                    {index === 0 && (
+                      <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
+                        {t("library.executableManager.primary")}
+                      </span>
+                    )}
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {getFileName(exe) || t("library.executableManager.noFile")}
+                    </span>
+                  </div>
+                  <span className="truncate text-xs text-muted-foreground">{exe}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {index !== 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleMakePrimary(index)}
+                      title={t("library.executableManager.makePrimary")}
+                    >
+                      <GripVertical className="h-4 w-4 text-primary" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleChangeExecutable(index)}
+                    title={t("library.executableManager.change")}
+                  >
+                    <Pencil className="h-4 w-4 text-primary" />
+                  </Button>
+                  {executables.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive h-8 w-8"
+                      onClick={() => handleRemoveExecutable(index)}
+                      title={t("library.executableManager.remove")}
+                    >
+                      <X className="h-4 w-4 text-primary" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          className="w-full text-primary"
+          onClick={handleAddExecutable}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t("library.executableManager.addExecutable")}
+        </Button>
+
+        <AlertDialogFooter className="mt-4 flex gap-2">
+          <Button variant="outline" className="text-primary" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            className="bg-primary text-secondary"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                {t("common.saving")}
+              </>
+            ) : (
+              t("common.save")
+            )}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+const ExecutableSelectDialog = ({ open, onClose, executables, onSelect, t }) => {
+  const getFileName = path => {
+    if (!path) return "";
+    return path.split(/[/\\]/).pop();
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            {t("library.executableSelect.title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            {t("library.executableSelect.description")}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="my-4 max-h-64 space-y-2 overflow-y-auto">
+          {executables.map((exe, index) => (
+            <button
+              key={index}
+              onClick={() => onSelect(exe)}
+              className="flex w-full items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent"
+            >
+              <Play className="h-5 w-5 shrink-0 text-primary" />
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <div className="flex items-center gap-2">
+                  {index === 0 && (
+                    <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
+                      {t("library.executableManager.primary")}
+                    </span>
+                  )}
+                  <span className="truncate text-sm font-medium text-foreground">
+                    {getFileName(exe)}
+                  </span>
+                </div>
+                <span className="truncate text-xs text-muted-foreground">{exe}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <AlertDialogFooter>
+          <Button variant="outline" className="text-primary" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+const ErrorDialog = ({
+  open,
+  onClose,
+  errorGame,
+  errorMessage,
+  t,
+  onManageExecutables,
+}) => (
   <AlertDialog open={open} onOpenChange={onClose}>
     <AlertDialogContent>
       <AlertDialogHeader>
@@ -98,12 +430,9 @@ const ErrorDialog = ({ open, onClose, errorGame, errorMessage, t }) => (
         </Button>
         <Button
           className="bg-primary text-secondary"
-          onClick={async () => {
-            const exePath = await window.electron.openFileDialog();
-            if (exePath) {
-              await gameUpdateService.updateGameExecutable(errorGame, exePath);
-            }
+          onClick={() => {
             onClose();
+            onManageExecutables();
           }}
         >
           {t("library.changeExecutable")}
@@ -217,6 +546,7 @@ export default function GameScreen() {
   const { gameData } = location.state || {};
   const { settings } = useSettings();
   const igdbConfig = useIgdbConfig();
+  const { isAuthenticated } = useAuth();
   const [game, setGame] = useState(gameData || null);
   const [loading, setLoading] = useState(!gameData);
   const [imageData, setImageData] = useState("");
@@ -245,15 +575,52 @@ export default function GameScreen() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorGame, setErrorGame] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showExecutableManager, setShowExecutableManager] = useState(false);
+  const [showExecutableSelect, setShowExecutableSelect] = useState(false);
+  const [availableExecutables, setAvailableExecutables] = useState([]);
+  const [pendingLaunchOptions, setPendingLaunchOptions] = useState(null);
   const [igdbData, setIgdbData] = useState(null);
   const [igdbLoading, setIgdbLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
+  const [launchOptionsDialogOpen, setLaunchOptionsDialogOpen] = useState(false);
+  const [launchCommand, setLaunchCommand] = useState("");
   const { setTrack, play } = useAudioPlayer();
+
+  // Nexus Mods state
+  const [supportsModManaging, setSupportsModManaging] = useState(false);
+  const [nexusGameData, setNexusGameData] = useState(null);
+  const [popularMods, setPopularMods] = useState([]);
+  const [modsLoading, setModsLoading] = useState(false);
+  const [allMods, setAllMods] = useState([]);
+  const [modsTotalCount, setModsTotalCount] = useState(0);
+  const [modsPage, setModsPage] = useState(0);
+  const [modsSearchQuery, setModsSearchQuery] = useState("");
+  const [modsSortBy, setModsSortBy] = useState("endorsements");
+  const [selectedMod, setSelectedMod] = useState(null);
+  const [modFiles, setModFiles] = useState([]);
+  const [modFilesLoading, setModFilesLoading] = useState(false);
+  const [showModDetails, setShowModDetails] = useState(false);
+  const [showOldVersions, setShowOldVersions] = useState(false);
+  const modsPerPage = 12;
+
+  // FLiNG Trainer state
+  const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
+  const [flingTrainerData, setFlingTrainerData] = useState(null);
+
+  // Cloud library state
+  const [isInCloudLibrary, setIsInCloudLibrary] = useState(false);
+  const [cloudLibraryLoading, setCloudLibraryLoading] = useState(true);
 
   // Achievements state
   const [achievements, setAchievements] = useState(null);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
+
+  // Game update state
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [isStartingUpdate, setIsStartingUpdate] = useState(false);
 
   // Achievements pagination state
   const [achievementsPage, setAchievementsPage] = useState(0);
@@ -372,6 +739,61 @@ export default function GameScreen() {
     };
   }, [game, navigate]);
 
+  // Check for game updates
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      console.log(
+        "[GameScreen] checkForUpdates called, game:",
+        game?.game,
+        "gameID:",
+        game?.gameID,
+        "version:",
+        game?.version,
+        "isCustom:",
+        game?.isCustom
+      );
+
+      if (!game || game.isCustom || !game.gameID) {
+        console.log(
+          "[GameScreen] Skipping update check - no game, custom game, or no gameID"
+        );
+        setUpdateInfo(null);
+        return;
+      }
+
+      setUpdateCheckLoading(true);
+      try {
+        console.log(
+          `[GameScreen] Checking update for ${game.game} (${game.gameID}), version: ${game.version}`
+        );
+        const result = await gameService.checkGameUpdate(game.gameID, game.version);
+        console.log("[GameScreen] Update check result:", result);
+        setUpdateInfo(result);
+        if (result?.updateAvailable) {
+          console.log(
+            "[GameScreen] UPDATE AVAILABLE! Latest:",
+            result.latestVersion,
+            "Local:",
+            result.localVersion
+          );
+        }
+      } catch (error) {
+        console.error("[GameScreen] Error checking for game update:", error);
+        setUpdateInfo(null);
+      }
+      setUpdateCheckLoading(false);
+    };
+
+    checkForUpdates();
+  }, [game]);
+
+  // Re-fetch IGDB data when API config becomes available
+  useEffect(() => {
+    if (game && (igdbConfig.enabled || settings.giantBombKey)) {
+      fetchIgdbData(game.game || game.name);
+    }
+  }, [igdbConfig.enabled, settings.giantBombKey]);
+
   // Set up event listeners
   useEffect(() => {
     if (!isInitialized) return; // Don't set up listeners until initialized
@@ -384,7 +806,12 @@ export default function GameScreen() {
           g => (g.game || g.name) === (game.game || game.name)
         );
 
-        if (gameData && gameData.launchCount === 1) {
+        if (
+          gameData &&
+          gameData.launchCount === 1 &&
+          settings.usingLocalIndex &&
+          game.gameID
+        ) {
           setShowRateDialog(true);
         }
       }
@@ -540,6 +967,159 @@ export default function GameScreen() {
     }
   }, [game]);
 
+  // Check Nexus Mods support for the game
+  useEffect(() => {
+    const checkNexusModSupport = async () => {
+      if (game?.game || game?.name) {
+        const gameName = game.game || game.name;
+        try {
+          const result = await nexusModsService.checkModSupport(gameName);
+          setSupportsModManaging(result.supported);
+          setNexusGameData(result.gameData);
+
+          // If supported and user is authenticated, fetch mods with pagination
+          if (result.supported && result.gameData?.domainName && isAuthenticated) {
+            setModsLoading(true);
+            const modsResult = await nexusModsService.getMods(
+              result.gameData.domainName,
+              {
+                count: modsPerPage,
+                offset: 0,
+                sortBy: "endorsements",
+              }
+            );
+            setAllMods(modsResult.mods);
+            setModsTotalCount(modsResult.totalCount);
+            setModsLoading(false);
+          }
+        } catch (error) {
+          console.error("Error checking Nexus Mods support:", error);
+          setSupportsModManaging(false);
+        }
+      }
+    };
+
+    checkNexusModSupport();
+  }, [game?.game, game?.name, isAuthenticated]);
+
+  // Check FLiNG Trainer support for the game
+  useEffect(() => {
+    const checkFlingTrainerSupport = async () => {
+      if (game?.game || game?.name) {
+        const gameName = game.game || game.name;
+        try {
+          const result = await flingTrainerService.checkTrainerSupport(gameName);
+          setSupportsFlingTrainer(result.supported);
+          setFlingTrainerData(result.trainerData);
+        } catch (error) {
+          console.error("Error checking FLiNG Trainer support:", error);
+          setSupportsFlingTrainer(false);
+        }
+      }
+    };
+
+    checkFlingTrainerSupport();
+  }, [game?.game, game?.name]);
+
+  // Check if game is in cloud library
+  useEffect(() => {
+    const checkCloudLibrary = async () => {
+      if (!isAuthenticated) {
+        setCloudLibraryLoading(false);
+        setIsInCloudLibrary(false);
+        return;
+      }
+
+      const gameName = game?.game || game?.name;
+      if (!gameName) {
+        setCloudLibraryLoading(false);
+        return;
+      }
+
+      try {
+        const result = await getCloudLibrary();
+        if (result.data?.games) {
+          const isInCloud = result.data.games.some(
+            g => g.name?.toLowerCase() === gameName.toLowerCase()
+          );
+          setIsInCloudLibrary(isInCloud);
+        }
+      } catch (error) {
+        console.error("Error checking cloud library:", error);
+      }
+      setCloudLibraryLoading(false);
+    };
+
+    checkCloudLibrary();
+  }, [game?.game, game?.name, isAuthenticated]);
+
+  // Fetch mods with pagination and search
+  const fetchMods = async (page = 0, search = "", sort = "endorsements") => {
+    if (!nexusGameData?.domainName) return;
+
+    setModsLoading(true);
+    try {
+      const result = await nexusModsService.getMods(nexusGameData.domainName, {
+        count: modsPerPage,
+        offset: page * modsPerPage,
+        sortBy: sort,
+        searchQuery: search || null,
+      });
+      setAllMods(result.mods);
+      setModsTotalCount(result.totalCount);
+    } catch (error) {
+      console.error("Error fetching mods:", error);
+    }
+    setModsLoading(false);
+  };
+
+  // Fetch mod files when a mod is selected
+  const fetchModFiles = async mod => {
+    if (!nexusGameData?.id || !mod?.modId) return;
+
+    setModFilesLoading(true);
+    setSelectedMod(mod);
+    setShowModDetails(true);
+    try {
+      const files = await nexusModsService.getModFiles(nexusGameData.id, mod.modId);
+      setModFiles(files);
+    } catch (error) {
+      console.error("Error fetching mod files:", error);
+      setModFiles([]);
+    }
+    setModFilesLoading(false);
+  };
+
+  // Handle mod search
+  const handleModSearch = e => {
+    e.preventDefault();
+    setModsPage(0);
+    fetchMods(0, modsSearchQuery, modsSortBy);
+  };
+
+  // Handle sort change
+  const handleSortChange = newSort => {
+    setModsSortBy(newSort);
+    setModsPage(0);
+    fetchMods(0, modsSearchQuery, newSort);
+  };
+
+  // Handle page change
+  const handleModsPageChange = newPage => {
+    setModsPage(newPage);
+    fetchMods(newPage, modsSearchQuery, modsSortBy);
+  };
+
+  // Download mod file - opens in browser since Nexus requires auth
+  const handleDownloadMod = (mod, fileId = null) => {
+    const url = nexusModsService.getModDownloadUrl(
+      nexusGameData?.domainName,
+      mod.modId,
+      fileId
+    );
+    window.electron.openURL(url);
+  };
+
   // Toggle favorite status
   const toggleFavorite = async () => {
     try {
@@ -571,7 +1151,7 @@ export default function GameScreen() {
   };
 
   // Handle play game
-  const handlePlayGame = async (forcePlay = false) => {
+  const handlePlayGame = async (forcePlay = false, specificExecutable = null) => {
     const gameName = game.game || game.name;
     setIsLaunching(true);
 
@@ -620,6 +1200,25 @@ export default function GameScreen() {
         }
       }
 
+      // Check for multiple executables if no specific one was provided
+      if (!specificExecutable) {
+        const executables = await gameUpdateService.getGameExecutables(
+          gameName,
+          game.isCustom
+        );
+        if (executables.length > 1) {
+          // Store launch options and show selection dialog
+          setPendingLaunchOptions({
+            forcePlay,
+            adminLaunch: isShiftKeyPressed,
+          });
+          setAvailableExecutables(executables);
+          setShowExecutableSelect(true);
+          setIsLaunching(false);
+          return;
+        }
+      }
+
       console.log("Launching game: ", gameName);
       // Launch the game
       killAudioAndMiniplayer();
@@ -631,7 +1230,8 @@ export default function GameScreen() {
         gameName,
         game.isCustom,
         game.backups ?? false,
-        isShiftKeyPressed
+        isShiftKeyPressed,
+        specificExecutable
       );
 
       // Get and cache the game image before saving to recently played
@@ -660,6 +1260,16 @@ export default function GameScreen() {
       console.error("Error launching game:", error);
       setIsLaunching(false);
     }
+  };
+
+  // Handle executable selection from dialog
+  const handleExecutableSelect = async selectedExecutable => {
+    setShowExecutableSelect(false);
+    if (selectedExecutable && pendingLaunchOptions) {
+      await handlePlayGame(pendingLaunchOptions.forcePlay, selectedExecutable);
+    }
+    setPendingLaunchOptions(null);
+    setAvailableExecutables([]);
   };
 
   // Handle open directory
@@ -883,7 +1493,25 @@ export default function GameScreen() {
                 <div className="flex items-center gap-1 text-sm text-primary/80">
                   <Tag className="h-4 w-4" />
                   <span>{game.version}</span>
+                  {updateInfo?.updateAvailable && (
+                    <button
+                      onClick={() => setShowUpdateDialog(true)}
+                      className="ml-1 flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
+                    >
+                      <Download className="h-3 w-3" />
+                      {t("gameScreen.updateBadge")}
+                    </button>
+                  )}
                 </div>
+              )}
+              {!game.version && updateInfo?.updateAvailable && (
+                <button
+                  onClick={() => setShowUpdateDialog(true)}
+                  className="flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
+                >
+                  <Download className="h-3 w-3" />
+                  {t("gameScreen.updateBadge")}
+                </button>
               )}
               {game.size && (
                 <div className="flex items-center gap-1 text-sm text-primary/80">
@@ -906,7 +1534,46 @@ export default function GameScreen() {
           <div className="lg:col-span-1">
             <Card className="overflow-hidden">
               <CardContent className="space-y-6 p-6">
-                {/* Main image */}
+                {/* Cloud Library Status */}
+                <div className="flex items-center justify-between rounded-lg border bg-card/50 p-3">
+                  <div className="flex items-center gap-3">
+                    {isAuthenticated ? (
+                      cloudLibraryLoading ? (
+                        <Loader className="h-5 w-5 animate-spin text-muted-foreground" />
+                      ) : isInCloudLibrary ? (
+                        <Cloud className="h-5 w-5 text-primary" />
+                      ) : (
+                        <CloudOff className="h-5 w-5 text-muted-foreground" />
+                      )
+                    ) : (
+                      <CloudOff className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">
+                        {isAuthenticated
+                          ? isInCloudLibrary
+                            ? t("gameScreen.inCloudLibrary")
+                            : t("gameScreen.notInCloudLibrary")
+                          : t("gameScreen.cloudLibraryPromo")}
+                      </p>
+                      {!isAuthenticated && (
+                        <p className="text-xs text-muted-foreground">
+                          {t("gameScreen.cloudLibraryPromoDesc")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {!isAuthenticated && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 whitespace-nowrap"
+                      onClick={() => navigate("/ascend")}
+                    >
+                      {t("gameScreen.getAscend")}
+                    </Button>
+                  )}
+                </div>
                 <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
                   <img
                     src={imageData}
@@ -1062,6 +1729,22 @@ export default function GameScreen() {
                     variant="outline"
                     className="w-full justify-start gap-2"
                     onClick={async () => {
+                      const commands = await window.electron.getLaunchCommands(
+                        game.game || game.name,
+                        game.isCustom
+                      );
+                      setLaunchCommand(commands || "");
+                      setLaunchOptionsDialogOpen(true);
+                    }}
+                  >
+                    <Bolt className="h-4 w-4" />
+                    {t("gameScreen.launchOptions")}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={async () => {
                       const success = await window.electron.createGameShortcut(game);
                       if (success) {
                         toast.success(t("library.shortcutCreated"));
@@ -1074,34 +1757,20 @@ export default function GameScreen() {
                     {t("library.createShortcut")}
                   </Button>
 
-                  {!game.isCustom && (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2"
-                      onClick={async () => {
-                        const exePath = await window.electron.openFileDialog(
-                          game.executable
-                        );
-                        if (exePath) {
-                          await gameUpdateService.updateGameExecutable(
-                            game.game || game.name,
-                            exePath
-                          );
-                          const exists = await window.electron.checkFileExists(exePath);
-                          setExecutableExists(exists);
-                        }
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                      {t("library.changeExecutable")}
-                      {!executableExists && (
-                        <AlertTriangle
-                          className="h-4 w-4 text-yellow-500"
-                          title={t("library.executableNotFound")}
-                        />
-                      )}
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => setShowExecutableManager(true)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    {t("library.changeExecutable")}
+                    {!executableExists && (
+                      <AlertTriangle
+                        className="h-4 w-4 text-yellow-500"
+                        title={t("library.executableNotFound")}
+                      />
+                    )}
+                  </Button>
 
                   <Button
                     variant="outline"
@@ -1144,9 +1813,21 @@ export default function GameScreen() {
                     {t("gameScreen.details")}
                   </TabsTrigger>
                 )}
+                {supportsModManaging && (
+                  <TabsTrigger value="mods">
+                    <Puzzle className="mr-2 h-4 w-4" />
+                    {t("gameScreen.mods")}
+                  </TabsTrigger>
+                )}
+                {supportsFlingTrainer && (
+                  <TabsTrigger value="trainers">
+                    <Bolt className="mr-2 h-4 w-4" />
+                    {t("gameScreen.trainers")}
+                  </TabsTrigger>
+                )}
               </TabsList>
 
-              {!hasRated && (
+              {!hasRated && settings.usingLocalIndex && game.gameID && (
                 <Card className="mb-4 overflow-hidden bg-gradient-to-br from-primary/80 via-primary to-primary/90 shadow-lg transition-all hover:shadow-xl">
                   <CardContent className="flex items-center justify-between p-6">
                     <div className="flex items-center space-x-4 text-secondary">
@@ -1542,7 +2223,7 @@ export default function GameScreen() {
                           <Monitor className="h-5 w-5 text-muted-foreground" />
                           <div>
                             <span className="text-sm text-muted-foreground">
-                              {t("library.executable").toUpperCase()}
+                              {t("library.executable")}
                             </span>
                             <div className="flex items-center gap-2">
                               <p className="max-w-[220px] truncate text-sm font-medium text-foreground">
@@ -1753,10 +2434,608 @@ export default function GameScreen() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {/* Mods tab - Show for all users with supported games, but require Ascend for full access */}
+              {supportsModManaging && (
+                <TabsContent value="mods" className="space-y-6">
+                  <Card>
+                    <CardContent className="p-6">
+                      {!isAuthenticated ? (
+                        /* Ascend promotion for non-authenticated users */
+                        <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
+                          <div className="rounded-full bg-primary/10 p-6">
+                            <Puzzle className="h-16 w-16 text-primary" />
+                          </div>
+                          <div className="space-y-3">
+                            <h2 className="text-2xl font-bold">
+                              {t("gameScreen.modsTitle")}
+                            </h2>
+                            {nexusGameData && (
+                              <p className="text-lg text-muted-foreground">
+                                {t("gameScreen.modsAvailable", {
+                                  count: nexusGameData.modCount || 0,
+                                })}
+                              </p>
+                            )}
+                            <p className="max-w-md text-sm text-muted-foreground">
+                              {t("gameScreen.modsAscendPromo")}
+                            </p>
+                          </div>
+                          <Button
+                            className="gap-2 text-secondary"
+                            onClick={() => navigate("/ascend")}
+                          >
+                            <Gem className="h-4 w-4" />
+                            {t("gameScreen.getAscend")}
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Header with search and sort */}
+                          <div className="mb-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h2 className="text-2xl font-bold">
+                                  {t("gameScreen.modsTitle")}
+                                </h2>
+                                {nexusGameData && (
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    {t("gameScreen.modsAvailable", {
+                                      count: nexusGameData.modCount || 0,
+                                    })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Search and Sort Controls */}
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                              <form
+                                onSubmit={handleModSearch}
+                                className="flex flex-1 gap-2"
+                              >
+                                <Input
+                                  placeholder={t("gameScreen.searchMods")}
+                                  value={modsSearchQuery}
+                                  onChange={e => setModsSearchQuery(e.target.value)}
+                                  className="flex-1"
+                                />
+                                <Button type="submit" variant="outline" size="icon">
+                                  <FileSearch className="h-4 w-4" />
+                                </Button>
+                              </form>
+                              <Select value={modsSortBy} onValueChange={handleSortChange}>
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue placeholder={t("gameScreen.sortBy")} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="endorsements">
+                                    {t("gameScreen.sortPopular")}
+                                  </SelectItem>
+                                  <SelectItem value="downloads">
+                                    {t("gameScreen.sortDownloads")}
+                                  </SelectItem>
+                                  <SelectItem value="updatedAt">
+                                    {t("gameScreen.sortRecent")}
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {/* Mods Grid */}
+                          {modsLoading ? (
+                            <div className="flex flex-col items-center justify-center space-y-6 py-12">
+                              <div className="relative flex flex-col items-center">
+                                <Puzzle className="h-8 w-8 animate-pulse text-primary/60 drop-shadow-lg" />
+                              </div>
+                              <p className="animate-pulse text-base font-semibold text-primary/70">
+                                {t("gameScreen.loadingMods")}
+                              </p>
+                            </div>
+                          ) : allMods.length > 0 ? (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {allMods.map((mod, index) => (
+                                  <div
+                                    key={mod.modId || index}
+                                    className="group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-all hover:shadow-lg"
+                                    onClick={() => fetchModFiles(mod)}
+                                  >
+                                    {mod.pictureUrl && (
+                                      <div className="aspect-video overflow-hidden bg-muted">
+                                        <img
+                                          src={mod.pictureUrl}
+                                          alt={mod.name}
+                                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="p-4">
+                                      <h4 className="line-clamp-1 font-semibold text-foreground">
+                                        {mod.name}
+                                      </h4>
+                                      {mod.uploader?.name && (
+                                        <p className="text-xs text-muted-foreground">
+                                          {t("gameScreen.modBy")} {mod.uploader.name}
+                                        </p>
+                                      )}
+                                      {mod.summary && (
+                                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                          {mod.summary}
+                                        </p>
+                                      )}
+                                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                                        {mod.version && (
+                                          <span className="flex items-center gap-1">
+                                            <Tag className="h-3 w-3" />v{mod.version}
+                                          </span>
+                                        )}
+                                        {mod.modCategory?.name && (
+                                          <span className="rounded bg-muted px-2 py-0.5">
+                                            {mod.modCategory.name}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Pagination */}
+                              {modsTotalCount > modsPerPage && (
+                                <div className="flex items-center justify-between border-t px-6 py-4">
+                                  <div className="text-sm text-muted-foreground">
+                                    {t("gameScreen.showingMods", {
+                                      from: modsPage * modsPerPage + 1,
+                                      to: Math.min(
+                                        (modsPage + 1) * modsPerPage,
+                                        modsTotalCount
+                                      ),
+                                      total: modsTotalCount,
+                                    })}
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-sm text-muted-foreground">
+                                      {t("common.page")} {modsPage + 1} /{" "}
+                                      {Math.ceil(modsTotalCount / modsPerPage)}
+                                    </span>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleModsPageChange(modsPage - 1)}
+                                        disabled={modsPage === 0}
+                                      >
+                                        {t("common.prev")}
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleModsPageChange(modsPage + 1)}
+                                        disabled={
+                                          (modsPage + 1) * modsPerPage >= modsTotalCount
+                                        }
+                                      >
+                                        {t("common.next")}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : popularMods.length > 0 ? (
+                            <div className="space-y-4">
+                              <h3 className="text-lg font-semibold text-muted-foreground">
+                                {t("gameScreen.popularMods")}
+                              </h3>
+                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {popularMods.map((mod, index) => (
+                                  <div
+                                    key={mod.modId || index}
+                                    className="group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-all hover:shadow-lg"
+                                    onClick={() => fetchModFiles(mod)}
+                                  >
+                                    {mod.pictureUrl && (
+                                      <div className="aspect-video overflow-hidden bg-muted">
+                                        <img
+                                          src={mod.pictureUrl}
+                                          alt={mod.name}
+                                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="p-4">
+                                      <h4 className="line-clamp-1 font-semibold text-foreground">
+                                        {mod.name}
+                                      </h4>
+                                      {mod.summary && (
+                                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                          {mod.summary}
+                                        </p>
+                                      )}
+                                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                                        {mod.version && (
+                                          <span className="flex items-center gap-1">
+                                            <Tag className="h-3 w-3" />v{mod.version}
+                                          </span>
+                                        )}
+                                        {mod.modCategory?.name && (
+                                          <span className="rounded bg-muted px-2 py-0.5">
+                                            {mod.modCategory.name}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center space-y-4 py-12 text-center">
+                              <div className="rounded-full bg-muted p-4">
+                                <Puzzle className="h-12 w-12 text-muted-foreground" />
+                              </div>
+                              <div className="space-y-2">
+                                <p className="font-medium">
+                                  {t("gameScreen.modsSupported")}
+                                </p>
+                                <p className="max-w-sm text-sm text-muted-foreground">
+                                  {t("gameScreen.modsDescription")}
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                className="mt-4 gap-2"
+                                onClick={() => fetchMods(0, "", "endorsements")}
+                              >
+                                <Puzzle className="h-4 w-4" />
+                                {t("gameScreen.browseMods")}
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
+
+              {/* Trainers tab - FLiNG Trainer */}
+              {supportsFlingTrainer && (
+                <TabsContent value="trainers" className="space-y-6">
+                  <Card>
+                    <CardContent className="p-6">
+                      {!isAuthenticated ? (
+                        /* Ascend promotion for non-authenticated users */
+                        <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
+                          <div className="rounded-full bg-primary/10 p-6">
+                            <Bolt className="h-16 w-16 text-primary" />
+                          </div>
+                          <div className="space-y-3">
+                            <h2 className="text-2xl font-bold">
+                              {t("gameScreen.trainersTitle")}
+                            </h2>
+                            <p className="text-lg text-muted-foreground">
+                              {t("gameScreen.trainerAvailable")}
+                            </p>
+                            <p className="max-w-md text-sm text-muted-foreground">
+                              {t("gameScreen.trainersAscendPromo")}
+                            </p>
+                          </div>
+                          <Button
+                            className="gap-2 text-secondary"
+                            onClick={() => navigate("/ascend")}
+                          >
+                            <Gem className="h-4 w-4" />
+                            {t("gameScreen.getAscend")}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center space-y-6 py-8 text-center">
+                          {flingTrainerData?.imageUrl && (
+                            <div className="overflow-hidden rounded-lg">
+                              <img
+                                src={flingTrainerData.imageUrl}
+                                alt={flingTrainerData.title}
+                                className="h-32 w-auto object-contain"
+                              />
+                            </div>
+                          )}
+                          {!flingTrainerData?.imageUrl && (
+                            <div className="rounded-full bg-primary/10 p-6">
+                              <Bolt className="h-16 w-16 text-primary" />
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <h2 className="text-2xl font-bold">
+                              {flingTrainerData?.title || t("gameScreen.trainersTitle")}
+                            </h2>
+                            {flingTrainerData?.options && (
+                              <p className="text-lg text-primary">
+                                {flingTrainerData.options} Options
+                              </p>
+                            )}
+                            {flingTrainerData?.version && (
+                              <p className="text-sm text-muted-foreground">
+                                {flingTrainerData.version}
+                              </p>
+                            )}
+                            <p className="max-w-md text-sm text-muted-foreground">
+                              {t("gameScreen.trainersDescription")}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-3 sm:flex-row">
+                            {flingTrainerData?.downloadUrl ? (
+                              <Button
+                                className="gap-2 text-secondary"
+                                onClick={async () => {
+                                  const success =
+                                    await flingTrainerService.downloadTrainer(
+                                      flingTrainerData,
+                                      game?.game || game?.name
+                                    );
+                                  if (success) {
+                                    toast.success(t("gameScreen.trainerDownloadStarted"));
+                                  } else {
+                                    toast.error(t("gameScreen.trainerDownloadFailed"));
+                                  }
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
+                                {t("gameScreen.downloadTrainer")}
+                              </Button>
+                            ) : (
+                              <Button
+                                className="gap-2 text-secondary"
+                                onClick={() =>
+                                  flingTrainerService.openTrainerPage(flingTrainerData)
+                                }
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                {t("gameScreen.downloadTrainer")}
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() =>
+                                flingTrainerService.openTrainerPage(flingTrainerData)
+                              }
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              {t("gameScreen.viewOnFling")}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>
       </div>
+
+      {/* Mod Details Dialog */}
+      <AlertDialog open={showModDetails} onOpenChange={setShowModDetails}>
+        <AlertDialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold">
+              {selectedMod?.name}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-muted-foreground">
+              {selectedMod?.uploader?.name
+                ? `${t("gameScreen.modBy")} ${selectedMod.uploader.name}`
+                : t("gameScreen.modDetails")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            {selectedMod?.pictureUrl && (
+              <div className="aspect-video overflow-hidden rounded-lg bg-muted">
+                <img
+                  src={selectedMod.pictureUrl}
+                  alt={selectedMod.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
+
+            {selectedMod?.summary && (
+              <p className="text-sm text-muted-foreground">{selectedMod.summary}</p>
+            )}
+
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              {selectedMod?.version && (
+                <span className="flex items-center gap-1">
+                  <Tag className="h-4 w-4" />v{selectedMod.version}
+                </span>
+              )}
+              {selectedMod?.modCategory?.name && (
+                <span className="rounded bg-muted px-2 py-0.5">
+                  {selectedMod.modCategory.name}
+                </span>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Mod Files Section */}
+            <div>
+              <h3 className="mb-3 font-semibold text-primary">
+                {t("gameScreen.modFiles")}
+              </h3>
+              {modFilesLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : modFiles.length > 0 ? (
+                <div className="space-y-2">
+                  {/* Current/Main files */}
+                  {[...modFiles]
+                    .filter(
+                      file =>
+                        !["OLD_VERSION", "REMOVED", "ARCHIVED"].includes(file.category)
+                    )
+                    .sort((a, b) => (b.primary || 0) - (a.primary || 0))
+                    .map((file, index) => (
+                      <div
+                        key={file.fileId || index}
+                        className={`flex items-center justify-between rounded-lg border p-3 ${
+                          file.primary === 1
+                            ? "border-primary/50 bg-primary/10"
+                            : "bg-card"
+                        }`}
+                      >
+                        <div className="flex-1 overflow-hidden">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-medium text-foreground">
+                              {file.name}
+                            </p>
+                            {file.primary === 1 && (
+                              <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
+                                {t("gameScreen.mainFile")}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                            {file.version && <span>v{file.version}</span>}
+                            {file.sizeInBytes && (
+                              <span>
+                                {nexusModsService.formatFileSize(file.sizeInBytes)}
+                              </span>
+                            )}
+                            {file.category && <span>{file.category}</span>}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="ml-3 gap-1 text-secondary"
+                          onClick={() => handleDownloadMod(selectedMod, file.fileId)}
+                        >
+                          <Download className="h-4 w-4" />
+                          {t("gameScreen.downloadFile")}
+                        </Button>
+                      </div>
+                    ))}
+
+                  {/* Hidden categories collapsible sections */}
+                  {["OLD_VERSION", "ARCHIVED", "REMOVED"].map(category => {
+                    const filesInCategory = modFiles.filter(
+                      file => file.category === category
+                    );
+                    if (filesInCategory.length === 0) return null;
+
+                    const isExpanded = showOldVersions;
+                    const categoryLabels = {
+                      OLD_VERSION: { key: "oldVersions", icon: Clock },
+                      ARCHIVED: { key: "archivedFiles", icon: BookX },
+                      REMOVED: { key: "removedFiles", icon: Trash2 },
+                    };
+                    const { key, icon: Icon } = categoryLabels[category];
+
+                    return (
+                      <div key={category} className="mt-4">
+                        <button
+                          onClick={() => setShowOldVersions(!showOldVersions)}
+                          className="flex w-full items-center justify-between rounded-lg border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Icon className="h-4 w-4" />
+                            {t(`gameScreen.${key}`, { count: filesInCategory.length })}
+                          </span>
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-2">
+                            {filesInCategory.map((file, index) => (
+                              <div
+                                key={file.fileId || index}
+                                className="flex items-center justify-between rounded-lg border bg-card/50 p-3 opacity-75"
+                              >
+                                <div className="flex-1 overflow-hidden">
+                                  <div className="flex items-center gap-2">
+                                    <p className="truncate font-medium text-foreground">
+                                      {file.name}
+                                    </p>
+                                  </div>
+                                  <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                                    {file.version && <span>v{file.version}</span>}
+                                    {file.sizeInBytes && (
+                                      <span>
+                                        {nexusModsService.formatFileSize(
+                                          file.sizeInBytes
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="ml-3 gap-1 text-primary"
+                                  onClick={() =>
+                                    handleDownloadMod(selectedMod, file.fileId)
+                                  }
+                                >
+                                  <Download className="h-4 w-4" />
+                                  {t("gameScreen.downloadFile")}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {t("gameScreen.noFilesFound")}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-3 gap-2"
+                    onClick={() => handleDownloadMod(selectedMod)}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {t("gameScreen.viewOnNexus")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <AlertDialogFooter className="mt-4">
+            <Button
+              className="text-primary"
+              variant="outline"
+              onClick={() => {
+                setShowModDetails(false);
+                setSelectedMod(null);
+                setModFiles([]);
+              }}
+            >
+              {t("common.close")}
+            </Button>
+            <Button
+              className="gap-2 text-secondary"
+              onClick={() => handleDownloadMod(selectedMod)}
+            >
+              <ExternalLink className="h-4 w-4" />
+              {t("gameScreen.viewOnNexus")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialogs */}
       <VerifyingGameDialog
@@ -1860,6 +3139,38 @@ export default function GameScreen() {
         errorGame={errorGame}
         errorMessage={errorMessage}
         t={t}
+        onManageExecutables={() => setShowExecutableManager(true)}
+      />
+
+      <ExecutableManagerDialog
+        open={showExecutableManager}
+        onSave={async newExecutables => {
+          if (newExecutables.length > 0) {
+            setGame(prev => ({
+              ...prev,
+              executable: newExecutables[0],
+              executables: newExecutables,
+            }));
+            const exists = await window.electron.checkFileExists(newExecutables[0]);
+            setExecutableExists(exists);
+          }
+        }}
+        onClose={() => setShowExecutableManager(false)}
+        gameName={game?.game || game?.name}
+        isCustom={game?.isCustom}
+        t={t}
+      />
+
+      <ExecutableSelectDialog
+        open={showExecutableSelect}
+        onClose={() => {
+          setShowExecutableSelect(false);
+          setPendingLaunchOptions(null);
+          setAvailableExecutables([]);
+        }}
+        executables={availableExecutables}
+        onSelect={handleExecutableSelect}
+        t={t}
       />
 
       {/* Edit Cover Dialog */}
@@ -1901,6 +3212,215 @@ export default function GameScreen() {
         onClose={() => setShowSteamNotRunningWarning(false)}
         t={t}
       />
+
+      {/* Game Update Available Dialog */}
+      <AlertDialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("gameScreen.updateAvailable")}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-muted-foreground">
+                <p>
+                  {isAuthenticated
+                    ? t("gameScreen.updateAvailableDescription")
+                    : t("gameScreen.updateAvailableDescriptionNoAuth")}
+                </p>
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">{t("gameScreen.currentVersion")}</span>
+                    <span className="font-mono text-sm font-medium text-foreground">
+                      {updateInfo?.localVersion || game?.version || "-"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-sm">{t("gameScreen.latestVersion")}</span>
+                    <span className="font-mono text-sm font-medium text-primary">
+                      {updateInfo?.latestVersion || "-"}
+                    </span>
+                  </div>
+                </div>
+                {!isAuthenticated && (
+                  <p className="text-xs text-muted-foreground/80">
+                    {t("gameScreen.updateManualHint")}
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => setShowUpdateDialog(false)}
+            >
+              {t("common.later")}
+            </Button>
+            <Button
+              className="text-secondary"
+              disabled={isStartingUpdate}
+              onClick={async () => {
+                // Check if user is authenticated - if not, promote Ascend
+                if (!isAuthenticated) {
+                  setShowUpdateDialog(false);
+                  navigate("/ascend");
+                  return;
+                }
+
+                if (!updateInfo?.autoUpdateSupported) {
+                  // No seamless provider, navigate to download page
+                  setShowUpdateDialog(false);
+                  navigate("/download", {
+                    state: {
+                      gameData: {
+                        game: updateInfo?.gameName || game?.game,
+                        gameID: updateInfo?.gameID || game?.gameID,
+                        version: updateInfo?.latestVersion,
+                        download_links: updateInfo?.downloadLinks,
+                        imgID: game?.imgID,
+                        isUpdate: true,
+                      },
+                    },
+                  });
+                  return;
+                }
+
+                // Try seamless providers: gofile first, then buzzheavier, then pixeldrain
+                const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
+                const downloadLinks = updateInfo?.downloadLinks || {};
+
+                let downloadUrl = null;
+                for (const provider of seamlessProviders) {
+                  const links = downloadLinks[provider];
+                  if (Array.isArray(links) && links.length > 0) {
+                    const validLink = links.find(
+                      link => link && typeof link === "string"
+                    );
+                    if (validLink) {
+                      downloadUrl = validLink.replace(/^(?:https?:)?\/\//, "https://");
+                      console.log(
+                        `[GameScreen] Found seamless link from ${provider}:`,
+                        downloadUrl
+                      );
+                      break;
+                    }
+                  }
+                }
+
+                if (!downloadUrl) {
+                  // Fallback to download page if no seamless link found
+                  setShowUpdateDialog(false);
+                  navigate("/download", {
+                    state: {
+                      gameData: {
+                        game: updateInfo?.gameName || game?.game,
+                        gameID: updateInfo?.gameID || game?.gameID,
+                        version: updateInfo?.latestVersion,
+                        download_links: updateInfo?.downloadLinks,
+                        imgID: game?.imgID,
+                        isUpdate: true,
+                      },
+                    },
+                  });
+                  return;
+                }
+
+                // Start the seamless download directly
+                setIsStartingUpdate(true);
+                try {
+                  const gameName = game?.game || game?.name;
+                  const dir = await window.electron.getDownloadDirectory();
+
+                  console.log(`[GameScreen] Starting update download for ${gameName}`);
+                  await window.electron.downloadFile(
+                    downloadUrl,
+                    gameName,
+                    game?.online || false,
+                    game?.dlc || false,
+                    game?.isVr || false,
+                    true, // isUpdating
+                    updateInfo?.latestVersion || "",
+                    game?.imgID,
+                    game?.size || "",
+                    dir,
+                    game?.gameID || ""
+                  );
+
+                  toast.success(t("gameScreen.updateStarted"));
+                  setShowUpdateDialog(false);
+                  navigate("/downloads");
+                } catch (error) {
+                  console.error("[GameScreen] Error starting update:", error);
+                  toast.error(t("gameScreen.updateFailed"));
+                } finally {
+                  setIsStartingUpdate(false);
+                }
+              }}
+            >
+              {isStartingUpdate ? (
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isAuthenticated
+                ? isStartingUpdate
+                  ? t("gameScreen.startingUpdate")
+                  : t("gameScreen.downloadUpdate")
+                : t("gameScreen.getAscendToUpdate")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Launch Options Dialog */}
+      <AlertDialog
+        open={launchOptionsDialogOpen}
+        onOpenChange={setLaunchOptionsDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("gameScreen.launchOptions")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("gameScreen.launchOptionsDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={launchCommand}
+            className="text-foreground"
+            onChange={e => setLaunchCommand(e.target.value)}
+            placeholder={t("gameScreen.launchCommandPlaceholder")}
+          />
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => setLaunchOptionsDialogOpen(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              className="text-secondary"
+              onClick={async () => {
+                const success = await window.electron.saveLaunchCommands(
+                  game.game || game.name,
+                  launchCommand,
+                  game.isCustom
+                );
+                if (success) {
+                  setGame({ ...game, launchCommands: launchCommand });
+                  toast.success(t("gameScreen.launchOptionsSaved"));
+                } else {
+                  toast.error(t("common.error"));
+                }
+                setLaunchOptionsDialogOpen(false);
+              }}
+            >
+              {t("common.save")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -10,6 +10,8 @@ import {
   ArrowUpFromLine,
   ArrowDown,
   Calendar,
+  Clock,
+  Check,
 } from "lucide-react";
 import {
   TooltipProvider,
@@ -27,11 +29,14 @@ import torboxService from "@/services/torboxService";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { analytics } from "@/services/analyticsService";
+import ratingQueueService from "@/services/ratingQueueService";
+import installedGamesService from "@/services/installedGamesService";
 
 const GameCard = memo(function GameCard({ game, compact }) {
   const navigate = useNavigate();
   const [showAllTags, setShowAllTags] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isPlayLater, setIsPlayLater] = useState(false);
   const cardRef = useRef(null);
   const { cachedImage, loading, error } = useImageLoader(game?.imgID, {
     quality: isVisible ? "high" : "low",
@@ -41,8 +46,18 @@ const GameCard = memo(function GameCard({ game, compact }) {
   const [isInstalled, setIsInstalled] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [gameRating, setGameRating] = useState(game?.rating || 0);
   const isMounted = useRef(true);
   const { t } = useLanguage();
+  const { settings } = useSettings();
+
+  // Check if game is in Play Later list
+  useEffect(() => {
+    if (!game?.game) return;
+    const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+    const isInList = playLaterGames.some(g => g.game === game.game);
+    setIsPlayLater(isInList);
+  }, [game?.game]);
 
   // Setup intersection observer for lazy loading
   useEffect(() => {
@@ -53,7 +68,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
         }
       },
       {
-        rootMargin: "50px",
+        rootMargin: "200px", // Increased for earlier preloading
         threshold: 0.1,
       }
     );
@@ -80,32 +95,52 @@ const GameCard = memo(function GameCard({ game, compact }) {
   }, [gameCategories, showAllTags]);
 
   useEffect(() => {
-    const checkInstalled = async () => {
-      try {
-        const installedGames = await window.electron.getGames();
+    // Use cached installed games service to prevent IPC flooding
+    installedGamesService
+      .checkGameStatus(game.game, game.version)
+      .then(({ isInstalled: installed, needsUpdate: update }) => {
         if (isMounted.current) {
-          const installedGame = installedGames.find(ig => ig.game === game.game);
-          if (installedGame && game.version) {
-            const installedVersion = installedGame.version || "0.0.0";
-            const newVersion = game.version;
-            setNeedsUpdate(installedVersion !== newVersion);
-            setIsInstalled(!needsUpdate);
-          } else {
-            setIsInstalled(!!installedGame);
-            setNeedsUpdate(false);
-          }
+          setIsInstalled(installed);
+          setNeedsUpdate(update);
         }
-      } catch (error) {
+      })
+      .catch(error => {
         console.error("Error checking game installation:", error);
-      }
-    };
-
-    checkInstalled();
+      });
 
     return () => {
       isMounted.current = false;
     };
-  }, [game.game]);
+  }, [game.game, game.version]);
+
+  // Fetch rating from queue service
+  // This ensures ratings are fetched one at a time to prevent API flooding
+  // and cached persistently in localStorage
+  useEffect(() => {
+    if (!game.gameID) return;
+
+    // If game already has a rating from the API response, use it
+    if (game.rating && game.rating > 0) {
+      setGameRating(game.rating);
+      return;
+    }
+
+    // Check for cached rating first (loads immediately from localStorage)
+    const cachedRating = ratingQueueService.getCachedRating(game.gameID);
+    if (cachedRating !== null && cachedRating > 0) {
+      setGameRating(cachedRating);
+      // Don't return - still subscribe to get fresh rating in background
+    }
+
+    // Subscribe to rating updates - will be processed in queue
+    const unsubscribe = ratingQueueService.subscribe(game.gameID, rating => {
+      if (isMounted.current && rating > 0) {
+        setGameRating(rating);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [game.gameID, game.rating]);
 
   const handleDownload = useCallback(() => {
     if (isInstalled && !needsUpdate) return;
@@ -131,6 +166,52 @@ const GameCard = memo(function GameCard({ game, compact }) {
     });
   }, [navigate, game, isInstalled, needsUpdate, t]);
 
+  const handlePlayLater = useCallback(
+    e => {
+      e.stopPropagation();
+      const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+
+      if (isPlayLater) {
+        // Remove from list and cached image
+        const updatedList = playLaterGames.filter(g => g.game !== game.game);
+        localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+        localStorage.removeItem(`play-later-image-${game.game}`);
+        setIsPlayLater(false);
+      } else {
+        // Add to list with essential game data
+        const gameToSave = {
+          game: game.game,
+          gameID: game.gameID,
+          imgID: game.imgID,
+          version: game.version,
+          size: game.size,
+          category: game.category,
+          dlc: game.dlc,
+          online: game.online,
+          download_links: game.download_links,
+          desc: game.desc,
+          addedAt: Date.now(),
+        };
+        playLaterGames.push(gameToSave);
+        localStorage.setItem("play-later-games", JSON.stringify(playLaterGames));
+
+        // Cache the image if available
+        if (cachedImage) {
+          try {
+            localStorage.setItem(`play-later-image-${game.game}`, cachedImage);
+          } catch (e) {
+            console.warn("Could not cache play later image:", e);
+          }
+        }
+
+        setIsPlayLater(true);
+      }
+      // Dispatch event so Library can update
+      window.dispatchEvent(new CustomEvent("play-later-updated"));
+    },
+    [game, isPlayLater, cachedImage]
+  );
+
   if (compact) {
     return (
       <div className="flex cursor-pointer gap-4 rounded-lg p-2 transition-colors hover:bg-secondary/50">
@@ -152,8 +233,6 @@ const GameCard = memo(function GameCard({ game, compact }) {
       </div>
     );
   }
-
-  const { settings } = useSettings();
 
   return (
     <Card
@@ -196,7 +275,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
             <h3 className="line-clamp-1 text-lg font-semibold text-foreground">
               {sanitizeText(game.game)}
             </h3>
-            {game.rating > 0 && (
+            {gameRating > 0 && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -225,7 +304,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
                           fontSize="10"
                           fontWeight="bold"
                         >
-                          {Math.round(game.rating)}
+                          {Math.round(gameRating)}
                         </text>
                       </svg>
                     </div>
@@ -296,7 +375,28 @@ const GameCard = memo(function GameCard({ game, compact }) {
           )}
         </div>
       </CardContent>
-      <CardFooter className="flex items-center justify-between p-4">
+      <CardFooter className="flex flex-col gap-2 p-4">
+        {/* Play Later Button */}
+        {!isInstalled && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`w-full gap-2 ${isPlayLater ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={handlePlayLater}
+          >
+            {isPlayLater ? (
+              <>
+                <Check className="h-4 w-4" />
+                {t("gameCard.addedToPlayLater")}
+              </>
+            ) : (
+              <>
+                <Clock className="h-4 w-4" />
+                {t("gameCard.playLater")}
+              </>
+            )}
+          </Button>
+        )}
         {(() => {
           // Determine button state and provider
           const buttonState = isLoading

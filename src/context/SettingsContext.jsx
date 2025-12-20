@@ -6,7 +6,7 @@ import React, {
   useCallback,
 } from "react";
 
-const SettingsContext = createContext();
+export const SettingsContext = createContext();
 
 export function SettingsProvider({ children }) {
   const [settings, setSettingsState] = useState({
@@ -18,6 +18,7 @@ export function SettingsProvider({ children }) {
     behaviorAfterDownload: "none",
     rpcEnabled: true,
     seeInappropriateContent: false,
+    hideOnGameLaunch: true,
     earlyReleasePreview: false,
     viewWorkshopPage: false,
     notifications: true,
@@ -31,7 +32,9 @@ export function SettingsProvider({ children }) {
     endOnClose: false,
     language: "en",
     theme: "purple",
+    customTheme: [],
     threadCount: 12,
+    singleStream: true,
     downloadLimit: 0,
     excludeFolders: false,
     sideScrollBar: false,
@@ -41,6 +44,12 @@ export function SettingsProvider({ children }) {
     twitchClientId: "",
     giantBombKey: "",
     torboxApiKey: "",
+    localIndex: "",
+    blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
+    usingLocalIndex: false,
+    shareLocalIndex: true,
+    fetchPageCount: 50,
+    localRefreshWorkers: 8,
     ludusavi: {
       backupLocation: "",
       backupFormat: "zip",
@@ -69,6 +78,31 @@ export function SettingsProvider({ children }) {
         await window.electron.saveSettings(updatedSettings);
       } catch (error) {
         console.error("Error saving settings:", error);
+      }
+    },
+    [settings]
+  );
+
+  // Update local state only without saving to electron
+  const setSettingsLocal = useCallback(
+    newSettings => {
+      const updatedSettings =
+        typeof newSettings === "function"
+          ? newSettings(settings)
+          : { ...settings, ...newSettings };
+      setSettingsState(updatedSettings);
+    },
+    [settings]
+  );
+
+  const updateSetting = useCallback(
+    async (key, value) => {
+      const updatedSettings = { ...settings, [key]: value };
+      setSettingsState(updatedSettings);
+      try {
+        await window.electron.updateSetting(key, value);
+      } catch (error) {
+        console.error("Error updating setting:", error);
       }
     },
     [settings]
@@ -124,6 +158,8 @@ export function SettingsProvider({ children }) {
       value={{
         settings,
         setSettings,
+        setSettingsLocal,
+        updateSetting,
       }}
     >
       {children}
@@ -131,10 +167,71 @@ export function SettingsProvider({ children }) {
   );
 }
 
+// Default settings to use when context is not available
+const defaultSettings = {
+  downloadDirectory: "",
+  additionalDirectories: [],
+  watchingFolders: [],
+  showOldDownloadLinks: false,
+  defaultOpenPage: "home",
+  behaviorAfterDownload: "none",
+  rpcEnabled: true,
+  seeInappropriateContent: false,
+  hideOnGameLaunch: true,
+  earlyReleasePreview: false,
+  viewWorkshopPage: false,
+  notifications: true,
+  downloadHandler: false,
+  torrentEnabled: false,
+  gameSource: "steamrip",
+  autoCreateShortcuts: true,
+  smoothTransitions: true,
+  sendAnalytics: true,
+  autoUpdate: true,
+  endOnClose: false,
+  language: "en",
+  theme: "purple",
+  customTheme: [],
+  threadCount: 12,
+  singleStream: true,
+  downloadLimit: 0,
+  excludeFolders: false,
+  sideScrollBar: false,
+  prioritizeTorboxOverSeamless: false,
+  crackDirectory: "",
+  twitchSecret: "",
+  twitchClientId: "",
+  giantBombKey: "",
+  torboxApiKey: "",
+  localIndex: "",
+  blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
+  usingLocalIndex: false,
+  shareLocalIndex: true,
+  fetchPageCount: 50,
+  localRefreshWorkers: 8,
+  ludusavi: {
+    backupLocation: "",
+    backupFormat: "zip",
+    enabled: false,
+    backupOptions: {
+      backupsToKeep: 5,
+      skipManifestCheck: false,
+      compressionLevel: "default",
+    },
+  },
+};
+
 export function useSettings() {
   const context = useContext(SettingsContext);
   if (context === undefined) {
-    throw new Error("useSettings must be used within a SettingsProvider");
+    // Return default values instead of throwing to prevent crashes
+    console.warn("useSettings called outside of SettingsProvider, using defaults");
+    return {
+      settings: defaultSettings,
+      setSettings: () => {},
+      setSettingsLocal: () => {},
+      updateSetting: () => {},
+    };
   }
   return context;
 }

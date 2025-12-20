@@ -9,7 +9,7 @@ import {
 import { Button } from "./ui/button";
 import {
   AlertTriangle,
-  CheckCircle2,
+  CircleCheck,
   Loader,
   FileSearch,
   RefreshCw,
@@ -118,7 +118,7 @@ const VerifyingGameDialog = ({ game, open, onOpenChange }) => {
     <Card className="mb-4 border-green-500/30 bg-green-500/5">
       <CardContent className="space-y-4 p-4">
         <div className="flex items-center gap-3 text-green-500">
-          <CheckCircle2 className="h-5 w-5" />
+          <CircleCheck className="h-5 w-5" />
           <span className="font-medium">{t("downloads.verificationSuccess")}</span>
         </div>
         <span className="text-sm text-muted-foreground">

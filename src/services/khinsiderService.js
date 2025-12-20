@@ -3,8 +3,8 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
-const isDev = import.meta.env.DEV;
-const BASE_URL = isDev ? "/api/khinsider" : "https://downloads.khinsider.com";
+// Always use proxy to avoid CORS issues (works in both dev and production)
+const BASE_URL = "/api/khinsider";
 
 /**
  * Search for albums by keyword (returns array of {id, name})

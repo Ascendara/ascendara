@@ -8,7 +8,7 @@ class ImageCacheService {
     // Core caching
     this.memoryCache = new Map(); // imgID -> { url, quality }
     this.memoryCacheOrder = [];
-    this.maxMemoryCacheSize = 150;
+    this.maxMemoryCacheSize = 200; // Increased for local index
     this.db = null;
     this.isInitialized = false;
     this.initPromise = null;
@@ -17,7 +17,7 @@ class ImageCacheService {
 
     // Request management
     this.activeRequests = new Map();
-    this.maxConcurrentRequests = 12;
+    this.maxConcurrentRequests = 16; // Increased for local loading
     this.retryDelay = 2000;
     this.maxRetries = 2;
 
@@ -32,8 +32,88 @@ class ImageCacheService {
     this.recent404Count = 0;
     this.max404BeforeClear = 4;
 
+    // Settings cache to avoid repeated IPC calls
+    this._settingsCache = null;
+    this._settingsCacheTime = 0;
+    this._settingsCacheDuration = 30000; // 30 seconds - longer cache for settings
+    this._settingsLoadPromise = null;
+
+    // Initialize settings eagerly (non-blocking)
+    this._preloadSettings();
+
     // Initialize
     this.initPromise = this.initializeDB();
+  }
+
+  /**
+   * Preload settings on service initialization
+   */
+  _preloadSettings() {
+    if (!this._settingsLoadPromise) {
+      this._settingsLoadPromise = window.electron
+        .getSettings()
+        .then(settings => {
+          this._settingsCache = settings;
+          this._settingsCacheTime = Date.now();
+          this._settingsLoadPromise = null;
+          return settings;
+        })
+        .catch(err => {
+          console.warn("[ImageCache] Failed to preload settings:", err);
+          this._settingsLoadPromise = null;
+          return null;
+        });
+    }
+    return this._settingsLoadPromise;
+  }
+
+  /**
+   * Get cached settings or fetch fresh ones
+   * Returns cached value immediately if available, otherwise waits for load
+   */
+  async _getSettings() {
+    const now = Date.now();
+
+    // Return cached settings if valid
+    if (
+      this._settingsCache &&
+      now - this._settingsCacheTime < this._settingsCacheDuration
+    ) {
+      return this._settingsCache;
+    }
+
+    // If already loading, wait for that promise
+    if (this._settingsLoadPromise) {
+      return this._settingsLoadPromise;
+    }
+
+    // Load fresh settings
+    return this._preloadSettings();
+  }
+
+  /**
+   * Get settings synchronously if cached, null otherwise
+   * Use this for non-blocking checks
+   */
+  _getSettingsSync() {
+    const now = Date.now();
+    if (
+      this._settingsCache &&
+      now - this._settingsCacheTime < this._settingsCacheDuration
+    ) {
+      return this._settingsCache;
+    }
+    // Trigger async load but don't wait
+    this._preloadSettings();
+    return this._settingsCache; // May be stale or null
+  }
+
+  /**
+   * Invalidate settings cache (call when settings change)
+   */
+  invalidateSettingsCache() {
+    this._settingsCache = null;
+    this._settingsCacheTime = 0;
   }
 
   async initializeDB() {
@@ -121,43 +201,65 @@ class ImageCacheService {
   }
 
   /**
-   * Get image URL for given imgID. Uses LRU memory cache, IndexedDB, and deduplication.
+   * Get image URL for given imgID. Uses LRU memory cache, local files (if local index), IndexedDB, and deduplication.
    * If the image is requested multiple times concurrently, all requests await the same promise.
    */
   async getImage(imgID, options = { priority: "normal", quality: "high" }) {
     if (!imgID) return null;
 
-    // Wait for initialization
-    await this.initPromise;
-
-    // Check memory cache first (LRU)
+    // Check memory cache FIRST - no async needed, instant return
     if (this.memoryCache.has(imgID)) {
       const cached = this.memoryCache.get(imgID);
       // Move to most recently used
       this.memoryCacheOrder = this.memoryCacheOrder.filter(id => id !== imgID);
       this.memoryCacheOrder.push(imgID);
 
-      // If we have the requested quality or better, return it
-      if (options.quality === "low" || cached.quality === options.quality) {
-        console.debug(`[ImageCache] Memory cache HIT for ${imgID}`);
+      // Return if we have high quality or requested quality
+      if (
+        cached.quality === "high" ||
+        options.quality === "low" ||
+        cached.quality === options.quality
+      ) {
         return cached.url;
-      }
-
-      // If we need higher quality, let it fall through to load high quality version
-      if (options.quality === "high" && cached.quality === "low") {
-        console.debug(`[ImageCache] Upgrading quality for ${imgID}`);
       }
     }
 
-    // Try IndexedDB cache if available
+    // If already being loaded, return the existing promise (deduplication)
+    if (this.activeRequests.has(imgID)) {
+      return this.activeRequests.get(imgID);
+    }
+
+    // Get settings to determine if local index
+    const settings = await this._getSettings();
+    const isLocalIndex = settings?.usingLocalIndex && settings?.localIndex;
+
+    // For local index - load directly from disk (no IndexedDB wait needed)
+    // When using local index, NEVER fall back to API
+    if (isLocalIndex) {
+      const loadPromise = this._loadLocalImage(imgID, settings.localIndex);
+      this.activeRequests.set(imgID, loadPromise);
+
+      try {
+        const result = await loadPromise;
+        return result; // Return result even if null - don't fall back to API
+      } catch (error) {
+        console.warn(`[ImageCache] Failed to load local image ${imgID}:`, error);
+        return null; // Return null instead of falling through to API
+      } finally {
+        this.activeRequests.delete(imgID);
+      }
+    }
+
+    // For API images only (not using local index), wait for IndexedDB initialization
+    await this.initPromise;
+
+    // Try IndexedDB cache if available (only for API images)
     if (this.db) {
       try {
         const cachedImage = await this.getFromIndexedDB(imgID);
         if (cachedImage) {
           const url = URL.createObjectURL(cachedImage);
           this._setMemoryCache(imgID, url);
-          // Logging for IndexedDB hit
-          console.debug(`[ImageCache] IndexedDB cache HIT for ${imgID}`);
           return url;
         }
       } catch (error) {
@@ -165,15 +267,8 @@ class ImageCacheService {
       }
     }
 
-    // If already being loaded, return the existing promise
-    if (this.activeRequests.has(imgID)) {
-      return this.activeRequests.get(imgID);
-    }
-
-    // Start loading
-    // Logging for cache miss (network fetch)
-    console.debug(`[ImageCache] Cache MISS for ${imgID}, fetching from network`);
-    const loadPromise = this.loadImage(imgID);
+    // Load from API (only when NOT using local index)
+    const loadPromise = this._loadFromAPI(imgID, settings, options);
     this.activeRequests.set(imgID, loadPromise);
 
     try {
@@ -186,6 +281,19 @@ class ImageCacheService {
     } finally {
       this.activeRequests.delete(imgID);
     }
+  }
+
+  /**
+   * Load image from local disk (for local index) - always high quality
+   */
+  async _loadLocalImage(imgID, localIndexPath) {
+    const localImagePath = `${localIndexPath}/imgs/${imgID}.jpg`;
+    const localImageUrl = await window.electron.getLocalImageUrl(localImagePath);
+    if (localImageUrl) {
+      this._setMemoryCache(imgID, localImageUrl, "high");
+      return localImageUrl;
+    }
+    return null;
   }
 
   _setMemoryCache(imgID, url, quality = "high") {
@@ -204,17 +312,32 @@ class ImageCacheService {
     }
   }
 
+  /**
+   * Load image from API (legacy method, kept for compatibility)
+   */
   async loadImage(
     imgID,
     retryCount = 0,
     options = { quality: "high", priority: "normal" }
+  ) {
+    const settings = await this._getSettings();
+    return this._loadFromAPI(imgID, settings, options, retryCount);
+  }
+
+  /**
+   * Load image from API with retry logic (uses IPC to bypass CORS)
+   */
+  async _loadFromAPI(
+    imgID,
+    settings,
+    options = { quality: "high", priority: "normal" },
+    retryCount = 0
   ) {
     if (!imgID) return null;
 
     try {
       const timestamp = Math.floor(Date.now() / 1000);
       const signature = await this.generateSignature(timestamp);
-      const settings = await window.electron.getSettings();
       const source = settings?.gameSource || "steamrip";
 
       let endpoint = "v2/image";
@@ -222,51 +345,54 @@ class ImageCacheService {
         endpoint = "v2/fitgirl/image";
       }
 
-      // Add quality parameter for progressive loading
-      if (options.quality === "low") {
-        endpoint += "/preview";
-      }
+      // Use IPC to fetch image from main process (bypasses CORS)
+      const result = await window.electron.fetchApiImage(
+        endpoint,
+        imgID,
+        timestamp,
+        signature
+      );
 
-      const response = await fetch(`https://api.ascendara.app/${endpoint}/${imgID}`, {
-        headers: {
-          "X-Timestamp": timestamp.toString(),
-          "X-Signature": signature,
-          "Cache-Control": "no-store",
-        },
-      });
-      if (!response.ok) {
-        if (response.status === 404) {
+      if (result.error) {
+        if (result.status === 404) {
           this.recent404Count++;
-          console.warn(
-            `[ImageCache] 404 for image ${imgID} (consecutive: ${this.recent404Count})`
-          );
           if (this.recent404Count >= this.max404BeforeClear) {
             await this.clearCache();
             this.recent404Count = 0;
-            console.warn(
-              `[ImageCache] Cleared cache due to ${this.max404BeforeClear} consecutive 404s`
-            );
           }
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${result.status}`);
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+
+      // Result is a data URL, use it directly
+      const url = result.dataUrl;
+
       // Cache the result with correct quality
       this._setMemoryCache(imgID, url, options.quality);
-      // Save to IndexedDB in the background if available
+
+      // For IndexedDB, we need to convert data URL to blob
       if (this.db) {
-        this.saveToIndexedDB(imgID, blob).catch(error => {
-          console.warn(`[ImageCache] Failed to save image ${imgID} to IndexedDB:`, error);
-        });
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          this.saveToIndexedDB(imgID, blob).catch(error => {
+            console.warn(
+              `[ImageCache] Failed to save image ${imgID} to IndexedDB:`,
+              error
+            );
+          });
+        } catch (e) {
+          // Ignore IndexedDB save errors
+        }
       }
+
       // Reset 404 counter on success
       if (this.recent404Count > 0) this.recent404Count = 0;
       return url;
     } catch (error) {
       if (retryCount < this.maxRetries) {
         await new Promise(resolve => setTimeout(resolve, this.retryDelay));
-        return this.loadImage(imgID, retryCount + 1);
+        return this._loadFromAPI(imgID, settings, options, retryCount + 1);
       }
       throw error;
     }
@@ -341,11 +467,11 @@ class ImageCacheService {
   }
 
   // Utility methods
-  clearCache() {
+  async clearCache(skipRefresh = false) {
     console.log("[ImageCache] Clearing cache");
     this.memoryCache.clear();
     this.memoryCacheOrder = [];
-    this.clearIndexedDB();
+    await this.clearIndexedDB();
 
     // Clear localStorage cache
     try {
@@ -353,31 +479,41 @@ class ImageCacheService {
       localStorage.removeItem("local_ascendara_games_timestamp");
       localStorage.removeItem("local_ascendara_metadata_cache");
 
-      // Force a refresh of the game data by fetching from API
-      gameService
-        .fetchDataFromAPI()
-        .then(data => {
-          gameService.updateCache(data);
+      // Force a refresh of the game data (respects local index setting)
+      // Skip refresh if caller will handle it (e.g., during page reload)
+      if (!skipRefresh) {
+        try {
+          await gameService.getCachedData();
           console.log("[ImageCache] Game service cache refreshed successfully");
-        })
-        .catch(error => {
+        } catch (error) {
           console.error("[ImageCache] Error refreshing game service cache:", error);
-        });
+        }
+      }
     } catch (error) {
       console.error("[ImageCache] Error clearing game service cache:", error);
     }
   }
 
-  clearIndexedDB() {
+  async clearIndexedDB() {
     if (this.db) {
-      try {
-        const transaction = this.db.transaction(["images"], "readwrite");
-        const store = transaction.objectStore("images");
-        store.clear();
-        console.log("[ImageCache] IndexedDB cleared successfully");
-      } catch (error) {
-        console.error("[ImageCache] Error clearing IndexedDB:", error);
-      }
+      return new Promise(resolve => {
+        try {
+          const transaction = this.db.transaction(["images"], "readwrite");
+          const store = transaction.objectStore("images");
+          const request = store.clear();
+          request.onsuccess = () => {
+            console.log("[ImageCache] IndexedDB cleared successfully");
+            resolve();
+          };
+          request.onerror = () => {
+            console.error("[ImageCache] Error clearing IndexedDB:", request.error);
+            resolve();
+          };
+        } catch (error) {
+          console.error("[ImageCache] Error clearing IndexedDB:", error);
+          resolve();
+        }
+      });
     }
   }
 

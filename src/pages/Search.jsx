@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   X,
   SendIcon,
+  Database,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import {
@@ -56,6 +57,9 @@ const Search = memo(() => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showStickySearch, setShowStickySearch] = useState(false);
+  const mainSearchRef = useRef(null);
+  const searchSectionRef = useRef(null);
   const [selectedCategories, setSelectedCategories] = useState(() => {
     const saved = window.localStorage.getItem("selectedCategories");
     return saved ? JSON.parse(saved) : [];
@@ -92,11 +96,48 @@ const Search = memo(() => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef(null);
+  const scrollThreshold = 200;
   const gamesPerLoad = useWindowSize();
   const [apiMetadata, setApiMetadata] = useState(null);
   const { t } = useLanguage();
   const isFitGirlSource = settings.gameSource === "fitgirl";
   const navigate = useNavigate();
+
+  // Handle scroll to show/hide sticky search bar
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setShowStickySearch(scrollY > scrollThreshold);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [scrollThreshold]);
+
+  // Handle sticky search click - scroll to top and focus input
+  const handleStickySearchClick = useCallback(() => {
+    const startPosition = window.scrollY;
+    const duration = 600;
+    const startTime = performance.now();
+
+    const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+
+    const animateScroll = currentTime => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = easeOutCubic(progress);
+
+      window.scrollTo(0, startPosition * (1 - easedProgress));
+
+      if (progress < 1) {
+        requestAnimationFrame(animateScroll);
+      } else {
+        mainSearchRef.current?.focus();
+      }
+    };
+
+    requestAnimationFrame(animateScroll);
+  }, []);
 
   const isCacheValid = useCallback(() => {
     return (
@@ -209,11 +250,7 @@ const Search = memo(() => {
     [isCacheValid]
   );
 
-  useEffect(() => {
-    setLoading(true);
-    refreshGames().finally(() => setLoading(false));
-  }, [refreshGames]);
-
+  // Load games on mount - single effect to avoid duplicate loading
   useEffect(() => {
     setLoading(true);
     refreshGames(true).finally(() => setLoading(false));
@@ -271,11 +308,15 @@ const Search = memo(() => {
     return () => unsubscribe();
   }, []);
 
-  // Start status check interval when component mounts
+  // Start status check interval when component mounts (skip for local index)
   useEffect(() => {
+    // Skip server status checks if using local index
+    if (settings?.usingLocalIndex) {
+      return;
+    }
     const stopStatusCheck = startStatusCheck();
     return () => stopStatusCheck();
-  }, []);
+  }, [settings?.usingLocalIndex]);
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
@@ -510,78 +551,127 @@ const Search = memo(() => {
 
   return (
     <div className="flex flex-col bg-background">
+      {/* Sticky Search Bar */}
+      <div
+        onClick={handleStickySearchClick}
+        className={`fixed left-1/2 z-50 -translate-x-1/2 cursor-pointer transition-all duration-300 ease-out ${
+          showStickySearch
+            ? "top-4 translate-y-0 opacity-100"
+            : "pointer-events-none top-0 -translate-y-full opacity-0"
+        }`}
+      >
+        <div className="flex min-w-[280px] items-center gap-3 rounded-full border border-border/50 bg-background/80 px-6 py-2.5 shadow-lg backdrop-blur-md transition-colors hover:border-border hover:bg-background/90">
+          <SearchIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            {searchQuery || t("search.placeholder")}
+          </span>
+        </div>
+      </div>
       <div className="flex-1 p-8 pb-24">
         <div className="mx-auto max-w-[1400px]">
           {apiMetadata && (
-            <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-              <span>
-                {apiMetadata.games.toLocaleString()} {t("search.gamesIndexed")}
-              </span>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <InfoIcon className="h-4 w-4 cursor-pointer transition-colors hover:text-foreground" />
-                </AlertDialogTrigger>
-                <AlertDialogContent className="border-border">
-                  <AlertDialogCancel className="absolute right-2 top-2 cursor-pointer text-foreground transition-colors">
-                    <X className="h-4 w-4" />
-                  </AlertDialogCancel>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                      {t("search.indexedInformation")}
-                    </AlertDialogTitle>
-                    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                      <p>
-                        {t("search.indexedInformationDescription")}{" "}
-                        <a
-                          onClick={() =>
-                            window.electron.openURL("https://ascendara.app/dmca")
-                          }
-                          className="cursor-pointer text-primary hover:underline"
-                        >
-                          {t("common.learnMore")}{" "}
-                          <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                        </a>
-                      </p>
-
-                      <Separator className="bg-border/50" />
-                      <p>
-                        {t("search.totalGames")}: {apiMetadata.games.toLocaleString()}
-                      </p>
-                      <p>
-                        {t("search.source")}: {apiMetadata.source}
-                      </p>
-                      <p>
-                        {t("search.lastUpdated")}: {apiMetadata.getDate}
-                      </p>
-                      <Separator className="bg-border/50" />
-                      <div className="space-y-2 pt-2">
-                        <Button
-                          variant="outline"
-                          onClick={handleRefreshIndex}
-                          disabled={isRefreshing}
-                          className="flex w-full items-center justify-center gap-2"
-                        >
-                          <RefreshCw
-                            className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                          />
-                          {isRefreshing
-                            ? t("search.refreshingIndex")
-                            : t("search.refreshIndex")}
-                        </Button>
-
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsRefreshRequestDialogOpen(true)}
-                          className="flex w-full items-center justify-center gap-2"
-                        >
-                          <SendIcon className="h-4 w-4" />
-                          {t("search.sendRefreshRequest")}
-                        </Button>
+            <div className="mb-6 flex flex-col gap-3">
+              {!apiMetadata.local && (
+                <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{t("search.usingApiWarning")}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>
+                  {apiMetadata.games.toLocaleString()} {t("search.gamesIndexed")}
+                </span>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <InfoIcon className="h-4 w-4 cursor-pointer transition-colors hover:text-foreground" />
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-border">
+                    <AlertDialogCancel className="absolute right-2 top-2 cursor-pointer text-foreground transition-colors">
+                      <X className="h-4 w-4" />
+                    </AlertDialogCancel>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                        {apiMetadata.local
+                          ? t("search.localIndexedInformation")
+                          : t("search.indexedInformation")}
+                      </AlertDialogTitle>
+                      <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                        {apiMetadata.local ? (
+                          <>
+                            <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-green-600 dark:text-green-400">
+                              <Database className="h-4 w-4 shrink-0" />
+                              <span>{t("search.usingLocalIndex")}</span>
+                            </div>
+                            <p>{t("search.localIndexedDescription")}</p>
+                            <Separator className="bg-border/50" />
+                            <p>
+                              {t("search.totalGames")}:{" "}
+                              {apiMetadata.games.toLocaleString()}
+                            </p>
+                            <p>
+                              {t("search.source")}: {apiMetadata.source}
+                            </p>
+                            <p>
+                              {t("search.lastUpdated")}: {apiMetadata.getDate}
+                            </p>
+                            <Separator className="bg-border/50" />
+                            <div className="pt-2">
+                              <Button
+                                className="flex w-full items-center justify-center gap-2 text-secondary"
+                                onClick={() => navigate("/localrefresh")}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                {t("search.refreshLocalIndex")}
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p>
+                              {t("search.indexedInformationDescription")}{" "}
+                              <a
+                                onClick={() =>
+                                  window.electron.openURL("https://ascendara.app/dmca")
+                                }
+                                className="cursor-pointer text-primary hover:underline"
+                              >
+                                {t("common.learnMore")}{" "}
+                                <ExternalLink className="mb-1 inline-block h-3 w-3" />
+                              </a>
+                            </p>
+                            <Separator className="bg-border/50" />
+                            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-yellow-600 dark:text-yellow-400">
+                              <AlertTriangle className="h-4 w-4 shrink-0" />
+                              <span>{t("search.usingApiWarning")}</span>
+                            </div>
+                            <Separator className="bg-border/50" />
+                            <p>
+                              {t("search.totalGames")}:{" "}
+                              {apiMetadata.games.toLocaleString()}
+                            </p>
+                            <p>
+                              {t("search.source")}: {apiMetadata.source}
+                            </p>
+                            <p>
+                              {t("search.lastUpdated")}: {apiMetadata.getDate}
+                            </p>
+                            <Separator className="bg-border/50" />
+                            <div className="pt-2">
+                              <Button
+                                className="flex w-full items-center justify-center gap-2 text-secondary"
+                                onClick={() => navigate("/localrefresh")}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                {t("search.switchToLocalIndex")}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    </div>
-                  </AlertDialogHeader>
-                </AlertDialogContent>
-              </AlertDialog>
+                    </AlertDialogHeader>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
 
               {/* Send Refresh Request Confirmation Dialog */}
               <AlertDialog
@@ -622,6 +712,7 @@ const Search = memo(() => {
               <div className="relative flex-1">
                 <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  ref={mainSearchRef}
                   placeholder={t("search.placeholder")}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
