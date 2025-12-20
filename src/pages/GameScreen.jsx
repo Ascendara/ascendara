@@ -88,7 +88,7 @@ import EditCoverDialog from "@/components/EditCoverDialog";
 import nexusModsService from "@/services/nexusModsService";
 import flingTrainerService from "@/services/flingTrainerService";
 import { useAuth } from "@/context/AuthContext";
-import { getCloudLibrary } from "@/services/firebaseService";
+import { getCloudLibrary, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
@@ -546,8 +546,14 @@ export default function GameScreen() {
   const { gameData } = location.state || {};
   const { settings } = useSettings();
   const igdbConfig = useIgdbConfig();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [game, setGame] = useState(gameData || null);
+  const [ascendAccess, setAscendAccess] = useState({
+    hasAccess: false,
+    isSubscribed: false,
+    isVerified: false,
+    verified: false,
+  });
   const [loading, setLoading] = useState(!gameData);
   const [imageData, setImageData] = useState("");
   const [executableExists, setExecutableExists] = useState(true);
@@ -977,8 +983,13 @@ export default function GameScreen() {
           setSupportsModManaging(result.supported);
           setNexusGameData(result.gameData);
 
-          // If supported and user is authenticated, fetch mods with pagination
-          if (result.supported && result.gameData?.domainName && isAuthenticated) {
+          // If supported and user has Ascend access, fetch mods with pagination
+          if (
+            result.supported &&
+            result.gameData?.domainName &&
+            isAuthenticated &&
+            ascendAccess.hasAccess
+          ) {
             setModsLoading(true);
             const modsResult = await nexusModsService.getMods(
               result.gameData.domainName,
@@ -1000,7 +1011,7 @@ export default function GameScreen() {
     };
 
     checkNexusModSupport();
-  }, [game?.game, game?.name, isAuthenticated]);
+  }, [game?.game, game?.name, isAuthenticated, ascendAccess.hasAccess]);
 
   // Check FLiNG Trainer support for the game
   useEffect(() => {
@@ -1020,6 +1031,41 @@ export default function GameScreen() {
 
     checkFlingTrainerSupport();
   }, [game?.game, game?.name]);
+
+  // Verify Ascend access
+  useEffect(() => {
+    const checkAscendAccess = async () => {
+      if (!isAuthenticated || !user) {
+        setAscendAccess({
+          hasAccess: false,
+          isSubscribed: false,
+          isVerified: false,
+          verified: false,
+        });
+        return;
+      }
+
+      try {
+        const result = await verifyAscendAccess();
+        setAscendAccess({
+          hasAccess: result.hasAccess,
+          isSubscribed: result.isSubscribed,
+          isVerified: result.isVerified,
+          verified: result.verified || result.isVerified,
+        });
+      } catch (error) {
+        console.error("Error verifying Ascend access:", error);
+        setAscendAccess({
+          hasAccess: false,
+          isSubscribed: false,
+          isVerified: false,
+          verified: false,
+        });
+      }
+    };
+
+    checkAscendAccess();
+  }, [isAuthenticated, user]);
 
   // Check if game is in cloud library
   useEffect(() => {
@@ -2440,8 +2486,8 @@ export default function GameScreen() {
                 <TabsContent value="mods" className="space-y-6">
                   <Card>
                     <CardContent className="p-6">
-                      {!isAuthenticated ? (
-                        /* Ascend promotion for non-authenticated users */
+                      {!isAuthenticated || !ascendAccess.hasAccess ? (
+                        /* Ascend promotion for non-authenticated users or expired trial */
                         <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
                           <div className="rounded-full bg-primary/10 p-6">
                             <Puzzle className="h-16 w-16 text-primary" />
@@ -2458,7 +2504,10 @@ export default function GameScreen() {
                               </p>
                             )}
                             <p className="max-w-md text-sm text-muted-foreground">
-                              {t("gameScreen.modsAscendPromo")}
+                              {!isAuthenticated
+                                ? t("gameScreen.modsAscendPromo")
+                                : t("gameScreen.modsAscendRequired") ||
+                                  "Ascend subscription required to access mods"}
                             </p>
                           </div>
                           <Button
@@ -2466,7 +2515,10 @@ export default function GameScreen() {
                             onClick={() => navigate("/ascend")}
                           >
                             <Gem className="h-4 w-4" />
-                            {t("gameScreen.getAscend")}
+                            {!isAuthenticated
+                              ? t("gameScreen.getAscend")
+                              : t("gameScreen.subscribeToAscend") ||
+                                "Subscribe to Ascend"}
                           </Button>
                         </div>
                       ) : (
@@ -2706,8 +2758,8 @@ export default function GameScreen() {
                 <TabsContent value="trainers" className="space-y-6">
                   <Card>
                     <CardContent className="p-6">
-                      {!isAuthenticated ? (
-                        /* Ascend promotion for non-authenticated users */
+                      {!isAuthenticated || !ascendAccess.hasAccess ? (
+                        /* Ascend promotion for non-authenticated users or expired trial */
                         <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
                           <div className="rounded-full bg-primary/10 p-6">
                             <Bolt className="h-16 w-16 text-primary" />
@@ -2720,7 +2772,10 @@ export default function GameScreen() {
                               {t("gameScreen.trainerAvailable")}
                             </p>
                             <p className="max-w-md text-sm text-muted-foreground">
-                              {t("gameScreen.trainersAscendPromo")}
+                              {!isAuthenticated
+                                ? t("gameScreen.trainersAscendPromo")
+                                : t("gameScreen.trainersAscendRequired") ||
+                                  "Ascend subscription required to access trainers"}
                             </p>
                           </div>
                           <Button
@@ -2728,7 +2783,10 @@ export default function GameScreen() {
                             onClick={() => navigate("/ascend")}
                           >
                             <Gem className="h-4 w-4" />
-                            {t("gameScreen.getAscend")}
+                            {!isAuthenticated
+                              ? t("gameScreen.getAscend")
+                              : t("gameScreen.subscribeToAscend") ||
+                                "Subscribe to Ascend"}
                           </Button>
                         </div>
                       ) : (
@@ -3223,7 +3281,7 @@ export default function GameScreen() {
             <AlertDialogDescription asChild>
               <div className="space-y-4 text-muted-foreground">
                 <p>
-                  {isAuthenticated
+                  {isAuthenticated && ascendAccess.hasAccess
                     ? t("gameScreen.updateAvailableDescription")
                     : t("gameScreen.updateAvailableDescriptionNoAuth")}
                 </p>
@@ -3241,7 +3299,7 @@ export default function GameScreen() {
                     </span>
                   </div>
                 </div>
-                {!isAuthenticated && (
+                {(!isAuthenticated || !ascendAccess.hasAccess) && (
                   <p className="text-xs text-muted-foreground/80">
                     {t("gameScreen.updateManualHint")}
                   </p>
@@ -3261,8 +3319,8 @@ export default function GameScreen() {
               className="text-secondary"
               disabled={isStartingUpdate}
               onClick={async () => {
-                // Check if user is authenticated - if not, promote Ascend
-                if (!isAuthenticated) {
+                // Check if user has Ascend access - if not, promote Ascend
+                if (!isAuthenticated || !ascendAccess.hasAccess) {
                   setShowUpdateDialog(false);
                   navigate("/ascend");
                   return;
@@ -3363,7 +3421,7 @@ export default function GameScreen() {
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
-              {isAuthenticated
+              {isAuthenticated && ascendAccess.hasAccess
                 ? isStartingUpdate
                   ? t("gameScreen.startingUpdate")
                   : t("gameScreen.downloadUpdate")

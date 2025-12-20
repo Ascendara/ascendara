@@ -75,6 +75,7 @@ import {
   getGameAchievements,
   syncCloudLibrary,
   syncGameAchievements,
+  verifyAscendAccess,
 } from "@/services/firebaseService";
 import { calculateLibraryValue } from "@/services/cheapsharkService";
 
@@ -174,10 +175,47 @@ const Library = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [ascendAccess, setAscendAccess] = useState({
+    hasAccess: false,
+    isSubscribed: false,
+    isVerified: false,
+  });
 
   useEffect(() => {
     localStorage.setItem("game-favorites", JSON.stringify(favorites));
   }, [favorites]);
+
+  // Verify Ascend access
+  useEffect(() => {
+    const checkAscendAccess = async () => {
+      if (!user) {
+        setAscendAccess({
+          hasAccess: false,
+          isSubscribed: false,
+          isVerified: false,
+        });
+        return;
+      }
+
+      try {
+        const result = await verifyAscendAccess();
+        setAscendAccess({
+          hasAccess: result.hasAccess,
+          isSubscribed: result.isSubscribed,
+          isVerified: result.isVerified,
+        });
+      } catch (error) {
+        console.error("Error verifying Ascend access:", error);
+        setAscendAccess({
+          hasAccess: false,
+          isSubscribed: false,
+          isVerified: false,
+        });
+      }
+    };
+
+    checkAscendAccess();
+  }, [user]);
 
   useEffect(() => {
     const checkWindows = async () => {
@@ -415,10 +453,17 @@ const Library = () => {
     });
   };
 
-  // Check for game updates when games are loaded
+  // Check for game updates when games are loaded (only for Ascend subscribers)
   useEffect(() => {
     const checkGameUpdates = async () => {
       console.log("[Library] checkGameUpdates called, games:", games.length);
+
+      // Only check if user has Ascend access
+      if (!user || !ascendAccess.hasAccess) {
+        console.log("[Library] Skipping update check - no Ascend access");
+        setGameUpdates({});
+        return;
+      }
 
       // Only check for non-custom games with gameID
       const gamesWithId = games.filter(g => !g.isFolder && !g.isCustom && g.gameID);
@@ -460,11 +505,13 @@ const Library = () => {
         "[Library] Triggering update check, isInitialized:",
         isInitialized,
         "games.length:",
-        games.length
+        games.length,
+        "hasAccess:",
+        ascendAccess.hasAccess
       );
       checkGameUpdates();
     }
-  }, [isInitialized, games]);
+  }, [isInitialized, games, user, ascendAccess.hasAccess]);
 
   // Load cloud-only games (games in cloud but not installed locally)
   useEffect(() => {
