@@ -352,7 +352,8 @@ export const updateExtendedProfile = async profileData => {
       bio: profileData.bio || null,
       country: profileData.country || null,
       socials: {
-        discord: profileData.socials?.discord || null,
+        linkedDiscord: profileData.socials?.linkedDiscord || null,
+        epicId: profileData.socials?.epicId || null,
         github: profileData.socials?.github || null,
         steam: profileData.socials?.steam || null,
       },
@@ -501,7 +502,8 @@ export const getUserData = async uid => {
           bio: data.bio || null,
           country: data.country || null,
           socials: {
-            discord: data.socials?.discord || null,
+            linkedDiscord: data.socials?.linkedDiscord || null,
+            epicId: data.socials?.epicId || null,
             github: data.socials?.github || null,
             steam: data.socials?.steam || null,
           },

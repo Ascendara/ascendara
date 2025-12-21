@@ -1216,7 +1216,7 @@ const Ascend = () => {
     setEditPhotoURL(user?.photoURL || "");
     setEditBio(userData?.bio || "");
     setEditCountry(userData?.country || "");
-    setEditDiscord(userData?.socials?.discord || "");
+    setEditDiscord(userData?.socials?.linkedDiscord || "");
     setEditEpicId(userData?.socials?.epicId || "");
     setEditGithub(userData?.socials?.github || "");
     setEditSteam(userData?.socials?.steam || "");
@@ -1249,8 +1249,8 @@ const Ascend = () => {
       bio: editBio.trim(),
       country: editCountry.trim(),
       socials: {
-        discord: editDiscord.trim(),
-        linkDiscord: editLinkDiscord.trim(),
+        linkedDiscord: userData?.socials?.linkedDiscord || "",
+        epicId: editEpicId.trim(),
         github: editGithub.trim(),
         steam: editSteam.trim(),
       },
@@ -4194,7 +4194,7 @@ const Ascend = () => {
                     {/* Empty state for bio/socials */}
                     {!userData?.bio &&
                       !userData?.country &&
-                      !userData?.socials?.discord &&
+                      !userData?.socials?.linkedDiscord &&
                       !userData?.socials?.github &&
                       !userData?.socials?.steam && (
                         <div className="mt-5 border-t border-border/50 pt-5 text-center">
