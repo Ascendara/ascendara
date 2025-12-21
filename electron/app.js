@@ -18,6 +18,11 @@ const https = require("https");
 const path = require("path");
 const fs = require("fs-extra");
 
+// Disable sandbox for Linux compatibility (must be set before app ready)
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("--no-sandbox");
+}
+
 // Import modules
 const {
   config,
