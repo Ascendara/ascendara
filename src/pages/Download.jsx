@@ -1825,58 +1825,77 @@ export default function DownloadPage() {
               </div>
 
               {/* Ascend Features Banner - Bottom of Hero */}
-              <div className="mt-4 flex items-center justify-between rounded-lg border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-2.5">
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
-                      <Cloud className="h-4 w-4 text-primary" />
+              <div className="group relative mt-4 overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-br from-primary/[0.08] via-background/50 to-primary/[0.05] p-5 shadow-lg shadow-primary/5 transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                {/* Animated background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+                <div className="relative flex items-center justify-between gap-4">
+                  <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-3">
+                    {/* Cloud Saves Feature */}
+                    <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                      <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                        <Cloud className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground">
+                        {t("download.cloudSaving")}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium">
-                      {t("download.cloudSavingSupported")}
-                    </span>
+
+                    {/* Mod Manager Feature */}
+                    {supportsModManaging && (
+                      <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                        <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                          <Puzzle className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                          <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                        </div>
+                        <span className="text-sm font-semibold text-foreground">
+                          {t("download.modManaging")}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Trainer Feature */}
+                    {supportsFlingTrainer && (
+                      <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                        <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                          <Zap className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                          <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                        </div>
+                        <span className="text-sm font-semibold text-foreground">
+                          {t("download.trainer")}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Auto Updates Feature */}
+                    {providers.some(p => seamlessProviders.includes(p)) && (
+                      <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                        <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                          <RefreshCw className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                          <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                        </div>
+                        <span className="text-sm font-semibold text-foreground">
+                          {t("download.autoUpdates")}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {supportsModManaging && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
-                        <Puzzle className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="text-sm font-medium">
-                        {t("download.modManagingSupported")}
+
+                  {/* CTA Button for non-authenticated users */}
+                  {!isAuthenticated && (
+                    <Button
+                      size="sm"
+                      className="group/btn relative shrink-0 overflow-hidden bg-gradient-to-r from-primary to-primary/80 px-5 py-2 font-semibold text-secondary shadow-md shadow-primary/25 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/40"
+                      onClick={() => navigate("/ascend")}
+                    >
+                      <span className="relative z-10 flex items-center gap-2">
+                        {t("download.getAscend")}
                       </span>
-                    </div>
-                  )}
-                  {supportsFlingTrainer && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
-                        <Zap className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="text-sm font-medium">
-                        {t("download.trainerAvailable")}
-                      </span>
-                    </div>
-                  )}
-                  {providers.some(p => seamlessProviders.includes(p)) && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20">
-                        <RefreshCw className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="text-sm font-medium">
-                        {t("download.autoUpdatesSupported")}
-                      </span>
-                    </div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" />
+                    </Button>
                   )}
                 </div>
-                {!isAuthenticated && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-primary hover:bg-primary/10"
-                    onClick={() => navigate("/ascend")}
-                  >
-                    {t("download.getAscend")}
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </Button>
-                )}
               </div>
             </div>
           </div>
