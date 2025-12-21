@@ -36,6 +36,7 @@
     "electron": "electron ./electron/app.js",
     "start": "concurrently \"vite\" \"wait-on tcp:5173 && electron ./electron/app.js\"",
     "dist": "python3 ./scripts/build_ascendara.py",
+    "dist-linux": "python3 ./scripts/build_ascendara_linux.py",
     "buildwithelectron": "electron-builder --config.extraMetadata.main=electron/app.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -181,10 +182,6 @@
         "to": "."
       },
       {
-        "from": "binaries/AscendaraGofileHelper/src/debian/AscendaraGofileHelper.py",
-        "to": "."
-      },
-      {
         "from": "binaries/AscendaraDownloader/src/debian/AscendaraDownloader.py",
         "to": "."
       },
@@ -221,6 +218,63 @@
     },
     "mac": {
       "target": "dmg"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "maintainer": "tagoWorks",
+      "vendor": "tagoWorks",
+      "synopsis": "Skip extracting files, navigating setup processes, or any unnecessary hassles.",
+      "description": "Ascendara is a desktop application that helps you skip extracting files, navigating setup processes, or any unnecessary hassles when installing software.",
+      "extraResources": [
+        {
+          "from": "src/public",
+          "to": "public"
+        },
+        {
+          "from": "binaries/AscendaraDownloader/src/debian/AscendaraDownloader.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraDownloader/src/debian/AscendaraGofileHelper.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraGameHandler/src/debian/AscendaraGameHandler.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraCrashReporter/src/debian/AscendaraCrashReporter.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraNotificationHelper/src/debian/AscendaraNotificationHelper.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraLanguageTranslation/src/debian/AscendaraLanguageTranslation.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraLocalRefresh/src/debian/AscendaraLocalRefresh.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraTorrentHandler/src/debian/AscendaraTorrentHandler.py",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher",
+          "to": "."
+        }
+      ]
     },
     "productName": "Ascendara",
     "directories": {
