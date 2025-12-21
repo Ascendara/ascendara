@@ -124,6 +124,7 @@ import {
   ListOrdered,
   Puzzle,
   Infinity,
+  Copy,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -223,6 +224,7 @@ const Ascend = () => {
   const [editBio, setEditBio] = useState("");
   const [editCountry, setEditCountry] = useState("");
   const [editDiscord, setEditDiscord] = useState("");
+  const [editEpicId, setEditEpicId] = useState("");
   const [editGithub, setEditGithub] = useState("");
   const [editSteam, setEditSteam] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -1215,6 +1217,7 @@ const Ascend = () => {
     setEditBio(userData?.bio || "");
     setEditCountry(userData?.country || "");
     setEditDiscord(userData?.socials?.discord || "");
+    setEditEpicId(userData?.socials?.epicId || "");
     setEditGithub(userData?.socials?.github || "");
     setEditSteam(userData?.socials?.steam || "");
     setIsEditingProfile(true);
@@ -1247,6 +1250,7 @@ const Ascend = () => {
       country: editCountry.trim(),
       socials: {
         discord: editDiscord.trim(),
+        linkDiscord: editLinkDiscord.trim(),
         github: editGithub.trim(),
         steam: editSteam.trim(),
       },
@@ -1272,6 +1276,7 @@ const Ascend = () => {
     setEditBio("");
     setEditCountry("");
     setEditDiscord("");
+    setEditEpicId("");
     setEditGithub("");
     setEditSteam("");
   };
@@ -3978,7 +3983,7 @@ const Ascend = () => {
                       </h3>
 
                       <div className="grid gap-4">
-                        {/* Discord */}
+                        {/* Discord (Read-only) */}
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/10">
                             <svg
@@ -3989,11 +3994,35 @@ const Ascend = () => {
                               <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                             </svg>
                           </div>
+                          <div className="flex-1">
+                            <Input
+                              type="text"
+                              placeholder={t("ascend.settings.discordPlaceholder")}
+                              value={editDiscord}
+                              readOnly
+                              disabled
+                              className="h-11 cursor-not-allowed rounded-xl bg-muted/50"
+                            />
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("ascend.settings.discordReadOnly") ||
+                                "Discord username is read-only"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Epic Games ID */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-foreground/10">
+                            <Gamepad2 className="h-5 w-5" />
+                          </div>
                           <Input
                             type="text"
-                            placeholder={t("ascend.settings.discordPlaceholder")}
-                            value={editDiscord}
-                            onChange={e => setEditDiscord(e.target.value)}
+                            placeholder={
+                              t("ascend.settings.epicIdPlaceholder") ||
+                              "Your Epic Games ID"
+                            }
+                            value={editEpicId}
+                            onChange={e => setEditEpicId(e.target.value)}
                             className="h-11 flex-1 rounded-xl"
                           />
                         </div>
@@ -4113,7 +4142,8 @@ const Ascend = () => {
                     </div>
 
                     {/* Social Links Display */}
-                    {(userData?.socials?.discord ||
+                    {(userData?.socials?.linkedDiscord ||
+                      userData?.socials?.epicId ||
                       userData?.socials?.github ||
                       userData?.socials?.steam) && (
                       <div className="mt-5 border-t border-border/50 pt-5">
@@ -4121,7 +4151,7 @@ const Ascend = () => {
                           {t("ascend.settings.socialLinks")}
                         </h4>
                         <div className="flex flex-wrap gap-3">
-                          {userData?.socials?.discord && (
+                          {userData?.socials?.linkedDiscord && (
                             <div className="flex items-center gap-2 rounded-xl bg-[#5865F2]/10 px-3 py-2 text-sm">
                               <svg
                                 className="h-4 w-4 text-[#5865F2]"
@@ -4130,7 +4160,13 @@ const Ascend = () => {
                               >
                                 <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                               </svg>
-                              <span>{userData.socials.discord}</span>
+                              <span>{userData.socials.linkedDiscord}</span>
+                            </div>
+                          )}
+                          {userData?.socials?.epicId && (
+                            <div className="flex items-center gap-2 rounded-xl bg-foreground/10 px-3 py-2 text-sm">
+                              <Gamepad2 className="h-4 w-4" />
+                              <span>{userData.socials.epicId}</span>
                             </div>
                           )}
                           {userData?.socials?.github && (
@@ -4641,6 +4677,113 @@ const Ascend = () => {
                   </div>
                 </AlertDialogContent>
               </AlertDialog>
+
+              {/* Discord Verification Card */}
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+                <div className="flex items-center justify-between border-b border-border/50 p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#5865F2]/10">
+                      <svg
+                        className="h-4 w-4 text-[#5865F2]"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                      </svg>
+                    </div>
+                    <h2 className="font-semibold">
+                      {t("ascend.settings.discordVerification") || "Discord Verification"}
+                    </h2>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/10">
+                        <BadgeCheck className="h-5 w-5 text-[#5865F2]" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="mb-1 font-medium">
+                          {t("ascend.settings.verifyYourAccount") ||
+                            "Verify Your Account"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {t("ascend.settings.discordVerificationDescription") ||
+                            "Get verified on our Discord server to unlock exclusive roles and features."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/50 p-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">
+                          {t("ascend.settings.howToVerify") || "How to Verify"}
+                        </span>
+                      </div>
+                      <ol className="space-y-2 text-sm text-muted-foreground">
+                        <li className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                            1
+                          </span>
+                          <span>
+                            {t("ascend.settings.verifyStep1") ||
+                              "Join our Discord server"}
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                            2
+                          </span>
+                          <span>
+                            {t("ascend.settings.verifyStep2") ||
+                              "Run the following command in any channel:"}
+                          </span>
+                        </li>
+                      </ol>
+
+                      <div className="mt-3 rounded-lg bg-background/80 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <code className="font-mono text-xs text-muted-foreground">
+                            {t("ascend.settings.verifyCommand") || "Verification Command"}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 gap-1 px-2 text-xs"
+                            onClick={() => {
+                              const command = `=verifyascend ${user?.uid?.substring(0, 10) || ""}`;
+                              navigator.clipboard.writeText(command);
+                              toast.success(
+                                t("ascend.settings.commandCopied") ||
+                                  "Command copied to clipboard!"
+                              );
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                            {t("ascend.settings.copy") || "Copy"}
+                          </Button>
+                        </div>
+                        <div className="rounded bg-muted/50 px-3 py-2 font-mono text-sm">
+                          =verifyascend {user?.uid?.substring(0, 10) || "XXXXXXXXXX"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 border-[#5865F2]/30 bg-[#5865F2]/5 hover:bg-[#5865F2]/10"
+                      onClick={() =>
+                        window.electron?.openURL("https://ascendara.app/discord")
+                      }
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      {t("ascend.settings.joinDiscord") || "Join Discord Server"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
 
               {/* Account Actions */}
               <div className="mt-8 space-y-4 border-t border-border/50 pt-8">
@@ -6242,7 +6385,7 @@ const Ascend = () => {
                                   <span>{viewingProfile.country}</span>
                                 </div>
                               )}
-                              {viewingProfile.socials?.discord && (
+                              {viewingProfile.socials?.linkedDiscord && (
                                 <div className="flex items-center gap-1.5 rounded-lg bg-[#5865F2]/10 px-2.5 py-1 text-sm">
                                   <svg
                                     className="h-4 w-4 text-[#5865F2]"
@@ -6251,7 +6394,13 @@ const Ascend = () => {
                                   >
                                     <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                                   </svg>
-                                  <span>{viewingProfile.socials.discord}</span>
+                                  <span>{viewingProfile.socials.linkedDiscord}</span>
+                                </div>
+                              )}
+                              {viewingProfile.socials?.epicId && (
+                                <div className="flex items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-1 text-sm">
+                                  <Gamepad2 className="h-4 w-4" />
+                                  <span>{viewingProfile.socials.epicId}</span>
                                 </div>
                               )}
                               {viewingProfile.socials?.github && (
