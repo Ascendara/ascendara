@@ -54,6 +54,7 @@ if (isDev) {
 // Global variables
 let tray = null;
 let localServer = null;
+let watcherProcess = null;
 
 /**
  * Launch crash reporter
@@ -107,6 +108,74 @@ function createTray() {
   tray.on("click", () => {
     windowModule.showWindow();
   });
+}
+
+/**
+ * Start the achievement watcher process (Windows only)
+ */
+function startAchievementWatcher() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const { spawn } = require("child_process");
+  const os = require("os");
+
+  const watcherExePath = isDev
+    ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe"
+    : path.join(process.resourcesPath, "AscendaraAchievementWatcher.exe");
+
+  if (!fs.existsSync(watcherExePath)) {
+    console.error("Achievement watcher not found at:", watcherExePath);
+    return;
+  }
+
+  watcherProcess = spawn(watcherExePath, [], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ASCENDARA_STEAM_WEB_API_KEY: config.steamWebApiKey,
+    },
+    windowsHide: true,
+  });
+
+  watcherProcess.stdout.on("data", data => {
+    console.log(`[WATCHER] ${data.toString().trim()}`);
+  });
+
+  watcherProcess.stderr.on("data", data => {
+    console.error(`[WATCHER ERROR] ${data.toString().trim()}`);
+  });
+
+  watcherProcess.on("error", error => {
+    console.error("Achievement watcher error:", error);
+  });
+
+  watcherProcess.on("exit", (code, signal) => {
+    console.log(`Achievement watcher exited with code ${code} and signal ${signal}`);
+    watcherProcess = null;
+  });
+
+  console.log("Achievement watcher started");
+}
+
+/**
+ * Terminate the achievement watcher process
+ */
+function terminateWatcher() {
+  if (watcherProcess && !watcherProcess.killed) {
+    if (process.platform === "win32") {
+      const { exec } = require("child_process");
+      exec(`taskkill /pid ${watcherProcess.pid} /T /F`, err => {
+        if (err) {
+          console.error("Error terminating watcher:", err);
+        }
+      });
+    } else {
+      watcherProcess.kill("SIGTERM");
+    }
+    watcherProcess = null;
+  }
 }
 
 /**
@@ -368,6 +437,9 @@ async function initializeApp() {
     // Create system tray
     createTray();
 
+    // Start achievement watcher (Windows only)
+    startAchievementWatcher();
+
     // Defer non-critical initialization until after window loads
     mainWindow.webContents.once("did-finish-load", () => {
       // Register deferred handlers (steamcmd, ludusavi, translations, themes, etc.)
@@ -423,7 +495,9 @@ async function initializeApp() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("app-closing");
     }
+    // Cleanup
     discordRpc.destroyDiscordRPC();
+    terminateWatcher();
   });
 
   // Will quit cleanup
