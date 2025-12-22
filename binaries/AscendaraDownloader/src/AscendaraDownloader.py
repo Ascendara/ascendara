@@ -455,7 +455,17 @@ class ChunkedDownloader:
                     # Check if download is complete
                     final_size = os.path.getsize(self.dest_path)
                     
-                    if self.total_size is None or final_size >= self.total_size:
+                    # Debug logging to see exact values
+                    logging.info(f"[ChunkedDownloader] DEBUG: final_size={final_size}, total_size={self.total_size}, difference={abs(final_size - self.total_size) if self.total_size else 'N/A'}")
+                    
+                    # If stream completed successfully and we have a total_size, check completion
+                    # Allow small tolerance for size comparison (1KB) to handle edge cases
+                    if self.total_size is None:
+                        # No total size known - assume complete if stream finished
+                        logging.info(f"[ChunkedDownloader] Download complete: {read_size(final_size)}")
+                        return True
+                    elif final_size >= self.total_size - 1024:
+                        # Download is complete (within 1KB tolerance)
                         # Clear retry status
                         if 'retryAttempt' in self.game_info.get('downloadingData', {}):
                             del self.game_info['downloadingData']['retryAttempt']
@@ -862,6 +872,28 @@ class RobustDownloader:
                         if new_archive not in processed_archives and new_archive not in archives_to_process:
                             archives_to_process.append(new_archive)
                             logging.info(f"[RobustDownloader] Found nested archive: {new_archive}")
+                            
+                            # Count files in nested archive and update total
+                            try:
+                                nested_file_count = 0
+                                if ext == '.zip':
+                                    with zipfile.ZipFile(new_archive, 'r') as zip_ref:
+                                        for zip_info in zip_ref.infolist():
+                                            if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
+                                                nested_file_count += 1
+                                elif ext == '.rar':
+                                    from unrar import rarfile
+                                    with rarfile.RarFile(new_archive) as rar_ref:
+                                        for rar_info in rar_ref.infolist():
+                                            is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                                            if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename and not is_dir:
+                                                nested_file_count += 1
+                                
+                                if nested_file_count > 0:
+                                    self._total_files_to_extract += nested_file_count
+                                    logging.info(f"[RobustDownloader] Added {nested_file_count} files from nested archive (new total: {self._total_files_to_extract})")
+                            except Exception as e:
+                                logging.warning(f"[RobustDownloader] Could not count files in nested archive {new_archive}: {e}")
         
         # Flatten nested directories
         self._flatten_directories()
