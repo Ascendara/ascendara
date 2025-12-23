@@ -719,9 +719,9 @@ export default function GameScreen() {
     init();
   }, []);
 
-  // Load game data
+  // Load game data when component mounts
   useEffect(() => {
-    const launchGame = async (withTrainer = false) => {
+    const initializeGameScreen = async () => {
       try {
         // If we don't have game data from location state, navigate back to library
         if (!game) {
@@ -751,156 +751,7 @@ export default function GameScreen() {
       }
     };
 
-    const handlePlay = async (withTrainer = false) => {
-      if (!game) return;
-
-      const gameName = game.game || game.name;
-      const isCustom = !!game.isCustom;
-
-      setIsLaunching(true);
-
-      try {
-        // Check if Steam is required and running
-        if (game.requiresSteam) {
-          const hideSteamWarning = localStorage.getItem("hideSteamWarning");
-          if (!hideSteamWarning) {
-            const steamRunning = await window.electron.isSteamRunning();
-            if (!steamRunning) {
-              setShowSteamNotRunningWarning(true);
-              setIsLaunching(false);
-              return;
-            }
-          }
-        }
-
-        // Check for VR warning
-        if (game.vr && settings.showVrWarning !== false) {
-          setShowVrWarning(true);
-          setIsLaunching(false);
-          return;
-        }
-
-        // Check for online fix warning
-        if (game.online && settings.showOnlineFixWarning !== false) {
-          setShowOnlineFixWarning(true);
-          setIsLaunching(false);
-          return;
-        }
-
-        // Launch the game
-        await launchGame(withTrainer);
-      } catch (error) {
-        console.error("Error in handlePlay:", error);
-        setIsLaunching(false);
-      }
-    };
-
-    const loadGame = async () => {
-      try {
-        // First check if game is already running
-        const isRunning = await window.electron.isGameRunning(game.game || game.name);
-        if (isRunning) {
-          toast.error(t("library.alreadyRunning", { game: game.game || game.name }));
-          setIsLaunching(false);
-          return;
-        }
-
-        // Check if Steam is running for onlinefix
-        if (game.online) {
-          const hideSteamWarning = localStorage.getItem("hideSteamWarning");
-          if (!hideSteamWarning) {
-            if (!(await window.electron.isSteamRunning())) {
-              toast.error(t("library.steamNotRunning"));
-              setIsLaunching(false);
-              setShowSteamNotRunningWarning(true);
-              return;
-            }
-          }
-        }
-
-        // Check if game is VR and show warning
-        if (game.isVr && !withTrainer) {
-          setShowVrWarning(true);
-          setIsLaunching(false);
-          return;
-        }
-
-        if (game.online && (game.launchCount < 1 || !game.launchCount)) {
-          // Check if warning has been shown before
-          const onlineFixWarningShown = localStorage.getItem("onlineFixWarningShown");
-          if (!onlineFixWarningShown) {
-            setShowOnlineFixWarning(true);
-            // Save that warning has been shown
-            localStorage.setItem("onlineFixWarningShown", "true");
-            setIsLaunching(false);
-            return;
-          }
-        }
-
-        // Check for multiple executables if no specific one was provided
-        if (!specificExecutable) {
-          const executables = await gameUpdateService.getGameExecutables(
-            gameName,
-            game.isCustom
-          );
-          if (executables.length > 1) {
-            // Store launch options and show selection dialog
-            setPendingLaunchOptions({
-              forcePlay,
-              adminLaunch: isShiftKeyPressed,
-            });
-            setAvailableExecutables(executables);
-            setShowExecutableSelect(true);
-            setIsLaunching(false);
-            return;
-          }
-        }
-
-        console.log("Launching game: ", gameName);
-        // Launch the game
-        killAudioAndMiniplayer();
-        // Use the tracked shift key state for admin privileges
-        if (isShiftKeyPressed) {
-          console.log("Launching game with admin privileges");
-        }
-        await window.electron.playGame(
-          gameName,
-          isCustom,
-          backupOnClose,
-          launchWithAdmin,
-          null,
-          withTrainer
-        );
-
-        // Get and cache the game image before saving to recently played
-        const imageBase64 = await window.electron.getGameImage(gameName);
-        if (imageBase64) {
-          await imageCacheService.getImage(game.imgID);
-        }
-
-        // Save to recently played games
-        recentGamesService.addRecentGame({
-          game: gameName,
-          name: game.name,
-          imgID: game.imgID,
-          version: game.version,
-          isCustom: game.isCustom,
-          online: game.online,
-          dlc: game.dlc,
-        });
-
-        analytics.trackGameButtonClick(game.game, "play", {
-          isLaunching,
-          isRunning,
-        });
-        setIsLaunching(false);
-      } catch (error) {
-        console.error("Error launching game:", error);
-        setIsLaunching(false);
-      }
-    };
-
-    loadGame();
+    initializeGameScreen();
 
     // Set up game running status listener
     const gameStatusInterval = setInterval(async () => {
