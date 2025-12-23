@@ -150,22 +150,30 @@ const searchGameGiantBomb = async (gameName, apiKey) => {
   try {
     // URL encode the game name
     const encodedGameName = encodeURIComponent(gameName);
-    const url = `${GIANTBOMB_API_URL}/search/?api_key=${apiKey}&format=json&query=${encodedGameName}&resources=game&limit=1`;
+    const baseUrl = `${GIANTBOMB_API_URL}/search/`;
+    const url = `${baseUrl}?query=${encodedGameName}&resources=game&limit=1`;
 
-    // Set up headers
-    const headers = {
-      Accept: "application/json",
-      "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
-    };
-
-    // In production, we need to add CORS headers
-    if (!isDev) {
-      headers["Access-Control-Allow-Origin"] = "*";
+    // In production (Electron), use IPC to bypass CORS
+    if (!isDev && window.electron?.giantbombRequest) {
+      const result = await window.electron.giantbombRequest(url, apiKey);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      const data = result.data;
+      console.log("GiantBomb search response:", data);
+      if (data.error === "OK" && data.results && data.results.length > 0) {
+        return data.results[0];
+      }
+      return null;
     }
 
+    // In dev mode, use Vite proxy
     const response = await fetch(url, {
       method: "GET",
-      headers,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
+      },
     });
 
     if (!response.ok) {
@@ -197,10 +205,25 @@ const getGameDetailByIdGiantBomb = async (gameId, apiKey) => {
   try {
     console.log(`Fetching GiantBomb details for game ID: ${gameId}`);
 
-    // Construct the URL with the game ID and API key
+    // Construct the URL with the game ID
     // Include fields parameter to request specific data including images
-    const url = `https://www.giantbomb.com/api/game/${gameId}/?api_key=${apiKey}&format=json&field_list=id,name,deck,description,image,images,genres,platforms,videos,original_release_date,site_detail_url,aliases`;
+    const url = `https://www.giantbomb.com/api/game/${gameId}/?field_list=id,name,deck,description,image,images,genres,platforms,videos,original_release_date,site_detail_url,aliases`;
 
+    // In production (Electron), use IPC to bypass CORS
+    if (!isDev && window.electron?.giantbombRequest) {
+      const result = await window.electron.giantbombRequest(url, apiKey);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      const data = result.data;
+      console.log("GiantBomb detail response:", data);
+      if (data.error === "OK" && data.results) {
+        return data.results;
+      }
+      return null;
+    }
+
+    // In dev mode, use direct fetch
     const response = await fetch(url);
 
     if (!response.ok) {

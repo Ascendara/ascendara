@@ -112,6 +112,13 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   igdbRequest: (endpoint, body, clientId, accessToken) =>
     ipcRenderer.invoke("igdb-request", { endpoint, body, clientId, accessToken }),
+
+  //===========================================================================
+  // GiantBomb API (bypasses CORS)
+  //===========================================================================
+  giantbombRequest: (url, apiKey) =>
+    ipcRenderer.invoke("giantbomb-request", { url, apiKey }),
+
   switchRPC: state => ipcRenderer.invoke("switch-rpc", state),
 
   //===========================================================================

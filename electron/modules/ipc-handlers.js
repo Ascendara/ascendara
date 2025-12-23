@@ -124,6 +124,26 @@ function registerMiscHandlers() {
     }
   });
 
+  // GiantBomb API request handler (bypasses CORS)
+  ipcMain.handle("giantbomb-request", async (_, { url, apiKey }) => {
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
+          Accept: "application/json",
+        },
+        params: {
+          api_key: apiKey,
+          format: "json",
+        },
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("GiantBomb request error:", error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Is experiment
   let experiment = false;
   ipcMain.handle("is-experiment", () => experiment);
