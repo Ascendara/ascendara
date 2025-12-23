@@ -494,6 +494,11 @@ const SteamNotRunningDialog = ({ open, onClose, t }) => {
     }, 2000);
   };
 
+  const handleDontShowAgain = () => {
+    localStorage.setItem("hideSteamWarning", "true");
+    onClose();
+  };
+
   return (
     <AlertDialog open={open} onOpenChange={onClose}>
       <AlertDialogContent>
@@ -506,6 +511,15 @@ const SteamNotRunningDialog = ({ open, onClose, t }) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mr-auto text-xs text-muted-foreground hover:text-foreground"
+            onClick={handleDontShowAgain}
+          >
+            {t("gameScreen.dontShowSteamWarning")}
+          </Button>
+
           <Button
             className="text-secondary"
             onClick={handleStartSteam}
@@ -748,11 +762,14 @@ export default function GameScreen() {
       try {
         // Check if Steam is required and running
         if (game.requiresSteam) {
-          const steamRunning = await window.electron.isSteamRunning();
-          if (!steamRunning) {
-            setShowSteamNotRunningWarning(true);
-            setIsLaunching(false);
-            return;
+          const hideSteamWarning = localStorage.getItem("hideSteamWarning");
+          if (!hideSteamWarning) {
+            const steamRunning = await window.electron.isSteamRunning();
+            if (!steamRunning) {
+              setShowSteamNotRunningWarning(true);
+              setIsLaunching(false);
+              return;
+            }
           }
         }
 
@@ -790,11 +807,14 @@ export default function GameScreen() {
 
         // Check if Steam is running for onlinefix
         if (game.online) {
-          if (!(await window.electron.isSteamRunning())) {
-            toast.error(t("library.steamNotRunning"));
-            setIsLaunching(false);
-            setShowSteamNotRunningWarning(true);
-            return;
+          const hideSteamWarning = localStorage.getItem("hideSteamWarning");
+          if (!hideSteamWarning) {
+            if (!(await window.electron.isSteamRunning())) {
+              toast.error(t("library.steamNotRunning"));
+              setIsLaunching(false);
+              setShowSteamNotRunningWarning(true);
+              return;
+            }
           }
         }
 
@@ -1376,11 +1396,14 @@ export default function GameScreen() {
 
       // Check if Steam is running for onlinefix
       if (game.online) {
-        if (!(await window.electron.isSteamRunning())) {
-          toast.error(t("library.steamNotRunning"));
-          setIsLaunching(false);
-          setShowSteamNotRunningWarning(true);
-          return;
+        const hideSteamWarning = localStorage.getItem("hideSteamWarning");
+        if (!hideSteamWarning) {
+          if (!(await window.electron.isSteamRunning())) {
+            toast.error(t("library.steamNotRunning"));
+            setIsLaunching(false);
+            setShowSteamNotRunningWarning(true);
+            return;
+          }
         }
       }
 

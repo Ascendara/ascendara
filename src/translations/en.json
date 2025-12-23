@@ -1053,6 +1053,7 @@
     "currentVersion": "Current Version",
     "details": "Details",
     "dismiss": "Dismiss",
+    "dontShowSteamWarning": "Don't show this again",
     "downloadAll": "Download All",
     "downloadComplete": "Download complete!",
     "downloadFailed": "Download failed.",
