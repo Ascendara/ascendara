@@ -195,6 +195,14 @@ function setMainWindowHidden(value) {
 }
 
 /**
+ * Get the main window
+ * @returns {BrowserWindow|null} - The main window or null if not found
+ */
+function getMainWindow() {
+  return BrowserWindow.getAllWindows().find(win => win) || null;
+}
+
+/**
  * Show an error dialog
  * @param {string} title - Dialog title
  * @param {string} message - Dialog message
@@ -258,8 +266,10 @@ function registerWindowHandlers() {
         mainWindowHidden = true;
         destroyDiscordRPC();
         win.hide();
-        console.log("Window hidden instead of closed");
+        console.log("Window hidden to tray");
       } else {
+        // Set quitting flag to allow app to quit
+        app.isQuitting = true;
         win.close();
         // If endOnClose is true, we should make sure the app fully quits
         if (process.platform !== "darwin") {
@@ -349,6 +359,7 @@ module.exports = {
   createWindow,
   hideWindow,
   showWindow,
+  getMainWindow,
   setHandlingProtocolUrl,
   isMainWindowHidden,
   setMainWindowHidden,

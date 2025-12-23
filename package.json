@@ -154,6 +154,10 @@
         "to": "public"
       },
       {
+        "from": "readme/logo/ico/ascendara_256x.ico",
+        "to": "icon.ico"
+      },
+      {
         "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader.exe",
         "to": "."
       },

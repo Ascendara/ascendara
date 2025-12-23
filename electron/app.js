@@ -88,20 +88,47 @@ function launchCrashReporter(errorType, errorMessage) {
  * Create system tray
  */
 function createTray() {
-  const iconPath = path.join(__dirname, "icon.ico");
+  // Use the correct icon path - try multiple locations
+  let iconPath;
+  if (isDev) {
+    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_256x.ico");
+  } else {
+    // In production, icon should be in resources
+    iconPath = path.join(process.resourcesPath, "icon.ico");
+    // Fallback to app directory if not in resources
+    if (!fs.existsSync(iconPath)) {
+      iconPath = path.join(config.appDirectory, "icon.ico");
+    }
+  }
+
+  // Verify icon exists
+  if (!fs.existsSync(iconPath)) {
+    console.error("Tray icon not found at:", iconPath);
+    // Use a fallback - create from the window icon
+    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_256x.ico");
+  }
+
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon);
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: "Open Ascendara",
+      label: "Show Ascendara",
       click: () => {
         windowModule.showWindow();
       },
     },
     {
+      label: "Hide Ascendara",
+      click: () => {
+        windowModule.hideWindow();
+      },
+    },
+    { type: "separator" },
+    {
       label: "Quit",
       click: () => {
+        app.isQuitting = true;
         app.quit();
       },
     },
@@ -110,9 +137,28 @@ function createTray() {
   tray.setToolTip("Ascendara");
   tray.setContextMenu(contextMenu);
 
-  tray.on("click", () => {
-    windowModule.showWindow();
+  // Double-click to show/hide window
+  tray.on("double-click", () => {
+    const mainWindow = windowModule.getMainWindow();
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        windowModule.hideWindow();
+      } else {
+        windowModule.showWindow();
+      }
+    } else {
+      windowModule.showWindow();
+    }
   });
+
+  // Single click to show window (Windows behavior)
+  if (process.platform === "win32") {
+    tray.on("click", () => {
+      windowModule.showWindow();
+    });
+  }
+
+  console.log("System tray created successfully");
 }
 
 /**
@@ -482,8 +528,10 @@ async function initializeApp() {
 
   // Quit when all windows are closed (except on macOS)
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-      // Don't quit, just hide to tray
+    // Don't quit - keep running in tray
+    // Only quit if explicitly requested via tray menu or app.isQuitting flag
+    if (app.isQuitting) {
+      app.quit();
     }
   });
 
