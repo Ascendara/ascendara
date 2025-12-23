@@ -235,10 +235,6 @@
       "description": "Ascendara is a desktop application that helps you skip extracting files, navigating setup processes, or any unnecessary hassles when installing software.",
       "extraResources": [
         {
-          "from": "src/public",
-          "to": "public"
-        },
-        {
           "from": "binaries/AscendaraDownloader/src/debian/AscendaraDownloader.py",
           "to": "."
         },
