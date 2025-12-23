@@ -620,7 +620,7 @@
       "verifyCheckoutError": "Failed to verify payment. Please contact support if you were charged.",
       "verifyCommand": "Verification Command",
       "verifyStep1": "Join the Discord server",
-      "verifyStep2": "Run the following command in any channel:",
+      "verifyStep2": "Run the following command in the commands channel:",
       "verifyYourAccount": "Verify Your Account",
       "welcomeToAscend": "Welcome to Ascend!"
     },
