@@ -253,6 +253,10 @@ const Ascend = () => {
   const [verifyingAccess, setVerifyingAccess] = useState(true);
   const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
 
+  // Developer mode state
+  const [isDev, setIsDev] = useState(false);
+  const [devSubscriptionState, setDevSubscriptionState] = useState("normal"); // normal, trial, verified, subscribed
+
   // Messaging state
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -314,6 +318,20 @@ const Ascend = () => {
   // Version check state
   const [isOutdated, setIsOutdated] = useState(false);
   const [checkingVersion, setCheckingVersion] = useState(true);
+
+  // Check if in development mode
+  useEffect(() => {
+    const checkDevMode = async () => {
+      try {
+        const isDevMode = await window.electron.isDev();
+        setIsDev(isDevMode);
+      } catch (error) {
+        console.error("Error checking dev mode:", error);
+        setIsDev(false);
+      }
+    };
+    checkDevMode();
+  }, []);
 
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState(null);
@@ -1375,6 +1393,33 @@ const Ascend = () => {
 
   // Open Stripe Customer Portal for managing subscription
   const handleManageSubscription = async () => {
+    try {
+      const authToken = await getAuthToken();
+      const response = await fetch("https://api.ascendara.app/stripe/customer-portal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          returnUrl: "ascendara://checkout-canceled",
+        }),
+      });
+      if (response.ok) {
+        const { url } = await response.json();
+        window.electron?.openURL?.(url);
+      } else {
+        toast.error(t("ascend.settings.portalError"));
+      }
+    } catch (error) {
+      console.error("Error opening customer portal:", error);
+      toast.error(t("ascend.settings.portalError"));
+    }
+  };
+
+  // Open Stripe Customer Portal for viewing invoices
+  const handleViewInvoices = async () => {
     try {
       const authToken = await getAuthToken();
       const response = await fetch("https://api.ascendara.app/stripe/customer-portal", {
@@ -4307,7 +4352,9 @@ const Ascend = () => {
                         />
                       )}
                     </div>
-                    <h2 className="font-semibold">{t("ascend.settings.subscription")}</h2>
+                    <h2 className="mt-2 font-semibold">
+                      {t("ascend.settings.subscription")}
+                    </h2>
                   </div>
                   {ascendAccess.isVerified ? (
                     <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-3 py-1">
@@ -4326,8 +4373,34 @@ const Ascend = () => {
                   ) : null}
                 </div>
 
+                {/* Developer Mode Subscription State Switcher */}
+                {isDev && (
+                  <div className="border-t border-border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Dev: Subscription State
+                      </span>
+                      <Select
+                        value={devSubscriptionState}
+                        onValueChange={setDevSubscriptionState}
+                      >
+                        <SelectTrigger className="h-8 w-[140px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="trial">Trial Active</SelectItem>
+                          <SelectItem value="verified">Verified</SelectItem>
+                          <SelectItem value="subscribed">Subscribed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative p-5">
-                  {ascendAccess.isVerified ? (
+                  {(isDev && devSubscriptionState === "verified") ||
+                  (!isDev && ascendAccess.isVerified) ? (
                     // Verified User - Special Design
                     <div className="space-y-6">
                       <div className="flex items-center gap-4">
@@ -4404,7 +4477,8 @@ const Ascend = () => {
                         </div>
                       </div>
                     </div>
-                  ) : ascendAccess.isSubscribed ? (
+                  ) : (isDev && devSubscriptionState === "subscribed") ||
+                    (!isDev && ascendAccess.isSubscribed) ? (
                     // Active Subscription - Premium Design
                     <div className="space-y-6">
                       <div className="flex items-center gap-4">
@@ -4419,7 +4493,7 @@ const Ascend = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-xl font-bold text-transparent">
-                              {t("ascend.settings.ascendPro")}
+                              {t("ascend.settings.ascendSubscription") || "Ascend"}
                             </h3>
                           </div>
                           <p className="text-sm text-muted-foreground">
@@ -4476,31 +4550,47 @@ const Ascend = () => {
                         </div>
                       </div>
 
-                      <Button
-                        variant="outline"
-                        className="h-12 w-full gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
-                        onClick={handleManageSubscription}
-                      >
-                        <Settings className="h-4 w-4" />
-                        {t("ascend.settings.manageSubscription")}
-                      </Button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          variant="outline"
+                          className="h-12 gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
+                          onClick={handleViewInvoices}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          {t("ascend.settings.viewInvoices")}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-12 gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
+                          onClick={handleManageSubscription}
+                        >
+                          <Settings className="h-4 w-4" />
+                          {t("ascend.settings.manageSubscription")}
+                        </Button>
+                      </div>
                     </div>
-                  ) : ascendAccess.hasAccess && ascendAccess.daysRemaining > 0 ? (
-                    // Trial Active - Engaging Design
+                  ) : (isDev && devSubscriptionState === "trial") ||
+                    (!isDev &&
+                      ascendAccess.hasAccess &&
+                      ascendAccess.daysRemaining > 0) ? (
+                    // Trial Active - Premium Features Showcase
                     <div className="space-y-5">
                       <div className="flex items-center gap-4">
                         <div className="relative">
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/20 ring-2 ring-primary/20">
-                            <Clock className="h-7 w-7 text-primary" />
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 ring-2 ring-emerald-500/20">
+                            <BadgeCheck className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                           </div>
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold">
-                            {t("ascend.settings.freeTrial")}
+                            {t("ascend.settings.trialActive") || "Trial Active"}
                           </h3>
                           <p className="text-sm text-muted-foreground">
                             {t("ascend.settings.trialDaysRemaining", {
-                              days: ascendAccess.daysRemaining,
+                              days:
+                                isDev && devSubscriptionState === "trial"
+                                  ? 5
+                                  : ascendAccess.daysRemaining,
                             })}
                           </p>
                         </div>
@@ -4512,14 +4602,17 @@ const Ascend = () => {
                             {t("ascend.settings.trialProgress")}
                           </span>
                           <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
-                            {ascendAccess.daysRemaining} {t("ascend.settings.daysLeft")}
+                            {isDev && devSubscriptionState === "trial"
+                              ? 5
+                              : ascendAccess.daysRemaining}{" "}
+                            {t("ascend.settings.daysLeft")}
                           </span>
                         </div>
                         <div className="h-3 w-full overflow-hidden rounded-full bg-muted/50">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{
-                              width: `${((7 - ascendAccess.daysRemaining) / 7) * 100}%`,
+                              width: `${((7 - (isDev && devSubscriptionState === "trial" ? 5 : ascendAccess.daysRemaining)) / 7) * 100}%`,
                             }}
                             transition={{ duration: 1, ease: "easeOut" }}
                             className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500"
@@ -4527,79 +4620,229 @@ const Ascend = () => {
                         </div>
                       </div>
 
-                      <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 to-violet-500/5 p-5">
-                        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-                        <div className="relative">
-                          <div className="mb-3 flex items-center gap-2">
-                            <BadgeDollarSign className="h-5 w-5 text-primary" />
-                            <h4 className="font-semibold">
-                              {t("ascend.settings.upgradeToProTitle")}
-                            </h4>
+                      <div className="rounded-xl bg-gradient-to-r from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 ring-1 ring-emerald-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20">
+                            <Sparkle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                           </div>
-                          <p className="mb-4 text-sm text-muted-foreground">
-                            {t("ascend.settings.upgradeToProDescription")}
-                          </p>
-                          {!deletedAccountWarning ? (
-                            <Button
-                              className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
-                              onClick={handleSubscribe}
-                            >
-                              <BadgeDollarSign className="h-4 w-4" />
-                              {t("ascend.settings.upgradeToPro")}
-                            </Button>
-                          ) : (
-                            <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">
-                              {t("account.errors.cannotSubscribeDeleted") ||
-                                "Cannot subscribe - account deleted"}
-                            </div>
-                          )}
+                          <div>
+                            <p className="text-sm font-medium">
+                              {t("ascend.settings.enjoyingAscend") ||
+                                "Enjoying all Ascend features"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t("ascend.settings.subscribeToKeep") ||
+                                "Subscribe to keep them forever"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // No Access / Trial Expired - Compelling CTA
-                    <div className="space-y-5">
-                      <div className="text-center">
-                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/20">
-                          <BadgeDollarSign className="h-8 w-8 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-bold">
-                          {t("ascend.settings.joinAscend")}
-                        </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {t("ascend.settings.subscribeToUnlock")}
-                        </p>
                       </div>
 
-                      <div className="grid gap-2">
+                      <div className="max-h-[280px] space-y-2 overflow-y-auto pr-2">
                         {[
-                          { icon: Users, text: t("ascend.settings.feature1") },
-                          { icon: CloudIcon, text: t("ascend.settings.feature2") },
-                          { icon: Gamepad2, text: t("ascend.settings.feature3") },
-                          { icon: Sparkle, text: t("ascend.settings.feature4") },
+                          {
+                            icon: Users,
+                            title: "Friends System",
+                            desc: "Build your gaming network",
+                          },
+                          {
+                            icon: MessageCircle,
+                            title: "Real-Time Chat",
+                            desc: "Chat with friends directly",
+                          },
+                          {
+                            icon: CloudIcon,
+                            title: "Cloud Sync",
+                            desc: "Data synced across devices",
+                          },
+                          {
+                            icon: Trophy,
+                            title: "Public Leaderboard",
+                            desc: "Compete with the community",
+                          },
+                          {
+                            icon: Infinity,
+                            title: "Unlimited Downloads",
+                            desc: "No download restrictions",
+                          },
+                          {
+                            icon: Zap,
+                            title: "FLiNG Trainer",
+                            desc: "Auto trainer downloads",
+                          },
+                          {
+                            icon: ListOrdered,
+                            title: "Download Queue",
+                            desc: "Queue multiple downloads",
+                          },
+                          {
+                            icon: Sparkle,
+                            title: "And More",
+                            desc: "Plus many other features",
+                          },
                         ].map((feature, i) => (
                           <motion.div
                             key={i}
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.1 }}
-                            className="flex items-center gap-3 rounded-lg bg-muted/30 p-3"
+                            transition={{ delay: i * 0.05 }}
+                            className="flex items-center gap-3 rounded-lg bg-muted/30 p-2.5"
                           >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                              <feature.icon className="h-4 w-4 text-primary" />
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                              <feature.icon className="h-3.5 w-3.5 text-primary" />
                             </div>
-                            <span className="text-sm">{feature.text}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium">{feature.title}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {feature.desc}
+                              </p>
+                            </div>
                           </motion.div>
                         ))}
                       </div>
 
                       {!deletedAccountWarning ? (
                         <Button
-                          className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
+                          className="h-12 w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/25 transition-all hover:scale-[1.02] hover:shadow-yellow-500/40"
                           onClick={handleSubscribe}
                         >
-                          <BadgeDollarSign className="h-4 w-4" />
-                          {t("ascend.settings.subscribe")}
+                          <Crown className="h-4 w-4" />
+                          {t("ascend.settings.keepAscendForever") ||
+                            "Keep Ascend Forever"}
+                        </Button>
+                      ) : (
+                        <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">
+                          {t("account.errors.cannotSubscribeDeleted") ||
+                            "Cannot subscribe - account deleted"}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // No Access / Trial Expired - Premium Features Showcase
+                    <div className="space-y-5">
+                      <div className="text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-600/20 ring-2 ring-yellow-500/20">
+                          <Crown className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <h3 className="text-xl font-bold">
+                          {t("ascend.settings.keepAscend") || "Keep Ascend Forever"}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t("ascend.settings.keepAscendDescription") ||
+                            "Subscribe to make all these features permanent"}
+                        </p>
+                      </div>
+
+                      <div className="max-h-[400px] space-y-2 overflow-y-auto pr-2">
+                        {[
+                          {
+                            icon: Users,
+                            title: "Friends System",
+                            desc: "Build your gaming network and see when friends are online",
+                          },
+                          {
+                            icon: MessageCircle,
+                            title: "Real-Time Chat",
+                            desc: "Chat directly with friends and coordinate play sessions",
+                          },
+                          {
+                            icon: User,
+                            title: "Profile & Bio",
+                            desc: "Personalized profile with custom bio and gaming preferences",
+                          },
+                          {
+                            icon: CloudIcon,
+                            title: "Cloud Sync",
+                            desc: "Profile and game data synced across all your devices",
+                          },
+                          {
+                            icon: Trophy,
+                            title: "Public Leaderboard",
+                            desc: "Compete with the community and climb the ranks",
+                          },
+                          {
+                            icon: RefreshCw,
+                            title: "Auto Game Updates",
+                            desc: "Automatic background checking for game updates",
+                          },
+                          {
+                            icon: Eye,
+                            title: "Upcoming Updates Peek",
+                            desc: "Exclusive preview of upcoming Ascendara features",
+                          },
+                          {
+                            icon: Puzzle,
+                            title: "Nexus Mod Managing",
+                            desc: "Browse, install, and organize mods seamlessly",
+                          },
+                          {
+                            icon: Infinity,
+                            title: "Unlimited Downloads",
+                            desc: "Download as many games as you want, no restrictions",
+                          },
+                          {
+                            icon: Zap,
+                            title: "FLiNG Trainer",
+                            desc: "Auto-downloads and installs the correct trainer for your game",
+                          },
+                          {
+                            icon: ListOrdered,
+                            title: "Download Queue",
+                            desc: "Queue multiple downloads and let them run automatically",
+                          },
+                          {
+                            icon: Users,
+                            title: "Game Communities",
+                            desc: "Connect with players in game-specific communities",
+                            badge: "PLANNED",
+                          },
+                          {
+                            icon: CloudUpload,
+                            title: "Cloud Backups",
+                            desc: "Automatic cloud backup of your game saves",
+                            badge: "PLANNED",
+                          },
+                          {
+                            icon: Sparkle,
+                            title: "And More Coming",
+                            desc: "Constantly evolving with new features for subscribers",
+                          },
+                        ].map((feature, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            className="group relative flex items-start gap-3 rounded-lg bg-gradient-to-r from-muted/50 to-muted/30 p-3 transition-colors hover:from-primary/10 hover:to-primary/5"
+                          >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                              <feature.icon className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">{feature.title}</p>
+                                {feature.badge && (
+                                  <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                    {feature.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {feature.desc}
+                              </p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      {!deletedAccountWarning ? (
+                        <Button
+                          className="h-12 w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/25 transition-all hover:scale-[1.02] hover:shadow-yellow-500/40"
+                          onClick={handleSubscribe}
+                        >
+                          <Crown className="h-4 w-4" />
+                          {t("ascend.settings.subscribeToPro") ||
+                            "Subscribe to Ascend Pro"}
                         </Button>
                       ) : (
                         <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">
@@ -4691,7 +4934,7 @@ const Ascend = () => {
                         <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                       </svg>
                     </div>
-                    <h2 className="font-semibold">
+                    <h2 className="mt-2 font-semibold">
                       {t("ascend.settings.discordVerification") || "Discord Verification"}
                     </h2>
                   </div>
@@ -4699,6 +4942,27 @@ const Ascend = () => {
 
                 <div className="p-5">
                   <div className="space-y-4">
+                    {/* Trial Warning Banner */}
+                    {!ascendAccess.isSubscribed && !ascendAccess.isVerified && (
+                      <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-yellow-500/20">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                              {t("ascend.settings.verificationRequiresSubscription") ||
+                                "Subscription Required"}
+                            </p>
+                            <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
+                              {t("ascend.settings.verificationTrialWarning") ||
+                                "The verification command only works for active subscribers. Subscribe to Ascend to get verified and unlock exclusive Discord roles."}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/10">
                         <BadgeCheck className="h-5 w-5 text-[#5865F2]" />
