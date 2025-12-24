@@ -1,104 +1,21 @@
-Creative Commons Legal Code
+MIT License
 
-CC BY-NC 1.0 Universal (Non-Commercial Use Only)
+Copyright (c) 2025 Ascendara
 
-    CREATIVE COMMONS CORPORATION IS NOT A LAW FIRM AND DOES NOT PROVIDE
-    LEGAL SERVICES. DISTRIBUTION OF THIS DOCUMENT DOES NOT CREATE AN
-    ATTORNEY-CLIENT RELATIONSHIP. CREATIVE COMMONS PROVIDES THIS
-    INFORMATION ON AN "AS-IS" BASIS. CREATIVE COMMONS MAKES NO WARRANTIES
-    REGARDING THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS
-    PROVIDED HEREUNDER, AND DISCLAIMS LIABILITY FOR DAMAGES RESULTING FROM
-    THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS PROVIDED
-    HEREUNDER.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Statement of Purpose
-The laws of most jurisdictions throughout the world automatically confer exclusive 
-Copyright and Related Rights (defined below) upon the creator and subsequent owner(s) 
-(each and all, an "owner") of an original work of authorship and/or a database (each, a "Work").
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-Certain owners wish to contribute a Work to a Commons that the public can reliably 
-and without fear of later claims of infringement build upon, modify, incorporate in 
-other works, reuse and redistribute, provided such use is for non-commercial purposes 
-only. These owners contribute to the Commons to promote the ideal of a free culture and 
-to encourage further production of creative, cultural, and scientific works for 
-non-commercial use.
-
-For these and/or other purposes and motivations, and without any expectation of
-additional consideration or compensation, the person associating this License 
-with a Work (the "Affirmer"), to the extent that they are an owner of Copyright
-and Related Rights in the Work, voluntarily elects to apply this License to the
-Work and publicly distribute the Work under its terms, with knowledge of their 
-Copyright and Related Rights in the Work and the meaning and intended legal
-effect of this License on those rights.
-
-1. Copyright and Related Rights.
-
-A Work made available under this License may be protected by copyright and 
-related or neighboring rights ("Copyright and Related Rights"). Copyright 
-and Related Rights include, but are not limited to, the following:
-
-i. the right to reproduce, adapt, distribute, perform, display, communicate, 
-and translate a Work, but only for non-commercial purposes;
-
-ii. moral rights retained by the original author(s) and/or performer(s);
-
-iii. publicity and privacy rights pertaining to a person's image or likeness 
-depicted in a Work;
-
-iv. rights protecting against unfair competition in regards to a Work, subject
-to the limitations in paragraph 4(a), below;
-
-v. rights protecting the extraction, dissemination, use, and reuse of data in a Work;
-
-vi. database rights (such as those arising under Directive 96/9/EC of the European 
-Parliament and of the Council of 11 March 1996 on the legal protection of databases, 
-and under any national implementation thereof, including any amended or successor 
-version of such directive); and
-
-vii. other similar, equivalent, or corresponding rights throughout the world 
-based on applicable law or treaty, and any national implementations thereof.
-
-2. Non-Commercial Use Only.
-
-To the greatest extent permitted by applicable law, the Affirmer grants the 
-public the following rights to use the Work, but only for non-commercial purposes:
-
-i. Non-Commercial Use: The Work may be used only for personal, educational, 
-or research purposes, or any other non-commercial purpose.
-
-ii. Commercial Use Prohibited: Use of the Work for any commercial purpose is strictly 
-prohibited without the express, written consent of the Affirmer.
-
-iii. Attribution: Users of the Work must provide appropriate credit to the Affirmer,
-include a link to this License, and indicate if any changes were made to the original Work.
-
-3. Public License Fallback.
-
-Should any part of this License for any reason be judged legally invalid or ineffective
-under applicable law, then to the greatest extent possible, the Affirmer hereby grants 
-to each affected person a royalty-free, non-transferable, non-sublicensable, non-exclusive, 
-irrevocable and unconditional license to exercise the Affirmer's Copyright and Related Rights 
-in the Work (i) in all territories worldwide, (ii) for the maximum duration provided by applicable 
-law or treaty (including future time extensions), and (iii) in any current or future medium and for 
-any number of copies, but only for non-commercial purposes.
-
-4. Limitations and Disclaimers.
-
-a. No trademark or patent rights held by the Affirmer are waived, abandoned, surrendered, 
-licensed, or otherwise affected by this document.
-
-b. The Affirmer offers the Work as-is and makes no representations or warranties of any
-kind concerning the Work, express, implied, statutory, or otherwise, including without 
-limitation warranties of title, merchantability, fitness for a particular purpose, 
-non-infringement, or the absence of latent or other defects, accuracy, or the presence 
-or absence of errors, whether or not discoverable, all to the greatest extent permissible 
-under applicable law.
-
-c. The Affirmer disclaims responsibility for clearing rights of other persons that may 
-apply to the Work or any use thereof, including without limitation any person's Copyright
-and Related Rights in the Work. Further, the Affirmer disclaims responsibility for obtaining 
-any necessary consents, permissions, or other rights required for any use of the Work.
-
-d. The Affirmer understands and acknowledges that Creative Commons is not a party to this
-document and has no duty or obligation with respect to this License or use of the Work.
-
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
