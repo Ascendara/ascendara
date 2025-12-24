@@ -64,7 +64,7 @@
       "nexusMods": "MODとトレーナーの統合",
       "nexusModsDesc": "ワンクリック統合により、Ascendara 内でゲーム MOD とトレーナーを直接管理およびインストールできます。",
       "profiles": "プロフィール",
-      "profilesDesc": "プロフィール、公開プロフィール、統計情報を設定します。 Ascend で他のユーザーのプロフィールや統計も表示します。",
+      "profilesDesc": "プロフィール、公開プロフィール、統計情報を設定します。 Ascend で他のユーザーのプロフィールや統計情報も表示します。",
       "unlimitedDownloads": "無制限のダウンロード",
       "unlimitedDownloadsDesc": "制限も制限もありません",
       "upcomingUpdates": "今後のアップデートのピーク",
@@ -137,12 +137,12 @@
       "description": "Ascendara のこのバージョンには、ダウンロード、アップデート、その他のコア機能などの機能に関する既知の重大な問題が含まれています。",
       "development": "このバージョンを使用すると、問題やクラッシュが発生する可能性があります。 Web サイトから Ascendara を最新バージョンに更新してください。",
       "title": "壊れたバージョンを実行しています",
-      "understand": "問題を理解しました。続行します",
+      "understand": "問題は理解しました。続行します",
       "update": "今すぐアップデート"
     },
     "crashScreen": {
       "checkConnection": "インターネット接続を確認してください",
-      "clearCache": "ブラウザのキャッシュと Cookie をクリアします",
+      "clearCache": "ブラウザのキャッシュと Cookie をクリアする",
       "contactSupport": "問題が解決しない場合は、サポートに報告してください",
       "description": "アセンダラさんは今起こったことが気に入らなかった。心配する必要はありません。分析が有効になっている場合、このエラーは追跡されており、開発者がこの問題を修正します。",
       "reload": "アセンダラをリロード",
@@ -199,7 +199,7 @@
       "updateNow": "今すぐアップデート",
       "updateReady": "Ascendara をアップデートする準備ができました",
       "updateReadyDesc": "Ascendara はアップデートをダウンロードし、インストールして再起動する準備ができました",
-      "viewChangelog": "変更ログの表示"
+      "viewChangelog": "変更履歴の表示"
     },
     "torrentWarning": "トレントが有効になっています - VPN を使用してください",
     "watchdog": {
@@ -274,7 +274,7 @@
       "sync": "ライブラリの同期",
       "syncDifferences": "同期の違い",
       "syncFailed": "ライブラリの同期に失敗しました",
-      "syncFirst": "ライブラリを同期してここでゲームを確認してください",
+      "syncFirst": "ライブラリを同期して、ここでゲームを確認してください",
       "syncNow": "今すぐ同期",
       "syncToLoadAchievements": "ライブラリを同期して完全な実績データをロードします",
       "synced": "ライブラリがクラウドに同期されました!",
@@ -381,7 +381,7 @@
         "title": "ゲームの自動アップデートチェック"
       },
       "chat": {
-        "description": "Ascendara 内で友達と直接チャットできます。ゲームのおすすめを共有し、プレイ セッションを調整し、ゲーム サークルとのつながりを保ちます。",
+        "description": "Ascendara 内で友達と直接チャットしましょう。ゲームのおすすめを共有し、プレイ セッションを調整し、ゲーム サークルとのつながりを保ちます。",
         "title": "リアルタイムチャット"
       },
       "cloudBackups": {
@@ -432,7 +432,7 @@
         "title": "無制限のダウンロード"
       },
       "upcoming": {
-        "description": "次回の Ascendara アップデートで何が起こるかについての独占プレビューを入手してください。時代の先を行き、今後どのような新機能が登場するかを把握してください。",
+        "description": "次回の Ascendara アップデートの内容を独占プレビューしてください。時代の先を行き、今後どのような新機能が登場するかを把握してください。",
         "title": "今後のアップデートのピーク"
       }
     },
@@ -522,6 +522,7 @@
       "addProfileInfo": "プロフィール情報を追加する",
       "allFeaturesUnlocked": "すべてのプレミアム機能がロック解除されました",
       "ascendPro": "昇る",
+      "ascendSubscription": "昇る",
       "billingCycle": "請求サイクル",
       "bio": "バイオ",
       "bioPlaceholder": "あなた自身について教えてください...",
@@ -550,6 +551,7 @@
       "displayName": "表示名",
       "edit": "プロフィールの編集",
       "encrypted": "256ビットSSL",
+      "enjoyingAscend": "Ascend のすべての機能を楽しむ",
       "epicIdPlaceholder": "Epic Games ID",
       "expires": "有効期限が切れます",
       "feature1": "デバイス間でのクラウド ライブラリの同期",
@@ -561,6 +563,9 @@
       "howToVerify": "確認方法",
       "joinAscend": "アセンドに参加する",
       "joinDiscord": "Discordサーバーに参加する",
+      "keepAscend": "永遠に上昇し続ける",
+      "keepAscendDescription": "これらすべての機能を永続的にするには購読してください",
+      "keepAscendForever": "永遠に上昇し続ける",
       "lifetime": "一生",
       "linkDescription": "Link by Stripe を使用すると、支払い情報を保存し、ワンクリックで何千ものサイトでチェックアウトできます。",
       "manageBilling": "請求の管理",
@@ -598,6 +603,8 @@
       "steamPlaceholder": "Steam ユーザー名または ID",
       "stripeSecure": "ストライプセキュア",
       "subscribe": "アセンドを購読する",
+      "subscribeToKeep": "購読して永久に保存します",
+      "subscribeToPro": "アセンドを購読する",
       "subscribeToUnlock": "購読してすべての Ascend 機能のロックを解除します",
       "subscription": "サブスクリプション",
       "subscriptionSuccess": "アセンドへようこそ！サブスクリプションが有効になりました。",
@@ -608,11 +615,14 @@
       "supportMessageSub": "Ascend に登録されています。ご支援ありがとうございます！",
       "thankYouSubscriber": "アセンダラを応援していただきありがとうございます！",
       "title": "アカウント設定",
+      "trialActive": "トライアルが有効です",
       "trialDaysRemaining": "トライアル期間は残り {{days}} 日です",
       "trialProgress": "トライアルの進行状況",
       "upgradeToPro": "ステップアップ。接続する。アセンドに参加します。",
       "upgradeToProDescription": "すべての Ascend 機能に無制限にアクセスして、個人開発者をサポートします。",
       "upgradeToProTitle": "Ascend を永久に維持するには購読してください",
+      "verificationRequiresSubscription": "購読が必要です",
+      "verificationTrialWarning": "検証コマンドは、アクティブなサブスクライバに対してのみ機能します。 Ascend に登録して認証を受け、専用の Discord チャンネルのロックを解除してください。",
       "verifiedDescription": "すべての Ascend 機能に完全にアクセスできます",
       "verifiedThankYou": "アセンダラにご参加いただきありがとうございます!",
       "verifiedThankYouSub": "あなたの貢献がこれを可能にするのに役立ちます",
@@ -620,8 +630,9 @@
       "verifyCheckoutError": "支払いの確認に失敗しました。請求された場合はサポートにお問い合わせください。",
       "verifyCommand": "検証コマンド",
       "verifyStep1": "Discordサーバーに参加する",
-      "verifyStep2": "任意のチャネルで次のコマンドを実行します。",
+      "verifyStep2": "コマンド チャネルで次のコマンドを実行します。",
       "verifyYourAccount": "アカウントを確認する",
+      "viewInvoices": "請求書の表示",
       "welcomeToAscend": "アセンドへようこそ！"
     },
     "stats": {
@@ -663,7 +674,7 @@
     "updateRequired": {
       "description": "Ascend の機能にアクセスするには、Ascendara を最新バージョンに更新してください。",
       "download": "最新バージョンをダウンロード",
-      "info": "Ascend では、セキュリティと互換性を確保するために、最新バージョンの Ascendara が必要です。",
+      "info": "Ascend では、セキュリティと互換性を確保するために最新バージョンの Ascendara が必要です。",
       "title": "アップデートが必要です"
     },
     "welcome": "おかえりなさい、{{name}}!"
@@ -880,7 +891,7 @@
     "selectPath": {
       "default": "デフォルトのパス",
       "defaultDirectory": "デフォルトのディレクトリ",
-      "description": "環境設定で追加のディレクトリが設定されています。このゲームをダウンロードするには、以下の 1 つから選択してください。",
+      "description": "環境設定で追加のディレクトリが設定されています。このゲームをダウンロードするには、以下のいずれかを選択してください。",
       "title": "このゲームをどこからダウンロードしますか?"
     },
     "sendingTorrent": "トレントを送信中...",
@@ -1053,6 +1064,7 @@
     "currentVersion": "現在のバージョン",
     "details": "詳細",
     "dismiss": "却下する",
+    "dontShowSteamWarning": "これを二度と表示しないでください",
     "downloadAll": "すべてダウンロード",
     "downloadComplete": "ダウンロード完了！",
     "downloadFailed": "ダウンロードに失敗しました。",
@@ -1127,7 +1139,7 @@
     "summary": "まとめ",
     "trackNameCopied": "トラック名をコピーしました!",
     "trackTitle": "トラックタイトル",
-    "trainerAvailable": "このゲームにはトレーナーが用意されています",
+    "trainerAvailable": "このゲームではトレーナーが利用可能です",
     "trainerDisabledToast": "トレーナーの自動起動が無効になっています",
     "trainerDownloadFailed": "トレーナーのダウンロードに失敗しました",
     "trainerDownloadStarted": "トレーナーのダウンロードが開始されました",
@@ -1256,7 +1268,7 @@
     "confirmRemoveFolderDesc": "このフォルダを削除してもよろしいですか?内部のすべてのゲームはメイン ライブラリに戻されます。",
     "confirmRemoveFolderTitle": "フォルダーを削除しますか?",
     "coverSearchError": "画像検索エラー",
-    "createShortcut": "デスクトップショートカットを作成する",
+    "createShortcut": "デスクトップショートカットの作成",
     "delete": "{{game}}を削除",
     "deleteConfirmMessage": "ライブラリから {{game}} を削除してもよろしいですか?これにより、Ascendara ライブラリからゲームが削除され、関連ファイルもすべて削除されます。この操作は元に戻すことができません。",
     "deleteFolder": "フォルダーの削除",
@@ -1322,7 +1334,7 @@
     "importSuccessDesc": "Steam ゲームは正常にインポートされました。一部のゲーム カバーと実行可能パスが見つからないか正しくない場合があります。ゲーム情報を更新することでこれを修正できます。",
     "importSuccessTitle": "インポート完了！",
     "importingGames": "Steam ゲームをインポートしています...",
-    "importingGamesDesc": "Steam ゲームがインポートされている間お待ちください。ライブラリのサイズによっては、これには数分かかる場合があります。",
+    "importingGamesDesc": "Steam ゲームがインポートされている間、お待ちください。ライブラリのサイズによっては、これには数分かかる場合があります。",
     "includesAllDLCs": "すべてのDLCを含む",
     "launchError": "起動エラー",
     "launchErrorMessage": "{{game}} を実行できませんでした。ゲームの実行可能ファイルの名前がゲーム名と異なる場合があります。 Ascendara が正しいファイルを実行しようとしていることを確認してください。",
@@ -1360,7 +1372,7 @@
       "desc": "新しいフォルダーの名前を入力します",
       "exists": "この名前のフォルダーはすでに存在します",
       "placeholder": "フォルダ名",
-      "required": "フォルダー名は必須です",
+      "required": "フォルダ名は必須です",
       "title": "新しいフォルダー"
     },
     "noResultsFound": "結果が見つかりませんでした。検索は正確にしてください。",
@@ -1411,7 +1423,7 @@
     "searchOnline": "検索インデックス",
     "setExecutable": "ゲームの実行可能ファイルを設定する",
     "shortcutCreated": "プライマリ実行可能ファイルに対して作成されたショートカット",
-    "shortcutError": "ショートカットの作成中にエラーが発生しました。実行ファイルのパスが存在しないのではないでしょうか？",
+    "shortcutError": "ショートカット作成中にエラーが発生しました。実行ファイルのパスが存在しないのではないでしょうか？",
     "size": "サイズ",
     "sort": { "aToZ": "A から Z まで並べ替える", "zToA": "Z から A に並べ替える" },
     "spaceTooltip": {
@@ -1454,6 +1466,9 @@
     "daysAgo": "数日前",
     "description": "ゲーム インデックスを更新して、利用可能な最新のゲームを確認します。",
     "done": "終わり",
+    "download": "ダウンロード",
+    "downloadSharedIndex": "共有インデックスをダウンロード",
+    "downloadSharedIndexDesc": "Ascendara で他の人がスクレイピングして共有したインデックスをダウンロードします。",
     "downloading": "ダウンロード中...",
     "enableLocalIndex": "有効にする",
     "enableSharing": "共有を有効にする",
@@ -1466,7 +1481,7 @@
     "fetchingPosts": "ゲーム投稿を取得しています...",
     "fetchingViews": "ビュー数を取得しています...",
     "games": "ゲーム",
-    "gamesPerPage": "ページごとのゲーム数",
+    "gamesPerPage": "ページごとのゲーム",
     "gamesPerPageHint": "値を低くするとタイムアウトを回避できます (10 ～ 100)",
     "gamesProcessed": "処理されたゲーム",
     "hourAgo": "1時間前",
@@ -1499,6 +1514,9 @@
     "refreshFirst": "最初にインデックスを更新",
     "refreshStopped": "ゲームリストの更新が停止しました",
     "saving": "データを保存中...",
+    "scrapeAgain": "もう一度こする",
+    "scrapeFromSteamRIP": "SteamRIP からスクレイピング",
+    "scrapeFromSteamRIPDesc": "ゲームデータを直接スクレイピングして独自のインデックスを構築する",
     "settings": "設定",
     "shareIndex": "インデックスを共有する",
     "shareIndexDesc": "他のユーザーを支援するために、更新後にインデックスを自動的にアップロードします",
@@ -1507,10 +1525,12 @@
     "skipRefresh": "手動更新をスキップする",
     "startFailed": "更新の開始に失敗しました",
     "startRefresh": "リフレッシュの開始",
+    "startScrape": "スクレイピングの開始",
     "statusCompleted": "更新が完了しました",
     "statusError": "更新に失敗しました",
     "statusIdle": "リフレッシュの準備完了",
     "statusRunning": "インデックスを更新中...",
+    "stop": "停止",
     "stopConfirmDescription": "更新プロセスを停止してもよろしいですか?進行状況は失われるため、最初からやり直す必要があります。",
     "stopConfirmTitle": "リフレッシュを停止しますか?",
     "stopFailed": "リフレッシュの停止に失敗しました",
@@ -1700,7 +1720,7 @@
     "ascendaraAnalyticsDescription": "使用状況データを送信して Ascendara の改善にご協力ください。このデータは匿名であり、お客様を特定するために使用することはできません。",
     "ascendaraTimechine": "アセンダラ・タイムマシン",
     "ascendaraToggleAnalytics": "オプトインして Ascendara の改善にご協力ください",
-    "ascendaraUpdates": "自動アップデート",
+    "ascendaraUpdates": "自動更新",
     "ascendaraUpdatesDescription": "Ascendara の新しいバージョンを自動的にダウンロードし、準備ができたらインストールするように求めます。",
     "ascendaraWorkshopDownloader": "ワークショップダウンローダー",
     "ascendaraWorkshopDownloaderDescription": "Workshop Downloader を使用すると、アカウントを持っていなくても Steam ワークショップからアイテムをダウンロードできます。",
@@ -1948,7 +1968,7 @@
     "smoothTransitionsDescription": "アプリ内のページ間の切り替えには、より自然に感じられるスムーズなアニメーションが使用されています。",
     "sourceChangeReload": "ゲームソースを変更した後は、Ascendara をリロードする必要があります。ソースを切り替えると、キャッシュされたデータはすべてクリアされます。",
     "sourceInactive": "非アクティブ",
-    "steamripDescription": "SteamRIP は Ascendara の主要なソースであり、安全で信頼性の高いゲームのコレクションを定期的に更新して提供します。",
+    "steamripDescription": "SteamRIP は Ascendara の主要なソースであり、安全で信頼できるゲームのコレクションを定期的に更新して提供します。",
     "supportCodeDesc": "ログを自動的にアップロードするには、ここに 6 桁のサポート コードを入力します。助けが必要ですか?",
     "supportDesc": "サポート コードを使用して、Ascendara のサポート チームに連絡します。ログは自動的にアップロードされます。",
     "supportError": "ログのアップロードに失敗しました。もう一度試してください。",
@@ -2006,7 +2026,7 @@
   },
   "torbox": {
     "account": "TorBox アカウント",
-    "completed": "完了",
+    "completed": "完了しました",
     "cooldown": "クールダウン",
     "data": "データ",
     "data_refreshed": "TorBox データが更新されました",
@@ -2115,9 +2135,9 @@
     "ascendaraNeverCollects": "Ascendara は個人情報やゲーム データを収集することはありません。すべての分析は匿名であり、Ascendara を改善するためにのみ使用されます。",
     "ascendaraNeverCollectsPersonalInfo": "Ascendara は個人情報やゲーム データを収集することはありません。すべての分析は匿名であり、Ascendara を改善するためにのみ使用されます。",
     "audioProcessing": "音声処理",
-    "automaticUpdates": "自動アップデート",
+    "automaticUpdates": "自動更新",
     "automaticUpdatesDesc": "最新の機能と改善点が利用可能になり次第入手してください",
-    "automaticUpdatesTitle": "自動アップデート",
+    "automaticUpdatesTitle": "自動更新",
     "bePartOfImproving": "Ascendara の改善に参加してください",
     "bePartOfImprovingDesc": "Ascendara を使用するだけで Ascendara の改善に貢献する何百もの他の人たちに加わりましょう",
     "browse": "ブラウズ",
@@ -2167,7 +2187,7 @@
     "installationFailed": "インストールに失敗しました",
     "installingDependencies": "依存関係をインストールしています...",
     "lightThemes": "ライトテーマ",
-    "lightningFastDesc": "V7 は速度とパフォーマンスに関して最適化されており、これまでよりもスムーズかつ高速なエクスペリエンスを実現します。",
+    "lightningFastDesc": "V7 は速度とパフォーマンスに関して最適化されており、これまで以上にスムーズかつ高速なエクスペリエンスを実現します。",
     "lightningFastTitle": "電光石火の速さ",
     "localIndex": {
       "canContinue": "インデックスがバックグラウンドで構築されている間、セットアップを続行できます。",
@@ -2175,10 +2195,10 @@
       "point2": "オフライン時やサーバーダウン時でもゲーム情報にアクセス",
       "point3": "ローカルにキャッシュされたゲームカバーによる画像の読み込みの高速化",
       "refreshComplete": "ゲームインデックスが完成しました！",
-      "refreshing": "ゲーム インデックスを作成しています...",
+      "refreshing": "ゲームインデックスを構築しています...",
       "setupIndex": "ゲームインデックスのセットアップ",
       "stillRefreshing": "ゲームインデックスはまだ構築中です",
-      "subtitle": "Ascendara は、高速なブラウジングとオフライン アクセスのためにローカル ゲーム インデックスを使用します",
+      "subtitle": "Ascendara はローカル ゲーム インデックスを使用して、より高速なブラウジングとオフライン アクセスを実現します。",
       "title": "ゲームインデックスをセットアップする",
       "waitForRefresh": "インデックスが完了するまで、ゲームを参照することはできません。通常、これには数分かかります。"
     },
@@ -2190,7 +2210,7 @@
     "noticeAppIsFree": {
       "point1": "Ascendara のダウンロードとゲームに関連するすべては常に無料です",
       "point2": "Ascendara は、ゲームをダウンロードしたりプレイしたりするために個人情報を尋ねることはありません",
-      "point3": "Ascend への参加を選択した場合は、それらの機能用のアカウントを作成する必要があります",
+      "point3": "Ascend への参加を選択した場合は、これらの機能用のアカウントを作成する必要があります",
       "point4": "匿名データはオプトインした場合にのみ共有され、これは設定でいつでも変更できます。",
       "subtitle": "Ascendara にお金を支払ったら、詐欺に遭ったことになります。すぐに銀行にご連絡ください。",
       "title": "Ascendara は完全に無料で使用できます"
@@ -2245,7 +2265,7 @@
     "theExtensionBlocksKnownProviders": "この拡張機能は、認証 Cookie を Ascendara にシームレスに送信することで、ゲーム インデックスのセットアップにも役立ちます",
     "thisIsWhereAllYourDownloadedGamesWillBeStored": "ダウンロードしたすべてのゲームがここに保存されます",
     "welcomeTo": "へようこそ",
-    "welcomeToAscendaraDescription": "Ascendara を使い始める準備がほぼ整いました。オンボーディング プロセスを一緒に進めてから、ゲーム インデックスを設定しますが、その前に利用規約とプライバシー ポリシーをお読みください。",
+    "welcomeToAscendaraDescription": "Ascendara を使い始める準備がほぼ整いました。オンボーディング プロセスを一緒に進めてからゲーム インデックスを設定しますが、その前に利用規約とプライバシー ポリシーをお読みください。",
     "whenYouClickADownloadLink": "既知のプロバイダーからダウンロードを開始すると、拡張機能はブラウザーでのダウンロードを自動的に停止し、Ascendara でダウンロードを開始します。",
     "wineIsRequired": "ワインと遊ぶ",
     "wineMustBeInstalled": "Windows ゲームを実行するには、Wine、DXVK、およびその他のツールをコンピューターにインストールしてセットアップする必要があります。ただし、心配しないでください。Ascendara がすべてをインストールして設定できます。",
@@ -2276,6 +2296,6 @@
     "mainTitle": "ワークショップアイテムをダウンロード",
     "waitingForLogs": "ダウンロードの開始を待っています...",
     "welcome": "Ascendara のワークショップ ダウンローダーへようこそ",
-    "welcomeDescription": "ここでは、アカウントを持っていなくても Steam ワークショップからアイテムをダウンロードできます。"
+    "welcomeDescription": "ここでは、アカウントを持っていなくても、Steam ワークショップからアイテムをダウンロードできます。"
   }
 }
