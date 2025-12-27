@@ -664,28 +664,42 @@ function registerMiscHandlers() {
         }
 
         if (imgID) {
-          let imageLink;
-          if (settings.usingLocalIndex) {
-            imageLink = `https://api.ascendara.app/v3/image/${imgID}`;
-          } else if (settings.gameSource === "fitgirl") {
-            imageLink = `https://api.ascendara.app/v2/fitgirl/image/${imgID}`;
+          let imageBuffer;
+          let extension = ".jpg";
+
+          if (settings.usingLocalIndex && settings.localIndex) {
+            const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+            try {
+              imageBuffer = await fs.promises.readFile(localImagePath);
+            } catch (error) {
+              console.warn(`Could not load local image for ${imgID}, skipping:`, error);
+              imageBuffer = null;
+            }
           } else {
-            imageLink = `https://api.ascendara.app/v2/image/${imgID}`;
+            let imageLink;
+            if (settings.gameSource === "fitgirl") {
+              imageLink = `https://api.ascendara.app/v2/fitgirl/image/${imgID}`;
+            } else {
+              imageLink = `https://api.ascendara.app/v2/image/${imgID}`;
+            }
+
+            const response = await axios({
+              url: imageLink,
+              method: "GET",
+              responseType: "arraybuffer",
+            });
+
+            imageBuffer = Buffer.from(response.data);
+            const mimeType = response.headers["content-type"];
+            extension = getExtensionFromMimeType(mimeType);
           }
 
-          const response = await axios({
-            url: imageLink,
-            method: "GET",
-            responseType: "arraybuffer",
-          });
-
-          const imageBuffer = Buffer.from(response.data);
-          const mimeType = response.headers["content-type"];
-          const extension = getExtensionFromMimeType(mimeType);
-          await fs.promises.writeFile(
-            path.join(gamesDirectory, `${game}.ascendara${extension}`),
-            imageBuffer
-          );
+          if (imageBuffer) {
+            await fs.promises.writeFile(
+              path.join(gamesDirectory, `${game}.ascendara${extension}`),
+              imageBuffer
+            );
+          }
         }
 
         try {
@@ -730,20 +744,30 @@ function registerMiscHandlers() {
       let extension = ".jpg";
 
       if (imgID) {
-        const imageLink =
-          settings.gameSource === "fitgirl"
-            ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
-            : `https://api.ascendara.app/v2/image/${imgID}`;
+        if (settings.usingLocalIndex && settings.localIndex) {
+          const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+          try {
+            imageBuffer = await fs.promises.readFile(localImagePath);
+          } catch (error) {
+            console.warn(`Could not load local image for ${imgID}:`, error);
+            return false;
+          }
+        } else {
+          const imageLink =
+            settings.gameSource === "fitgirl"
+              ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
+              : `https://api.ascendara.app/v2/image/${imgID}`;
 
-        const response = await axios({
-          url: imageLink,
-          method: "GET",
-          responseType: "arraybuffer",
-        });
+          const response = await axios({
+            url: imageLink,
+            method: "GET",
+            responseType: "arraybuffer",
+          });
 
-        imageBuffer = Buffer.from(response.data);
-        const mimeType = response.headers["content-type"];
-        extension = getExtensionFromMimeType(mimeType);
+          imageBuffer = Buffer.from(response.data);
+          const mimeType = response.headers["content-type"];
+          extension = getExtensionFromMimeType(mimeType);
+        }
       } else if (imageData) {
         const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
         imageBuffer = Buffer.from(base64Data, "base64");

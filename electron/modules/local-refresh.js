@@ -350,8 +350,6 @@ function registerLocalRefreshHandlers() {
               "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
               "--output",
               outputPath,
-              "--cookie",
-              cfClearance,
               "--per-page",
               String(fetchPerPage),
               "--workers",
@@ -359,6 +357,10 @@ function registerLocalRefreshHandlers() {
               "--view-workers",
               "4",
             ];
+            // Only add cookie if provided (CF protection may not be active)
+            if (cfClearance) {
+              args.push("--cookie", cfClearance);
+            }
           } else {
             executablePath = path.join(
               appDirectory,
@@ -367,8 +369,6 @@ function registerLocalRefreshHandlers() {
             args = [
               "--output",
               outputPath,
-              "--cookie",
-              cfClearance,
               "--per-page",
               String(fetchPerPage),
               "--workers",
@@ -376,6 +376,10 @@ function registerLocalRefreshHandlers() {
               "--view-workers",
               "4",
             ];
+            // Only add cookie if provided (CF protection may not be active)
+            if (cfClearance) {
+              args.push("--cookie", cfClearance);
+            }
           }
           if (userAgent) args.push("--user-agent", userAgent);
         } else {
@@ -387,8 +391,6 @@ function registerLocalRefreshHandlers() {
             scriptPath,
             "--output",
             outputPath,
-            "--cookie",
-            cfClearance,
             "--per-page",
             String(fetchPerPage),
             "--workers",
@@ -396,6 +398,10 @@ function registerLocalRefreshHandlers() {
             "--view-workers",
             "32",
           ];
+          // Only add cookie if provided (CF protection may not be active)
+          if (cfClearance) {
+            args.push("--cookie", cfClearance);
+          }
           if (userAgent) args.push("--user-agent", userAgent);
         }
 
