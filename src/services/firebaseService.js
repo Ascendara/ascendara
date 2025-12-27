@@ -1048,24 +1048,44 @@ export const checkHardwareIdAccount = async hardwareId => {
 /**
  * Check if hardware ID belongs to a deleted account
  * @param {string} hardwareId - The hardware ID to check
- * @returns {Promise<{isDeleted: boolean, error: string|null}>}
+ * @returns {Promise<{isDeleted: boolean, email: string|null, error: string|null}>}
  */
 export const checkDeletedAccount = async hardwareId => {
   try {
     if (!hardwareId) {
-      return { isDeleted: false, error: null };
+      return { isDeleted: false, email: null, error: null };
     }
 
     const hwDoc = await getDoc(doc(db, "hardwareIds", hardwareId));
     if (!hwDoc.exists()) {
-      return { isDeleted: false, error: null };
+      return { isDeleted: false, email: null, error: null };
     }
 
     const data = hwDoc.data();
-    return { isDeleted: data.deletedAcc === true, error: null };
+    const isDeleted = data.deletedAcc === true;
+
+    // Get the linked user's email if account is deleted
+    let email = null;
+    if (isDeleted && data.userId && auth.currentUser) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", data.userId));
+        if (userDoc.exists()) {
+          const userEmail = userDoc.data().email || "";
+          // Mask email for privacy: show first 2 chars and domain
+          email =
+            userEmail.length > 0
+              ? userEmail.substring(0, 2) + "***@" + userEmail.split("@")[1]
+              : null;
+        }
+      } catch (userError) {
+        console.warn("Could not fetch user email:", userError);
+      }
+    }
+
+    return { isDeleted, email, error: null };
   } catch (error) {
     console.error("Check deleted account error:", error);
-    return { isDeleted: false, error: error.message };
+    return { isDeleted: false, email: null, error: error.message };
   }
 };
 
