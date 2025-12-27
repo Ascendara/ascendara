@@ -175,6 +175,7 @@ const Library = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { settings } = useSettings();
   const [ascendAccess, setAscendAccess] = useState({
     hasAccess: false,
     isSubscribed: false,
@@ -552,15 +553,24 @@ const Library = () => {
               if (cachedImage) {
                 images[game.name] = cachedImage;
               } else if (game.gameID) {
-                // Check if using local index
-                const imageUrl = settings.usingLocalIndex
-                  ? gameService.getImageUrlByGameId(game.gameID)
-                  : `https://api.ascendara.app/v3/image/${game.gameID}`;
+                // For local index, we need to find the game's imgID
+                let imageId = game.gameID;
+                if (settings.usingLocalIndex) {
+                  try {
+                    const gameData = await gameService.findGameByGameID(game.gameID);
+                    if (gameData?.imgID) {
+                      imageId = gameData.imgID;
+                    }
+                  } catch (error) {
+                    console.warn("Could not find game in local index:", error);
+                    continue;
+                  }
+                }
 
-                // For local index, try to load from local file system
+                // For local index, try to load from local file system using imgID
                 if (settings.usingLocalIndex && settings.localIndex) {
                   try {
-                    const localImagePath = `${settings.localIndex}/imgs/${game.gameID}.jpg`;
+                    const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
                     const imageData = await window.electron.ipcRenderer.readFile(
                       localImagePath,
                       "base64"
@@ -580,7 +590,8 @@ const Library = () => {
                     );
                   }
                 } else {
-                  // Fetch from API
+                  // Fetch from API using gameID
+                  const imageUrl = `https://api.ascendara.app/v3/image/${game.gameID}`;
                   const response = await fetch(imageUrl);
                   if (response.ok) {
                     const blob = await response.blob();
@@ -2843,11 +2854,8 @@ const AddGameForm = ({ onSuccess }) => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    // When using local index, pass gameID; otherwise pass imgID
-    const coverImageId =
-      settings.usingLocalIndex && coverSearch.selectedCover?.gameID
-        ? coverSearch.selectedCover.gameID
-        : coverSearch.selectedCover?.imgID;
+    // imgID is used for image file lookups in both local index and API
+    const coverImageId = coverSearch.selectedCover?.imgID;
     await window.electron.addGame(
       formData.name,
       formData.isOnline,
