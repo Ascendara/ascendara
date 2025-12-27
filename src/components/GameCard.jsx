@@ -27,10 +27,10 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import torboxService from "@/services/torboxService";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
-import { useImageLoader } from "@/hooks/useImageLoader";
-import { analytics } from "@/services/analyticsService";
 import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
+import { trackGameButtonClick } from "@/services/analyticsService";
+import { useImageLoader } from "@/hooks/useImageLoader";
 
 const GameCard = memo(function GameCard({ game, compact }) {
   const navigate = useNavigate();
@@ -148,10 +148,11 @@ const GameCard = memo(function GameCard({ game, compact }) {
     let buttonType = "download";
     if (needsUpdate) buttonType = "update";
     else if (isInstalled) buttonType = "install";
-    analytics.trackGameButtonClick(game.game, buttonType, {
+    trackGameButtonClick(game.game, buttonType, {
       isInstalled,
       needsUpdate,
     });
+
     const downloadLinks = game.download_links || {};
     setTimeout(() => {
       navigate("/download", {
