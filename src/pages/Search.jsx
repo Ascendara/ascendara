@@ -13,6 +13,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSettings } from "@/context/SettingsContext";
 import GameCard from "@/components/GameCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import {
@@ -43,7 +44,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import imageCacheService from "@/services/imageCacheService";
 
 // Module-level cache with timestamp
@@ -56,10 +57,14 @@ let gamesCache = {
 const Search = memo(() => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    const saved = window.localStorage.getItem("searchQuery");
+    return saved || "";
+  });
   const [showStickySearch, setShowStickySearch] = useState(false);
   const mainSearchRef = useRef(null);
   const searchSectionRef = useRef(null);
+  const location = useLocation();
   const [selectedCategories, setSelectedCategories] = useState(() => {
     const saved = window.localStorage.getItem("selectedCategories");
     return saved ? JSON.parse(saved) : [];
@@ -81,8 +86,14 @@ const Search = memo(() => {
     return saved === "true";
   });
 
-  const [filterSmallestSize, setFilterSmallestSize] = useState(false);
-  const [filterProvider, setFilterProvider] = useState("");
+  const [filterSmallestSize, setFilterSmallestSize] = useState(() => {
+    const saved = window.localStorage.getItem("filterSmallestSize");
+    return saved === "true";
+  });
+  const [filterProvider, setFilterProvider] = useState(() => {
+    const saved = window.localStorage.getItem("filterProvider");
+    return saved || "";
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isIndexUpdating, setIsIndexUpdating] = useState(false);
   const [isRefreshRequestDialogOpen, setIsRefreshRequestDialogOpen] = useState(false);
@@ -317,6 +328,21 @@ const Search = memo(() => {
     const stopStatusCheck = startStatusCheck();
     return () => stopStatusCheck();
   }, [settings?.usingLocalIndex]);
+
+  // Persist searchQuery to localStorage
+  useEffect(() => {
+    window.localStorage.setItem("searchQuery", searchQuery);
+  }, [searchQuery]);
+
+  // Persist filterSmallestSize to localStorage
+  useEffect(() => {
+    window.localStorage.setItem("filterSmallestSize", filterSmallestSize.toString());
+  }, [filterSmallestSize]);
+
+  // Persist filterProvider to localStorage
+  useEffect(() => {
+    window.localStorage.setItem("filterProvider", filterProvider);
+  }, [filterProvider]);
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
@@ -889,11 +915,12 @@ const Search = memo(() => {
               <div className="relative">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                   {displayedGames.map(game => (
-                    <GameCard
+                    <div
                       key={game.imgID || game.id || `${game.game}-${game.version}`}
-                      game={game}
-                      onDownload={() => handleDownload(game)}
-                    />
+                      data-game-name={game.game}
+                    >
+                      <GameCard game={game} onDownload={() => handleDownload(game)} />
+                    </div>
                   ))}
                 </div>
                 {hasMore && (
