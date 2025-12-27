@@ -29,7 +29,7 @@ import torboxService from "@/services/torboxService";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
-import { trackGameButtonClick } from "@/services/analyticsService";
+import { analytics } from "@/services/analyticsService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 
 const GameCard = memo(function GameCard({ game, compact }) {
@@ -148,7 +148,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
     let buttonType = "download";
     if (needsUpdate) buttonType = "update";
     else if (isInstalled) buttonType = "install";
-    trackGameButtonClick(game.game, buttonType, {
+    analytics.trackGameButtonClick(game.game, buttonType, {
       isInstalled,
       needsUpdate,
     });
