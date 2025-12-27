@@ -937,6 +937,7 @@
       "processingLink": "Processing download link...",
       "reportFailed": "Failed to submit report",
       "reportSubmitted": "Report submitted successfully",
+      "torboxOffline": "This provider is offline on Torbox at the moment. Try another provider.",
       "torboxProcessingError": "Error processing Torbox link",
       "torrentSent": "Torrent sent to qBittorrent"
     },

@@ -97,6 +97,30 @@ const sanitizeGameName = name => {
   return sanitizeText(name);
 };
 
+// Helper function to check Torbox service status for a specific provider
+const checkTorboxStatus = async provider => {
+  try {
+    const response = await fetch("https://api.ascendara.app/app/json/torboxstatus");
+    if (!response.ok) {
+      throw new Error("Failed to fetch Torbox status");
+    }
+    const data = await response.json();
+    // Check if the specific provider is online
+    // API returns: {"buzzheavier":"online","datanodes":"online","gofile":"online","megadb":"offline","vikingfile":"online"}
+    if (provider && data[provider]) {
+      return {
+        provider: provider,
+        status: data[provider],
+        isOnline: data[provider] === "online",
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error checking Torbox status:", error);
+    return null;
+  }
+};
+
 // Helper function to check if there are active downloads
 const checkActiveDownloads = async () => {
   try {
@@ -558,6 +582,15 @@ export default function DownloadPage() {
 
     // Handle providers using Torbox service
     if (!directUrl && shouldUseTorbox()) {
+      // Check Torbox service status first for the selected provider
+      const torboxStatus = await checkTorboxStatus(selectedProvider);
+      if (!torboxStatus || !torboxStatus.isOnline) {
+        toast.error(t("download.toast.torboxOffline"));
+        setIsStartingDownload(false);
+        clearDownloadLock();
+        return;
+      }
+
       // Get the appropriate link based on the selected provider
       let providerLink;
 
