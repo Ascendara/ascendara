@@ -83,7 +83,7 @@
       "email": "E-mail",
       "emailPlaceholder": "Inserisci la tua email",
       "linkWithPC": "Collega permanentemente questo account a questo PC",
-      "orContinueWith": "oppure continuare con l'e-mail",
+      "orContinueWith": "oppure continua con l'e-mail",
       "password": "Password",
       "passwordPlaceholder": "Crea una password",
       "privacyLink": "politica sulla riservatezza",
@@ -428,7 +428,7 @@
       "subtitle": "Queste sono le funzionalità attualmente disponibili a cui hai accesso con Ascend",
       "title": "Funzionalità premium",
       "unlimitedDownloads": {
-        "description": "Scarica tutti i giochi che vuoi senza restrizioni. Ascend rimuove tutti i limiti di download così puoi creare liberamente la tua libreria.",
+        "description": "Scarica tutti i giochi che desideri senza restrizioni. Ascend rimuove tutti i limiti di download così puoi creare liberamente la tua libreria.",
         "title": "Download illimitati"
       },
       "upcoming": {
@@ -613,11 +613,11 @@
       "subtitle": "Gestisci il tuo account e profilo",
       "supportMessage": "Fai un passo avanti. Collegare. Unisciti ad Ascesa.",
       "supportMessageSub": "Sei iscritto ad Ascend. Grazie per il vostro supporto!",
-      "thankYouSubscriber": "Grazie per aver supportato Ascendara!",
+      "thankYouSubscriber": "Grazie per supportare Ascendara!",
       "title": "Impostazioni dell'account",
       "trialActive": "Prova attiva",
       "trialDaysRemaining": "{{days}} giorni rimanenti nel periodo di prova",
-      "trialProgress": "Avanzamento della prova",
+      "trialProgress": "Progresso della prova",
       "upgradeToPro": "Fai un passo avanti. Collegare. Unisciti ad Ascesa.",
       "upgradeToProDescription": "Ottieni accesso illimitato a tutte le funzionalità di Ascend e supporta lo sviluppatore solista.",
       "upgradeToProTitle": "Iscriviti per mantenere Ascend per sempre",
@@ -802,12 +802,12 @@
       },
       "torrentInstructions": {
         "description": "Fare clic sul pulsante in basso per scaricare il file torrent. Assicurati di avere un client torrent installato e una VPN abilitata per il download sicuro.",
-        "noTorrent": "Non è possibile accedere a qBittorrent WebUI. Controlla le impostazioni per ulteriori informazioni.",
+        "noTorrent": "qNon è possibile accedere a Bittorrent WebUI. Controlla le impostazioni per ulteriori informazioni.",
         "title": "Scarica tramite Torrent"
       },
       "waitingForBrowser": "In attesa che il browser invii il download..."
     },
-    "failedToLoadSpecs": "Impossibile caricare le specifiche di sistema",
+    "failedToLoadSpecs": "Impossibile caricare le specifiche del sistema",
     "firstReleasedOn": "Gioco rilasciato",
     "gameNeedsEmulator": "Ciò richiede l'esecuzione di un emulatore.",
     "gameNeedsVR": "Per questo gioco potrebbe essere necessaria la realtà virtuale.",
@@ -895,7 +895,7 @@
       "title": "Dove vuoi scaricare questo gioco?"
     },
     "sendingTorrent": "Invio del torrent...",
-    "shareGame": "Condividi il collegamento del gioco Ascendara",
+    "shareGame": "Condividi il collegamento al gioco Ascendara",
     "showingResultsFor": "Risultati per",
     "specs": {
       "component": "Componente",
@@ -937,6 +937,7 @@
       "processingLink": "Elaborazione del collegamento per il download...",
       "reportFailed": "Impossibile inviare il rapporto",
       "reportSubmitted": "Rapporto inviato con successo",
+      "torboxOffline": "Questo provider è attualmente offline su Torbox. Prova un altro fornitore.",
       "torboxProcessingError": "Errore durante l'elaborazione del collegamento Torbox",
       "torrentSent": "Torrent inviato a qBittorrent"
     },
@@ -1066,7 +1067,7 @@
     "dismiss": "Congedare",
     "dontShowSteamWarning": "Non mostrarlo più",
     "downloadAll": "Scarica tutto",
-    "downloadComplete": "Download completo!",
+    "downloadComplete": "Download completato!",
     "downloadFailed": "Download non riuscito.",
     "downloadFile": "Scaricamento",
     "downloadStandalone": "Scarica sul desktop",
@@ -1363,7 +1364,7 @@
     "loadingLibraryMessage": "Ascendara sta raccogliendo tutti i tuoi giochi per te. Se riesci a leggere questo messaggio, significa che sta impiegando più tempo del previsto.",
     "minute": "minuto",
     "minutes": "minuti",
-    "multiselect": "Selezione multipla",
+    "multiselect": "Multiselezione",
     "neverPlayed": "Non hai ancora giocato a questo gioco",
     "neverPlayed2": "Mai giocato",
     "newBadge": "NUOVO",
@@ -1598,7 +1599,9 @@
   },
   "refreshDialog": {
     "beginRefresh": "Inizia l'aggiornamento",
+    "checkingCF": "Controllo dello stato di Cloudflare...",
     "clickToOpen": "Fare clic sul pulsante in basso per aprire SteamRIP:",
+    "continueRefresh": "Continua Aggiorna",
     "cookieExpiredDesc": "Il cookie è scaduto durante il processo di aggiornamento. Dovrai procurartene uno nuovo per continuare.",
     "cookieExpiredTitle": "Cookie scaduto",
     "cookieExpiredWarning": "Cookie scaduto durante l'aggiornamento",
@@ -1608,6 +1611,8 @@
     "cookieReceivedTitle": "Biscotto ricevuto!",
     "cookieRefreshDescription": "Completa nuovamente la verifica per ottenere un nuovo cookie e continuare l'aggiornamento.",
     "copyLink": "Copia collegamento",
+    "detectingDesc": "Verifica se la protezione Cloudflare è attiva su SteamRIP",
+    "detectingProtection": "Rilevamento dello stato di protezione in corso...",
     "extNote": "L'aggiornamento inizierà automaticamente una volta che l'estensione avrà inviato i dati.",
     "extStep1": "Completa il captcha di Cloudflare sulla pagina SteamRIP",
     "extStep2": "Cerca il popup dell'estensione Ascendara",
@@ -1625,6 +1630,9 @@
     "manualStep4Desc": "Cerca \"post\" nell'elenco delle richieste di rete",
     "manualStep5": "Copia il cookie cf_clearance",
     "manualStep5Desc": "Fare clic sulla richiesta → scheda Cookie → Copia valore cf_clearance",
+    "noCFDesc": "Avvio dell'aggiornamento senza cookie...",
+    "noCFDetected": "La protezione Cloudflare non è attiva",
+    "noCFTitle": "Nessuna protezione rilevata",
     "noExtension": "No, non ce l'ho",
     "noExtensionDesc": "Copierò manualmente il cookie dagli strumenti di sviluppo del browser",
     "openSteamRIP": "Apri SteamRIP",
@@ -2030,7 +2038,7 @@
     "cooldown": "Raffreddare",
     "data": "Dati",
     "data_refreshed": "Dati TorBox aggiornati",
-    "data_size": "{{size}} GB",
+    "data_size": "{{size}}GB",
     "delete_download": "Elimina download",
     "delete_download_confirm": "Sei sicuro di voler rimuovere {{name}} dai download memorizzati nella cache?",
     "download_deleted_desc": "{{name}} è stato eliminato.",
@@ -2080,7 +2088,7 @@
       "title": "Ascendere"
     },
     "downloads": {
-      "content": "Questa è la tua area Download. Puoi tenere traccia dei download correnti, verificare l'avanzamento e gestire i download qui.",
+      "content": "Questa è la tua area Download. Puoi tenere traccia dei tuoi download correnti, controllare l'avanzamento e gestire i download qui.",
       "title": "Download"
     },
     "final": {
@@ -2171,11 +2179,11 @@
     "graphicsAndMultimedia": "Grafica e multimedialità",
     "havePython": "Ho Python",
     "haveWine": "Ho questi, portami al tour",
-    "helpIdentifyAndFix": "Aiuta a identificare e risolvere i problemi più rapidamente",
+    "helpIdentifyAndFix": "Aiuta a identificare e risolvere i problemi più velocemente",
     "helpIdentifyAndFixDesc": "Tutti gli errori verranno automaticamente inviati ad Analytics con un flag urgente, inserendoli in cima all'elenco",
     "helpImprove": "Aiuta a migliorare Ascendara",
     "howItWorks": "Come funziona:",
-    "iHaveReadAndAgreeTo": "Ho letto e accetto quelli di Ascendara",
+    "iHaveReadAndAgreeTo": "Ho letto e accetto i termini di Ascendara",
     "iHaveTheseTakeMeToTheTour": "Ho questi, portami al tour",
     "improvedUXDesc": "Le cose sono suddivise in più pagine e organizzate meglio per assicurarti di poter trovare ciò di cui hai bisogno",
     "improvedUXTitle": "Esperienza utente migliorata",
@@ -2200,7 +2208,7 @@
       "stillRefreshing": "Il tuo indice di gioco è ancora in fase di creazione",
       "subtitle": "Ascendara utilizza un indice di gioco locale per una navigazione più rapida e un accesso offline",
       "title": "Imposta l'indice del tuo gioco",
-      "waitForRefresh": "Non potrai sfogliare i giochi finché l'indice non sarà completo. Di solito l'operazione richiede alcuni minuti."
+      "waitForRefresh": "Non potrai sfogliare i giochi finché l'indice non sarà completo. Solitamente l'operazione richiede alcuni minuti."
     },
     "makeSureYouHaveEnoughDiskSpaceInTheSelectedLocation": "Assicurati di avere abbastanza spazio su disco nella posizione selezionata",
     "manualUpdates": "Aggiornamenti manuali",

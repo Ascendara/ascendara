@@ -756,7 +756,7 @@
     "cloudSaving": "Sauvegardes dans le cloud",
     "cloudSavingDesc": "Votre progression, partout",
     "companies": "Entreprises",
-    "compareYourPC": "Comparez votre PC",
+    "compareYourPC": "Comparez votre ordinateur",
     "completionist": "Finaliste",
     "criticError": "Échec du chargement des avis critiques",
     "criticReviews": "Critiques des critiques",
@@ -937,6 +937,7 @@
       "processingLink": "Lien de téléchargement en cours de traitement...",
       "reportFailed": "Échec de l'envoi du rapport",
       "reportSubmitted": "Rapport soumis avec succès",
+      "torboxOffline": "Ce fournisseur est actuellement hors ligne sur Torbox. Essayez un autre fournisseur.",
       "torboxProcessingError": "Erreur lors du traitement du lien Torbox",
       "torrentSent": "Torrent envoyé à qBittorrent"
     },
@@ -956,7 +957,7 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "Annuler et supprimer",
-      "legacyGameVerification": "La vérification des fichiers n'est disponible que pour les jeux téléchargés après Ascendara version 8.1.2.",
+      "legacyGameVerification": "La vérification des fichiers n'est disponible que pour les jeux téléchargés après la version 8.1.2 d'Ascendara.",
       "openFolder": "Ouvrir le dossier",
       "retryDownload": "Réessayer de télécharger",
       "stopAndDelete": "Arrêter et supprimer le contenu",
@@ -982,7 +983,7 @@
     "extracting": "Extraction des fichiers du jeu...",
     "extractingDescription": "L'extraction des fichiers du jeu peut prendre jusqu'à 30 minutes selon la taille du fichier.",
     "firstTimeDownload": {
-      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton « Arrêter le téléchargement ».",
+      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton \"Arrêter le téléchargement\".",
       "title": "Téléchargement sur Ascendara",
       "understand": "Je comprends"
     },
@@ -1593,12 +1594,14 @@
     "totalPlaytime": "Durée totale de jeu",
     "totalXP": "XP totale : {{xp}}",
     "uploadImage": "Télécharger une image",
-    "usingEmoji": "Utiliser des émoticônes",
+    "usingEmoji": "Utiliser des émojis",
     "yourLevel": "Votre niveau"
   },
   "refreshDialog": {
     "beginRefresh": "Commencer l'actualisation",
+    "checkingCF": "Vérification de l'état de Cloudflare...",
     "clickToOpen": "Cliquez sur le bouton ci-dessous pour ouvrir SteamRIP :",
+    "continueRefresh": "Continuer Actualiser",
     "cookieExpiredDesc": "Le cookie a expiré pendant le processus d'actualisation. Vous devrez en obtenir un nouveau pour continuer.",
     "cookieExpiredTitle": "Cookie expiré",
     "cookieExpiredWarning": "Cookie expiré lors de l'actualisation",
@@ -1608,6 +1611,8 @@
     "cookieReceivedTitle": "Cookie reçu !",
     "cookieRefreshDescription": "Effectuez à nouveau la vérification pour obtenir un nouveau cookie et poursuivez l'actualisation.",
     "copyLink": "Copier le lien",
+    "detectingDesc": "Vérifier si la protection Cloudflare est active sur SteamRIP",
+    "detectingProtection": "Détection de l'état de protection...",
     "extNote": "L'actualisation démarrera automatiquement une fois que l'extension aura envoyé les données.",
     "extStep1": "Complétez le captcha Cloudflare sur la page SteamRIP",
     "extStep2": "Recherchez la fenêtre contextuelle de l'extension Ascendara",
@@ -1625,6 +1630,9 @@
     "manualStep4Desc": "Recherchez les « messages » dans la liste des demandes réseau",
     "manualStep5": "Copiez le cookie cf_clearance",
     "manualStep5Desc": "Cliquez sur la demande → onglet Cookies → Copier la valeur cf_clearance",
+    "noCFDesc": "Démarrage de l'actualisation sans cookie...",
+    "noCFDetected": "La protection Cloudflare n'est pas active",
+    "noCFTitle": "Aucune protection détectée",
     "noExtension": "Non, je ne l'ai pas",
     "noExtensionDesc": "Je vais copier manuellement le cookie à partir des outils de développement du navigateur",
     "openSteamRIP": "Ouvrez SteamRIP",
@@ -1651,7 +1659,7 @@
     "alphabeticalZA": "Alphabétique ZA",
     "categories": "Catégories",
     "confirmSendRefreshRequest": "Envoyer la demande",
-    "filterOptions": "Options de filtre",
+    "filterOptions": "Options de filtrage",
     "filters": "Filtres",
     "gamesIndexed": "Jeux indexés",
     "indexedInformation": "Informations indexées",
@@ -2112,7 +2120,7 @@
       "title": "Statut du serveur"
     },
     "settings": {
-      "content": "Personnalisez Ascendara : ajustez les thèmes, choisissez votre dossier de téléchargement, ajoutez des dossiers de téléchargement et affinez d'autres préférences ici. Il existe également des fonctionnalités utiles que vous pouvez activer et désactiver. Revenez après la visite pour voir ce que vous pourriez souhaiter.",
+      "content": "Personnalisez Ascendara : ajustez les thèmes, choisissez votre dossier de téléchargement, ajoutez des dossiers de téléchargement et affinez d'autres préférences ici. Il existe également des fonctionnalités utiles que vous pouvez activer et désactiver. Revenez après la visite pour voir ce que vous pourriez vouloir.",
       "title": "Vos préférences"
     },
     "sound": {
@@ -2172,7 +2180,7 @@
     "havePython": "J'ai Python",
     "haveWine": "J'ai ça, emmène-moi faire le tour",
     "helpIdentifyAndFix": "Aide à identifier et à résoudre les problèmes plus rapidement",
-    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées à Analytics avec un indicateur urgent, les plaçant en haut de la liste",
+    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées aux analyses avec un indicateur urgent, les plaçant en haut de la liste",
     "helpImprove": "Aidez à améliorer Ascendara",
     "howItWorks": "Comment ça marche :",
     "iHaveReadAndAgreeTo": "J'ai lu et j'accepte les conditions d'Ascendara",
@@ -2206,7 +2214,7 @@
     "manualUpdates": "Mises à jour manuelles",
     "neverAutomaticallyUpdate": "Ne jamais mettre à jour automatiquement",
     "next": "Suivant",
-    "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d'espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
+    "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d’espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
     "noticeAppIsFree": {
       "point1": "Les téléchargements et tout ce qui concerne les jeux sur Ascendara seront toujours gratuits",
       "point2": "Ascendara ne demandera aucune information personnelle pour télécharger ou jouer à des jeux",
@@ -2270,7 +2278,7 @@
     "wineIsRequired": "Jouez avec le vin",
     "wineMustBeInstalled": "Wine, DXVK et d'autres outils doivent être installés et configurés sur votre ordinateur pour exécuter des jeux Windows. Ne vous inquiétez pas, Ascendara peut tout installer et configurer juste pour vous.",
     "youCanAddMoreLater": "Vous pourrez ajouter plus de répertoires dans les préférences plus tard",
-    "youCanChangeThisLater": "Vous pourrez toujours mettre à jour votre langue ultérieurement dans Paramètres.",
+    "youCanChangeThisLater": "Vous pouvez toujours mettre à jour votre langue ultérieurement dans Paramètres.",
     "youCanChangeThisSettingLater": "Vous pourrez modifier cela ultérieurement dans Paramètres.",
     "youWillReceiveAdminPrompts": "Vous recevrez des invites d'administrateur des installateurs officiels de Microsoft pour installer les composants requis. Votre ordinateur devra peut-être redémarrer après l'installation.",
     "yourContinuedSupport": "Votre soutien continu a fait d'Ascendara ce qu'elle est aujourd'hui. Ascendara a été entièrement reconstruit avec un nouveau look et une nouvelle sensation que vous demandiez."
