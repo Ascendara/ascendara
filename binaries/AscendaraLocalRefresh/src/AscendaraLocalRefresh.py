@@ -543,6 +543,15 @@ def extract_version(content):
     return ""
 
 
+def extract_released_by(content):
+    """Extract 'Released By' field from content"""
+    match = re.search(r'Released By:?\s*</strong>\s*([^<]+)', content, re.IGNORECASE)
+    if match:
+        released_by = match.group(1).strip()
+        return html.unescape(released_by)
+    return ""
+
+
 def extract_min_requirements(content):
     """Extract minimum system requirements from content"""
     reqs = {}
@@ -907,6 +916,7 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
         download_links = extract_download_links(content)
         game_size = extract_game_size(content)
         version = extract_version(content)
+        released_by = extract_released_by(content)
         is_online = check_online_status(content, title)
         has_dlc = check_dlc_status(content)
         min_reqs = extract_min_requirements(content)
@@ -938,6 +948,7 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
             "game": game_name,
             "size": game_size,
             "version": version,
+            "releasedBy": released_by,
             "online": is_online,
             "dlc": has_dlc,
             "dirlink": post.get("link", ""),
@@ -1415,6 +1426,7 @@ def main():
             "getDate": datetime.datetime.now().strftime("%B %d, %Y, %I:%M %p"),
             "local": True,
             "source": "STEAMRIP",
+            "listVersion": "1.0",
             "games": str(len(game_data))
         }
         

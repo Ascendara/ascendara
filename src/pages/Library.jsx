@@ -552,21 +552,49 @@ const Library = () => {
               if (cachedImage) {
                 images[game.name] = cachedImage;
               } else if (game.gameID) {
-                const response = await fetch(
-                  `https://api.ascendara.app/v3/image/${game.gameID}`
-                );
-                if (response.ok) {
-                  const blob = await response.blob();
-                  const dataUrl = await new Promise(resolve => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.readAsDataURL(blob);
-                  });
-                  images[game.name] = dataUrl;
+                // Check if using local index
+                const imageUrl = settings.usingLocalIndex
+                  ? gameService.getImageUrlByGameId(game.gameID)
+                  : `https://api.ascendara.app/v3/image/${game.gameID}`;
+
+                // For local index, try to load from local file system
+                if (settings.usingLocalIndex && settings.localIndex) {
                   try {
-                    localStorage.setItem(localStorageKey, dataUrl);
-                  } catch (e) {
-                    console.warn("Could not cache cloud game image:", e);
+                    const localImagePath = `${settings.localIndex}/imgs/${game.gameID}.jpg`;
+                    const imageData = await window.electron.ipcRenderer.readFile(
+                      localImagePath,
+                      "base64"
+                    );
+                    const dataUrl = `data:image/jpeg;base64,${imageData}`;
+                    images[game.name] = dataUrl;
+                    try {
+                      localStorage.setItem(localStorageKey, dataUrl);
+                    } catch (e) {
+                      console.warn("Could not cache cloud game image:", e);
+                    }
+                    continue;
+                  } catch (localError) {
+                    console.warn(
+                      "Could not load from local index, skipping:",
+                      localError
+                    );
+                  }
+                } else {
+                  // Fetch from API
+                  const response = await fetch(imageUrl);
+                  if (response.ok) {
+                    const blob = await response.blob();
+                    const dataUrl = await new Promise(resolve => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => resolve(reader.result);
+                      reader.readAsDataURL(blob);
+                    });
+                    images[game.name] = dataUrl;
+                    try {
+                      localStorage.setItem(localStorageKey, dataUrl);
+                    } catch (e) {
+                      console.warn("Could not cache cloud game image:", e);
+                    }
                   }
                 }
               }
@@ -2101,6 +2129,7 @@ const InstalledGameCard = memo(
       results: [],
       selectedCover: null,
     });
+    const [coverImageUrls, setCoverImageUrls] = useState({});
 
     const handleCoverSearch = async query => {
       setCoverSearch(prev => ({
@@ -2112,13 +2141,37 @@ const InstalledGameCard = memo(
       }));
       if (query.length < minSearchLength) {
         setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
+        setCoverImageUrls({});
         return;
       }
       try {
         const covers = await gameService.searchGameCovers(query);
         setCoverSearch(prev => ({ ...prev, isLoading: false, results: covers || [] }));
+
+        // Load local images if using local index
+        if (settings.usingLocalIndex && settings.localIndex) {
+          const imageUrls = {};
+          for (const cover of covers || []) {
+            if (cover.gameID) {
+              try {
+                const localImagePath = `${settings.localIndex}/imgs/${cover.gameID}.jpg`;
+                const localImageUrl =
+                  await window.electron.getLocalImageUrl(localImagePath);
+                if (localImageUrl) {
+                  imageUrls[cover.gameID] = localImageUrl;
+                }
+              } catch (error) {
+                console.warn(`Could not load local image for ${cover.gameID}:`, error);
+              }
+            }
+          }
+          setCoverImageUrls(imageUrls);
+        } else {
+          setCoverImageUrls({});
+        }
       } catch (err) {
         setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
+        setCoverImageUrls({});
       }
     };
 
@@ -2179,9 +2232,13 @@ const InstalledGameCard = memo(
                     >
                       <img
                         src={
-                          settings.usingLocalIndex && cover.gameID
-                            ? gameService.getImageUrlByGameId(cover.gameID)
-                            : gameService.getImageUrl(cover.imgID)
+                          settings.usingLocalIndex &&
+                          cover.gameID &&
+                          coverImageUrls[cover.gameID]
+                            ? coverImageUrls[cover.gameID]
+                            : settings.usingLocalIndex && cover.gameID
+                              ? gameService.getImageUrlByGameId(cover.gameID)
+                              : gameService.getImageUrl(cover.imgID)
                         }
                         alt={cover.title}
                         className="h-full w-full object-cover"
@@ -2218,26 +2275,45 @@ const InstalledGameCard = memo(
                   localStorage.removeItem(localStorageKey);
                   // Fetch new image and save to localStorage
                   try {
-                    const imageUrl =
-                      settings.usingLocalIndex && coverSearch.selectedCover.gameID
-                        ? gameService.getImageUrlByGameId(
-                            coverSearch.selectedCover.gameID
-                          )
-                        : gameService.getImageUrl(coverSearch.selectedCover.imgID);
-                    const response = await fetch(imageUrl);
-                    const blob = await response.blob();
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      const dataUrl = reader.result;
-                      try {
-                        localStorage.setItem(localStorageKey, dataUrl);
-                      } catch (e) {
-                        console.warn("Could not cache new cover image:", e);
+                    let dataUrl;
+                    // For local index, load from local file system
+                    if (settings.usingLocalIndex && coverSearch.selectedCover.gameID) {
+                      if (coverImageUrls[coverSearch.selectedCover.gameID]) {
+                        // Already loaded, convert blob URL to data URL for storage
+                        const response = await fetch(
+                          coverImageUrls[coverSearch.selectedCover.gameID]
+                        );
+                        const blob = await response.blob();
+                        dataUrl = await new Promise(resolve => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolve(reader.result);
+                          reader.readAsDataURL(blob);
+                        });
+                      } else {
+                        // Try to load from local file
+                        const localImagePath = `${settings.localIndex}/imgs/${coverSearch.selectedCover.gameID}.jpg`;
+                        const imageData = await window.electron.ipcRenderer.readFile(
+                          localImagePath,
+                          "base64"
+                        );
+                        dataUrl = `data:image/jpeg;base64,${imageData}`;
                       }
-                      setImageData(dataUrl);
-                      setShowEditCoverDialog(false);
-                    };
-                    reader.readAsDataURL(blob);
+                    } else {
+                      // Fetch from API
+                      const imageUrl = gameService.getImageUrl(
+                        coverSearch.selectedCover.imgID
+                      );
+                      const response = await fetch(imageUrl);
+                      const blob = await response.blob();
+                      dataUrl = await new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                      });
+                    }
+                    localStorage.setItem(localStorageKey, dataUrl);
+                    setImageData(dataUrl);
+                    setShowEditCoverDialog(false);
                   } catch (e) {
                     console.error("Failed to update cover image", e);
                   }
@@ -2692,6 +2768,7 @@ const AddGameForm = ({ onSuccess }) => {
     results: [],
     selectedCover: null,
   });
+  const [coverImageUrls, setCoverImageUrls] = useState({});
 
   // Add debounce timer ref
   const searchDebounceRef = useRef(null);
@@ -2709,6 +2786,7 @@ const AddGameForm = ({ onSuccess }) => {
     // Don't search if query is too short
     if (!query.trim() || query.length < minSearchLength) {
       setCoverSearch(prev => ({ ...prev, results: [], isLoading: false }));
+      setCoverImageUrls({});
       return;
     }
 
@@ -2722,6 +2800,28 @@ const AddGameForm = ({ onSuccess }) => {
           results: results.slice(0, 9),
           isLoading: false,
         }));
+
+        // Load local images if using local index
+        if (settings.usingLocalIndex && settings.localIndex) {
+          const imageUrls = {};
+          for (const cover of results.slice(0, 9)) {
+            if (cover.gameID) {
+              try {
+                const localImagePath = `${settings.localIndex}/imgs/${cover.gameID}.jpg`;
+                const localImageUrl =
+                  await window.electron.getLocalImageUrl(localImagePath);
+                if (localImageUrl) {
+                  imageUrls[cover.gameID] = localImageUrl;
+                }
+              } catch (error) {
+                console.warn(`Could not load local image for ${cover.gameID}:`, error);
+              }
+            }
+          }
+          setCoverImageUrls(imageUrls);
+        } else {
+          setCoverImageUrls({});
+        }
       } catch (error) {
         console.error("Error searching covers:", error);
         setCoverSearch(prev => ({ ...prev, isLoading: false }));
@@ -3024,9 +3124,13 @@ const AddGameForm = ({ onSuccess }) => {
                 >
                   <img
                     src={
-                      settings.usingLocalIndex && cover.gameID
-                        ? gameService.getImageUrlByGameId(cover.gameID)
-                        : gameService.getImageUrl(cover.imgID)
+                      settings.usingLocalIndex &&
+                      cover.gameID &&
+                      coverImageUrls[cover.gameID]
+                        ? coverImageUrls[cover.gameID]
+                        : settings.usingLocalIndex && cover.gameID
+                          ? gameService.getImageUrlByGameId(cover.gameID)
+                          : gameService.getImageUrl(cover.imgID)
                     }
                     alt={cover.title}
                     className="h-full w-full object-cover"
@@ -3049,9 +3153,15 @@ const AddGameForm = ({ onSuccess }) => {
               <div className="relative aspect-video w-64 overflow-hidden rounded-lg border-2 border-primary">
                 <img
                   src={
-                    settings.usingLocalIndex && coverSearch.selectedCover.gameID
-                      ? gameService.getImageUrlByGameId(coverSearch.selectedCover.gameID)
-                      : gameService.getImageUrl(coverSearch.selectedCover.imgID)
+                    settings.usingLocalIndex &&
+                    coverSearch.selectedCover.gameID &&
+                    coverImageUrls[coverSearch.selectedCover.gameID]
+                      ? coverImageUrls[coverSearch.selectedCover.gameID]
+                      : settings.usingLocalIndex && coverSearch.selectedCover.gameID
+                        ? gameService.getImageUrlByGameId(
+                            coverSearch.selectedCover.gameID
+                          )
+                        : gameService.getImageUrl(coverSearch.selectedCover.imgID)
                   }
                   alt={coverSearch.selectedCover.title}
                   className="h-full w-full object-cover"

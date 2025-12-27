@@ -116,7 +116,39 @@ var app = {
       let self = this;
       self.cache = [];
       console.log("Achievement Watchdog starting ...");
-      const folders = await monitor.getFolders();
+
+      // Build game directory list from settings
+      const settings = await getSettings();
+      const downloadDir = settings.downloadDirectory;
+      const gameDirList = [];
+
+      if (downloadDir) {
+        try {
+          // Scan download directory for game folders
+          const gameFolders = await fs.readdir(downloadDir, { withFileTypes: true });
+          for (const dirent of gameFolders) {
+            if (dirent.isDirectory()) {
+              const gameFolderPath = path.join(downloadDir, dirent.name);
+              gameDirList.push({
+                path: gameFolderPath,
+                notify: true,
+              });
+            }
+          }
+          console.log(`Found ${gameDirList.length} game directories to monitor`);
+        } catch (err) {
+          console.warn("Failed to scan download directory:", err);
+        }
+      }
+
+      // Create temporary file for monitor.getFolders()
+      const tempFile = path.join(
+        process.env.TEMP || process.env.TMP || "/tmp",
+        "ascendara_game_dirs.json"
+      );
+      await fs.writeFile(tempFile, JSON.stringify(gameDirList), "utf8");
+
+      const folders = await monitor.getFolders(tempFile);
       console.log(`monitor.getFolders() returned:`, folders);
       let i = 1;
       for (let folder of folders) {
