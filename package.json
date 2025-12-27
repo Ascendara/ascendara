@@ -154,7 +154,7 @@
         "to": "public"
       },
       {
-        "from": "readme/logo/ico/ascendara_256x.ico",
+        "from": "readme/logo/ico/ascendara_64x.ico",
         "to": "icon.ico"
       },
       {

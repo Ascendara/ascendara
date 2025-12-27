@@ -91,7 +91,7 @@ function createTray() {
   // Use the correct icon path - try multiple locations
   let iconPath;
   if (isDev) {
-    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_256x.ico");
+    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   } else {
     // In production, icon should be in resources
     iconPath = path.join(process.resourcesPath, "icon.ico");
@@ -105,7 +105,7 @@ function createTray() {
   if (!fs.existsSync(iconPath)) {
     console.error("Tray icon not found at:", iconPath);
     // Use a fallback - create from the window icon
-    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_256x.ico");
+    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   }
 
   const icon = nativeImage.createFromPath(iconPath);
