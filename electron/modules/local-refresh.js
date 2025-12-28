@@ -12,6 +12,7 @@ const { getSettingsManager } = require("./settings");
 const archiver = require("archiver");
 const https = require("https");
 const http = require("http");
+const yauzl = require("yauzl");
 
 let localRefreshProcess = null;
 let localRefreshProgressInterval = null;
@@ -781,8 +782,6 @@ function registerLocalRefreshHandlers() {
     const mainWindow = BrowserWindow.getAllWindows()[0];
 
     try {
-      const AdmZip = require("adm-zip");
-
       // Set downloading flag and notify renderer
       publicIndexDownloading = true;
       if (mainWindow) {
@@ -985,17 +984,129 @@ function registerLocalRefreshHandlers() {
         fs.cpSync(imgsDir, imgsBackup, { recursive: true });
       }
 
-      // Extract the zip
-      const zip = new AdmZip(zipPath);
-      zip.extractAllTo(outputPath, true);
+      // Extract the zip asynchronously to avoid blocking the UI
+      await new Promise((resolve, reject) => {
+        yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+          if (err) return reject(err);
 
-      // Clean up
-      fs.unlinkSync(zipPath);
+          let extractedCount = 0;
+          let totalEntries = 0;
+
+          zipfile.on("entry", entry => {
+            totalEntries++;
+
+            if (/\/$/.test(entry.fileName)) {
+              // Directory entry - use async mkdir
+              const dirPath = path.join(outputPath, entry.fileName);
+              fs.mkdir(dirPath, { recursive: true }, err => {
+                if (err && err.code !== "EEXIST") return reject(err);
+                // Yield to event loop before reading next entry
+                setImmediate(() => zipfile.readEntry());
+              });
+            } else {
+              // File entry
+              zipfile.openReadStream(entry, (err, readStream) => {
+                if (err) return reject(err);
+
+                const filePath = path.join(outputPath, entry.fileName);
+                const fileDir = path.dirname(filePath);
+
+                // Use async mkdir for file directories
+                fs.mkdir(fileDir, { recursive: true }, err => {
+                  if (err && err.code !== "EEXIST") return reject(err);
+
+                  const writeStream = fs.createWriteStream(filePath);
+                  readStream.pipe(writeStream);
+
+                  writeStream.on("finish", () => {
+                    extractedCount++;
+                    // Send progress updates periodically
+                    if (mainWindow && extractedCount % 10 === 0) {
+                      mainWindow.webContents.send("public-index-download-progress", {
+                        downloaded: extractedCount,
+                        total: totalEntries,
+                        progress:
+                          totalEntries > 0 ? (extractedCount / totalEntries) * 100 : -1,
+                        phase: "extracting",
+                      });
+                    }
+                    // Yield to event loop before reading next entry
+                    setImmediate(() => zipfile.readEntry());
+                  });
+
+                  writeStream.on("error", reject);
+                  readStream.on("error", reject);
+                });
+              });
+            }
+          });
+
+          zipfile.on("end", () => {
+            // Send final extraction complete
+            if (mainWindow) {
+              mainWindow.webContents.send("public-index-download-progress", {
+                downloaded: extractedCount,
+                total: totalEntries,
+                progress: 100,
+                phase: "complete",
+              });
+            }
+            resolve();
+          });
+
+          zipfile.on("error", reject);
+          zipfile.readEntry();
+        });
+      });
+
+      // Clean up temporary files and folders
+      console.log("Cleaning up temporary files and folders...");
+
+      // Remove the downloaded zip file
+      if (fs.existsSync(zipPath)) {
+        fs.unlinkSync(zipPath);
+      }
+
+      // Remove backup files
       if (fs.existsSync(gamesBackup)) {
         fs.unlinkSync(gamesBackup);
       }
       if (fs.existsSync(imgsBackup)) {
         fs.rmSync(imgsBackup, { recursive: true, force: true });
+      }
+
+      // Remove any temporary folders that may have been extracted
+      const tempFolders = [
+        path.join(outputPath, "incoming"),
+        path.join(outputPath, "progress"),
+        path.join(outputPath, "__MACOSX"), // macOS metadata folder
+        path.join(outputPath, "temp"),
+        path.join(outputPath, "tmp"),
+      ];
+
+      for (const folder of tempFolders) {
+        if (fs.existsSync(folder)) {
+          console.log(`Removing temporary folder: ${folder}`);
+          fs.rmSync(folder, { recursive: true, force: true });
+        }
+      }
+
+      // Check for and remove duplicate image directories
+      const imgsDirs = fs.readdirSync(outputPath).filter(item => {
+        const fullPath = path.join(outputPath, item);
+        return (
+          fs.statSync(fullPath).isDirectory() &&
+          (item.toLowerCase().includes("img") || item === "images")
+        );
+      });
+
+      // Keep only the 'imgs' directory, remove any others
+      for (const dir of imgsDirs) {
+        if (dir !== "imgs") {
+          const dirPath = path.join(outputPath, dir);
+          console.log(`Removing duplicate image directory: ${dirPath}`);
+          fs.rmSync(dirPath, { recursive: true, force: true });
+        }
       }
 
       console.log("Shared index set up successfully");

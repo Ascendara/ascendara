@@ -117,6 +117,7 @@
     "tailwindcss-animate": "^1.0.7",
     "unzipper": "^0.12.1",
     "winreg": "^1.2.5",
+    "yauzl": "^2.10.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
