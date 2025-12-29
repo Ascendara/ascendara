@@ -1553,6 +1553,7 @@ const Ascend = () => {
   };
 
   const handleGoogleSignIn = async () => {
+    console.log("[handleGoogleSignIn] Starting Google sign-in flow...");
     setIsGoogleLoading(true);
     setAccountExistsError(null);
 
@@ -1560,16 +1561,32 @@ const Ascend = () => {
     let hardwareId = null;
     if (window.electron?.getHardwareId) {
       hardwareId = await window.electron.getHardwareId();
+      console.log(
+        "[handleGoogleSignIn] Hardware ID obtained:",
+        hardwareId ? "yes" : "no"
+      );
     }
 
+    console.log("[handleGoogleSignIn] Calling googleSignIn()...");
     const result = await googleSignIn();
+    console.log("[handleGoogleSignIn] googleSignIn() returned:", {
+      hasUser: !!result.user,
+      isNewUser: result.isNewUser,
+      error: result.error,
+    });
     if (result.user) {
+      console.log("[handleGoogleSignIn] User signed in successfully");
       if (result.isNewUser) {
+        console.log("[handleGoogleSignIn] New user detected, checking hardware ID...");
         // Check if hardware ID already has an account
         if (hardwareId) {
           // First check if this hardware ID is associated with a deleted account
+          console.log("[handleGoogleSignIn] Checking for deleted account...");
           const deletedCheck = await checkDeletedAccount(hardwareId);
           if (deletedCheck.isDeleted) {
+            console.log(
+              "[handleGoogleSignIn] Hardware ID has deleted account, removing new account"
+            );
             // Delete the newly created account and show deleted account error
             await deleteNewAccount();
             setAccountExistsError({ email: deletedCheck.email, isDeleted: true });
@@ -1577,8 +1594,14 @@ const Ascend = () => {
             return;
           }
 
+          console.log(
+            "[handleGoogleSignIn] Checking if hardware ID has existing account..."
+          );
           const hwCheck = await checkHardwareIdAccount(hardwareId);
           if (hwCheck.hasAccount) {
+            console.log(
+              "[handleGoogleSignIn] Hardware ID already has account, removing new account"
+            );
             // Delete the newly created account and show error
             await deleteNewAccount();
             setAccountExistsError({ email: hwCheck.email, isDeleted: false });
@@ -1586,17 +1609,26 @@ const Ascend = () => {
             return;
           }
           // Register the hardware ID for this new user
+          console.log("[handleGoogleSignIn] Registering hardware ID for new user...");
           await registerHardwareId(hardwareId, result.user.uid);
         }
         // New user - prompt for display name
+        console.log("[handleGoogleSignIn] Showing display name prompt for new user");
         setGoogleDisplayName(result.user.displayName || "");
         setShowDisplayNamePrompt(true);
       } else {
+        console.log("[handleGoogleSignIn] Existing user logged in successfully");
         toast.success(t("account.success.loggedIn"));
       }
     } else if (result.error) {
+      console.log("[handleGoogleSignIn] Sign-in error:", result.error);
       toast.error(result.error);
+    } else {
+      console.log(
+        "[handleGoogleSignIn] Sign-in returned no user and no error (cancelled or redirecting)"
+      );
     }
+    console.log("[handleGoogleSignIn] Google sign-in flow complete");
     setIsGoogleLoading(false);
   };
 

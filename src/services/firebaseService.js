@@ -80,11 +80,13 @@ googleProvider.setCustomParameters({
  */
 export const signInWithGoogle = async () => {
   try {
+    console.log("[signInWithGoogle] Starting Google sign-in...");
     let result;
 
     try {
       // Try popup first
       result = await signInWithPopup(auth, googleProvider);
+      console.log("[signInWithGoogle] Popup sign-in successful");
     } catch (popupError) {
       // User cancelled the popup - just return silently
       if (
@@ -107,10 +109,18 @@ export const signInWithGoogle = async () => {
 
     const user = result.user;
     const isNewUser = result._tokenResponse?.isNewUser ?? false;
+    console.log(
+      "[signInWithGoogle] User authenticated:",
+      user.uid,
+      "isNewUser:",
+      isNewUser
+    );
 
     // Check if user document exists, create if new
     const userDoc = await getDoc(doc(db, "users", user.uid));
+    console.log("[signInWithGoogle] User document exists:", userDoc.exists());
     if (!userDoc.exists()) {
+      console.log("[signInWithGoogle] Creating new user document...");
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
@@ -127,14 +137,18 @@ export const signInWithGoogle = async () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      console.log("[signInWithGoogle] User document created successfully");
+
       // Set initial online status
       await setDoc(doc(db, "userStatus", user.uid), {
         status: "online",
         customMessage: "",
         updatedAt: serverTimestamp(),
       });
+      console.log("[signInWithGoogle] User status document created");
     }
 
+    console.log("[signInWithGoogle] Sign-in complete, returning user");
     return { user, error: null, isNewUser };
   } catch (error) {
     console.error("Google sign-in error:", error);

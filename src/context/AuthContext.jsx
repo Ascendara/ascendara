@@ -65,11 +65,32 @@ export const AuthProvider = ({ children }) => {
       unsubscribe = subscribeToAuthChanges(async firebaseUser => {
         try {
           if (firebaseUser) {
-            // Fetch additional user data from Firestore
-            const { data } = await getUserData(firebaseUser.uid);
+            console.log(
+              "[AuthContext] Auth state changed - user logged in:",
+              firebaseUser.uid
+            );
 
-            // Check if account has pending deletion request
-            if (data?.reqDelete) {
+            // Fetch additional user data from Firestore
+            const { data, error: fetchError } = await getUserData(firebaseUser.uid);
+
+            // If we can't fetch user data, it might be a new account still being created
+            // Don't log them out - just set the user and let the data load later
+            if (fetchError) {
+              console.warn(
+                "[AuthContext] Failed to fetch user data (might be new account):",
+                fetchError
+              );
+              setUser(firebaseUser);
+              setUserData(null);
+              setLoading(false);
+              return;
+            }
+
+            // Only check for pending deletion if we successfully fetched user data
+            if (data && data.reqDelete) {
+              console.log(
+                "[AuthContext] Account has pending deletion request - logging out"
+              );
               // Sign out and show warning
               await logoutUser();
               setUser(null);
@@ -79,14 +100,18 @@ export const AuthProvider = ({ children }) => {
               return;
             }
 
+            console.log("[AuthContext] Setting user and user data");
             setUser(firebaseUser);
             setUserData(data);
           } else {
+            console.log("[AuthContext] Auth state changed - user logged out");
             setUser(null);
             setUserData(null);
           }
         } catch (err) {
-          console.error("Error in auth state change handler:", err);
+          console.error("[AuthContext] Error in auth state change handler:", err);
+          // Don't log out on error - keep the user logged in
+          setUser(firebaseUser);
           setUserData(null);
         } finally {
           setLoading(false);
