@@ -1018,25 +1018,27 @@ export const deleteCloudGame = async gameName => {
 /**
  * Check if hardware ID already has an account (for preventing multiple accounts)
  * @param {string} hardwareId - The hardware ID to check
- * @returns {Promise<{hasAccount: boolean, email: string|null, error: string|null}>}
+ * @returns {Promise<{hasAccount: boolean, email: string|null, userId: string|null, error: string|null}>}
  */
 export const checkHardwareIdAccount = async hardwareId => {
   try {
     if (!hardwareId) {
-      return { hasAccount: false, email: null, error: null };
+      return { hasAccount: false, email: null, userId: null, error: null };
     }
 
     const hwDoc = await getDoc(doc(db, "hardwareIds", hardwareId));
     if (!hwDoc.exists()) {
-      return { hasAccount: false, email: null, error: null };
+      return { hasAccount: false, email: null, userId: null, error: null };
     }
 
     const data = hwDoc.data();
+    const linkedUserId = data.userId || null;
+
     // Get the linked user's email (partially masked for privacy)
     // Only try to fetch user doc if we're authenticated (users collection requires auth)
-    if (data.userId && auth.currentUser) {
+    if (linkedUserId && auth.currentUser) {
       try {
-        const userDoc = await getDoc(doc(db, "users", data.userId));
+        const userDoc = await getDoc(doc(db, "users", linkedUserId));
         if (userDoc.exists()) {
           const email = userDoc.data().email || "";
           // Mask email for privacy: show first 2 chars and domain
@@ -1044,7 +1046,12 @@ export const checkHardwareIdAccount = async hardwareId => {
             email.length > 0
               ? email.substring(0, 2) + "***@" + email.split("@")[1]
               : null;
-          return { hasAccount: true, email: maskedEmail, error: null };
+          return {
+            hasAccount: true,
+            email: maskedEmail,
+            userId: linkedUserId,
+            error: null,
+          };
         }
       } catch (userError) {
         // Can't read user doc - just return that account exists without email
@@ -1052,10 +1059,10 @@ export const checkHardwareIdAccount = async hardwareId => {
       }
     }
 
-    return { hasAccount: true, email: null, error: null };
+    return { hasAccount: true, email: null, userId: linkedUserId, error: null };
   } catch (error) {
     console.error("Check hardware ID account error:", error);
-    return { hasAccount: false, email: null, error: error.message };
+    return { hasAccount: false, email: null, userId: null, error: error.message };
   }
 };
 
@@ -1314,7 +1321,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
     // Check hardware ID for trial abuse (non-blocking - don't fail access check if this fails)
     if (hardwareId) {
       try {
-        // If user doesn't have a hardware ID stored, register it
+        // If user doesn't have a hardware ID stored, check for trial abuse but DON'T register yet
+        // Registration happens in handleGoogleSignIn after duplicate account check
         if (!userData.hardwareId) {
           // Check if this hardware ID was used by another account with expired trial
           const hwCheck = await checkHardwareIdTrial(hardwareId);
@@ -1331,10 +1339,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
               error: "Trial already used on this device",
             };
           }
-          // Register the hardware ID for this user (don't await - fire and forget)
-          registerHardwareId(hardwareId, user.uid).catch(e =>
-            console.warn("Hardware ID registration failed:", e)
-          );
+          // NOTE: Hardware ID registration is handled by handleGoogleSignIn for new users
+          // to avoid race condition with duplicate account check
         } else if (userData.hardwareId !== hardwareId) {
           // User has a different hardware ID stored - could be using multiple devices
           // Check if the new hardware ID has an expired trial

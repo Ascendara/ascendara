@@ -1598,9 +1598,16 @@ const Ascend = () => {
             "[handleGoogleSignIn] Checking if hardware ID has existing account..."
           );
           const hwCheck = await checkHardwareIdAccount(hardwareId);
-          if (hwCheck.hasAccount) {
+          console.log("[handleGoogleSignIn] Hardware ID check result:", {
+            hasAccount: hwCheck.hasAccount,
+            userId: hwCheck.userId,
+            currentUserId: result.user.uid,
+          });
+
+          // Only treat it as a duplicate if the hardware ID belongs to a DIFFERENT user
+          if (hwCheck.hasAccount && hwCheck.userId !== result.user.uid) {
             console.log(
-              "[handleGoogleSignIn] Hardware ID already has account, removing new account"
+              "[handleGoogleSignIn] Hardware ID belongs to different account, removing new account"
             );
             // Delete the newly created account and show error
             await deleteNewAccount();
@@ -1608,6 +1615,10 @@ const Ascend = () => {
             setIsGoogleLoading(false);
             return;
           }
+
+          console.log(
+            "[handleGoogleSignIn] Hardware ID check passed (either no account or belongs to current user)"
+          );
           // Register the hardware ID for this new user
           console.log("[handleGoogleSignIn] Registering hardware ID for new user...");
           await registerHardwareId(hardwareId, result.user.uid);
