@@ -1,8 +1,6 @@
 /**
  * Game Data Service
- * Handles fetching game data from multiple APIs:
- * - IGDB (via Twitch): https://api-docs.igdb.com/#authentication
- * - GiantBomb: https://www.giantbomb.com/api/
+ * Handles fetching game data from Steam API
  */
 
 // Import cache service
@@ -11,291 +9,249 @@ import gameApiCache from "./gameInfoCacheService";
 // Constants for APIs
 const isDev = import.meta.env.DEV;
 
-// IGDB API endpoints
-const IGDB_API_URL = isDev ? "/api/igdb" : "https://api.igdb.com/v4";
-const TWITCH_AUTH_URL = "https://id.twitch.tv/oauth2/token";
-
-// GiantBomb API endpoints
-const GIANTBOMB_API_URL = isDev ? "/api/giantbomb" : "https://www.giantbomb.com/api";
+// Steam API endpoints
+const STEAM_STORE_SEARCH_URL = isDev
+  ? "/api/steam/search"
+  : "https://store.steampowered.com/api/storesearch";
+const STEAM_APP_LIST_URL = isDev
+  ? "/api/steam/applist"
+  : "https://api.steampowered.com/ISteamApps/GetAppList/v2";
+const STEAM_APP_DETAILS_URL = isDev
+  ? "/api/steam/appdetails"
+  : "https://store.steampowered.com/api/appdetails";
 
 /**
- * Get Twitch access token for IGDB
- * @returns {Promise<string>} Access token
+ * Normalize game title for better matching
+ * @param {string} title - Game title to normalize
+ * @returns {string} Normalized title
  */
-const getTwitchToken = async (clientId, clientSecret) => {
-  try {
-    const response = await fetch(
-      `${TWITCH_AUTH_URL}?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
-      {
-        method: "POST",
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to get Twitch token: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.access_token;
-  } catch (error) {
-    console.error("Error getting Twitch token:", error);
-    throw error;
-  }
+const normalizeGameTitle = title => {
+  if (!title) return "";
+  return title
+    .toLowerCase()
+    .replace(/[™®©]/g, "") // Remove trademark symbols
+    .replace(/[:\-–—]/g, " ") // Replace colons and dashes with spaces
+    .replace(
+      /\b(edition|remastered|demo|dlc|goty|complete|definitive|enhanced|ultimate|deluxe|premium|gold|standard)\b/gi,
+      ""
+    ) // Remove edition words
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim();
 };
 
 /**
- * Search for a game by name using IGDB
+ * Search for a game by name using Steam Store Search API
  * @param {string} gameName - Name of the game to search for
- * @param {string} clientId - Twitch Client ID
- * @param {string} accessToken - Twitch Access Token
- * @returns {Promise<Object>} Game data
+ * @param {string} apiKey - Steam API Key (not used for store search)
+ * @returns {Promise<Object>} Game data with appid
  */
-const searchGameIGDB = async (gameName, clientId, accessToken) => {
+const searchGameSteam = async (gameName, apiKey) => {
   try {
-    const body = `search "${gameName}"; fields name,summary,storyline,rating,cover.url,screenshots.url,genres.name,platforms.name,release_dates.human,involved_companies.company.name,involved_companies.developer,involved_companies.publisher; limit 1;`;
+    // Normalize the search term
+    const normalizedSearch = normalizeGameTitle(gameName);
+    const encodedSearch = encodeURIComponent(gameName);
 
-    // In production (Electron), use IPC to bypass CORS
-    if (!isDev && window.electron?.igdbRequest) {
-      const result = await window.electron.igdbRequest(
-        "games",
-        body,
-        clientId,
-        accessToken
-      );
-      if (!result.success) {
-        throw new Error(result.error);
+    console.log(`Searching Steam for: "${gameName}" (normalized: "${normalizedSearch}")`);
+
+    // Try Steam Store Search API with original title first
+    let storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${encodedSearch}&l=en&cc=US`;
+    let storeResponse = await fetch(storeSearchUrl);
+
+    if (storeResponse.ok) {
+      const storeData = await storeResponse.json();
+      console.log("Steam Store Search response:", storeData);
+
+      if (storeData.items && storeData.items.length > 0) {
+        console.log(`Found ${storeData.items.length} items from Steam Store Search`);
+
+        // Find best match using normalized titles
+        let bestMatch = null;
+        let bestScore = 0;
+
+        for (const item of storeData.items) {
+          console.log(`Checking item: ${item.name} (type: ${item.type})`);
+
+          // Steam uses "app" for games, not "game"
+          // We'll accept all types and let similarity matching handle it
+          // if (item.type !== "app") continue;
+
+          const normalizedItemName = normalizeGameTitle(item.name);
+
+          // Exact match gets highest priority
+          if (normalizedItemName === normalizedSearch) {
+            bestMatch = { appid: item.id, name: item.name };
+            console.log(`Found exact match: ${item.name}`);
+            break;
+          }
+
+          // Calculate similarity score
+          const score = calculateSimilarity(normalizedSearch, normalizedItemName);
+          console.log(`Similarity score for "${item.name}": ${score}`);
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = { appid: item.id, name: item.name };
+          }
+        }
+
+        if (bestMatch) {
+          console.log(
+            `Steam Store Search found: ${bestMatch.name} (AppID: ${bestMatch.appid}, score: ${bestScore})`
+          );
+          return bestMatch;
+        } else {
+          console.log("No suitable match found in store search results");
+        }
+      } else {
+        console.log("Store search returned no items with original title");
+
+        // Try again with just the base game name (remove edition suffixes)
+        if (gameName !== normalizedSearch) {
+          console.log(`Trying normalized search: "${normalizedSearch}"`);
+          const normalizedEncoded = encodeURIComponent(normalizedSearch);
+          storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${normalizedEncoded}&l=en&cc=US`;
+          storeResponse = await fetch(storeSearchUrl);
+
+          if (storeResponse.ok) {
+            const normalizedData = await storeResponse.json();
+            console.log("Normalized search response:", normalizedData);
+
+            if (normalizedData.items && normalizedData.items.length > 0) {
+              // Take the first result from normalized search
+              const firstResult = normalizedData.items[0];
+              console.log(
+                `Using first result from normalized search: ${firstResult.name} (AppID: ${firstResult.id})`
+              );
+              return { appid: firstResult.id, name: firstResult.name };
+            }
+          }
+        }
       }
-      return result.data.length > 0 ? result.data[0] : null;
+    } else {
+      console.log(`Store search failed with status: ${storeResponse.status}`);
     }
 
-    // In dev mode, use Vite proxy
-    const response = await fetch(`${IGDB_API_URL}/games`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Client-ID": clientId,
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body,
-    });
-
-    if (!response.ok) {
-      throw new Error(`IGDB API error: ${response.status}`);
-    }
-
-    const games = await response.json();
-    return games.length > 0 ? games[0] : null;
+    console.log(`No Steam app found for: ${gameName}`);
+    return null;
   } catch (error) {
-    console.error("Error searching for game on IGDB:", error);
+    console.error("Error searching for game on Steam:", error);
     return null;
   }
 };
 
 /**
- * Get game screenshots from IGDB
- * @param {number} gameId - IGDB Game ID
- * @param {string} clientId - Twitch Client ID
- * @param {string} accessToken - Twitch Access Token
- * @returns {Promise<Array>} Screenshots array
+ * Calculate similarity between two strings (simple implementation)
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string
+ * @returns {number} Similarity score (0-1)
  */
-const getGameScreenshotsIGDB = async (gameId, clientId, accessToken) => {
-  try {
-    const body = `fields *; where game = ${gameId}; limit 10;`;
+const calculateSimilarity = (str1, str2) => {
+  if (str1 === str2) return 1;
+  if (!str1 || !str2) return 0;
 
-    // In production (Electron), use IPC to bypass CORS
-    if (!isDev && window.electron?.igdbRequest) {
-      const result = await window.electron.igdbRequest(
-        "screenshots",
-        body,
-        clientId,
-        accessToken
-      );
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      return result.data;
-    }
-
-    // In dev mode, use Vite proxy
-    const response = await fetch(`${IGDB_API_URL}/screenshots`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Client-ID": clientId,
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body,
-    });
-
-    if (!response.ok) {
-      throw new Error(`IGDB API error: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error getting game screenshots from IGDB:", error);
-    return [];
+  // Check if one string contains the other
+  if (str1.includes(str2) || str2.includes(str1)) {
+    return 0.8;
   }
+
+  // Simple word-based matching
+  const words1 = str1.split(" ").filter(w => w.length > 2);
+  const words2 = str2.split(" ").filter(w => w.length > 2);
+
+  if (words1.length === 0 || words2.length === 0) return 0;
+
+  let matchCount = 0;
+  for (const word1 of words1) {
+    if (words2.some(word2 => word2.includes(word1) || word1.includes(word2))) {
+      matchCount++;
+    }
+  }
+
+  return matchCount / Math.max(words1.length, words2.length);
 };
 
 /**
- * Search for a game by name using GiantBomb
- * @param {string} gameName - Name of the game to search for
- * @param {string} apiKey - GiantBomb API Key
- * @returns {Promise<Object>} Game data
- */
-const searchGameGiantBomb = async (gameName, apiKey) => {
-  try {
-    // URL encode the game name
-    const encodedGameName = encodeURIComponent(gameName);
-    const baseUrl = `${GIANTBOMB_API_URL}/search/`;
-    const url = `${baseUrl}?query=${encodedGameName}&resources=game&limit=1`;
-
-    // In production (Electron), use IPC to bypass CORS
-    if (!isDev && window.electron?.giantbombRequest) {
-      const result = await window.electron.giantbombRequest(url, apiKey);
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      const data = result.data;
-      console.log("GiantBomb search response:", data);
-      if (data.error === "OK" && data.results && data.results.length > 0) {
-        return data.results[0];
-      }
-      return null;
-    }
-
-    // In dev mode, use Vite proxy
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`GiantBomb API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    console.log("GiantBomb search response:", data);
-
-    if (data.error === "OK" && data.results && data.results.length > 0) {
-      return data.results[0];
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error searching for game on GiantBomb:", error);
-    return null;
-  }
-};
-
-/**
- * Get detailed game info from GiantBomb by ID
- * @param {string} gameId - GiantBomb Game ID/GUID
- * @param {string} apiKey - GiantBomb API Key
+ * Get detailed game info from Steam by App ID
+ * @param {number} appId - Steam App ID
+ * @param {string} apiKey - Steam API Key
  * @returns {Promise<Object>} Detailed game data
  */
-const getGameDetailByIdGiantBomb = async (gameId, apiKey) => {
+const getGameDetailByIdSteam = async (appId, apiKey) => {
   try {
-    console.log(`Fetching GiantBomb details for game ID: ${gameId}`);
+    console.log(`Fetching Steam details for app ID: ${appId}`);
 
-    // Construct the URL with the game ID
-    // Include fields parameter to request specific data including images
-    const url = `https://www.giantbomb.com/api/game/${gameId}/?field_list=id,name,deck,description,image,images,genres,platforms,videos,original_release_date,site_detail_url,aliases`;
+    // Get game details from Steam Store API
+    const url = `${STEAM_APP_DETAILS_URL}?appids=${appId}`;
 
-    // In production (Electron), use IPC to bypass CORS
-    if (!isDev && window.electron?.giantbombRequest) {
-      const result = await window.electron.giantbombRequest(url, apiKey);
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      const data = result.data;
-      console.log("GiantBomb detail response:", data);
-      if (data.error === "OK" && data.results) {
-        return data.results;
-      }
-      return null;
-    }
-
-    // In dev mode, use direct fetch
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`GiantBomb API error: ${response.status}`);
+      throw new Error(`Steam API error: ${response.status}`);
     }
 
     const data = await response.json();
 
-    console.log("GiantBomb detail response:", data);
+    console.log("Steam detail response:", data);
 
-    if (data.error === "OK" && data.results) {
-      return data.results;
+    if (data[appId]?.success && data[appId]?.data) {
+      return data[appId].data;
     }
 
     return null;
   } catch (error) {
-    console.error("Error getting game details from GiantBomb:", error);
+    console.error("Error getting game details from Steam:", error);
     return null;
   }
 };
 
 /**
- * Get game details from GiantBomb
+ * Get game details from Steam
  * @param {string} gameName - Name of the game
- * @param {Object} config - Configuration with apiKey
+ * @param {Object} config - Configuration (apiKey is loaded from electron config)
  * @returns {Promise<Object>} Game details
  */
-const getGameDetailsGiantBomb = async (gameName, config) => {
+const getGameDetailsSteam = async (gameName, config) => {
   try {
-    console.log(`Fetching GiantBomb data for: ${gameName}`);
+    console.log(`Fetching Steam data for: ${gameName}`);
 
-    // Extract config values
-    const apiKey = config.apiKey;
+    // Get Steam API key from electron config (hardcoded)
+    const apiKey = await window.electron.getSteamApiKey();
 
-    // Skip if missing credentials
     if (!apiKey) {
-      console.log("GiantBomb integration is missing API key");
+      console.log("Steam API key not available from electron config");
       return null;
     }
 
     // Search for the game
-    const searchResult = await searchGameGiantBomb(gameName, apiKey);
+    const searchResult = await searchGameSteam(gameName, apiKey);
 
-    console.log("GiantBomb search result:", searchResult);
+    console.log("Steam search result:", searchResult);
 
     if (!searchResult) {
-      console.log(`No GiantBomb results found for: ${gameName}`);
+      console.log(`No Steam results found for: ${gameName}`);
       return null;
     }
 
     // Get detailed game info
-    const gameDetails = await getGameDetailByIdGiantBomb(searchResult.guid, apiKey);
+    const gameDetails = await getGameDetailByIdSteam(searchResult.appid, apiKey);
 
     if (!gameDetails) {
       console.log(
-        `No detailed GiantBomb data found for: ${gameName} (${searchResult.guid})`
+        `No detailed Steam data found for: ${gameName} (${searchResult.appid})`
       );
-      // Format basic search result to match IGDB format
-      return formatGiantBombToIgdbFormat(searchResult);
+      return null;
     }
 
     // Process and format the game data to match IGDB format
-    const formattedDetails = formatGiantBombToIgdbFormat(gameDetails);
+    const formattedDetails = formatSteamToIgdbFormat(gameDetails);
 
-    console.log(`Successfully processed GiantBomb data for: ${gameName}`);
+    console.log(`Successfully processed Steam data for: ${gameName}`);
 
     // Cache the processed game data
-    gameApiCache.cacheGame(gameName, formattedDetails, "giantbomb");
+    gameApiCache.cacheGame(gameName, formattedDetails, "steam");
 
     return formattedDetails;
   } catch (error) {
-    console.error("Error getting game details from GiantBomb:", error);
+    console.error("Error getting game details from Steam:", error);
     return null;
   }
 };
@@ -542,144 +498,123 @@ const extractGameFeatures = description => {
 };
 
 /**
- * Format GiantBomb data to match IGDB format for compatibility
- * @param {Object} giantBombData - Raw GiantBomb data
+ * Format Steam data to match IGDB format for compatibility
+ * @param {Object} steamData - Raw Steam data
  * @returns {Object} Formatted data in IGDB-compatible format
  */
-const formatGiantBombToIgdbFormat = giantBombData => {
-  if (!giantBombData) return null;
+const formatSteamToIgdbFormat = steamData => {
+  if (!steamData) return null;
 
-  // Extract image URLs
+  // Extract screenshots
   const screenshots = [];
-
-  // Add main image if available
-  if (giantBombData.image) {
-    screenshots.push({
-      id: `gb-main-${giantBombData.id}`,
-      url: giantBombData.image.original_url,
-      image_id: `gb-main-${giantBombData.id}`,
-      width: giantBombData.image.width || 1920,
-      height: giantBombData.image.height || 1080,
-      formatted_url: giantBombData.image.original_url,
-    });
-  }
-
-  // Add additional images if available
-  if (giantBombData.images && Array.isArray(giantBombData.images)) {
-    giantBombData.images.forEach((image, index) => {
-      // Only add screenshots (type: "screenshot")
-      if (image.tags && image.tags.includes("Screenshot")) {
-        screenshots.push({
-          id: `gb-${image.id || index}`,
-          image_id: `gb-${image.id || index}`,
-          url: image.original_url,
-          width: image.width || 1920,
-          height: image.height || 1080,
-          formatted_url: image.original_url,
-        });
-      }
+  if (steamData.screenshots && Array.isArray(steamData.screenshots)) {
+    steamData.screenshots.forEach((screenshot, index) => {
+      screenshots.push({
+        id: `steam-${steamData.steam_appid}-${index}`,
+        image_id: `steam-${steamData.steam_appid}-${index}`,
+        url: screenshot.path_full,
+        width: 1920,
+        height: 1080,
+        formatted_url: screenshot.path_full,
+      });
     });
   }
 
   // Extract platforms
   const platforms = [];
-  if (giantBombData.platforms && Array.isArray(giantBombData.platforms)) {
-    giantBombData.platforms.forEach(platform => {
-      platforms.push({
-        id: platform.id,
-        name: platform.name,
-        abbreviation: platform.abbreviation || "",
-      });
-    });
+  if (steamData.platforms) {
+    if (steamData.platforms.windows) platforms.push({ id: 1, name: "Windows" });
+    if (steamData.platforms.mac) platforms.push({ id: 2, name: "Mac" });
+    if (steamData.platforms.linux) platforms.push({ id: 3, name: "Linux" });
   }
 
   // Extract genres
   const genres = [];
-  if (giantBombData.genres && Array.isArray(giantBombData.genres)) {
-    giantBombData.genres.forEach(genre => {
+  if (steamData.genres && Array.isArray(steamData.genres)) {
+    steamData.genres.forEach(genre => {
       genres.push({
         id: genre.id,
-        name: genre.name,
+        name: genre.description,
       });
     });
   }
 
-  // Get a clean description - prioritize the deck (summary) field
-  let cleanDescription = "";
-  if (giantBombData.deck) {
-    // The deck field might still have HTML, so strip it
-    cleanDescription = stripHtmlTags(giantBombData.deck);
-  } else if (giantBombData.description) {
-    // For description, we might just need to strip HTML without further processing
-    cleanDescription = stripHtmlTags(giantBombData.description);
-  }
-
-  // Store the full description separately for detailed views if needed
-  // This is only needed if we want to display the full description elsewhere
-  const fullCleanDescription = giantBombData.description
-    ? cleanDescriptionText(giantBombData.description)
+  // Get clean description - prefer about_the_game over short_description
+  const aboutTheGame = steamData.about_the_game
+    ? stripHtmlTags(steamData.about_the_game)
+    : "";
+  const cleanDescription = aboutTheGame || steamData.short_description || "";
+  const fullCleanDescription = steamData.detailed_description
+    ? stripHtmlTags(steamData.detailed_description)
     : "";
 
-  // Parse system requirements
-  const systemRequirements = parseSystemRequirements(giantBombData.description || "");
-
-  // Extract game features
-  const features = extractGameFeatures(giantBombData.description || "");
-
-  // Extract release date in a cleaner format
-  let releaseDate = giantBombData.original_release_date || "";
-  if (releaseDate) {
-    try {
-      const dateObj = new Date(releaseDate);
-      releaseDate = dateObj.toISOString().split("T")[0]; // Format as YYYY-MM-DD
-    } catch (e) {
-      console.error("Error formatting release date:", e);
-    }
+  // Parse system requirements from PC requirements
+  let systemRequirements = null;
+  if (steamData.pc_requirements) {
+    systemRequirements = {
+      minimum: steamData.pc_requirements.minimum
+        ? stripHtmlTags(steamData.pc_requirements.minimum)
+        : "",
+      recommended: steamData.pc_requirements.recommended
+        ? stripHtmlTags(steamData.pc_requirements.recommended)
+        : "",
+    };
   }
+
+  // Extract release date
+  let releaseDate = "";
+  if (steamData.release_date && steamData.release_date.date) {
+    releaseDate = steamData.release_date.date;
+  }
+
+  // Extract developers and publishers
+  const developers = steamData.developers || [];
+  const publishers = steamData.publishers || [];
 
   // Format the data to match IGDB structure
   return {
-    id: giantBombData.id,
-    name: giantBombData.name,
+    id: steamData.steam_appid,
+    name: steamData.name,
     summary: cleanDescription,
     description: cleanDescription,
-    storyline: null, // GiantBomb doesn't provide a separate storyline field
+    storyline: null,
 
     // Store the full description separately
     full_description: fullCleanDescription,
 
-    // IGDB specific fields with GiantBomb data
-    cover: giantBombData.image
+    // IGDB specific fields with Steam data
+    cover: steamData.header_image
       ? {
-          id: giantBombData.id,
-          image_id: giantBombData.id,
-          url: giantBombData.image.original_url,
-          width: giantBombData.image.width || 1920,
-          height: giantBombData.image.height || 1080,
-          formatted_url: giantBombData.image.original_url,
+          id: steamData.steam_appid,
+          image_id: steamData.steam_appid,
+          url: steamData.header_image,
+          width: 460,
+          height: 215,
+          formatted_url: steamData.header_image,
         }
       : null,
 
     screenshots: screenshots,
     formatted_screenshots: screenshots,
-    videos: giantBombData.videos || [],
+    videos: steamData.movies || [],
     similar_games: [],
     genres: genres,
     platforms: platforms,
 
-    // Additional GiantBomb specific fields
-    aliases: giantBombData.aliases || "",
+    // Additional Steam specific fields
+    developers: developers,
+    publishers: publishers,
     release_date: releaseDate,
-    site_detail_url: giantBombData.site_detail_url,
+    site_detail_url: `https://store.steampowered.com/app/${steamData.steam_appid}`,
 
     // Structured system requirements
     system_requirements: systemRequirements,
 
     // Game features
-    features: features,
+    features: [],
 
     // Source information
-    source: "giantbomb",
+    source: "steam",
   };
 };
 
@@ -731,171 +666,51 @@ const removeDuplicatedPhrases = text => {
 };
 
 /**
- * Get game details from IGDB
+ * Get game details from Steam API
  * @param {string} gameName - Name of the game
- * @param {Object} config - Configuration with clientId and clientSecret
- * @returns {Promise<Object>} Game details
- */
-const getGameDetailsIGDB = async (gameName, config = {}) => {
-  try {
-    console.log(`Fetching IGDB data for: ${gameName}`);
-
-    // Extract config values
-    const clientId = config.clientId;
-    const clientSecret = config.clientSecret;
-
-    // Skip if missing credentials
-    if (!clientId || !clientSecret) {
-      console.log("IGDB integration is missing credentials");
-      return null;
-    }
-
-    // Get access token
-    const accessToken = await getTwitchToken(clientId, clientSecret);
-
-    // Search for the game
-    const game = await searchGameIGDB(gameName, clientId, accessToken);
-
-    if (!game) {
-      return null;
-    }
-
-    // Process the game data
-    const gameDetails = {
-      id: game.id,
-      name: game.name,
-      summary: game.summary,
-      storyline: game.storyline,
-      rating: game.rating,
-      cover: game.cover,
-      screenshots: game.screenshots || [],
-      genres: game.genres || [],
-      platforms: game.platforms || [],
-      release_date: game.release_dates?.[0]?.human,
-    };
-
-    // Extract developers and publishers
-    if (game.involved_companies) {
-      gameDetails.developers = game.involved_companies
-        .filter(company => company.developer)
-        .map(company => company.company.name);
-
-      gameDetails.publishers = game.involved_companies
-        .filter(company => company.publisher)
-        .map(company => company.company.name);
-    }
-
-    // Get additional screenshots if needed
-    if (game.screenshots?.length < 3 && game.id) {
-      const additionalScreenshots = await getGameScreenshotsIGDB(
-        game.id,
-        clientId,
-        accessToken
-      );
-
-      if (additionalScreenshots.length > 0) {
-        gameDetails.screenshots = additionalScreenshots;
-      }
-    }
-
-    // Cache the processed game data
-    gameApiCache.cacheGame(gameName, gameDetails, "igdb");
-
-    return gameDetails;
-  } catch (error) {
-    console.error("Error getting game details from IGDB:", error);
-    return null;
-  }
-};
-
-/**
- * Get game details from all available APIs
- * @param {string} gameName - Name of the game
- * @param {Object} config - Configuration with API credentials
- * @returns {Promise<Object>} Combined game details from all APIs
+ * @param {Object} config - Configuration (not used, kept for compatibility)
+ * @returns {Promise<Object>} Game details from Steam
  */
 const getGameDetails = async (gameName, config = {}) => {
-  console.log("getGameDetails config:", config);
+  console.log("getGameDetails for:", gameName);
 
-  // Extract credentials from config
-  const clientId = config.clientId || "";
-  const clientSecret = config.clientSecret || "";
-
-  // Extract GiantBomb API key - check both formats for backward compatibility
-  let giantBombApiKey = "";
-  if (config.giantbomb && config.giantbomb.apiKey) {
-    giantBombApiKey = config.giantbomb.apiKey;
-  } else if (config.giantBombKey) {
-    giantBombApiKey = config.giantBombKey;
+  // Get Steam API key from electron config (always available)
+  let steamApiKey = "";
+  try {
+    steamApiKey = await window.electron.getSteamApiKey();
+  } catch (error) {
+    console.error("Error getting Steam API key from electron:", error);
   }
 
-  console.log(
-    "IGDB credentials:",
-    clientId ? "Set" : "Not set",
-    clientSecret ? "Set" : "Not set"
-  );
-  console.log("GiantBomb API key:", giantBombApiKey ? "Set" : "Not set");
+  console.log("Steam API key:", steamApiKey ? "Set" : "Not set");
 
-  // Check if IGDB is enabled (has valid credentials)
-  const useIgdb =
-    clientId && clientSecret && clientId.trim() !== "" && clientSecret.trim() !== "";
+  // Check if Steam is enabled (has valid API key from electron config)
+  const useSteam = steamApiKey && steamApiKey.trim() !== "";
 
-  // Check if GiantBomb is enabled (has valid API key)
-  const useGiantBomb = giantBombApiKey && giantBombApiKey.trim() !== "";
+  console.log("Using Steam:", useSteam);
 
-  console.log("Using IGDB:", useIgdb);
-  console.log("Using GiantBomb:", useGiantBomb);
-
-  // If no API is enabled, return null
-  if (!useIgdb && !useGiantBomb) {
-    console.log("No game API integration is enabled");
+  // If Steam API is not available, return null
+  if (!useSteam) {
+    console.log("Steam API is not available");
     return null;
   }
 
   // Check cache first
-  let cachedData = gameApiCache.getCachedGame(gameName, "combined");
+  let cachedData = gameApiCache.getCachedGame(gameName, "steam");
   if (cachedData) {
-    console.log(`Using cached combined data for: ${gameName}`);
+    console.log(`Using cached Steam data for: ${gameName}`);
     return cachedData;
   }
 
-  // Results object
-  let gameData = null;
-
-  // Try IGDB first if enabled
-  if (useIgdb) {
-    gameData = await getGameDetailsIGDB(gameName, {
-      clientId,
-      clientSecret,
-      enabled: true,
-    });
-
-    if (gameData) {
-      gameData.source = "igdb";
-
-      // Format screenshots for IGDB data
-      if (gameData.screenshots && gameData.screenshots.length > 0) {
-        gameData.formatted_screenshots = gameData.screenshots.map(screenshot => ({
-          ...screenshot,
-          formatted_url: formatImageUrl(screenshot.url, "screenshot_huge"),
-        }));
-      }
-    }
-  }
-
-  // If no IGDB data or IGDB not enabled, try GiantBomb
-  if (!gameData && useGiantBomb) {
-    gameData = await getGameDetailsGiantBomb(gameName, {
-      apiKey: giantBombApiKey,
-      enabled: true,
-    });
-
-    // GiantBomb data is already formatted to match IGDB format in the formatGiantBombToIgdbFormat function
-  }
+  // Get Steam data
+  const gameData = await getGameDetailsSteam(gameName, {
+    apiKey: steamApiKey,
+    enabled: true,
+  });
 
   // Cache the data if we found any
   if (gameData) {
-    gameApiCache.cacheGame(gameName, gameData, "combined");
+    gameApiCache.cacheGame(gameName, gameData, "steam");
   } else {
     console.log(`No game data found for: ${gameName}`);
   }
@@ -905,33 +720,28 @@ const getGameDetails = async (gameName, config = {}) => {
 
 /**
  * Format image URL to get the appropriate size
- * @param {string} url - Original image URL from IGDB or GiantBomb
- * @param {string} size - Size of the image (e.g., 'cover_big', 'screenshot_huge')
+ * @param {string} url - Original image URL from Steam
+ * @param {string} size - Size parameter (not used for Steam, kept for compatibility)
  * @returns {string} Formatted image URL
  */
 const formatImageUrl = (url, size = "screenshot_big") => {
   if (!url) return null;
 
-  // Check if it's a GiantBomb URL
-  if (url.includes("giantbomb.com")) {
-    // GiantBomb URLs don't need size formatting, just return the original
-    return url;
+  // Fix protocol-relative URLs (starting with //)
+  if (url.startsWith("//")) {
+    url = `https:${url}`;
   }
 
-  // Handle IGDB URL
-  // Replace the size in the URL
-  // Original URL format: //images.igdb.com/igdb/image/upload/t_thumb/co1wyy.jpg
-  return url.replace("t_thumb", `t_${size}`).replace("//", "https://");
+  return url;
 };
 
 // Export the service functions
 export default {
-  // Main function to get game details from all APIs
+  // Main function to get game details from Steam
   getGameDetails,
 
   // Individual API functions
-  getGameDetailsIGDB,
-  getGameDetailsGiantBomb,
+  getGameDetailsSteam,
 
   // Helper functions
   formatImageUrl,
