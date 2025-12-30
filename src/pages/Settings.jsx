@@ -2268,33 +2268,6 @@ function Settings() {
               </div>
             </Card>
 
-            {/* Additional Game Info Card */}
-            <Card className="border-border p-6">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-primary">
-                  {t("settings.additionalGameInfo") || "Additional Game Info"}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("settings.additionalGameInfoDescription") ||
-                    "Configure API keys for enhanced game metadata, artwork, and information."}
-                </p>
-              </div>
-
-              {/* Steam API Info */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">{t("settings.steamApi.title")}</h3>
-                <p className="text-xs text-muted-foreground">
-                  {t("settings.steamApi.description")}
-                </p>
-                <div className="rounded-md bg-muted/50 p-3 text-sm">
-                  <p className="text-muted-foreground">
-                    <strong>{t("common.note")}:</strong>{" "}
-                    {t("settings.steamApi.autoConfigured")}
-                  </p>
-                </div>
-              </div>
-            </Card>
-
             {/* Torrenting Card */}
             <Card className="border-border p-6">
               <div className="mb-6 flex items-center justify-between">
