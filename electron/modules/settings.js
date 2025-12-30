@@ -11,12 +11,7 @@ const { encrypt, decrypt } = require("./encryption");
 class SettingsManager {
   constructor() {
     this.filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
-    this.sensitiveKeys = [
-      "twitchSecret",
-      "twitchClientId",
-      "giantBombKey",
-      "torboxApiKey",
-    ];
+    this.sensitiveKeys = ["twitchSecret", "twitchClientId", "torboxApiKey"];
     this.defaultSettings = {
       downloadDirectory: "",
       additionalDirectories: [],
@@ -50,7 +45,6 @@ class SettingsManager {
       crackDirectory: "",
       twitchSecret: "",
       twitchClientId: "",
-      giantBombKey: "",
       torboxApiKey: "",
       localIndex: "",
       blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],

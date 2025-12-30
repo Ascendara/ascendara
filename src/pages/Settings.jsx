@@ -227,8 +227,6 @@ function Settings() {
   const [showTorrentWarning, setShowTorrentWarning] = useState(false);
   const [showNoTorrentDialog, setShowNoTorrentDialog] = useState(false);
   const [showNoLudusaviDialog, setShowNoLudusaviDialog] = useState(false);
-  const [twitchSecret, setTwitchSecret] = useState("");
-  const [twitchClientId, setTwitchClientId] = useState("");
   const [availableLanguages, setAvailableLanguages] = useState([]);
   const [isExperiment, setIsExperiment] = useState(false);
   const [isDev, setIsDev] = useState(false);
@@ -299,15 +297,6 @@ function Settings() {
     }
     setExclusionLoading(false);
   };
-
-  useEffect(() => {
-    if (settings.twitchSecret) {
-      setTwitchSecret(settings.twitchSecret);
-    }
-    if (settings.twitchClientId) {
-      setTwitchClientId(settings.twitchClientId);
-    }
-  }, [settings]);
 
   // Load last refresh time and check if refresh is running
   useEffect(() => {
@@ -2291,154 +2280,19 @@ function Settings() {
                 </p>
               </div>
 
-              {/* API Tabs */}
-              <Tabs
-                defaultValue={
-                  settings.giantBombKey
-                    ? "giantbomb"
-                    : settings.twitchClientId && settings.twitchSecret
-                      ? "igdb"
-                      : "giantbomb"
-                }
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="giantbomb">GiantBomb</TabsTrigger>
-                  <TabsTrigger value="igdb">IGDB</TabsTrigger>
-                </TabsList>
-
-                {/* IGDB Tab Content */}
-                <TabsContent value="igdb" className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">IGDB API</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings.igdbApiKeyDescription") ||
-                        "IGDB provides comprehensive game data including release dates, ratings, and screenshots."}
-                    </p>
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/ascendara-xtra#setting-up-igdb"
-                        )
-                      }
-                      className="cursor inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                    >
-                      {t("settings.igdbLearnHowtoGet") || "Learn how to get API keys"}
-                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                    </a>
-                  </div>
-                  <div className="space-y-3 pt-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="twitch-client-id">
-                        {t("settings.twitchClientId") || "Twitch Client ID"}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="twitch-client-id"
-                          type="password"
-                          value={twitchClientId}
-                          onChange={e => setTwitchClientId(e.target.value)}
-                          placeholder={
-                            t("settings.enterTwitchClientId") || "Enter Twitch Client ID"
-                          }
-                          className="flex-grow"
-                        />
-                        <Button
-                          variant="outline"
-                          className="text-primary"
-                          onClick={() => {
-                            handleSettingChange("twitchClientId", twitchClientId);
-                          }}
-                        >
-                          {t("settings.setKey") || "Set"}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="twitch-secret">
-                        {t("settings.twitchSecret") || "Twitch Secret"}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="twitch-secret"
-                          type="password"
-                          value={twitchSecret}
-                          onChange={e => setTwitchSecret(e.target.value)}
-                          placeholder={
-                            t("settings.enterIgdbApiKey") || "Enter Twitch Secret"
-                          }
-                          className="flex-grow"
-                        />
-                        <Button
-                          variant="outline"
-                          className="text-primary"
-                          onClick={() => {
-                            handleSettingChange("twitchSecret", twitchSecret);
-                          }}
-                        >
-                          {t("settings.setKey")}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* GiantBomb Tab Content */}
-                <TabsContent value="giantbomb" className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">GiantBomb API</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings.giantBombDescription") ||
-                        "GiantBomb provides detailed game information, reviews, and media content."}
-                    </p>
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/ascendara-xtra#setting-up-giantbomb"
-                        )
-                      }
-                      className="cursor inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                    >
-                      {t("settings.giantBombLearnHowtoGet") || "Learn how to get API key"}
-                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                    </a>
-                  </div>
-                  <div className="space-y-3 pt-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="giantbomb-key">
-                        {t("settings.giantBombApiKey") || "GiantBomb API Key"}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="giantbomb-key"
-                          type="password"
-                          value={settings.giantBombKey || ""}
-                          onChange={e =>
-                            handleSettingChange("giantBombKey", e.target.value)
-                          }
-                          placeholder={
-                            t("settings.enterGiantBombApiKey") ||
-                            "Enter GiantBomb API Key"
-                          }
-                          className="flex-grow"
-                        />
-                        <Button
-                          variant="outline"
-                          className="text-primary"
-                          onClick={() => {
-                            handleSettingChange(
-                              "giantBombKey",
-                              settings.giantBombKey || ""
-                            );
-                          }}
-                        >
-                          {t("settings.setKey") || "Set"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
+              {/* Steam API Info */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">{t("settings.steamApi.title")}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {t("settings.steamApi.description")}
+                </p>
+                <div className="rounded-md bg-muted/50 p-3 text-sm">
+                  <p className="text-muted-foreground">
+                    <strong>{t("common.note")}:</strong>{" "}
+                    {t("settings.steamApi.autoConfigured")}
+                  </p>
+                </div>
+              </div>
             </Card>
 
             {/* Torrenting Card */}
