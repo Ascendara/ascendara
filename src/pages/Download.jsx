@@ -1414,7 +1414,7 @@ export default function DownloadPage() {
     } else {
       setSelectedProvider("");
     }
-  }, [gameData]);
+  }, [gameData, settings.prioritizeTorboxOverSeamless, settings.torboxApiKey]);
 
   if (gameData && gameData.game) {
     gameData.game = sanitizeGameName(gameData.game);
