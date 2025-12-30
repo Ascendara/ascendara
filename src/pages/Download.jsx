@@ -228,19 +228,12 @@ export default function DownloadPage() {
   // Fetch IGDB data
   const fetchIgdbData = async gameName => {
     try {
-      // Steam API is always available (hardcoded), IGDB is optional
-      const apiConfig = {
-        ...igdbConfig,
-      };
-
-      // Steam API is always enabled, so we always fetch
-      // (no need to check for API availability)
-
+      // Steam API is always available (hardcoded)
       setIgdbLoading(true);
       setIgdbError(null);
 
       try {
-        const data = await igdbService.getGameDetails(gameName, apiConfig);
+        const data = await igdbService.getGameDetails(gameName);
 
         if (data) {
           setIgdbData(data);
@@ -297,13 +290,13 @@ export default function DownloadPage() {
     console.log("Received game data:", gameData);
   }, [gameData, navigate]);
 
-  // Fetch IGDB data when game data changes or when API config becomes available
+  // Fetch IGDB data when game data changes
   // Steam API is always available (hardcoded), so we always fetch
   useEffect(() => {
     if (gameData && gameData.game) {
       fetchIgdbData(gameData.game);
     }
-  }, [gameData, igdbConfig.enabled]);
+  }, [gameData]);
 
   // State declarations
   const [selectedProvider, setSelectedProvider] = useState("");
