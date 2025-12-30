@@ -230,17 +230,13 @@ export default function DownloadPage() {
   // Fetch IGDB data
   const fetchIgdbData = async gameName => {
     try {
-      // Create a config object that includes both IGDB and GiantBomb credentials
+      // Steam API is always available (hardcoded), IGDB is optional
       const apiConfig = {
         ...igdbConfig,
-        giantBombKey: settings.giantBombKey || "",
       };
 
-      // Skip if no API is enabled
-      if (!igdbConfig.enabled && !settings.giantBombKey) {
-        console.log("No game API integration is enabled");
-        return;
-      }
+      // Steam API is always enabled, so we always fetch
+      // (no need to check for API availability)
 
       setIgdbLoading(true);
       setIgdbError(null);
@@ -304,11 +300,12 @@ export default function DownloadPage() {
   }, [gameData, navigate]);
 
   // Fetch IGDB data when game data changes or when API config becomes available
+  // Steam API is always available (hardcoded), so we always fetch
   useEffect(() => {
-    if (gameData && gameData.game && (igdbConfig.enabled || settings.giantBombKey)) {
+    if (gameData && gameData.game) {
       fetchIgdbData(gameData.game);
     }
-  }, [gameData, igdbConfig.enabled, settings.giantBombKey]);
+  }, [gameData, igdbConfig.enabled]);
 
   // State declarations
   const [selectedProvider, setSelectedProvider] = useState("");
@@ -3150,23 +3147,27 @@ export default function DownloadPage() {
                   </div>
                 )}
 
-                {/* IGDB Attribution */}
+                {/* Data Attribution */}
                 <div className="mt-8 flex items-center justify-end text-xs text-muted-foreground">
                   <span>{t("download.dataProvidedBy")}</span>
-                  {igdbData?.source === "giantbomb" ? (
+                  {igdbData?.source === "steam" ? (
                     <a
-                      onClick={() => window.electron.openURL("https://www.giantbomb.com")}
+                      onClick={() =>
+                        window.electron.openURL("https://store.steampowered.com")
+                      }
                       className="ml-1 flex cursor-pointer items-center text-primary hover:underline"
                     >
-                      GiantBomb <ExternalLink className="ml-1 h-3 w-3" />
+                      Steam <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
-                  ) : (
+                  ) : igdbData?.source === "igdb" ? (
                     <a
                       onClick={() => window.electron.openURL("https://www.igdb.com")}
                       className="ml-1 flex cursor-pointer items-center text-primary hover:underline"
                     >
                       IGDB <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
+                  ) : (
+                    <span className="ml-1">Steam / IGDB</span>
                   )}
                   .
                   <span className="ml-1 text-xs text-muted-foreground">

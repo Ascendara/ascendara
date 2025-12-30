@@ -815,11 +815,12 @@ export default function GameScreen() {
   }, [game]);
 
   // Re-fetch IGDB data when API config becomes available
+  // Steam API is always available (hardcoded), so we always fetch
   useEffect(() => {
-    if (game && (igdbConfig.enabled || settings.giantBombKey)) {
+    if (game) {
       fetchIgdbData(game.game || game.name);
     }
-  }, [igdbConfig.enabled, settings.giantBombKey]);
+  }, [igdbConfig.enabled]);
 
   // Set up event listeners
   useEffect(() => {
@@ -1417,15 +1418,14 @@ export default function GameScreen() {
     try {
       setIgdbLoading(true);
 
-      // Create a config object that includes both IGDB and GiantBomb credentials
+      // Steam API is always available (hardcoded), IGDB is optional
       const apiConfig = {
         ...igdbConfig,
-        giantBombKey: settings.giantBombKey || "",
       };
 
       console.log("Fetching game data with config:", {
         igdbEnabled: igdbConfig.enabled,
-        giantBombKeySet: Boolean(settings.giantBombKey),
+        steamEnabled: true, // Always enabled
       });
 
       const data = await igdbService.getGameDetails(gameName, apiConfig);
@@ -2226,7 +2226,7 @@ export default function GameScreen() {
                           {t("gameScreen.noSummaryDescription")}
                         </p>
 
-                        {!igdbData && !igdbLoading && (
+                        {!igdbData && !igdbLoading && !igdbConfig.enabled && (
                           <Button
                             variant="outline"
                             className="mt-4 gap-2"
@@ -2380,7 +2380,7 @@ export default function GameScreen() {
                             </p>
                           </div>
                         </div>
-                        {!igdbData && !igdbLoading && (
+                        {!igdbData && !igdbLoading && !igdbConfig.enabled && (
                           <Button
                             variant="outline"
                             className="gap-2"
