@@ -145,6 +145,108 @@ const TrialWarningChecker = () => {
   );
 };
 
+// Check for deprecated GiantBomb API key and show migration warning
+const GiantBombMigrationWarning = () => {
+  const { t } = useTranslation();
+  const { settings, setSettings } = useSettings();
+  const navigate = useNavigate();
+  const [showWarning, setShowWarning] = useState(false);
+  const hasCheckedRef = useRef(false);
+
+  console.log("[MigrationWarning] Component rendered, settings:", settings);
+
+  useEffect(() => {
+    console.log(
+      "[MigrationWarning] useEffect running, hasCheckedRef:",
+      hasCheckedRef.current
+    );
+
+    // Skip if settings haven't loaded yet (check for a property that always has a value when loaded)
+    if (
+      !settings ||
+      !settings.downloadDirectory ||
+      settings.downloadDirectory.trim() === ""
+    ) {
+      console.log(
+        "[MigrationWarning] Settings not loaded yet (no downloadDirectory), skipping"
+      );
+      return;
+    }
+
+    // Only check once after settings are loaded
+    if (hasCheckedRef.current) {
+      console.log("[MigrationWarning] Already checked, skipping");
+      return;
+    }
+
+    // Check if user has deprecated API keys set (giantBombKey or IGDB keys)
+    // Note: giantBombKey was removed from default settings, so it will only exist if user had it previously
+    const hasGiantBombKey = settings.giantBombKey && settings.giantBombKey.trim() !== "";
+    const hasIgdbKeys =
+      (settings.twitchClientId && settings.twitchClientId.trim() !== "") ||
+      (settings.twitchSecret && settings.twitchSecret.trim() !== "");
+
+    console.log("Migration check - hasGiantBombKey:", hasGiantBombKey);
+    console.log("Migration check - hasIgdbKeys:", hasIgdbKeys);
+    console.log("Migration check - giantBombKey value:", settings.giantBombKey);
+    console.log("Migration check - twitchClientId value:", settings.twitchClientId);
+    console.log("Migration check - twitchSecret value:", settings.twitchSecret);
+
+    if (hasGiantBombKey || hasIgdbKeys) {
+      console.log("SHOWING MIGRATION WARNING!");
+      setShowWarning(true);
+    } else {
+      console.log("No deprecated keys found, not showing warning");
+    }
+
+    // Mark as checked AFTER we've actually checked with loaded settings
+    hasCheckedRef.current = true;
+  }, [settings]);
+
+  const handleDismiss = async () => {
+    // Clear all deprecated API keys
+    await setSettings({
+      ...settings,
+      giantBombKey: "",
+      twitchClientId: "",
+      twitchSecret: "",
+    });
+    setShowWarning(false);
+  };
+
+  return (
+    <AlertDialog open={showWarning} onOpenChange={setShowWarning}>
+      <AlertDialogContent className="border-border">
+        <AlertDialogHeader>
+          <div className="flex items-center gap-4">
+            <AlertTriangle className="mb-2 h-10 w-10 text-yellow-500" />
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("welcome.apiMigration.title")}
+            </AlertDialogTitle>
+          </div>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4">
+              <div className="text-foreground">{t("welcome.apiMigration.goodNews")}</div>
+              <div className="text-muted-foreground">
+                {t("welcome.apiMigration.steamBuiltIn")}
+              </div>
+              <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+                {t("welcome.apiMigration.whatChanged")}
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={handleDismiss}>
+            {t("welcome.okay")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
 const ScrollToTop = () => {
   const { pathname } = useLocation();
 
@@ -1162,6 +1264,7 @@ function App() {
                   <UserActivityTracker />
                   <MessageNotificationChecker />
                   <TrialWarningChecker />
+                  <GiantBombMigrationWarning />
                   <AppRoutes />
                   <MiniPlayer
                     expanded={playerExpanded}
