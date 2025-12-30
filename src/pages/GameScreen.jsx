@@ -812,13 +812,13 @@ export default function GameScreen() {
     checkForUpdates();
   }, [game]);
 
-  // Re-fetch IGDB data when API config becomes available
+  // Re-fetch IGDB data when game changes
   // Steam API is always available (hardcoded), so we always fetch
   useEffect(() => {
     if (game) {
       fetchIgdbData(game.game || game.name);
     }
-  }, [igdbConfig.enabled]);
+  }, [game]);
 
   // Set up event listeners
   useEffect(() => {
@@ -1416,17 +1416,10 @@ export default function GameScreen() {
     try {
       setIgdbLoading(true);
 
-      // Steam API is always available (hardcoded), IGDB is optional
-      const apiConfig = {
-        ...igdbConfig,
-      };
+      // Steam API is always available (hardcoded)
+      console.log("Fetching game data from Steam API");
 
-      console.log("Fetching game data with config:", {
-        igdbEnabled: igdbConfig.enabled,
-        steamEnabled: true, // Always enabled
-      });
-
-      const data = await igdbService.getGameDetails(gameName, apiConfig);
+      const data = await igdbService.getGameDetails(gameName);
 
       if (data) {
         if (data.screenshots && data.screenshots.length > 0) {
@@ -2224,17 +2217,6 @@ export default function GameScreen() {
                           {t("gameScreen.noSummaryDescription")}
                         </p>
 
-                        {!igdbData && !igdbLoading && !igdbConfig.enabled && (
-                          <Button
-                            variant="outline"
-                            className="mt-4 gap-2"
-                            onClick={() => navigate("/settings")}
-                          >
-                            <Settings2 className="h-4 w-4" />
-                            {t("gameScreen.configureIgdb")}
-                          </Button>
-                        )}
-
                         {igdbLoading && (
                           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader className="h-4 w-4 animate-spin" />
@@ -2378,17 +2360,6 @@ export default function GameScreen() {
                             </p>
                           </div>
                         </div>
-                        {!igdbData && !igdbLoading && !igdbConfig.enabled && (
-                          <Button
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => navigate("/settings")}
-                          >
-                            <Settings2 className="h-4 w-4" />
-                            {t("gameScreen.configureIgdb")}
-                          </Button>
-                        )}
-
                         {igdbLoading && (
                           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader className="h-4 w-4 animate-spin" />

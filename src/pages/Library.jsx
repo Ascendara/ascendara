@@ -2820,6 +2820,7 @@ const AddGameForm = ({ onSuccess }) => {
             setCoverSearch(prev => ({
               ...prev,
               results: [steamResult],
+              selectedCover: steamResult, // Auto-select Steam result
               isLoading: false,
             }));
 
@@ -2838,9 +2839,11 @@ const AddGameForm = ({ onSuccess }) => {
 
         // Fallback to original game service search
         const results = await gameService.searchGameCovers(query);
+        const firstResult = results.length > 0 ? results[0] : null;
         setCoverSearch(prev => ({
           ...prev,
           results: results.slice(0, 9),
+          selectedCover: firstResult, // Auto-select first result
           isLoading: false,
         }));
 
@@ -2943,18 +2946,20 @@ const AddGameForm = ({ onSuccess }) => {
                   {t("library.importSteamGames")}
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-foreground">
-                  {t("library.importSteamGamesDescription")}{" "}
-                  <a
-                    className="cursor-pointer text-primary hover:underline"
-                    onClick={() =>
-                      window.electron.openURL(
-                        "https://ascendara.app/docs/features/overview#importing-from-steam"
-                      )
-                    }
-                  >
-                    {t("common.learnMore")}{" "}
-                    <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                  </a>
+                  <span>
+                    {t("library.importSteamGamesDescription")}{" "}
+                    <a
+                      className="cursor-pointer text-primary hover:underline"
+                      onClick={() =>
+                        window.electron.openURL(
+                          "https://ascendara.app/docs/features/overview#importing-from-steam"
+                        )
+                      }
+                    >
+                      {t("common.learnMore")}{" "}
+                      <ExternalLink className="mb-1 inline-block h-3 w-3" />
+                    </a>
+                  </span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="space-y-2">
