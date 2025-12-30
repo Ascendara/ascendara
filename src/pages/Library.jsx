@@ -67,7 +67,6 @@ import gameService from "@/services/gameService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import igdbService from "@/services/gameInfoService";
-import { useIgdbConfig } from "@/services/gameInfoConfig";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -2805,6 +2804,39 @@ const AddGameForm = ({ onSuccess }) => {
     searchDebounceRef.current = setTimeout(async () => {
       setCoverSearch(prev => ({ ...prev, isLoading: true }));
       try {
+        // Try Steam API first for better metadata
+        let steamData = null;
+        try {
+          steamData = await igdbService.getGameDetails(query);
+          if (steamData && steamData.cover) {
+            // If Steam API returns data, use it
+            const steamResult = {
+              game: steamData.name,
+              gameID: steamData.id?.toString(),
+              imgID: steamData.id?.toString(),
+              img: steamData.cover.url || steamData.cover.formatted_url,
+              steamAppId: steamData.id,
+            };
+            setCoverSearch(prev => ({
+              ...prev,
+              results: [steamResult],
+              isLoading: false,
+            }));
+
+            // Set the image URL directly from Steam
+            if (steamResult.img) {
+              setCoverImageUrls({ [steamResult.gameID]: steamResult.img });
+            }
+            return;
+          }
+        } catch (steamError) {
+          console.log(
+            "Steam API search failed, falling back to game service:",
+            steamError
+          );
+        }
+
+        // Fallback to original game service search
         const results = await gameService.searchGameCovers(query);
         setCoverSearch(prev => ({
           ...prev,
@@ -2844,11 +2876,17 @@ const AddGameForm = ({ onSuccess }) => {
   const handleChooseExecutable = async () => {
     const file = await window.electron.openFileDialog();
     if (file) {
+      const gameName = file.split("\\").pop().replace(".exe", "");
       setFormData(prev => ({
         ...prev,
         executable: file,
-        name: file.split("\\").pop().replace(".exe", ""),
+        name: gameName,
       }));
+
+      // Automatically search for game cover using Steam API
+      if (gameName) {
+        handleCoverSearch(gameName);
+      }
     }
   };
 
@@ -2877,18 +2915,10 @@ const AddGameForm = ({ onSuccess }) => {
               variant="outline"
               className="w-full justify-start truncate bg-background text-left font-normal text-primary hover:bg-accent"
               onClick={() => setShowImportDialog(true)}
-              disabled={!useIgdbConfig().enabled}
             >
               <Import className="mr-2 h-4 w-4 flex-shrink-0" />
               <span>{t("library.importSteamGames")}</span>
             </Button>
-
-            {!useIgdbConfig().enabled && (
-              <div className="flex items-center gap-2 rounded-md bg-yellow-500/10 px-3 py-1.5 text-xs text-yellow-600 dark:text-yellow-400">
-                <AlertCircle className="h-3.5 w-3.5" />
-                <span>{t("library.igdbKeysRequired")}</span>
-              </div>
-            )}
           </div>
 
           <Separator className="my-2" />
