@@ -109,6 +109,37 @@ export default defineConfig({
           });
         },
       },
+      "/api/steam/search": {
+        target: "https://store.steampowered.com/api",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/steam\/search/, "/storesearch"),
+        configure: (proxy, _options) => {
+          proxy.on("error", (err, _req, _res) => {
+            console.log("Steam Store Search proxy error", err);
+          });
+        },
+      },
+      "/api/steam/applist": {
+        target: "https://api.steampowered.com",
+        changeOrigin: true,
+        rewrite: path =>
+          path.replace(/^\/api\/steam\/applist/, "/ISteamApps/GetAppList/v2"),
+        configure: (proxy, _options) => {
+          proxy.on("error", (err, _req, _res) => {
+            console.log("Steam App List proxy error", err);
+          });
+        },
+      },
+      "/api/steam/appdetails": {
+        target: "https://store.steampowered.com/api",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/steam\/appdetails/, "/appdetails"),
+        configure: (proxy, _options) => {
+          proxy.on("error", (err, _req, _res) => {
+            console.log("Steam App Details proxy error", err);
+          });
+        },
+      },
     },
   },
   resolve: {
