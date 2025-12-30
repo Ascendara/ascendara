@@ -51,7 +51,6 @@ import gameUpdateService from "@/services/gameUpdateService";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/context/SettingsContext";
-import { useIgdbConfig } from "@/services/gameInfoConfig";
 import { useAudioPlayer, killAudioAndMiniplayer } from "@/services/audioPlayerService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -560,7 +559,6 @@ export default function GameScreen() {
   const location = useLocation();
   const { gameData } = location.state || {};
   const { settings } = useSettings();
-  const igdbConfig = useIgdbConfig();
   const { isAuthenticated, user } = useAuth();
   const [game, setGame] = useState(gameData || null);
   const [ascendAccess, setAscendAccess] = useState({

@@ -70,7 +70,6 @@ import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
 import { toast } from "sonner";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import igdbService from "@/services/gameInfoService";
-import { useIgdbConfig } from "@/services/gameInfoConfig";
 import torboxService from "@/services/torboxService";
 import TorboxIcon from "@/components/TorboxIcon";
 import GameScreenshots from "@/components/GameScreenshots";
@@ -179,7 +178,6 @@ export default function DownloadPage() {
   const { t } = useLanguage();
   const { settings, setSettings } = useSettings();
   const { isAuthenticated } = useAuth();
-  const igdbConfig = useIgdbConfig();
 
   useEffect(() => {
     fetchProviderPatterns()
