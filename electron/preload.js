@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld("electron", {
   updateSetting: (key, value) => ipcRenderer.invoke("update-setting", key, value),
   getDefaultLocalIndexPath: () => ipcRenderer.invoke("get-default-local-index-path"),
   getDownloadDirectory: () => ipcRenderer.invoke("get-download-directory"),
+  getSteamApiKey: () => ipcRenderer.invoke("get-steam-api-key"),
   onSettingsChanged: callback => {
     ipcRenderer.on("settings-updated", callback);
     return () => ipcRenderer.removeListener("settings-updated", callback);
@@ -114,10 +115,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("igdb-request", { endpoint, body, clientId, accessToken }),
 
   //===========================================================================
-  // GiantBomb API (bypasses CORS)
+  // Steam API (no CORS bypass needed)
   //===========================================================================
-  giantbombRequest: (url, apiKey) =>
-    ipcRenderer.invoke("giantbomb-request", { url, apiKey }),
 
   switchRPC: state => ipcRenderer.invoke("switch-rpc", state),
 
