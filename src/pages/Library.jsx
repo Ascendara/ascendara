@@ -65,7 +65,7 @@ import {
 } from "@/components/ui/tooltip";
 import gameService from "@/services/gameService";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import igdbService from "@/services/gameInfoService";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
@@ -173,6 +173,7 @@ const Library = () => {
   const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { settings } = useSettings();
   const [ascendAccess, setAscendAccess] = useState({
@@ -241,32 +242,13 @@ const Library = () => {
     lastLaunchedGameRef.current = lastLaunchedGame;
   }, [lastLaunchedGame]);
 
-  const [CurPage, SetCurPage] = useState(() => {
-    const PageState = Number(location?.state?.libraryPage);
-    if (Number.isInteger(PageState) && PageState >= 1) return PageState;
-    return 1;
+  const [currentPage, setCurrentPage] = useState(() => {
+    const statePage = Number(location?.state?.libraryPage);
+    // // //
+    return Number.isInteger(statePage) && statePage >= 1 ? statePage : 1;
   });
+
   const PAGE_SIZE = 15;
-
-  // Current Page QOL <3
-  // Makes sure to keep Current Library Page when going back from GameScreen.jsx :P
-
-  useEffect(() => {
-    const PState = Number(location?.state?.libraryPage);
-    if (Number.isInteger(PState) && PState >= 1 && PState !== CurPage) {
-      SetCurPage(PState)
-    }
-  }, [location?.key]);
-
-  useEffect(() => {
-    const PState = Number(location?.state?.libraryPage);
-    if (PState == CurPage) return
-    //
-    navigate(location.pathname, {
-      replace: true,
-      state: { ...(location.state || {}), libraryPage: CurPage },
-    });
-  }, [CurPage, location.pathname, location.state, navigate]);
 
   // Filter games based on search query
   const filteredGames = games
@@ -323,10 +305,10 @@ const Library = () => {
     };
   }, []);
 
-  // Reset to first page if filter/search changes and current page is out of range
+  // Keep current page in range. Avoid resetting during initial load when totalPages is 0.
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(1);
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
 
@@ -948,6 +930,7 @@ const Library = () => {
     navigate("/gamescreen", {
       state: {
         gameData: game,
+        libraryPage: currentPage,
       },
     });
   };
