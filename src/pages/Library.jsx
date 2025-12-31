@@ -241,8 +241,32 @@ const Library = () => {
     lastLaunchedGameRef.current = lastLaunchedGame;
   }, [lastLaunchedGame]);
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [CurPage, SetCurPage] = useState(() => {
+    const PageState = Number(location?.state?.libraryPage);
+    if (Number.isInteger(PageState) && PageState >= 1) return PageState;
+    return 1;
+  });
   const PAGE_SIZE = 15;
+
+  // Current Page QOL <3
+  // Makes sure to keep Current Library Page when going back from GameScreen.jsx :P
+
+  useEffect(() => {
+    const PState = Number(location?.state?.libraryPage);
+    if (Number.isInteger(PState) && PState >= 1 && PState !== CurPage) {
+      SetCurPage(PState)
+    }
+  }, [location?.key]);
+
+  useEffect(() => {
+    const PState = Number(location?.state?.libraryPage);
+    if (PState == CurPage) return
+    //
+    navigate(location.pathname, {
+      replace: true,
+      state: { ...(location.state || {}), libraryPage: CurPage },
+    });
+  }, [CurPage, location.pathname, location.state, navigate]);
 
   // Filter games based on search query
   const filteredGames = games
