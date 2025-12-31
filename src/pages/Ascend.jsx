@@ -412,8 +412,8 @@ const Ascend = () => {
     let level = Math.max(1, Math.floor(1 + Math.sqrt(totalXP / baseXP) * 1.5));
     level = Math.min(level, 999);
 
-    const xpForCurrentLevel = level <= 1 ? 0 : baseXP * Math.pow(level, 2);
-    const xpForNextLevel = baseXP * Math.pow(level + 1, 2);
+    const xpForCurrentLevel = level <= 1 ? 0 : baseXP * Math.pow((level - 1) / 1.5, 2);
+    const xpForNextLevel = baseXP * Math.pow(level / 1.5, 2);
     const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
     const currentLevelProgress = Math.max(0, totalXP - xpForCurrentLevel);
 

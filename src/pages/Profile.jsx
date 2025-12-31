@@ -357,8 +357,9 @@ const Profile = () => {
       };
     }
 
-    const XpForCurrentLevel = Level <= 1 ? 0 : LevelXpBase * Math.pow(Level, 2);
-    const XpForNextLevel = LevelXpBase * Math.pow(Level + 1, 2);
+    const XpForCurrentLevel =
+      Level <= 1 ? 0 : LevelXpBase * Math.pow((Level - 1) / 1.5, 2);
+    const XpForNextLevel = LevelXpBase * Math.pow(Level / 1.5, 2);
     const XpNeededForNextLevel = XpForNextLevel - XpForCurrentLevel;
     const CurrentLevelProgress = Math.max(0, NormalizedXp - XpForCurrentLevel);
 
@@ -1536,7 +1537,7 @@ const Profile = () => {
                             <div
                               className={Cn(
                                 "flex flex-col items-center justify-end px-2 py-2 text-center",
-                                emphasize ? "min-h-[92px]" : "min-h-[76px]"
+                                emphasize ? "h-[92px]" : "h-[76px]"
                               )}
                             >
                               <div

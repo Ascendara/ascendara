@@ -53,10 +53,27 @@ const LevelingCard = ({ level, currentXP, nextLevelXp, totalXP }) => {
   const progressPercentage = (() => {
     // Handle special cases
     if (localLevel >= 999) return 100; // Max level always shows 100%
-    if (localNextLevelXp <= 0) return 0; // Prevent division by zero
+
+    // Handle undefined/null/invalid values
+    const safeCurrentXP = Number(localCurrentXP) || 0;
+    const safeNextLevelXp = Number(localNextLevelXp) || 1;
+
+    if (safeNextLevelXp <= 0) {
+      console.warn("LevelingCard: Invalid nextLevelXp value:", localNextLevelXp);
+      return 0; // Prevent division by zero
+    }
 
     // Normal case: calculate percentage with a cap at 100%
-    return Math.min((localCurrentXP / localNextLevelXp) * 100, 100);
+    const percentage = Math.min((safeCurrentXP / safeNextLevelXp) * 100, 100);
+
+    // Debug logging
+    console.log("LevelingCard Progress:", {
+      currentXP: safeCurrentXP,
+      nextLevelXp: safeNextLevelXp,
+      percentage: percentage.toFixed(2) + "%",
+    });
+
+    return percentage;
   })();
 
   // Format large numbers for display with improved readability
