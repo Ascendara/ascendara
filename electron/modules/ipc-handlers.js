@@ -174,6 +174,8 @@ function registerMiscHandlers() {
 
   ipcMain.handle("get-image-key", () => imageKey);
 
+  ipcMain.handle("get-steam-api-key", () => config.steamWebApiKey);
+
   // Open URL
   ipcMain.handle("open-url", async (_, url) => {
     shell.openExternal(url);
