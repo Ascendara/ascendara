@@ -647,6 +647,16 @@ export default function GameScreen() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [isStartingUpdate, setIsStartingUpdate] = useState(false);
 
+  // Go Back To Library!!!!
+
+  const BackLibrary = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/library");
+  };
+  
   // Achievements pagination state
   const [achievementsPage, setAchievementsPage] = useState(0);
   const perPage = 12; // 3 rows x 4 columns
@@ -723,7 +733,7 @@ export default function GameScreen() {
       try {
         // If we don't have game data from location state, navigate back to library
         if (!game) {
-          navigate("/library");
+          BackLibrary();
           return;
         }
 
@@ -1397,7 +1407,7 @@ export default function GameScreen() {
 
       setIsUninstalling(false);
       setIsDeleteDialogOpen(false);
-      navigate("/library");
+      BackLibrary();
     } catch (error) {
       console.error("Error deleting game:", error);
       setIsUninstalling(false);
@@ -1457,7 +1467,7 @@ export default function GameScreen() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-background">
         <div className="space-y-4 text-center">
           <h1 className="text-2xl font-bold">{t("gameScreen.gameNotFound")}</h1>
-          <Button onClick={() => navigate("/library")}>
+          <Button onClick={BackLibrary}>
             {t("gameScreen.backToLibrary")}
           </Button>
         </div>
@@ -1477,7 +1487,7 @@ export default function GameScreen() {
           <Button
             variant="ghost"
             className="flex w-fit items-center gap-2 text-primary hover:bg-primary/10"
-            onClick={() => navigate("/library")}
+            onClick={BackLibrary}
           >
             <ChevronLeft className="h-4 w-4" />
             {t("common.back")}
