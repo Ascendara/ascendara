@@ -2054,6 +2054,7 @@
     "data_size": "{{size}} GB",
     "delete_download": "Delete Download",
     "delete_download_confirm": "Are you sure you want to remove {{name}} from your cached downloads?",
+    "description": "Manage your TorBox downloads and cloud storage",
     "download_deleted_desc": "{{name}} has been deleted.",
     "download_ready": "Download ready",
     "download_started": "Download started for {{name}}",
