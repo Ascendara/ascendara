@@ -38,6 +38,7 @@ import {
   orderBy,
   limit,
   writeBatch,
+  onSnapshot,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -72,6 +73,33 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: "select_account",
 });
+
+/**
+ * Subscribe to real-time user status updates
+ * @param {string} userId - User ID to watch
+ * @param {function} onChange - Callback function receiving status data
+ * @returns {function} Unsubscribe function
+ */
+export const SnapUserStatus = (userId, onChange) => {
+  if (!userId) return () => {};
+
+  const ref = doc(db, "userStatus", userId);
+  const snap = onSnapshot(
+    ref,
+    snapshot => {
+      if (snapshot.exists()) {
+        onChange(snapshot.data());
+      } else {
+        onChange({ status: "offline", customMessage: "" });
+      }
+    },
+    error => {
+      console.error("[SnapUserStatus] Error:", error);
+    }
+  );
+
+  return snap;
+};
 
 /**
  * Sign in with Google
