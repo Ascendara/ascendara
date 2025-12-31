@@ -222,6 +222,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("get-launch-commands", game, isCustom),
   readGameAchievements: (game, isCustom) =>
     ipcRenderer.invoke("read-game-achievements", game, isCustom),
+  getAchievementsLeaderboard: (games, options) =>
+    ipcRenderer.invoke("get-achievements-leaderboard", games, options),
   writeGameAchievements: (gameName, achievements) =>
     ipcRenderer.invoke("write-game-achievements", gameName, achievements),
   restoreCloudGameData: (gameName, cloudData) =>
