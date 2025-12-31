@@ -271,7 +271,7 @@ const LevelingCard = ({ level, currentXP, nextLevelXp, totalXP }) => {
         <CardTitle
           className={`flex items-center gap-2 ${localLevel >= 100 ? colorScheme.text : ""}`}
         >
-          {t("profile.yourLevel")}
+          {t("ascend.profile.yourLevel")}
         </CardTitle>
         <CardDescription>{t("profile.levelProgress")}</CardDescription>
       </CardHeader>
