@@ -6473,15 +6473,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.additions.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.additions.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
@@ -6506,15 +6518,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.fixes.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <Check className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.fixes.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <Check className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
@@ -6539,15 +6563,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.improvements.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.improvements.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
@@ -6572,15 +6608,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.removals.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.removals.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
