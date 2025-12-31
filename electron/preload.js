@@ -115,8 +115,9 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("igdb-request", { endpoint, body, clientId, accessToken }),
 
   //===========================================================================
-  // Steam API (no CORS bypass needed)
+  // Steam API (bypasses CORS)
   //===========================================================================
+  steamRequest: url => ipcRenderer.invoke("steam-request", { url }),
 
   switchRPC: state => ipcRenderer.invoke("switch-rpc", state),
 

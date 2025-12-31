@@ -54,11 +54,11 @@ const searchGameSteam = async (gameName, apiKey) => {
     console.log(`Searching Steam for: "${gameName}" (normalized: "${normalizedSearch}")`);
 
     // Try Steam Store Search API with original title first
-    let storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${encodedSearch}&l=en&cc=US`;
-    let storeResponse = await fetch(storeSearchUrl);
+    const storeSearchUrl = `https://store.steampowered.com/api/storesearch?term=${encodedSearch}&l=en&cc=US`;
+    const storeResult = await window.electron.steamRequest(storeSearchUrl);
 
-    if (storeResponse.ok) {
-      const storeData = await storeResponse.json();
+    if (storeResult.success) {
+      const storeData = storeResult.data;
       console.log("Steam Store Search response:", storeData);
 
       if (storeData.items && storeData.items.length > 0) {
@@ -108,11 +108,12 @@ const searchGameSteam = async (gameName, apiKey) => {
         if (gameName !== normalizedSearch) {
           console.log(`Trying normalized search: "${normalizedSearch}"`);
           const normalizedEncoded = encodeURIComponent(normalizedSearch);
-          storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${normalizedEncoded}&l=en&cc=US`;
-          storeResponse = await fetch(storeSearchUrl);
+          const normalizedSearchUrl = `https://store.steampowered.com/api/storesearch?term=${normalizedEncoded}&l=en&cc=US`;
+          const normalizedResult =
+            await window.electron.steamRequest(normalizedSearchUrl);
 
-          if (storeResponse.ok) {
-            const normalizedData = await storeResponse.json();
+          if (normalizedResult.success) {
+            const normalizedData = normalizedResult.data;
             console.log("Normalized search response:", normalizedData);
 
             if (normalizedData.items && normalizedData.items.length > 0) {
@@ -127,7 +128,7 @@ const searchGameSteam = async (gameName, apiKey) => {
         }
       }
     } else {
-      console.log(`Store search failed with status: ${storeResponse.status}`);
+      console.log(`Store search failed`);
     }
 
     console.log(`No Steam app found for: ${gameName}`);
@@ -180,15 +181,15 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
     console.log(`Fetching Steam details for app ID: ${appId}`);
 
     // Get game details from Steam Store API
-    const url = `${STEAM_APP_DETAILS_URL}?appids=${appId}`;
+    const url = `https://store.steampowered.com/api/appdetails?appids=${appId}`;
 
-    const response = await fetch(url);
+    const result = await window.electron.steamRequest(url);
 
-    if (!response.ok) {
-      throw new Error(`Steam API error: ${response.status}`);
+    if (!result.success) {
+      throw new Error(`Steam API error`);
     }
 
-    const data = await response.json();
+    const data = result.data;
 
     console.log("Steam detail response:", data);
 

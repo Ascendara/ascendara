@@ -145,6 +145,22 @@ function registerMiscHandlers() {
     }
   });
 
+  // Steam API request handler (bypasses CORS)
+  ipcMain.handle("steam-request", async (_, { url }) => {
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
+          Accept: "application/json",
+        },
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("Steam request error:", error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Is experiment
   let experiment = false;
   ipcMain.handle("is-experiment", () => experiment);
