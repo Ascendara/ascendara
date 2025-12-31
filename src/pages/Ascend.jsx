@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { checkForUpdates } from "@/services/updateCheckingService";
+import { validateInput } from "@/services/profanityFilterService";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1252,6 +1253,45 @@ const Ascend = () => {
       return;
     }
 
+    // Validate display name for profanity
+    const displayNameValidation = await validateInput(
+      editDisplayName.trim(),
+      userData?.owner
+    );
+    if (!displayNameValidation.valid) {
+      if (displayNameValidation.type === "notAllowed") {
+        toast.error(
+          t("ascend.settings.notAllowedDisplayName") ||
+            "Display name contains words that are not allowed"
+        );
+      } else {
+        toast.error(
+          t("ascend.settings.inappropriateDisplayName") ||
+            "Please try to avoid harsh or inappropriate words in your display name"
+        );
+      }
+      return;
+    }
+
+    // Validate bio for profanity
+    if (editBio.trim()) {
+      const bioValidation = await validateInput(editBio.trim(), userData?.owner);
+      if (!bioValidation.valid) {
+        if (bioValidation.type === "notAllowed") {
+          toast.error(
+            t("ascend.settings.notAllowedBio") ||
+              "Bio contains words that are not allowed"
+          );
+        } else {
+          toast.error(
+            t("ascend.settings.inappropriateBio") ||
+              "Please try to avoid harsh or inappropriate words in your bio"
+          );
+        }
+        return;
+      }
+    }
+
     setIsSavingProfile(true);
 
     // Update basic profile (display name, photo)
@@ -1643,11 +1683,29 @@ const Ascend = () => {
     setIsGoogleLoading(false);
   };
 
-  const handleDisplayNameSubmit = async () => {
+  const handleGoogleDisplayNameSubmit = async () => {
     if (googleDisplayName.trim().length < 4) {
       toast.error(t("account.errors.displayNameTooShort"));
       return;
     }
+
+    // Validate display name for profanity (no owner bypass on signup)
+    const displayNameValidation = await validateInput(googleDisplayName.trim(), false);
+    if (!displayNameValidation.valid) {
+      if (displayNameValidation.type === "notAllowed") {
+        toast.error(
+          t("ascend.settings.notAllowedDisplayName") ||
+            "Display name contains words that are not allowed"
+        );
+      } else {
+        toast.error(
+          t("ascend.settings.inappropriateDisplayName") ||
+            "Please try to avoid harsh or inappropriate words in your display name"
+        );
+      }
+      return;
+    }
+
     setIsSubmitting(true);
     const result = await updateProfile({ displayName: googleDisplayName.trim() });
     if (result.success) {
@@ -1689,6 +1747,28 @@ const Ascend = () => {
         setIsSubmitting(false);
         return;
       }
+
+      // Validate display name for profanity (no owner bypass on signup)
+      const displayNameValidation = await validateInput(
+        formData.displayName.trim(),
+        false
+      );
+      if (!displayNameValidation.valid) {
+        if (displayNameValidation.type === "notAllowed") {
+          toast.error(
+            t("ascend.settings.notAllowedDisplayName") ||
+              "Display name contains words that are not allowed"
+          );
+        } else {
+          toast.error(
+            t("ascend.settings.inappropriateDisplayName") ||
+              "Please try to avoid harsh or inappropriate words in your display name"
+          );
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
       if (formData.password !== formData.confirmPassword) {
         toast.error(t("account.errors.passwordMismatch"));
         setIsSubmitting(false);
