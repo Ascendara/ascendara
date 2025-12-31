@@ -430,6 +430,64 @@ async function initializeApp() {
           return;
         }
 
+        // Handle Analytics proxy requests
+        if (req.url.startsWith("/api/analytics")) {
+          const targetPath = req.url.replace(/^\/api\/analytics/, "");
+          const targetUrl = `https://analytics.ascendara.app${targetPath}`;
+
+          // Collect request body for POST/PUT requests
+          let body = [];
+          req.on("data", chunk => body.push(chunk));
+          req.on("end", () => {
+            body = Buffer.concat(body);
+
+            const parsedUrl = new URL(targetUrl);
+            const proxyOptions = {
+              hostname: parsedUrl.hostname,
+              port: 443,
+              path: parsedUrl.pathname + parsedUrl.search,
+              method: req.method,
+              headers: { ...req.headers, host: parsedUrl.hostname },
+            };
+
+            // Remove headers that shouldn't be forwarded
+            delete proxyOptions.headers["host"];
+            delete proxyOptions.headers["connection"];
+            delete proxyOptions.headers["content-length"];
+            if (body.length > 0) {
+              proxyOptions.headers["content-length"] = body.length;
+            }
+
+            const proxyReq = https.request(proxyOptions, proxyRes => {
+              // Set CORS headers
+              res.setHeader("Access-Control-Allow-Origin", "*");
+              res.setHeader(
+                "Access-Control-Allow-Methods",
+                "GET, POST, PUT, DELETE, OPTIONS"
+              );
+              res.setHeader(
+                "Access-Control-Allow-Headers",
+                "Content-Type, Authorization, X-API-Key, X-Signature"
+              );
+
+              res.writeHead(proxyRes.statusCode, proxyRes.headers);
+              proxyRes.pipe(res);
+            });
+
+            proxyReq.on("error", err => {
+              console.error("Analytics proxy error:", err);
+              res.writeHead(502);
+              res.end("Proxy error");
+            });
+
+            if (body.length > 0) {
+              proxyReq.write(body);
+            }
+            proxyReq.end();
+          });
+          return;
+        }
+
         // Handle CORS preflight for API routes
         if (req.method === "OPTIONS" && req.url.startsWith("/api/")) {
           res.setHeader("Access-Control-Allow-Origin", "*");
