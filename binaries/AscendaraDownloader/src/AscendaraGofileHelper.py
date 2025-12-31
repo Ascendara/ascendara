@@ -300,6 +300,10 @@ class GofileDownloader:
             logging.error(f"[AscendaraGofileHelper] No files found for download from {url}. Skipping...")
             handleerror(self.game_info, self.game_info_path, "no_files_error")
             return
+        
+        logging.info(f"[AscendaraGofileHelper] Successfully discovered {len(files_info)} files to download")
+        for file_id, file_data in files_info.items():
+            logging.debug(f"[AscendaraGofileHelper] File: {file_data.get('filename', 'Unknown')} (Path: {file_data.get('path', 'root')})")
 
         # Calculate total size first
         self._total_size = 0
@@ -406,13 +410,24 @@ class GofileDownloader:
             for child_id in data["children"]:
                 child = data["children"][child_id]
                 if child["type"] == "folder":
-                    files_info.update(self._parseLinksRecursively(child["id"], password, folder_path))
+                    # Recursively process nested folders
+                    nested_files = self._parseLinksRecursively(child["id"], password, folder_path)
+                    if nested_files:
+                        files_info.update(nested_files)
+                        logging.info(f"[AscendaraGofileHelper] Found {len(nested_files)} files in nested folder: {child.get('name', child_id)}")
+                    else:
+                        logging.warning(f"[AscendaraGofileHelper] No files found in nested folder: {child.get('name', child_id)}")
                 else:
-                    files_info[child["id"]] = {
-                        "path": folder_path,
-                        "filename": child["name"],
-                        "link": child["link"]
-                    }
+                    # Direct file in this folder
+                    if "link" in child:
+                        files_info[child["id"]] = {
+                            "path": folder_path,
+                            "filename": child["name"],
+                            "link": child["link"]
+                        }
+                        logging.debug(f"[AscendaraGofileHelper] Added file: {child['name']}")
+                    else:
+                        logging.warning(f"[AscendaraGofileHelper] File missing download link: {child.get('name', child_id)}")
         else:
             files_info[data["id"]] = {
                 "path": current_path,

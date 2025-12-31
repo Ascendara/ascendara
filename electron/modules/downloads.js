@@ -361,6 +361,46 @@ function registerDownloadHandlers() {
         `Stopping download for game: ${game}, deleteContents: ${deleteContents}`
       );
       const sanitizedGame = sanitizeText(game);
+      const settings = settingsManager.getSettings();
+
+      // Find the game directory across all possible locations
+      let gameDirectory = null;
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ];
+
+      for (const dir of allDirectories) {
+        const testPath = path.join(dir, sanitizedGame);
+        if (fs.existsSync(testPath)) {
+          gameDirectory = testPath;
+          console.log(`Found game directory at: ${gameDirectory}`);
+          break;
+        }
+      }
+
+      if (!gameDirectory) {
+        console.error(`Game directory not found for: ${sanitizedGame}`);
+        return false;
+      }
+
+      // Step 1: Update JSON to mark as stopped FIRST (before killing processes)
+      // This prevents the downloader from overwriting the stopped state
+      const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+      if (fs.existsSync(jsonFile)) {
+        try {
+          const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+          gameInfo.downloadingData = { stopped: true };
+          fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+          console.log(`Marked download as stopped in JSON: ${jsonFile}`);
+        } catch (jsonError) {
+          console.error(`Error updating JSON file: ${jsonError}`);
+          // Continue with process termination even if JSON update fails
+        }
+      }
+
+      // Step 2: Kill all downloader processes
+      let killedProcesses = 0;
 
       if (isWindows) {
         const downloaderExes = [
@@ -391,9 +431,17 @@ function registerDownloadHandlers() {
               });
             });
 
+            console.log(`Found ${pids.length} ${exe} processes for ${sanitizedGame}`);
+
             for (const pid of pids) {
-              const killProcess = spawn("taskkill", ["/F", "/T", "/PID", pid]);
-              await new Promise(resolve => killProcess.on("close", resolve));
+              try {
+                const killProcess = spawn("taskkill", ["/F", "/T", "/PID", pid]);
+                await new Promise(resolve => killProcess.on("close", resolve));
+                killedProcesses++;
+                console.log(`Killed process ${exe} with PID ${pid}`);
+              } catch (killErr) {
+                console.error(`Failed to kill PID ${pid}:`, killErr);
+              }
             }
           } catch (err) {
             console.error(`Error finding/killing ${exe} processes:`, err);
@@ -417,10 +465,18 @@ function registerDownloadHandlers() {
               );
             });
 
+            console.log(`Found ${pids.length} ${script} processes for ${sanitizedGame}`);
+
             for (const pid of pids) {
               if (pid) {
-                const killProcess = spawn("kill", ["-9", pid]);
-                await new Promise(resolve => killProcess.on("close", resolve));
+                try {
+                  const killProcess = spawn("kill", ["-9", pid]);
+                  await new Promise(resolve => killProcess.on("close", resolve));
+                  killedProcesses++;
+                  console.log(`Killed process ${script} with PID ${pid}`);
+                } catch (killErr) {
+                  console.error(`Failed to kill PID ${pid}:`, killErr);
+                }
               }
             }
           } catch (err) {
@@ -430,29 +486,61 @@ function registerDownloadHandlers() {
       }
 
       downloadProcesses.delete(sanitizedGame);
+      console.log(`Total processes killed: ${killedProcesses}`);
 
-      // Wait for processes to terminate
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Step 3: Wait for processes to fully terminate and release file locks
+      // Use exponential backoff to verify processes are gone
+      let waitTime = 1000;
+      for (let i = 0; i < 3; i++) {
+        await new Promise(resolve => setTimeout(resolve, waitTime));
 
-      // Update the JSON
-      const settings = settingsManager.getSettings();
-      if (settings.downloadDirectory) {
-        const gameDirectory = path.join(settings.downloadDirectory, sanitizedGame);
-        const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
-        if (fs.existsSync(jsonFile)) {
+        // Verify processes are actually gone
+        if (isWindows) {
+          const verifyCommand = `Get-Process | Where-Object { $_.Name -match 'Ascendara(Downloader|GofileHelper|TorrentHandler)' -and $_.CommandLine -like '*${sanitizedGame}*' } | Measure-Object | Select-Object -ExpandProperty Count`;
+          const verifyProcess = spawn("powershell", [
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            verifyCommand,
+          ]);
+
+          const stillRunning = await new Promise(resolve => {
+            let output = "";
+            verifyProcess.stdout.on("data", data => (output += data.toString()));
+            verifyProcess.on("close", () => {
+              const count = parseInt(output.trim()) || 0;
+              resolve(count > 0);
+            });
+          });
+
+          if (!stillRunning) {
+            console.log(`All processes terminated after ${waitTime * (i + 1)}ms`);
+            break;
+          }
+        }
+
+        waitTime *= 2; // Exponential backoff
+      }
+
+      // Step 4: Ensure JSON is in stopped state (in case downloader overwrote it)
+      if (fs.existsSync(jsonFile)) {
+        try {
           const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
           gameInfo.downloadingData = { stopped: true };
           fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+          console.log(`Confirmed stopped state in JSON: ${jsonFile}`);
+        } catch (jsonError) {
+          console.error(`Error confirming JSON state: ${jsonError}`);
         }
       }
 
-      // Delete contents if requested
+      // Step 5: Delete contents if requested
       if (deleteContents) {
+        console.log(`Deleting game directory: ${gameDirectory}`);
         let attempts = 0;
         const maxAttempts = 5;
         while (attempts < maxAttempts) {
           try {
-            const gameDirectory = path.join(settings.downloadDirectory, sanitizedGame);
             const files = await fs.promises.readdir(gameDirectory, {
               withFileTypes: true,
             });
@@ -461,15 +549,24 @@ function registerDownloadHandlers() {
               await fs.promises.rm(fullPath, { recursive: true, force: true });
             }
             await fs.promises.rmdir(gameDirectory);
+            console.log(`Successfully deleted game directory`);
             break;
           } catch (deleteError) {
             attempts++;
-            if (attempts === maxAttempts) throw deleteError;
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.error(
+              `Delete attempt ${attempts}/${maxAttempts} failed:`,
+              deleteError
+            );
+            if (attempts === maxAttempts) {
+              console.error(`Failed to delete directory after ${maxAttempts} attempts`);
+              throw deleteError;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
       }
 
+      console.log(`Successfully stopped download for: ${sanitizedGame}`);
       return true;
     } catch (error) {
       console.error("Error stopping download:", error);
