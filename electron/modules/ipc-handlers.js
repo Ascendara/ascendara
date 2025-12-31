@@ -17,6 +17,7 @@ const {
   APIKEY,
   analyticsAPI,
   imageKey,
+  steamWebApiKey,
   TIMESTAMP_FILE,
 } = require("./config");
 const { getSettingsManager } = require("./settings");
@@ -174,7 +175,7 @@ function registerMiscHandlers() {
 
   ipcMain.handle("get-image-key", () => imageKey);
 
-  ipcMain.handle("get-steam-api-key", () => config.steamWebApiKey);
+  ipcMain.handle("get-steam-api-key", () => steamWebApiKey);
 
   // Open URL
   ipcMain.handle("open-url", async (_, url) => {
