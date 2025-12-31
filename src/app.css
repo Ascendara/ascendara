@@ -383,3 +383,63 @@ h2 {
 .bg-nav-hover {
   background-color: rgb(var(--color-nav-hover, var(--color-secondary)));
 }
+
+/* Keyframing */
+
+@keyframes spin-bounce {
+  0% {
+    transform: rotate(0deg);
+  }
+  80% {
+    transform: rotate(370deg);
+  }
+  90% {
+    transform: rotate(355deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.group\/avatar:hover .spin-bounce {
+  animation: spin-bounce 1s cubic-bezier(0.68, -0.6, 0.32, 1.6) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group\/avatar:hover .spin-bounce {
+    animation: none;
+  }
+}
+
+@keyframes pop-bounce {
+  0% { transform: scale(0.95); }
+  40% { transform: scale(1.08); }
+  60% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+.animate-pop-bounce {
+  animation: pop-bounce 0.4s cubic-bezier(.68,-0.55,.27,1.55);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px);}
+  to { opacity: 1; transform: translateY(0);}
+}
+.animate-fade-in {
+  animation: fade-in 0.4s cubic-bezier(.4,0,.2,1) both;
+}
+
+@keyframes dropdownIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-dropdown-in {
+  animation: dropdownIn 0.22s cubic-bezier(.33,1,.68,1) both;
+}

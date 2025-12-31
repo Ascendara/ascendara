@@ -1,43 +1,134 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useLanguage } from "@/context/LanguageContext";
+import React, {
+  useEffect as UseEffect,
+  useMemo as UseMemo,
+  useRef as UseRef,
+  useState as UseState,
+} from "react";
+import { useLanguage as UseLanguage } from "@/context/LanguageContext";
+import { useAuth as UseAuth } from "@/context/AuthContext";
+
 import UsernameDialog from "@/components/UsernameDialog";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+
+import { cn as Cn } from "@/lib/utils";
 import {
-  Trophy,
-  Clock,
-  Smile,
-  Timer,
+  getUserStatus as GetUserStatus,
+  updateUserStatus as UpdateUserStatus,
+} from "@/services/firebaseService";
+import {
   Archive,
+  Clock,
+  Cpu,
   FileDown,
-  Trash2,
+  Gamepad2,
+  HardDrive,
+  Monitor,
+  Music2,
+  Smile,
+  Sparkles,
+  Trophy,
   Upload,
 } from "lucide-react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardDescription,
-} from "@/components/ui/card";
-import LevelingCard from "@/components/LevelingCard";
-import { cn } from "@/lib/utils";
+
+const VUS = ["online", "away", "busy", "invisible"];
+
+const LevelXpBase = 1000;
+const MaxProfileLevel = 999;
+
+const XpRules = {
+  basePerGame: 25,
+  perHourPlayed: 10,
+  perLaunch: 2,
+  launchBonusCap: 50,
+  completedBonus: 100,
+  playtimeMilestones: [
+    { hours: 10, bonus: 50 },
+    { hours: 25, bonus: 100 },
+    { hours: 50, bonus: 250 },
+    { hours: 100, bonus: 500 },
+  ],
+};
+
+const ReadJsonFromLocalStorage = (StorageKey, FallbackValue) => {
+  try {
+    const RawValue = localStorage.getItem(StorageKey);
+
+    if (!RawValue) {
+      return FallbackValue;
+    }
+
+    return JSON.parse(RawValue);
+  } catch (Error) {
+    console.warn(
+      `[Profile]couldnt read ${StorageKey} in localstorage using defaults`,
+      Error
+    );
+
+    return FallbackValue;
+  }
+};
+
+const CompareAchievementEntries = (Left, Right) => {
+  if (!Left && !Right) return 0;
+  if (!Left) return 1;
+  if (!Right) return -1;
+
+  if (Right.unlocked !== Left.unlocked) {
+    return Right.unlocked - Left.unlocked;
+  }
+
+  if (Right.percentage !== Left.percentage) {
+    return Right.percentage - Left.percentage;
+  }
+
+  if (Right.total !== Left.total) {
+    return Right.total - Left.total;
+  }
+
+  return String(Left.gameName).localeCompare(String(Right.gameName));
+};
 
 const Profile = () => {
-  const { t } = useLanguage();
-  const [joinDate, setJoinDate] = useState("");
-  const [username, setUsername] = useState("");
-  const [useGoldbergName, setUseGoldbergName] = useState(true);
-  const [generalUsername, setGeneralUsername] = useState("");
-  const [selectedEmoji, setSelectedEmoji] = useState(() => {
+  const { t: T } = UseLanguage();
+  const { user: User } = UseAuth();
+
+  const [JoinDate, SetJoinDate] = UseState("");
+  const [Username, SetUsername] = UseState("");
+  const [IsUsingGoldbergName, SetIsUsingGoldbergName] = UseState(true);
+  const [GeneralUsername, SetGeneralUsername] = UseState("");
+  const [PrivateNotes, SetPrivateNotes] = UseState(() => {
+    const UserPrefs = ReadJsonFromLocalStorage("userProfile", {});
+
+    return UserPrefs.privateNotes || UserPrefs.bio || "";
+  });
+  const [IsTypingNotes, SetIsTypingNotes] = UseState(false);
+  const TypingNotesTTTPtr = UseRef(null);
+  const LastSyncedProfileStatsPtr = UseRef(null);
+
+  const [DeviceInfo, SetDeviceInfo] = UseState({
+    platform: "Unknown",
+    os: "Unknown",
+    cpu: "Unknown",
+    ram: "Unknown",
+    gpu: "Unknown",
+    directx: "Unknown",
+  });
+  const [SelectedEmoji, SetSelectedEmoji] = UseState(() => {
     return localStorage.getItem("selectedEmoji") || "😊";
   });
-  const [profileImage, setProfileImage] = useState(null);
-  const [games, setGames] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [ProfileImage, SetProfileImage] = UseState(null);
+  const [Games, SetGames] = UseState([]);
+  const [IsLoading, SetIsLoading] = UseState(true);
+  const [AchievementsLeaderboard, SetAchievementsLeaderboard] = UseState([]);
+  const [IsLoadingAchievementsLeaderboard, SetIsLoadingAchievementsLeaderboard] =
+    UseState(false);
+  const [Stats, SetStats] = UseState({
     gamesPlayed: 0,
     totalPlayTime: 0,
     favoriteGames: [],
@@ -54,122 +145,11 @@ const Profile = () => {
     favoriteGenres: [],
     genreDistribution: {},
   });
-  const [gameImages, setGameImages] = useState({});
-  const [downloadHistory, setDownloadHistory] = useState([]);
-
-  useEffect(() => {
-    localStorage.setItem("selectedEmoji", selectedEmoji);
-  }, [selectedEmoji]);
-
-  // Calculate profile statistics based on games data
-  const calculateProfileStats = (games, customGames) => {
-    const allGames = [...(games || []), ...(customGames || [])];
-
-    // Calculate total playtime and XP from games
-    let totalXP = 0;
-    let totalPlaytime = 0;
-
-    allGames.forEach(game => {
-      // Increased base XP for each game
-      let gameXP = 100; // Base XP for each game
-
-      // Increased XP from playtime
-      const playtimeHours = (game.playTime || 0) / 3600;
-      gameXP += Math.floor(playtimeHours * 50); // 50 XP per hour of playtime
-
-      // Increased XP from launches
-      gameXP += Math.min((game.launchCount || 0) * 10, 100);
-
-      // Increased bonus XP for completed games
-      if (game.completed) {
-        gameXP += 150; // Bonus XP for completing a game
-      }
-
-      totalXP += gameXP;
-      totalPlaytime += game.playTime || 0;
-    });
-
-    // Add milestone bonuses based on total playtime - easier milestones
-    const totalPlaytimeHours = totalPlaytime / 3600;
-
-    // New milestone bonuses for reaching certain playtime thresholds
-    if (totalPlaytimeHours >= 25) totalXP += 100;
-    if (totalPlaytimeHours >= 50) totalXP += 200;
-    if (totalPlaytimeHours >= 100) totalXP += 300;
-    if (totalPlaytimeHours >= 200) totalXP += 500;
-    if (totalPlaytimeHours >= 500) totalXP += 1000;
-
-    // New level calculation with a much more reasonable curve
-    // Using a common RPG-style formula where each level requires a bit more XP than the last
-    // but the curve is much gentler
-
-    // Base XP needed for level 2 (lowered)
-    const baseXP = 50;
-
-    // Calculate level directly from total XP using a gentler formula
-    // Multiplied by 1.5 for faster leveling
-    let level = Math.max(1, Math.floor(1 + Math.sqrt(totalXP / baseXP) * 1.5));
-
-    // Cap at level 999
-    level = Math.min(level, 999);
-
-    // Calculate XP needed for current and next level
-    // For level 1, xpForCurrentLevel should be 0
-    const xpForCurrentLevel = level <= 1 ? 0 : baseXP * Math.pow(level, 2);
-    const xpForNextLevel = baseXP * Math.pow(level + 1, 2);
-    const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
-
-    // Calculate current XP progress toward next level
-    // Ensure this is never negative
-    const currentLevelProgress = Math.max(0, totalXP - xpForCurrentLevel);
-
-    // Handle max level case
-    if (level >= 999) {
-      // At max level, show full progress
-      return {
-        totalPlaytime,
-        gamesPlayed: allGames.filter(game => game.playTime > 0).length,
-        totalGames: allGames.length,
-        level: 999,
-        xp: totalXP,
-        currentXP: 100,
-        nextLevelXp: 100, // Set equal values to show full progress bar
-        allGames,
-      };
-    }
-
-    return {
-      totalPlaytime,
-      gamesPlayed: allGames.filter(game => game.playTime > 0).length,
-      totalGames: allGames.length,
-      level,
-      xp: totalXP,
-      currentXP: currentLevelProgress,
-      nextLevelXp: xpNeededForNextLevel,
-      allGames,
-    };
-  };
-
-  const emojiCategories = [
+  const EmojiCategories = [
     {
       id: "gaming",
       title: "Gaming",
-      emojis: [
-        "🎮",
-        "🕹️",
-        "👾",
-        "🎲",
-        "🎯",
-        "⚔️",
-        "🛡️",
-        "🏆",
-        "🎪",
-        "🎨",
-        "🎭",
-        "🎢",
-        "🔥",
-        "💎",
-      ],
+      emojis: ["🎮", "🕹️", "👾", "🎲", "🎯", "⚔️", "🛡️", "🏆", "🎨", "🎭", "🔥", "💎"],
     },
     {
       id: "faces",
@@ -187,7 +167,6 @@ const Profile = () => {
         "🤗",
         "🫡",
         "🤭",
-        "🫢",
         "😌",
         "😏",
       ],
@@ -205,7 +184,6 @@ const Profile = () => {
         "💡",
         "🔧",
         "⚙️",
-        "🛠️",
         "💾",
         "📡",
         "🔌",
@@ -222,9 +200,7 @@ const Profile = () => {
         "💫",
         "☄️",
         "🌙",
-        "🌎",
         "🌍",
-        "🌏",
         "🪐",
         "🌠",
         "🌌",
@@ -246,39 +222,223 @@ const Profile = () => {
         "🎸",
         "🎺",
         "🎻",
-        "🪘",
         "🎧",
         "🔊",
         "📻",
         "🎙️",
         "🎚️",
-        "🎛️",
       ],
     },
   ];
-
-  const handleEmojiSelect = emoji => {
-    setSelectedEmoji(emoji);
+  const EmojiTabIcons = {
+    gaming: (
+      <Gamepad2 className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+    ),
+    faces: (
+      <Smile className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+    ),
+    tech: (
+      <Cpu className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+    ),
+    space: (
+      <Sparkles className="h-4 w-4 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+    ),
+    audio: (
+      <Music2 className="h-4 w-4 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+    ),
   };
+  const [GameImages, SetGameImages] = UseState({});
+  const [DownloadHistory, SetDownloadHistory] = UseState([]);
 
-  const getDisplayUsername = () => {
-    // Use the generalUsername state which is properly synced during loadProfile
-    return generalUsername || "Guest";
-  };
+  const [UserStatus, SetUserStatus] = UseState("online");
 
-  useEffect(() => {
-    loadProfile();
-    loadProfileImage();
+  const [ActiveEmojiCategoryId, SetActiveEmojiCategoryId] = UseState(
+    EmojiCategories[0].id
+  );
 
-    // Add event listener to reload profile when username is updated
-    const handleProfileUpdate = () => {
-      loadProfile();
+  UseEffect(() => {
+    localStorage.setItem("selectedEmoji", SelectedEmoji);
+  }, [SelectedEmoji]);
+
+  UseEffect(() => {
+    let DidCancel = false;
+
+    const LoadStatus = async () => {
+      if (!User?.uid) return;
+
+      try {
+        const Result = await GetUserStatus(User.uid);
+
+        if (DidCancel) return;
+
+        const FetchedStatus = Result?.data?.status;
+
+        if (FetchedStatus && VUS.includes(FetchedStatus)) {
+          SetUserStatus(FetchedStatus);
+          return;
+        }
+
+        if (FetchedStatus === "offline") {
+          SetUserStatus("online");
+          return;
+        }
+
+        if (FetchedStatus != null) {
+          console.warn(
+            `[Profile] Unexpected user status from backend; defaulting to online.`,
+            { FetchedStatus }
+          );
+        }
+      } catch (Error) {
+        console.error(
+          `[Profile] Failed to load user status — check Firestore rules / network.`,
+          Error
+        );
+      }
     };
 
-    // Listen for storage events (when localStorage changes in other tabs)
+    LoadStatus();
+
+    return () => {
+      DidCancel = true;
+    };
+  }, [User?.uid]);
+
+  const handleUserStatusChange = async NextStatus => {
+    if (!VUS.includes(NextStatus)) {
+      console.warn(`[Profile] Ignore`, {
+        NextStatus,
+      });
+      return;
+    }
+
+    const PreviousStatus = UserStatus;
+
+    SetUserStatus(NextStatus);
+
+    if (!User?.uid) return;
+
+    try {
+      const Result = await UpdateUserStatus(NextStatus);
+
+      if (!Result?.success) {
+        console.error(`[Profile] Failed to update status`, {
+          NextStatus,
+          Error: Result?.error,
+        });
+        SetUserStatus(PreviousStatus);
+
+        const Refreshed = await GetUserStatus(User.uid);
+        const BackendStatus = Refreshed?.data?.status;
+
+        if (BackendStatus && VUS.includes(BackendStatus)) {
+          SetUserStatus(BackendStatus);
+        }
+      }
+    } catch (Error) {
+      console.error(
+        `[Profile] Failed to update user status check firestore`,
+        Error
+      );
+      SetUserStatus(PreviousStatus);
+    }
+  };
+
+  const calculateLevelProgressFromXP = TotalXp => {
+    const NormalizedXp = typeof TotalXp === "number" ? TotalXp : 0;
+
+    const RawLevel = 1 + Math.sqrt(NormalizedXp / LevelXpBase) * 1.5;
+    let Level = Math.max(1, Math.floor(RawLevel));
+    Level = Math.min(Level, MaxProfileLevel);
+
+    if (Level >= MaxProfileLevel) {
+      return {
+        level: MaxProfileLevel,
+        xp: NormalizedXp,
+        currentXP: 100,
+        nextLevelXp: 100,
+      };
+    }
+
+    const XpForCurrentLevel = Level <= 1 ? 0 : LevelXpBase * Math.pow(Level, 2);
+    const XpForNextLevel = LevelXpBase * Math.pow(Level + 1, 2);
+    const XpNeededForNextLevel = XpForNextLevel - XpForCurrentLevel;
+    const CurrentLevelProgress = Math.max(0, NormalizedXp - XpForCurrentLevel);
+
+    return {
+      level: Level,
+      xp: NormalizedXp,
+      currentXP: CurrentLevelProgress,
+      nextLevelXp: XpNeededForNextLevel,
+    };
+  };
+
+  const buildProfileStatsFromGames = (InstalledGames, CustomGames) => {
+    const AllGames = [...(InstalledGames || []), ...(CustomGames || [])];
+
+    let TotalXp = 0;
+    let TotalPlaytimeSeconds = 0;
+    let GamesPlayedCount = 0;
+
+    for (const Game of AllGames) {
+      const PlaytimeSeconds = typeof Game?.playTime === "number" ? Game.playTime : 0;
+      const PlaytimeHours = PlaytimeSeconds / 3600;
+      const LaunchCount = typeof Game?.launchCount === "number" ? Game.launchCount : 0;
+      const IsCompleted = !!Game?.completed;
+
+      if (PlaytimeSeconds > 0) {
+        GamesPlayedCount += 1;
+      }
+
+      let XpFromThisGame = XpRules.basePerGame;
+
+      XpFromThisGame += Math.floor(PlaytimeHours * XpRules.perHourPlayed);
+      const LaunchBonus = Math.min(LaunchCount * XpRules.perLaunch, XpRules.launchBonusCap);
+      XpFromThisGame += LaunchBonus;
+
+      if (IsCompleted) {
+        XpFromThisGame += XpRules.completedBonus;
+      }
+
+      TotalXp += XpFromThisGame;
+      TotalPlaytimeSeconds += PlaytimeSeconds;
+    }
+
+    const TotalPlaytimeHours = TotalPlaytimeSeconds / 3600;
+    for (const Milestone of XpRules.playtimeMilestones) {
+      if (TotalPlaytimeHours >= Milestone.hours) {
+        TotalXp += Milestone.bonus;
+      }
+    }
+
+    const LevelProgress = calculateLevelProgressFromXP(TotalXp);
+
+    return {
+      totalPlaytime: TotalPlaytimeSeconds,
+      gamesPlayed: GamesPlayedCount,
+      totalGames: AllGames.length,
+      level: LevelProgress.level,
+      xp: LevelProgress.xp,
+      currentXP: LevelProgress.currentXP,
+      nextLevelXp: LevelProgress.nextLevelXp,
+      allGames: AllGames,
+    };
+  };
+
+  const GetDisplayUsername = () => {
+    return GeneralUsername || "Guest";
+  };
+
+  UseEffect(() => {
+    LoadProfile();
+    LoadProfileImage();
+
+    const handleProfileUpdate = () => {
+      LoadProfile();
+    };
+
     window.addEventListener("storage", handleProfileUpdate);
 
-    // Listen for username update event
     window.addEventListener("username-updated", handleProfileUpdate);
 
     return () => {
@@ -287,365 +447,692 @@ const Profile = () => {
     };
   }, []);
 
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
+  UseEffect(() => {
+    let DidCancel = false;
 
-      // Get timestamp for join date
-      const joinDate = await window.electron.timestampTime();
-      setJoinDate(joinDate);
+    const loadAchievementsLeaderboard = async () => {
+      try {
+        if (!Array.isArray(Games) || Games.length === 0) {
+          SetAchievementsLeaderboard([]);
+          return;
+        }
 
-      // Get games directly from the file system
-      const games = await loadGamesData();
+        if (!window.electron?.readGameAchievements && !window.electron?.getAchievementsLeaderboard) {
+          SetAchievementsLeaderboard([]);
+          return;
+        }
 
-      // Get download history
-      const history = await window.electron.getDownloadHistory();
-      setDownloadHistory(history);
+        SetIsLoadingAchievementsLeaderboard(true);
 
-      // Calculate statistics directly in the component
-      const calculatedStats = calculateProfileStats(games, []);
+        const EligibleGames = Games
+          .filter(
+            g =>
+              !g?.downloadingData?.downloading &&
+              !g?.downloadingData?.extracting
+          )
+          .slice(0, 75);
 
-      setStats({
-        ...calculatedStats,
-        totalPlayTime: calculatedStats.totalPlaytime || 0,
-        xp: calculatedStats.xp || 0,
-        currentXP: calculatedStats.currentXP || 0,
-        nextLevelXp: calculatedStats.nextLevelXp || 100,
-        level: calculatedStats.level || 1,
-        gamesPlayed: calculatedStats.gamesPlayed || 0,
-        totalGames: calculatedStats.totalGames || 0,
-      });
+        if (DidCancel) return;
 
-      setGames(games);
+        if (window.electron?.getAchievementsLeaderboard) {
+          const Leaderboard = await window.electron.getAchievementsLeaderboard(
+            EligibleGames.map(Game => ({
+              gameName: Game.game || Game.name,
+              isCustom: Game.isCustom || Game.custom || false,
+            })),
+            { limit: 6 }
+          );
 
-      // Load user preferences from localStorage
-      const userPrefs = JSON.parse(localStorage.getItem("userProfile") || "{}");
-
-      // Check if profileName is missing but cracked username exists
-      if (!userPrefs.profileName) {
-        try {
-          // Try to get the cracked username
-          const crackedUsername = await window.electron.getLocalCrackUsername();
-          if (crackedUsername) {
-            // Update userPrefs with the cracked username
-            userPrefs.profileName = crackedUsername;
-            // Save updated preferences to localStorage
-            localStorage.setItem("userProfile", JSON.stringify(userPrefs));
-            // Dispatch event to notify other components
-            window.dispatchEvent(new Event("username-updated"));
+          if (!DidCancel) {
+            SetAchievementsLeaderboard(Array.isArray(Leaderboard) ? Leaderboard : []);
           }
-        } catch (error) {
-          console.error("Error fetching cracked username:", error);
+          return;
+        }
+
+        const results = await Promise.all(
+          EligibleGames.map(async Game => {
+            try {
+              const GameName = Game.game || Game.name;
+              const IsCustom = Game.isCustom || Game.custom || false;
+
+              if (!GameName) return null;
+
+              const achievementData = await window.electron.readGameAchievements(
+                GameName,
+                IsCustom
+              );
+
+              const AchievementList = achievementData?.achievements;
+              if (!Array.isArray(AchievementList) || AchievementList.length === 0) {
+                return null;
+              }
+
+              const UnlockedCount = AchievementList.filter(
+                a => !!(a?.achieved || a?.unlocked || a?.isUnlocked)
+              ).length;
+              const TotalCount = AchievementList.length;
+
+              let Percentage = 0;
+              if (TotalCount > 0) {
+                Percentage = Math.round((UnlockedCount / TotalCount) * 100);
+              }
+
+              return {
+                gameName: GameName,
+                unlocked: UnlockedCount,
+                total: TotalCount,
+                percentage: Percentage,
+              };
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        if (DidCancel) return;
+
+        const Top6 = results
+          .filter(Boolean)
+          .sort(CompareAchievementEntries)
+          .slice(0, 6);
+
+        SetAchievementsLeaderboard(Top6);
+      } catch (e) {
+        console.warn(
+          `[Profile] Failed to load achievements leaderboard — check IPC or achievements files.`,
+          e
+        );
+        SetAchievementsLeaderboard([]);
+      } finally {
+        if (!DidCancel) SetIsLoadingAchievementsLeaderboard(false);
+      }
+    };
+
+    loadAchievementsLeaderboard();
+
+    return () => {
+      DidCancel = true;
+    };
+  }, [Games]);
+
+  const LoadProfile = async () => {
+    try {
+      SetIsLoading(true);
+
+      if (!window.electron) {
+        throw new Error("window.electron is not available (preload/IPC not initialized)");
+      }
+
+      const JoinDateString = await window.electron.timestampTime();
+      SetJoinDate(JoinDateString);
+
+      const InstalledAndCustomGames = await LoadGamesData();
+
+      const DownloadHistory = await window.electron.getDownloadHistory();
+      SetDownloadHistory(DownloadHistory);
+
+      let CalculatedStats = buildProfileStatsFromGames(InstalledAndCustomGames, []);
+
+      let persistedProfileStats = null;
+      try {
+        persistedProfileStats =
+          await window.electron?.getTimestampValue?.("profileStats");
+      } catch (e) {
+        persistedProfileStats = null;
+      }
+
+      if (!InstalledAndCustomGames || InstalledAndCustomGames.length === 0) {
+        const PersistedXp = persistedProfileStats?.xp;
+
+        if (typeof PersistedXp === "number") {
+          const Progress = calculateLevelProgressFromXP(PersistedXp);
+
+          CalculatedStats = {
+            ...CalculatedStats,
+            ...Progress,
+            totalPlaytime:
+              typeof persistedProfileStats?.totalPlaytime === "number"
+                ? persistedProfileStats.totalPlaytime
+                : CalculatedStats.totalPlaytime,
+            gamesPlayed:
+              typeof persistedProfileStats?.gamesPlayed === "number"
+                ? persistedProfileStats.gamesPlayed
+                : CalculatedStats.gamesPlayed,
+            totalGames:
+              typeof persistedProfileStats?.totalGames === "number"
+                ? persistedProfileStats.totalGames
+                : CalculatedStats.totalGames,
+          };
         }
       }
 
-      // Set username values based on localStorage
-      setUsername(userPrefs.username || "");
-      setGeneralUsername(userPrefs.profileName || "");
-      setUseGoldbergName(userPrefs.useForGoldberg ?? true);
+      SetStats({
+        ...CalculatedStats,
+        totalPlayTime: CalculatedStats.totalPlaytime || 0,
+        xp: CalculatedStats.xp || 0,
+        currentXP: CalculatedStats.currentXP || 0,
+        nextLevelXp: CalculatedStats.nextLevelXp || 100,
+        level: CalculatedStats.level || 1,
+        gamesPlayed: CalculatedStats.gamesPlayed || 0,
+        totalGames: CalculatedStats.totalGames || 0,
+      });
 
-      setLoading(false);
+      SetGames(InstalledAndCustomGames);
+      if (window.electron?.setTimestampValue) {
+        const Payload = {
+          level: CalculatedStats.level || 1,
+          xp: CalculatedStats.xp || 0,
+          totalPlaytime: CalculatedStats.totalPlaytime || 0,
+          gamesPlayed: CalculatedStats.gamesPlayed || 0,
+          totalGames: CalculatedStats.totalGames || 0,
+          joinDate: JoinDateString || null,
+        };
+
+        const Fingerprint = JSON.stringify(Payload);
+
+        if (LastSyncedProfileStatsPtr.current !== Fingerprint) {
+          LastSyncedProfileStatsPtr.current = Fingerprint;
+          try {
+            await window.electron.setTimestampValue("profileStats", Payload);
+          } catch (e) {
+            console.warn(
+              `[Profile] Failed to persist profileStats locally — check write permissions / disk.`,
+              e
+            );
+          }
+        }
+      }
+      const UserPrefs = ReadJsonFromLocalStorage("userProfile", {});
+
+      if (!UserPrefs.profileName) {
+        try {
+          const CrackedUsername = await window.electron.getLocalCrackUsername();
+
+          if (CrackedUsername) {
+            UserPrefs.profileName = CrackedUsername;
+            localStorage.setItem("userProfile", JSON.stringify(UserPrefs));
+            window.dispatchEvent(new Event("username-updated"));
+          }
+        } catch (error) {
+          console.error(
+            `[Profile] Something went wrong fetching the cracked username — check the crack helper.`,
+            error
+          );
+        }
+      }
+
+      SetUsername(UserPrefs.username || "");
+      SetGeneralUsername(UserPrefs.profileName || "");
+      SetIsUsingGoldbergName(UserPrefs.useForGoldberg ?? true);
+      SetPrivateNotes(UserPrefs.privateNotes || UserPrefs.bio || "");
+
+      SetIsLoading(false);
     } catch (error) {
-      console.error("Error loading profile:", error);
-      setLoading(false);
+      console.error(
+        `[Profile] Error loading profile — if this is a fresh install, double-check preload/IPC wiring.`,
+        error
+      );
+      SetIsLoading(false);
     }
   };
 
-  // New function to load games data directly
-  const loadGamesData = async () => {
+  UseEffect(() => {
+    let cancelled = false;
+
+    const loadDeviceInfo = async () => {
+      try {
+        const platform =
+          window.electron?.getPlatform?.() ||
+          navigator.userAgentData?.platform ||
+          navigator.platform ||
+          "Unknown";
+
+        const specs = await window.electron?.fetchSystemSpecs?.();
+        if (cancelled) return;
+
+        SetDeviceInfo(Prev => ({
+          ...Prev,
+          platform,
+          ...(specs || {}),
+        }));
+      } catch (error) {
+        console.error(`[Profile] device info load failed`, error);
+      }
+    };
+
+    loadDeviceInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const LoadGamesData = async () => {
     try {
-      // Get settings to find download directory
-      const settings = await window.electron.getSettings();
-      if (!settings || !settings.downloadDirectory) {
+      const Settings = await window.electron.getSettings();
+
+      if (!Settings || !Settings.downloadDirectory) {
         return [];
       }
 
-      // Get installed games
-      const installedGames = await window.electron.getGames();
-
-      // Get custom games if available
+      const InstalledGames = await window.electron.getGames();
       let customGames = [];
       try {
         customGames = await window.electron.getCustomGames();
       } catch (error) {
-        console.error("Error loading custom games:", error);
+        console.error(
+          `[Profile] Failed to load custom games — continuing with installed games only.`,
+          error
+        );
       }
-
-      // Combine all games
-      return [...installedGames, ...customGames];
+      return [...InstalledGames, ...customGames];
     } catch (error) {
-      console.error("Error loading games data:", error);
+      console.error(
+        `[Profile] Error loading games data — check permissions / download folder path.`,
+        error
+      );
       return [];
     }
   };
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  UseEffect(() => {
+    const LoadGameImages = async () => {
+      const Images = {};
 
-  useEffect(() => {
-    // Load game images with localStorage caching
-    const loadGameImages = async () => {
-      const images = {};
-      for (const game of games) {
+      for (const Game of Games) {
         try {
-          const gameId = game.game || game.name;
-          const localStorageKey = `game-cover-${gameId}`;
+          const GameId = Game.game || Game.name;
+          const LocalStorageKey = `game-cover-${GameId}`;
+          const CachedImage = localStorage.getItem(LocalStorageKey);
 
-          // Try localStorage first
-          const cachedImage = localStorage.getItem(localStorageKey);
-          if (cachedImage) {
-            images[gameId] = cachedImage;
+          if (CachedImage) {
+            Images[GameId] = CachedImage;
             continue;
           }
 
-          // Otherwise fetch from Electron
-          const imageBase64 = await window.electron.getGameImage(gameId);
-          if (imageBase64) {
-            const dataUrl = `data:image/jpeg;base64,${imageBase64}`;
-            images[gameId] = dataUrl;
-            // Cache in localStorage
+          const ImageBase64 = await window.electron.getGameImage(GameId);
+          if (ImageBase64) {
+            const DataUrl = `data:image/jpeg;base64,${ImageBase64}`;
+            Images[GameId] = DataUrl;
             try {
-              localStorage.setItem(localStorageKey, dataUrl);
-            } catch (e) {
-              console.warn("Could not cache game image:", e);
+              localStorage.setItem(LocalStorageKey, DataUrl);
+            } catch (Error) {
+              console.warn(`[Profile] couldnt cache game cover`, Error);
             }
           }
-        } catch (error) {
-          console.error("Error loading game image:", error);
+        } catch (Error) {
+          console.error(`[Profile] game cover load failed`, Error);
         }
       }
-      setGameImages(images);
+
+      SetGameImages(Images);
     };
 
-    // Listen for game cover update events
-    const handleCoverUpdate = event => {
-      const { gameName, dataUrl } = event.detail;
-      if (gameName && dataUrl && games.some(g => (g.game || g.name) === gameName)) {
-        console.log(`[Profile] Received cover update for ${gameName}`);
-        setGameImages(prevImages => {
-          const newImages = { ...prevImages, [gameName]: dataUrl };
-          // Update localStorage cache
-          try {
-            const localStorageKey = `game-cover-${gameName}`;
-            localStorage.setItem(localStorageKey, dataUrl);
-          } catch (e) {
-            console.warn("Could not cache updated game image:", e);
-          }
-          return newImages;
-        });
-      }
+    const HandleCoverUpdate = Event => {
+      const { gameName: GameName, dataUrl: DataUrl } = Event.detail;
+
+      if (!GameName || !DataUrl) return;
+      if (!Games.some(g => (g.game || g.name) === GameName)) return;
+
+      console.log(`[Profile] got cover update for ${GameName}`);
+      SetGameImages(PrevImages => {
+        const NewImages = { ...PrevImages, [GameName]: DataUrl };
+
+        try {
+          const LocalStorageKey = `game-cover-${GameName}`;
+          localStorage.setItem(LocalStorageKey, DataUrl);
+        } catch (Error) {
+          console.warn(`[Profile] couldnt cache cover`, Error);
+        }
+
+        return NewImages;
+      });
     };
 
-    // Add event listener for cover updates
-    window.addEventListener("game-cover-updated", handleCoverUpdate);
+    window.addEventListener("game-cover-updated", HandleCoverUpdate);
 
-    // Initial load
-    if (games.length > 0) {
-      loadGameImages();
+    if (Games.length > 0) {
+      LoadGameImages();
     }
 
-    // Clean up event listener
     return () => {
-      window.removeEventListener("game-cover-updated", handleCoverUpdate);
+      window.removeEventListener("game-cover-updated", HandleCoverUpdate);
     };
-  }, [games]);
+  }, [Games]);
 
-  const handleImageUpload = async e => {
-    const file = e.target.files[0];
-    if (file) {
+  const HandleImageUpload = async E => {
+    const File = E.target.files[0];
+    if (File) {
       try {
-        const reader = new FileReader();
-        reader.onload = async event => {
-          const base64 = event.target.result;
-          const result = await window.electron.uploadProfileImage(base64);
-          if (result.success) {
-            setProfileImage(base64);
-            localStorage.setItem("profileImage", base64);
+        const Reader = new FileReader();
+        Reader.onload = async Event => {
+          const Base64 = Event.target.result;
+          const Result = await window.electron.uploadProfileImage(Base64);
+          if (Result.success) {
+            SetProfileImage(Base64);
+            localStorage.setItem("profileImage", Base64);
             localStorage.setItem("useEmoji", "false");
           }
         };
-        reader.readAsDataURL(file);
+        Reader.readAsDataURL(File);
       } catch (error) {
-        console.error("Error uploading image:", error);
+        console.error(`[Profile] profile image upload failed`, error);
       }
     }
   };
 
-  const switchToEmoji = emoji => {
-    setSelectedEmoji(emoji);
-    setProfileImage(null);
+  const SwitchToEmoji = Emoji => {
+    SetSelectedEmoji(Emoji);
+    SetProfileImage(null);
     localStorage.removeItem("profileImage");
     localStorage.setItem("useEmoji", "true");
   };
 
-  const removeProfileImage = () => {
-    setProfileImage(null);
-    localStorage.removeItem("profileImage");
-    localStorage.setItem("useEmoji", "true");
-  };
-
-  const loadProfileImage = async () => {
+  const LoadProfileImage = async () => {
     try {
-      const useEmoji = localStorage.getItem("useEmoji") !== "false";
-      if (useEmoji) {
-        setProfileImage(null);
+      const UseEmoji = localStorage.getItem("useEmoji") !== "false";
+      if (UseEmoji) {
+        SetProfileImage(null);
         return;
       }
 
-      const savedImage = localStorage.getItem("profileImage");
-      if (savedImage) {
-        setProfileImage(savedImage);
+      const SavedImage = localStorage.getItem("profileImage");
+      if (SavedImage) {
+        SetProfileImage(SavedImage);
       } else {
-        const image = await window.electron.getProfileImage();
-        if (image) {
-          const base64 = `data:image/png;base64,${image}`;
-          setProfileImage(base64);
-          localStorage.setItem("profileImage", base64);
+        const Image = await window.electron.getProfileImage();
+        if (Image) {
+          const Base64 = `data:image/png;base64,${Image}`;
+          SetProfileImage(Base64);
+          localStorage.setItem("profileImage", Base64);
         }
       }
     } catch (error) {
-      console.error("Error loading profile image:", error);
+      console.error(`[Profile] profile image load failed`, error);
     }
   };
 
   const renderProfileSection = () => {
-    const isUsingEmoji = !profileImage;
+    const IsUsingEmoji = !ProfileImage;
 
     return (
       <div className="relative">
-        <div className="flex items-center gap-4 p-4">
+        <div className="flex items-center justify-start gap-4 p-4 text-left">
           <Popover>
             <PopoverTrigger asChild>
               <div
-                className="relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-2 border-border bg-card text-4xl shadow-lg transition-all duration-200 hover:scale-105 hover:border-primary/50 hover:opacity-90 hover:shadow-xl"
+                className={Cn(
+                  "group/avatar relative flex h-32 w-32 cursor-pointer items-center justify-center rounded-full bg-card text-4xl shadow-sm ring-0 transition-all duration-300 ease-out hover:scale-105 hover:shadow-lg active:scale-95",
+                  UserStatus === "online" && "hover:ring-4 hover:ring-green-500",
+                  UserStatus === "away" && "hover:ring-4 hover:ring-yellow-400",
+                  UserStatus === "busy" && "hover:ring-4 hover:ring-red-500",
+                  UserStatus === "invisible" && "hover:ring-4 hover:ring-gray-400"
+                )}
                 style={
-                  profileImage
+                  ProfileImage
                     ? {
-                        backgroundImage: `url(${profileImage})`,
+                        backgroundImage: `url(${ProfileImage})`,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
                       }
                     : {}
                 }
               >
-                {!profileImage && selectedEmoji}
-                <div className="absolute bottom-0 right-0 rounded-full bg-primary p-1.5 shadow-md">
-                  <Smile className="h-4 w-4 text-secondary" />
+                {!ProfileImage && SelectedEmoji}
+                <div className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-full bg-primary/90 p-1 shadow-sm transition-transform duration-300 ease-out group-hover/avatar:scale-110">
+                  <Smile className="spin-bounce h-6 w-6 text-secondary" />
                 </div>
               </div>
             </PopoverTrigger>
-            <PopoverContent className="w-[340px] p-4" align="start" sideOffset={5}>
-              <div className="space-y-5">
+            <PopoverContent
+              className={Cn(
+                "group relative overflow-hidden",
+                "animate-fade-in w-[360px] rounded-2xl",
+                "border border-dashed border-border/60",
+                "bg-background/80 p-6 shadow-sm backdrop-blur-md",
+                "transition-all duration-300 ease-out",
+                "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
+              )}
+              align="start"
+              sideOffset={8}
+            >
+              <div className="space-y-6">
                 {/* Current Display */}
-                <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-background ring-1 ring-border">
-                      {profileImage ? (
+                <div
+                  className={Cn(
+                    "group relative overflow-hidden",
+                    "animate-fade-in flex items-center justify-between rounded-xl",
+                    "border border-dashed border-border/60",
+                    "bg-transparent p-4 shadow-sm backdrop-blur-md",
+                    "transition-all duration-300 ease-out",
+                    "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
+                  )}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-16 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-background/60 shadow-sm ring-1 ring-border/60 transition-all duration-300 ease-out active:scale-95">
+                      {ProfileImage ? (
                         <img
-                          src={profileImage}
+                          src={ProfileImage}
                           alt="Profile"
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-cover transition-all duration-300 ease-out"
                         />
                       ) : (
-                        <span className="text-2xl">{selectedEmoji}</span>
+                        <span className="text-3xl">{SelectedEmoji}</span>
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium">
-                        {profileImage
-                          ? t("profile.customImage")
-                          : t("profile.usingEmoji")}
+                      <p className="text-base font-semibold text-foreground">
+                        {ProfileImage
+                          ? "Currently Using Custom Image"
+                          : "Currently Using Emoji"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {profileImage
-                          ? t("profile.switchToEmoji")
-                          : t("profile.orUploadImage")}
+                        {ProfileImage
+                          ? "Why not express yourself with emojis?"
+                          : "Be stylish with a custom image!"}
                       </p>
                     </div>
                   </div>
-                  {profileImage && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={removeProfileImage}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
 
-                <Separator />
+                {/* User Status Dropdown */}
+                <div className="animate-fade-in mb-2 flex justify-center">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={Cn(
+                          "group flex items-center gap-2 rounded-full",
+                          "border border-dashed border-border/60 bg-transparent",
+                          "px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md",
+                          "transition-all duration-300 focus:outline-none",
+                          "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15",
+                          UserStatus === "online" && "ring-green-500",
+                          UserStatus === "away" && "ring-yellow-400",
+                          UserStatus === "busy" && "ring-red-500",
+                          UserStatus === "invisible" && "ring-gray-400",
+                          "active:scale-95"
+                        )}
+                      >
+                        <span
+                          className={Cn(
+                            "transition-transform duration-300",
+                            "group-hover:scale-125 group-active:scale-90"
+                          )}
+                        >
+                          {UserStatus === "online" && (
+                            <span className="text-green-500">🟢</span>
+                          )}
+                          {UserStatus === "away" && (
+                            <span className="text-yellow-400">🟡</span>
+                          )}
+                          {UserStatus === "busy" && (
+                            <span className="text-red-500">🔴</span>
+                          )}
+                          {UserStatus === "invisible" && (
+                            <span className="text-gray-400">⚪</span>
+                          )}
+                        </span>
+                        <span className="capitalize">{UserStatus}</span>
+                        <svg
+                          className="ml-1 h-3 w-3 text-muted-foreground transition-transform duration-300 group-data-[state=open]:-rotate-180"
+                          fill="none"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            d="M6 8l4 4 4-4"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="center"
+                      sideOffset={8}
+                      className={Cn(
+                        "group relative overflow-hidden",
+                        "animate-dropdown-in w-44 rounded-xl",
+                        "border border-dashed border-border/60",
+                        "bg-background/80 p-2 shadow-sm backdrop-blur-md",
+                        "transition-all duration-300",
+                        "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
+                      )}
+                    >
+                      {[
+                        {
+                          id: "online",
+                          label: "Online",
+                          icon: "🟢",
+                          color: "text-green-500",
+                        },
+                        {
+                          id: "away",
+                          label: "Away",
+                          icon: "🟡",
+                          color: "text-yellow-400",
+                        },
+                        { id: "busy", label: "Busy", icon: "🔴", color: "text-red-500" },
+                      ].map(status => (
+                        <button
+                          key={status.id}
+                          className={Cn(
+                            "flex w-full items-center gap-2 rounded-lg",
+                            "border border-transparent px-3 py-2 text-xs font-semibold",
+                            "transition-all duration-200",
+                            "hover:scale-[1.02] hover:border-primary/20 hover:bg-accent/20 active:scale-95",
+                            UserStatus === status.id
+                              ? "border-primary/30 bg-accent/25 text-primary"
+                              : "text-foreground"
+                          )}
+                          onClick={() => handleUserStatusChange(status.id)}
+                          type="button"
+                        >
+                          <span className={status.color}>{status.icon}</span>
+                          <span className="capitalize">{status.label}</span>
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <Separator className="transition-all duration-300 ease-out" />
 
                 {/* Upload Image */}
-                <div>
+                <div className="animate-fade-in flex flex-col items-center gap-3 rounded-xl border border-dashed border-accent bg-accent/10 p-4 transition-all duration-300 ease-out hover:bg-accent/20">
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={handleImageUpload}
+                    onChange={HandleImageUpload}
                     className="hidden"
                     id="profile-image-upload"
                   />
                   <Button
                     variant="outline"
-                    className="flex h-9 w-full items-center justify-center gap-2 hover:bg-accent/50"
+                    className="animate-pop-bounce flex h-10 w-full items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-300 ease-out hover:bg-accent/60 active:scale-95"
                     onClick={() =>
                       document.getElementById("profile-image-upload").click()
                     }
                   >
-                    <Upload className="h-4 w-4" />
-                    <span className="font-medium">{t("profile.uploadImage")}</span>
+                    <Upload className="h-5 w-5 transition-all duration-300 ease-out" />
+                    <span>Upload a profile image</span>
                   </Button>
+                  <span className="text-xs text-muted-foreground">
+                    PNG, JPG, .GIF, ETC, up to 50MB
+                  </span>
+                </div>
+              </div>
+
+              <div className="my-6">
+                <Separator className="transition-all duration-300 ease-out" />
+              </div>
+
+              {/* Emoji Selection */}
+              <div className="animate-fade-in space-y-4">
+                {/* Icon Tabs */}
+                <div className="mb-2 flex items-center justify-center gap-2">
+                  {EmojiCategories.map(category => (
+                    <button
+                      key={category.id}
+                      className={Cn(
+                        "group grid h-8 min-h-8 w-8 min-w-8 place-items-center rounded-full bg-transparent shadow-sm transition-all duration-300 ease-out focus:outline-none",
+                        ActiveEmojiCategoryId === category.id ? "animate-pop-bounce scale-110 ring-2 ring-primary" : "hover:scale-105 hover:bg-accent/20"
+                      )}
+                      onClick={() => SetActiveEmojiCategoryId(category.id)}
+                      type="button"
+                      aria-label={category.title}
+                    >
+                      {EmojiTabIcons[category.id]}
+                    </button>
+                  ))}
                 </div>
 
-                <Separator />
-
-                {/* Emoji Selection */}
-                <div className="space-y-3">
-                  <ScrollArea className="h-[280px] pr-4">
-                    <div className="space-y-4">
-                      {emojiCategories.map(category => (
-                        <div key={category.id} className="space-y-2">
-                          <h4 className="text-sm font-medium text-muted-foreground">
-                            {category.title}
-                          </h4>
-                          <div className="grid grid-cols-6 gap-2">
-                            {category.emojis.map((emoji, index) => (
-                              <Button
-                                key={`${category.id}-${emoji}-${index}`}
-                                variant={
-                                  selectedEmoji === emoji && !profileImage
-                                    ? "secondary"
-                                    : "ghost"
-                                }
-                                className={cn(
-                                  "h-10 text-xl transition-all duration-200",
-                                  "hover:scale-105 hover:bg-accent/80",
-                                  selectedEmoji === emoji &&
-                                    !profileImage &&
-                                    "ring-1 ring-primary"
-                                )}
-                                onClick={() => switchToEmoji(emoji)}
-                              >
-                                {emoji}
-                              </Button>
-                            ))}
-                          </div>
+                {/* Emoji Grid */}
+                <div className="animate-fade-in">
+                  {EmojiCategories
+                    .filter(category => category.id === ActiveEmojiCategoryId)
+                    .map(category => (
+                      <div key={category.id} className="space-y-2">
+                        <div className="grid grid-cols-6 gap-2">
+                          {category.emojis.map((emoji, index) => (
+                            <Button
+                              key={`${category.id}-${emoji}-${index}`}
+                              variant={
+                                SelectedEmoji === emoji && !ProfileImage
+                                  ? "secondary"
+                                  : "ghost"
+                              }
+                              className={Cn(
+                                "h-10 w-10 rounded-lg text-2xl shadow-sm transition-all duration-300 ease-out",
+                                "hover:scale-110 hover:bg-accent/80 active:scale-95",
+                                SelectedEmoji === emoji &&
+                                  !ProfileImage &&
+                                  "animate-pop-bounce ring-2 ring-primary"
+                              )}
+                              onClick={() => SwitchToEmoji(emoji)}
+                            >
+                              {emoji}
+                            </Button>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
+                      </div>
+                    ))}
                 </div>
               </div>
             </PopoverContent>
           </Popover>
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold">{getDisplayUsername()}</h2>
-              <div className="mb-1">
+            <div className="mt-4 flex flex-col items-start gap-2 px-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold leading-none text-primary">
+                  {GetDisplayUsername()}
+                </h2>
                 <UsernameDialog />
               </div>
+              <span className="text-primary-foreground mt-2 inline-block rounded-full bg-primary/80 px-4 py-1 text-xs font-semibold shadow transition-all">
+                {T("profile.memberSince", { date: JoinDate })}
+              </span>
             </div>
           </div>
         </div>
@@ -653,7 +1140,7 @@ const Profile = () => {
     );
   };
 
-  const formatPlayTime = seconds => {
+  const FormatPlayTime = seconds => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
 
@@ -663,25 +1150,24 @@ const Profile = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  const sortedGames = useMemo(() => {
-    return [...games]
-      .filter(game => game.playTime && game.playTime >= 60) // Only show games with 1+ minutes of playtime
+  const SortedGames = UseMemo(() => {
+    return [...Games]
+      .filter(game => game.playTime && game.playTime >= 60)
       .sort((a, b) => (b.playTime || 0) - (a.playTime || 0));
-  }, [games]);
+  }, [Games]);
 
-  // Calculate playtime statistics
-  const playtimeStats = useMemo(() => {
-    if (!sortedGames.length) return null;
 
-    const totalPlaytime = sortedGames.reduce(
+
+  const PlaytimeStats = UseMemo(() => {
+    if (!SortedGames.length) return null;
+
+    const totalPlaytime = SortedGames.reduce(
       (sum, game) => sum + (game.playTime || 0),
       0
     );
-    const avgPlaytime = totalPlaytime / sortedGames.length;
-    const mostPlayed = sortedGames[0];
-
-    // Calculate playtime distribution for last 5 games
-    const recentGames = sortedGames.slice(0, 5).map(game => ({
+    const avgPlaytime = totalPlaytime / SortedGames.length;
+    const mostPlayed = SortedGames[0];
+    const recentGames = SortedGames.slice(0, 5).map(game => ({
       name: game.game || game.name,
       playTime: game.playTime || 0,
       percentage: ((game.playTime || 0) / totalPlaytime) * 100,
@@ -693,10 +1179,16 @@ const Profile = () => {
       mostPlayed,
       recentGames,
     };
-  }, [sortedGames]);
+  }, [SortedGames]);
 
-  // Function to save user profile preferences to localStorage
-  const saveUserPreferences = data => {
+  const LevelProgressPercent = UseMemo(() => {
+    const denom = Stats.nextLevelXp || 0;
+    if (!denom) return 0;
+    const raw = (Stats.currentXP / denom) * 100;
+    return Math.max(0, Math.min(100, raw));
+  }, [Stats.currentXP, Stats.nextLevelXp]);
+
+  const SaveUserPreferences = data => {
     try {
       const currentPrefs = JSON.parse(localStorage.getItem("userProfile") || "{}");
       const updatedPrefs = { ...currentPrefs, ...data };
@@ -708,7 +1200,18 @@ const Profile = () => {
     }
   };
 
-  // Format date to a more readable format
+  UseEffect(() => {
+    SaveUserPreferences({ privateNotes: PrivateNotes });
+  }, [PrivateNotes]);
+
+  UseEffect(() => {
+    return () => {
+      if (TypingNotesTTTPtr.current) {
+        clearTimeout(TypingNotesTTTPtr.current);
+      }
+    };
+  }, []);
+
   const formatDate = dateString => {
     const date = new Date(dateString);
     return date.toLocaleDateString(undefined, {
@@ -721,204 +1224,583 @@ const Profile = () => {
   };
 
   return (
-    <div className="container mx-auto space-y-8 p-4">
-      {/* Banner Section */}
-      <div className="relative mt-12 h-48 overflow-hidden rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-card">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">{renderProfileSection()}</div>
+    <div className="container mx-auto space-y-6 p-4">
+      {/* Profile Header */}
+      <div
+        className={Cn(
+          "group relative mt-8 overflow-hidden rounded-2xl border border-primary/30",
+          "bg-gradient-to-br from-primary/10 via-primary/5 to-violet-500/5",
+          "p-6 transition-all",
+          "animate-fade-in motion-reduce:animate-none",
+          "hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+        )}
+      >
+        <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl transition-all group-hover:bg-primary/30" />
+        <div className="relative min-h-[13rem]">
+          <div className="absolute inset-0 flex items-center justify-start">
+            {renderProfileSection()}
+          </div>
         </div>
       </div>
 
-      {/* Profile Info Section */}
-      <div className="mx-auto max-w-2xl text-center">
-        <p className="mt-2 text-muted-foreground">
-          {t("profile.memberSince", { date: joinDate })}
-        </p>
-      </div>
+      {/* Widget Card Layout */}
+      {/* TODO: Make a proper widget system with draggable UI Interfaces */}
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+        <Card
+          style={{ animationDelay: "60ms" }}
+          className={Cn(
+            "group relative overflow-hidden rounded-xl border border-dashed border-border/60",
+            "bg-transparent",
+            "p-1 transition-all",
+            "animate-fade-in motion-reduce:animate-none",
+            "transition-all duration-300 ease-out",
+            "shadow-sm",
+            "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15",
+            "h-full"
+          )}
+        >
+          <CardHeader className="relative pb-3">
+            <CardTitle className="group flex w-full items-center justify-start gap-2 text-left">
+              <Sparkles className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+              <span className="transition-colors duration-300 ease-out group-hover:text-primary">
+                {T("profile.stats") || "Stats"}
+              </span>
+            </CardTitle>
+          </CardHeader>
 
-      {/* Stats Overview */}
-      <div className="grid gap-6">
-        {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-border bg-card/50 backdrop-blur">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {t("profile.totalPlaytime")}
-              </CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {playtimeStats ? formatPlayTime(playtimeStats.totalPlaytime) : "0h"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("profile.acrossGames", { count: sortedGames.length })}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card/50 backdrop-blur">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {t("profile.avgSession")}
-              </CardTitle>
-              <Timer className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {playtimeStats ? formatPlayTime(playtimeStats.avgPlaytime) : "0h"}
-              </div>
-              <p className="text-xs text-muted-foreground">{t("profile.perGameAvg")}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card/50 backdrop-blur">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {t("profile.mostPlayed")}
-              </CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="truncate text-2xl font-bold">
-                {playtimeStats?.mostPlayed
-                  ? playtimeStats.mostPlayed.game || playtimeStats.mostPlayed.name
-                  : "-"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {playtimeStats?.mostPlayed
-                  ? formatPlayTime(playtimeStats.mostPlayed.playTime)
-                  : t("profile.noGames")}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Level Progress */}
-        <LevelingCard
-          level={stats.level}
-          currentXP={stats.currentXP}
-          nextLevelXp={stats.nextLevelXp}
-          totalXP={stats.xp}
-        />
-
-        {/* Playtime Distribution */}
-        {playtimeStats && playtimeStats.recentGames.length > 0 && (
-          <Card className="col-span-full border-border bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle>{t("profile.topGames")}</CardTitle>
-              <CardDescription>{t("profile.playTimeDistribution")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {playtimeStats.recentGames.map(game => (
-                  <div key={game.name} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex-1 truncate font-medium">{game.name}</span>
-                      <span className="text-muted-foreground">
-                        {formatPlayTime(game.playTime)}
+          <CardContent className="relative flex h-full flex-col">
+            <div className="flex flex-1 flex-col gap-4">
+              <div
+                className={Cn(
+                  "group rounded-lg border-2 border-border bg-background/5 p-4 backdrop-blur-md",
+                  "transition-all duration-300 ease-out",
+                  "hover:bg-background/10"
+                )}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <Sparkles className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+                      <span className="transition-colors duration-300 ease-out group-hover:text-primary">
+                        {T("profile.level") || "Level"}
                       </span>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${game.percentage}%` }}
-                      />
+                    <div className="text-sm font-bold text-primary">{Stats.level}</div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {Math.min(Stats.currentXP, Stats.nextLevelXp)} /{" "}
+                        {Stats.nextLevelXp} XP
+                      </span>
+                      <span>{Math.round(LevelProgressPercent)}%</span>
+                    </div>
+                    <Progress value={LevelProgressPercent} className="h-2 bg-muted/40" />
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid gap-2 text-left text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="group flex items-center gap-2 text-muted-foreground">
+                        <Clock className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
+                        {T("profile.totalPlaytime")}
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {PlaytimeStats
+                          ? FormatPlayTime(PlaytimeStats.totalPlaytime)
+                          : "0h"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="group flex items-center gap-2 text-muted-foreground">
+                        <Trophy className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
+                        {T("profile.gamesPlayed")}
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {Stats.gamesPlayed}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        {T("profile.mostPlayed")}
+                      </span>
+                      <span className="max-w-[160px] truncate text-left font-semibold text-foreground">
+                        {PlaytimeStats?.mostPlayed
+                          ? PlaytimeStats.mostPlayed.game || PlaytimeStats.mostPlayed.name
+                          : "-"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="group flex items-center gap-2 text-muted-foreground">
+                        <Cpu className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+                        XP
+                      </span>
+                      <span className="font-semibold text-foreground">{Stats.xp}</span>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Games List */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">{t("profile.games")}</h2>
-            <span className="text-sm text-muted-foreground">
-              {sortedGames.length} {t("profile.gamesPlayed")}
-            </span>
-          </div>
-          <ScrollArea className="pr-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {sortedGames.map(game => {
-                const gameId = game.game || game.name;
-                return (
+              <div
+                className={Cn(
+                  "group rounded-lg border-2 border-border bg-background/5 p-4 backdrop-blur-md",
+                  "transition-all duration-300 ease-out",
+                  "hover:bg-background/10"
+                )}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-start gap-2 text-left text-sm font-semibold">
+                    <Smile className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+                    <span>{T("profile.privateNotes") || "Private Notes"}</span>
+                  </div>
+
                   <div
-                    key={gameId}
-                    className="group flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3 backdrop-blur transition-all hover:bg-accent/50"
+                    className={Cn(
+                      "relative overflow-hidden rounded-md",
+                      "transition-all duration-300 ease-out",
+                      "hover:ring-1 hover:ring-primary/15",
+                      "focus-within:ring-2 focus-within:ring-primary/30",
+                      IsTypingNotes && "ring-2 ring-primary/30"
+                    )}
                   >
-                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md">
-                      <img
-                        src={gameImages[gameId]}
-                        alt={gameId}
-                        className="h-full w-full object-cover"
-                      />
+                    <div
+                      className={Cn(
+                        "pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-300 ease-out",
+                        IsTypingNotes && "opacity-100"
+                      )}
+                    >
+                      <div className="via-primary/12 absolute inset-0 animate-shine bg-gradient-to-r from-primary/0 to-primary/0 bg-[length:200%_100%] mix-blend-soft-light motion-reduce:animate-none" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-medium text-foreground">{gameId}</h3>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          {game.playTime !== undefined
-                            ? game.playTime < 120
-                              ? `1 ${t("library.minute")}`
-                              : game.playTime < 3600
-                                ? `${Math.floor(game.playTime / 60)} ${t("library.minutes")}`
-                                : game.playTime < 7200
-                                  ? `1 ${t("library.hour")}`
-                                  : `${Math.floor(game.playTime / 3600)} ${t("library.hours")}`
-                            : t("library.neverPlayed")}
+
+                    <Textarea
+                      value={PrivateNotes}
+                      onChange={e => {
+                        const nextValue = e.target.value;
+                        SetPrivateNotes(nextValue);
+
+                        SetIsTypingNotes(true);
+                        if (TypingNotesTTTPtr.current) {
+                          clearTimeout(TypingNotesTTTPtr.current);
+                        }
+                        TypingNotesTTTPtr.current = setTimeout(() => {
+                          SetIsTypingNotes(false);
+                        }, 350);
+                      }}
+                      placeholder={
+                        T("profile.privateNotesPlaceholder") ||
+                        "Notes for this device (private)..."
+                      }
+                      className={Cn(
+                        "relative z-10 min-h-[110px] resize-none",
+                        "bg-background/50 backdrop-blur",
+                        "cursor-text caret-primary selection:bg-primary/20",
+                        "transition-colors duration-200 ease-out",
+                        "focus-visible:outline-none"
+                      )}
+                    />
+                  </div>
+                  <div className="text-center text-xs text-muted-foreground">
+                    {T("profile.savedLocally") || "Saved locally"}
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-start gap-2 text-left text-sm font-semibold">
+                      <Monitor className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+                      <span className="transition-colors duration-300 ease-out group-hover:text-primary">
+                        {T("profile.device") || "Device"}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-2 text-left text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="group flex items-center gap-2 text-muted-foreground">
+                          <Monitor className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
+                          {T("profile.platform") || "Platform"}
+                        </span>
+                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                          {DeviceInfo.platform || "Unknown"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="group flex items-center gap-2 text-muted-foreground">
+                          <HardDrive className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
+                          {T("profile.os") || "OS"}
+                        </span>
+                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                          {DeviceInfo.os || "Unknown"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="group flex items-center gap-2 text-muted-foreground">
+                          <Cpu className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
+                          {T("profile.cpu") || "CPU"}
+                        </span>
+                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                          {DeviceInfo.cpu || "Unknown"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="group flex items-center gap-2 text-muted-foreground">
+                          <HardDrive className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
+                          {T("profile.ram") || "RAM"}
+                        </span>
+                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                          {DeviceInfo.ram || "Unknown"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="group flex items-center gap-2 text-muted-foreground">
+                          <Monitor className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
+                          {T("profile.gpu") || "GPU"}
+                        </span>
+                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                          {DeviceInfo.gpu || "Unknown"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="group flex items-center gap-2 text-muted-foreground">
+                          <Sparkles className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
+                          {T("profile.directX") || "DirectX"}
+                        </span>
+                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                          {DeviceInfo.directx || "Unknown"}
                         </span>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* Download History */}
-        <div className="mt-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">
-              {t("profile.downloadHistory") || "Download History"}
-            </h2>
-          </div>
-          <ScrollArea className="h-[200px] pr-4">
-            <div className="space-y-3">
-              {downloadHistory.length > 0 ? (
-                downloadHistory.map((item, index) => (
-                  <div
-                    key={`${item.game}-${index}`}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3 backdrop-blur transition-all hover:bg-accent/50"
-                  >
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <FileDown className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-medium text-foreground">
-                        {item.game}
-                      </h3>
-                      <div className="text-xs text-muted-foreground">
-                        {formatDate(item.timestamp)}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <Archive className="mb-2 h-10 w-10 text-muted-foreground/50" />
-                  <h3 className="text-lg font-medium">No download history yet</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your game download history will appear here
-                  </p>
                 </div>
-              )}
+              </div>
+
+              <div
+                className={Cn(
+                  "group flex flex-col rounded-lg border-2 border-border bg-background/5 p-4 backdrop-blur-md",
+                  "transition-all duration-300 ease-out",
+                  "hover:bg-background/10"
+                )}
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <Trophy className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+                      <span className="transition-colors duration-300 ease-out group-hover:text-primary">
+                        {T("profile.achievements") || "Achievements"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {IsLoadingAchievementsLeaderboard
+                        ? T("profile.loading") || "Loading..."
+                        : AchievementsLeaderboard.length > 0
+                          ? (T("profile.topN", {
+                              count: Math.min(AchievementsLeaderboard.length, 6),
+                            }) || `Top ${Math.min(AchievementsLeaderboard.length, 6)}`)
+                          : T("profile.none") || "None"}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 items-end gap-3">
+                    {(() => {
+                      const second = AchievementsLeaderboard[1] || null;
+                      const first = AchievementsLeaderboard[0] || null;
+                      const third = AchievementsLeaderboard[2] || null;
+
+                      const runner4 = AchievementsLeaderboard[3] || null;
+                      const runner5 = AchievementsLeaderboard[4] || null;
+                      const runner6 = AchievementsLeaderboard[5] || null;
+
+                      const Column = ({ FirstPlace, topEntry, runnerRank, runnerEntry, emphasize }) => {
+                        const showRunner = true;
+
+                        return (
+                          <div
+                            className={Cn(
+                              "flex flex-col overflow-hidden rounded-lg border border-dashed border-border/70",
+                              "bg-transparent",
+                              "transition-all duration-300 ease-out",
+                              "hover:border-primary/30 hover:ring-1 hover:ring-primary/10"
+                            )}
+                          >
+                            <div
+                              className={Cn(
+                                "flex flex-col items-center justify-end px-2 py-2 text-center",
+                                emphasize ? "min-h-[92px]" : "min-h-[76px]"
+                              )}
+                            >
+                              <div
+                                className={Cn(
+                                  "text-xs font-semibold text-muted-foreground",
+                                  emphasize && "text-sm"
+                                )}
+                              >
+                                #{FirstPlace}
+                              </div>
+                              <div
+                                className={Cn(
+                                  "mt-1 w-full truncate font-semibold text-foreground",
+                                  emphasize ? "text-sm" : "text-xs"
+                                )}
+                                title={topEntry?.gameName || ""}
+                              >
+                                {topEntry?.gameName || "—"}
+                              </div>
+                              <div
+                                className={Cn(
+                                  "mt-1 text-xs text-muted-foreground",
+                                  emphasize && "text-[0.7rem]"
+                                )}
+                              >
+                                {topEntry ? `${topEntry.unlocked}/${topEntry.total}` : " "}
+                              </div>
+                            </div>
+
+                            {showRunner ? (
+                              <div className="border-t border-dashed border-border/70 px-2 py-2">
+                                <div className="text-[0.7rem] font-semibold text-muted-foreground">
+                                  #{runnerRank}
+                                </div>
+                                <div
+                                  className="mt-1 truncate text-xs font-semibold text-foreground"
+                                  title={runnerEntry?.gameName || ""}
+                                >
+                                  {runnerEntry?.gameName || "—"}
+                                </div>
+                                <div className="mt-1 text-[0.7rem] text-muted-foreground">
+                                  {runnerEntry
+                                    ? `${runnerEntry.unlocked}/${runnerEntry.total}`
+                                    : " "}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <>
+                          <Column
+                            FirstPlace={2}
+                            topEntry={second}
+                            runnerRank={4}
+                            runnerEntry={runner4}
+                            emphasize={false}
+                          />
+                          <Column
+                            FirstPlace={1}
+                            topEntry={first}
+                            runnerRank={5}
+                            runnerEntry={runner5}
+                            emphasize={true}
+                          />
+                          <Column
+                            FirstPlace={3}
+                            topEntry={third}
+                            runnerRank={6}
+                            runnerEntry={runner6}
+                            emphasize={false}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="mt-3 text-center text-xs text-muted-foreground opacity-60">
+                    {"Powered by Coffee"}
+                  </div>
+                </div>
+              </div>
             </div>
-          </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Widget Style Cards I guess */}
+        {/* TODO: Make a Proper Widget System Where You can add, move, and remove widgets */}
+        <div className="grid gap-6">
+          <Card
+            style={{ animationDelay: "110ms" }}
+            className={Cn(
+              "group relative overflow-hidden rounded-xl border border-dashed border-border/60",
+              "bg-transparent",
+              "p-1 transition-all",
+              "animate-fade-in motion-reduce:animate-none",
+              "transition-all duration-300 ease-out",
+              "shadow-sm",
+              "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
+            )}
+          >
+            <CardHeader className="relative pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="group flex items-center justify-start gap-2 text-left">
+                  <Gamepad2 className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+                  <span className="transition-colors duration-300 ease-out group-hover:text-primary">
+                    {T("profile.games")}
+                  </span>
+                </CardTitle>
+                <span className="text-sm text-muted-foreground">
+                  {SortedGames.length} {T("profile.gamesPlayed")}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="relative">
+              <ScrollArea className="h-[360px] pr-4">
+                {SortedGames.length > 0 ? (
+                  <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {SortedGames.map(game => {
+                      const gameId = game.game || game.name;
+                      return (
+                        <div
+                          key={gameId}
+                          className={Cn(
+                            "group flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
+                            "backdrop-blur",
+                            "transition-all duration-300 ease-out",
+                            "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm"
+                          )}
+                        >
+                          <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted/30">
+                            {GameImages[gameId] ? (
+                              <img
+                                src={GameImages[gameId]}
+                                alt={gameId}
+                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-left font-medium text-foreground transition-colors duration-300 ease-out group-hover:text-primary">
+                              {gameId}
+                            </h3>
+                            <div className="flex items-center justify-start gap-2 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+                              <span>
+                                {game.playTime !== undefined
+                                  ? game.playTime < 120
+                                    ? `1 ${T("library.minute")}`
+                                    : game.playTime < 3600
+                                      ? `${Math.floor(game.playTime / 60)} ${T("library.minutes")}`
+                                      : game.playTime < 7200
+                                        ? `1 ${T("library.hour")}`
+                                        : `${Math.floor(game.playTime / 3600)} ${T("library.hours")}`
+                                  : T("library.neverPlayed")}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="group flex min-h-[360px] flex-col items-center justify-center text-center">
+                    <Gamepad2 className="relative z-10 mb-2 h-10 w-10 text-muted-foreground/50 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+                    <h3 className="relative z-10 text-lg font-semibold">
+                      <span className="relative inline-block">
+                        <span className="transition-opacity duration-200 ease-out group-hover:opacity-0">
+                          {T("profile.noGames") || "No Games"}
+                        </span>
+                        <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100">
+                          <span className="block bg-gradient-to-r from-primary via-primary/70 to-foreground bg-[length:200%_100%] bg-clip-text text-transparent group-hover:animate-shine">
+                            {T("profile.noGames") || "No Games"}
+                          </span>
+                        </span>
+                      </span>
+                    </h3>
+                    <p className="relative z-10 text-sm text-muted-foreground">
+                      {T("profile.noGamesDesc") || "Play a game to see it here"}
+                    </p>
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card
+            style={{ animationDelay: "160ms" }}
+            className={Cn(
+              "group relative overflow-hidden rounded-xl border border-dashed border-border/60",
+              "bg-transparent",
+              "p-1 transition-all",
+              "animate-fade-in motion-reduce:animate-none",
+              "transition-all duration-300 ease-out",
+              "shadow-sm",
+              "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
+            )}
+          >
+            <CardHeader className="relative pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="group flex items-center justify-start gap-2 text-left">
+                  <FileDown className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+                  <span className="transition-colors duration-300 ease-out group-hover:text-primary">
+                    {T("profile.downloadHistory") || "Download History"}
+                  </span>
+                </CardTitle>
+                <span className="text-sm text-muted-foreground">
+                  {DownloadHistory.length}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="relative">
+              <ScrollArea className="h-[360px] pr-4">
+                <div className="mx-auto w-full max-w-6xl space-y-3">
+                  {DownloadHistory.length > 0 ? (
+                    DownloadHistory.map((item, index) => (
+                      <div
+                        key={`${item.game}-${index}`}
+                        className={Cn(
+                          "group flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
+                          "backdrop-blur",
+                          "transition-all duration-300 ease-out",
+                          "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm"
+                        )}
+                      >
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+                          <FileDown className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-left font-medium text-foreground transition-colors duration-300 ease-out group-hover:text-primary">
+                            {item.game}
+                          </h3>
+                          <div className="text-left text-xs text-muted-foreground">
+                            {formatDate(item.timestamp)}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="group flex min-h-[360px] flex-col items-center justify-center text-center">
+                      <Archive className="relative z-10 mb-2 h-10 w-10 text-muted-foreground/50 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+                      <h3 className="relative z-10 text-lg font-semibold">
+                        <span className="relative inline-block">
+                          <span className="transition-opacity duration-200 ease-out group-hover:opacity-0">
+                            {T("profile.noDownloadHistory") || "No download history yet"}
+                          </span>
+                          <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100">
+                            <span className="block bg-gradient-to-r from-primary via-primary/70 to-foreground bg-[length:200%_100%] bg-clip-text text-transparent group-hover:animate-shine">
+                              {T("profile.noDownloadHistory") ||
+                                "No download history yet"}
+                            </span>
+                          </span>
+                        </span>
+                      </h3>
+                      <p className="relative z-10 text-sm text-muted-foreground">
+                        {T("profile.noDownloadHistoryDesc") ||
+                          "Your game download history will appear here"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

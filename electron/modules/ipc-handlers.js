@@ -570,6 +570,146 @@ function registerMiscHandlers() {
     }
   });
 
+  // Compute achievements leaderboard (main process)
+  // Expects games as an array of strings or objects: { gameName|game, isCustom }
+  // Returns ranked entries: { gameName, unlocked, total, percentage }
+  ipcMain.handle(
+    "get-achievements-leaderboard",
+    async (_, games = [], options = {}) => {
+      try {
+        const limit =
+          typeof options?.limit === "number" && Number.isFinite(options.limit)
+            ? Math.max(1, Math.floor(options.limit))
+            : 6;
+
+        if (!Array.isArray(games) || games.length === 0) return [];
+
+        // Reuse the existing achievements reader via a local invoke-style call.
+        // We intentionally call the underlying IPC handler logic by invoking the same
+        // reader through ipcMain's handler directly is not supported, so we replicate
+        // the minimal read logic here.
+        const settings = settingsManager.getSettings();
+        if (!settings.downloadDirectory || !settings.additionalDirectories) {
+          return [];
+        }
+
+        const allDirectories = [
+          settings.downloadDirectory,
+          ...settings.additionalDirectories,
+        ];
+
+        const readAchievements = async (gameName, isCustom) => {
+          if (!gameName) return null;
+
+          if (!isCustom) {
+            for (const directory of allDirectories) {
+              const achievementsPath = path.join(
+                directory,
+                gameName,
+                "achievements.ascendara.json"
+              );
+              if (fs.existsSync(achievementsPath)) {
+                try {
+                  const data = fs.readFileSync(achievementsPath, "utf8");
+                  const parsed = JSON.parse(data);
+
+                  if (parsed.achievementWater && !parsed.watcher) {
+                    parsed.watcher = parsed.achievementWater;
+                    delete parsed.achievementWater;
+                    fs.writeFileSync(
+                      achievementsPath,
+                      JSON.stringify(parsed, null, 4),
+                      "utf8"
+                    );
+                  }
+
+                  return parsed;
+                } catch (error) {
+                  console.error("Error reading achievements file:", error);
+                  return null;
+                }
+              }
+            }
+            return null;
+          }
+
+          // Custom game: stored in games.json (achievementWatcher) or alongside executable
+          try {
+            const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+            const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+            const gameInfo = gamesData.games.find(g => g.game === gameName);
+
+            if (gameInfo) {
+              if (gameInfo.achievementWater && !gameInfo.achievementWatcher) {
+                gameInfo.achievementWatcher = gameInfo.achievementWater;
+                delete gameInfo.achievementWater;
+                fs.writeFileSync(
+                  gamesFilePath,
+                  JSON.stringify(gamesData, null, 4),
+                  "utf8"
+                );
+              }
+
+              if (gameInfo.achievementWatcher) {
+                return gameInfo.achievementWatcher;
+              }
+
+              if (gameInfo.executable) {
+                const achievementsPath = path.join(
+                  path.dirname(gameInfo.executable),
+                  "achievements.ascendara.json"
+                );
+                if (fs.existsSync(achievementsPath)) {
+                  return JSON.parse(fs.readFileSync(achievementsPath, "utf8"));
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error reading games.json:", error);
+          }
+
+          return null;
+        };
+
+        const entries = await Promise.all(
+          games.map(async g => {
+            const gameName =
+              typeof g === "string" ? g : g?.gameName || g?.game || g?.name;
+            const isCustom = typeof g === "object" ? !!g?.isCustom : false;
+
+            const achievementData = await readAchievements(gameName, isCustom);
+            const list = achievementData?.achievements;
+            if (!Array.isArray(list) || list.length === 0) return null;
+
+            const unlocked = list.filter(a => !!(a?.achieved || a?.unlocked || a?.isUnlocked))
+              .length;
+            const total = list.length;
+
+            return {
+              gameName,
+              unlocked,
+              total,
+              percentage: total > 0 ? Math.round((unlocked / total) * 100) : 0,
+            };
+          })
+        );
+
+        return entries
+          .filter(Boolean)
+          .sort((a, b) => {
+            if (b.unlocked !== a.unlocked) return b.unlocked - a.unlocked;
+            if (b.percentage !== a.percentage) return b.percentage - a.percentage;
+            if (b.total !== a.total) return b.total - a.total;
+            return String(a.gameName).localeCompare(String(b.gameName));
+          })
+          .slice(0, limit);
+      } catch (error) {
+        console.error("Error computing achievements leaderboard:", error);
+        return [];
+      }
+    }
+  );
+
   // Write game achievements (for cloud restore)
   // isCustom parameter tells us if this is a custom game (stored in games.json)
   ipcMain.handle(
