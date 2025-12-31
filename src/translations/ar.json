@@ -430,7 +430,8 @@
       "topGames": "أفضل الألعاب",
       "totalPlaytime": "إجمالي وقت اللعب",
       "totalXP": "إجمالي XP",
-      "xp": "XP"
+      "xp": "XP",
+      "yourLevel": "مستواك"
     },
     "report": {
       "details": "تفاصيل",
@@ -683,7 +684,7 @@
       "downloadOptions": "خيارات التنزيل",
       "downloadSource": "تحميل المصدر",
       "downloadTorrent": "تحميل تورنت",
-      "downloading": "جاري التحميل",
+      "downloading": "جارٍ التنزيل",
       "getExtension": "ليس لديك التمديد؟ احصل عليه لمتصفح Chrome أو Firefox",
       "handlerInstructions": {
         "step1": "افتح الرابط في متصفحك وقم بتمكين الامتداد",
@@ -863,16 +864,23 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "إلغاء وحذف",
+      "killDownload": "تحميل قتل",
+      "killDownloadDescription": "سيؤدي هذا إلى إيقاف التنزيل نهائيًا وحذف جميع الملفات التي تم تنزيلها. لا يمكن التراجع عن هذا الإجراء.",
+      "killDownloadTitle": "هل تريد إيقاف التنزيل لـ {{gameName}}؟",
       "legacyGameVerification": "التحقق من الملفات متاح فقط للألعاب التي تم تنزيلها بعد الإصدار 8.1.2 من Ascendara",
       "openFolder": "افتح المجلد",
-      "retryDownload": "أعد محاولة التنزيل",
-      "stopAndDelete": "إيقاف وحذف المحتويات",
-      "stopDownload": "توقف عن التنزيل",
-      "stopDownloadDescription": "هل أنت متأكد أنك تريد إيقاف هذا التنزيل؟ يمكنك اختيار الاحتفاظ بالمحتويات التي تم تنزيلها أو حذفها.",
-      "stopDownloadTitle": "هل تريد إيقاف تنزيل {{gameName}}؟"
+      "pauseDownload": "وقفة التحميل",
+      "resumeDownload": "استئناف التنزيل",
+      "retryDownload": "أعد محاولة التنزيل"
     },
     "activeDownloads": "تحميل العاب",
     "alreadyReported": "تم الإبلاغ عنها بالفعل",
+    "ascendRequired": {
+      "description": "لديك بالفعل عملية تنزيل قيد التقدم. هل تريد تنزيل ألعاب متعددة في وقت واحد؟",
+      "learnMore": "انضم إلى الصعود",
+      "suggestion": "انضم إلى Ascend لفتح عدد غير محدود من التنزيلات المتزامنة ودعم المطور المنفرد وراء Ascendara. أو قم بإيقاف التنزيل الحالي مؤقتًا أولاً لبدء هذا التنزيل.",
+      "title": "تحميل العاب متعددة في وقت واحد"
+    },
     "completed": "اكتمل التنزيل",
     "completedDescription": "تم الانتهاء من تنزيل لعبتك وأصبحت جاهزة للعب",
     "connectionBrokenError": "تمت مقاطعة اتصال التنزيل. حاول تمكين تنزيل التدفق الفردي في تفضيلات Ascendara للحصول على تنزيل أكثر استقرارًا.",
@@ -880,10 +888,14 @@
     "contentTypeError": "أبلغ برنامج التنزيل عن خطأ في نوع المحتوى. هذا يعني على الأرجح أن رابط التنزيل قد انتهت صلاحيته.",
     "currentTotalSpeed": "السرعة الإجمالية الحالية",
     "downloadError": "خطأ في التنزيل",
-    "downloading": "جاري التحميل",
+    "downloading": "جارٍ التنزيل",
     "downloadsInProgress": "{{count}} التنزيل قيد التقدم",
     "errorReported": "تم الإبلاغ عن المشكلة بنجاح",
     "errorReportedDescription": "شكرًا لك على المساعدة في تحسين Ascendara. سيقوم فريق مطوري Ascendara بالتحقيق في هذه المشكلة.",
+    "errors": {
+      "killFailed": "فشل في قتل التنزيل",
+      "pauseFailed": "فشل في إيقاف التنزيل مؤقتًا"
+    },
     "extracting": "استخراج ملفات اللعبة...",
     "extractingDescription": "قد يستغرق استخراج ملفات اللعبة ما يصل إلى 30 دقيقة حسب حجم الملف.",
     "firstTimeDownload": {
@@ -891,21 +903,28 @@
       "title": "جاري التحميل على Ascendara",
       "understand": "أفهم"
     },
+    "killSuccess": "تحميل قتل وحذف الملفات",
     "largeFileNotice": "هذا الملف أكبر من الملفات الأخرى ويستغرق استخراجه وقتًا أطول...",
     "limitedTo": "يقتصر على",
     "noDownloads": "حسنًا ، هذا مريح ...",
     "noDownloadsMessage": "أنت لا تقوم بتنزيل أي شيء الآن، ابدأ التنزيل لتتبع تقدمه هنا.",
     "noFilesError": "لم يتمكن برنامج التنزيل من العثور على أي ملفات لتنزيلها. هذا يعني على الأرجح أنه تمت إزالة الملف من المصدر.",
     "noSpaceLeftError": "لا توجد مساحة متبقية على الجهاز. الرجاء تحرير مساحة القرص لمواصلة التنزيل.",
+    "pauseSuccess": "تم إيقاف التنزيل مؤقتًا بنجاح",
     "preparingExtraction": "تحضير استخراج...",
     "queuedCount": "{{count}} في قائمة الانتظار",
     "queuedDownloadStarted": "بدء التنزيل في قائمة الانتظار: {{name}}",
     "queuedDownloads": "التنزيلات في قائمة الانتظار",
+    "resumeError": "فشل في استئناف التنزيل",
+    "resumeErrorDescription": "لا يمكن استئناف التنزيل. ربما انتهت صلاحية رابط التنزيل أو أن البيانات المخزنة مؤقتًا مفقودة.",
+    "resumeSuccess": "تم استئناف التنزيل",
+    "resuming": "استئناف التنزيل",
+    "resumingDescription": "جارٍ إعادة تشغيل عملية التنزيل...",
     "retryDataNotAvailable": "إعادة المحاولة البيانات غير متوفرة. سيتم حذف التنزيل وسيتعين عليك إعادة تشغيل التنزيل يدويًا.",
     "speedHistory": "سرعات التنزيل",
     "startingSoon": "البدء قريبا...",
     "stopped": "التحميل متوقف",
-    "stoppedDescription": "لقد تم إيقاف التنزيل. يمكنك إما إعادة تشغيل التنزيل أو حذفه.",
+    "stoppedDescription": "لقد تم إيقاف التنزيل. انقر فوق \"استئناف\" للمتابعة من حيث توقفت.",
     "updating": "جارٍ تحديث اللعبة...",
     "verificationFailed": "فشل التحقق من الملفات",
     "verificationFailed1": "فشل التحقق من الملف {{numFailed}}.",
@@ -1832,7 +1851,7 @@
     "download_stopped_desc": "تم إيقاف تنزيل {{name}}.",
     "download_to_pc": "تحميل على جهاز الكمبيوتر",
     "downloaded": "تم التنزيل",
-    "downloading": "جاري التحميل",
+    "downloading": "جارٍ التنزيل",
     "downloads": "التنزيلات",
     "error_deleting_download": "حدث خطأ أثناء حذف التنزيل",
     "error_downloading_to_pc": "حدث خطأ أثناء التنزيل على جهاز الكمبيوتر",

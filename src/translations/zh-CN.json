@@ -430,7 +430,8 @@
       "topGames": "热门游戏",
       "totalPlaytime": "总游戏时间",
       "totalXP": "总经验值",
-      "xp": "XP"
+      "xp": "XP",
+      "yourLevel": "你的水平"
     },
     "report": {
       "details": "细节",
@@ -863,16 +864,23 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "取消并删除",
+      "killDownload": "杀下载",
+      "killDownloadDescription": "这将永久停止下载并删除所有下载的文件。此操作无法撤消。",
+      "killDownloadTitle": "终止下载 {{gameName}}？",
       "legacyGameVerification": "文件验证仅适用于 Ascendara 8.1.2 版本之后下载的游戏",
       "openFolder": "打开文件夹",
-      "retryDownload": "重试下载",
-      "stopAndDelete": "停止并删除内容",
-      "stopDownload": "停止下载",
-      "stopDownloadDescription": "您确定要停止此下载吗？您可以选择保留或删除已下载的内容。",
-      "stopDownloadTitle": "停止下载{{gameName}}？"
+      "pauseDownload": "暂停下载",
+      "resumeDownload": "简历下载",
+      "retryDownload": "重试下载"
     },
     "activeDownloads": "下载游戏",
     "alreadyReported": "已举报",
+    "ascendRequired": {
+      "description": "您已经有一个下载正在进行中。想要一次下载多个游戏？",
+      "learnMore": "加入奥升德",
+      "suggestion": "加入 Ascend，解锁无限同时下载并支持 Ascendara 背后的独立开发者。或者先暂停当前的下载以开始此下载。",
+      "title": "一次下载多个游戏"
+    },
     "completed": "下载完成",
     "completedDescription": "您的游戏已下载完成并可以玩",
     "connectionBrokenError": "下载连接已中断。尝试在 Ascendara 首选项中启用单流下载以获得更稳定的下载。",
@@ -884,6 +892,7 @@
     "downloadsInProgress": "{{count}}正在下载",
     "errorReported": "问题报告成功",
     "errorReportedDescription": "感谢您帮助改进 Ascendara。 Ascendara 开发团队将调查此问题。",
+    "errors": { "killFailed": "杀掉下载失败", "pauseFailed": "暂停下载失败" },
     "extracting": "正在提取游戏文件...",
     "extractingDescription": "提取游戏文件可能需要长达 30 分钟的时间，具体取决于文件大小。",
     "firstTimeDownload": {
@@ -891,21 +900,28 @@
       "title": "在 Ascendara 上下载",
       "understand": "我明白"
     },
+    "killSuccess": "下载被终止并且文件被删除",
     "largeFileNotice": "该文件比其他文件大，并且提取时间较长...",
     "limitedTo": "仅限于",
     "noDownloads": "嗯，这样很放松...",
     "noDownloadsMessage": "您现在没有下载任何内容，请在此处开始下载以跟踪其进度。",
     "noFilesError": "下载器找不到任何要下载的文件。这很可能意味着该文件已从源中删除。",
     "noSpaceLeftError": "设备上没有剩余空间。请释放磁盘空间以继续下载。",
+    "pauseSuccess": "下载暂停成功",
     "preparingExtraction": "准备提取...",
     "queuedCount": "{{count}} 已排队",
     "queuedDownloadStarted": "开始排队下载：{{name}}",
     "queuedDownloads": "排队下载",
+    "resumeError": "恢复下载失败",
+    "resumeErrorDescription": "无法继续下载。下载链接可能已过期或缓存的数据丢失。",
+    "resumeSuccess": "下载已恢复",
+    "resuming": "恢复下载",
+    "resumingDescription": "正在重新启动下载过程...",
     "retryDataNotAvailable": "重试数据不可用。下载将被删除，您必须手动重新启动下载。",
     "speedHistory": "下载速度",
     "startingSoon": "即将开始...",
     "stopped": "下载已停止",
-    "stoppedDescription": "下载已停止。您可以重新启动或删除下载。",
+    "stoppedDescription": "下载已停止。单击“继续”从中断处继续。",
     "updating": "正在更新游戏...",
     "verificationFailed": "文件验证失败",
     "verificationFailed1": "{{numFailed}} 文件验证失败",

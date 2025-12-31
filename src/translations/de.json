@@ -430,7 +430,8 @@
       "topGames": "Top-Spiele",
       "totalPlaytime": "Gesamtspielzeit",
       "totalXP": "Gesamt-XP",
-      "xp": "XP"
+      "xp": "XP",
+      "yourLevel": "Dein Level"
     },
     "report": {
       "details": "Einzelheiten",
@@ -863,16 +864,23 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "Abbrechen und löschen",
+      "killDownload": "Download beenden",
+      "killDownloadDescription": "Dadurch wird der Download dauerhaft gestoppt und alle heruntergeladenen Dateien gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "killDownloadTitle": "Download für {{gameName}} beenden?",
       "legacyGameVerification": "Die Dateiüberprüfung ist nur für Spiele verfügbar, die nach Ascendara Version 8.1.2 heruntergeladen wurden",
       "openFolder": "Ordner öffnen",
-      "retryDownload": "Versuchen Sie den Download erneut",
-      "stopAndDelete": "Inhalte stoppen und löschen",
-      "stopDownload": "Stoppen Sie den Download",
-      "stopDownloadDescription": "Möchten Sie diesen Download wirklich stoppen? Sie können die heruntergeladenen Inhalte behalten oder löschen.",
-      "stopDownloadTitle": "Herunterladen von {{gameName}} beenden?"
+      "pauseDownload": "Download anhalten",
+      "resumeDownload": "Download fortsetzen",
+      "retryDownload": "Versuchen Sie den Download erneut"
     },
     "activeDownloads": "Spiele herunterladen",
     "alreadyReported": "Bereits gemeldet",
+    "ascendRequired": {
+      "description": "Sie haben bereits einen Download im Gange. Möchten Sie mehrere Spiele gleichzeitig herunterladen?",
+      "learnMore": "Treten Sie Ascend bei",
+      "suggestion": "Treten Sie Ascend bei, um unbegrenzte gleichzeitige Downloads freizuschalten und den Solo-Entwickler hinter Ascendara zu unterstützen. Oder unterbrechen Sie zunächst Ihren aktuellen Download, um diesen zu starten.",
+      "title": "Laden Sie mehrere Spiele gleichzeitig herunter"
+    },
     "completed": "Download abgeschlossen",
     "completedDescription": "Der Download Ihres Spiels ist abgeschlossen und Sie können es spielen",
     "connectionBrokenError": "Die Download-Verbindung wurde unterbrochen. Versuchen Sie, den Single-Stream-Download in den Ascendara-Einstellungen zu aktivieren, um einen stabileren Download zu gewährleisten.",
@@ -884,6 +892,10 @@
     "downloadsInProgress": "{{count}} Download läuft",
     "errorReported": "Problem erfolgreich gemeldet",
     "errorReportedDescription": "Vielen Dank, dass Sie dabei geholfen haben, Ascendara zu verbessern. Das Ascendara-Entwicklerteam wird dieses Problem untersuchen.",
+    "errors": {
+      "killFailed": "Der Download konnte nicht beendet werden",
+      "pauseFailed": "Der Download konnte nicht angehalten werden"
+    },
     "extracting": "Spieledateien werden extrahiert...",
     "extractingDescription": "Das Extrahieren von Spieledateien kann je nach Dateigröße bis zu 30 Minuten dauern.",
     "firstTimeDownload": {
@@ -891,21 +903,28 @@
       "title": "Herunterladen auf Ascendara",
       "understand": "Ich verstehe"
     },
+    "killSuccess": "Download abgebrochen und Dateien gelöscht",
     "largeFileNotice": "Diese Datei ist größer als andere und das Extrahieren dauert länger ...",
     "limitedTo": "Begrenzt auf",
     "noDownloads": "Nun ja, das ist entspannend...",
     "noDownloadsMessage": "Sie laden gerade nichts herunter. Starten Sie hier einen Download, um den Fortschritt zu verfolgen.",
     "noFilesError": "Der Downloader konnte keine Dateien zum Herunterladen finden. Dies bedeutet höchstwahrscheinlich, dass die Datei aus der Quelle entfernt wurde.",
     "noSpaceLeftError": "Auf dem Gerät ist kein Speicherplatz mehr vorhanden. Bitte geben Sie Speicherplatz frei, um den Download fortzusetzen.",
+    "pauseSuccess": "Der Download wurde erfolgreich angehalten",
     "preparingExtraction": "Extraktion wird vorbereitet...",
     "queuedCount": "{{count}} in der Warteschlange",
     "queuedDownloadStarted": "Download in der Warteschlange wird gestartet: {{name}}",
     "queuedDownloads": "Downloads in der Warteschlange",
+    "resumeError": "Der Download konnte nicht fortgesetzt werden",
+    "resumeErrorDescription": "Der Download konnte nicht fortgesetzt werden. Der Download-Link ist möglicherweise abgelaufen oder die zwischengespeicherten Daten fehlen.",
+    "resumeSuccess": "Laden Sie Resumed herunter",
+    "resuming": "Download wird fortgesetzt",
+    "resumingDescription": "Der Downloadvorgang wird neu gestartet...",
     "retryDataNotAvailable": "Wiederholungsdaten nicht verfügbar. Der Download wird gelöscht und Sie müssen den Download manuell neu starten.",
     "speedHistory": "Download-Geschwindigkeiten",
     "startingSoon": "Bald geht es los...",
     "stopped": "Download gestoppt",
-    "stoppedDescription": "Der Download wurde gestoppt. Sie können den Download entweder neu starten oder löschen.",
+    "stoppedDescription": "Der Download wurde gestoppt. Klicken Sie auf „Fortsetzen“, um dort fortzufahren, wo Sie aufgehört haben.",
     "updating": "Spiel wird aktualisiert...",
     "verificationFailed": "Dateien konnten nicht überprüft werden",
     "verificationFailed1": "{{numFailed}} Datei konnte nicht überprüft werden",

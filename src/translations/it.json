@@ -430,7 +430,8 @@
       "topGames": "I migliori giochi",
       "totalPlaytime": "Tempo di riproduzione totale",
       "totalXP": "XP totali",
-      "xp": "XP"
+      "xp": "XP",
+      "yourLevel": "Il tuo livello"
     },
     "report": {
       "details": "Dettagli",
@@ -867,16 +868,23 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "Annulla ed elimina",
+      "killDownload": "Uccidi il download",
+      "killDownloadDescription": "Ciò interromperà definitivamente il download ed eliminerà tutti i file scaricati. Questa azione non può essere annullata.",
+      "killDownloadTitle": "Uccidere il download per {{gameName}}?",
       "legacyGameVerification": "La verifica dei file è disponibile solo per i giochi scaricati dopo la versione 8.1.2 di Ascendara",
       "openFolder": "Apri cartella",
-      "retryDownload": "Riprova a scaricare",
-      "stopAndDelete": "Interrompi ed elimina contenuti",
-      "stopDownload": "Interrompi download",
-      "stopDownloadDescription": "Sei sicuro di voler interrompere questo download? Puoi scegliere di conservare o eliminare i contenuti scaricati.",
-      "stopDownloadTitle": "Interrompere il download di {{gameName}}?"
+      "pauseDownload": "Metti in pausa il download",
+      "resumeDownload": "Riprendi il download",
+      "retryDownload": "Riprova a scaricare"
     },
     "activeDownloads": "Download di giochi",
     "alreadyReported": "Già segnalato",
+    "ascendRequired": {
+      "description": "Hai già un download in corso. Vuoi scaricare più giochi contemporaneamente?",
+      "learnMore": "Unisciti ad Ascesa",
+      "suggestion": "Unisciti ad Ascend per sbloccare download simultanei illimitati e supportare lo sviluppatore solista dietro Ascendara. Oppure metti prima in pausa il download corrente per avviare questo.",
+      "title": "Scarica più giochi contemporaneamente"
+    },
     "completed": "Scarica completo",
     "completedDescription": "Il download del gioco è terminato ed è pronto per essere giocato",
     "connectionBrokenError": "La connessione per il download è stata interrotta. Prova ad abilitare il download a flusso singolo nelle Preferenze di Ascendara per un download più stabile.",
@@ -888,6 +896,10 @@
     "downloadsInProgress": "Download di {{count}} in corso",
     "errorReported": "Problema segnalato correttamente",
     "errorReportedDescription": "Grazie per aver contribuito a migliorare Ascendara. Il team di sviluppatori di Ascendara indagherà su questo problema.",
+    "errors": {
+      "killFailed": "Impossibile terminare il download",
+      "pauseFailed": "Impossibile mettere in pausa il download"
+    },
     "extracting": "Estrazione dei file di gioco...",
     "extractingDescription": "L'estrazione dei file di gioco potrebbe richiedere fino a 30 minuti a seconda delle dimensioni del file.",
     "firstTimeDownload": {
@@ -895,21 +907,28 @@
       "title": "Download su Ascendara",
       "understand": "Capisco"
     },
+    "killSuccess": "Download ucciso e file cancellati",
     "largeFileNotice": "Questo file è più grande degli altri e richiede più tempo per l'estrazione...",
     "limitedTo": "Limitato a",
     "noDownloads": "Beh, è ​​rilassante...",
     "noDownloadsMessage": "Non stai scaricando nulla in questo momento, avvia un download per monitorarne l'avanzamento qui.",
     "noFilesError": "Il downloader non è riuscito a trovare alcun file da scaricare. Ciò molto probabilmente significa che il file è stato rimosso dall'origine.",
     "noSpaceLeftError": "Spazio esaurito sul dispositivo. Liberare spazio su disco per continuare il download.",
+    "pauseSuccess": "Download sospeso con successo",
     "preparingExtraction": "Preparazione dell'estrazione...",
     "queuedCount": "{{count}} in coda",
     "queuedDownloadStarted": "Avvio download in coda: {{name}}",
     "queuedDownloads": "Download in coda",
+    "resumeError": "Impossibile riprendere il download",
+    "resumeErrorDescription": "Impossibile riprendere il download. Il collegamento per il download potrebbe essere scaduto oppure i dati memorizzati nella cache potrebbero essere mancanti.",
+    "resumeSuccess": "Scarica Riprendi",
+    "resuming": "Ripresa del download",
+    "resumingDescription": "Riavvio del processo di download...",
     "retryDataNotAvailable": "Riprova dati non disponibili. Il download verrà eliminato e dovrai riavviarlo manualmente.",
     "speedHistory": "Scarica velocità",
     "startingSoon": "A partire da presto...",
     "stopped": "Download interrotto",
-    "stoppedDescription": "Il download è stato interrotto. Puoi riavviare o eliminare il download.",
+    "stoppedDescription": "Il download è stato interrotto. Fare clic su Riprendi per continuare da dove era stato interrotto.",
     "updating": "Aggiornamento del gioco...",
     "verificationFailed": "Impossibile verificare i file",
     "verificationFailed1": "Impossibile verificare il file {{numFailed}}",

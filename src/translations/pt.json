@@ -430,7 +430,8 @@
       "topGames": "Principais jogos",
       "totalPlaytime": "Tempo total de jogo",
       "totalXP": "EXP total",
-      "xp": "XP"
+      "xp": "XP",
+      "yourLevel": "Seu nível"
     },
     "report": {
       "details": "Detalhes",
@@ -867,16 +868,23 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "Cancelar e excluir",
+      "killDownload": "Matar Baixar",
+      "killDownloadDescription": "Isso interromperá permanentemente o download e excluirá todos os arquivos baixados. Esta ação não pode ser desfeita.",
+      "killDownloadTitle": "Matar download para {{gameName}}?",
       "legacyGameVerification": "A verificação de arquivos está disponível apenas para jogos baixados após a versão 8.1.2 do Ascendara",
       "openFolder": "Abrir pasta",
-      "retryDownload": "Tentar baixar novamente",
-      "stopAndDelete": "Parar e excluir conteúdo",
-      "stopDownload": "Parar download",
-      "stopDownloadDescription": "Tem certeza de que deseja interromper este download? Você pode optar por manter ou excluir o conteúdo baixado.",
-      "stopDownloadTitle": "Parar de baixar {{gameName}}?"
+      "pauseDownload": "Pausar download",
+      "resumeDownload": "Retomar download",
+      "retryDownload": "Tentar baixar novamente"
     },
     "activeDownloads": "Baixando jogos",
     "alreadyReported": "Já relatado",
+    "ascendRequired": {
+      "description": "Você já tem um download em andamento. Quer baixar vários jogos de uma vez?",
+      "learnMore": "Junte-se ao Ascend",
+      "suggestion": "Junte-se ao Ascend para desbloquear downloads simultâneos ilimitados e apoiar o desenvolvedor solo por trás do Ascendara. Ou pause primeiro o download atual para iniciar este.",
+      "title": "Baixe vários jogos de uma vez"
+    },
     "completed": "Download completo",
     "completedDescription": "Seu jogo terminou de baixar e está pronto para jogar",
     "connectionBrokenError": "A conexão de download foi interrompida. Tente ativar o download de fluxo único nas preferências do Ascendara para um download mais estável.",
@@ -888,6 +896,10 @@
     "downloadsInProgress": "{{count}} download em andamento",
     "errorReported": "Problema relatado com sucesso",
     "errorReportedDescription": "Obrigado por ajudar a melhorar o Ascendara. A equipe de desenvolvedores do Ascendara investigará esse problema.",
+    "errors": {
+      "killFailed": "Falha ao encerrar o download",
+      "pauseFailed": "Falha ao pausar o download"
+    },
     "extracting": "Extraindo arquivos do jogo...",
     "extractingDescription": "A extração dos arquivos do jogo pode levar até 30 minutos, dependendo do tamanho do arquivo.",
     "firstTimeDownload": {
@@ -895,21 +907,28 @@
       "title": "Baixando no Ascendara",
       "understand": "Eu entendo"
     },
+    "killSuccess": "Download morto e arquivos excluídos",
     "largeFileNotice": "Este arquivo é maior que os outros e está demorando mais para ser extraído...",
     "limitedTo": "Limitado a",
     "noDownloads": "Bem, isso é relaxante...",
     "noDownloadsMessage": "Você não está baixando nada no momento, inicie um download para acompanhar o progresso aqui.",
     "noFilesError": "O downloader não encontrou nenhum arquivo para baixar. Isso provavelmente significa que o arquivo foi removido da fonte.",
     "noSpaceLeftError": "Não há mais espaço no dispositivo. Libere espaço em disco para continuar o download.",
+    "pauseSuccess": "Download pausado com sucesso",
     "preparingExtraction": "Preparando a extração...",
     "queuedCount": "{{count}} na fila",
     "queuedDownloadStarted": "Iniciando download na fila: {{name}}",
     "queuedDownloads": "Downloads na fila",
+    "resumeError": "Falha ao retomar o download",
+    "resumeErrorDescription": "Não foi possível retomar o download. O link de download pode ter expirado ou os dados armazenados em cache estão faltando.",
+    "resumeSuccess": "Download retomado",
+    "resuming": "Retomando o download",
+    "resumingDescription": "Reiniciando o processo de download...",
     "retryDataNotAvailable": "Dados de nova tentativa não disponíveis. O download será excluído e você terá que reiniciá-lo manualmente.",
     "speedHistory": "Velocidades de download",
     "startingSoon": "Começando em breve...",
     "stopped": "Download interrompido",
-    "stoppedDescription": "O download foi interrompido. Você pode reiniciar ou excluir o download.",
+    "stoppedDescription": "O download foi interrompido. Clique em Continuar para continuar de onde parou.",
     "updating": "Atualizando jogo...",
     "verificationFailed": "Falha na verificação dos arquivos",
     "verificationFailed1": "{{numFailed}} arquivo não foi verificado",

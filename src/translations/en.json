@@ -875,11 +875,7 @@
       "openFolder": "Open Folder",
       "pauseDownload": "Pause Download",
       "resumeDownload": "Resume Download",
-      "retryDownload": "Retry Download",
-      "stopAndDelete": "Stop & Delete Contents",
-      "stopDownload": "Stop Download",
-      "stopDownloadDescription": "Are you sure you want to stop this download? You can choose to keep or delete the downloaded contents.",
-      "stopDownloadTitle": "Stop Downloading {{gameName}}?"
+      "retryDownload": "Retry Download"
     },
     "activeDownloads": "Downloading Games",
     "alreadyReported": "Already Reported",

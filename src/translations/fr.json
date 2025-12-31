@@ -430,7 +430,8 @@
       "topGames": "Meilleurs jeux",
       "totalPlaytime": "Durée totale de jeu",
       "totalXP": "XP totale",
-      "xp": "XP"
+      "xp": "XP",
+      "yourLevel": "Votre niveau"
     },
     "report": {
       "details": "Détails",
@@ -863,16 +864,23 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "Annuler et supprimer",
+      "killDownload": "Tuer Télécharger",
+      "killDownloadDescription": "Cela arrêtera définitivement le téléchargement et supprimera tous les fichiers téléchargés. Cette action ne peut pas être annulée.",
+      "killDownloadTitle": "Arrêter le téléchargement pour {{gameName}} ?",
       "legacyGameVerification": "La vérification des fichiers n'est disponible que pour les jeux téléchargés après Ascendara version 8.1.2.",
       "openFolder": "Ouvrir le dossier",
-      "retryDownload": "Réessayer de télécharger",
-      "stopAndDelete": "Arrêter et supprimer le contenu",
-      "stopDownload": "Arrêter le téléchargement",
-      "stopDownloadDescription": "Êtes-vous sûr de vouloir arrêter ce téléchargement ? Vous pouvez choisir de conserver ou de supprimer le contenu téléchargé.",
-      "stopDownloadTitle": "Arrêter le téléchargement de {{gameName}} ?"
+      "pauseDownload": "Suspendre le téléchargement",
+      "resumeDownload": "Reprendre le téléchargement",
+      "retryDownload": "Réessayer de télécharger"
     },
     "activeDownloads": "Téléchargement de jeux",
     "alreadyReported": "Déjà signalé",
+    "ascendRequired": {
+      "description": "Vous avez déjà un téléchargement en cours. Vous souhaitez télécharger plusieurs jeux à la fois ?",
+      "learnMore": "Rejoignez Ascend",
+      "suggestion": "Rejoignez Ascend pour débloquer des téléchargements simultanés illimités et soutenir le développeur solo derrière Ascendara. Ou mettez d'abord en pause votre téléchargement en cours pour démarrer celui-ci.",
+      "title": "Téléchargez plusieurs jeux à la fois"
+    },
     "completed": "Téléchargement terminé",
     "completedDescription": "Votre jeu est terminé et prêt à jouer",
     "connectionBrokenError": "La connexion de téléchargement a été interrompue. Essayez d'activer le téléchargement en flux unique dans les préférences d'Ascendara pour un téléchargement plus stable.",
@@ -884,6 +892,10 @@
     "downloadsInProgress": "{{count}} téléchargement en cours",
     "errorReported": "Problème signalé avec succès",
     "errorReportedDescription": "Merci d'avoir contribué à l'amélioration d'Ascendara. L'équipe de développeurs d'Ascendara étudiera ce problème.",
+    "errors": {
+      "killFailed": "Échec de l'arrêt du téléchargement",
+      "pauseFailed": "Échec de la suspension du téléchargement"
+    },
     "extracting": "Extraction des fichiers du jeu...",
     "extractingDescription": "L'extraction des fichiers du jeu peut prendre jusqu'à 30 minutes selon la taille du fichier.",
     "firstTimeDownload": {
@@ -891,21 +903,28 @@
       "title": "Téléchargement sur Ascendara",
       "understand": "Je comprends"
     },
+    "killSuccess": "Téléchargement supprimé et fichiers supprimés",
     "largeFileNotice": "Ce fichier est plus volumineux que les autres et prend plus de temps à extraire...",
     "limitedTo": "Limité à",
     "noDownloads": "Eh bien, c'est relaxant...",
     "noDownloadsMessage": "Vous ne téléchargez rien pour le moment, démarrez un téléchargement pour suivre sa progression ici.",
     "noFilesError": "Le téléchargeur n'a trouvé aucun fichier à télécharger. Cela signifie très probablement que le fichier a été supprimé de la source.",
     "noSpaceLeftError": "Il ne reste plus d'espace sur l'appareil. Veuillez libérer de l'espace disque pour continuer le téléchargement.",
+    "pauseSuccess": "Téléchargement interrompu avec succès",
     "preparingExtraction": "Préparation de l'extraction...",
     "queuedCount": "{{count}} en file d'attente",
     "queuedDownloadStarted": "Démarrage du téléchargement en file d'attente : {{name}}",
     "queuedDownloads": "Téléchargements en file d'attente",
+    "resumeError": "Échec de la reprise du téléchargement",
+    "resumeErrorDescription": "Impossible de reprendre le téléchargement. Le lien de téléchargement a peut-être expiré ou les données mises en cache sont manquantes.",
+    "resumeSuccess": "Téléchargement repris",
+    "resuming": "Reprise du téléchargement",
+    "resumingDescription": "Redémarrage du processus de téléchargement...",
     "retryDataNotAvailable": "Données de nouvelle tentative non disponibles. Le téléchargement sera supprimé et vous devrez redémarrer manuellement le téléchargement.",
     "speedHistory": "Vitesses de téléchargement",
     "startingSoon": "Bientôt...",
     "stopped": "Téléchargement arrêté",
-    "stoppedDescription": "Le téléchargement a été arrêté. Vous pouvez soit redémarrer, soit supprimer le téléchargement.",
+    "stoppedDescription": "Le téléchargement a été arrêté. Cliquez sur Reprendre pour continuer là où il s'est arrêté.",
     "updating": "Mise à jour du jeu...",
     "verificationFailed": "Les fichiers n'ont pas pu être vérifiés",
     "verificationFailed1": "{{numFailed}} fichier n'a pas pu être vérifié",

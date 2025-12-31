@@ -430,7 +430,8 @@
       "topGames": "人気のゲーム",
       "totalPlaytime": "総プレイ時間",
       "totalXP": "合計XP",
-      "xp": "XP"
+      "xp": "XP",
+      "yourLevel": "あなたのレベル"
     },
     "report": {
       "details": "詳細",
@@ -863,16 +864,23 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "キャンセルと削除",
+      "killDownload": "ダウンロードを強制終了する",
+      "killDownloadDescription": "これにより、ダウンロードが完全に停止され、ダウンロードされたすべてのファイルが削除されます。この操作は元に戻すことができません。",
+      "killDownloadTitle": "{{gameName}} のダウンロードを中止しますか?",
       "legacyGameVerification": "ファイル検証は、Ascendara バージョン 8.1.2 以降にダウンロードされたゲームでのみ利用できます。",
       "openFolder": "フォルダーを開く",
-      "retryDownload": "ダウンロードを再試行する",
-      "stopAndDelete": "コンテンツの停止と削除",
-      "stopDownload": "ダウンロードを停止する",
-      "stopDownloadDescription": "このダウンロードを中止してもよろしいですか?ダウンロードしたコンテンツを保持するか削除するかを選択できます。",
-      "stopDownloadTitle": "{{gameName}} のダウンロードを中止しますか?"
+      "pauseDownload": "ダウンロードを一時停止する",
+      "resumeDownload": "ダウンロードを再開する",
+      "retryDownload": "ダウンロードを再試行する"
     },
     "activeDownloads": "ゲームをダウンロードする",
     "alreadyReported": "すでに報告済み",
+    "ascendRequired": {
+      "description": "すでにダウンロードが進行中です。複数のゲームを一度にダウンロードしたいですか?",
+      "learnMore": "アセンドに参加する",
+      "suggestion": "Ascend に参加して無制限の同時ダウンロードのロックを解除し、Ascendara の背後にある個人開発者をサポートしてください。または、まず現在のダウンロードを一時停止して、このダウンロードを開始します。",
+      "title": "複数のゲームを一度にダウンロード"
+    },
     "completed": "ダウンロード完了",
     "completedDescription": "ゲームのダウンロードが完了し、プレイする準備ができました",
     "connectionBrokenError": "ダウンロード接続が中断されました。ダウンロードをより安定させるには、Ascendara 設定でシングル ストリーム ダウンロードを有効にしてみてください。",
@@ -884,6 +892,10 @@
     "downloadsInProgress": "{{count}}のダウンロードが進行中です",
     "errorReported": "問題は正常に報告されました",
     "errorReportedDescription": "Ascendara の改善にご協力いただきありがとうございます。 Ascendara 開発者チームがこの問題を調査します。",
+    "errors": {
+      "killFailed": "ダウンロードの強制終了に失敗しました",
+      "pauseFailed": "ダウンロードの一時停止に失敗しました"
+    },
     "extracting": "ゲームファイルを抽出しています...",
     "extractingDescription": "ファイル サイズによっては、ゲーム ファイルの抽出に最大 30 分かかる場合があります。",
     "firstTimeDownload": {
@@ -891,21 +903,28 @@
       "title": "Ascendara でダウンロードする",
       "understand": "わかりました"
     },
+    "killSuccess": "ダウンロードが強制終了され、ファイルが削除されました",
     "largeFileNotice": "このファイルは他のファイルより大きいため、抽出に時間がかかります...",
     "limitedTo": "限定",
     "noDownloads": "まあ、それはリラックスしています...",
     "noDownloadsMessage": "現在は何もダウンロードしていません。ここでダウンロードを開始して進行状況を追跡してください。",
     "noFilesError": "ダウンローダーはダウンロードするファイルを見つけることができませんでした。これはおそらく、ファイルがソースから削除されたことを意味します。",
     "noSpaceLeftError": "デバイスに空き領域がありません。ダウンロードを続行するには、ディスク容量を解放してください。",
+    "pauseSuccess": "ダウンロードは正常に一時停止されました",
     "preparingExtraction": "抽出を準備しています...",
     "queuedCount": "{{count}} がキューに入れられました",
     "queuedDownloadStarted": "キューに入れられたダウンロードを開始します: {{name}}",
     "queuedDownloads": "キューに入れられたダウンロード",
+    "resumeError": "ダウンロードの再開に失敗しました",
+    "resumeErrorDescription": "ダウンロードを再開できませんでした。ダウンロード リンクの有効期限が切れているか、キャッシュされたデータが欠落している可能性があります。",
+    "resumeSuccess": "ダウンロードを再開しました",
+    "resuming": "ダウンロードを再開する",
+    "resumingDescription": "ダウンロードプロセスを再開しています...",
     "retryDataNotAvailable": "再試行データがありません。ダウンロードは削除されるため、ダウンロードを手動で再開する必要があります。",
     "speedHistory": "ダウンロード速度",
     "startingSoon": "もうすぐ始まります...",
     "stopped": "ダウンロードが停止しました",
-    "stoppedDescription": "ダウンロードは停止されました。ダウンロードを再開するか、削除することができます。",
+    "stoppedDescription": "ダウンロードは停止されました。中断したところから続行するには、「再開」をクリックします。",
     "updating": "ゲームを更新中...",
     "verificationFailed": "ファイルの検証に失敗しました",
     "verificationFailed1": "{{numFailed}} ファイルを検証できませんでした",
