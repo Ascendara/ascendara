@@ -557,7 +557,7 @@ export default function GameScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { gameData } = location.state || {};
+  const { gameData, libraryPage } = location.state || {};
   const { settings } = useSettings();
   const { isAuthenticated, user } = useAuth();
   const [game, setGame] = useState(gameData || null);
@@ -647,13 +647,16 @@ export default function GameScreen() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [isStartingUpdate, setIsStartingUpdate] = useState(false);
 
-  // Go Back To Library!!!!
+  // GO BACK!
 
   const BackLibrary = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
+    const page = Number(libraryPage);
+
+    if (Number.isInteger(page) && page >= 1) {
+      navigate("/library", { replace: true, state: { libraryPage: page } });
       return;
     }
+    
     navigate("/library");
   };
   
@@ -733,7 +736,7 @@ export default function GameScreen() {
       try {
         // If we don't have game data from location state, navigate back to library
         if (!game) {
-          BackLibrary();
+          navigate("/library");
           return;
         }
 
@@ -1407,7 +1410,7 @@ export default function GameScreen() {
 
       setIsUninstalling(false);
       setIsDeleteDialogOpen(false);
-      BackLibrary();
+      navigate("/library");
     } catch (error) {
       console.error("Error deleting game:", error);
       setIsUninstalling(false);
@@ -1467,7 +1470,7 @@ export default function GameScreen() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-background">
         <div className="space-y-4 text-center">
           <h1 className="text-2xl font-bold">{t("gameScreen.gameNotFound")}</h1>
-          <Button onClick={BackLibrary}>
+          <Button onClick={() => navigate("/library")}>
             {t("gameScreen.backToLibrary")}
           </Button>
         </div>
