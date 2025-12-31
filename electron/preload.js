@@ -287,6 +287,7 @@ contextBridge.exposeInMainWorld("electron", {
     ),
   stopDownload: (game, deleteContents) =>
     ipcRenderer.invoke("stop-download", game, deleteContents),
+  resumeDownload: game => ipcRenderer.invoke("resume-download", game),
   retryDownload: (link, game, online, dlc, version) =>
     ipcRenderer.invoke("retry-download", link, game, online, dlc, version),
   checkRetryExtract: game => ipcRenderer.invoke("check-retry-extract", game),

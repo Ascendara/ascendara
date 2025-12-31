@@ -311,6 +311,24 @@ function registerDownloadHandlers() {
           spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
         }
 
+        // Cache download data for resume functionality
+        const cacheDir = path.join(app.getPath("userData"), "downloadCache");
+        await fs.promises.mkdir(cacheDir, { recursive: true });
+        const cachedDataPath = path.join(cacheDir, `${sanitizedGame}.json`);
+        const cacheData = {
+          link: link,
+          game: game,
+          online: online,
+          dlc: dlc,
+          isVr: isVr,
+          version: version,
+          size: size,
+          gameID: gameID,
+          timestamp: new Date().toISOString(),
+        };
+        await fs.promises.writeFile(cachedDataPath, JSON.stringify(cacheData, null, 2));
+        console.log(`Cached download data for resume: ${cachedDataPath}`);
+
         // Update download history
         let timestampData = {};
         try {
@@ -763,6 +781,182 @@ function registerDownloadHandlers() {
     } catch (error) {
       console.error("Error retrying download:", error);
       return false;
+    }
+  });
+
+  // Resume download handler
+  ipcMain.handle("resume-download", async (_, game) => {
+    try {
+      console.log(`Resuming download for game: ${game}`);
+      const sanitizedGame = sanitizeText(game);
+      const settings = settingsManager.getSettings();
+
+      // Find the game directory across all possible locations
+      let gameDirectory = null;
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ];
+
+      for (const dir of allDirectories) {
+        const testPath = path.join(dir, sanitizedGame);
+        if (fs.existsSync(testPath)) {
+          gameDirectory = testPath;
+          console.log(`Found game directory at: ${gameDirectory}`);
+          break;
+        }
+      }
+
+      if (!gameDirectory) {
+        console.error(`Game directory not found for: ${sanitizedGame}`);
+        return { success: false, error: "Game directory not found" };
+      }
+
+      // Read the game info JSON to get download details
+      const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+      if (!fs.existsSync(jsonFile)) {
+        console.error(`Game info JSON not found: ${jsonFile}`);
+        return { success: false, error: "Game info not found" };
+      }
+
+      let gameInfo;
+      try {
+        gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+      } catch (jsonError) {
+        console.error(`Error reading game info JSON: ${jsonError}`);
+        return { success: false, error: "Failed to read game info" };
+      }
+
+      // Check if there's cached download data with the original link
+      const cachedDataPath = path.join(
+        app.getPath("userData"),
+        "downloadCache",
+        `${sanitizedGame}.json`
+      );
+
+      let downloadLink = null;
+      let online = gameInfo.online || "false";
+      let dlc = gameInfo.dlc || "false";
+      let isVr = gameInfo.isVr || "false";
+      let version = gameInfo.version || "";
+      let size = gameInfo.size || "";
+      let gameID = gameInfo.gameID || "";
+
+      if (fs.existsSync(cachedDataPath)) {
+        try {
+          const cachedData = JSON.parse(fs.readFileSync(cachedDataPath, "utf8"));
+          downloadLink = cachedData.link;
+          console.log(`Found cached download link: ${downloadLink}`);
+        } catch (cacheError) {
+          console.error(`Error reading cached download data: ${cacheError}`);
+        }
+      }
+
+      if (!downloadLink) {
+        console.error(`No download link found for: ${sanitizedGame}`);
+        return { success: false, error: "Download link not found. Cannot resume." };
+      }
+
+      // Determine which downloader to use
+      let executablePath;
+      let spawnCommand;
+      const targetDirectory = path.dirname(gameDirectory);
+
+      if (isWindows) {
+        executablePath = isDev
+          ? path.join(
+              downloadLink.includes("gofile.io")
+                ? "./binaries/AscendaraDownloader/dist/AscendaraGofileHelper.exe"
+                : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
+            )
+          : path.join(
+              appDirectory,
+              downloadLink.includes("gofile.io")
+                ? "/resources/AscendaraGofileHelper.exe"
+                : "/resources/AscendaraDownloader.exe"
+            );
+
+        spawnCommand = [
+          downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+          sanitizedGame,
+          online,
+          dlc,
+          isVr,
+          "false", // updateFlow
+          version || "-1",
+          size,
+          targetDirectory,
+          gameID || "",
+        ];
+      } else {
+        executablePath = "python3";
+        const scriptPath = isDev
+          ? path.join(
+              downloadLink.includes("gofile.io")
+                ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
+                : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+            )
+          : path.join(
+              appDirectory,
+              "..",
+              downloadLink.includes("gofile.io")
+                ? "/resources/AscendaraGofileHelper.py"
+                : "/resources/AscendaraDownloader.py"
+            );
+
+        spawnCommand = [
+          scriptPath,
+          downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+          game,
+          online,
+          dlc,
+          isVr,
+          "false", // updateFlow
+          version || "-1",
+          size,
+          targetDirectory,
+          gameID || "",
+        ];
+      }
+
+      // Add notification flags if enabled
+      if (settings.notifications) {
+        spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
+      }
+
+      // Clear the stopped state from JSON
+      gameInfo.downloadingData = {
+        downloading: false,
+        verifying: false,
+        extracting: false,
+        updating: false,
+        progressCompleted: "0.00",
+        progressDownloadSpeeds: "0.00 KB/s",
+        timeUntilComplete: "0s",
+      };
+      fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+      console.log(`Cleared stopped state from JSON: ${jsonFile}`);
+
+      // Start the download process
+      const downloadProcess = spawn(executablePath, spawnCommand, {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false,
+      });
+
+      downloadProcess.on("error", err => {
+        console.error(`Failed to start resume process: ${err}`);
+        return { success: false, error: err.message };
+      });
+
+      downloadProcesses.set(sanitizedGame, downloadProcess);
+      downloadProcess.unref();
+
+      console.log(`Successfully resumed download for: ${sanitizedGame}`);
+      return { success: true };
+    } catch (error) {
+      console.error("Error resuming download:", error);
+      return { success: false, error: error.message };
     }
   });
 
