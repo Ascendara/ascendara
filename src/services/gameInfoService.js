@@ -242,8 +242,8 @@ const getGameDetailsSteam = async (gameName, config) => {
       return null;
     }
 
-    // Process and format the game data to match IGDB format
-    const formattedDetails = formatSteamToIgdbFormat(gameDetails);
+    // Process and format the game data
+    const formattedDetails = formatSteamData(gameDetails);
 
     console.log(`Successfully processed Steam data for: ${gameName}`);
 
@@ -499,11 +499,11 @@ const extractGameFeatures = description => {
 };
 
 /**
- * Format Steam data to match IGDB format for compatibility
+ * Format Steam data for use in the application
  * @param {Object} steamData - Raw Steam data
- * @returns {Object} Formatted data in IGDB-compatible format
+ * @returns {Object} Formatted Steam data
  */
-const formatSteamToIgdbFormat = steamData => {
+const formatSteamData = steamData => {
   if (!steamData) return null;
 
   // Extract screenshots
@@ -540,11 +540,11 @@ const formatSteamToIgdbFormat = steamData => {
     });
   }
 
-  // Get clean description - prefer about_the_game over short_description
+  // Get clean description - prefer short_description for summary, about_the_game for detailed
+  const shortDescription = steamData.short_description || "";
   const aboutTheGame = steamData.about_the_game
     ? stripHtmlTags(steamData.about_the_game)
     : "";
-  const cleanDescription = aboutTheGame || steamData.short_description || "";
   const fullCleanDescription = steamData.detailed_description
     ? stripHtmlTags(steamData.detailed_description)
     : "";
@@ -572,18 +572,18 @@ const formatSteamToIgdbFormat = steamData => {
   const developers = steamData.developers || [];
   const publishers = steamData.publishers || [];
 
-  // Format the data to match IGDB structure
+  // Format the data for the application
   return {
     id: steamData.steam_appid,
     name: steamData.name,
-    summary: cleanDescription,
-    description: cleanDescription,
+    summary: shortDescription,
+    description: aboutTheGame || shortDescription,
     storyline: null,
 
     // Store the full description separately
     full_description: fullCleanDescription,
 
-    // IGDB specific fields with Steam data
+    // Steam API fields
     cover: steamData.header_image
       ? {
           id: steamData.steam_appid,
