@@ -55,6 +55,7 @@ import {
   XCircle,
   ArrowDownToLine,
   Wifi,
+  Play,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -1386,7 +1387,7 @@ const DownloadCard = ({
               {isStopped ? (
                 <>
                   <DropdownMenuItem onClick={() => onResume(game)} className="gap-2">
-                    <RefreshCw className="h-4 w-4" />
+                    <Play className="h-4 w-4" />
                     {t("downloads.actions.resumeDownload")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -1554,7 +1555,7 @@ const DownloadCard = ({
                 {isResuming ? (
                   <Loader className="h-4 w-4 animate-spin" />
                 ) : (
-                  <RefreshCw className="h-4 w-4" />
+                  <Play className="h-4 w-4" />
                 )}
                 {t("downloads.actions.resumeDownload")}
               </Button>
