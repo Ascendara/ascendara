@@ -109,12 +109,6 @@ contextBridge.exposeInMainWorld("electron", {
   toggleDiscordRPC: enabled => ipcRenderer.invoke("toggle-discord-rpc", enabled),
 
   //===========================================================================
-  // IGDB API (bypasses CORS)
-  //===========================================================================
-  igdbRequest: (endpoint, body, clientId, accessToken) =>
-    ipcRenderer.invoke("igdb-request", { endpoint, body, clientId, accessToken }),
-
-  //===========================================================================
   // Steam API (bypasses CORS)
   //===========================================================================
   steamRequest: url => ipcRenderer.invoke("steam-request", { url }),

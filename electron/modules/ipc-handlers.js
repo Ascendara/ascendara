@@ -42,56 +42,7 @@ const getTwitchToken = async (clientId, clientSecret) => {
   }
 };
 
-/**
- * Search IGDB for game details
- */
-const searchGameIGDB = async (gameName, clientId, accessToken) => {
-  try {
-    const response = await axios.post(
-      "https://api.igdb.com/v4/games",
-      `search "${gameName}"; fields name,cover.*; limit 1;`,
-      {
-        headers: {
-          "Client-ID": clientId,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-    return response.data[0] || null;
-  } catch (error) {
-    console.error("Error searching IGDB:", error.message);
-    return null;
-  }
-};
-
-/**
- * Get game details from IGDB
- */
-const getGameDetails = async (gameName, credentials) => {
-  try {
-    if (!credentials.clientId || !credentials.clientSecret) {
-      return null;
-    }
-    const accessToken = await getTwitchToken(
-      credentials.clientId,
-      credentials.clientSecret
-    );
-    const gameData = await searchGameIGDB(gameName, credentials.clientId, accessToken);
-    if (gameData?.cover?.url) {
-      const coverUrl = gameData.cover.url
-        .replace("t_thumb", "t_cover_big")
-        .replace("//", "https://");
-      return {
-        name: gameData.name,
-        cover: { url: coverUrl },
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error("Error getting game details:", error.message);
-    return null;
-  }
-};
+// IGDB functions removed - now using Steam API only
 
 /**
  * Register miscellaneous IPC handlers
@@ -108,22 +59,7 @@ function registerMiscHandlers() {
   // Is dev mode
   ipcMain.handle("is-dev", () => isDev);
 
-  // IGDB API request handler (bypasses CORS)
-  ipcMain.handle("igdb-request", async (_, { endpoint, body, clientId, accessToken }) => {
-    try {
-      const response = await axios.post(`https://api.igdb.com/v4/${endpoint}`, body, {
-        headers: {
-          "Client-ID": clientId,
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "text/plain",
-        },
-      });
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error("IGDB request error:", error.message);
-      return { success: false, error: error.message };
-    }
-  });
+  // IGDB handler removed - now using Steam API only
 
   // GiantBomb API request handler (bypasses CORS)
   ipcMain.handle("giantbomb-request", async (_, { url, apiKey }) => {
