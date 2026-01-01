@@ -1288,8 +1288,10 @@ const Profile = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
-                        {Math.min(Stats.currentXP, Stats.nextLevelXp)} /{" "}
-                        {Stats.nextLevelXp} XP
+                        {Math.floor(
+                          Math.min(Stats.currentXP, Stats.nextLevelXp)
+                        ).toLocaleString()}{" "}
+                        / {Math.floor(Stats.nextLevelXp).toLocaleString()} XP
                       </span>
                       <span>{Math.round(LevelProgressPercent)}%</span>
                     </div>
