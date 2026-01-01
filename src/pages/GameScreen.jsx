@@ -656,10 +656,10 @@ export default function GameScreen() {
       navigate("/library", { replace: true, state: { libraryPage: page } });
       return;
     }
-    
+
     navigate("/library");
   };
-  
+
   // Achievements pagination state
   const [achievementsPage, setAchievementsPage] = useState(0);
   const perPage = 12; // 3 rows x 4 columns
@@ -1921,6 +1921,12 @@ export default function GameScreen() {
                   <Trophy className="mr-2 h-4 w-4" />
                   {t("gameScreen.achievements")}
                 </TabsTrigger>
+                {screenshots.length > 0 && (
+                  <TabsTrigger value="media">
+                    <ImageUp className="mr-2 h-4 w-4" />
+                    {t("gameScreen.media")}
+                  </TabsTrigger>
+                )}
                 {igdbData && (
                   <TabsTrigger value="details">
                     <LetterText className="mr-2 h-4 w-4" />
@@ -2347,6 +2353,36 @@ export default function GameScreen() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Media tab */}
+              <TabsContent value="media" className="space-y-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <h2 className="text-2xl font-bold">
+                        {t("gameScreen.screenshots")}
+                      </h2>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {screenshots.map((screenshot, index) => (
+                          <div
+                            key={index}
+                            className="aspect-video overflow-hidden rounded-lg bg-muted transition-transform hover:scale-105"
+                          >
+                            <img
+                              src={screenshot.formatted_url}
+                              alt={`Screenshot ${index + 1}`}
+                              className="h-full w-full cursor-pointer object-cover"
+                              onClick={() =>
+                                window.electron.openURL(screenshot.formatted_url)
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
