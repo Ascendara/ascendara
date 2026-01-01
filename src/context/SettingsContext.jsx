@@ -4,6 +4,8 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
+  useRef,
 } from "react";
 
 export const SettingsContext = createContext();
@@ -61,14 +63,20 @@ export function SettingsProvider({ children }) {
       },
     },
   });
+  const settingsRef = useRef(settings);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const setSettings = useCallback(
     async newSettings => {
-      // If newSettings is a function, call it with current settings
+      // If newSettings is a function, call it with current settings from ref
       const updatedSettings =
         typeof newSettings === "function"
-          ? newSettings(settings)
-          : { ...settings, ...newSettings };
+          ? newSettings(settingsRef.current)
+          : { ...settingsRef.current, ...newSettings };
 
       // Update local state
       setSettingsState(updatedSettings);
@@ -80,7 +88,7 @@ export function SettingsProvider({ children }) {
         console.error("Error saving settings:", error);
       }
     },
-    [settings]
+    [] // No dependencies - uses ref
   );
 
   // Update local state only without saving to electron
@@ -88,16 +96,16 @@ export function SettingsProvider({ children }) {
     newSettings => {
       const updatedSettings =
         typeof newSettings === "function"
-          ? newSettings(settings)
-          : { ...settings, ...newSettings };
+          ? newSettings(settingsRef.current)
+          : { ...settingsRef.current, ...newSettings };
       setSettingsState(updatedSettings);
     },
-    [settings]
+    [] // No dependencies - uses ref
   );
 
   const updateSetting = useCallback(
     async (key, value) => {
-      const updatedSettings = { ...settings, [key]: value };
+      const updatedSettings = { ...settingsRef.current, [key]: value };
       setSettingsState(updatedSettings);
       try {
         await window.electron.updateSetting(key, value);
@@ -105,7 +113,18 @@ export function SettingsProvider({ children }) {
         console.error("Error updating setting:", error);
       }
     },
-    [settings]
+    [] // No dependencies - uses ref
+  );
+
+  // Memoize context value to prevent unnecessary rerenders
+  const contextValue = useMemo(
+    () => ({
+      settings,
+      setSettings,
+      setSettingsLocal,
+      updateSetting,
+    }),
+    [settings, setSettings, setSettingsLocal, updateSetting]
   );
 
   // Effect to toggle Discord RPC when rpcEnabled setting changes
@@ -154,16 +173,7 @@ export function SettingsProvider({ children }) {
   }, []);
 
   return (
-    <SettingsContext.Provider
-      value={{
-        settings,
-        setSettings,
-        setSettingsLocal,
-        updateSetting,
-      }}
-    >
-      {children}
-    </SettingsContext.Provider>
+    <SettingsContext.Provider value={contextValue}>{children}</SettingsContext.Provider>
   );
 }
 

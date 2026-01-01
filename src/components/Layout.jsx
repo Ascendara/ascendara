@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, memo, useMemo } from "react";
 import { Outlet, useSearchParams, useLocation } from "react-router-dom";
 import Navigation from "./Navigation";
 import MenuBar from "./MenuBar";
@@ -7,7 +7,7 @@ import PageTransition from "./PageTransition";
 import { useTheme } from "@/context/ThemeContext";
 import { SettingsContext } from "@/context/SettingsContext";
 
-function Layout() {
+const Layout = memo(() => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showTour, setShowTour] = useState(false);
   const { theme, resolvedTheme } = useTheme();
@@ -39,6 +39,8 @@ function Layout() {
       <Navigation className="fixed bottom-0 left-0 right-0" />
     </div>
   );
-}
+});
+
+Layout.displayName = "Layout";
 
 export default Layout;

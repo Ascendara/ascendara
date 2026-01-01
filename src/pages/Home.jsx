@@ -57,14 +57,18 @@ let carouselGamesCache = null;
 // Compact Game Card for horizontal scrolling sections
 const CompactGameCard = memo(({ game, onClick }) => {
   const [imageUrl, setImageUrl] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
   const { t } = useLanguage();
+  const imageLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (imageLoadedRef.current) return;
     const loadImage = async () => {
       if (game?.imgID) {
         const url = await imageCacheService.getImage(game.imgID);
-        setImageUrl(url);
+        if (url) {
+          imageLoadedRef.current = true;
+          setImageUrl(url);
+        }
       }
     };
     loadImage();
@@ -74,8 +78,6 @@ const CompactGameCard = memo(({ game, onClick }) => {
     <div
       className="group relative flex-shrink-0 cursor-pointer"
       style={{ width: "280px" }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
     >
       <div className="relative overflow-hidden rounded-xl border border-border/30 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5">
@@ -84,20 +86,12 @@ const CompactGameCard = memo(({ game, onClick }) => {
             <img
               src={imageUrl}
               alt={game.game}
-              className={cn(
-                "h-full w-full object-cover transition-transform duration-500",
-                isHovered && "scale-110"
-              )}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
             />
           ) : (
             <Skeleton className="h-full w-full" />
           )}
-          <div
-            className={cn(
-              "absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-300",
-              isHovered ? "opacity-100" : "opacity-70"
-            )}
-          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-100" />
         </AspectRatio>
 
         <div className="absolute bottom-0 left-0 right-0 p-3">
@@ -118,12 +112,7 @@ const CompactGameCard = memo(({ game, onClick }) => {
           </h3>
         </div>
 
-        <div
-          className={cn(
-            "absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300",
-            isHovered && "opacity-100"
-          )}
-        ></div>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
       </div>
     </div>
   );
@@ -132,13 +121,17 @@ const CompactGameCard = memo(({ game, onClick }) => {
 // Mini Game Card for category grids
 const MiniGameCard = memo(({ game, onClick }) => {
   const [imageUrl, setImageUrl] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
+  const imageLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (imageLoadedRef.current) return;
     const loadImage = async () => {
       if (game?.imgID) {
         const url = await imageCacheService.getImage(game.imgID);
-        setImageUrl(url);
+        if (url) {
+          imageLoadedRef.current = true;
+          setImageUrl(url);
+        }
       }
     };
     loadImage();
@@ -147,8 +140,6 @@ const MiniGameCard = memo(({ game, onClick }) => {
   return (
     <div
       className="group/mini relative cursor-pointer overflow-hidden rounded-lg"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
     >
       <AspectRatio ratio={16 / 9}>
@@ -156,32 +147,19 @@ const MiniGameCard = memo(({ game, onClick }) => {
           <img
             src={imageUrl}
             alt={game.game}
-            className={cn(
-              "h-full w-full object-cover transition-transform duration-300",
-              isHovered && "scale-110"
-            )}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover/mini:scale-110"
           />
         ) : (
           <Skeleton className="h-full w-full" />
         )}
-        <div
-          className={cn(
-            "absolute inset-0 bg-gradient-to-t from-black/70 to-transparent transition-opacity",
-            isHovered ? "opacity-100" : "opacity-60"
-          )}
-        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-60 transition-opacity group-hover/mini:opacity-100" />
       </AspectRatio>
       <div className="absolute bottom-0 left-0 right-0 p-2">
         <p className="line-clamp-1 text-xs font-medium text-white">
           {sanitizeText(game.game)}
         </p>
       </div>
-      <div
-        className={cn(
-          "absolute inset-0 flex items-center justify-center bg-primary/20 opacity-0 transition-opacity",
-          isHovered && "opacity-100"
-        )}
-      >
+      <div className="absolute inset-0 flex items-center justify-center bg-primary/20 opacity-0 transition-opacity group-hover/mini:opacity-100">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
           <ArrowRight className="h-3 w-3" />
         </div>
@@ -193,16 +171,18 @@ const MiniGameCard = memo(({ game, onClick }) => {
 // Mini Recent Card for hero sidebar - compact version
 const MiniRecentCard = memo(({ game, onPlay }) => {
   const [imageData, setImageData] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
   const [, setTick] = useState(0);
   const sanitizedGameName = sanitizeText(game.game || game.name);
+  const imageLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (imageLoadedRef.current) return;
     const loadImage = async () => {
       const gameId = game.game || game.name;
       const localStorageKey = `game-cover-${gameId}`;
       const cachedImage = localStorage.getItem(localStorageKey);
       if (cachedImage) {
+        imageLoadedRef.current = true;
         setImageData(cachedImage);
         return;
       }
@@ -210,6 +190,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
         const imageBase64 = await window.electron.getGameImage(gameId);
         if (imageBase64) {
           const dataUrl = `data:image/jpeg;base64,${imageBase64}`;
+          imageLoadedRef.current = true;
           setImageData(dataUrl);
           try {
             localStorage.setItem(localStorageKey, dataUrl);
@@ -218,7 +199,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
       } catch (error) {}
     };
     loadImage();
-  }, [game]);
+  }, [game.game, game.name]);
 
   // Update time display every minute
   useEffect(() => {
@@ -243,28 +224,18 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
   return (
     <div
       className="group relative min-h-0 flex-1 cursor-pointer overflow-hidden rounded-lg"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={() => onPlay(game)}
     >
       {imageData ? (
         <img
           src={imageData}
           alt={sanitizedGameName}
-          className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-transform duration-300",
-            isHovered && "scale-110"
-          )}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
         />
       ) : (
         <Skeleton className="absolute inset-0 h-full w-full" />
       )}
-      <div
-        className={cn(
-          "absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent transition-opacity",
-          isHovered ? "opacity-100" : "opacity-70"
-        )}
-      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-70 transition-opacity group-hover:opacity-100" />
       <div className="absolute bottom-0 left-0 right-0 p-2">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
@@ -273,12 +244,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
             </h3>
             <p className="text-[12px] text-white/70">{getTimeSinceLastPlayed()}</p>
           </div>
-          <div
-            className={cn(
-              "ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-all",
-              isHovered ? "scale-110 bg-primary" : "opacity-0"
-            )}
-          >
+          <div className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-white opacity-0 transition-all group-hover:scale-110 group-hover:bg-primary group-hover:opacity-100">
             <Play className="h-2.5 w-2.5" />
           </div>
         </div>
@@ -580,7 +546,7 @@ const Home = memo(() => {
     };
 
     loadCarouselImages();
-  }, [carouselGames, currentSlide]);
+  }, [carouselGames.length, currentSlide]);
 
   // Initial load - preload all carousel images for smooth transitions
   useEffect(() => {
@@ -607,17 +573,23 @@ const Home = memo(() => {
     // Delay preloading to not block initial render
     const timer = setTimeout(preloadAllCarouselImages, 1000);
     return () => clearTimeout(timer);
-  }, [carouselGames]);
+  }, [carouselGames.length]);
 
   useEffect(() => {
     const updateRecentGames = async () => {
       const recent = await getRecentGames([...installedGames, ...apiGames]);
       setRecentGames(recent);
     };
-    updateRecentGames();
-  }, [installedGames, apiGames]);
+    // Only update when games actually change, not on every render
+    if (installedGames.length > 0 || apiGames.length > 0) {
+      updateRecentGames();
+    }
+  }, [installedGames.length, apiGames.length]);
 
   useEffect(() => {
+    // Only recalculate sections when apiGames actually changes
+    if (apiGames.length === 0) return;
+
     // Get game sections
     const {
       topGames: topSection,
@@ -635,7 +607,7 @@ const Home = memo(() => {
     setOnlineGames(onlineSection);
     setActionGames(actionSection);
     setPopularCategories(popularCats);
-  }, [apiGames]);
+  }, [apiGames.length]);
 
   const getGameSections = games => {
     if (!Array.isArray(games))
@@ -817,12 +789,12 @@ const Home = memo(() => {
   const handlePrevSlide = useCallback(() => {
     setCurrentSlide(prev => (prev === 0 ? carouselGames.length - 1 : prev - 1));
     setAutoPlay(false);
-  }, [carouselGames]);
+  }, [carouselGames.length]);
 
   const handleNextSlide = useCallback(() => {
     setCurrentSlide(prev => (prev === carouselGames.length - 1 ? 0 : prev + 1));
     setAutoPlay(false);
-  }, [carouselGames]);
+  }, [carouselGames.length]);
 
   const handleCloseTour = useCallback(() => {
     setShowTour(false);
@@ -878,7 +850,7 @@ const Home = memo(() => {
       }
     }
     setDragOffset(0);
-  }, [touchStart, touchEnd]);
+  }, [touchStart, touchEnd, handleNextSlide, handlePrevSlide]);
 
   const handleMouseDown = useCallback(e => {
     setIsDragging(true);
@@ -914,7 +886,7 @@ const Home = memo(() => {
       setDragOffset(0);
       e.preventDefault();
     },
-    [isDragging, dragStart]
+    [isDragging, dragStart, handleNextSlide, handlePrevSlide]
   );
 
   const handleMouseLeave = useCallback(

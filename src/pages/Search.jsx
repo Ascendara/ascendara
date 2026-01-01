@@ -62,6 +62,7 @@ const Search = memo(() => {
     return saved || "";
   });
   const [showStickySearch, setShowStickySearch] = useState(false);
+  const showStickySearchRef = useRef(false);
   const mainSearchRef = useRef(null);
   const searchSectionRef = useRef(null);
   const location = useLocation();
@@ -114,11 +115,25 @@ const Search = memo(() => {
   const isFitGirlSource = settings.gameSource === "fitgirl";
   const navigate = useNavigate();
 
-  // Handle scroll to show/hide sticky search bar
+  // Handle scroll to show/hide sticky search bar with throttling
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      const scrollY = window.scrollY;
-      setShowStickySearch(scrollY > scrollThreshold);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollY = window.scrollY;
+          const shouldShow = scrollY > scrollThreshold;
+
+          // Only update state if value actually changed
+          if (shouldShow !== showStickySearchRef.current) {
+            showStickySearchRef.current = shouldShow;
+            setShowStickySearch(shouldShow);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });

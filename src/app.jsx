@@ -259,12 +259,16 @@ const ScrollToTop = () => {
 };
 
 // Track user activity and update Firebase customMessage
-const UserActivityTracker = () => {
+const UserActivityTracker = React.memo(() => {
   const { pathname, state } = useLocation();
   const { user } = useAuth();
+  const lastPathRef = useRef(null);
 
   useEffect(() => {
     if (!user?.uid) return;
+    // Skip if path hasn't changed to prevent unnecessary updates
+    if (lastPathRef.current === pathname) return;
+    lastPathRef.current = pathname;
 
     // Map routes to activity types
     const updateActivity = async () => {
@@ -311,7 +315,7 @@ const UserActivityTracker = () => {
     };
 
     updateActivity();
-  }, [pathname, state, user?.uid]);
+  }, [pathname, state?.gameData?.game, state?.game?.game, user?.uid]);
 
   // Listen for game launch/close events
   useEffect(() => {
@@ -382,7 +386,9 @@ const UserActivityTracker = () => {
   }, [user?.uid]);
 
   return null;
-};
+});
+
+UserActivityTracker.displayName = "UserActivityTracker";
 
 // Initialize Ascend status service when user is authenticated
 const AscendStatusInitializer = () => {
@@ -456,10 +462,10 @@ const MessageNotificationChecker = () => {
     };
 
     // Initial check after a short delay
-    const initialTimeout = setTimeout(checkForNewMessages, 3000);
+    const initialTimeout = setTimeout(checkForNewMessages, 5000);
 
-    // Check every 30 seconds
-    checkIntervalRef.current = setInterval(checkForNewMessages, 30000);
+    // Reduce polling frequency from 30s to 60s to reduce CPU usage
+    checkIntervalRef.current = setInterval(checkForNewMessages, 60000);
 
     return () => {
       clearTimeout(initialTimeout);

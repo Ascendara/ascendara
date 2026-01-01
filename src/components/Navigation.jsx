@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback, useMemo } from "react";
+import React, { useState, useEffect, memo, useCallback, useMemo, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -24,12 +24,12 @@ const Navigation = memo(({ items }) => {
   const { settings } = useSettings();
   const location = useLocation();
   const navigate = useNavigate();
-  const [hoveredItem, setHoveredItem] = useState(null);
   const [size, setSize] = useState(() => {
     const savedSize = localStorage.getItem("navSize");
     return savedSize ? parseFloat(savedSize) : 100;
   });
   const [downloadCount, setDownloadCount] = useState(0);
+  const downloadCountRef = useRef(0);
 
   const handleMouseDown = useCallback(
     (e, isLeft) => {
@@ -57,14 +57,6 @@ const Navigation = memo(({ items }) => {
     },
     [size]
   );
-
-  const handleMouseEnter = useCallback(item => {
-    setHoveredItem(item.path);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setHoveredItem(null);
-  }, []);
 
   const navStyle = useMemo(
     () => ({
@@ -184,7 +176,12 @@ const Navigation = memo(({ items }) => {
               downloadingData.error)
           );
         });
-        setDownloadCount(downloadingGames.length);
+        const count = downloadingGames.length;
+        // Only update state if count changed to prevent unnecessary rerenders
+        if (count !== downloadCountRef.current) {
+          downloadCountRef.current = count;
+          setDownloadCount(count);
+        }
       } catch (error) {
         console.error("Error checking downloading games:", error);
       }
@@ -193,10 +190,10 @@ const Navigation = memo(({ items }) => {
     // Check immediately
     checkDownloaderStatus();
 
-    // Then check every second
+    // Reduce polling frequency from 1s to 3s to reduce CPU usage
     const interval = setInterval(() => {
       checkDownloaderStatus();
-    }, 1000);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -270,22 +267,20 @@ const Navigation = memo(({ items }) => {
               <React.Fragment key={item.path}>
                 <Link
                   to={item.path}
-                  onMouseEnter={() => handleMouseEnter(item)}
-                  onMouseLeave={handleMouseLeave}
                   className={`group relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
                     isActive(item.path)
                       ? "z-10 scale-110 bg-primary text-background"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  } ${hoveredItem === item.path ? "z-10 scale-110" : "z-0 scale-100"} `}
+                      : "z-0 scale-100 text-muted-foreground hover:z-10 hover:scale-110 hover:bg-secondary hover:text-foreground"
+                  }`}
                 >
                   <div
-                    className={`absolute inset-0 rounded-xl bg-gradient-to-br ${item.color} opacity-0 ${isActive(item.path) || hoveredItem === item.path ? "opacity-100" : ""} transition-opacity duration-300`}
+                    className={`absolute inset-0 rounded-xl bg-gradient-to-br ${item.color} transition-opacity duration-300 ${isActive(item.path) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                   />
                   <div
                     className={`relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-200 ${
                       isActive(item.path)
                         ? "bg-gradient-to-br " + item.color
-                        : "hover:bg-white/10"
+                        : "group-hover:bg-white/10"
                     }`}
                   >
                     <item.icon className="h-5 w-5" />
@@ -295,13 +290,7 @@ const Navigation = memo(({ items }) => {
                       </div>
                     )}
                   </div>
-                  <div
-                    className={`absolute -top-10 transform whitespace-nowrap rounded-lg border border-border bg-background/95 px-3 py-1.5 text-sm font-medium text-foreground transition-all duration-300 ${
-                      hoveredItem === item.path
-                        ? "translate-y-0 opacity-100"
-                        : "pointer-events-none translate-y-2 opacity-0"
-                    }`}
-                  >
+                  <div className="pointer-events-none absolute -top-10 translate-y-2 transform whitespace-nowrap rounded-lg border border-border bg-background/95 px-3 py-1.5 text-sm font-medium text-foreground opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
                     {item.label}
                     <ChevronRight className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-90 transform text-border" />
                   </div>
