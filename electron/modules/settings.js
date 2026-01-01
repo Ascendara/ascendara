@@ -107,13 +107,7 @@ class SettingsManager {
           }
         }
       }
-      // Save if any default settings were missing (but don't save just to reset arrays)
-      const settingsChanged = Object.keys(this.defaultSettings).some(
-        key => !(key in settings)
-      );
-      if (settingsChanged) {
-        fs.writeFileSync(this.filePath, JSON.stringify(mergedSettings, null, 2));
-      }
+      // Only return the merged settings without writing to disk
       return mergedSettings;
     } catch (error) {
       console.error("Error loading settings:", error);

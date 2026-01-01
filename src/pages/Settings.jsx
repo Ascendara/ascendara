@@ -447,6 +447,7 @@ function Settings() {
         }
 
         isFirstMount.current = false;
+        setIsInitialized(true);
       } catch (error) {
         console.error("Error initializing settings:", error);
       } finally {

@@ -76,7 +76,7 @@ export function SettingsProvider({ children }) {
       const updatedSettings =
         typeof newSettings === "function"
           ? newSettings(settingsRef.current)
-          : { ...settingsRef.current, ...newSettings };
+          : newSettings; // Don't merge - use newSettings directly to avoid losing values
 
       // Update local state
       setSettingsState(updatedSettings);
