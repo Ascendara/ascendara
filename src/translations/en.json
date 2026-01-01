@@ -131,7 +131,7 @@
     },
     "crashScreen": {
       "checkConnection": "Check your internet connection",
-      "clearCache": "Clear your browser cache and cookies",
+      "clearCache": "Clear Ascendara's app cache and cookies",
       "contactSupport": "If the issue persists, please report it to support",
       "description": "Ascendara did not like what just happened. No worries, if you have analytics enabled this error has been tracked and the developer will get this fixed.",
       "reload": "Reload Ascendara",
@@ -734,8 +734,6 @@
     "genres": "Genres",
     "getAscend": "Join Ascend",
     "hours": "hours",
-    "igdbLoading": "Loading game information...",
-    "igdbRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",
     "infoMaybeInaccurate": "Game information may be inaccurate.",
     "installSize": "Installation Size",
     "installSizeInfo": {
@@ -820,6 +818,8 @@
       "os": "OS",
       "ram": "RAM"
     },
+    "steamLoading": "Loading game information...",
+    "steamRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",
     "submitReport": "Submit Report",
     "submitting": "Submitting...",
     "switchProvider": "Switch Provider",
@@ -1963,9 +1963,9 @@
     "analyticsDesc": "Share anonymous usage data to help improve your experience",
     "apiMigration": {
       "goodNews": "Good news! Ascendara Xtra no longer requires manual API key setup.",
-      "steamBuiltIn": "The Steam API is now built-in and automatically configured. Your old GiantBomb and IGDB API keys are no longer needed.",
+      "steamBuiltIn": "The Steam API is now built-in and automatically configured. Your old GiantBomb API keys are no longer needed.",
       "title": "Ascendara Xtra Update",
-      "whatChanged": "What changed: Steam API now provides game metadata, screenshots, and details automatically. IGDB is still available as an optional enhancement if you configure it in Settings."
+      "whatChanged": "What changed: Steam API now provides game metadata, screenshots, and details automatically."
     },
     "areYouSureYouWantToSkip": "Are you sure you want to skip installing dependencies? Some games may not work properly.",
     "ascendara": "Ascendara",
