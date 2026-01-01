@@ -40,6 +40,41 @@ const normalizeGameTitle = title => {
 };
 
 /**
+ * Generate search variations for a game title
+ * Handles common patterns like "Game Name - Abbreviation"
+ * @param {string} title - Original game title
+ * @returns {Array<string>} Array of search variations to try
+ */
+const generateSearchVariations = title => {
+  if (!title) return [];
+
+  const variations = [title]; // Start with original
+
+  // Pattern: "Game Name - Abbreviation" (e.g., "Grand Theft Auto V - GTA 5")
+  // Try removing everything after the dash
+  const dashMatch = title.match(/^(.+?)\s*[-–—]\s*.+$/);
+  if (dashMatch) {
+    variations.push(dashMatch[1].trim());
+  }
+
+  // Pattern: "Game Name: Subtitle"
+  // Try removing subtitle
+  const colonMatch = title.match(/^(.+?):\s*.+$/);
+  if (colonMatch) {
+    variations.push(colonMatch[1].trim());
+  }
+
+  // Try normalized version
+  const normalized = normalizeGameTitle(title);
+  if (normalized && normalized !== title.toLowerCase()) {
+    variations.push(normalized);
+  }
+
+  // Remove duplicates while preserving order
+  return [...new Set(variations)];
+};
+
+/**
  * Search for a game by name using Steam Store Search API
  * @param {string} gameName - Name of the game to search for
  * @param {string} apiKey - Steam API Key (not used for store search)
@@ -47,88 +82,80 @@ const normalizeGameTitle = title => {
  */
 const searchGameSteam = async (gameName, apiKey) => {
   try {
-    // Normalize the search term
-    const normalizedSearch = normalizeGameTitle(gameName);
-    const encodedSearch = encodeURIComponent(gameName);
+    // Generate search variations
+    const searchVariations = generateSearchVariations(gameName);
+    console.log(
+      `Generated ${searchVariations.length} search variations:`,
+      searchVariations
+    );
 
+    const normalizedSearch = normalizeGameTitle(gameName);
     console.log(`Searching Steam for: "${gameName}" (normalized: "${normalizedSearch}")`);
 
-    // Try Steam Store Search API with original title first
-    const storeSearchUrl = `https://store.steampowered.com/api/storesearch?term=${encodedSearch}&l=en&cc=US`;
-    const storeResult = await window.electron.steamRequest(storeSearchUrl);
+    // Try each search variation until we find results
+    for (let i = 0; i < searchVariations.length; i++) {
+      const searchTerm = searchVariations[i];
+      const encodedSearch = encodeURIComponent(searchTerm);
 
-    if (storeResult.success) {
-      const storeData = storeResult.data;
-      console.log("Steam Store Search response:", storeData);
+      console.log(
+        `[Attempt ${i + 1}/${searchVariations.length}] Trying: "${searchTerm}"`
+      );
 
-      if (storeData.items && storeData.items.length > 0) {
-        console.log(`Found ${storeData.items.length} items from Steam Store Search`);
+      const storeSearchUrl = `https://store.steampowered.com/api/storesearch?term=${encodedSearch}&l=en&cc=US`;
+      const storeResult = await window.electron.steamRequest(storeSearchUrl);
 
-        // Find best match using normalized titles
-        let bestMatch = null;
-        let bestScore = 0;
+      if (storeResult.success) {
+        const storeData = storeResult.data;
+        console.log(`Search response for "${searchTerm}":`, storeData);
 
-        for (const item of storeData.items) {
-          console.log(`Checking item: ${item.name} (type: ${item.type})`);
+        if (storeData.items && storeData.items.length > 0) {
+          console.log(`Found ${storeData.items.length} items from Steam Store Search`);
 
-          // Steam uses "app" for games, not "game"
-          // We'll accept all types and let similarity matching handle it
-          // if (item.type !== "app") continue;
+          // Find best match using normalized titles
+          let bestMatch = null;
+          let bestScore = 0;
 
-          const normalizedItemName = normalizeGameTitle(item.name);
+          for (const item of storeData.items) {
+            console.log(`Checking item: ${item.name} (type: ${item.type})`);
 
-          // Exact match gets highest priority
-          if (normalizedItemName === normalizedSearch) {
-            bestMatch = { appid: item.id, name: item.name };
-            console.log(`Found exact match: ${item.name}`);
-            break;
-          }
+            const normalizedItemName = normalizeGameTitle(item.name);
 
-          // Calculate similarity score
-          const score = calculateSimilarity(normalizedSearch, normalizedItemName);
-          console.log(`Similarity score for "${item.name}": ${score}`);
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = { appid: item.id, name: item.name };
-          }
-        }
+            // Exact match gets highest priority
+            if (normalizedItemName === normalizedSearch) {
+              bestMatch = { appid: item.id, name: item.name };
+              console.log(`Found exact match: ${item.name}`);
+              break;
+            }
 
-        if (bestMatch) {
-          console.log(
-            `Steam Store Search found: ${bestMatch.name} (AppID: ${bestMatch.appid}, score: ${bestScore})`
-          );
-          return bestMatch;
-        } else {
-          console.log("No suitable match found in store search results");
-        }
-      } else {
-        console.log("Store search returned no items with original title");
-
-        // Try again with just the base game name (remove edition suffixes)
-        if (gameName !== normalizedSearch) {
-          console.log(`Trying normalized search: "${normalizedSearch}"`);
-          const normalizedEncoded = encodeURIComponent(normalizedSearch);
-          const normalizedSearchUrl = `https://store.steampowered.com/api/storesearch?term=${normalizedEncoded}&l=en&cc=US`;
-          const normalizedResult =
-            await window.electron.steamRequest(normalizedSearchUrl);
-
-          if (normalizedResult.success) {
-            const normalizedData = normalizedResult.data;
-            console.log("Normalized search response:", normalizedData);
-
-            if (normalizedData.items && normalizedData.items.length > 0) {
-              // Take the first result from normalized search
-              const firstResult = normalizedData.items[0];
-              console.log(
-                `Using first result from normalized search: ${firstResult.name} (AppID: ${firstResult.id})`
-              );
-              return { appid: firstResult.id, name: firstResult.name };
+            // Calculate similarity score
+            const score = calculateSimilarity(normalizedSearch, normalizedItemName);
+            console.log(`Similarity score for "${item.name}": ${score}`);
+            if (score > bestScore && score > 0.5) {
+              // Only consider matches with >50% similarity
+              bestScore = score;
+              bestMatch = { appid: item.id, name: item.name };
             }
           }
+
+          if (bestMatch) {
+            console.log(
+              `Steam Store Search found: ${bestMatch.name} (AppID: ${bestMatch.appid}, score: ${bestScore})`
+            );
+            return bestMatch;
+          } else {
+            console.log("No suitable match found in store search results");
+          }
+        } else {
+          console.log(`No items returned for search term: "${searchTerm}"`);
         }
+      } else {
+        console.log(`Store search failed for: "${searchTerm}"`);
       }
-    } else {
-      console.log(`Store search failed`);
+
+      // Small delay between requests to avoid rate limiting
+      if (i < searchVariations.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
     }
 
     console.log(`No Steam app found for: ${gameName}`);
