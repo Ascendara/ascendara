@@ -60,6 +60,12 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -82,7 +88,7 @@ import recentGamesService from "@/services/recentGamesService";
 import GamesBackupDialog from "@/components/GamesBackupDialog";
 import imageCacheService from "@/services/imageCacheService";
 import GameMetadata from "@/components/GameMetadata";
-import igdbService from "@/services/gameInfoService";
+import steamService from "@/services/gameInfoService";
 import GameRate from "@/components/GameRate";
 import EditCoverDialog from "@/components/EditCoverDialog";
 import nexusModsService from "@/services/nexusModsService";
@@ -598,8 +604,8 @@ export default function GameScreen() {
   const [showExecutableSelect, setShowExecutableSelect] = useState(false);
   const [availableExecutables, setAvailableExecutables] = useState([]);
   const [pendingLaunchOptions, setPendingLaunchOptions] = useState(null);
-  const [igdbData, setIgdbData] = useState(null);
-  const [igdbLoading, setIgdbLoading] = useState(false);
+  const [steamData, setSteamData] = useState(null);
+  const [steamLoading, setSteamLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
   const [launchOptionsDialogOpen, setLaunchOptionsDialogOpen] = useState(false);
@@ -754,8 +760,8 @@ export default function GameScreen() {
 
         setLoading(false);
 
-        // Fetch IGDB data
-        fetchIgdbData(game.game || game.name);
+        // Fetch Steam API data
+        fetchSteamData(game.game || game.name);
       } catch (error) {
         console.error("Error loading game:", error);
         setLoading(false);
@@ -825,11 +831,11 @@ export default function GameScreen() {
     checkForUpdates();
   }, [game]);
 
-  // Re-fetch IGDB data when game changes
+  // Re-fetch Steam data when game changes
   // Steam API is always available (hardcoded), so we always fetch
   useEffect(() => {
     if (game) {
-      fetchIgdbData(game.game || game.name);
+      fetchSteamData(game.game || game.name);
     }
   }, [game]);
 
@@ -937,12 +943,12 @@ export default function GameScreen() {
         return;
       }
 
-      // If IGDB cover is available, use it
-      if (igdbData?.cover?.url) {
-        const coverUrl = igdbService.formatImageUrl(igdbData.cover.url, "cover_big");
+      // If Steam cover is available, use it
+      if (steamData?.cover?.url) {
+        const coverUrl = steamService.formatImageUrl(steamData.cover.url, "cover_big");
         if (coverUrl && isMounted) {
           setImageData(coverUrl);
-          // Cache the IGDB cover URL
+          // Cache the Steam cover URL
           try {
             localStorage.setItem(localStorageKey, coverUrl);
           } catch (e) {
@@ -996,7 +1002,7 @@ export default function GameScreen() {
       // Clean up event listener
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
     };
-  }, [game.game, game.name, igdbData?.cover?.url]); // Add igdbData.cover.url as dependency
+  }, [game.game, game.name, steamData?.cover?.url]); // Add steamData.cover.url as dependency
 
   // Log hasRated state changes
   useEffect(() => {
@@ -1424,32 +1430,32 @@ export default function GameScreen() {
     setErrorMessage("");
   };
 
-  // Fetch IGDB data
-  const fetchIgdbData = async gameName => {
+  // Fetch Steam API data
+  const fetchSteamData = async gameName => {
     try {
-      setIgdbLoading(true);
+      setSteamLoading(true);
 
       // Steam API is always available (hardcoded)
       console.log("Fetching game data from Steam API");
 
-      const data = await igdbService.getGameDetails(gameName);
+      const data = await steamService.getGameDetails(gameName);
 
       if (data) {
         if (data.screenshots && data.screenshots.length > 0) {
           data.formatted_screenshots = data.screenshots.map(screenshot => ({
             ...screenshot,
-            formatted_url: igdbService.formatImageUrl(screenshot.url, "screenshot_huge"),
+            formatted_url: steamService.formatImageUrl(screenshot.url, "screenshot_huge"),
           }));
         }
-        setIgdbData(data);
+        setSteamData(data);
       } else {
         console.log("No game data found for:", gameName);
       }
 
-      setIgdbLoading(false);
+      setSteamLoading(false);
     } catch (error) {
       console.error("Error fetching game data:", error);
-      setIgdbLoading(false);
+      setSteamLoading(false);
     }
   };
 
@@ -1478,8 +1484,8 @@ export default function GameScreen() {
     );
   }
 
-  // Prepare screenshots data from IGDB if available
-  const screenshots = igdbData?.formatted_screenshots || [];
+  // Prepare screenshots data from Steam API if available
+  const screenshots = steamData?.formatted_screenshots || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -1905,46 +1911,92 @@ export default function GameScreen() {
           </div>
 
           {/* Right column - Game details */}
-          <div className="space-y-8 lg:col-span-2">
-            {/* Tabs for different sections */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Quick Navigation - Compact Pills */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setActiveTab("overview")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                  activeTab === "overview"
+                    ? "bg-primary text-secondary"
+                    : "bg-muted hover:bg-muted/80"
+                )}
+              >
+                <Info className="h-3.5 w-3.5" />
+                {t("gameScreen.overview")}
+              </button>
+              <button
+                onClick={() => setActiveTab("soundtrack")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                  activeTab === "soundtrack"
+                    ? "bg-primary text-secondary"
+                    : "bg-muted hover:bg-muted/80"
+                )}
+              >
+                <Music2 className="h-3.5 w-3.5" />
+                {t("gameScreen.soundtrack")}
+              </button>
+              <button
+                onClick={() => setActiveTab("achievements")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                  activeTab === "achievements"
+                    ? "bg-primary text-secondary"
+                    : "bg-muted hover:bg-muted/80"
+                )}
+              >
+                <Trophy className="h-3.5 w-3.5" />
+                {t("gameScreen.achievements")}
+              </button>
+              {screenshots.length > 0 && (
+                <button
+                  onClick={() => setActiveTab("media")}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    activeTab === "media"
+                      ? "bg-primary text-secondary"
+                      : "bg-muted hover:bg-muted/80"
+                  )}
+                >
+                  <ImageUp className="h-3.5 w-3.5" />
+                  {t("gameScreen.media")}
+                </button>
+              )}
+              {supportsModManaging && (
+                <button
+                  onClick={() => setActiveTab("mods")}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    activeTab === "mods"
+                      ? "bg-primary text-secondary"
+                      : "bg-muted hover:bg-muted/80"
+                  )}
+                >
+                  <Puzzle className="h-3.5 w-3.5" />
+                  {t("gameScreen.mods")}
+                </button>
+              )}
+              {supportsFlingTrainer && (
+                <button
+                  onClick={() => setActiveTab("trainers")}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    activeTab === "trainers"
+                      ? "bg-primary text-secondary"
+                      : "bg-muted hover:bg-muted/80"
+                  )}
+                >
+                  <Bolt className="h-3.5 w-3.5" />
+                  {t("gameScreen.trainers")}
+                </button>
+              )}
+            </div>
+
             <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-4">
-                <TabsTrigger value="overview">
-                  <Info className="mr-2 h-4 w-4" />
-                  {t("gameScreen.overview")}
-                </TabsTrigger>
-                <TabsTrigger value="soundtrack">
-                  <Music2 className="mr-2 h-4 w-4" />
-                  {t("gameScreen.soundtrack")}
-                </TabsTrigger>
-                <TabsTrigger value="achievements">
-                  <Trophy className="mr-2 h-4 w-4" />
-                  {t("gameScreen.achievements")}
-                </TabsTrigger>
-                {screenshots.length > 0 && (
-                  <TabsTrigger value="media">
-                    <ImageUp className="mr-2 h-4 w-4" />
-                    {t("gameScreen.media")}
-                  </TabsTrigger>
-                )}
-                {igdbData && (
-                  <TabsTrigger value="details">
-                    <LetterText className="mr-2 h-4 w-4" />
-                    {t("gameScreen.details")}
-                  </TabsTrigger>
-                )}
-                {supportsModManaging && (
-                  <TabsTrigger value="mods">
-                    <Puzzle className="mr-2 h-4 w-4" />
-                    {t("gameScreen.mods")}
-                  </TabsTrigger>
-                )}
-                {supportsFlingTrainer && (
-                  <TabsTrigger value="trainers">
-                    <Bolt className="mr-2 h-4 w-4" />
-                    {t("gameScreen.trainers")}
-                  </TabsTrigger>
-                )}
+              <TabsList className="hidden">
+                <TabsTrigger value="overview">{t("gameScreen.overview")}</TabsTrigger>
               </TabsList>
 
               {!hasRated && settings.usingLocalIndex && game.gameID && (
@@ -2214,38 +2266,108 @@ export default function GameScreen() {
 
               {/* Overview tab */}
               <TabsContent value="overview" className="space-y-6">
-                <Card>
-                  <CardContent className="p-6">
-                    {/* Game summary */}
-                    {igdbData?.summary ? (
-                      <div className="space-y-4">
-                        <h2 className="text-xl font-bold">{t("gameScreen.summary")}</h2>
-                        <p className="leading-relaxed text-muted-foreground">
-                          {igdbData.summary}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <div className="mb-4 rounded-full bg-muted p-3">
-                          <Info className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-medium">
-                          {t("gameScreen.noSummaryAvailable")}
-                        </h3>
-                        <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                          {t("gameScreen.noSummaryDescription")}
-                        </p>
-
-                        {igdbLoading && (
-                          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader className="h-4 w-4 animate-spin" />
-                            {t("gameScreen.loadingGameInfo")}
+                {/* Game Info Stats Cards */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  {game.version && game.version !== "-1" && (
+                    <Card
+                      className={updateInfo?.updateAvailable ? "border-blue-500/50" : ""}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex flex-col items-center text-center">
+                          <div className="relative mb-2">
+                            <Tag className="h-5 w-5 text-primary" />
+                            {updateInfo?.updateAvailable && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="absolute -right-2 -top-2 h-4 w-4 text-blue-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right">
+                                    <p className="text-xs">
+                                      Update available: {updateInfo.latestVersion}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                           </div>
-                        )}
+                          <span className="text-xs text-muted-foreground">
+                            {t("library.version")}
+                          </span>
+                          <p className="mt-1 text-sm font-semibold">{game.version}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {game.size && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex flex-col items-center text-center">
+                          <PackageOpen className="mb-2 h-5 w-5 text-primary" />
+                          <span className="text-xs text-muted-foreground">
+                            {t("library.size")}
+                          </span>
+                          <p className="mt-1 text-sm font-semibold">{game.size}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col items-center text-center">
+                        <Clock className="mb-2 h-5 w-5 text-primary" />
+                        <span className="text-xs text-muted-foreground">
+                          {t("library.playTime")}
+                        </span>
+                        <p className="mt-1 text-sm font-semibold">
+                          {formatPlaytime(game.playTime)}
+                        </p>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+
+                  {game.executable && (
+                    <Card className={!executableExists ? "border-red-500/50" : ""}>
+                      <CardContent className="p-4">
+                        <div className="flex flex-col items-center text-center">
+                          <Monitor className="mb-2 h-5 w-5 text-primary" />
+                          <span className="text-xs text-muted-foreground">
+                            {t("library.executable")}
+                          </span>
+                          <div className="mt-1 flex items-center gap-1">
+                            <p className="max-w-[100px] truncate text-sm font-semibold">
+                              {game.executable.split("\\").pop()}
+                            </p>
+                            {!executableExists && (
+                              <AlertTriangle className="h-4 w-4 text-red-500" />
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Game Summary */}
+                {steamData?.summary && (
+                  <Card className="border-l-4 border-l-primary">
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="rounded-full bg-primary/10 p-2">
+                            <Info className="h-5 w-5 text-primary" />
+                          </div>
+                          <h2 className="text-xl font-bold">{t("gameScreen.summary")}</h2>
+                        </div>
+                        <p className="text-base leading-relaxed text-foreground/80">
+                          {steamData.summary}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Featured screenshots */}
                 {screenshots.length > 0 && (
@@ -2253,30 +2375,38 @@ export default function GameScreen() {
                     <CardContent className="p-6">
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <h2 className="text-xl font-bold">
-                            {t("gameScreen.screenshots")}
-                          </h2>
+                          <div className="flex items-center gap-2">
+                            <ImageUp className="h-5 w-5 text-primary" />
+                            <h2 className="text-xl font-bold">
+                              {t("gameScreen.screenshots")}
+                            </h2>
+                          </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-muted-foreground"
+                            className="gap-1 text-muted-foreground hover:text-primary"
                             onClick={() => setActiveTab("media")}
                           >
                             {t("gameScreen.viewAll")}
+                            <ExternalLink className="h-3 w-3" />
                           </Button>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                          {screenshots.slice(0, 4).map((screenshot, index) => (
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                          {screenshots.slice(0, 6).map((screenshot, index) => (
                             <div
                               key={index}
-                              className="aspect-video overflow-hidden rounded-lg bg-muted"
+                              className="group relative aspect-video cursor-pointer overflow-hidden rounded-lg bg-muted transition-all hover:ring-2 hover:ring-primary"
+                              onClick={() =>
+                                window.electron.openURL(screenshot.formatted_url)
+                              }
                             >
                               <img
                                 src={screenshot.formatted_url}
                                 alt={`Screenshot ${index + 1}`}
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-cover transition-transform group-hover:scale-105"
                               />
+                              <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
                             </div>
                           ))}
                         </div>
@@ -2284,78 +2414,6 @@ export default function GameScreen() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* Basic game info */}
-                <Card>
-                  <CardContent className="p-6">
-                    <h2 className="mb-4 text-xl font-bold">{t("gameScreen.gameInfo")}</h2>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {game.version && game.version !== "-1" && (
-                        <div className="flex items-center gap-2">
-                          <Tag className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <span className="text-sm text-muted-foreground">
-                              {t("library.version")}
-                            </span>
-                            <p className="text-sm font-medium">{game.version}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {game.size && (
-                        <div className="flex items-center gap-2">
-                          <PackageOpen className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <span className="text-sm text-muted-foreground">
-                              {t("library.size")}
-                            </span>
-                            <p className="text-sm font-medium">{game.size}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <span className="text-sm text-muted-foreground">
-                            {t("library.playTime")}
-                          </span>
-                          <p className="text-sm font-medium">
-                            {formatPlaytime(game.playTime)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {game.executable && (
-                        <div className="flex items-center gap-3">
-                          <Monitor className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <span className="text-sm text-muted-foreground">
-                              {t("library.executable")}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <p className="max-w-[220px] truncate text-sm font-medium text-foreground">
-                                {game.executable.split("\\").pop()}
-                              </p>
-                              {!executableExists && (
-                                <AlertTriangle
-                                  className="h-5 w-5 animate-pulse text-red-500"
-                                  title={t("library.executableNotFound")}
-                                />
-                              )}
-                            </div>
-                            {!executableExists && (
-                              <p className="text-sm text-muted-foreground">
-                                {t("library.executableNotFound")}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               {/* Media tab */}
@@ -2384,39 +2442,6 @@ export default function GameScreen() {
                         ))}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Details tab */}
-              <TabsContent value="details" className="space-y-6">
-                <Card>
-                  <CardContent className="p-6">
-                    {igdbData ? (
-                      <GameMetadata gameInfo={igdbData} />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center space-y-4 py-12 text-center">
-                        <div className="flex flex-col items-center justify-center space-y-2 text-center">
-                          <div className="rounded-full bg-muted p-4">
-                            <BookX className="h-12 w-12 text-muted-foreground" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="font-medium">
-                              {t("gameScreen.noDetailsAvailable")}
-                            </p>
-                            <p className="max-w-sm text-sm text-muted-foreground">
-                              {t("gameScreen.noDetailsDescription")}
-                            </p>
-                          </div>
-                        </div>
-                        {igdbLoading && (
-                          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader className="h-4 w-4 animate-spin" />
-                            {t("gameScreen.loadingGameInfo")}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

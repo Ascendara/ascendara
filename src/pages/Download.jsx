@@ -69,7 +69,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
 import { toast } from "sonner";
 import TimemachineDialog from "@/components/TimemachineDialog";
-import igdbService from "@/services/gameInfoService";
+import steamService from "@/services/gameInfoService";
 import torboxService from "@/services/torboxService";
 import TorboxIcon from "@/components/TorboxIcon";
 import GameScreenshots from "@/components/GameScreenshots";
@@ -225,32 +225,32 @@ export default function DownloadPage() {
     }
   };
 
-  // Fetch IGDB data
-  const fetchIgdbData = async gameName => {
+  // Fetch Steam API data
+  const fetchSteamData = async gameName => {
     try {
       // Steam API is always available (hardcoded)
-      setIgdbLoading(true);
-      setIgdbError(null);
+      setSteamLoading(true);
+      setSteamError(null);
 
       try {
-        const data = await igdbService.getGameDetails(gameName);
+        const data = await steamService.getGameDetails(gameName);
 
         if (data) {
-          setIgdbData(data);
+          setSteamData(data);
         } else {
           console.log("No game data found for:", gameData.game);
-          setIgdbError("No game data found");
+          setSteamError("No game data found");
         }
       } catch (error) {
         console.error("Error fetching game data:", error);
-        setIgdbError(error.message || "Error fetching game data");
+        setSteamError(error.message || "Error fetching game data");
       } finally {
-        setIgdbLoading(false);
+        setSteamLoading(false);
       }
     } catch (error) {
       console.error("Error in fetchGameInfo:", error);
-      setIgdbLoading(false);
-      setIgdbError(error.message || "An unexpected error occurred");
+      setSteamLoading(false);
+      setSteamError(error.message || "An unexpected error occurred");
     }
   };
 
@@ -290,11 +290,11 @@ export default function DownloadPage() {
     console.log("Received game data:", gameData);
   }, [gameData, navigate]);
 
-  // Fetch IGDB data when game data changes
+  // Fetch Steam data when game data changes
   // Steam API is always available (hardcoded), so we always fetch
   useEffect(() => {
     if (gameData && gameData.game) {
-      fetchIgdbData(gameData.game);
+      fetchSteamData(gameData.game);
     }
   }, [gameData]);
 
@@ -342,9 +342,9 @@ export default function DownloadPage() {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [showQueuePrompt, setShowQueuePrompt] = useState(false);
   const [pendingDownloadData, setPendingDownloadData] = useState(null);
-  const [igdbData, setIgdbData] = useState(null);
-  const [igdbError, setIgdbError] = useState(null);
-  const [igdbLoading, setIgdbLoading] = useState(false);
+  const [steamData, setSteamData] = useState(null);
+  const [steamError, setSteamError] = useState(null);
+  const [steamLoading, setSteamLoading] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [showCompareDialog, setShowCompareDialog] = useState(false);
   const [systemSpecs, setSystemSpecs] = useState(null);
@@ -417,7 +417,7 @@ export default function DownloadPage() {
   // Use a ref to track the event handler and active status
   const urlHandlerRef = useRef(null);
   const isActive = useRef(false);
-  const igdbSectionRef = useRef(null);
+  const steamSectionRef = useRef(null);
   const mainContentRef = useRef(null);
   const scrollThreshold = 220;
   const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
@@ -947,14 +947,14 @@ export default function DownloadPage() {
   }, []);
 
   useEffect(() => {
-    if (!igdbData || !igdbSectionRef.current) return;
+    if (!steamData || !steamSectionRef.current) return;
 
     let lastScrollY = 0;
     let ticking = false;
     let scrollingTimeout = null;
     let scrollDirection = null;
     let lastScrollTime = Date.now();
-    let hasScrolledToIgdb = false;
+    let hasScrolledToSteam = false;
     let hasScrolledToBottom = false;
 
     const handleScroll = () => {
@@ -990,17 +990,18 @@ export default function DownloadPage() {
             return;
           }
 
-          const igdbSectionTop = igdbSectionRef.current.offsetTop;
-          const igdbSectionBottom = igdbSectionTop + igdbSectionRef.current.offsetHeight;
+          const steamSectionTop = steamSectionRef.current.offsetTop;
+          const steamSectionBottom =
+            steamSectionTop + steamSectionRef.current.offsetHeight;
           const windowHeight = window.innerHeight;
           const documentHeight = document.documentElement.scrollHeight;
           const scrollBottom = currentScrollY + windowHeight;
 
           // Reset flags when user has scrolled far enough
           if (currentScrollY < scrollThreshold) {
-            hasScrolledToIgdb = false;
+            hasScrolledToSteam = false;
           }
-          if (currentScrollY < igdbSectionTop - 100) {
+          if (currentScrollY < steamSectionTop - 100) {
             hasScrolledToBottom = false;
           }
 
@@ -1031,8 +1032,8 @@ export default function DownloadPage() {
                   setIsAutoScrolling(false);
 
                   // Update flags after scrolling completes
-                  if (targetPosition >= igdbSectionTop - 100) {
-                    hasScrolledToIgdb = true;
+                  if (targetPosition >= steamSectionTop - 100) {
+                    hasScrolledToSteam = true;
                   }
                   if (targetPosition >= documentHeight - windowHeight - 50) {
                     hasScrolledToBottom = true;
@@ -1044,40 +1045,40 @@ export default function DownloadPage() {
             window.requestAnimationFrame(animateScroll);
           };
 
-          // Case 1: Scrolling down from top area to IGDB section
+          // Case 1: Scrolling down from top area to Steam section
           if (
             scrollDirection === "down" &&
             currentScrollY > scrollThreshold &&
-            currentScrollY < igdbSectionTop - 150 &&
-            !hasScrolledToIgdb
+            currentScrollY < steamSectionTop - 150 &&
+            !hasScrolledToSteam
           ) {
-            smoothScrollTo(currentScrollY, igdbSectionTop - 40);
+            smoothScrollTo(currentScrollY, steamSectionTop - 40);
           }
-          // Case 2: Scrolling up from IGDB section to top area
+          // Case 2: Scrolling up from Steam section to top area
           else if (
             scrollDirection === "up" &&
-            currentScrollY < igdbSectionTop &&
+            currentScrollY < steamSectionTop &&
             currentScrollY > scrollThreshold
           ) {
             smoothScrollTo(currentScrollY, 0);
           }
-          // Case 3: Scrolling up from bottom of page to IGDB section
+          // Case 3: Scrolling up from bottom of page to Steam section
           else if (
             scrollDirection === "up" &&
-            currentScrollY > igdbSectionBottom + 200 &&
+            currentScrollY > steamSectionBottom + 200 &&
             currentScrollY < documentHeight - windowHeight - 100
           ) {
             // Only trigger if we've scrolled up a significant amount
             if (scrollBottom < documentHeight - 150) {
-              smoothScrollTo(currentScrollY, igdbSectionTop - 40);
+              smoothScrollTo(currentScrollY, steamSectionTop - 40);
             }
           }
-          // Case 4: Scrolling down from IGDB section to bottom of page
-          // Only trigger if we haven't already scrolled to bottom and we're near the end of the IGDB section
+          // Case 4: Scrolling down from Steam section to bottom of page
+          // Only trigger if we haven't already scrolled to bottom and we're near the end of the Steam section
           else if (
             scrollDirection === "down" &&
-            currentScrollY >= igdbSectionBottom - 200 &&
-            currentScrollY < igdbSectionBottom &&
+            currentScrollY >= steamSectionBottom - 200 &&
+            currentScrollY < steamSectionBottom &&
             !hasScrolledToBottom
           ) {
             smoothScrollTo(currentScrollY, documentHeight - windowHeight);
@@ -1098,7 +1099,7 @@ export default function DownloadPage() {
         clearTimeout(scrollingTimeout);
       }
     };
-  }, [igdbData, isAutoScrolling]);
+  }, [steamData, isAutoScrolling]);
 
   const checkDownloadPath = async () => {
     try {
@@ -2837,7 +2838,7 @@ export default function DownloadPage() {
         </div>
       </div>
 
-      {igdbData && (
+      {steamData && (
         <div className="mt-4 opacity-50">{t("download.scrollToViewMore")}</div>
       )}
 
@@ -2865,27 +2866,27 @@ export default function DownloadPage() {
         </TooltipProvider>
       )}
 
-      {/* IGDB Game Store-like Section */}
+      {/* Steam Game Info Section */}
       {gameData && (
         <div
-          ref={igdbSectionRef}
+          ref={steamSectionRef}
           className="mb-8 mt-48 overflow-hidden rounded-lg border border-border bg-card shadow-md"
         >
-          {igdbLoading ? (
+          {steamLoading ? (
             <div className="flex items-center justify-center px-16 py-16">
               <Loader className="mr-2 h-4 w-4 animate-spin text-primary" />
-              {t("download.igdbLoading")}
+              {t("download.steamLoading")}
             </div>
-          ) : igdbData ? (
+          ) : steamData ? (
             <>
               {/* Hero Banner with Cover Image */}
               <div className="relative">
-                {igdbData.screenshots && igdbData.screenshots.length > 0 ? (
+                {steamData.screenshots && steamData.screenshots.length > 0 ? (
                   <div className="relative h-[400px] w-full overflow-hidden">
                     <div
                       className="absolute inset-0 bg-cover bg-center"
                       style={{
-                        backgroundImage: `url(${igdbService.formatImageUrl(igdbData.screenshots[0].url, "screenshot_huge")})`,
+                        backgroundImage: `url(${steamService.formatImageUrl(steamData.screenshots[0].url, "screenshot_huge")})`,
                         filter: "blur(1px)",
                         transform: "scale(1.01)",
                       }}
@@ -2895,14 +2896,14 @@ export default function DownloadPage() {
                     <div className="absolute bottom-0 left-0 right-0 flex items-end p-8">
                       <div className="relative z-10 flex w-full flex-col md:flex-row md:items-end">
                         {/* Game Cover */}
-                        {igdbData.cover && (
+                        {steamData.cover && (
                           <div className="mb-4 h-[200px] w-[150px] shrink-0 overflow-hidden rounded-md border border-border shadow-lg md:mb-0 md:mr-6">
                             <img
-                              src={igdbService.formatImageUrl(
-                                igdbData.cover.url,
+                              src={steamService.formatImageUrl(
+                                steamData.cover.url,
                                 "cover_big"
                               )}
-                              alt={igdbData.name}
+                              alt={steamData.name}
                               className="h-full w-full object-cover"
                             />
                           </div>
@@ -2910,7 +2911,7 @@ export default function DownloadPage() {
                         {/* Game Title and Basic Info */}
                         <div className="flex-1">
                           <h1 className="text-3xl font-bold text-primary drop-shadow-md">
-                            {igdbData.name || gameData.game}
+                            {steamData.name || gameData.game}
                           </h1>
 
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-primary/80">
@@ -2934,21 +2935,21 @@ export default function DownloadPage() {
                           </div>
 
                           <div className="mt-3 flex flex-wrap items-center gap-4">
-                            {igdbData.rating && (
+                            {steamData.rating && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div className="flex cursor-help items-center gap-2">
                                       <Apple className="h-5 w-5 fill-red-400 text-red-400" />
                                       <span className="text-sm font-medium text-primary">
-                                        {(igdbData.rating / 10).toFixed(1)}
+                                        {(steamData.rating / 10).toFixed(1)}
                                       </span>
                                     </div>
                                   </TooltipTrigger>
                                   <TooltipContent side="bottom">
                                     <p className="max-w-[300px] text-xs font-semibold text-secondary">
-                                      {t("download.igdbRating", {
-                                        rating: (igdbData.rating / 10).toFixed(1),
+                                      {t("download.steamRating", {
+                                        rating: (steamData.rating / 10).toFixed(1),
                                       })}
                                     </p>
                                   </TooltipContent>
@@ -2985,9 +2986,9 @@ export default function DownloadPage() {
                               </TooltipProvider>
                             )}
 
-                            {igdbData.release_date && (
+                            {steamData.release_date && (
                               <div className="rounded-full bg-primary/20 px-3 py-1 text-sm font-medium text-primary">
-                                {t("download.firstReleasedOn")}: {igdbData.release_date}
+                                {t("download.firstReleasedOn")}: {steamData.release_date}
                               </div>
                             )}
 
@@ -3005,7 +3006,7 @@ export default function DownloadPage() {
                 ) : (
                   <div className="flex h-[200px] items-center justify-center bg-gradient-to-r from-primary/20 to-secondary/20">
                     <h1 className="text-3xl font-bold text-foreground">
-                      {igdbData.name || gameData.game}
+                      {steamData.name || gameData.game}
                     </h1>
                   </div>
                 )}
@@ -3044,19 +3045,19 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                   {/* Game Summary - Spans 2 columns */}
                   <div className="md:col-span-2">
-                    {igdbData.summary && (
+                    {steamData.summary && (
                       <div className="mb-8">
                         <h2 className="mb-3 text-xl font-bold text-foreground">
                           {t("download.aboutGame")}
                         </h2>
                         <p className="leading-relaxed text-muted-foreground">
-                          {igdbData.summary}
+                          {steamData.summary}
                         </p>
 
-                        {igdbData.storyline && (
+                        {steamData.storyline && (
                           <div className="mt-4">
                             <p className="leading-relaxed text-muted-foreground">
-                              {igdbData.storyline}
+                              {steamData.storyline}
                             </p>
                           </div>
                         )}
@@ -3086,31 +3087,31 @@ export default function DownloadPage() {
                     )}
 
                     {/* Developers & Publishers */}
-                    {(igdbData.developers?.length > 0 ||
-                      igdbData.publishers?.length > 0) && (
+                    {(steamData.developers?.length > 0 ||
+                      steamData.publishers?.length > 0) && (
                       <div className="rounded-lg border border-border bg-card/50 p-4">
                         <h3 className="mb-2 font-semibold text-foreground">
                           {t("download.companies")}
                         </h3>
 
-                        {igdbData.developers?.length > 0 && (
+                        {steamData.developers?.length > 0 && (
                           <div className="mb-2">
                             <h4 className="text-xs font-medium uppercase text-muted-foreground">
                               {t("download.developers")}
                             </h4>
                             <p className="text-sm text-foreground">
-                              {igdbData.developers.join(", ")}
+                              {steamData.developers.join(", ")}
                             </p>
                           </div>
                         )}
 
-                        {igdbData.publishers?.length > 0 && (
+                        {steamData.publishers?.length > 0 && (
                           <div>
                             <h4 className="text-xs font-medium uppercase text-muted-foreground">
                               {t("download.publishers")}
                             </h4>
                             <p className="text-sm text-foreground">
-                              {igdbData.publishers.join(", ")}
+                              {steamData.publishers.join(", ")}
                             </p>
                           </div>
                         )}
@@ -3119,16 +3120,19 @@ export default function DownloadPage() {
                   </div>
                 </div>
                 {/* Screenshots Gallery - Full width */}
-                {igdbData.screenshots && igdbData.screenshots.length > 0 && (
+                {steamData.screenshots && steamData.screenshots.length > 0 && (
                   <div className="mb-64 mt-8">
                     <h2 className="mb-4 text-xl font-bold text-foreground">
                       {t("download.screenshots")}
                     </h2>
                     <GameScreenshots
-                      screenshots={igdbData.screenshots.slice(0, 4).map(screenshot => ({
+                      screenshots={steamData.screenshots.slice(0, 4).map(screenshot => ({
                         ...screenshot,
-                        url: igdbService.formatImageUrl(screenshot.url, "screenshot_big"),
-                        formatted_url: igdbService.formatImageUrl(
+                        url: steamService.formatImageUrl(
+                          screenshot.url,
+                          "screenshot_big"
+                        ),
+                        formatted_url: steamService.formatImageUrl(
                           screenshot.url,
                           "screenshot_huge"
                         ),
@@ -3141,7 +3145,7 @@ export default function DownloadPage() {
                 {/* Data Attribution */}
                 <div className="mt-8 flex items-center justify-end text-xs text-muted-foreground">
                   <span>{t("download.dataProvidedBy")}</span>
-                  {igdbData?.source === "steam" ? (
+                  {steamData?.source === "steam" ? (
                     <a
                       onClick={() =>
                         window.electron.openURL("https://store.steampowered.com")
@@ -3150,15 +3154,8 @@ export default function DownloadPage() {
                     >
                       Steam <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
-                  ) : igdbData?.source === "igdb" ? (
-                    <a
-                      onClick={() => window.electron.openURL("https://www.igdb.com")}
-                      className="ml-1 flex cursor-pointer items-center text-primary hover:underline"
-                    >
-                      IGDB <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
                   ) : (
-                    <span className="ml-1">Steam / IGDB</span>
+                    <span className="ml-1">Steam</span>
                   )}
                   .
                   <span className="ml-1 text-xs text-muted-foreground">
@@ -3169,12 +3166,14 @@ export default function DownloadPage() {
             </>
           ) : (
             <div className="p-6">
-              {igdbError ? (
+              {steamError ? (
                 <div className="flex flex-col items-center gap-2">
                   <p className="text-destructive text-center font-medium">
                     {t("download.gameInfoError", "Error fetching game information")}
                   </p>
-                  <p className="text-center text-sm text-muted-foreground">{igdbError}</p>
+                  <p className="text-center text-sm text-muted-foreground">
+                    {steamError}
+                  </p>
                 </div>
               ) : (
                 <p className="text-center text-muted-foreground">

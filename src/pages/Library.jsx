@@ -66,7 +66,7 @@ import {
 import gameService from "@/services/gameService";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
-import igdbService from "@/services/gameInfoService";
+import steamService from "@/services/gameInfoService";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -1003,14 +1003,14 @@ const Library = () => {
 
     setIsCoverSearchLoading(true);
     try {
-      const gameDetails = await igdbService.getGameDetails(query);
+      const gameDetails = await steamService.getGameDetails(query);
       // Transform the results to match the expected format
       const results = gameDetails
         .map(game => ({
           id: game.id,
           url:
             game.screenshots && game.screenshots.length > 0
-              ? igdbService.formatImageUrl(game.screenshots[0].url, "screenshot_big")
+              ? steamService.formatImageUrl(game.screenshots[0].url, "screenshot_big")
               : null,
           name: game.name,
         }))
@@ -2814,7 +2814,7 @@ const AddGameForm = ({ onSuccess }) => {
         // Try Steam API first for better metadata
         let steamData = null;
         try {
-          steamData = await igdbService.getGameDetails(query);
+          steamData = await steamService.getGameDetails(query);
           if (steamData && steamData.cover) {
             // If Steam API returns data, use it
             const steamResult = {
