@@ -49,6 +49,7 @@ export function SettingsProvider({ children }) {
     shareLocalIndex: true,
     fetchPageCount: 50,
     localRefreshWorkers: 8,
+    homeSearch: true,
     ludusavi: {
       backupLocation: "",
       backupFormat: "zip",
@@ -207,6 +208,7 @@ const defaultSettings = {
   shareLocalIndex: true,
   fetchPageCount: 50,
   localRefreshWorkers: 8,
+  homeSearch: true,
   ludusavi: {
     backupLocation: "",
     backupFormat: "zip",

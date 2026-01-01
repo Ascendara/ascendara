@@ -9,6 +9,16 @@ import RecentGameCard from "@/components/RecentGameCard";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import {
   Flame,
   Globe,
   ChevronLeft,
@@ -25,6 +35,13 @@ import {
   ExternalLink,
   HandCoins,
   BanknoteIcon,
+  Search,
+  Info,
+  Library,
+  Download,
+  Settings as SettingsIcon,
+  MessageSquare,
+  HelpCircle,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import Tour from "@/components/Tour";
@@ -439,6 +456,12 @@ const Home = memo(() => {
   const [dragStart, setDragStart] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [featuredGame, setFeaturedGame] = useState(null);
+  const [showQuickAccessDialog, setShowQuickAccessDialog] = useState(false);
+  const [quickAccessPage, setQuickAccessPage] = useState(() => {
+    return localStorage.getItem("homeQuickAccessPage") || "library";
+  });
+  const longPressTimer = useRef(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -1128,6 +1151,231 @@ const Home = memo(() => {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Search Bar with Quick Access Buttons */}
+        {settings.homeSearch && (
+          <section className="mt-10">
+            <div className="flex items-center gap-4">
+              {/* Left Divider */}
+              <div className="hidden flex-1 lg:block">
+                <div className="h-px bg-gradient-to-r from-transparent via-border to-border"></div>
+              </div>
+
+              {/* Search Bar Container */}
+              <div className="mx-auto flex w-full items-center gap-3 lg:w-auto lg:flex-none">
+                {/* Main Search Bar */}
+                <div
+                  onClick={() => {
+                    navigate("/search");
+                    setTimeout(() => {
+                      const searchInput = document.querySelector(
+                        'input[placeholder*="Search"]'
+                      );
+                      if (searchInput) {
+                        searchInput.focus();
+                        searchInput.click();
+                      }
+                    }, 150);
+                  }}
+                  className="group flex-1 cursor-text lg:w-[600px] lg:flex-none"
+                >
+                  <div className="relative flex items-center gap-3 rounded-2xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 px-5 py-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                      <Search className="h-5 w-5 text-primary transition-all duration-300 group-hover:scale-110" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-base font-medium text-muted-foreground/80 transition-colors group-hover:text-foreground">
+                        {t("home.searchPlaceholder")}
+                      </span>
+                      <p className="mt-0.5 text-xs text-muted-foreground/60">
+                        {t("home.searchSubtitle")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Access Buttons */}
+                <div className="flex gap-2">
+                  {/* Customizable Quick Access Button */}
+                  <div
+                    className="group cursor-pointer"
+                    onMouseDown={() => {
+                      setIsLongPressing(false);
+                      longPressTimer.current = setTimeout(() => {
+                        setIsLongPressing(true);
+                        setShowQuickAccessDialog(true);
+                      }, 500);
+                    }}
+                    onMouseUp={() => {
+                      if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                      }
+                      if (!isLongPressing) {
+                        navigate(`/${quickAccessPage}`);
+                      }
+                      setIsLongPressing(false);
+                    }}
+                    onMouseLeave={() => {
+                      if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                      }
+                      setIsLongPressing(false);
+                    }}
+                    onTouchStart={() => {
+                      setIsLongPressing(false);
+                      longPressTimer.current = setTimeout(() => {
+                        setIsLongPressing(true);
+                        setShowQuickAccessDialog(true);
+                      }, 500);
+                    }}
+                    onTouchEnd={() => {
+                      if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                      }
+                      if (!isLongPressing) {
+                        navigate(`/${quickAccessPage}`);
+                      }
+                      setIsLongPressing(false);
+                    }}
+                  >
+                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                        {quickAccessPage === "library" && (
+                          <Library className="h-4 w-4 text-primary" />
+                        )}
+                        {quickAccessPage === "downloads" && (
+                          <Download className="h-4 w-4 text-primary" />
+                        )}
+                        {quickAccessPage === "preferences" && (
+                          <SettingsIcon className="h-4 w-4 text-primary" />
+                        )}
+                        {quickAccessPage === "ascend" && (
+                          <Sparkles className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {quickAccessPage === "library" && t("common.library")}
+                        {quickAccessPage === "downloads" && t("common.downloads")}
+                        {quickAccessPage === "preferences" && t("common.preferences")}
+                        {quickAccessPage === "ascend" && t("common.ascend")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Discord Button */}
+                  <div
+                    className="group cursor-pointer"
+                    onClick={() =>
+                      window.electron.openURL("https://ascendara.app/discord")
+                    }
+                  >
+                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {t("common.discord")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="group cursor-pointer"
+                    onClick={() => window.electron.openURL("https://ascendara.app/docs")}
+                  >
+                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                        <HelpCircle className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {t("common.help")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Divider */}
+              <div className="hidden flex-1 lg:block">
+                <div className="h-px bg-gradient-to-l from-transparent via-border to-border"></div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Quick Access Configuration Dialog */}
+        {settings.homeSearch && (
+          <AlertDialog
+            open={showQuickAccessDialog}
+            onOpenChange={setShowQuickAccessDialog}
+          >
+            <AlertDialogContent className="border-border">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                  {t("home.quickAccess.title") || "Quick Access Button"}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground">
+                  {t("home.quickAccess.description") ||
+                    "Choose which page you want to quickly access from the home screen."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="mt-4">
+                <RadioGroup
+                  value={quickAccessPage}
+                  onValueChange={value => {
+                    setQuickAccessPage(value);
+                    localStorage.setItem("homeQuickAccessPage", value);
+                  }}
+                  className="space-y-3"
+                >
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="library" id="library" />
+                    <Label
+                      htmlFor="library"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <Library className="h-4 w-4 text-primary" />
+                      <span>{t("common.library")}</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="downloads" id="downloads" />
+                    <Label
+                      htmlFor="downloads"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <Download className="h-4 w-4 text-primary" />
+                      <span>{t("common.downloads")}</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="preferences" id="preferences" />
+                    <Label
+                      htmlFor="preferences"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <SettingsIcon className="h-4 w-4 text-primary" />
+                      <span>{t("common.preferences")}</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="ascend" id="ascend" />
+                    <Label
+                      htmlFor="ascend"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span>{t("common.ascend")}</span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
 
         {/* Recently Played - Mobile/Tablet (shows when sidebar is hidden) */}

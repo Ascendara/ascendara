@@ -609,6 +609,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "delete": "Delete",
+    "discord": "Discord",
     "downloading": "Downloading...",
     "downloads": "Downloads",
     "error": "Error",
@@ -616,6 +617,7 @@
     "finish": "Finish",
     "getStarted": "Get Started",
     "giveFeedback": "Give Feedback",
+    "help": "Help",
     "home": "Home",
     "later": "Later",
     "learnMore": "Learn More",
@@ -1095,7 +1097,13 @@
     "noRecentGamesHint": "Start playing to see your games",
     "onlineGames": "Online Games",
     "popularCategories": "Popular Categories",
+    "quickAccess": {
+      "description": "Choose which page you want to quickly access from the home screen.",
+      "title": "Quick Access Button"
+    },
     "recentGames": "Recent Games",
+    "searchPlaceholder": "Search for games...",
+    "searchSubtitle": "Press to start searching",
     "topGames": "Top Games",
     "viewGame": "View Game"
   },
@@ -1710,6 +1718,8 @@
     "hideOnGameLaunch": "Hide on Game Launch",
     "hideOnGameLaunchDescription": "Hide Ascendara when a game is launched from it.",
     "highThreadWarning": "Using more than 32 threads is considered extreme and may cause instability, bans, or network issues. Use with caution.",
+    "homeSearch": "Home Search Bar",
+    "homeSearchDescription": "Show the search bar and quick access buttons on the home page.",
     "importTheme": "Import",
     "installGameDependencies": "Dependencies",
     "invalidSupportCode": "Invalid or expired support code",

@@ -52,6 +52,7 @@ class SettingsManager {
       shareLocalIndex: true,
       fetchPageCount: 50,
       localRefreshWorkers: 8,
+      homeSearch: true,
       ludusavi: {
         backupLocation: "",
         backupFormat: "zip",
