@@ -74,11 +74,18 @@ export const setActivity = async (activityType, context = null) => {
     const customMessage = getActivityMessage(activityType, context);
 
     // Get current status to preserve it
-    // Use preferredStatus if current status is invisible (from previous session)
+    // Both offline and invisible mean the user is offline (just set differently)
     const currentStatus = await getCurrentUserStatus(user.uid);
     let status = currentStatus?.status || "online";
-    if (status === "invisible" && currentStatus?.preferredStatus) {
-      status = currentStatus.preferredStatus;
+
+    // Don't preserve offline status - user is now active
+    // Use preferredStatus if available, otherwise default to online
+    if (status === "offline") {
+      status = currentStatus?.preferredStatus || "online";
+      // If preferredStatus is also offline, default to online
+      if (status === "offline") {
+        status = "online";
+      }
     }
 
     // Update with the current status and new activity message
@@ -123,7 +130,17 @@ export const updateCustomMessage = async customMessage => {
 
     // Get current status first to preserve it
     const currentStatus = await getCurrentUserStatus(user.uid);
-    const status = currentStatus?.status || "online";
+    let status = currentStatus?.status || "online";
+
+    // Don't preserve offline status - user is now active
+    // Use preferredStatus if available, otherwise default to online
+    if (status === "offline") {
+      status = currentStatus?.preferredStatus || "online";
+      // If preferredStatus is also offline, default to online
+      if (status === "offline") {
+        status = "online";
+      }
+    }
 
     // Update with the current status and new custom message
     const result = await updateUserStatus(status, customMessage);

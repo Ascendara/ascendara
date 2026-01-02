@@ -637,17 +637,12 @@ export const reloadCurrentUser = async () => {
 };
 
 /**
- * Update user status (online, away, busy, invisible)
+ * Update user status (online, away, busy, offline)
  * @param {string} status - Status type
  * @param {string} customMessage - Optional custom status message
  * @returns {Promise<{success: boolean, error: string|null}>}
  */
 export const updateUserStatus = async (status, customMessage = "") => {
-  // Debug: trace what's setting status to invisible
-  if (status === "invisible") {
-    console.log("[updateUserStatus] Setting to invisible, stack:", new Error().stack);
-  }
-
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -660,8 +655,9 @@ export const updateUserStatus = async (status, customMessage = "") => {
       updatedAt: serverTimestamp(),
     };
 
-    // Store preferred status if user manually sets a non-invisible status
-    if (status !== "invisible") {
+    // Store preferred status if user manually sets a non-offline status
+    // offline is set automatically by app close/API timeout, not user choice
+    if (status !== "offline") {
       updateData.preferredStatus = status;
     }
 
