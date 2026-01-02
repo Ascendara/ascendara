@@ -235,10 +235,19 @@ function registerWindowHandlers() {
     if (win) {
       if (win.isMaximized()) {
         win.unmaximize();
+        return false;
       } else {
         win.maximize();
+        return true;
       }
     }
+    return false;
+  });
+
+  // Let the interface knows if it's already at max at start
+  ipcMain.handle("is-window-maximized", () => {
+    const win = BrowserWindow.getFocusedWindow();
+    return win ? win.isMaximized() : false;
   });
 
   // Handle fullscreen toggle
