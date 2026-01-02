@@ -6,6 +6,10 @@ import React, {
 } from "react";
 import { useLanguage as UseLanguage } from "@/context/LanguageContext";
 import { useAuth as UseAuth } from "@/context/AuthContext";
+import {
+  calculateLevelFromXP,
+  getLevelConstants,
+} from "@/services/levelCalculationService";
 
 import UsernameDialog from "@/components/UsernameDialog";
 import { Button } from "@/components/ui/button";
@@ -38,22 +42,11 @@ import {
 
 const VUS = ["online", "away", "busy", "invisible"];
 
-const LevelXpBase = 1000;
-const MaxProfileLevel = 999;
-
-const XpRules = {
-  basePerGame: 25,
-  perHourPlayed: 10,
-  perLaunch: 2,
-  launchBonusCap: 50,
-  completedBonus: 100,
-  playtimeMilestones: [
-    { hours: 10, bonus: 50 },
-    { hours: 25, bonus: 100 },
-    { hours: 50, bonus: 250 },
-    { hours: 100, bonus: 500 },
-  ],
-};
+const {
+  LEVEL_XP_BASE: LevelXpBase,
+  MAX_PROFILE_LEVEL: MaxProfileLevel,
+  XP_RULES: XpRules,
+} = getLevelConstants();
 
 const ReadJsonFromLocalStorage = (StorageKey, FallbackValue) => {
   try {
@@ -342,33 +335,7 @@ const Profile = () => {
   };
 
   const calculateLevelProgressFromXP = TotalXp => {
-    const NormalizedXp = typeof TotalXp === "number" ? TotalXp : 0;
-
-    const RawLevel = 1 + Math.sqrt(NormalizedXp / LevelXpBase) * 1.5;
-    let Level = Math.max(1, Math.floor(RawLevel));
-    Level = Math.min(Level, MaxProfileLevel);
-
-    if (Level >= MaxProfileLevel) {
-      return {
-        level: MaxProfileLevel,
-        xp: NormalizedXp,
-        currentXP: 100,
-        nextLevelXp: 100,
-      };
-    }
-
-    const XpForCurrentLevel =
-      Level <= 1 ? 0 : LevelXpBase * Math.pow((Level - 1) / 1.5, 2);
-    const XpForNextLevel = LevelXpBase * Math.pow(Level / 1.5, 2);
-    const XpNeededForNextLevel = XpForNextLevel - XpForCurrentLevel;
-    const CurrentLevelProgress = Math.max(0, NormalizedXp - XpForCurrentLevel);
-
-    return {
-      level: Level,
-      xp: NormalizedXp,
-      currentXP: CurrentLevelProgress,
-      nextLevelXp: XpNeededForNextLevel,
-    };
+    return calculateLevelFromXP(TotalXp);
   };
 
   const buildProfileStatsFromGames = (InstalledGames, CustomGames) => {
@@ -564,11 +531,19 @@ const Profile = () => {
       SetJoinDate(JoinDateString);
 
       const InstalledAndCustomGames = await LoadGamesData();
+      console.log("[Profile] Loaded games:", InstalledAndCustomGames?.length, "games");
 
       const DownloadHistory = await window.electron.getDownloadHistory();
       SetDownloadHistory(DownloadHistory);
 
       let CalculatedStats = buildProfileStatsFromGames(InstalledAndCustomGames, []);
+      console.log("[Profile] Calculated stats:", {
+        totalGames: CalculatedStats.totalGames,
+        gamesPlayed: CalculatedStats.gamesPlayed,
+        xp: CalculatedStats.xp,
+        level: CalculatedStats.level,
+        totalPlaytime: CalculatedStats.totalPlaytime,
+      });
 
       let persistedProfileStats = null;
       try {
@@ -1288,10 +1263,10 @@ const Profile = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
-                        {Math.floor(
+                        {Math.round(
                           Math.min(Stats.currentXP, Stats.nextLevelXp)
                         ).toLocaleString()}{" "}
-                        / {Math.floor(Stats.nextLevelXp).toLocaleString()} XP
+                        / {Math.round(Stats.nextLevelXp).toLocaleString()} XP
                       </span>
                       <span>{Math.round(LevelProgressPercent)}%</span>
                     </div>

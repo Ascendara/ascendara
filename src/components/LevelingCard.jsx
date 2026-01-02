@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { formatNumber } from "@/services/levelCalculationService";
 import {
   Card,
   CardHeader,
@@ -75,27 +76,6 @@ const LevelingCard = ({ level, currentXP, nextLevelXp, totalXP }) => {
 
     return percentage;
   })();
-
-  // Format large numbers for display with improved readability
-  const formatNumber = num => {
-    // Ensure we're working with a valid number
-    if (num === undefined || num === null || isNaN(num)) {
-      return "0";
-    }
-
-    // Convert to integer to avoid decimal places and scientific notation
-    const safeNum = Math.round(Number(num));
-
-    // Format based on magnitude
-    if (safeNum >= 1000000) {
-      return `${(safeNum / 1000000).toFixed(1)}M`.replace(".0", "");
-    } else if (safeNum >= 1000) {
-      return `${(safeNum / 1000).toFixed(1)}K`.replace(".0", "");
-    }
-
-    // For smaller numbers, use simple formatting without decimals
-    return safeNum.toLocaleString();
-  };
 
   // Check for level up animation
   useEffect(() => {

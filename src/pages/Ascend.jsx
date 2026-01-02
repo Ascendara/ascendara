@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import { validateInput } from "@/services/profanityFilterService";
+import {
+  calculateLevelFromXP,
+  getLevelConstants,
+} from "@/services/levelCalculationService";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -387,57 +391,55 @@ const Ascend = () => {
   // Calculate profile statistics based on games data (same logic as Profile.jsx)
   const calculateProfileStats = (games, customGames) => {
     const allGames = [...(games || []), ...(customGames || [])];
+    const { XP_RULES } = getLevelConstants();
 
     let totalXP = 0;
     let totalPlaytime = 0;
+    let gamesPlayedCount = 0;
 
     allGames.forEach(game => {
-      let gameXP = 100;
-      const playtimeHours = (game.playTime || 0) / 3600;
-      gameXP += Math.floor(playtimeHours * 50);
-      gameXP += Math.min((game.launchCount || 0) * 10, 100);
-      if (game.completed) gameXP += 150;
+      const playtimeSeconds = typeof game?.playTime === "number" ? game.playTime : 0;
+      const playtimeHours = playtimeSeconds / 3600;
+      const launchCount = typeof game?.launchCount === "number" ? game.launchCount : 0;
+      const isCompleted = !!game?.completed;
+
+      if (playtimeSeconds > 0) {
+        gamesPlayedCount += 1;
+      }
+
+      let gameXP = XP_RULES.basePerGame;
+      gameXP += Math.floor(playtimeHours * XP_RULES.perHourPlayed);
+      const launchBonus = Math.min(
+        launchCount * XP_RULES.perLaunch,
+        XP_RULES.launchBonusCap
+      );
+      gameXP += launchBonus;
+
+      if (isCompleted) {
+        gameXP += XP_RULES.completedBonus;
+      }
+
       totalXP += gameXP;
-      totalPlaytime += game.playTime || 0;
+      totalPlaytime += playtimeSeconds;
     });
 
     const totalPlaytimeHours = totalPlaytime / 3600;
-    if (totalPlaytimeHours >= 25) totalXP += 100;
-    if (totalPlaytimeHours >= 50) totalXP += 200;
-    if (totalPlaytimeHours >= 100) totalXP += 300;
-    if (totalPlaytimeHours >= 200) totalXP += 500;
-    if (totalPlaytimeHours >= 500) totalXP += 1000;
-
-    const baseXP = 50;
-    let level = Math.max(1, Math.floor(1 + Math.sqrt(totalXP / baseXP) * 1.5));
-    level = Math.min(level, 999);
-
-    const xpForCurrentLevel = level <= 1 ? 0 : baseXP * Math.pow((level - 1) / 1.5, 2);
-    const xpForNextLevel = baseXP * Math.pow(level / 1.5, 2);
-    const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
-    const currentLevelProgress = Math.max(0, totalXP - xpForCurrentLevel);
-
-    if (level >= 999) {
-      return {
-        totalPlaytime,
-        gamesPlayed: allGames.filter(game => game.playTime > 0).length,
-        totalGames: allGames.length,
-        level: 999,
-        xp: totalXP,
-        currentXP: 100,
-        nextLevelXp: 100,
-        allGames,
-      };
+    for (const milestone of XP_RULES.playtimeMilestones) {
+      if (totalPlaytimeHours >= milestone.hours) {
+        totalXP += milestone.bonus;
+      }
     }
+
+    const levelData = calculateLevelFromXP(totalXP);
 
     return {
       totalPlaytime,
       gamesPlayed: allGames.filter(game => game.playTime > 0).length,
       totalGames: allGames.length,
-      level,
-      xp: totalXP,
-      currentXP: currentLevelProgress,
-      nextLevelXp: xpNeededForNextLevel,
+      level: levelData.level,
+      xp: levelData.xp,
+      currentXP: levelData.currentXP,
+      nextLevelXp: levelData.nextLevelXp,
       allGames,
     };
   };
@@ -448,7 +450,15 @@ const Ascend = () => {
     try {
       const games = (await window.electron?.getGames?.()) || [];
       const customGames = (await window.electron?.getCustomGames?.()) || [];
+      console.log("[Ascend] Loaded games:", games.length + customGames.length, "games");
       const stats = calculateProfileStats(games, customGames);
+      console.log("[Ascend] Calculated stats:", {
+        totalGames: stats.totalGames,
+        gamesPlayed: stats.gamesPlayed,
+        xp: stats.xp,
+        level: stats.level,
+        totalPlaytime: stats.totalPlaytime,
+      });
 
       setLocalStats({
         level: stats.level,
@@ -559,39 +569,16 @@ const Ascend = () => {
       const joinDate = (await window.electron?.timestampTime?.()) || null;
       const games = (await window.electron?.getGames?.()) || [];
       const customGames = (await window.electron?.getCustomGames?.()) || [];
-      const allGames = [...games, ...customGames];
 
-      // Calculate stats (same logic as Profile.jsx)
-      let totalXP = 0;
-      let totalPlaytime = 0;
-
-      allGames.forEach(game => {
-        let gameXP = 100;
-        const playtimeHours = (game.playTime || 0) / 3600;
-        gameXP += Math.floor(playtimeHours * 50);
-        gameXP += Math.min((game.launchCount || 0) * 10, 100);
-        if (game.completed) gameXP += 150;
-        totalXP += gameXP;
-        totalPlaytime += game.playTime || 0;
-      });
-
-      const totalPlaytimeHours = totalPlaytime / 3600;
-      if (totalPlaytimeHours >= 25) totalXP += 100;
-      if (totalPlaytimeHours >= 50) totalXP += 200;
-      if (totalPlaytimeHours >= 100) totalXP += 300;
-      if (totalPlaytimeHours >= 200) totalXP += 500;
-      if (totalPlaytimeHours >= 500) totalXP += 1000;
-
-      const baseXP = 50;
-      let level = Math.max(1, Math.floor(1 + Math.sqrt(totalXP / baseXP) * 1.5));
-      level = Math.min(level, 999);
+      // Use centralized calculation
+      const stats = calculateProfileStats(games, customGames);
 
       const profileData = {
-        level,
-        xp: totalXP,
-        totalPlaytime,
-        gamesPlayed: allGames.filter(g => g.playTime > 0).length,
-        totalGames: allGames.length,
+        level: stats.level,
+        xp: stats.xp,
+        totalPlaytime: stats.totalPlaytime,
+        gamesPlayed: stats.gamesPlayed,
+        totalGames: stats.totalGames,
         joinDate,
       };
 
