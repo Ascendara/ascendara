@@ -457,3 +457,34 @@ h2 {
 .animate-dropdown-in {
   animation: dropdownIn 0.22s cubic-bezier(0.33, 1, 0.68, 1) both;
 }
+
+.profile-small-card {
+  backface-visibility: hidden;
+}
+.profile-small-card .profile-small-img,
+.profile-small-card .profile-small-icon,
+.profile-small-card .profile-small-title {
+  transition:
+    transform 0.28s cubic-bezier(0.2, 0, 0, 1),
+    color 0.18s ease,
+    opacity 0.18s ease;
+  transform-origin: center center;
+}
+.profile-small-card:hover .profile-small-img {
+  transform: scale(1.05);
+}
+.profile-small-card:hover .profile-small-icon {
+  transform: rotate(-6deg) scale(1.08);
+}
+.profile-small-card:hover .profile-small-title {
+  color: rgb(var(--color-primary));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-small-card .profile-small-img,
+  .profile-small-card .profile-small-icon,
+  .profile-small-card .profile-small-title {
+    transition: none !important;
+    transform: none !important;
+  }
+}

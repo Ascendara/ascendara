@@ -1638,10 +1638,14 @@ const Profile = () => {
                         <div
                           key={gameId}
                           className={Cn(
-                            "group flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
+                            "profile-small-card flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
                             "backdrop-blur",
                             "transition-all duration-300 ease-out",
-                            "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm"
+                            "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm",
+                            "hover:[&_.profile-small-img]:scale-105",
+                            "hover:[&_.profile-small-title]:text-primary",
+                            "hover:[&_.profile-small-icon]:-rotate-6",
+                            "hover:[&_.profile-small-icon]:scale-110"
                           )}
                         >
                           <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted/30">
@@ -1649,16 +1653,16 @@ const Profile = () => {
                               <img
                                 src={GameImages[gameId]}
                                 alt={gameId}
-                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                className="profile-small-img h-full w-full object-cover transition-transform duration-300"
                               />
                             ) : null}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h3 className="truncate text-left font-medium text-foreground transition-colors duration-300 ease-out group-hover:text-primary">
+                            <h3 className="profile-small-title truncate text-left font-medium text-foreground transition-colors duration-300 ease-out">
                               {gameId}
                             </h3>
                             <div className="flex items-center justify-start gap-2 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
+                              <Clock className="profile-small-icon h-3 w-3 transition-transform duration-300 ease-out" />
                               <span>
                                 {game.playTime !== undefined
                                   ? game.playTime < 120
@@ -1729,21 +1733,26 @@ const Profile = () => {
               <ScrollArea className="h-[360px] pr-4">
                 <div className="mx-auto w-full max-w-6xl space-y-3">
                   {DownloadHistory.length > 0 ? (
-                    DownloadHistory.map((item, index) => (
+                    [...DownloadHistory]
+                      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                      .map((item, index) => (
                       <div
                         key={`${item.game}-${index}`}
                         className={Cn(
-                          "group flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
+                          "profile-small-card flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
                           "backdrop-blur",
                           "transition-all duration-300 ease-out",
-                          "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm"
+                          "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm",
+                          "hover:[&_.profile-small-icon]:rotate-6",
+                          "hover:[&_.profile-small-icon]:scale-110",
+                          "hover:[&_.profile-small-title]:text-primary"
                         )}
                       >
                         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                          <FileDown className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
+                          <FileDown className="profile-small-icon h-5 w-5 text-primary transition-transform duration-300 ease-out" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-left font-medium text-foreground transition-colors duration-300 ease-out group-hover:text-primary">
+                          <h3 className="profile-small-title truncate text-left font-medium text-foreground transition-colors duration-300 ease-out">
                             {item.game}
                           </h3>
                           <div className="text-left text-xs text-muted-foreground">
