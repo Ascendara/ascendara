@@ -190,22 +190,6 @@ const getThemeColors = themeId => {
   return themeMap[themeId] || themeMap.light;
 };
 
-// Move debounce helper function up
-function createDebouncedFunction(func, wait) {
-  let timeoutId;
-
-  const debouncedFn = (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), wait);
-  };
-
-  debouncedFn.cancel = () => {
-    clearTimeout(timeoutId);
-  };
-
-  return debouncedFn;
-}
-
 function Settings() {
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
@@ -377,15 +361,6 @@ function Settings() {
     checkPlatform();
   }, []);
 
-  // Create a debounced save function to prevent too frequent saves
-  const debouncedSave = useMemo(
-    () =>
-      createDebouncedFunction(newSettings => {
-        window.electron.saveSettings(newSettings);
-      }, 300),
-    []
-  );
-
   useEffect(() => {
     const checkDownloaderStatus = async () => {
       try {
@@ -416,94 +391,88 @@ function Settings() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-save settings whenever they change
+  // Auto-save is handled by handleSettingChange, no need for this effect
+
+  // Load initial settings - only run once when settings are loaded
   useEffect(() => {
-    if (isInitialized && !isFirstMount.current) {
-      debouncedSave(settings);
-    }
-  }, [settings, isInitialized]);
+    // Only initialize once
+    if (!isFirstMount.current) return;
 
-  // Load initial settings
-  useEffect(() => {
-    const initializeSettings = async () => {
-      if (!isFirstMount.current) return;
-
-      setIsLoading(true);
-
-      try {
-        // Load settings first
-        const savedSettings = await window.electron.getSettings();
-
-        if (savedSettings) {
-          setSettings(savedSettings);
-          // Set the download directory from saved settings
-          if (savedSettings.downloadDirectory) {
-            setDownloadPath(savedSettings.downloadDirectory);
-          }
-          if (savedSettings.backupDirectory) {
-            setBackupPath(savedSettings.backupDirectory);
-          }
-          initialSettingsRef.current = savedSettings;
-        }
-
-        isFirstMount.current = false;
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("Error initializing settings:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeSettings();
-  }, []); // Run only once on mount
-
-  const handleSettingChange = async (key, value, ludusavi = false) => {
-    if (key === "sideScrollBar") {
-      setSettingsLocal(prev => ({
-        ...prev,
-        [key]: value,
-      }));
-      // Update scrollbar styles directly
-      if (value) {
-        document.documentElement.classList.add("custom-scrollbar");
-      } else {
-        document.documentElement.classList.remove("custom-scrollbar");
-      }
+    // Wait for settings to be loaded from context
+    if (!settings || !settings.downloadDirectory) {
       return;
     }
 
-    // Handle Ludusavi settings
-    if (ludusavi) {
-      // Only update the nested ludusavi object
-      window.electron
-        .updateSetting("ludusavi", {
-          ...(settings.ludusavi || {}),
-          [key]: value,
-        })
-        .then(success => {
-          if (success) {
-            setSettingsLocal(prev => ({
-              ...prev,
-              ludusavi: {
-                ...(prev.ludusavi || {}),
-                [key]: value,
-              },
-            }));
-          }
-        });
-      return;
-    }
+    setIsLoading(true);
 
-    window.electron.updateSetting(key, value).then(success => {
-      if (success) {
+    try {
+      // Settings are already loaded by SettingsContext, just sync local state
+      if (settings.downloadDirectory) {
+        setDownloadPath(settings.downloadDirectory);
+      }
+      if (settings.backupDirectory) {
+        setBackupPath(settings.backupDirectory);
+      }
+      initialSettingsRef.current = settings;
+
+      isFirstMount.current = false;
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("Error initializing settings:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [settings.downloadDirectory, settings.backupDirectory]); // Only depend on specific values we need
+
+  const handleSettingChange = useCallback(
+    async (key, value, ludusavi = false) => {
+      if (key === "sideScrollBar") {
         setSettingsLocal(prev => ({
           ...prev,
           [key]: value,
         }));
+        // Update scrollbar styles directly
+        if (value) {
+          document.documentElement.classList.add("custom-scrollbar");
+        } else {
+          document.documentElement.classList.remove("custom-scrollbar");
+        }
+        return;
       }
-    });
-  };
+
+      // Handle Ludusavi settings
+      if (ludusavi) {
+        // Only update the nested ludusavi object
+        window.electron
+          .updateSetting("ludusavi", {
+            ...(settings.ludusavi || {}),
+            [key]: value,
+          })
+          .then(success => {
+            if (success) {
+              setSettingsLocal(prev => ({
+                ...prev,
+                ludusavi: {
+                  ...(prev.ludusavi || {}),
+                  [key]: value,
+                },
+              }));
+            }
+          });
+        return;
+      }
+
+      window.electron.updateSetting(key, value).then(success => {
+        if (success) {
+          setSettingsLocal(prev => ({
+            ...prev,
+            [key]: value,
+          }));
+        }
+      });
+    },
+    [settings.ludusavi, setSettingsLocal]
+  );
 
   const handleDirectorySelect = useCallback(async () => {
     try {
@@ -597,12 +566,6 @@ function Settings() {
       setTheme(savedTheme);
     }
   }, [setTheme]);
-
-  useEffect(() => {
-    if (theme && isInitialized) {
-      handleSettingChange("theme", theme);
-    }
-  }, [theme, isInitialized, handleSettingChange]);
 
   const groupedThemes = {
     light: themes.filter(t => t.group === "light"),
