@@ -1758,7 +1758,9 @@ const Profile = () => {
               <ScrollArea className="h-[360px] pr-4">
                 <div className="mx-auto w-full max-w-6xl space-y-3">
                   {DownloadHistory.length > 0 ? (
-                    DownloadHistory.map((item, index) => (
+                    [...DownloadHistory]
+                      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                      .map((item, index) => (
                       <div
                         key={`${item.game}-${index}`}
                         className={Cn(
