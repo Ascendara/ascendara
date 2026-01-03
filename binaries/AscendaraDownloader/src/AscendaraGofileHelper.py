@@ -662,13 +662,22 @@ class GofileDownloader:
             
             safe_write_json(self.game_info_path, self.game_info)
 
-    def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int):
-        """Update extraction progress in the game info JSON."""
+    def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int, force: bool = False):
+        """Update extraction progress in the game info JSON.
+        
+        Args:
+            current_file: Name of the file being extracted
+            files_extracted: Number of files extracted so far
+            total_files: Total number of files to extract
+            force: Force immediate JSON write (used for completion)
+        """
         with self._lock:
-            elapsed = time.time() - self._extraction_start_time
+            current_time = time.time()
+            elapsed = current_time - self._extraction_start_time
             speed = files_extracted / elapsed if elapsed > 0 else 0
             percent = (files_extracted / total_files * 100) if total_files > 0 else 0
             
+            # Always update in-memory data
             self.game_info["downloadingData"]["extractionProgress"] = {
                 "currentFile": current_file[:50] + "..." if len(current_file) > 50 else current_file,
                 "filesExtracted": files_extracted,
@@ -676,7 +685,11 @@ class GofileDownloader:
                 "percentComplete": f"{percent:.2f}",
                 "extractionSpeed": f"{speed:.1f} files/s" if speed >= 1 else f"{speed:.2f} files/s"
             }
-            safe_write_json(self.game_info_path, self.game_info)
+            
+            # Only write to disk every 0.25 seconds or when forced (completion/error)
+            if force or (current_time - self._last_progress_update) >= 0.25:
+                safe_write_json(self.game_info_path, self.game_info)
+                self._last_progress_update = current_time
 
     def _check_extraction_tools(self):
         """Check if required extraction tools are available and try to install if missing."""
@@ -741,6 +754,7 @@ class GofileDownloader:
         # Track extraction timing
         self._extraction_start_time = time.time()
         self._files_extracted_count = 0
+        self._last_progress_update = 0  # Track last JSON write time
 
         # Check if extraction tools are available
         if not self._check_extraction_tools():
@@ -787,7 +801,7 @@ class GofileDownloader:
         
         logging.info(f"[AscendaraGofileHelper] Total files to extract: {total_files_to_extract}")
         self._files_extracted_count = 0
-        self._update_extraction_progress("Preparing...", 0, total_files_to_extract)
+        self._update_extraction_progress("Preparing...", 0, total_files_to_extract, force=True)
         
         # Extract all archives with progress tracking
         for archive_path, file in archives_to_process:
@@ -1059,6 +1073,9 @@ class GofileDownloader:
                             watching_data[rel_path] = {"size": os.path.getsize(full_path)}
                 logging.info(f"[AscendaraGofileHelper] Rebuilt filemap after first-word flattening with {len(watching_data)} files")
                 safe_write_json(watching_path, watching_data)
+        
+        # Force final progress update before finishing extraction
+        self._update_extraction_progress("Complete", self._files_extracted_count, total_files_to_extract if total_files_to_extract > 0 else self._files_extracted_count, force=True)
         
         # Remove archive files from watching_data (if not already rebuilt)
         archive_exts = {'.rar', '.zip', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso'}
