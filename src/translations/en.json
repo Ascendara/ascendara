@@ -1566,6 +1566,8 @@
     "mostRecentlyUpdated": "Recently Updated",
     "noResults": "No results found",
     "placeholder": "Search games...",
+    "quickSearchResults": "Quick Search Results",
+    "recentSearches": "Recent Searches",
     "refreshLocalIndex": "Refresh Local Index",
     "refreshRequestError": "Error sending refresh request",
     "refreshRequestRateLimited": "You've already sent a refresh request recently. Please try again later.",

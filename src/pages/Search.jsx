@@ -26,7 +26,7 @@ import {
   RefreshCw,
   AlertTriangle,
   X,
-  SendIcon,
+  Calendar,
   Database,
 } from "lucide-react";
 import gameService from "@/services/gameService";
@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useNavigate, useLocation } from "react-router-dom";
 import imageCacheService from "@/services/imageCacheService";
+import { formatLatestUpdate } from "@/lib/utils";
 
 // Module-level cache with timestamp
 let gamesCache = {
@@ -86,6 +87,12 @@ const Search = memo(() => {
     const saved = window.localStorage.getItem("showOnline");
     return saved === "true";
   });
+  const [recentSearches, setRecentSearches] = useState(() => {
+    const saved = window.localStorage.getItem("recentSearches");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
+  const [quickSearchResults, setQuickSearchResults] = useState([]);
 
   const [filterSmallestSize, setFilterSmallestSize] = useState(() => {
     const saved = window.localStorage.getItem("filterSmallestSize");
@@ -114,6 +121,56 @@ const Search = memo(() => {
   const { t } = useLanguage();
   const isFitGirlSource = settings.gameSource === "fitgirl";
   const navigate = useNavigate();
+
+  // Save recent searches to localStorage
+  const saveRecentSearch = useCallback(query => {
+    if (!query || query.trim().length === 0) return;
+
+    const trimmedQuery = query.trim();
+    setRecentSearches(prev => {
+      // Remove duplicate if exists and add to front
+      const filtered = prev.filter(
+        item => item.toLowerCase() !== trimmedQuery.toLowerCase()
+      );
+      const updated = [trimmedQuery, ...filtered].slice(0, 10); // Keep max 10 items
+      window.localStorage.setItem("recentSearches", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // Clear a specific recent search
+  const clearRecentSearch = useCallback(query => {
+    setRecentSearches(prev => {
+      const updated = prev.filter(item => item !== query);
+      window.localStorage.setItem("recentSearches", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // Handle selecting a recent search
+  const handleRecentSearchClick = useCallback(query => {
+    setSearchQuery(query);
+    setShowRecentSearches(false);
+    mainSearchRef.current?.blur();
+  }, []);
+
+  // Quick search - search only game titles
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      setQuickSearchResults([]);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    const results = games
+      .filter(game => {
+        const title = game.game.toLowerCase();
+        return title.includes(query);
+      })
+      .slice(0, 5); // Limit to 5 results
+
+    setQuickSearchResults(results);
+  }, [searchQuery, games]);
 
   // Handle scroll to show/hide sticky search bar with throttling
   useEffect(() => {
@@ -492,6 +549,11 @@ const Search = memo(() => {
   }, [loadMore, isLoadingMore, hasMore]);
 
   const handleDownload = async game => {
+    // Save the current search query when downloading a game
+    if (searchQuery && searchQuery.trim()) {
+      saveRecentSearch(searchQuery);
+    }
+
     try {
       // Get the cached image first
       const cachedImage = await imageCacheService.getImage(game.imgID);
@@ -515,6 +577,16 @@ const Search = memo(() => {
       });
     }
   };
+
+  // Handle clicking on a quick search result
+  const handleQuickSearchClick = useCallback(
+    game => {
+      saveRecentSearch(searchQuery);
+      setShowRecentSearches(false);
+      handleDownload(game);
+    },
+    [searchQuery, saveRecentSearch, handleDownload]
+  );
 
   const handleRefreshIndex = async () => {
     setIsRefreshing(true);
@@ -757,6 +829,17 @@ const Search = memo(() => {
                   placeholder={t("search.placeholder")}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowRecentSearches(true)}
+                  onBlur={() => {
+                    // Delay hiding to allow clicking on recent searches
+                    setTimeout(() => setShowRecentSearches(false), 200);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && searchQuery.trim()) {
+                      saveRecentSearch(searchQuery);
+                      mainSearchRef.current?.blur();
+                    }
+                  }}
                   className="pl-10"
                 />
                 {isIndexUpdating && (
@@ -764,6 +847,88 @@ const Search = memo(() => {
                     <AlertTriangle size={20} />
                   </div>
                 )}
+                {/* Quick Search & Recent Searches Dropdown */}
+                {showRecentSearches &&
+                  (quickSearchResults.length > 0 || recentSearches.length > 0) && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[400px] overflow-y-auto rounded-lg border border-border bg-background shadow-lg">
+                      <div className="p-2">
+                        {/* Quick Search Results */}
+                        {quickSearchResults.length > 0 && (
+                          <>
+                            <div className="mb-2 px-2 text-xs font-medium text-muted-foreground">
+                              {t("search.quickSearchResults")}
+                            </div>
+                            {quickSearchResults.map((game, index) => (
+                              <div
+                                key={index}
+                                onClick={() => handleQuickSearchClick(game)}
+                                className="group flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 hover:bg-accent"
+                              >
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium text-foreground">
+                                    {game.game}
+                                  </div>
+                                  <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                                    {game.size && (
+                                      <div className="flex items-center gap-1">
+                                        <Database className="h-3 w-3" />
+                                        <span>{game.size}</span>
+                                      </div>
+                                    )}
+                                    {game.latest_update && (
+                                      <div className="flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" />
+                                        <span>
+                                          {formatLatestUpdate(game.latest_update)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        )}
+
+                        {/* Separator */}
+                        {quickSearchResults.length > 0 && recentSearches.length > 0 && (
+                          <Separator className="my-2 bg-border/50" />
+                        )}
+
+                        {/* Recent Searches */}
+                        {recentSearches.length > 0 && (
+                          <>
+                            <div className="mb-2 px-2 text-xs font-medium text-muted-foreground">
+                              {t("search.recentSearches")}
+                            </div>
+                            {recentSearches.map((query, index) => (
+                              <div
+                                key={index}
+                                className="group flex items-center justify-between rounded-md px-3 py-2 hover:bg-accent"
+                              >
+                                <button
+                                  onClick={() => handleRecentSearchClick(query)}
+                                  className="flex-1 cursor-pointer text-left text-sm text-foreground"
+                                >
+                                  {query}
+                                </button>
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    clearRecentSearch(query);
+                                  }}
+                                  className="ml-2 opacity-0 transition-opacity group-hover:opacity-100"
+                                  aria-label="Clear this search"
+                                >
+                                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                </button>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
               </div>
               <Sheet>
                 <SheetTrigger asChild>
