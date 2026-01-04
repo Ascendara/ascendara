@@ -1,28 +1,37 @@
-const LEVEL_XP_BASE = 1000;
+const LEVEL_XP_BASE = 50;
 const MAX_PROFILE_LEVEL = 999;
 
 const XP_RULES = {
-  basePerGame: 25,
-  perHourPlayed: 10,
-  perLaunch: 2,
-  launchBonusCap: 50,
-  completedBonus: 100,
+  basePerGame: 100,
+  perHourPlayed: 50,
+  perLaunch: 10,
+  launchBonusCap: 100,
+  completedBonus: 150,
   playtimeMilestones: [
-    { hours: 10, bonus: 50 },
     { hours: 25, bonus: 100 },
-    { hours: 50, bonus: 250 },
-    { hours: 100, bonus: 500 },
+    { hours: 50, bonus: 200 },
+    { hours: 100, bonus: 300 },
+    { hours: 200, bonus: 500 },
+    { hours: 500, bonus: 1000 },
   ],
 };
 
-const DEBUG_XP = false; // Set to true to enable XP calculation debugging
+const DEBUG_XP = false;
 
 export const calculateLevelFromXP = totalXP => {
   const normalizedXP = typeof totalXP === "number" ? totalXP : 0;
 
+  if (DEBUG_XP) {
+    console.log("[LevelCalc] Input XP:", totalXP, "Normalized:", normalizedXP);
+  }
+
   const rawLevel = 1 + Math.sqrt(normalizedXP / LEVEL_XP_BASE) * 1.5;
   let level = Math.max(1, Math.floor(rawLevel));
   level = Math.min(level, MAX_PROFILE_LEVEL);
+
+  if (DEBUG_XP) {
+    console.log("[LevelCalc] Raw level:", rawLevel, "Final level:", level);
+  }
 
   if (level >= MAX_PROFILE_LEVEL) {
     return {
@@ -38,6 +47,13 @@ export const calculateLevelFromXP = totalXP => {
   const xpForNextLevel = LEVEL_XP_BASE * Math.pow(level / 1.5, 2);
   const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
   const currentLevelProgress = Math.max(0, normalizedXP - xpForCurrentLevel);
+
+  if (DEBUG_XP) {
+    console.log("[LevelCalc] XP for current level:", xpForCurrentLevel);
+    console.log("[LevelCalc] XP for next level:", xpForNextLevel);
+    console.log("[LevelCalc] XP needed for next level:", xpNeededForNextLevel);
+    console.log("[LevelCalc] Current level progress:", currentLevelProgress);
+  }
 
   return {
     level,
