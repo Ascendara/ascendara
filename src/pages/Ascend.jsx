@@ -7854,7 +7854,7 @@ const Ascend = () => {
                     {t("account.pricingDetails")}{" "}
                     <a
                       onClick={() =>
-                        window.electron.openURL("https://ascendara.app/ascend")
+                        window.electron.openURL("https://ascendara.app/ascend?ref=app")
                       }
                       className="inline-flex cursor-pointer items-center text-primary hover:underline"
                     >
