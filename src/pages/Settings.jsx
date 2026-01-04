@@ -365,6 +365,10 @@ function Settings() {
     const checkDownloaderStatus = async () => {
       try {
         const games = await window.electron.getGames();
+        if (!games || !Array.isArray(games)) {
+          setIsDownloaderRunning(false);
+          return;
+        }
         const hasDownloadingGames = games.some(game => {
           const { downloadingData } = game;
           return (

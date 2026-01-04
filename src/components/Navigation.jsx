@@ -166,6 +166,13 @@ const Navigation = memo(({ items }) => {
     const checkDownloaderStatus = async () => {
       try {
         const games = await window.electron.getGames();
+        if (!games || !Array.isArray(games)) {
+          if (downloadCountRef.current !== 0) {
+            downloadCountRef.current = 0;
+            setDownloadCount(0);
+          }
+          return;
+        }
         const downloadingGames = games.filter(game => {
           const { downloadingData } = game;
           return (

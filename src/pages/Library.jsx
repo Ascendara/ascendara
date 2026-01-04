@@ -787,11 +787,15 @@ const Library = () => {
       const installedGames = await window.electron.getGames();
       const customGames = await window.electron.getCustomGames();
 
+      // Ensure we have arrays to work with
+      const safeInstalledGames = Array.isArray(installedGames) ? installedGames : [];
+      const safeCustomGames = Array.isArray(customGames) ? customGames : [];
+
       // Check for pending cloud restores (games that were downloaded from cloud)
-      await checkPendingCloudRestores([...installedGames, ...customGames]);
+      await checkPendingCloudRestores([...safeInstalledGames, ...safeCustomGames]);
 
       // Filter out games that are being verified or downloading
-      const filteredInstalledGames = installedGames.filter(
+      const filteredInstalledGames = safeInstalledGames.filter(
         game =>
           !game.downloadingData?.verifying &&
           !game.downloadingData?.downloading &&
@@ -808,7 +812,7 @@ const Library = () => {
           ...game,
           isCustom: false,
         })),
-        ...(customGames || []).map(game => ({
+        ...(safeCustomGames || []).map(game => ({
           name: game.game,
           game: game.game, // Keep original property for compatibility
           version: game.version,
