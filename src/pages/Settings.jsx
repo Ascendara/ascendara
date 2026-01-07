@@ -2157,6 +2157,10 @@ function Settings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/Steam/GSE Saves</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>AppData/Roaming/Steam/CODEX</span>
                   </div>
                   <div className="flex items-center gap-2">
