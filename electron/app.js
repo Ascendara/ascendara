@@ -243,6 +243,7 @@ function registerCriticalHandlers() {
   system.registerSystemHandlers();
   ipcHandlers.registerMiscHandlers();
   translations.registerTranslationHandlers();
+  localRefresh.registerLocalRefreshHandlers();
 }
 
 /**
@@ -250,7 +251,6 @@ function registerCriticalHandlers() {
  */
 function registerDeferredHandlers() {
   steamcmd.registerSteamCMDHandlers();
-  localRefresh.registerLocalRefreshHandlers();
   ludusavi.registerLudusaviHandlers();
   themes.registerThemeHandlers();
 }
