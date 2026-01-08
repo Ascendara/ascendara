@@ -425,8 +425,24 @@ class ImageCacheService {
 
   async generateSignature(timestamp) {
     try {
-      // Try to get secret from electron
-      const secret = (await window.electron?.imageSecret()) || "default_secret";
+      // Initializing with a default value
+      let secret = "default_secret";
+
+      // Verifying that window.electron exist and that imageSecret is a function
+      // Prevents the "is not a function" bug
+      if (window.electron && typeof window.electron.imageSecret === "function") {
+        try {
+          const fetchedSecret = await window.electron.imageSecret();
+          if (fetchedSecret) secret = fetchedSecret;
+        } catch (err) {
+          console.warn(
+            "[ImageCache] Failed to fetch secret from electron, using default:",
+            err
+          );
+        }
+      } else {
+        console.warn("[ImageCache] imageSecret function missing in preload");
+      }
 
       const encoder = new TextEncoder();
       const data = encoder.encode(timestamp.toString());
@@ -445,7 +461,9 @@ class ImageCacheService {
       return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
     } catch (error) {
       console.error("[ImageCache] Error generating signature:", error);
-      throw error;
+      // In case of a total error, the app doesn't crash, it returns an empty or dummy signature.
+      // so that the image still attempts to load (or fails cleanly).
+      return "signature_generation_failed";
     }
   }
 
