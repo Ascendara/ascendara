@@ -386,6 +386,7 @@ contextBridge.exposeInMainWorld("electron", {
   getAPIKey: () => ipcRenderer.invoke("get-api-key"),
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   getImageKey: () => ipcRenderer.invoke("get-image-key"),
+  imageSecret: () => ipcRenderer.invoke("get-image-secret"),
   openURL: url => ipcRenderer.invoke("open-url", url),
   fetchApiImage: (endpoint, imgID, timestamp, signature) =>
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),

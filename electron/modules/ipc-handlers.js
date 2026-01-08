@@ -17,6 +17,7 @@ const {
   APIKEY,
   analyticsAPI,
   imageKey,
+  imageSecret,
   steamWebApiKey,
   TIMESTAMP_FILE,
 } = require("./config");
@@ -126,6 +127,8 @@ function registerMiscHandlers() {
   ipcMain.handle("get-analytics-key", () => analyticsAPI);
 
   ipcMain.handle("get-image-key", () => imageKey);
+
+  ipcMain.handle("get-image-secret", () => imageSecret || "default_secret");
 
   ipcMain.handle("get-steam-api-key", () => steamWebApiKey);
 
