@@ -359,11 +359,20 @@ export const updateUserProfile = async profileData => {
 
     await updateProfile(user, profileData);
 
-    // Update Firestore document
-    await updateDoc(doc(db, "users", user.uid), {
-      ...profileData,
+    // Update Firestore document - only update specific fields to avoid deleting other data
+    const updateData = {
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // Only add fields that are actually in profileData
+    if (profileData.displayName !== undefined) {
+      updateData.displayName = profileData.displayName;
+    }
+    if (profileData.photoURL !== undefined) {
+      updateData.photoURL = profileData.photoURL;
+    }
+
+    await updateDoc(doc(db, "users", user.uid), updateData);
 
     return { success: true, error: null };
   } catch (error) {
@@ -570,10 +579,29 @@ export const getUserData = async uid => {
  */
 export const updateUserData = async (uid, data) => {
   try {
-    await updateDoc(doc(db, "users", uid), {
-      ...data,
+    // Build update object with only safe fields
+    const updateData = {
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // Allowed fields that can be updated
+    const allowedFields = [
+      "bio",
+      "country",
+      "socials",
+      "displayName",
+      "photoURL",
+      "cloudLibrary",
+      "profileStats",
+    ];
+
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) {
+        updateData[field] = data[field];
+      }
+    }
+
+    await updateDoc(doc(db, "users", uid), updateData);
     return { success: true, error: null };
   } catch (error) {
     console.error("Update user data error:", error);
@@ -1314,7 +1342,9 @@ export const verifyAscendAccess = async (hardwareId = null) => {
     // Check if user has active subscription (bypasses hardware check and noTrial)
     if (userData.ascendSubscription?.active) {
       const expiresAt = userData.ascendSubscription.expiresAt?.toDate();
-      if (expiresAt && expiresAt > new Date()) {
+      // If active flag is true, trust it regardless of expiration date
+      // This prevents subscribed users from being treated as trial users
+      if (!expiresAt || expiresAt > new Date()) {
         return {
           hasAccess: true,
           daysRemaining: -1,
@@ -1326,6 +1356,18 @@ export const verifyAscendAccess = async (hardwareId = null) => {
           error: null,
         };
       }
+      // If subscription is marked active but expired, still grant access
+      // The active flag should be the source of truth (managed server-side)
+      return {
+        hasAccess: true,
+        daysRemaining: -1,
+        isSubscribed: true,
+        isVerified: false,
+        trialBlocked: false,
+        noTrial: false,
+        noTrialReason: null,
+        error: null,
+      };
     }
 
     // Check if user is blocked from free trial
