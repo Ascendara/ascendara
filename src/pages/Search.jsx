@@ -59,34 +59,41 @@ const Search = memo(() => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(() => {
-    const saved = window.localStorage.getItem("searchQuery");
+    const saved = window.sessionStorage.getItem("searchQuery");
     return saved || "";
   });
+
   const [showStickySearch, setShowStickySearch] = useState(false);
   const showStickySearchRef = useRef(false);
   const mainSearchRef = useRef(null);
   const searchSectionRef = useRef(null);
   const location = useLocation();
+
   const [selectedCategories, setSelectedCategories] = useState(() => {
-    const saved = window.localStorage.getItem("selectedCategories");
+    const saved = window.sessionStorage.getItem("selectedCategories");
     return saved ? JSON.parse(saved) : [];
   });
+
   const [onlineFilter, setOnlineFilter] = useState(() => {
-    const saved = window.localStorage.getItem("onlineFilter");
+    const saved = window.sessionStorage.getItem("onlineFilter");
     return saved || "all";
   });
+
   const [selectedSort, setSelectedSort] = useState(() => {
-    const saved = window.localStorage.getItem("selectedSort");
+    const saved = window.sessionStorage.getItem("selectedSort");
     return saved || "weight";
   });
+
   const [showDLC, setShowDLC] = useState(() => {
-    const saved = window.localStorage.getItem("showDLC");
+    const saved = window.sessionStorage.getItem("showDLC");
     return saved === "true";
   });
+
   const [showOnline, setShowOnline] = useState(() => {
-    const saved = window.localStorage.getItem("showOnline");
+    const saved = window.sessionStorage.getItem("showOnline");
     return saved === "true";
   });
+
   const [recentSearches, setRecentSearches] = useState(() => {
     const saved = window.localStorage.getItem("recentSearches");
     return saved ? JSON.parse(saved) : [];
@@ -405,6 +412,35 @@ const Search = memo(() => {
   useEffect(() => {
     window.localStorage.setItem("searchQuery", searchQuery);
   }, [searchQuery]);
+
+  // Persist searchQuery
+  useEffect(() => {
+    window.sessionStorage.setItem("searchQuery", searchQuery);
+  }, [searchQuery]);
+
+  // Persist Filters and Sorting
+  useEffect(() => {
+    window.sessionStorage.setItem(
+      "selectedCategories",
+      JSON.stringify(selectedCategories)
+    );
+  }, [selectedCategories]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem("selectedSort", selectedSort);
+  }, [selectedSort]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem("onlineFilter", onlineFilter);
+  }, [onlineFilter]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem("showDLC", showDLC.toString());
+  }, [showDLC]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem("showOnline", showOnline.toString());
+  }, [showOnline]);
 
   // Persist filterSmallestSize to localStorage
   useEffect(() => {
