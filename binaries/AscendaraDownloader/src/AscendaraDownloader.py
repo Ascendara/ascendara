@@ -973,19 +973,33 @@ class RobustDownloader:
             zip_contents = zip_ref.infolist()
             logging.info(f"[RobustDownloader] ZIP contains {len(zip_contents)} files")
             
-            for zip_info in zip_contents:
-                if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename:
-                    try:
-                        zip_ref.extract(zip_info, self.download_dir)
-                        extracted_path = os.path.join(self.download_dir, zip_info.filename)
-                        key = os.path.relpath(extracted_path, self.download_dir)
-                        watching_data[key] = {"size": zip_info.file_size}
-                        # Update progress for non-directory entries
-                        if not zip_info.is_dir():
-                            self._files_extracted_count += 1
-                            self._update_extraction_progress(zip_info.filename, self._files_extracted_count, self._total_files_to_extract)
-                    except Exception as e:
-                        logging.error(f"[RobustDownloader] Failed to extract {zip_info.filename}: {e}")
+            # Filter members to extract (exclude .url and _CommonRedist)
+            members_to_extract = [
+                zip_info for zip_info in zip_contents
+                if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename
+            ]
+            
+            logging.info(f"[RobustDownloader] Extracting {len(members_to_extract)} files (filtered from {len(zip_contents)})")
+            
+            # Use extractall() for dramatically faster extraction (10-100x faster than file-by-file)
+            try:
+                zip_ref.extractall(self.download_dir, members=members_to_extract)
+                logging.info(f"[RobustDownloader] Bulk extraction complete")
+            except Exception as e:
+                logging.error(f"[RobustDownloader] Bulk extraction failed: {e}")
+                raise
+            
+            # Build watching data and update progress after extraction
+            for zip_info in members_to_extract:
+                extracted_path = os.path.join(self.download_dir, zip_info.filename)
+                key = os.path.relpath(extracted_path, self.download_dir)
+                watching_data[key] = {"size": zip_info.file_size}
+                # Update progress for non-directory entries
+                if not zip_info.is_dir():
+                    self._files_extracted_count += 1
+                    # Only update progress every 100 files to reduce I/O overhead
+                    if self._files_extracted_count % 100 == 0 or self._files_extracted_count == self._total_files_to_extract:
+                        self._update_extraction_progress(zip_info.filename, self._files_extracted_count, self._total_files_to_extract)
     
     def _extract_rar(self, archive_path: str, watching_data: Dict):
         """Extract a RAR file."""
@@ -995,24 +1009,97 @@ class RobustDownloader:
             logging.error("[RobustDownloader] unrar module not installed")
             raise ImportError("unrar module required for RAR extraction")
         
+        import threading
+        
         with rarfile.RarFile(archive_path) as rar_ref:
-            # Extract file by file for progress tracking
+            # Filter members to extract (exclude .url and _CommonRedist)
             rar_files = [info for info in rar_ref.infolist() 
                         if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename]
             
-            for rar_info in rar_files:
+            logging.info(f"[RobustDownloader] Extracting {len(rar_files)} files from RAR (fast mode)")
+            
+            # Count existing files before extraction to track only new files
+            initial_file_count = 0
+            try:
+                for root, dirs, files_in_dir in os.walk(self.download_dir):
+                    initial_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+            except Exception:
+                pass
+            
+            # Use extractall() in thread for speed, monitor directory for progress
+            extraction_complete = threading.Event()
+            extraction_error = []
+            
+            def extract_thread():
                 try:
-                    rar_ref.extract(rar_info, self.download_dir)
-                    extracted_path = os.path.join(self.download_dir, rar_info.filename)
-                    key = os.path.relpath(extracted_path, self.download_dir)
-                    watching_data[key] = {"size": rar_info.file_size}
-                    # Update progress for non-directory entries (check by filename ending)
-                    is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
-                    if not is_dir:
-                        self._files_extracted_count += 1
-                        self._update_extraction_progress(rar_info.filename, self._files_extracted_count, self._total_files_to_extract)
+                    rar_ref.extractall(self.download_dir)
                 except Exception as e:
-                    logging.error(f"[RobustDownloader] Failed to extract {rar_info.filename}: {e}")
+                    extraction_error.append(e)
+                finally:
+                    extraction_complete.set()
+            
+            # Start extraction in background
+            thread = threading.Thread(target=extract_thread, daemon=True)
+            thread.start()
+            
+            # Monitor progress by counting extracted files
+            last_count = 0
+            while not extraction_complete.is_set():
+                # Count files in extraction directory (subtract initial count)
+                current_count = 0
+                try:
+                    for root, dirs, files_in_dir in os.walk(self.download_dir):
+                        current_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+                except Exception:
+                    pass
+                
+                # Calculate newly extracted files
+                newly_extracted = max(0, current_count - initial_file_count)
+                
+                if newly_extracted > last_count:
+                    files_extracted_this_archive = self._files_extracted_count + newly_extracted
+                    self._update_extraction_progress(f"Extracting... ({newly_extracted} files)", files_extracted_this_archive, self._total_files_to_extract, force=True)
+                    last_count = newly_extracted
+                
+                time.sleep(0.5)  # Check every 0.5 seconds
+            
+            # Wait for thread to complete
+            thread.join(timeout=5)
+            
+            if extraction_error:
+                logging.error(f"[RobustDownloader] RAR extraction failed: {extraction_error[0]}")
+                raise extraction_error[0]
+            
+            logging.info(f"[RobustDownloader] RAR extraction complete")
+            
+            # Clean up unwanted files (.url and _CommonRedist)
+            for root, dirs, files_in_dir in os.walk(self.download_dir):
+                if '_CommonRedist' in root:
+                    try:
+                        shutil.rmtree(root)
+                        logging.info(f"[RobustDownloader] Removed _CommonRedist: {root}")
+                    except Exception as e:
+                        logging.warning(f"[RobustDownloader] Could not remove _CommonRedist: {e}")
+                    continue
+                
+                for fname in files_in_dir:
+                    if fname.endswith('.url'):
+                        try:
+                            os.remove(os.path.join(root, fname))
+                        except Exception:
+                            pass
+            
+            # Build watching data after extraction
+            for rar_info in rar_files:
+                extracted_path = os.path.join(self.download_dir, rar_info.filename)
+                key = os.path.relpath(extracted_path, self.download_dir)
+                watching_data[key] = {"size": rar_info.file_size}
+                
+                is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                if not is_dir:
+                    self._files_extracted_count += 1
+            
+            self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
     
     def _flatten_directories(self):
         """Flatten nested directories that should be at root level."""

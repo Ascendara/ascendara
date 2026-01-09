@@ -813,47 +813,133 @@ class GofileDownloader:
                 if sys.platform == "win32":
                     if file.endswith('.zip'):
                         with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                            for zip_info in zip_ref.infolist():
-                                if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename:
-                                    extracted_path = os.path.join(extract_dir, zip_info.filename)
-                                    zip_ref.extract(zip_info, extract_dir)
-                                    # Add to watching data
-                                    key = f"{os.path.relpath(extracted_path, self.download_dir)}"
-                                    watching_data[key] = {"size": zip_info.file_size}
-                                    # Update progress for non-directory entries
-                                    if not zip_info.is_dir():
-                                        self._files_extracted_count += 1
+                            # Filter members to extract (exclude .url and _CommonRedist)
+                            members_to_extract = [
+                                zip_info for zip_info in zip_ref.infolist()
+                                if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename
+                            ]
+                            
+                            logging.info(f"[AscendaraGofileHelper] Extracting {len(members_to_extract)} files from ZIP")
+                            
+                            # Use extractall() for dramatically faster extraction (10-100x faster than file-by-file)
+                            try:
+                                zip_ref.extractall(extract_dir, members=members_to_extract)
+                                logging.info(f"[AscendaraGofileHelper] Bulk ZIP extraction complete")
+                            except Exception as e:
+                                logging.error(f"[AscendaraGofileHelper] Bulk ZIP extraction failed: {e}")
+                                raise
+                            
+                            # Build watching data and update progress after extraction
+                            for zip_info in members_to_extract:
+                                extracted_path = os.path.join(extract_dir, zip_info.filename)
+                                key = f"{os.path.relpath(extracted_path, self.download_dir)}"
+                                watching_data[key] = {"size": zip_info.file_size}
+                                # Update progress for non-directory entries
+                                if not zip_info.is_dir():
+                                    self._files_extracted_count += 1
+                                    # Only update progress every 100 files to reduce I/O overhead
+                                    if self._files_extracted_count % 100 == 0 or self._files_extracted_count == total_files_to_extract:
                                         self._update_extraction_progress(zip_info.filename, self._files_extracted_count, total_files_to_extract)
                     elif file.endswith('.rar'):
                         from unrar import rarfile
+                        import threading
+                        
                         # Use long path prefix for extraction to support paths > 260 chars
                         long_extract_dir = long_path(extract_dir)
                         with rarfile.RarFile(archive_path, 'r') as rar_ref:
-                            # Get file list for progress tracking
+                            # Filter members to extract (exclude .url and _CommonRedist)
                             rar_files = [info for info in rar_ref.infolist() 
                                         if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename]
                             
-                            # Extract file by file for progress tracking
-                            for rar_info in rar_files:
+                            logging.info(f"[AscendaraGofileHelper] Extracting {len(rar_files)} files from RAR (fast mode)")
+                            
+                            # Count existing files before extraction to track only new files
+                            initial_file_count = 0
+                            try:
+                                for root, dirs, files_in_dir in os.walk(extract_dir):
+                                    initial_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+                            except Exception:
+                                pass
+                            
+                            # Use extractall() in thread for speed, monitor directory for progress
+                            extraction_complete = threading.Event()
+                            extraction_error = []
+                            
+                            def extract_thread():
                                 try:
                                     # Try with long path first, fall back to regular path
                                     try:
-                                        rar_ref.extract(rar_info, long_extract_dir)
+                                        rar_ref.extractall(long_extract_dir)
                                     except Exception:
-                                        rar_ref.extract(rar_info, extract_dir)
-                                    extracted_path = os.path.join(extract_dir, rar_info.filename)
-                                    # Check existence with long path support
-                                    if os.path.exists(long_path(extracted_path)) or os.path.exists(extracted_path):
-                                        key = f"{os.path.relpath(extracted_path, self.download_dir)}"
-                                        watching_data[key] = {"size": rar_info.file_size}
-                                    # Update progress for non-directory entries (check by filename ending)
-                                    is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
-                                    if not is_dir:
-                                        self._files_extracted_count += 1
-                                        self._update_extraction_progress(rar_info.filename, self._files_extracted_count, total_files_to_extract)
-                                except OSError as file_error:
-                                    logging.warning(f"[AscendaraGofileHelper] Could not extract {rar_info.filename}: {file_error}")
+                                        rar_ref.extractall(extract_dir)
+                                except Exception as e:
+                                    extraction_error.append(e)
+                                finally:
+                                    extraction_complete.set()
+                            
+                            # Start extraction in background
+                            thread = threading.Thread(target=extract_thread, daemon=True)
+                            thread.start()
+                            
+                            # Monitor progress by counting extracted files
+                            last_count = 0
+                            while not extraction_complete.is_set():
+                                # Count files in extraction directory (subtract initial count)
+                                current_count = 0
+                                try:
+                                    for root, dirs, files_in_dir in os.walk(extract_dir):
+                                        current_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+                                except Exception:
+                                    pass
+                                
+                                # Calculate newly extracted files
+                                newly_extracted = max(0, current_count - initial_file_count)
+                                
+                                if newly_extracted > last_count:
+                                    files_extracted_this_archive = self._files_extracted_count + newly_extracted
+                                    self._update_extraction_progress(f"Extracting... ({newly_extracted} files)", files_extracted_this_archive, total_files_to_extract, force=True)
+                                    last_count = newly_extracted
+                                
+                                time.sleep(0.5)  # Check every 0.5 seconds
+                            
+                            # Wait for thread to complete
+                            thread.join(timeout=5)
+                            
+                            if extraction_error:
+                                logging.error(f"[AscendaraGofileHelper] RAR extraction failed: {extraction_error[0]}")
+                                raise extraction_error[0]
+                            
+                            logging.info(f"[AscendaraGofileHelper] RAR extraction complete")
+                            
+                            # Clean up unwanted files (.url and _CommonRedist)
+                            for root, dirs, files_in_dir in os.walk(extract_dir):
+                                if '_CommonRedist' in root:
+                                    try:
+                                        shutil.rmtree(root)
+                                        logging.info(f"[AscendaraGofileHelper] Removed _CommonRedist: {root}")
+                                    except Exception as e:
+                                        logging.warning(f"[AscendaraGofileHelper] Could not remove _CommonRedist: {e}")
                                     continue
+                                
+                                for fname in files_in_dir:
+                                    if fname.endswith('.url'):
+                                        try:
+                                            os.remove(os.path.join(root, fname))
+                                        except Exception:
+                                            pass
+                            
+                            # Build watching data after extraction
+                            for rar_info in rar_files:
+                                extracted_path = os.path.join(extract_dir, rar_info.filename)
+                                if os.path.exists(long_path(extracted_path)) or os.path.exists(extracted_path):
+                                    key = f"{os.path.relpath(extracted_path, self.download_dir)}"
+                                    watching_data[key] = {"size": rar_info.file_size}
+                                
+                                is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                                if not is_dir:
+                                    self._files_extracted_count += 1
+                            
+                            self._update_extraction_progress("Complete", self._files_extracted_count, total_files_to_extract, force=True)
                 else:
                     # For non-Windows, use appropriate extraction tool
                     try:
