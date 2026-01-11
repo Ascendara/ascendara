@@ -954,8 +954,8 @@ class RobustDownloader:
             "extractionSpeed": f"{speed:.1f} files/s" if speed >= 1 else f"{speed:.2f} files/s"
         }
         
-        # Only write to disk every 1.5 seconds or when forced (completion/error)
-        if force or (current_time - self._last_progress_update) >= 2:
+        # Only write to disk every 0.25 seconds or when forced (completion/error)
+        if force or (current_time - self._last_progress_update) >= 0.25:
             safe_write_json(self.game_info_path, self.game_info)
             self._last_progress_update = current_time
 
