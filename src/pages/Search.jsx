@@ -59,7 +59,7 @@ const Search = memo(() => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(() => {
-    const saved = window.localStorage.getItem("searchQuery");
+    const saved = window.sessionStorage.getItem("searchQuery");
     return saved || "";
   });
   const [showStickySearch, setShowStickySearch] = useState(false);
@@ -401,9 +401,9 @@ const Search = memo(() => {
     return () => stopStatusCheck();
   }, [settings?.usingLocalIndex]);
 
-  // Persist searchQuery to localStorage
+  // Persist searchQuery to sessionStorage
   useEffect(() => {
-    window.localStorage.setItem("searchQuery", searchQuery);
+    window.sessionStorage.setItem("searchQuery", searchQuery);
   }, [searchQuery]);
 
   // Persist filterSmallestSize to localStorage
