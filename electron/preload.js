@@ -204,6 +204,11 @@ contextBridge.exposeInMainWorld("electron", {
   isGameAutoBackupsEnabled: (game, isCustom) =>
     ipcRenderer.invoke("is-game-auto-backups-enabled", game, isCustom),
   ludusavi: (action, game) => ipcRenderer.invoke("ludusavi", action, game),
+  listBackupFiles: dirPath => ipcRenderer.invoke("listBackupFiles", dirPath),
+  readBackupFile: filePath => ipcRenderer.invoke("readBackupFile", filePath),
+  getTempPath: () => ipcRenderer.invoke("getTempPath"),
+  writeFile: (filePath, buffer) => ipcRenderer.invoke("writeFile", filePath, buffer),
+  deleteFile: filePath => ipcRenderer.invoke("deleteFile", filePath),
 
   // Game Shortcuts & Executables
   createGameShortcut: game => ipcRenderer.invoke("create-game-shortcut", game),

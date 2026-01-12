@@ -59,6 +59,10 @@ import {
   deleteCloudGame,
   getUserPublicProfile,
   getNotifications,
+  uploadBackup,
+  listBackups,
+  getBackupDownloadUrl,
+  deleteBackup,
 } from "@/services/firebaseService";
 import {
   User,
@@ -110,7 +114,7 @@ import {
   Info,
   Globe,
   Github,
-  AtSign,
+  RotateCcw,
   Link2,
   Sparkle,
   CreditCard,
@@ -320,6 +324,17 @@ const Ascend = () => {
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
+  // Cloud Backups state
+  const [backups, setBackups] = useState([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [uploadingBackup, setUploadingBackup] = useState(false);
+  const [selectedBackupFile, setSelectedBackupFile] = useState(null);
+  const [backupGameName, setBackupGameName] = useState("");
+  const [backupName, setBackupName] = useState("");
+  const [backupFilterGame, setBackupFilterGame] = useState("");
+  const [deletingBackup, setDeletingBackup] = useState(null);
+  const [restoringBackup, setRestoringBackup] = useState(null);
+
   // Version check state
   const [isOutdated, setIsOutdated] = useState(false);
   const [checkingVersion, setCheckingVersion] = useState(true);
@@ -387,6 +402,17 @@ const Ascend = () => {
       loadNotifications();
     }
   }, [user?.uid, showDisplayNamePrompt]);
+
+  // Load backups when cloudbackups section is accessed
+  useEffect(() => {
+    if (
+      activeSection === "cloudbackups" &&
+      user?.uid &&
+      (ascendAccess.isSubscribed || ascendAccess.isVerified)
+    ) {
+      loadBackups();
+    }
+  }, [activeSection, user?.uid, ascendAccess.isSubscribed, ascendAccess.isVerified]);
 
   // Calculate profile statistics based on games data (same logic as Profile.jsx)
   const calculateProfileStats = (games, customGames) => {
@@ -981,6 +1007,218 @@ const Ascend = () => {
       console.error("Failed to load notifications:", e);
     }
     setLoadingNotifications(false);
+  };
+
+  const loadBackups = async (gameName = null) => {
+    setLoadingBackups(true);
+    try {
+      const result = await listBackups(gameName);
+      if (!result.error) {
+        // Check which backups exist locally
+        const backupsWithLocalCheck = await Promise.all(
+          result.backups.map(async backup => {
+            let existsLocally = false;
+
+            try {
+              const backupLocation = settings.ludusavi?.backupLocation;
+              if (backupLocation) {
+                const gameBackupFolder = `${backupLocation}/${backup.gameName}`;
+                const backupFiles =
+                  await window.electron.listBackupFiles(gameBackupFolder);
+
+                if (backupFiles && backupFiles.length > 0) {
+                  existsLocally = backupFiles.some(
+                    f =>
+                      f.includes(backup.backupName) ||
+                      backup.backupName.includes(f.replace(".zip", ""))
+                  );
+                }
+              }
+            } catch (err) {
+              console.warn(`Failed to check local backup for ${backup.gameName}:`, err);
+            }
+
+            return {
+              ...backup,
+              existsLocally,
+            };
+          })
+        );
+
+        setBackups(backupsWithLocalCheck);
+      } else if (result.code === "SUBSCRIPTION_REQUIRED") {
+        toast.error(
+          t("ascend.cloudBackups.subscriptionRequired") ||
+            "Active Ascend subscription required"
+        );
+      } else {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      console.error("Failed to load backups:", e);
+      toast.error(t("ascend.cloudBackups.loadError") || "Failed to load backups");
+    }
+    setLoadingBackups(false);
+  };
+
+  const handleBackupFileSelect = event => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error(
+          t("ascend.cloudBackups.fileTooLarge") || "File too large (max 100MB)"
+        );
+        return;
+      }
+      setSelectedBackupFile(file);
+    }
+  };
+
+  const handleUploadBackup = async () => {
+    if (!selectedBackupFile || !backupGameName.trim() || !backupName.trim()) {
+      toast.error(t("ascend.cloudBackups.fillAllFields") || "Please fill in all fields");
+      return;
+    }
+
+    setUploadingBackup(true);
+    try {
+      const result = await uploadBackup(selectedBackupFile, backupGameName, backupName);
+      if (result.success) {
+        toast.success(
+          t("ascend.cloudBackups.uploadSuccess") || "Backup uploaded successfully"
+        );
+        setSelectedBackupFile(null);
+        setBackupGameName("");
+        setBackupName("");
+        loadBackups(backupFilterGame || null);
+      } else if (result.code === "SUBSCRIPTION_REQUIRED") {
+        toast.error(
+          t("ascend.cloudBackups.subscriptionRequired") ||
+            "Active Ascend subscription required"
+        );
+      } else {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      console.error("Failed to upload backup:", e);
+      toast.error(t("ascend.cloudBackups.uploadError") || "Failed to upload backup");
+    }
+    setUploadingBackup(false);
+  };
+
+  const handleDownloadBackup = async (backupId, backupName) => {
+    try {
+      const result = await getBackupDownloadUrl(backupId);
+      if (result.downloadUrl) {
+        window.electron.openExternal(result.downloadUrl);
+        toast.success(t("ascend.cloudBackups.downloadStarted") || "Download started");
+      } else if (result.code === "SUBSCRIPTION_REQUIRED") {
+        toast.error(
+          t("ascend.cloudBackups.subscriptionRequired") ||
+            "Active Ascend subscription required"
+        );
+      } else {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      console.error("Failed to download backup:", e);
+      toast.error(t("ascend.cloudBackups.downloadError") || "Failed to download backup");
+    }
+  };
+
+  const handleRestoreBackup = async (backupId, gameName, backupName) => {
+    setRestoringBackup(backupId);
+    try {
+      // Get download URL from backend
+      const result = await getBackupDownloadUrl(backupId);
+      if (!result.downloadUrl) {
+        if (result.code === "SUBSCRIPTION_REQUIRED") {
+          toast.error(
+            t("ascend.cloudBackups.subscriptionRequired") ||
+              "Active Ascend subscription required"
+          );
+        } else {
+          toast.error(result.error || "Failed to get download URL");
+        }
+        setRestoringBackup(null);
+        return;
+      }
+
+      // Download the backup file
+      toast.info(
+        t("ascend.cloudBackups.downloadingBackup") || "Downloading backup from cloud..."
+      );
+
+      const response = await fetch(result.downloadUrl);
+      if (!response.ok) {
+        throw new Error("Failed to download backup file");
+      }
+
+      const blob = await response.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Save to temp location
+      const tempPath = await window.electron.getTempPath();
+      const backupFilePath = `${tempPath}/${backupName}.zip`;
+      await window.electron.writeFile(backupFilePath, buffer);
+
+      // Extract and restore using Ludusavi
+      toast.info(t("ascend.cloudBackups.restoringBackup") || "Restoring backup...");
+
+      const restoreResult = await window.electron.ludusavi({
+        action: "restore",
+        gameName: gameName,
+        path: backupFilePath,
+      });
+
+      if (restoreResult.success) {
+        toast.success(
+          t("ascend.cloudBackups.restoreSuccess") || "Backup restored successfully"
+        );
+      } else {
+        toast.error(
+          restoreResult.error ||
+            t("ascend.cloudBackups.restoreError") ||
+            "Failed to restore backup"
+        );
+      }
+
+      // Clean up temp file
+      try {
+        await window.electron.deleteFile(backupFilePath);
+      } catch (cleanupErr) {
+        console.warn("Failed to clean up temp file:", cleanupErr);
+      }
+    } catch (e) {
+      console.error("Failed to restore backup:", e);
+      toast.error(t("ascend.cloudBackups.restoreError") || "Failed to restore backup");
+    }
+    setRestoringBackup(null);
+  };
+
+  const handleDeleteBackup = async backupId => {
+    setDeletingBackup(backupId);
+    try {
+      const result = await deleteBackup(backupId);
+      if (result.success) {
+        toast.success(
+          t("ascend.cloudBackups.deleteSuccess") || "Backup deleted successfully"
+        );
+        loadBackups(backupFilterGame || null);
+      } else if (result.code === "SUBSCRIPTION_REQUIRED") {
+        toast.error(
+          t("ascend.cloudBackups.subscriptionRequired") ||
+            "Active Ascend subscription required"
+        );
+      } else {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      console.error("Failed to delete backup:", e);
+      toast.error(t("ascend.cloudBackups.deleteError") || "Failed to delete backup");
+    }
+    setDeletingBackup(null);
   };
 
   const handleSelectConversation = async conversation => {
@@ -7228,18 +7466,197 @@ const Ascend = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/50 bg-card/30 py-20">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10">
-                  <Cloud className="h-8 w-8 text-cyan-500" />
+              {!ascendAccess.isSubscribed && !ascendAccess.isVerified ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/50 bg-card/30 py-20">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
+                    <Crown className="h-8 w-8 text-amber-500" />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold">
+                    {t("ascend.cloudBackups.subscriptionRequired") ||
+                      "Subscription Required"}
+                  </h3>
+                  <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
+                    {t("ascend.cloudBackups.subscriptionRequiredDesc") ||
+                      "Cloud backups require an active Ascend subscription. Upgrade to access this feature."}
+                  </p>
+                  <Button onClick={() => setActiveSection("premium")} className="mt-6">
+                    <Crown className="mr-2 h-4 w-4" />
+                    {t("ascend.cloudBackups.viewPlans") || "View Plans"}
+                  </Button>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold">
-                  {t("ascend.cloudBackups.comingSoon") || "Coming Soon"}
-                </h3>
-                <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
-                  {t("ascend.cloudBackups.comingSoonDesc") ||
-                    "Cloud backup features for your game saves are currently in development. Stay tuned!"}
-                </p>
-              </div>
+              ) : (
+                <>
+                  {/* Backups List */}
+                  <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+                    <div className="flex items-center justify-between border-b border-border/50 p-5">
+                      <div className="flex items-center gap-2">
+                        <Cloud className="h-5 w-5 text-primary" />
+                        <h2 className="font-semibold">
+                          {t("ascend.cloudBackups.yourBackups") || "Your Backups"}
+                        </h2>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadBackups(backupFilterGame || null)}
+                        disabled={loadingBackups}
+                      >
+                        {loadingBackups ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <div className="p-5">
+                      <div className="mb-4">
+                        <Input
+                          placeholder={
+                            t("ascend.cloudBackups.filterByGame") ||
+                            "Filter by game name..."
+                          }
+                          value={backupFilterGame}
+                          onChange={e => {
+                            setBackupFilterGame(e.target.value);
+                            loadBackups(e.target.value || null);
+                          }}
+                        />
+                      </div>
+                      {loadingBackups ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      ) : backups.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <CloudOff className="h-12 w-12 text-muted-foreground/50" />
+                          <p className="mt-4 text-sm text-muted-foreground">
+                            {t("ascend.cloudBackups.noBackups") || "No backups found"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {/* Group backups by game */}
+                          {Object.entries(
+                            backups.reduce((acc, backup) => {
+                              const gameName = backup.gameName;
+                              if (!acc[gameName]) acc[gameName] = [];
+                              acc[gameName].push(backup);
+                              return acc;
+                            }, {})
+                          ).map(([gameName, gameBackups]) => (
+                            <div key={gameName} className="space-y-2">
+                              {/* Game Header */}
+                              <div className="flex items-center gap-2 px-2">
+                                <Gamepad2 className="h-4 w-4 text-primary" />
+                                <h3 className="font-semibold text-foreground">
+                                  {gameName}
+                                </h3>
+                                <span className="text-xs text-muted-foreground">
+                                  ({gameBackups.length} backup
+                                  {gameBackups.length !== 1 ? "s" : ""})
+                                </span>
+                              </div>
+                              {/* Backups for this game */}
+                              <div className="space-y-2">
+                                {gameBackups.map(backup => (
+                                  <div
+                                    key={backup.backupId}
+                                    className="ml-6 flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 p-4"
+                                  >
+                                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                        <Cloud className="h-4 w-4 text-primary" />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate font-medium">
+                                          {backup.backupName}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                          <span>
+                                            {new Date(
+                                              backup.createdAt
+                                            ).toLocaleDateString()}{" "}
+                                            {new Date(
+                                              backup.createdAt
+                                            ).toLocaleTimeString()}
+                                          </span>
+                                          {backup.size && backup.size > 0 && (
+                                            <>
+                                              <span>•</span>
+                                              <span>
+                                                {(backup.size / 1024 / 1024).toFixed(2)}{" "}
+                                                MB
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                        <div className="mt-1 flex items-center gap-2">
+                                          <span className="rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-0.5 text-xs font-medium text-white">
+                                            <Cloud className="mr-1 inline h-3 w-3" />
+                                            Cloud
+                                          </span>
+                                          {backup.existsLocally && (
+                                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                              <FolderSync className="mr-1 inline h-3 w-3" />
+                                              Local
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={deletingBackup === backup.backupId}
+                                          >
+                                            {deletingBackup === backup.backupId ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>
+                                              {t("ascend.cloudBackups.deleteTitle") ||
+                                                "Delete Backup?"}
+                                            </AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              {t("ascend.cloudBackups.deleteDesc") ||
+                                                "This will permanently delete this backup from cloud storage. This action cannot be undone."}
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>
+                                              {t("common.cancel") || "Cancel"}
+                                            </AlertDialogCancel>
+                                            <Button
+                                              variant="destructive"
+                                              onClick={() =>
+                                                handleDeleteBackup(backup.backupId)
+                                              }
+                                            >
+                                              {t("common.delete") || "Delete"}
+                                            </Button>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           );
 
@@ -7384,6 +7801,29 @@ const Ascend = () => {
                     <p className="mt-2 text-sm text-muted-foreground">
                       {t("ascend.premium.leaderboard.description") ||
                         "Compete with the community on the public leaderboard. See how your stats stack up against other players and climb the ranks."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-500/10 blur-2xl transition-all group-hover:bg-sky-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500">
+                      <CloudUpload className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="mt-4 text-lg font-semibold">
+                        {t("ascend.premium.cloudBackups.title") || "Cloud Backups"}
+                      </h3>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.cloudBackups.description") ||
+                        "Automatically back up your game saves to the cloud. Never lose your progress and restore your saves on any device."}
                     </p>
                   </div>
                 </motion.div>
@@ -7549,33 +7989,6 @@ const Ascend = () => {
                   </div>
                 </motion.div>
 
-                {/* Cloud Backups - PLANNED */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.65 }}
-                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-                >
-                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-500/10 blur-2xl transition-all group-hover:bg-sky-500/20" />
-                  <div className="relative">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500">
-                      <CloudUpload className="h-6 w-6" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="mt-4 text-lg font-semibold">
-                        {t("ascend.premium.cloudBackups.title") || "Cloud Backups"}
-                      </h3>
-                      <span className="mt-4 rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-semibold text-sky-600 dark:text-sky-400">
-                        {t("ascend.premium.planned") || "PLANNED"}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {t("ascend.premium.cloudBackups.description") ||
-                        "Automatically back up your game saves to the cloud. Never lose your progress and restore your saves on any device."}
-                    </p>
-                  </div>
-                </motion.div>
-
                 {/* And More Coming */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -7700,10 +8113,10 @@ const Ascend = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="text-base font-semibold text-foreground">
-                      {t("account.features.cloudSync")}
+                      {t("account.features.cloudSyncandBackups")}
                     </h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {t("account.features.cloudSyncDesc")}
+                      {t("account.features.cloudSyncandBackupsDesc")}
                     </p>
                   </div>
                 </div>

@@ -2361,5 +2361,210 @@ export const getNotifications = async () => {
   }
 };
 
+/**
+ * Get Ascendara auth token
+ * @returns {Promise<string>}
+ */
+const getAuthToken = async () => {
+  try {
+    const AUTHORIZATION = await window.electron.getAPIKey();
+    const response = await fetch("https://api.ascendara.app/auth/token", {
+      headers: {
+        Authorization: AUTHORIZATION,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to obtain token");
+    }
+
+    const data = await response.json();
+    return data.token;
+  } catch (error) {
+    console.error("Error getting token:", error);
+    throw error;
+  }
+};
+
+/**
+ * Upload a game save backup to cloud storage
+ * @param {File} file - The backup file to upload
+ * @param {string} gameName - Name of the game
+ * @param {string} backupName - Name for this backup
+ * @returns {Promise<{success: boolean, backupId: string|null, error: string|null}>}
+ */
+export const uploadBackup = async (file, gameName, backupName) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, backupId: null, error: "Not authenticated" };
+    }
+
+    const token = await getAuthToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("gameName", gameName);
+    formData.append("backupName", backupName);
+    formData.append("userId", user.uid);
+    formData.append("token", token);
+
+    const response = await fetch("https://api.ascendara.app/ascend/backups/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        backupId: null,
+        error: data.error || "Failed to upload backup",
+        code: data.code,
+      };
+    }
+
+    return { success: true, backupId: data.backupId, error: null };
+  } catch (error) {
+    console.error("Upload backup error:", error);
+    return { success: false, backupId: null, error: error.message };
+  }
+};
+
+/**
+ * List all backups for the current user
+ * @param {string} gameName - Optional: filter by game name
+ * @returns {Promise<{backups: array, error: string|null}>}
+ */
+export const listBackups = async (gameName = null) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { backups: [], error: "Not authenticated" };
+    }
+
+    const token = await getAuthToken();
+    const url = new URL("https://api.ascendara.app/ascend/backups/list");
+    url.searchParams.append("userId", user.uid);
+    if (gameName) {
+      url.searchParams.append("gameName", gameName);
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        backups: [],
+        error: data.error || "Failed to list backups",
+        code: data.code,
+      };
+    }
+
+    return { backups: data.backups, error: null };
+  } catch (error) {
+    console.error("List backups error:", error);
+    return { backups: [], error: error.message };
+  }
+};
+
+/**
+ * Get download URL for a backup
+ * @param {string} backupId - The backup ID
+ * @returns {Promise<{downloadUrl: string|null, backupName: string|null, gameName: string|null, error: string|null}>}
+ */
+export const getBackupDownloadUrl = async backupId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return {
+        downloadUrl: null,
+        backupName: null,
+        gameName: null,
+        error: "Not authenticated",
+      };
+    }
+
+    const token = await getAuthToken();
+    const url = new URL(`https://api.ascendara.app/ascend/backups/download/${backupId}`);
+    url.searchParams.append("userId", user.uid);
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        downloadUrl: null,
+        backupName: null,
+        gameName: null,
+        error: data.error || "Failed to get download URL",
+        code: data.code,
+      };
+    }
+
+    return {
+      downloadUrl: data.downloadUrl,
+      backupName: data.backupName,
+      gameName: data.gameName,
+      error: null,
+    };
+  } catch (error) {
+    console.error("Get backup download URL error:", error);
+    return { downloadUrl: null, backupName: null, gameName: null, error: error.message };
+  }
+};
+
+/**
+ * Delete a backup
+ * @param {string} backupId - The backup ID to delete
+ * @returns {Promise<{success: boolean, error: string|null}>}
+ */
+export const deleteBackup = async backupId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const token = await getAuthToken();
+    const url = new URL(`https://api.ascendara.app/ascend/backups/delete/${backupId}`);
+    url.searchParams.append("userId", user.uid);
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || "Failed to delete backup",
+        code: data.code,
+      };
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("Delete backup error:", error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Export Firebase instances for advanced usage
 export { app, auth, db, analytics };

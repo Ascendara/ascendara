@@ -144,6 +144,63 @@ function registerMiscHandlers() {
     }
   });
 
+  // List backup files in a directory
+  ipcMain.handle("listBackupFiles", async (_, dirPath) => {
+    try {
+      if (!fs.existsSync(dirPath)) {
+        return [];
+      }
+      const files = await fs.promises.readdir(dirPath);
+      return files;
+    } catch (error) {
+      console.error("Error listing backup files:", error);
+      return [];
+    }
+  });
+
+  // Read backup file as buffer
+  ipcMain.handle("readBackupFile", async (_, filePath) => {
+    try {
+      if (!fs.existsSync(filePath)) {
+        throw new Error("Backup file not found");
+      }
+      const buffer = await fs.promises.readFile(filePath);
+      return buffer;
+    } catch (error) {
+      console.error("Error reading backup file:", error);
+      throw error;
+    }
+  });
+
+  // Get temp directory path
+  ipcMain.handle("getTempPath", async () => {
+    return os.tmpdir();
+  });
+
+  // Write file (for cloud backup restore)
+  ipcMain.handle("writeFile", async (_, filePath, buffer) => {
+    try {
+      await fs.promises.writeFile(filePath, Buffer.from(buffer));
+      return true;
+    } catch (error) {
+      console.error("Error writing file:", error);
+      throw error;
+    }
+  });
+
+  // Delete file (cleanup after restore)
+  ipcMain.handle("deleteFile", async (_, filePath) => {
+    try {
+      if (fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+      }
+      return true;
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      throw error;
+    }
+  });
+
   // Read/write file
   ipcMain.handle("read-file", async (_, filePath) => {
     try {
