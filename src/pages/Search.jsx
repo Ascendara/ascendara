@@ -408,9 +408,9 @@ const Search = memo(() => {
     return () => stopStatusCheck();
   }, [settings?.usingLocalIndex]);
 
-  // Persist searchQuery to localStorage
+  // Persist searchQuery to sessionStorage
   useEffect(() => {
-    window.localStorage.setItem("searchQuery", searchQuery);
+    window.sessionStorage.setItem("searchQuery", searchQuery);
   }, [searchQuery]);
 
   // Persist searchQuery
