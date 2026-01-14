@@ -17,6 +17,7 @@ import { analytics } from "@/services/analyticsService";
 import {
   initializeStatusService,
   cleanupStatusService,
+  setGamePlayingState,
 } from "@/services/ascendStatusService";
 import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
 import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseService";
@@ -323,10 +324,12 @@ const UserActivityTracker = React.memo(() => {
 
     const handleGameLaunch = (_, data) => {
       const gameName = data?.game || "a game";
+      setGamePlayingState(true);
       setActivity(ActivityType.PLAYING_GAME, gameName);
     };
 
     const handleGameClosed = (_, data) => {
+      setGamePlayingState(false);
       // Restore to browsing library when game closes
       setActivity(ActivityType.BROWSING_LIBRARY);
     };

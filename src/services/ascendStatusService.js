@@ -5,6 +5,7 @@ let isInitialized = false;
 let statusChangeCallback = null;
 let currentUserId = null;
 let initializationTime = 0;
+let isPlayingGame = false;
 
 /**
  * Initialize the status service - sets user to their preferred status
@@ -112,6 +113,13 @@ const handleAppHidden = async () => {
     return;
   }
 
+  // Don't set offline if user is playing a game
+  // The window hides during game launch, but user is still active
+  if (isPlayingGame) {
+    console.log("[AscendStatus] Ignoring hidden event - user is playing a game");
+    return;
+  }
+
   try {
     await updateUserStatus("offline");
     if (statusChangeCallback) statusChangeCallback("offline");
@@ -169,3 +177,13 @@ export const setUserOnlineStatus = async status => {
  * Get the user's stored preferred status
  */
 export const getPreferredStatus = () => previousStatus;
+
+/**
+ * Set whether a game is currently being played
+ * This prevents status from being set to offline when window hides during game launch
+ * @param {boolean} playing - Whether a game is currently playing
+ */
+export const setGamePlayingState = playing => {
+  isPlayingGame = playing;
+  console.log("[AscendStatus] Game playing state set to:", playing);
+};
