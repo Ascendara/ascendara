@@ -155,12 +155,17 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
       });
 
       // Upload to cloud if requested and user is authenticated
+      let cloudUploadSuccess = true;
       if (uploadToCloud && user && autoCloudBackupEnabled) {
-        await handleUploadBackupToCloud(result);
+        cloudUploadSuccess = await handleUploadBackupToCloud(result);
       }
 
-      // Mark entire operation as complete
-      setBackupSuccess(true);
+      // Mark entire operation as complete only if cloud upload succeeded (or wasn't attempted)
+      if (cloudUploadSuccess) {
+        setBackupSuccess(true);
+      } else {
+        setBackupFailed(true);
+      }
     } catch (error) {
       console.error("Backup failed:", error);
       setBackupFailed(true);
@@ -172,7 +177,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
   const handleUploadBackupToCloud = async backupResult => {
     if (!user) {
       toast.error("Please sign in to Ascend to use cloud backups");
-      return;
+      return false;
     }
 
     setIsUploadingToCloud(true);
@@ -190,7 +195,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
       // Get list of backup files in the game folder
       const backupFiles = await window.electron.listBackupFiles(gameBackupFolder);
       if (!backupFiles || backupFiles.length === 0) {
-        throw new Error("No backup files found");
+        throw new Error("No backup files found in backup directory");
       }
 
       // Find the most recent .zip backup file
@@ -222,14 +227,17 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
 
       if (uploadResult.success) {
         toast.success("Backup uploaded to cloud successfully");
+        return true;
       } else if (uploadResult.code === "SUBSCRIPTION_REQUIRED") {
         toast.error("Cloud backups require an active Ascend subscription");
+        return false;
       } else {
         throw new Error(uploadResult.error);
       }
     } catch (error) {
       console.error("Failed to upload backup to cloud:", error);
       toast.error("Failed to upload backup to cloud: " + error.message);
+      return false;
     } finally {
       setIsUploadingToCloud(false);
     }
