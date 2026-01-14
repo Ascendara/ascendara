@@ -1174,6 +1174,8 @@
       "autoBackupEnabled": "Auto-backup enabled",
       "autoBackupEnabledDesc": "Auto-backup enabled for {{game}}",
       "autoBackupOnGameClose": "Auto-backup on Game Close",
+      "autoCloudBackup": "Auto-cloud backup",
+      "autoCloudBackupDesc": "Automatically save data to cloud when backing up",
       "backingUpDescription": "Backing up {{game}}...",
       "backupFailed": "Backup failed",
       "backupNow": "Backup {{game}} Now",

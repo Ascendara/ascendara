@@ -249,12 +249,31 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
     try {
       const gameName = game.game || game.name;
 
-      // Call the electron API to restore the backup
-      // If specificBackup is provided, use it for the restore
+      // Determine the latest backup if not specified
+      let backupToRestore = specificBackup;
+      if (!backupToRestore) {
+        // Merge and sort all backups by timestamp to find the latest
+        const allBackups = [
+          ...backupsList.map(b => ({ ...b, source: "local" })),
+          ...cloudBackupsList.map(b => ({ ...b, source: "cloud" })),
+        ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        if (allBackups.length > 0) {
+          backupToRestore = allBackups[0];
+        }
+      }
+
+      // If it's a cloud backup, use the cloud restore flow
+      if (backupToRestore && backupToRestore.isCloud) {
+        await handleRestoreCloudBackup(backupToRestore);
+        return;
+      }
+
+      // Call the electron API to restore the local backup
       const result = await window.electron.ludusavi(
         "restore",
         gameName,
-        specificBackup ? specificBackup.name : null
+        backupToRestore ? backupToRestore.name : null
       );
 
       if (!result?.success) {
@@ -350,12 +369,16 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
 
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        const uint8Array = new Uint8Array(arrayBuffer);
 
         // Save to temp location
         const tempPath = await window.electron.getTempPath();
-        backupFilePath = `${tempPath}/${cloudBackup.name}.zip`;
-        await window.electron.writeFile(backupFilePath, buffer);
+        // Sanitize filename to remove invalid characters for Windows file paths
+        const sanitizedName = cloudBackup.name
+          .replace(/[<>:"/\\|?*]/g, "_")
+          .replace(/\s+/g, "_");
+        backupFilePath = `${tempPath}/${sanitizedName}.zip`;
+        await window.electron.writeFile(backupFilePath, uint8Array);
         needsCleanup = true;
       }
 
@@ -424,9 +447,10 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
 
       // Parse the returned data structure
       const data = result.data;
+      let gameBackups = [];
 
       if (data && data.games && data.games[gameName] && data.games[gameName].backups) {
-        const gameBackups = data.games[gameName].backups.map(backup => ({
+        gameBackups = data.games[gameName].backups.map(backup => ({
           name: backup.name,
           timestamp: backup.when,
           os: backup.os,
@@ -1115,20 +1139,33 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
         (backupsList.length > 0 || cloudBackupsList.length > 0) && (
           <ScrollArea className="h-[300px]">
             <div className="space-y-2">
-              {/* Cloud Backups Section */}
-              {cloudBackupsList.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-1 py-2">
-                    <Cloud className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm font-semibold text-blue-500">
-                      Cloud Backups
-                    </span>
-                  </div>
-                  {cloudBackupsList.map((backup, index) => (
+              {/* Unified Backups List - Sorted by timestamp */}
+              {(() => {
+                // Merge and sort all backups by timestamp (newest first)
+                const allBackups = [
+                  ...backupsList.map(b => ({ ...b, source: "local" })),
+                  ...cloudBackupsList.map(b => ({ ...b, source: "cloud" })),
+                ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                return allBackups.map((backup, index) => {
+                  const isCloud = backup.isCloud || backup.source === "cloud";
+                  const isLocal = backup.isLocal || backup.source === "local";
+
+                  return (
                     <Card
-                      key={`cloud-${index}`}
-                      className="cursor-pointer border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-purple-500/5 transition-colors hover:border-blue-500/50"
-                      onClick={() => handleRestoreCloudBackup(backup)}
+                      key={`backup-${index}-${backup.backupId || backup.name}`}
+                      className={`cursor-pointer transition-colors ${
+                        isCloud
+                          ? "border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-purple-500/5 hover:border-blue-500/50"
+                          : "border-muted/60 hover:border-primary/40"
+                      }`}
+                      onClick={() => {
+                        if (isCloud) {
+                          handleRestoreCloudBackup(backup);
+                        } else {
+                          handleSelectBackup(backup);
+                        }
+                      }}
                     >
                       <CardContent className="p-3">
                         <div className="flex flex-col">
@@ -1141,11 +1178,13 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
                             </span>
                           </div>
                           <div className="mt-1 flex items-center gap-2">
-                            <span className="rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-0.5 text-xs font-medium text-white">
-                              <Cloud className="mr-1 inline h-3 w-3" />
-                              Cloud
-                            </span>
-                            {backup.existsLocally && (
+                            {isCloud && (
+                              <span className="rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-0.5 text-xs font-medium text-white">
+                                <Cloud className="mr-1 inline h-3 w-3" />
+                                Cloud
+                              </span>
+                            )}
+                            {(isLocal || backup.existsLocally) && (
                               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                 <FolderSync className="mr-1 inline h-3 w-3" />
                                 Local
@@ -1157,61 +1196,17 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
                               </span>
                             )}
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {/* Local Backups Section */}
-              {backupsList.length > 0 && (
-                <div className="space-y-2">
-                  {cloudBackupsList.length > 0 && (
-                    <div className="mt-4 flex items-center gap-2 px-1 py-2">
-                      <FolderSync className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-semibold text-primary">
-                        Local Backups
-                      </span>
-                    </div>
-                  )}
-                  {backupsList.map((backup, index) => (
-                    <Card
-                      key={`local-${index}`}
-                      className="cursor-pointer border-muted/60 transition-colors hover:border-primary/40"
-                      onClick={() => handleSelectBackup(backup)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex flex-col">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">
-                              {new Date(backup.timestamp).toLocaleString()}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {backup.name}
-                            </span>
-                          </div>
                           {backup.path && (
-                            <span className="truncate text-xs text-muted-foreground">
+                            <span className="mt-1 truncate text-xs text-muted-foreground">
                               {backup.path}
                             </span>
                           )}
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                              {backup.os}
-                            </span>
-                            {backup.locked && (
-                              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-500">
-                                {t("library.backups.locked")}
-                              </span>
-                            )}
-                          </div>
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
-                </div>
-              )}
+                  );
+                });
+              })()}
             </div>
           </ScrollArea>
         )}
