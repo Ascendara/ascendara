@@ -38,6 +38,8 @@ function createWindow() {
       preload: path.join(__dirname, "..", "preload.js"),
       nodeIntegration: true,
       contextIsolation: true,
+      // Disable sandbox for Linux compatibility
+      sandbox: false,
     },
   });
 
@@ -193,6 +195,14 @@ function setMainWindowHidden(value) {
 }
 
 /**
+ * Get the main window
+ * @returns {BrowserWindow|null} - The main window or null if not found
+ */
+function getMainWindow() {
+  return BrowserWindow.getAllWindows().find(win => win) || null;
+}
+
+/**
  * Show an error dialog
  * @param {string} title - Dialog title
  * @param {string} message - Dialog message
@@ -225,10 +235,19 @@ function registerWindowHandlers() {
     if (win) {
       if (win.isMaximized()) {
         win.unmaximize();
+        return false;
       } else {
         win.maximize();
+        return true;
       }
     }
+    return false;
+  });
+
+  // Let the interface knows if it's already at max at start
+  ipcMain.handle("is-window-maximized", () => {
+    const win = BrowserWindow.getFocusedWindow();
+    return win ? win.isMaximized() : false;
   });
 
   // Handle fullscreen toggle
@@ -256,8 +275,10 @@ function registerWindowHandlers() {
         mainWindowHidden = true;
         destroyDiscordRPC();
         win.hide();
-        console.log("Window hidden instead of closed");
+        console.log("Window hidden to tray");
       } else {
+        // Set quitting flag to allow app to quit
+        app.isQuitting = true;
         win.close();
         // If endOnClose is true, we should make sure the app fully quits
         if (process.platform !== "darwin") {
@@ -347,6 +368,7 @@ module.exports = {
   createWindow,
   hideWindow,
   showWindow,
+  getMainWindow,
   setHandlingProtocolUrl,
   isMainWindowHidden,
   setMainWindowHidden,

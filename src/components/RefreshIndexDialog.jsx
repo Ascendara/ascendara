@@ -42,9 +42,57 @@ const RefreshIndexDialog = ({
   const [isListening, setIsListening] = useState(false);
   const [cookieReceived, setCookieReceived] = useState(false);
   const [hasStartedRefresh, setHasStartedRefresh] = useState(false);
+  const [checkingCF, setCheckingCF] = useState(false);
+  const [cfActive, setCfActive] = useState(null);
 
   // Determine if this is a cookie refresh (mid-process) vs initial refresh
   const isCookieRefresh = mode === "cookie-refresh";
+
+  // Check Cloudflare protection status when dialog opens
+  useEffect(() => {
+    if (!open || isCookieRefresh) return; // Skip check for cookie refresh (CF is already active)
+
+    const checkCloudflareProtection = async () => {
+      setCheckingCF(true);
+      try {
+        const response = await fetch(STEAMRIP_POSTS_URL, {
+          method: "GET",
+          mode: "cors",
+        });
+
+        if (response.status === 200) {
+          // CF protection is NOT active
+          console.log("Cloudflare protection is NOT active - cookie not required");
+          setCfActive(false);
+          // Auto-start refresh without cookie
+          setTimeout(() => {
+            onStartRefresh({
+              method: "no-cookie",
+              cfClearance: null,
+              isCookieRefresh: false,
+            });
+            handleClose();
+          }, 500);
+        } else if (response.status === 403) {
+          // CF protection is active
+          console.log("Cloudflare protection is active - cookie required");
+          setCfActive(true);
+        } else {
+          // Unexpected status, assume CF is active
+          console.log(`Unexpected status ${response.status}, assuming CF is active`);
+          setCfActive(true);
+        }
+      } catch (error) {
+        // Error checking, assume CF is active
+        console.log("Error checking CF protection, assuming CF is active:", error);
+        setCfActive(true);
+      } finally {
+        setCheckingCF(false);
+      }
+    };
+
+    checkCloudflareProtection();
+  }, [open, isCookieRefresh]);
 
   // Listen for cookie from extension via protocol handler
   useEffect(() => {
@@ -103,6 +151,8 @@ const RefreshIndexDialog = ({
     setIsListening(false);
     setCookieReceived(false);
     setHasStartedRefresh(false);
+    setCheckingCF(false);
+    setCfActive(null);
   };
 
   const handleClose = () => {
@@ -134,6 +184,73 @@ const RefreshIndexDialog = ({
   };
 
   const renderStep = () => {
+    // Show checking state while verifying CF protection
+    if (checkingCF && !isCookieRefresh) {
+      return (
+        <>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Loader className="h-5 w-5 animate-spin text-primary" />
+              {t("refreshDialog.checkingCF") || "Checking Cloudflare Status..."}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 p-4">
+                  <Radio className="h-5 w-5 animate-pulse text-primary" />
+                  <div>
+                    <span className="block font-medium text-foreground">
+                      {t("refreshDialog.detectingProtection") ||
+                        "Detecting protection status..."}
+                    </span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t("refreshDialog.detectingDesc") ||
+                        "Checking if Cloudflare protection is active on SteamRIP"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" className="text-primary" onClick={handleClose}>
+              {t("common.cancel") || "Cancel"}
+            </Button>
+          </AlertDialogFooter>
+        </>
+      );
+    }
+
+    // Show success state if CF is not active
+    if (cfActive === false && !isCookieRefresh) {
+      return (
+        <>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CircleCheck className="h-5 w-5 text-green-500" />
+              {t("refreshDialog.noCFTitle") || "No Protection Detected"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+                  <CircleCheck className="h-6 w-6 text-green-500" />
+                  <div>
+                    <span className="block font-medium text-green-600 dark:text-green-400">
+                      {t("refreshDialog.noCFDetected") ||
+                        "Cloudflare protection is not active"}
+                    </span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t("refreshDialog.noCFDesc") ||
+                        "Starting refresh without cookie..."}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </>
+      );
+    }
+
     switch (step) {
       case 1:
         return (

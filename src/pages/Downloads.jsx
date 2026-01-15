@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -54,6 +55,7 @@ import {
   XCircle,
   ArrowDownToLine,
   Wifi,
+  Play,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -170,6 +172,7 @@ const SpeedIndicator = memo(({ speed, isHigh }) => (
 const Downloads = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     window.electron.switchRPC("downloading");
@@ -183,9 +186,15 @@ const Downloads = () => {
   const [torboxStates, setTorboxStates] = useState({}); // webdownloadId -> state
   const [queuedDownloads, setQueuedDownloads] = useState([]);
   // Refs to always access the latest values inside polling
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [totalSpeed, setTotalSpeed] = useState("0.00 MB/s");
+  const [activeDownloads, setActiveDownloads] = useState(0);
+  const [stoppingDownloads, setStoppingDownloads] = useState(new Set());
+  const [resumingDownloads, setResumingDownloads] = useState(new Set());
   const downloadingGamesRef = React.useRef(downloadingGames);
   const completedGamesRef = React.useRef(new Set());
   const fadingGamesRef = React.useRef(new Set());
+  const resumingDownloadsRef = React.useRef(new Set());
   const prevActiveCountRef = React.useRef(0);
   useEffect(() => {
     downloadingGamesRef.current = downloadingGames;
@@ -196,13 +205,14 @@ const Downloads = () => {
   useEffect(() => {
     fadingGamesRef.current = fadingGames;
   }, [fadingGames]);
-  const [selectedGame, setSelectedGame] = useState(null);
-  const [totalSpeed, setTotalSpeed] = useState("0.00 MB/s");
-  const [activeDownloads, setActiveDownloads] = useState(0);
-  const [stoppingDownloads, setStoppingDownloads] = useState(new Set());
+  useEffect(() => {
+    resumingDownloadsRef.current = resumingDownloads;
+  }, [resumingDownloads]);
   const [stopModalOpen, setStopModalOpen] = useState(false);
   const [gameToStop, setGameToStop] = useState(null);
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false);
+  const [showAscendWarning, setShowAscendWarning] = useState(false);
+  const [gameToResume, setGameToResume] = useState(null);
   const MAX_HISTORY_POINTS = 20;
   const [speedHistory, setSpeedHistory] = useState(() => {
     const savedHistory = localStorage.getItem("speedHistory");
@@ -330,16 +340,17 @@ const Downloads = () => {
           });
         }
 
-        // Build the display list: current downloads + completed/fading games
+        // Build the display list: current downloads + completed/fading games + resuming games
         const allGames = [...downloading];
 
         // Add completed games that aren't in the current download list
         prevGames.forEach(pg => {
           const isCompleted = completedGamesRef.current.has(pg.game);
           const isFading = fadingGamesRef.current.has(pg.game);
+          const isResuming = resumingDownloadsRef.current.has(pg.game);
           const alreadyInList = allGames.some(g => g.game === pg.game);
 
-          if ((isCompleted || isFading) && !alreadyInList) {
+          if ((isCompleted || isFading || isResuming) && !alreadyInList) {
             allGames.push({
               ...pg,
               isCompleted: isCompleted,
@@ -440,27 +451,17 @@ const Downloads = () => {
     };
   }, [downloadingGames.length]);
 
-  const handleStopDownload = game => {
-    setGameToStop(game);
-    setStopModalOpen(true);
-  };
-
-  const executeStopDownload = async (game, deleteContents = false) => {
-    console.log("Executing stop download for:", game, "deleteContents:", deleteContents);
+  const handlePauseDownload = async game => {
     setStoppingDownloads(prev => new Set([...prev, game.game]));
     try {
-      const result = await window.electron.stopDownload(game.game, deleteContents);
-      console.log("Stop download result:", result);
+      const result = await window.electron.stopDownload(game.game, false);
       if (!result) {
-        throw new Error("Failed to stop download");
+        throw new Error("Failed to pause download");
       }
+      toast.success(t("downloads.pauseSuccess"));
     } catch (error) {
-      console.error("Error stopping download:", error);
-      toast({
-        title: t("downloads.errors.stopFailed"),
-        description: deleteContents
-          ? t("downloads.errors.stopAndDeleteFailed")
-          : t("downloads.errors.stopOnlyFailed"),
+      console.error("Error pausing download:", error);
+      toast.error(t("downloads.errors.pauseFailed"), {
         variant: "destructive",
       });
     } finally {
@@ -469,14 +470,113 @@ const Downloads = () => {
         newSet.delete(game.game);
         return newSet;
       });
-      // Optimistically remove the game from the downloads list if deleteContents is true
-      if (deleteContents) {
-        // Clear the cached download data since the download is being deleted
-        clearCachedDownloadData(game.game);
-        setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
+    }
+  };
+
+  const handleKillDownload = game => {
+    setGameToStop(game);
+    setStopModalOpen(true);
+  };
+
+  const executeKillDownload = async game => {
+    console.log("Executing kill download for:", game);
+    setStoppingDownloads(prev => new Set([...prev, game.game]));
+    try {
+      const result = await window.electron.stopDownload(game.game, true);
+      console.log("Kill download result:", result);
+      if (!result) {
+        throw new Error("Failed to kill download");
       }
+      // Clear the cached download data since the download is being deleted
+      clearCachedDownloadData(game.game);
+      setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
+      toast.success(t("downloads.killSuccess"));
+    } catch (error) {
+      console.error("Error killing download:", error);
+      toast.error(t("downloads.errors.killFailed"), {
+        variant: "destructive",
+      });
+    } finally {
+      setStoppingDownloads(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(game.game);
+        return newSet;
+      });
       setStopModalOpen(false);
       setGameToStop(null);
+    }
+  };
+
+  const handleResumeDownload = async game => {
+    // Check if there's an active download OR another download is currently resuming
+    const hasActive = downloadingGames.some(
+      g => g.downloadingData?.downloading && g.game !== game.game
+    );
+    const hasResuming = resumingDownloads.size > 0 && !resumingDownloads.has(game.game);
+
+    // If there's an active download or another resuming download and user doesn't have Ascend, show warning
+    if ((hasActive || hasResuming) && !isAuthenticated) {
+      setGameToResume(game);
+      setShowAscendWarning(true);
+      return;
+    }
+
+    // Proceed with resume
+    await executeResumeDownload(game);
+  };
+
+  const executeResumeDownload = async game => {
+    setResumingDownloads(prev => new Set([...prev, game.game]));
+    try {
+      const result = await window.electron.resumeDownload(game.game);
+      if (result.success) {
+        toast.success(t("downloads.resumeSuccess"));
+        // Keep in resuming state until download actually starts (check every 500ms)
+        const checkInterval = setInterval(() => {
+          const currentGames = downloadingGamesRef.current;
+          const gameRestarted = currentGames.some(
+            g => g.game === game.game && g.downloadingData?.downloading
+          );
+
+          if (gameRestarted) {
+            clearInterval(checkInterval);
+            setResumingDownloads(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(game.game);
+              return newSet;
+            });
+          }
+        }, 500);
+
+        // Fallback: clear after 5 seconds even if download hasn't started
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          setResumingDownloads(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(game.game);
+            return newSet;
+          });
+        }, 5000);
+      } else {
+        setResumingDownloads(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(game.game);
+          return newSet;
+        });
+        toast.error(t("downloads.resumeError"), {
+          description: result.error || t("downloads.resumeErrorDescription"),
+        });
+      }
+    } catch (error) {
+      console.error("Error resuming download:", error);
+      setResumingDownloads(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(game.game);
+        return newSet;
+      });
+      toast.error(t("downloads.resumeError"), {
+        description: error.message,
+      });
     }
   };
 
@@ -700,10 +800,13 @@ const Downloads = () => {
                     ? torboxStates[game.torboxWebdownloadId]
                     : undefined
                 }
-                onStop={() => handleStopDownload(game)}
+                onPause={() => handlePauseDownload(game)}
+                onKill={() => handleKillDownload(game)}
+                onResume={() => handleResumeDownload(game)}
                 onRetry={() => handleRetryDownload(game)}
                 onOpenFolder={() => handleOpenFolder(game)}
                 isStopping={stoppingDownloads.has(game.game)}
+                isResuming={resumingDownloads.has(game.game)}
                 isCompleted={completedGames.has(game.game)}
                 isFading={fadingGames.has(game.game)}
                 onDelete={deletedGame => {
@@ -802,28 +905,57 @@ const Downloads = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("downloads.actions.stopDownloadTitle", { gameName: gameToStop?.game })}
+              {t("downloads.actions.killDownloadTitle", { gameName: gameToStop?.game })}
             </AlertDialogTitle>
           </AlertDialogHeader>
           <AlertDialogDescription className="text-muted-foreground">
-            {t("downloads.actions.stopDownloadDescription")}
+            {t("downloads.actions.killDownloadDescription")}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-primary">
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => gameToStop && executeStopDownload(gameToStop, false)}
-              className="bg-primary text-secondary hover:bg-primary/90"
+              onClick={() => gameToStop && executeKillDownload(gameToStop)}
+              className="text-secondary"
             >
-              {t("downloads.actions.stopDownload")}
+              <XCircle className="mr-2 h-4 w-4" />
+              {t("downloads.actions.killDownload")}
             </AlertDialogAction>
-            <AlertDialogAction
-              onClick={() => gameToStop && executeStopDownload(gameToStop, true)}
-              className="bg-primary text-secondary hover:bg-primary/90"
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Ascend Warning Dialog */}
+      <AlertDialog open={showAscendWarning} onOpenChange={setShowAscendWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("downloads.ascendRequired.title")}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription className="space-y-3 text-muted-foreground">
+            <p>{t("downloads.ascendRequired.description")}</p>
+            <p className="text-sm">{t("downloads.ascendRequired.suggestion")}</p>
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowAscendWarning(false);
+                setGameToResume(null);
+              }}
             >
-              <Trash2 className="h-4 w-4" />
-              <span className="ml-2">{t("downloads.actions.stopAndDelete")}</span>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowAscendWarning(false);
+                setGameToResume(null);
+                navigate("/ascend");
+              }}
+              className="text-secondary"
+            >
+              {t("downloads.ascendRequired.learnMore")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -901,10 +1033,13 @@ const StatusBadge = memo(({ status, t }) => {
 
 const DownloadCard = ({
   game,
-  onStop,
+  onPause,
+  onKill,
+  onResume,
   onRetry,
   onOpenFolder,
   isStopping,
+  isResuming,
   isCompleted,
   isFading,
   onDelete,
@@ -922,6 +1057,9 @@ const DownloadCard = ({
   const { settings } = useSettings();
 
   const { downloadingData } = game;
+
+  // Determine if download is in resuming state
+  const isResumingState = isResuming || (downloadingData?.stopped && isResuming);
 
   // Track extraction time per file to show notice for large files
   useEffect(() => {
@@ -1246,7 +1384,21 @@ const DownloadCard = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              {hasError || isStopped ? (
+              {isStopped ? (
+                <>
+                  <DropdownMenuItem onClick={() => onResume(game)} className="gap-2">
+                    <Play className="h-4 w-4" />
+                    {t("downloads.actions.resumeDownload")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleRemoveDownload(game)}
+                    className="gap-2 text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t("downloads.actions.cancelAndDelete")}
+                  </DropdownMenuItem>
+                </>
+              ) : hasError ? (
                 <>
                   <DropdownMenuItem onClick={() => onRetry(game)} className="gap-2">
                     <RefreshCcw className="h-4 w-4" />
@@ -1261,10 +1413,19 @@ const DownloadCard = ({
                   </DropdownMenuItem>
                 </>
               ) : (
-                <DropdownMenuItem onClick={() => onStop(game)} className="gap-2">
-                  <StopCircle className="h-4 w-4" />
-                  {t("downloads.actions.stopDownload")}
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem onClick={() => onPause(game)} className="gap-2">
+                    <Pause className="h-4 w-4" />
+                    {t("downloads.actions.pauseDownload")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onKill(game)}
+                    className="gap-2 text-red-600 focus:text-red-600"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    {t("downloads.actions.killDownload")}
+                  </DropdownMenuItem>
+                </>
               )}
               <DropdownMenuItem onClick={() => onOpenFolder(game)} className="gap-2">
                 <FolderOpen className="h-4 w-4" />
@@ -1355,28 +1516,49 @@ const DownloadCard = ({
             </div>
           )}
 
-          {/* Stopped State */}
-          {isStopped && !hasVerifyError && (
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/50 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                <Pause className="h-5 w-5 text-muted-foreground" />
+          {/* Resuming State */}
+          {isResumingState && (
+            <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                <Loader className="h-5 w-5 animate-spin text-blue-500" />
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-foreground">{t("downloads.stopped")}</p>
+              <div>
+                <p className="font-medium text-foreground">{t("downloads.resuming")}</p>
                 <p className="text-sm text-muted-foreground">
-                  {t("downloads.stoppedDescription")}{" "}
-                  <a
-                    onClick={() =>
-                      window.electron.openURL(
-                        "https://ascendara.app/docs/troubleshooting/common-issues#download-resumability"
-                      )
-                    }
-                    className="cursor-pointer text-primary hover:underline"
-                  >
-                    {t("common.learnMore")}
-                  </a>
+                  {t("downloads.resumingDescription")}
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Stopped State */}
+          {isStopped && !isResumingState && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/50 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                  <Pause className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-foreground">{t("downloads.stopped")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("downloads.stoppedDescription")}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onResume}
+                className="gap-2 text-secondary"
+                disabled={isResuming}
+              >
+                {isResuming ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {t("downloads.actions.resumeDownload")}
+              </Button>
             </div>
           )}
 

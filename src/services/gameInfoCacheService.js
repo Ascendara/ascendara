@@ -8,18 +8,17 @@ const CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 // Cache prefixes for different APIs
 const CACHE_PREFIXES = {
-  IGDB: "igdb_cache_",
-  GIANTBOMB: "gb_cache_",
+  STEAM: "steam_cache_",
   DEFAULT: "game_cache_",
 };
 
 /**
  * Get cached game data from a specific API
  * @param {string} gameName - Name of the game
- * @param {string} apiType - API type ("igdb", "giantbomb")
+ * @param {string} apiType - API type ("steam")
  * @returns {Object|null} Cached game data or null if not found/expired
  */
-const getCachedGame = (gameName, apiType = "igdb") => {
+const getCachedGame = (gameName, apiType = "steam") => {
   try {
     // Get the appropriate cache prefix
     const prefix = getCachePrefix(apiType);
@@ -54,9 +53,9 @@ const getCachedGame = (gameName, apiType = "igdb") => {
  * Cache game data from a specific API
  * @param {string} gameName - Name of the game
  * @param {Object} gameData - Game data to cache
- * @param {string} apiType - API type ("igdb", "giantbomb")
+ * @param {string} apiType - API type ("steam")
  */
-const cacheGame = (gameName, gameData, apiType = "igdb") => {
+const cacheGame = (gameName, gameData, apiType = "steam") => {
   try {
     if (!gameData) return;
 
@@ -81,16 +80,13 @@ const cacheGame = (gameName, gameData, apiType = "igdb") => {
 
 /**
  * Get the appropriate cache prefix for the API type
- * @param {string} apiType - API type ("igdb", "giantbomb")
+ * @param {string} apiType - API type ("steam")
  * @returns {string} Cache prefix
  */
 const getCachePrefix = apiType => {
   switch (apiType.toLowerCase()) {
-    case "igdb":
-      return CACHE_PREFIXES.IGDB;
-    case "giantbomb":
-    case "gb":
-      return CACHE_PREFIXES.GIANTBOMB;
+    case "steam":
+      return CACHE_PREFIXES.STEAM;
     default:
       return CACHE_PREFIXES.DEFAULT;
   }
@@ -241,8 +237,8 @@ const getCacheStats = (apiType = null) => {
 };
 
 // For backward compatibility
-const legacyGetCachedGame = gameName => getCachedGame(gameName, "igdb");
-const legacyCacheGame = (gameName, gameData) => cacheGame(gameName, gameData, "igdb");
+const legacyGetCachedGame = gameName => getCachedGame(gameName, "steam");
+const legacyCacheGame = (gameName, gameData) => cacheGame(gameName, gameData, "steam");
 
 // Run cleanup on service initialization
 clearExpiredCache();

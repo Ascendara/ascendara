@@ -502,135 +502,148 @@ const TorboxDownloads = () => {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="mb-6 mt-10 text-3xl font-bold text-primary">{t("torbox.title")}</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8 mt-10">
+        <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-4xl font-bold text-transparent">
+          {t("torbox.title")}
+        </h1>
+        <p className="mt-2 text-muted-foreground">{t("torbox.description")}</p>
+      </div>
 
-      {/* Server Stats */}
-      <Card className="mb-6 border-border/30">
+      {/* Account Info Card */}
+      <Card className="mb-8 border-border/40 bg-gradient-to-br from-background to-muted/20 shadow-lg">
         <CardContent className="p-6">
-          <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-            <div className="flex items-center gap-3">
-              <Server className="h-6 w-6 text-primary" />
-              <div>
-                <h3 className="font-semibold">{t("torbox.account")}</h3>
-                {userInfoLoading && !userInfo ? (
-                  <div className="mt-2 flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />{" "}
-                    {t("torbox.loading_account")}
-                  </div>
-                ) : userInfoError ? (
-                  <div className="text-destructive mt-2">{userInfoError}</div>
-                ) : (
-                  userInfo && (
-                    <div className="mt-2 space-y-3">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-muted-foreground">
-                          {t("common.email")}
-                        </span>
-                        <span className="font-medium">{userInfo.email}</span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">
-                            {t("torbox.plan")}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={userInfo.plan > 0 ? "default" : "outline"}
-                              className="mt-0.5 text-secondary"
-                            >
-                              {userInfo.plan === 0
-                                ? t("torbox.plan_free")
-                                : userInfo.plan === 1
-                                  ? t("torbox.plan_essential")
-                                  : userInfo.plan === 2
-                                    ? t("torbox.plan_standard")
-                                    : userInfo.plan === 3
-                                      ? t("torbox.plan_pro")
-                                      : "Unknown"}
-                            </Badge>
-                            {userInfo.premium_expires_at && userInfo.plan > 0 && (
-                              <span className="text-xs text-muted-foreground">
-                                {t("torbox.expires", {
-                                  date: new Date(
-                                    userInfo.premium_expires_at
-                                  ).toLocaleDateString(),
-                                })}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">
-                            {t("torbox.downloads")}
-                          </span>
-                          <span className="font-medium">
-                            {t("torbox.downloads_count", {
-                              count: userInfo.total_downloaded,
-                            })}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">
-                            {t("torbox.data")}
-                          </span>
-                          <span className="font-medium">
-                            {t("torbox.data_size", {
-                              size: (userInfo.total_bytes_downloaded / 1024 ** 3).toFixed(
-                                2
-                              ),
-                            })}
-                          </span>
-                        </div>
-
-                        {userInfo.cooldown_until &&
-                          new Date(userInfo.cooldown_until) > new Date() && (
-                            <div className="flex flex-col">
-                              <span className="text-sm text-muted-foreground">
-                                {t("torbox.cooldown")}
-                              </span>
-                              <span className="font-medium text-amber-500">
-                                {new Date(userInfo.cooldown_until).toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
+          {userInfoLoading && !userInfo ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-3 text-muted-foreground">
+                {t("torbox.loading_account")}
+              </span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={async () => {
-                try {
-                  await fetchTorboxDownloads();
-                  await fetchUserInfo();
-                  toast(t("torbox.data_refreshed"));
-                } catch (err) {
-                  console.error("Error in refresh handler:", err);
-                  if (toast.error) toast.error("Refresh failed");
-                }
-              }}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {t("common.refresh")}
-            </Button>
-          </div>
+          ) : userInfoError ? (
+            <div className="flex items-center justify-center py-8">
+              <AlertCircle className="text-destructive h-6 w-6" />
+              <span className="text-destructive ml-3">{userInfoError}</span>
+            </div>
+          ) : (
+            userInfo && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-primary/10 p-3">
+                      <Server className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">{t("torbox.account")}</h3>
+                      <p className="text-sm text-muted-foreground">{userInfo.email}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={async () => {
+                      try {
+                        await fetchTorboxDownloads();
+                        await fetchUserInfo();
+                        toast(t("torbox.data_refreshed"));
+                      } catch (err) {
+                        console.error("Error in refresh handler:", err);
+                        if (toast.error) toast.error("Refresh failed");
+                      }
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    {t("common.refresh")}
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="rounded-lg border border-border/50 bg-background/50 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="rounded-md bg-primary/10 p-1.5">
+                        <HardDrive className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {t("torbox.plan")}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={userInfo.plan > 0 ? "default" : "outline"}
+                        className="text-xs text-secondary"
+                      >
+                        {userInfo.plan === 0
+                          ? t("torbox.plan_free")
+                          : userInfo.plan === 1
+                            ? t("torbox.plan_essential")
+                            : userInfo.plan === 2
+                              ? t("torbox.plan_standard")
+                              : userInfo.plan === 3
+                                ? t("torbox.plan_pro")
+                                : "Unknown"}
+                      </Badge>
+                      {userInfo.premium_expires_at && userInfo.plan > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {t("torbox.expires", {
+                            date: new Date(
+                              userInfo.premium_expires_at
+                            ).toLocaleDateString(),
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/50 bg-background/50 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="rounded-md bg-primary/10 p-1.5">
+                        <Download className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {t("torbox.downloads")}
+                      </span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      {userInfo.total_downloaded.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-border/50 bg-background/50 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="rounded-md bg-primary/10 p-1.5">
+                        <HardDrive className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {t("torbox.data")}
+                      </span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      {(userInfo.total_bytes_downloaded / 1024 ** 3).toFixed(2)} GB
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          )}
         </CardContent>
       </Card>
 
       {/* Tabs for download categories */}
       <Tabs defaultValue="ready" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="ready">{t("torbox.ready")}</TabsTrigger>
-          <TabsTrigger value="downloading">{t("torbox.downloading")}</TabsTrigger>
-          <TabsTrigger value="completed">{t("torbox.completed")}</TabsTrigger>
+        <TabsList className="mb-6 grid w-full grid-cols-3 lg:w-[400px]">
+          <TabsTrigger value="ready" className="gap-2">
+            <CircleCheck className="h-4 w-4" />
+            {t("torbox.ready")}
+          </TabsTrigger>
+          <TabsTrigger value="downloading" className="gap-2">
+            <Loader2 className="h-4 w-4" />
+            {t("torbox.downloading")}
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="gap-2">
+            <Download className="h-4 w-4" />
+            {t("torbox.completed")}
+          </TabsTrigger>
         </TabsList>
 
         {isLoading ? (
@@ -661,19 +674,19 @@ const TorboxDownloads = () => {
                 );
 
                 return readyDownloads.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="mx-auto w-fit rounded-full bg-primary/5 p-6">
-                      <Coffee className="h-12 w-12 text-primary" />
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="mx-auto w-fit rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 p-8">
+                      <Coffee className="h-16 w-16 text-primary" />
                     </div>
-                    <h3 className="mb-1 mt-2 text-xl font-semibold">
+                    <h3 className="mb-2 mt-4 text-2xl font-semibold">
                       {t("torbox.no_ready_downloads")}
                     </h3>
-                    <p className="mt-2 text-muted-foreground">
+                    <p className="mt-1 max-w-md text-center text-muted-foreground">
                       {t("torbox.no_ready_downloads_desc")}
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {readyDownloads.map((download, idx) => (
                       <TorboxDownloadCard
                         key={download.id || `torbox-ready-${idx}`}
@@ -698,19 +711,19 @@ const TorboxDownloads = () => {
                 );
 
                 return downloadingDownloads.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="mx-auto w-fit rounded-full bg-primary/5 p-6">
-                      <Coffee className="h-12 w-12 text-primary" />
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="mx-auto w-fit rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 p-8">
+                      <Coffee className="h-16 w-16 text-primary" />
                     </div>
-                    <h3 className="mb-1 mt-2 text-xl font-semibold">
+                    <h3 className="mb-2 mt-4 text-2xl font-semibold">
                       {t("torbox.no_downloading")}
                     </h3>
-                    <p className="mt-2 text-muted-foreground">
+                    <p className="mt-1 max-w-md text-center text-muted-foreground">
                       {t("torbox.no_downloading_desc")}
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {downloadingDownloads.map((download, idx) => (
                       <TorboxDownloadCard
                         key={download.id || `torbox-downloading-${idx}`}
@@ -733,19 +746,19 @@ const TorboxDownloads = () => {
                 );
 
                 return completedDownloads.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="mx-auto w-fit rounded-full bg-primary/5 p-6">
-                      <Coffee className="h-12 w-12 text-primary" />
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="mx-auto w-fit rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 p-8">
+                      <Coffee className="h-16 w-16 text-primary" />
                     </div>
-                    <h3 className="mb-1 mt-2 text-xl font-semibold">
+                    <h3 className="mb-2 mt-4 text-2xl font-semibold">
                       {t("torbox.no_completed_downloads")}
                     </h3>
-                    <p className="mt-2 text-muted-foreground">
+                    <p className="mt-1 max-w-md text-center text-muted-foreground">
                       {t("torbox.no_completed_downloads_desc")}
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {completedDownloads.map((download, idx) => (
                       <TorboxDownloadCard
                         key={download.id || `torbox-completed-${idx}`}
@@ -976,34 +989,42 @@ const TorboxDownloadCard = ({
   };
 
   return (
-    <Card className="overflow-hidden border border-border/30 bg-background/50">
-      <CardContent className="p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+    <Card className="group overflow-hidden border border-border/40 bg-gradient-to-br from-background to-muted/10 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
+      <CardContent className="p-5">
+        <div className="mb-3 flex items-start justify-between">
+          <div className="flex-1">
             {status?.toLowerCase() === "downloading" && (
-              <div className="flex items-center gap-1 text-primary">
-                <Loader className="h-3 w-3 animate-spin" />
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-secondary">
+                <Loader className="h-3.5 w-3.5 animate-spin" />
                 <span className="text-xs font-medium">{t("torbox.downloading")}</span>
               </div>
             )}
             {isCompleted && !isDownloadedToPc && (
-              <Badge variant="outline" className="border-primary text-primary">
-                {t("torbox.ready_to_download")}
-              </Badge>
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-secondary">
+                <CircleCheck className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">
+                  {t("torbox.ready_to_download")}
+                </span>
+              </div>
             )}
             {isDownloadedToPc && (
-              <Badge variant="outline" className="border-success text-success">
-                {t("torbox.downloaded")}
-              </Badge>
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-green-600 dark:text-green-400">
+                <CircleCheck className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">{t("torbox.downloaded")}</span>
+              </div>
             )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 opacity-70 transition-opacity group-hover:opacity-100"
+              >
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-48">
               {!isCompleted && onStop && (
                 <DropdownMenuItem onClick={onStop}>
                   <StopCircle className="mr-2 h-4 w-4" />
@@ -1037,28 +1058,32 @@ const TorboxDownloadCard = ({
           </DropdownMenu>
         </div>
 
-        <h3 className="mb-2 truncate text-lg font-medium">{name}</h3>
+        <h3 className="mb-3 line-clamp-2 text-base font-semibold leading-snug">{name}</h3>
 
-        <Progress
-          value={progress}
-          className="mb-2 h-2"
-          color={isCompleted ? "bg-success" : undefined}
-        />
+        <div className="space-y-2">
+          <Progress
+            value={progress}
+            className="h-2.5"
+            color={isCompleted ? "bg-success" : undefined}
+          />
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            {downloaded && size ? `${downloaded} / ${size}` : size ? `${size}` : ""}
-          </span>
-          <span>{progress ? `${progress}%` : null}</span>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">
+              {downloaded && size ? `${downloaded} / ${size}` : size ? `${size}` : ""}
+            </span>
+            <span className="font-medium text-foreground">
+              {progress ? `${progress}%` : null}
+            </span>
+          </div>
         </div>
 
         {isCompleted && onDownloadToPC && (
           <Button
-            className="mt-3 w-full text-secondary"
+            className="mt-4 w-full gap-2 font-medium text-secondary"
             size="sm"
             onClick={onDownloadToPC}
           >
-            <Download className="mr-2 h-4 w-4" />
+            <Download className="h-4 w-4" />
             {t("torbox.download_to_pc")}
           </Button>
         )}

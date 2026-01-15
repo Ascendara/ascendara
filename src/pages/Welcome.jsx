@@ -1415,10 +1415,22 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 className="mb-8 w-full max-w-2xl space-y-4"
                 variants={itemVariants}
               >
+                {referralSource === "friend" && (
+                  <motion.div
+                    className="mb-4 rounded-lg border-2 border-primary bg-primary/5 p-4 text-center"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <p className="text-sm font-medium text-primary">
+                      {t("welcome.referral.friendThankYou")}
+                    </p>
+                  </motion.div>
+                )}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {[
+                    "friend",
                     "tiktok",
-                    "twitter",
                     "reddit",
                     "instagram",
                     "google",
@@ -1437,6 +1449,28 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       }`}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
+                      animate={
+                        source === "friend" && referralSource === "friend"
+                          ? {
+                              boxShadow: [
+                                "0 0 0 0 rgba(var(--primary), 0)",
+                                "0 0 0 8px rgba(var(--primary), 0.2)",
+                                "0 0 0 0 rgba(var(--primary), 0)",
+                              ],
+                            }
+                          : {}
+                      }
+                      transition={
+                        source === "friend" && referralSource === "friend"
+                          ? {
+                              boxShadow: {
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              },
+                            }
+                          : {}
+                      }
                     >
                       <span className="text-sm font-medium">
                         {t(`welcome.referral.sources.${source}`)}

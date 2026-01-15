@@ -18,6 +18,11 @@ const https = require("https");
 const path = require("path");
 const fs = require("fs-extra");
 
+// Disable sandbox for Linux compatibility (must be set before app ready)
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("--no-sandbox");
+}
+
 // Import modules
 const {
   config,
@@ -54,6 +59,7 @@ if (isDev) {
 // Global variables
 let tray = null;
 let localServer = null;
+let watcherProcess = null;
 
 /**
  * Launch crash reporter
@@ -82,20 +88,47 @@ function launchCrashReporter(errorType, errorMessage) {
  * Create system tray
  */
 function createTray() {
-  const iconPath = path.join(__dirname, "icon.ico");
+  // Use the correct icon path - try multiple locations
+  let iconPath;
+  if (isDev) {
+    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
+  } else {
+    // In production, icon should be in resources
+    iconPath = path.join(process.resourcesPath, "icon.ico");
+    // Fallback to app directory if not in resources
+    if (!fs.existsSync(iconPath)) {
+      iconPath = path.join(config.appDirectory, "icon.ico");
+    }
+  }
+
+  // Verify icon exists
+  if (!fs.existsSync(iconPath)) {
+    console.error("Tray icon not found at:", iconPath);
+    // Use a fallback - create from the window icon
+    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
+  }
+
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon);
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: "Open Ascendara",
+      label: "Show Ascendara",
       click: () => {
         windowModule.showWindow();
       },
     },
     {
+      label: "Hide Ascendara",
+      click: () => {
+        windowModule.hideWindow();
+      },
+    },
+    { type: "separator" },
+    {
       label: "Quit",
       click: () => {
+        app.isQuitting = true;
         app.quit();
       },
     },
@@ -104,9 +137,96 @@ function createTray() {
   tray.setToolTip("Ascendara");
   tray.setContextMenu(contextMenu);
 
-  tray.on("click", () => {
-    windowModule.showWindow();
+  // Double-click to show/hide window
+  tray.on("double-click", () => {
+    const mainWindow = windowModule.getMainWindow();
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        windowModule.hideWindow();
+      } else {
+        windowModule.showWindow();
+      }
+    } else {
+      windowModule.showWindow();
+    }
   });
+
+  // Single click to show window (Windows behavior)
+  if (process.platform === "win32") {
+    tray.on("click", () => {
+      windowModule.showWindow();
+    });
+  }
+
+  console.log("System tray created successfully");
+}
+
+/**
+ * Start the achievement watcher process (Windows only)
+ */
+function startAchievementWatcher() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const { spawn } = require("child_process");
+  const os = require("os");
+
+  const watcherExePath = isDev
+    ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe"
+    : path.join(process.resourcesPath, "AscendaraAchievementWatcher.exe");
+
+  if (!fs.existsSync(watcherExePath)) {
+    console.error("Achievement watcher not found at:", watcherExePath);
+    return;
+  }
+
+  watcherProcess = spawn(watcherExePath, [], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ASCENDARA_STEAM_WEB_API_KEY: config.steamWebApiKey,
+    },
+    windowsHide: true,
+  });
+
+  watcherProcess.stdout.on("data", data => {
+    console.log(`[WATCHER] ${data.toString().trim()}`);
+  });
+
+  watcherProcess.stderr.on("data", data => {
+    console.error(`[WATCHER ERROR] ${data.toString().trim()}`);
+  });
+
+  watcherProcess.on("error", error => {
+    console.error("Achievement watcher error:", error);
+  });
+
+  watcherProcess.on("exit", (code, signal) => {
+    console.log(`Achievement watcher exited with code ${code} and signal ${signal}`);
+    watcherProcess = null;
+  });
+
+  console.log("Achievement watcher started");
+}
+
+/**
+ * Terminate the achievement watcher process
+ */
+function terminateWatcher() {
+  if (watcherProcess && !watcherProcess.killed) {
+    if (process.platform === "win32") {
+      const { exec } = require("child_process");
+      exec(`taskkill /pid ${watcherProcess.pid} /T /F`, err => {
+        if (err) {
+          console.error("Error terminating watcher:", err);
+        }
+      });
+    } else {
+      watcherProcess.kill("SIGTERM");
+    }
+    watcherProcess = null;
+  }
 }
 
 /**
@@ -123,6 +243,7 @@ function registerCriticalHandlers() {
   system.registerSystemHandlers();
   ipcHandlers.registerMiscHandlers();
   translations.registerTranslationHandlers();
+  localRefresh.registerLocalRefreshHandlers();
 }
 
 /**
@@ -130,7 +251,6 @@ function registerCriticalHandlers() {
  */
 function registerDeferredHandlers() {
   steamcmd.registerSteamCMDHandlers();
-  localRefresh.registerLocalRefreshHandlers();
   ludusavi.registerLudusaviHandlers();
   themes.registerThemeHandlers();
 }
@@ -274,6 +394,100 @@ async function initializeApp() {
           return;
         }
 
+        // Handle FLiNG Trainer proxy requests
+        if (req.url.startsWith("/api/flingtrainer")) {
+          const targetPath = req.url.replace(/^\/api\/flingtrainer/, "");
+          const targetUrl = `https://flingtrainer.com${targetPath}`;
+
+          const parsedUrl = new URL(targetUrl);
+          const proxyOptions = {
+            hostname: parsedUrl.hostname,
+            port: 443,
+            path: parsedUrl.pathname + parsedUrl.search,
+            method: req.method,
+            headers: { ...req.headers, host: parsedUrl.hostname },
+          };
+
+          delete proxyOptions.headers["host"];
+          delete proxyOptions.headers["connection"];
+
+          const proxyReq = https.request(proxyOptions, proxyRes => {
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            proxyRes.pipe(res);
+          });
+
+          proxyReq.on("error", err => {
+            console.error("FlingTrainer proxy error:", err);
+            res.writeHead(502);
+            res.end("Proxy error");
+          });
+
+          proxyReq.end();
+          return;
+        }
+
+        // Handle Analytics proxy requests
+        if (req.url.startsWith("/api/analytics")) {
+          const targetPath = req.url.replace(/^\/api\/analytics/, "");
+          const targetUrl = `https://analytics.ascendara.app${targetPath}`;
+
+          // Collect request body for POST/PUT requests
+          let body = [];
+          req.on("data", chunk => body.push(chunk));
+          req.on("end", () => {
+            body = Buffer.concat(body);
+
+            const parsedUrl = new URL(targetUrl);
+            const proxyOptions = {
+              hostname: parsedUrl.hostname,
+              port: 443,
+              path: parsedUrl.pathname + parsedUrl.search,
+              method: req.method,
+              headers: { ...req.headers, host: parsedUrl.hostname },
+            };
+
+            // Remove headers that shouldn't be forwarded
+            delete proxyOptions.headers["host"];
+            delete proxyOptions.headers["connection"];
+            delete proxyOptions.headers["content-length"];
+            if (body.length > 0) {
+              proxyOptions.headers["content-length"] = body.length;
+            }
+
+            const proxyReq = https.request(proxyOptions, proxyRes => {
+              // Set CORS headers
+              res.setHeader("Access-Control-Allow-Origin", "*");
+              res.setHeader(
+                "Access-Control-Allow-Methods",
+                "GET, POST, PUT, DELETE, OPTIONS"
+              );
+              res.setHeader(
+                "Access-Control-Allow-Headers",
+                "Content-Type, Authorization, X-API-Key, X-Signature"
+              );
+
+              res.writeHead(proxyRes.statusCode, proxyRes.headers);
+              proxyRes.pipe(res);
+            });
+
+            proxyReq.on("error", err => {
+              console.error("Analytics proxy error:", err);
+              res.writeHead(502);
+              res.end("Proxy error");
+            });
+
+            if (body.length > 0) {
+              proxyReq.write(body);
+            }
+            proxyReq.end();
+          });
+          return;
+        }
+
         // Handle CORS preflight for API routes
         if (req.method === "OPTIONS" && req.url.startsWith("/api/")) {
           res.setHeader("Access-Control-Allow-Origin", "*");
@@ -332,6 +546,9 @@ async function initializeApp() {
     // Create system tray
     createTray();
 
+    // Start achievement watcher (Windows only)
+    startAchievementWatcher();
+
     // Defer non-critical initialization until after window loads
     mainWindow.webContents.once("did-finish-load", () => {
       // Register deferred handlers (steamcmd, ludusavi, translations, themes, etc.)
@@ -369,8 +586,10 @@ async function initializeApp() {
 
   // Quit when all windows are closed (except on macOS)
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-      // Don't quit, just hide to tray
+    // Don't quit - keep running in tray
+    // Only quit if explicitly requested via tray menu or app.isQuitting flag
+    if (app.isQuitting) {
+      app.quit();
     }
   });
 
@@ -387,7 +606,9 @@ async function initializeApp() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("app-closing");
     }
+    // Cleanup
     discordRpc.destroyDiscordRPC();
+    terminateWatcher();
   });
 
   // Will quit cleanup

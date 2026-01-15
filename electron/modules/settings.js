@@ -11,12 +11,7 @@ const { encrypt, decrypt } = require("./encryption");
 class SettingsManager {
   constructor() {
     this.filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
-    this.sensitiveKeys = [
-      "twitchSecret",
-      "twitchClientId",
-      "giantBombKey",
-      "torboxApiKey",
-    ];
+    this.sensitiveKeys = ["twitchSecret", "twitchClientId", "torboxApiKey"];
     this.defaultSettings = {
       downloadDirectory: "",
       additionalDirectories: [],
@@ -50,7 +45,6 @@ class SettingsManager {
       crackDirectory: "",
       twitchSecret: "",
       twitchClientId: "",
-      giantBombKey: "",
       torboxApiKey: "",
       localIndex: "",
       blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
@@ -58,6 +52,7 @@ class SettingsManager {
       shareLocalIndex: true,
       fetchPageCount: 50,
       localRefreshWorkers: 8,
+      homeSearch: true,
       ludusavi: {
         backupLocation: "",
         backupFormat: "zip",
@@ -112,13 +107,7 @@ class SettingsManager {
           }
         }
       }
-      // Save if any default settings were missing (but don't save just to reset arrays)
-      const settingsChanged = Object.keys(this.defaultSettings).some(
-        key => !(key in settings)
-      );
-      if (settingsChanged) {
-        fs.writeFileSync(this.filePath, JSON.stringify(mergedSettings, null, 2));
-      }
+      // Only return the merged settings without writing to disk
       return mergedSettings;
     } catch (error) {
       console.error("Error loading settings:", error);

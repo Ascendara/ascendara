@@ -1,81 +1,39 @@
 /**
  * Game APIs Configuration
  *
- * This file stores the configuration for multiple game data APIs:
- * - IGDB (via Twitch): https://dev.twitch.tv/console/apps
- * - GiantBomb: https://www.giantbomb.com/api/
+ * This file stores the configuration for game data APIs:
+ * - Steam: Built-in and automatically configured
  */
-
-import { useSettings } from "../context/SettingsContext";
 
 // Default configuration for all APIs
 const defaultConfig = {
   // Cache duration in milliseconds (default: 7 days)
   cacheDuration: 7 * 24 * 60 * 60 * 1000,
 
-  // IGDB/Twitch configuration
-  igdb: {
-    enabled: false,
-    clientId: "",
-    clientSecret: "",
-  },
-
-  // GiantBomb configuration
-  giantbomb: {
-    enabled: false,
-    apiKey: "",
+  // Steam configuration (always enabled with hardcoded key)
+  steam: {
+    enabled: true,
+    apiKey: "HARDCODED_FROM_CONFIG", // Loaded from electron config
   },
 };
 
 /**
- * Custom hook to get all game API configurations from settings
+ * Custom hook to get all game API configurations
  * @returns {Object} Configuration for all game APIs
  */
 export const useGameApisConfig = () => {
-  const { settings } = useSettings();
-
-  // IGDB/Twitch config
-  const twitchClientId = settings.twitchClientId || "";
-  const twitchSecret = settings.twitchSecret || "";
-  const igdbEnabled =
-    twitchClientId &&
-    twitchSecret &&
-    twitchClientId.trim() !== "" &&
-    twitchSecret.trim() !== "";
-
-  // GiantBomb config
-  const giantBombKey = settings.giantBombKey || "";
-  const giantBombEnabled = giantBombKey && giantBombKey.trim() !== "";
+  // Steam config - always enabled with hardcoded key from electron
+  // The actual key is loaded from electron config in gameInfoService
+  const steamEnabled = true;
 
   return {
     cacheDuration: defaultConfig.cacheDuration,
 
-    // IGDB/Twitch
-    igdb: {
-      enabled: igdbEnabled,
-      clientId: twitchClientId,
-      clientSecret: twitchSecret,
+    // Steam - always enabled
+    steam: {
+      enabled: steamEnabled,
+      apiKey: "HARDCODED_FROM_CONFIG", // Loaded in gameInfoService
     },
-
-    // GiantBomb
-    giantbomb: {
-      enabled: giantBombEnabled,
-      apiKey: giantBombKey,
-    },
-  };
-};
-
-/**
- * Legacy hook for backward compatibility
- * @returns {Object} IGDB configuration with credentials
- */
-export const useIgdbConfig = () => {
-  const config = useGameApisConfig();
-  return {
-    ...defaultConfig.igdb,
-    clientId: config.igdb.clientId,
-    clientSecret: config.igdb.clientSecret,
-    enabled: config.igdb.enabled,
   };
 };
 

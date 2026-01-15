@@ -47,7 +47,23 @@ def find_translation_keys_in_file(file_path: str, all_keys: Set[str]) -> Set[str
         matches = re.findall(r"t\(['\"]([^'\"]+)['\"]\)", content)
         found_keys.update(matches)
         
-        # Pattern 2: "key.subkey"
+        # Pattern 2: t(`key.subkey.${variable}`) - template literals with dynamic parts
+        # Find base patterns like t(`welcome.referral.sources.${source}`)
+        template_matches = re.findall(r"t\(`([^`$]+)\$\{[^}]+\}[^`]*`\)", content)
+        for base_pattern in template_matches:
+            # Find all keys that start with this base pattern
+            for key in all_keys:
+                if key.startswith(base_pattern):
+                    found_keys.add(key)
+        
+        # Pattern 3: t(`${variable}.key.subkey`) - dynamic prefix
+        template_suffix_matches = re.findall(r"t\(`\$\{[^}]+\}\.([^`]+)`\)", content)
+        for suffix_pattern in template_suffix_matches:
+            for key in all_keys:
+                if key.endswith(suffix_pattern):
+                    found_keys.add(key)
+        
+        # Pattern 4: "key.subkey" - literal string references
         for key in all_keys:
             if f'"{key}"' in content or f"'{key}'" in content:
                 found_keys.add(key)

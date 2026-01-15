@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   ThemeProvider as NextThemeProvider,
   useTheme as useNextTheme,
@@ -98,9 +105,11 @@ export function ThemeProvider({ children }) {
     };
   }, []);
 
-  const setTheme = newTheme => {
+  const setTheme = useCallback(newTheme => {
     setThemeState(newTheme);
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
 
   return (
     <NextThemeProvider
@@ -124,9 +133,7 @@ export function ThemeProvider({ children }) {
         "custom",
       ]}
     >
-      <ThemeContext.Provider value={{ theme, setTheme }}>
-        {children}
-      </ThemeContext.Provider>
+      <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
     </NextThemeProvider>
   );
 }

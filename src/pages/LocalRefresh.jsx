@@ -781,7 +781,7 @@ const LocalRefresh = () => {
                   {t("localRefresh.title") || "Local Game Index"}
                 </h1>
                 {settings?.usingLocalIndex && (
-                  <Badge className="gap-1 bg-green-500/10 text-green-600 dark:text-green-400">
+                  <Badge className="hover:bg-green/500/10 mb-2 gap-1 bg-green-500/10 text-green-600 dark:text-green-400">
                     <Zap className="h-3 w-3" />
                     {t("localRefresh.usingLocalIndex") || "Active"}
                   </Badge>
@@ -820,7 +820,7 @@ const LocalRefresh = () => {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Main Actions */}
           <div className="space-y-4 lg:col-span-2">
-            {/* Public Index Card */}
+            {/* Download Shared Index Card */}
             {apiAvailable && (
               <Card className="p-5">
                 <div className="flex items-center justify-between">
@@ -831,7 +831,8 @@ const LocalRefresh = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium">
-                          {t("localRefresh.publicIndex") || "Public Index"}
+                          {t("localRefresh.downloadSharedIndex") ||
+                            "Download Shared Index"}
                         </h3>
                         {!hasIndexBefore && (
                           <Badge variant="secondary" className="text-xs">
@@ -840,7 +841,9 @@ const LocalRefresh = () => {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {t("localRefresh.usePublicIndexDesc")}
+                        {t("localRefresh.downloadSharedIndexDesc") ||
+                          "Download a pre-built index shared by the community"}
+                        &nbsp;
                         <a
                           onClick={() =>
                             window.electron.openURL(
@@ -878,7 +881,7 @@ const LocalRefresh = () => {
                         if (result.success) {
                           toast.success(
                             t("localRefresh.indexDownloaded") ||
-                              "Public index downloaded!"
+                              "Shared index downloaded!"
                           );
                           if (window.electron?.setTimestampValue) {
                             await window.electron.setTimestampValue(
@@ -918,7 +921,7 @@ const LocalRefresh = () => {
                     ) : (
                       <>
                         <Download className="h-4 w-4" />
-                        {t("localRefresh.usePublicIndex") || "Download"}
+                        {t("localRefresh.download") || "Download"}
                       </>
                     )}
                   </Button>
@@ -926,7 +929,7 @@ const LocalRefresh = () => {
               </Card>
             )}
 
-            {/* Manual Refresh Card */}
+            {/* Scrape from SteamRIP Card */}
             <Card className="p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -956,18 +959,19 @@ const LocalRefresh = () => {
                       {isUploading
                         ? t("localRefresh.uploading") || "Uploading..."
                         : isRefreshing
-                          ? t("localRefresh.statusRunning") || "Refreshing..."
+                          ? t("localRefresh.statusRunning") || "Scraping..."
                           : refreshStatus === "completed"
                             ? t("localRefresh.statusCompleted") || "Complete"
                             : refreshStatus === "error" || uploadError
                               ? t("localRefresh.statusError") || "Failed"
-                              : t("localRefresh.manualRefresh") || "Manual Refresh"}
+                              : t("localRefresh.scrapeFromSteamRIP") ||
+                                "Scrape from SteamRIP"}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       {uploadError ||
                         currentStep ||
-                        t("localRefresh.manualRefreshDesc") ||
-                        "Scrape games directly from SteamRIP"}
+                        t("localRefresh.scrapeFromSteamRIPDesc") ||
+                        "Build your own index by scraping game data directly"}
                     </p>
                   </div>
                 </div>
@@ -980,12 +984,12 @@ const LocalRefresh = () => {
                     {refreshStatus === "completed" ? (
                       <>
                         <RefreshCw className="h-4 w-4" />
-                        {t("localRefresh.refreshAgain") || "Refresh"}
+                        {t("localRefresh.scrapeAgain") || "Scrape Again"}
                       </>
                     ) : (
                       <>
                         <Play className="h-4 w-4" />
-                        {t("localRefresh.startRefresh") || "Start"}
+                        {t("localRefresh.startScrape") || "Start Scrape"}
                       </>
                     )}
                   </Button>
@@ -1002,7 +1006,7 @@ const LocalRefresh = () => {
                     className="gap-2"
                   >
                     <StopCircle className="h-4 w-4" />
-                    {t("localRefresh.stopRefresh") || "Stop"}
+                    {t("localRefresh.stop") || "Stop"}
                   </Button>
                 )}
               </div>

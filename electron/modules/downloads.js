@@ -311,6 +311,24 @@ function registerDownloadHandlers() {
           spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
         }
 
+        // Cache download data for resume functionality
+        const cacheDir = path.join(app.getPath("userData"), "downloadCache");
+        await fs.promises.mkdir(cacheDir, { recursive: true });
+        const cachedDataPath = path.join(cacheDir, `${sanitizedGame}.json`);
+        const cacheData = {
+          link: link,
+          game: game,
+          online: online,
+          dlc: dlc,
+          isVr: isVr,
+          version: version,
+          size: size,
+          gameID: gameID,
+          timestamp: new Date().toISOString(),
+        };
+        await fs.promises.writeFile(cachedDataPath, JSON.stringify(cacheData, null, 2));
+        console.log(`Cached download data for resume: ${cachedDataPath}`);
+
         // Update download history
         let timestampData = {};
         try {
@@ -361,6 +379,46 @@ function registerDownloadHandlers() {
         `Stopping download for game: ${game}, deleteContents: ${deleteContents}`
       );
       const sanitizedGame = sanitizeText(game);
+      const settings = settingsManager.getSettings();
+
+      // Find the game directory across all possible locations
+      let gameDirectory = null;
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ];
+
+      for (const dir of allDirectories) {
+        const testPath = path.join(dir, sanitizedGame);
+        if (fs.existsSync(testPath)) {
+          gameDirectory = testPath;
+          console.log(`Found game directory at: ${gameDirectory}`);
+          break;
+        }
+      }
+
+      if (!gameDirectory) {
+        console.error(`Game directory not found for: ${sanitizedGame}`);
+        return false;
+      }
+
+      // Step 1: Update JSON to mark as stopped FIRST (before killing processes)
+      // This prevents the downloader from overwriting the stopped state
+      const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+      if (fs.existsSync(jsonFile)) {
+        try {
+          const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+          gameInfo.downloadingData = { stopped: true };
+          fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+          console.log(`Marked download as stopped in JSON: ${jsonFile}`);
+        } catch (jsonError) {
+          console.error(`Error updating JSON file: ${jsonError}`);
+          // Continue with process termination even if JSON update fails
+        }
+      }
+
+      // Step 2: Kill all downloader processes
+      let killedProcesses = 0;
 
       if (isWindows) {
         const downloaderExes = [
@@ -391,9 +449,17 @@ function registerDownloadHandlers() {
               });
             });
 
+            console.log(`Found ${pids.length} ${exe} processes for ${sanitizedGame}`);
+
             for (const pid of pids) {
-              const killProcess = spawn("taskkill", ["/F", "/T", "/PID", pid]);
-              await new Promise(resolve => killProcess.on("close", resolve));
+              try {
+                const killProcess = spawn("taskkill", ["/F", "/T", "/PID", pid]);
+                await new Promise(resolve => killProcess.on("close", resolve));
+                killedProcesses++;
+                console.log(`Killed process ${exe} with PID ${pid}`);
+              } catch (killErr) {
+                console.error(`Failed to kill PID ${pid}:`, killErr);
+              }
             }
           } catch (err) {
             console.error(`Error finding/killing ${exe} processes:`, err);
@@ -417,10 +483,18 @@ function registerDownloadHandlers() {
               );
             });
 
+            console.log(`Found ${pids.length} ${script} processes for ${sanitizedGame}`);
+
             for (const pid of pids) {
               if (pid) {
-                const killProcess = spawn("kill", ["-9", pid]);
-                await new Promise(resolve => killProcess.on("close", resolve));
+                try {
+                  const killProcess = spawn("kill", ["-9", pid]);
+                  await new Promise(resolve => killProcess.on("close", resolve));
+                  killedProcesses++;
+                  console.log(`Killed process ${script} with PID ${pid}`);
+                } catch (killErr) {
+                  console.error(`Failed to kill PID ${pid}:`, killErr);
+                }
               }
             }
           } catch (err) {
@@ -430,29 +504,61 @@ function registerDownloadHandlers() {
       }
 
       downloadProcesses.delete(sanitizedGame);
+      console.log(`Total processes killed: ${killedProcesses}`);
 
-      // Wait for processes to terminate
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Step 3: Wait for processes to fully terminate and release file locks
+      // Use exponential backoff to verify processes are gone
+      let waitTime = 1000;
+      for (let i = 0; i < 3; i++) {
+        await new Promise(resolve => setTimeout(resolve, waitTime));
 
-      // Update the JSON
-      const settings = settingsManager.getSettings();
-      if (settings.downloadDirectory) {
-        const gameDirectory = path.join(settings.downloadDirectory, sanitizedGame);
-        const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
-        if (fs.existsSync(jsonFile)) {
+        // Verify processes are actually gone
+        if (isWindows) {
+          const verifyCommand = `Get-Process | Where-Object { $_.Name -match 'Ascendara(Downloader|GofileHelper|TorrentHandler)' -and $_.CommandLine -like '*${sanitizedGame}*' } | Measure-Object | Select-Object -ExpandProperty Count`;
+          const verifyProcess = spawn("powershell", [
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            verifyCommand,
+          ]);
+
+          const stillRunning = await new Promise(resolve => {
+            let output = "";
+            verifyProcess.stdout.on("data", data => (output += data.toString()));
+            verifyProcess.on("close", () => {
+              const count = parseInt(output.trim()) || 0;
+              resolve(count > 0);
+            });
+          });
+
+          if (!stillRunning) {
+            console.log(`All processes terminated after ${waitTime * (i + 1)}ms`);
+            break;
+          }
+        }
+
+        waitTime *= 2; // Exponential backoff
+      }
+
+      // Step 4: Ensure JSON is in stopped state (in case downloader overwrote it)
+      if (fs.existsSync(jsonFile)) {
+        try {
           const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
           gameInfo.downloadingData = { stopped: true };
           fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+          console.log(`Confirmed stopped state in JSON: ${jsonFile}`);
+        } catch (jsonError) {
+          console.error(`Error confirming JSON state: ${jsonError}`);
         }
       }
 
-      // Delete contents if requested
+      // Step 5: Delete contents if requested
       if (deleteContents) {
+        console.log(`Deleting game directory: ${gameDirectory}`);
         let attempts = 0;
         const maxAttempts = 5;
         while (attempts < maxAttempts) {
           try {
-            const gameDirectory = path.join(settings.downloadDirectory, sanitizedGame);
             const files = await fs.promises.readdir(gameDirectory, {
               withFileTypes: true,
             });
@@ -461,15 +567,24 @@ function registerDownloadHandlers() {
               await fs.promises.rm(fullPath, { recursive: true, force: true });
             }
             await fs.promises.rmdir(gameDirectory);
+            console.log(`Successfully deleted game directory`);
             break;
           } catch (deleteError) {
             attempts++;
-            if (attempts === maxAttempts) throw deleteError;
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.error(
+              `Delete attempt ${attempts}/${maxAttempts} failed:`,
+              deleteError
+            );
+            if (attempts === maxAttempts) {
+              console.error(`Failed to delete directory after ${maxAttempts} attempts`);
+              throw deleteError;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
       }
 
+      console.log(`Successfully stopped download for: ${sanitizedGame}`);
       return true;
     } catch (error) {
       console.error("Error stopping download:", error);
@@ -666,6 +781,182 @@ function registerDownloadHandlers() {
     } catch (error) {
       console.error("Error retrying download:", error);
       return false;
+    }
+  });
+
+  // Resume download handler
+  ipcMain.handle("resume-download", async (_, game) => {
+    try {
+      console.log(`Resuming download for game: ${game}`);
+      const sanitizedGame = sanitizeText(game);
+      const settings = settingsManager.getSettings();
+
+      // Find the game directory across all possible locations
+      let gameDirectory = null;
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ];
+
+      for (const dir of allDirectories) {
+        const testPath = path.join(dir, sanitizedGame);
+        if (fs.existsSync(testPath)) {
+          gameDirectory = testPath;
+          console.log(`Found game directory at: ${gameDirectory}`);
+          break;
+        }
+      }
+
+      if (!gameDirectory) {
+        console.error(`Game directory not found for: ${sanitizedGame}`);
+        return { success: false, error: "Game directory not found" };
+      }
+
+      // Read the game info JSON to get download details
+      const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+      if (!fs.existsSync(jsonFile)) {
+        console.error(`Game info JSON not found: ${jsonFile}`);
+        return { success: false, error: "Game info not found" };
+      }
+
+      let gameInfo;
+      try {
+        gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+      } catch (jsonError) {
+        console.error(`Error reading game info JSON: ${jsonError}`);
+        return { success: false, error: "Failed to read game info" };
+      }
+
+      // Check if there's cached download data with the original link
+      const cachedDataPath = path.join(
+        app.getPath("userData"),
+        "downloadCache",
+        `${sanitizedGame}.json`
+      );
+
+      let downloadLink = null;
+      let online = gameInfo.online || "false";
+      let dlc = gameInfo.dlc || "false";
+      let isVr = gameInfo.isVr || "false";
+      let version = gameInfo.version || "";
+      let size = gameInfo.size || "";
+      let gameID = gameInfo.gameID || "";
+
+      if (fs.existsSync(cachedDataPath)) {
+        try {
+          const cachedData = JSON.parse(fs.readFileSync(cachedDataPath, "utf8"));
+          downloadLink = cachedData.link;
+          console.log(`Found cached download link: ${downloadLink}`);
+        } catch (cacheError) {
+          console.error(`Error reading cached download data: ${cacheError}`);
+        }
+      }
+
+      if (!downloadLink) {
+        console.error(`No download link found for: ${sanitizedGame}`);
+        return { success: false, error: "Download link not found. Cannot resume." };
+      }
+
+      // Determine which downloader to use
+      let executablePath;
+      let spawnCommand;
+      const targetDirectory = path.dirname(gameDirectory);
+
+      if (isWindows) {
+        executablePath = isDev
+          ? path.join(
+              downloadLink.includes("gofile.io")
+                ? "./binaries/AscendaraDownloader/dist/AscendaraGofileHelper.exe"
+                : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
+            )
+          : path.join(
+              appDirectory,
+              downloadLink.includes("gofile.io")
+                ? "/resources/AscendaraGofileHelper.exe"
+                : "/resources/AscendaraDownloader.exe"
+            );
+
+        spawnCommand = [
+          downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+          sanitizedGame,
+          online,
+          dlc,
+          isVr,
+          "false", // updateFlow
+          version || "-1",
+          size,
+          targetDirectory,
+          gameID || "",
+        ];
+      } else {
+        executablePath = "python3";
+        const scriptPath = isDev
+          ? path.join(
+              downloadLink.includes("gofile.io")
+                ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
+                : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+            )
+          : path.join(
+              appDirectory,
+              "..",
+              downloadLink.includes("gofile.io")
+                ? "/resources/AscendaraGofileHelper.py"
+                : "/resources/AscendaraDownloader.py"
+            );
+
+        spawnCommand = [
+          scriptPath,
+          downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+          game,
+          online,
+          dlc,
+          isVr,
+          "false", // updateFlow
+          version || "-1",
+          size,
+          targetDirectory,
+          gameID || "",
+        ];
+      }
+
+      // Add notification flags if enabled
+      if (settings.notifications) {
+        spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
+      }
+
+      // Clear the stopped state from JSON
+      gameInfo.downloadingData = {
+        downloading: false,
+        verifying: false,
+        extracting: false,
+        updating: false,
+        progressCompleted: "0.00",
+        progressDownloadSpeeds: "0.00 KB/s",
+        timeUntilComplete: "0s",
+      };
+      fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+      console.log(`Cleared stopped state from JSON: ${jsonFile}`);
+
+      // Start the download process
+      const downloadProcess = spawn(executablePath, spawnCommand, {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false,
+      });
+
+      downloadProcess.on("error", err => {
+        console.error(`Failed to start resume process: ${err}`);
+        return { success: false, error: err.message };
+      });
+
+      downloadProcesses.set(sanitizedGame, downloadProcess);
+      downloadProcess.unref();
+
+      console.log(`Successfully resumed download for: ${sanitizedGame}`);
+      return { success: true };
+    } catch (error) {
+      console.error("Error resuming download:", error);
+      return { success: false, error: error.message };
     }
   });
 

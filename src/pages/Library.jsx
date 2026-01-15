@@ -65,9 +65,8 @@ import {
 } from "@/components/ui/tooltip";
 import gameService from "@/services/gameService";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
-import igdbService from "@/services/gameInfoService";
-import { useIgdbConfig } from "@/services/gameInfoConfig";
+import { useLocation, useNavigate } from "react-router-dom";
+import steamService from "@/services/gameInfoService";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -75,6 +74,7 @@ import {
   getGameAchievements,
   syncCloudLibrary,
   syncGameAchievements,
+  verifyAscendAccess,
 } from "@/services/firebaseService";
 import { calculateLibraryValue } from "@/services/cheapsharkService";
 
@@ -173,11 +173,50 @@ const Library = () => {
   const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  const { settings } = useSettings();
+  const [ascendAccess, setAscendAccess] = useState({
+    hasAccess: false,
+    isSubscribed: false,
+    isVerified: false,
+  });
 
   useEffect(() => {
     localStorage.setItem("game-favorites", JSON.stringify(favorites));
   }, [favorites]);
+
+  // Verify Ascend access
+  useEffect(() => {
+    const checkAscendAccess = async () => {
+      if (!user) {
+        setAscendAccess({
+          hasAccess: false,
+          isSubscribed: false,
+          isVerified: false,
+        });
+        return;
+      }
+
+      try {
+        const result = await verifyAscendAccess();
+        setAscendAccess({
+          hasAccess: result.hasAccess,
+          isSubscribed: result.isSubscribed,
+          isVerified: result.isVerified,
+        });
+      } catch (error) {
+        console.error("Error verifying Ascend access:", error);
+        setAscendAccess({
+          hasAccess: false,
+          isSubscribed: false,
+          isVerified: false,
+        });
+      }
+    };
+
+    checkAscendAccess();
+  }, [user]);
 
   useEffect(() => {
     const checkWindows = async () => {
@@ -203,7 +242,12 @@ const Library = () => {
     lastLaunchedGameRef.current = lastLaunchedGame;
   }, [lastLaunchedGame]);
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => {
+    const statePage = Number(location?.state?.libraryPage);
+    // // //
+    return Number.isInteger(statePage) && statePage >= 1 ? statePage : 1;
+  });
+
   const PAGE_SIZE = 15;
 
   // Filter games based on search query
@@ -261,10 +305,10 @@ const Library = () => {
     };
   }, []);
 
-  // Reset to first page if filter/search changes and current page is out of range
+  // Keep current page in range. Avoid resetting during initial load when totalPages is 0.
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(1);
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
 
@@ -415,10 +459,17 @@ const Library = () => {
     });
   };
 
-  // Check for game updates when games are loaded
+  // Check for game updates when games are loaded (only for Ascend subscribers)
   useEffect(() => {
     const checkGameUpdates = async () => {
       console.log("[Library] checkGameUpdates called, games:", games.length);
+
+      // Only check if user has Ascend access
+      if (!user || !ascendAccess.hasAccess) {
+        console.log("[Library] Skipping update check - no Ascend access");
+        setGameUpdates({});
+        return;
+      }
 
       // Only check for non-custom games with gameID
       const gamesWithId = games.filter(g => !g.isFolder && !g.isCustom && g.gameID);
@@ -460,11 +511,13 @@ const Library = () => {
         "[Library] Triggering update check, isInitialized:",
         isInitialized,
         "games.length:",
-        games.length
+        games.length,
+        "hasAccess:",
+        ascendAccess.hasAccess
       );
       checkGameUpdates();
     }
-  }, [isInitialized, games]);
+  }, [isInitialized, games, user, ascendAccess.hasAccess]);
 
   // Load cloud-only games (games in cloud but not installed locally)
   useEffect(() => {
@@ -505,21 +558,59 @@ const Library = () => {
               if (cachedImage) {
                 images[game.name] = cachedImage;
               } else if (game.gameID) {
-                const response = await fetch(
-                  `https://api.ascendara.app/v3/image/${game.gameID}`
-                );
-                if (response.ok) {
-                  const blob = await response.blob();
-                  const dataUrl = await new Promise(resolve => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.readAsDataURL(blob);
-                  });
-                  images[game.name] = dataUrl;
+                // For local index, we need to find the game's imgID
+                let imageId = game.gameID;
+                if (settings.usingLocalIndex) {
                   try {
-                    localStorage.setItem(localStorageKey, dataUrl);
-                  } catch (e) {
-                    console.warn("Could not cache cloud game image:", e);
+                    const gameData = await gameService.findGameByGameID(game.gameID);
+                    if (gameData?.imgID) {
+                      imageId = gameData.imgID;
+                    }
+                  } catch (error) {
+                    console.warn("Could not find game in local index:", error);
+                    continue;
+                  }
+                }
+
+                // For local index, try to load from local file system using imgID
+                if (settings.usingLocalIndex && settings.localIndex) {
+                  try {
+                    const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
+                    const imageData = await window.electron.ipcRenderer.readFile(
+                      localImagePath,
+                      "base64"
+                    );
+                    const dataUrl = `data:image/jpeg;base64,${imageData}`;
+                    images[game.name] = dataUrl;
+                    try {
+                      localStorage.setItem(localStorageKey, dataUrl);
+                    } catch (e) {
+                      console.warn("Could not cache cloud game image:", e);
+                    }
+                    continue;
+                  } catch (localError) {
+                    console.warn(
+                      "Could not load from local index, skipping:",
+                      localError
+                    );
+                  }
+                } else {
+                  // Fetch from API using gameID
+                  const imageUrl = `https://api.ascendara.app/v3/image/${game.gameID}`;
+                  const response = await fetch(imageUrl);
+                  if (response.ok) {
+                    const blob = await response.blob();
+                    const dataUrl = await new Promise(resolve => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => resolve(reader.result);
+                      reader.readAsDataURL(blob);
+                    });
+                    images[game.name] = dataUrl;
+                    try {
+                      localStorage.setItem(localStorageKey, dataUrl);
+                    } catch (e) {
+                      console.warn("Could not cache cloud game image:", e);
+                    }
                   }
                 }
               }
@@ -696,11 +787,15 @@ const Library = () => {
       const installedGames = await window.electron.getGames();
       const customGames = await window.electron.getCustomGames();
 
+      // Ensure we have arrays to work with
+      const safeInstalledGames = Array.isArray(installedGames) ? installedGames : [];
+      const safeCustomGames = Array.isArray(customGames) ? customGames : [];
+
       // Check for pending cloud restores (games that were downloaded from cloud)
-      await checkPendingCloudRestores([...installedGames, ...customGames]);
+      await checkPendingCloudRestores([...safeInstalledGames, ...safeCustomGames]);
 
       // Filter out games that are being verified or downloading
-      const filteredInstalledGames = installedGames.filter(
+      const filteredInstalledGames = safeInstalledGames.filter(
         game =>
           !game.downloadingData?.verifying &&
           !game.downloadingData?.downloading &&
@@ -717,7 +812,7 @@ const Library = () => {
           ...game,
           isCustom: false,
         })),
-        ...(customGames || []).map(game => ({
+        ...(safeCustomGames || []).map(game => ({
           name: game.game,
           game: game.game, // Keep original property for compatibility
           version: game.version,
@@ -839,6 +934,7 @@ const Library = () => {
     navigate("/gamescreen", {
       state: {
         gameData: game,
+        libraryPage: currentPage,
       },
     });
   };
@@ -911,14 +1007,14 @@ const Library = () => {
 
     setIsCoverSearchLoading(true);
     try {
-      const gameDetails = await igdbService.getGameDetails(query);
+      const gameDetails = await steamService.getGameDetails(query);
       // Transform the results to match the expected format
       const results = gameDetails
         .map(game => ({
           id: game.id,
           url:
             game.screenshots && game.screenshots.length > 0
-              ? igdbService.formatImageUrl(game.screenshots[0].url, "screenshot_big")
+              ? steamService.formatImageUrl(game.screenshots[0].url, "screenshot_big")
               : null,
           name: game.name,
         }))
@@ -2054,6 +2150,7 @@ const InstalledGameCard = memo(
       results: [],
       selectedCover: null,
     });
+    const [coverImageUrls, setCoverImageUrls] = useState({});
 
     const handleCoverSearch = async query => {
       setCoverSearch(prev => ({
@@ -2065,13 +2162,37 @@ const InstalledGameCard = memo(
       }));
       if (query.length < minSearchLength) {
         setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
+        setCoverImageUrls({});
         return;
       }
       try {
         const covers = await gameService.searchGameCovers(query);
         setCoverSearch(prev => ({ ...prev, isLoading: false, results: covers || [] }));
+
+        // Load local images if using local index
+        if (settings.usingLocalIndex && settings.localIndex) {
+          const imageUrls = {};
+          for (const cover of covers || []) {
+            if (cover.gameID) {
+              try {
+                const localImagePath = `${settings.localIndex}/imgs/${cover.gameID}.jpg`;
+                const localImageUrl =
+                  await window.electron.getLocalImageUrl(localImagePath);
+                if (localImageUrl) {
+                  imageUrls[cover.gameID] = localImageUrl;
+                }
+              } catch (error) {
+                console.warn(`Could not load local image for ${cover.gameID}:`, error);
+              }
+            }
+          }
+          setCoverImageUrls(imageUrls);
+        } else {
+          setCoverImageUrls({});
+        }
       } catch (err) {
         setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
+        setCoverImageUrls({});
       }
     };
 
@@ -2132,9 +2253,13 @@ const InstalledGameCard = memo(
                     >
                       <img
                         src={
-                          settings.usingLocalIndex && cover.gameID
-                            ? gameService.getImageUrlByGameId(cover.gameID)
-                            : gameService.getImageUrl(cover.imgID)
+                          settings.usingLocalIndex &&
+                          cover.gameID &&
+                          coverImageUrls[cover.gameID]
+                            ? coverImageUrls[cover.gameID]
+                            : settings.usingLocalIndex && cover.gameID
+                              ? gameService.getImageUrlByGameId(cover.gameID)
+                              : gameService.getImageUrl(cover.imgID)
                         }
                         alt={cover.title}
                         className="h-full w-full object-cover"
@@ -2171,26 +2296,45 @@ const InstalledGameCard = memo(
                   localStorage.removeItem(localStorageKey);
                   // Fetch new image and save to localStorage
                   try {
-                    const imageUrl =
-                      settings.usingLocalIndex && coverSearch.selectedCover.gameID
-                        ? gameService.getImageUrlByGameId(
-                            coverSearch.selectedCover.gameID
-                          )
-                        : gameService.getImageUrl(coverSearch.selectedCover.imgID);
-                    const response = await fetch(imageUrl);
-                    const blob = await response.blob();
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      const dataUrl = reader.result;
-                      try {
-                        localStorage.setItem(localStorageKey, dataUrl);
-                      } catch (e) {
-                        console.warn("Could not cache new cover image:", e);
+                    let dataUrl;
+                    // For local index, load from local file system
+                    if (settings.usingLocalIndex && coverSearch.selectedCover.gameID) {
+                      if (coverImageUrls[coverSearch.selectedCover.gameID]) {
+                        // Already loaded, convert blob URL to data URL for storage
+                        const response = await fetch(
+                          coverImageUrls[coverSearch.selectedCover.gameID]
+                        );
+                        const blob = await response.blob();
+                        dataUrl = await new Promise(resolve => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolve(reader.result);
+                          reader.readAsDataURL(blob);
+                        });
+                      } else {
+                        // Try to load from local file
+                        const localImagePath = `${settings.localIndex}/imgs/${coverSearch.selectedCover.gameID}.jpg`;
+                        const imageData = await window.electron.ipcRenderer.readFile(
+                          localImagePath,
+                          "base64"
+                        );
+                        dataUrl = `data:image/jpeg;base64,${imageData}`;
                       }
-                      setImageData(dataUrl);
-                      setShowEditCoverDialog(false);
-                    };
-                    reader.readAsDataURL(blob);
+                    } else {
+                      // Fetch from API
+                      const imageUrl = gameService.getImageUrl(
+                        coverSearch.selectedCover.imgID
+                      );
+                      const response = await fetch(imageUrl);
+                      const blob = await response.blob();
+                      dataUrl = await new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                      });
+                    }
+                    localStorage.setItem(localStorageKey, dataUrl);
+                    setImageData(dataUrl);
+                    setShowEditCoverDialog(false);
                   } catch (e) {
                     console.error("Failed to update cover image", e);
                   }
@@ -2645,6 +2789,7 @@ const AddGameForm = ({ onSuccess }) => {
     results: [],
     selectedCover: null,
   });
+  const [coverImageUrls, setCoverImageUrls] = useState({});
 
   // Add debounce timer ref
   const searchDebounceRef = useRef(null);
@@ -2662,6 +2807,7 @@ const AddGameForm = ({ onSuccess }) => {
     // Don't search if query is too short
     if (!query.trim() || query.length < minSearchLength) {
       setCoverSearch(prev => ({ ...prev, results: [], isLoading: false }));
+      setCoverImageUrls({});
       return;
     }
 
@@ -2669,12 +2815,70 @@ const AddGameForm = ({ onSuccess }) => {
     searchDebounceRef.current = setTimeout(async () => {
       setCoverSearch(prev => ({ ...prev, isLoading: true }));
       try {
+        // Try Steam API first for better metadata
+        let steamData = null;
+        try {
+          steamData = await steamService.getGameDetails(query);
+          if (steamData && steamData.cover) {
+            // If Steam API returns data, use it
+            const steamResult = {
+              game: steamData.name,
+              gameID: steamData.id?.toString(),
+              imgID: steamData.id?.toString(),
+              img: steamData.cover.url || steamData.cover.formatted_url,
+              steamAppId: steamData.id,
+            };
+            setCoverSearch(prev => ({
+              ...prev,
+              results: [steamResult],
+              selectedCover: steamResult, // Auto-select Steam result
+              isLoading: false,
+            }));
+
+            // Set the image URL directly from Steam
+            if (steamResult.img) {
+              setCoverImageUrls({ [steamResult.gameID]: steamResult.img });
+            }
+            return;
+          }
+        } catch (steamError) {
+          console.log(
+            "Steam API search failed, falling back to game service:",
+            steamError
+          );
+        }
+
+        // Fallback to original game service search
         const results = await gameService.searchGameCovers(query);
+        const firstResult = results.length > 0 ? results[0] : null;
         setCoverSearch(prev => ({
           ...prev,
           results: results.slice(0, 9),
+          selectedCover: firstResult, // Auto-select first result
           isLoading: false,
         }));
+
+        // Load local images if using local index
+        if (settings.usingLocalIndex && settings.localIndex) {
+          const imageUrls = {};
+          for (const cover of results.slice(0, 9)) {
+            if (cover.gameID) {
+              try {
+                const localImagePath = `${settings.localIndex}/imgs/${cover.gameID}.jpg`;
+                const localImageUrl =
+                  await window.electron.getLocalImageUrl(localImagePath);
+                if (localImageUrl) {
+                  imageUrls[cover.gameID] = localImageUrl;
+                }
+              } catch (error) {
+                console.warn(`Could not load local image for ${cover.gameID}:`, error);
+              }
+            }
+          }
+          setCoverImageUrls(imageUrls);
+        } else {
+          setCoverImageUrls({});
+        }
       } catch (error) {
         console.error("Error searching covers:", error);
         setCoverSearch(prev => ({ ...prev, isLoading: false }));
@@ -2686,21 +2890,24 @@ const AddGameForm = ({ onSuccess }) => {
   const handleChooseExecutable = async () => {
     const file = await window.electron.openFileDialog();
     if (file) {
+      const gameName = file.split("\\").pop().replace(".exe", "");
       setFormData(prev => ({
         ...prev,
         executable: file,
-        name: file.split("\\").pop().replace(".exe", ""),
+        name: gameName,
       }));
+
+      // Automatically search for game cover using Steam API
+      if (gameName) {
+        handleCoverSearch(gameName);
+      }
     }
   };
 
   const handleSubmit = async e => {
     e.preventDefault();
-    // When using local index, pass gameID; otherwise pass imgID
-    const coverImageId =
-      settings.usingLocalIndex && coverSearch.selectedCover?.gameID
-        ? coverSearch.selectedCover.gameID
-        : coverSearch.selectedCover?.imgID;
+    // imgID is used for image file lookups in both local index and API
+    const coverImageId = coverSearch.selectedCover?.imgID;
     await window.electron.addGame(
       formData.name,
       formData.isOnline,
@@ -2722,18 +2929,10 @@ const AddGameForm = ({ onSuccess }) => {
               variant="outline"
               className="w-full justify-start truncate bg-background text-left font-normal text-primary hover:bg-accent"
               onClick={() => setShowImportDialog(true)}
-              disabled={!useIgdbConfig().enabled}
             >
               <Import className="mr-2 h-4 w-4 flex-shrink-0" />
               <span>{t("library.importSteamGames")}</span>
             </Button>
-
-            {!useIgdbConfig().enabled && (
-              <div className="flex items-center gap-2 rounded-md bg-yellow-500/10 px-3 py-1.5 text-xs text-yellow-600 dark:text-yellow-400">
-                <AlertCircle className="h-3.5 w-3.5" />
-                <span>{t("library.igdbKeysRequired")}</span>
-              </div>
-            )}
           </div>
 
           <Separator className="my-2" />
@@ -2758,18 +2957,20 @@ const AddGameForm = ({ onSuccess }) => {
                   {t("library.importSteamGames")}
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-foreground">
-                  {t("library.importSteamGamesDescription")}{" "}
-                  <a
-                    className="cursor-pointer text-primary hover:underline"
-                    onClick={() =>
-                      window.electron.openURL(
-                        "https://ascendara.app/docs/features/overview#importing-from-steam"
-                      )
-                    }
-                  >
-                    {t("common.learnMore")}{" "}
-                    <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                  </a>
+                  <span>
+                    {t("library.importSteamGamesDescription")}{" "}
+                    <a
+                      className="cursor-pointer text-primary hover:underline"
+                      onClick={() =>
+                        window.electron.openURL(
+                          "https://ascendara.app/docs/features/overview#importing-from-steam"
+                        )
+                      }
+                    >
+                      {t("common.learnMore")}{" "}
+                      <ExternalLink className="mb-1 inline-block h-3 w-3" />
+                    </a>
+                  </span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="space-y-2">
@@ -2977,9 +3178,13 @@ const AddGameForm = ({ onSuccess }) => {
                 >
                   <img
                     src={
-                      settings.usingLocalIndex && cover.gameID
-                        ? gameService.getImageUrlByGameId(cover.gameID)
-                        : gameService.getImageUrl(cover.imgID)
+                      settings.usingLocalIndex &&
+                      cover.gameID &&
+                      coverImageUrls[cover.gameID]
+                        ? coverImageUrls[cover.gameID]
+                        : settings.usingLocalIndex && cover.gameID
+                          ? gameService.getImageUrlByGameId(cover.gameID)
+                          : gameService.getImageUrl(cover.imgID)
                     }
                     alt={cover.title}
                     className="h-full w-full object-cover"
@@ -3002,9 +3207,15 @@ const AddGameForm = ({ onSuccess }) => {
               <div className="relative aspect-video w-64 overflow-hidden rounded-lg border-2 border-primary">
                 <img
                   src={
-                    settings.usingLocalIndex && coverSearch.selectedCover.gameID
-                      ? gameService.getImageUrlByGameId(coverSearch.selectedCover.gameID)
-                      : gameService.getImageUrl(coverSearch.selectedCover.imgID)
+                    settings.usingLocalIndex &&
+                    coverSearch.selectedCover.gameID &&
+                    coverImageUrls[coverSearch.selectedCover.gameID]
+                      ? coverImageUrls[coverSearch.selectedCover.gameID]
+                      : settings.usingLocalIndex && coverSearch.selectedCover.gameID
+                        ? gameService.getImageUrlByGameId(
+                            coverSearch.selectedCover.gameID
+                          )
+                        : gameService.getImageUrl(coverSearch.selectedCover.imgID)
                   }
                   alt={coverSearch.selectedCover.title}
                   className="h-full w-full object-cover"

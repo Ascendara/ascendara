@@ -1,7 +1,7 @@
-import React, { useContext, useRef, useEffect } from "react";
+import React, { useContext, useRef, useEffect, memo } from "react";
 import { SettingsContext } from "@/context/SettingsContext";
 
-const PageTransition = ({ children }) => {
+const PageTransition = memo(({ children }) => {
   const context = useContext(SettingsContext);
   const smoothTransitions = context?.settings?.smoothTransitions ?? true;
   const divRef = useRef(null);
@@ -24,6 +24,8 @@ const PageTransition = ({ children }) => {
   }
 
   return <div ref={divRef}>{children}</div>;
-};
+});
+
+PageTransition.displayName = "PageTransition";
 
 export default PageTransition;

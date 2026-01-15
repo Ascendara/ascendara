@@ -38,6 +38,7 @@ import {
   orderBy,
   limit,
   writeBatch,
+  onSnapshot,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -74,17 +75,46 @@ googleProvider.setCustomParameters({
 });
 
 /**
+ * Subscribe to real-time user status updates
+ * @param {string} userId - User ID to watch
+ * @param {function} onChange - Callback function receiving status data
+ * @returns {function} Unsubscribe function
+ */
+export const SnapUserStatus = (userId, onChange) => {
+  if (!userId) return () => {};
+
+  const ref = doc(db, "userStatus", userId);
+  const snap = onSnapshot(
+    ref,
+    snapshot => {
+      if (snapshot.exists()) {
+        onChange(snapshot.data());
+      } else {
+        onChange({ status: "offline", customMessage: "" });
+      }
+    },
+    error => {
+      console.error("[SnapUserStatus] Error:", error);
+    }
+  );
+
+  return snap;
+};
+
+/**
  * Sign in with Google
  * Uses popup with fallback to redirect for Electron compatibility
  * @returns {Promise<{user: object, error: string|null, isNewUser: boolean}>}
  */
 export const signInWithGoogle = async () => {
   try {
+    console.log("[signInWithGoogle] Starting Google sign-in...");
     let result;
 
     try {
       // Try popup first
       result = await signInWithPopup(auth, googleProvider);
+      console.log("[signInWithGoogle] Popup sign-in successful");
     } catch (popupError) {
       // User cancelled the popup - just return silently
       if (
@@ -107,10 +137,18 @@ export const signInWithGoogle = async () => {
 
     const user = result.user;
     const isNewUser = result._tokenResponse?.isNewUser ?? false;
+    console.log(
+      "[signInWithGoogle] User authenticated:",
+      user.uid,
+      "isNewUser:",
+      isNewUser
+    );
 
     // Check if user document exists, create if new
     const userDoc = await getDoc(doc(db, "users", user.uid));
+    console.log("[signInWithGoogle] User document exists:", userDoc.exists());
     if (!userDoc.exists()) {
+      console.log("[signInWithGoogle] Creating new user document...");
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
@@ -127,14 +165,18 @@ export const signInWithGoogle = async () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      console.log("[signInWithGoogle] User document created successfully");
+
       // Set initial online status
       await setDoc(doc(db, "userStatus", user.uid), {
         status: "online",
         customMessage: "",
         updatedAt: serverTimestamp(),
       });
+      console.log("[signInWithGoogle] User status document created");
     }
 
+    console.log("[signInWithGoogle] Sign-in complete, returning user");
     return { user, error: null, isNewUser };
   } catch (error) {
     console.error("Google sign-in error:", error);
@@ -317,11 +359,20 @@ export const updateUserProfile = async profileData => {
 
     await updateProfile(user, profileData);
 
-    // Update Firestore document
-    await updateDoc(doc(db, "users", user.uid), {
-      ...profileData,
+    // Update Firestore document - only update specific fields to avoid deleting other data
+    const updateData = {
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // Only add fields that are actually in profileData
+    if (profileData.displayName !== undefined) {
+      updateData.displayName = profileData.displayName;
+    }
+    if (profileData.photoURL !== undefined) {
+      updateData.photoURL = profileData.photoURL;
+    }
+
+    await updateDoc(doc(db, "users", user.uid), updateData);
 
     return { success: true, error: null };
   } catch (error) {
@@ -352,7 +403,8 @@ export const updateExtendedProfile = async profileData => {
       bio: profileData.bio || null,
       country: profileData.country || null,
       socials: {
-        discord: profileData.socials?.discord || null,
+        linkedDiscord: profileData.socials?.linkedDiscord || null,
+        epicId: profileData.socials?.epicId || null,
         github: profileData.socials?.github || null,
         steam: profileData.socials?.steam || null,
       },
@@ -501,7 +553,8 @@ export const getUserData = async uid => {
           bio: data.bio || null,
           country: data.country || null,
           socials: {
-            discord: data.socials?.discord || null,
+            linkedDiscord: data.socials?.linkedDiscord || null,
+            epicId: data.socials?.epicId || null,
             github: data.socials?.github || null,
             steam: data.socials?.steam || null,
           },
@@ -526,10 +579,29 @@ export const getUserData = async uid => {
  */
 export const updateUserData = async (uid, data) => {
   try {
-    await updateDoc(doc(db, "users", uid), {
-      ...data,
+    // Build update object with only safe fields
+    const updateData = {
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // Allowed fields that can be updated
+    const allowedFields = [
+      "bio",
+      "country",
+      "socials",
+      "displayName",
+      "photoURL",
+      "cloudLibrary",
+      "profileStats",
+    ];
+
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) {
+        updateData[field] = data[field];
+      }
+    }
+
+    await updateDoc(doc(db, "users", uid), updateData);
     return { success: true, error: null };
   } catch (error) {
     console.error("Update user data error:", error);
@@ -593,17 +665,12 @@ export const reloadCurrentUser = async () => {
 };
 
 /**
- * Update user status (online, away, busy, invisible)
+ * Update user status (online, away, busy, offline)
  * @param {string} status - Status type
  * @param {string} customMessage - Optional custom status message
  * @returns {Promise<{success: boolean, error: string|null}>}
  */
 export const updateUserStatus = async (status, customMessage = "") => {
-  // Debug: trace what's setting status to invisible
-  if (status === "invisible") {
-    console.log("[updateUserStatus] Setting to invisible, stack:", new Error().stack);
-  }
-
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -616,8 +683,9 @@ export const updateUserStatus = async (status, customMessage = "") => {
       updatedAt: serverTimestamp(),
     };
 
-    // Store preferred status if user manually sets a non-invisible status
-    if (status !== "invisible") {
+    // Store preferred status if user manually sets a non-offline status
+    // offline is set automatically by app close/API timeout, not user choice
+    if (status !== "offline") {
       updateData.preferredStatus = status;
     }
 
@@ -1002,25 +1070,27 @@ export const deleteCloudGame = async gameName => {
 /**
  * Check if hardware ID already has an account (for preventing multiple accounts)
  * @param {string} hardwareId - The hardware ID to check
- * @returns {Promise<{hasAccount: boolean, email: string|null, error: string|null}>}
+ * @returns {Promise<{hasAccount: boolean, email: string|null, userId: string|null, error: string|null}>}
  */
 export const checkHardwareIdAccount = async hardwareId => {
   try {
     if (!hardwareId) {
-      return { hasAccount: false, email: null, error: null };
+      return { hasAccount: false, email: null, userId: null, error: null };
     }
 
     const hwDoc = await getDoc(doc(db, "hardwareIds", hardwareId));
     if (!hwDoc.exists()) {
-      return { hasAccount: false, email: null, error: null };
+      return { hasAccount: false, email: null, userId: null, error: null };
     }
 
     const data = hwDoc.data();
+    const linkedUserId = data.userId || null;
+
     // Get the linked user's email (partially masked for privacy)
     // Only try to fetch user doc if we're authenticated (users collection requires auth)
-    if (data.userId && auth.currentUser) {
+    if (linkedUserId && auth.currentUser) {
       try {
-        const userDoc = await getDoc(doc(db, "users", data.userId));
+        const userDoc = await getDoc(doc(db, "users", linkedUserId));
         if (userDoc.exists()) {
           const email = userDoc.data().email || "";
           // Mask email for privacy: show first 2 chars and domain
@@ -1028,7 +1098,12 @@ export const checkHardwareIdAccount = async hardwareId => {
             email.length > 0
               ? email.substring(0, 2) + "***@" + email.split("@")[1]
               : null;
-          return { hasAccount: true, email: maskedEmail, error: null };
+          return {
+            hasAccount: true,
+            email: maskedEmail,
+            userId: linkedUserId,
+            error: null,
+          };
         }
       } catch (userError) {
         // Can't read user doc - just return that account exists without email
@@ -1036,34 +1111,54 @@ export const checkHardwareIdAccount = async hardwareId => {
       }
     }
 
-    return { hasAccount: true, email: null, error: null };
+    return { hasAccount: true, email: null, userId: linkedUserId, error: null };
   } catch (error) {
     console.error("Check hardware ID account error:", error);
-    return { hasAccount: false, email: null, error: error.message };
+    return { hasAccount: false, email: null, userId: null, error: error.message };
   }
 };
 
 /**
  * Check if hardware ID belongs to a deleted account
  * @param {string} hardwareId - The hardware ID to check
- * @returns {Promise<{isDeleted: boolean, error: string|null}>}
+ * @returns {Promise<{isDeleted: boolean, email: string|null, error: string|null}>}
  */
 export const checkDeletedAccount = async hardwareId => {
   try {
     if (!hardwareId) {
-      return { isDeleted: false, error: null };
+      return { isDeleted: false, email: null, error: null };
     }
 
     const hwDoc = await getDoc(doc(db, "hardwareIds", hardwareId));
     if (!hwDoc.exists()) {
-      return { isDeleted: false, error: null };
+      return { isDeleted: false, email: null, error: null };
     }
 
     const data = hwDoc.data();
-    return { isDeleted: data.deletedAcc === true, error: null };
+    const isDeleted = data.deletedAcc === true;
+
+    // Get the linked user's email if account is deleted
+    let email = null;
+    if (isDeleted && data.userId && auth.currentUser) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", data.userId));
+        if (userDoc.exists()) {
+          const userEmail = userDoc.data().email || "";
+          // Mask email for privacy: show first 2 chars and domain
+          email =
+            userEmail.length > 0
+              ? userEmail.substring(0, 2) + "***@" + userEmail.split("@")[1]
+              : null;
+        }
+      } catch (userError) {
+        console.warn("Could not fetch user email:", userError);
+      }
+    }
+
+    return { isDeleted, email, error: null };
   } catch (error) {
     console.error("Check deleted account error:", error);
-    return { isDeleted: false, error: error.message };
+    return { isDeleted: false, email: null, error: error.message };
   }
 };
 
@@ -1247,7 +1342,9 @@ export const verifyAscendAccess = async (hardwareId = null) => {
     // Check if user has active subscription (bypasses hardware check and noTrial)
     if (userData.ascendSubscription?.active) {
       const expiresAt = userData.ascendSubscription.expiresAt?.toDate();
-      if (expiresAt && expiresAt > new Date()) {
+      // If active flag is true, trust it regardless of expiration date
+      // This prevents subscribed users from being treated as trial users
+      if (!expiresAt || expiresAt > new Date()) {
         return {
           hasAccess: true,
           daysRemaining: -1,
@@ -1259,6 +1356,18 @@ export const verifyAscendAccess = async (hardwareId = null) => {
           error: null,
         };
       }
+      // If subscription is marked active but expired, still grant access
+      // The active flag should be the source of truth (managed server-side)
+      return {
+        hasAccess: true,
+        daysRemaining: -1,
+        isSubscribed: true,
+        isVerified: false,
+        trialBlocked: false,
+        noTrial: false,
+        noTrialReason: null,
+        error: null,
+      };
     }
 
     // Check if user is blocked from free trial
@@ -1278,7 +1387,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
     // Check hardware ID for trial abuse (non-blocking - don't fail access check if this fails)
     if (hardwareId) {
       try {
-        // If user doesn't have a hardware ID stored, register it
+        // If user doesn't have a hardware ID stored, check for trial abuse but DON'T register yet
+        // Registration happens in handleGoogleSignIn after duplicate account check
         if (!userData.hardwareId) {
           // Check if this hardware ID was used by another account with expired trial
           const hwCheck = await checkHardwareIdTrial(hardwareId);
@@ -1295,10 +1405,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
               error: "Trial already used on this device",
             };
           }
-          // Register the hardware ID for this user (don't await - fire and forget)
-          registerHardwareId(hardwareId, user.uid).catch(e =>
-            console.warn("Hardware ID registration failed:", e)
-          );
+          // NOTE: Hardware ID registration is handled by handleGoogleSignIn for new users
+          // to avoid race condition with duplicate account check
         } else if (userData.hardwareId !== hardwareId) {
           // User has a different hardware ID stored - could be using multiple devices
           // Check if the new hardware ID has an expired trial

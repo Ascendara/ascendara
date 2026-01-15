@@ -145,6 +145,108 @@ const TrialWarningChecker = () => {
   );
 };
 
+// Check for deprecated GiantBomb API key and show migration warning
+const GiantBombMigrationWarning = () => {
+  const { t } = useTranslation();
+  const { settings, setSettings } = useSettings();
+  const navigate = useNavigate();
+  const [showWarning, setShowWarning] = useState(false);
+  const hasCheckedRef = useRef(false);
+
+  console.log("[MigrationWarning] Component rendered, settings:", settings);
+
+  useEffect(() => {
+    console.log(
+      "[MigrationWarning] useEffect running, hasCheckedRef:",
+      hasCheckedRef.current
+    );
+
+    // Skip if settings haven't loaded yet (check for a property that always has a value when loaded)
+    if (
+      !settings ||
+      !settings.downloadDirectory ||
+      settings.downloadDirectory.trim() === ""
+    ) {
+      console.log(
+        "[MigrationWarning] Settings not loaded yet (no downloadDirectory), skipping"
+      );
+      return;
+    }
+
+    // Only check once after settings are loaded
+    if (hasCheckedRef.current) {
+      console.log("[MigrationWarning] Already checked, skipping");
+      return;
+    }
+
+    // Check if user has deprecated API keys set (giantBombKey or IGDB keys)
+    // Note: giantBombKey was removed from default settings, so it will only exist if user had it previously
+    const hasGiantBombKey = settings.giantBombKey && settings.giantBombKey.trim() !== "";
+    const hasIgdbKeys =
+      (settings.twitchClientId && settings.twitchClientId.trim() !== "") ||
+      (settings.twitchSecret && settings.twitchSecret.trim() !== "");
+
+    console.log("Migration check - hasGiantBombKey:", hasGiantBombKey);
+    console.log("Migration check - hasIgdbKeys:", hasIgdbKeys);
+    console.log("Migration check - giantBombKey value:", settings.giantBombKey);
+    console.log("Migration check - twitchClientId value:", settings.twitchClientId);
+    console.log("Migration check - twitchSecret value:", settings.twitchSecret);
+
+    if (hasGiantBombKey || hasIgdbKeys) {
+      console.log("SHOWING MIGRATION WARNING!");
+      setShowWarning(true);
+    } else {
+      console.log("No deprecated keys found, not showing warning");
+    }
+
+    // Mark as checked AFTER we've actually checked with loaded settings
+    hasCheckedRef.current = true;
+  }, [settings]);
+
+  const handleDismiss = async () => {
+    // Clear all deprecated API keys
+    await setSettings({
+      ...settings,
+      giantBombKey: "",
+      twitchClientId: "",
+      twitchSecret: "",
+    });
+    setShowWarning(false);
+  };
+
+  return (
+    <AlertDialog open={showWarning} onOpenChange={setShowWarning}>
+      <AlertDialogContent className="border-border">
+        <AlertDialogHeader>
+          <div className="flex items-center gap-4">
+            <AlertTriangle className="mb-2 h-10 w-10 text-yellow-500" />
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("welcome.apiMigration.title")}
+            </AlertDialogTitle>
+          </div>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4">
+              <div className="text-foreground">{t("welcome.apiMigration.goodNews")}</div>
+              <div className="text-muted-foreground">
+                {t("welcome.apiMigration.steamBuiltIn")}
+              </div>
+              <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+                {t("welcome.apiMigration.whatChanged")}
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={handleDismiss}>
+            {t("welcome.okay")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
 const ScrollToTop = () => {
   const { pathname } = useLocation();
 
@@ -157,12 +259,16 @@ const ScrollToTop = () => {
 };
 
 // Track user activity and update Firebase customMessage
-const UserActivityTracker = () => {
+const UserActivityTracker = React.memo(() => {
   const { pathname, state } = useLocation();
   const { user } = useAuth();
+  const lastPathRef = useRef(null);
 
   useEffect(() => {
     if (!user?.uid) return;
+    // Skip if path hasn't changed to prevent unnecessary updates
+    if (lastPathRef.current === pathname) return;
+    lastPathRef.current = pathname;
 
     // Map routes to activity types
     const updateActivity = async () => {
@@ -209,7 +315,7 @@ const UserActivityTracker = () => {
     };
 
     updateActivity();
-  }, [pathname, state, user?.uid]);
+  }, [pathname, state?.gameData?.game, state?.game?.game, user?.uid]);
 
   // Listen for game launch/close events
   useEffect(() => {
@@ -280,7 +386,9 @@ const UserActivityTracker = () => {
   }, [user?.uid]);
 
   return null;
-};
+});
+
+UserActivityTracker.displayName = "UserActivityTracker";
 
 // Initialize Ascend status service when user is authenticated
 const AscendStatusInitializer = () => {
@@ -354,10 +462,10 @@ const MessageNotificationChecker = () => {
     };
 
     // Initial check after a short delay
-    const initialTimeout = setTimeout(checkForNewMessages, 3000);
+    const initialTimeout = setTimeout(checkForNewMessages, 5000);
 
-    // Check every 30 seconds
-    checkIntervalRef.current = setInterval(checkForNewMessages, 30000);
+    // Reduce polling frequency from 30s to 60s to reduce CPU usage
+    checkIntervalRef.current = setInterval(checkForNewMessages, 60000);
 
     return () => {
       clearTimeout(initialTimeout);
@@ -1162,6 +1270,7 @@ function App() {
                   <UserActivityTracker />
                   <MessageNotificationChecker />
                   <TrialWarningChecker />
+                  <GiantBombMigrationWarning />
                   <AppRoutes />
                   <MiniPlayer
                     expanded={playerExpanded}

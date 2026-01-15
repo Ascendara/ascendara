@@ -30,8 +30,12 @@ async function updateWatchdogStatus(running) {
     payload = {};
   }
   payload.watchdogRunning = running;
+  payload.watchdogLastUpdated = moment().format();
   try {
     await fs.writeFile(timestampFilePath, JSON.stringify(payload, null, 2), "utf8");
+    console.log(
+      `Watchdog status updated: running=${running}, timestamp=${payload.watchdogLastUpdated}`
+    );
   } catch (e) {
     console.error("Failed to write watchdog status:", e);
   }
@@ -112,7 +116,39 @@ var app = {
       let self = this;
       self.cache = [];
       console.log("Achievement Watchdog starting ...");
-      const folders = await monitor.getFolders();
+
+      // Build game directory list from settings
+      const settings = await getSettings();
+      const downloadDir = settings.downloadDirectory;
+      const gameDirList = [];
+
+      if (downloadDir) {
+        try {
+          // Scan download directory for game folders
+          const gameFolders = await fs.readdir(downloadDir, { withFileTypes: true });
+          for (const dirent of gameFolders) {
+            if (dirent.isDirectory()) {
+              const gameFolderPath = path.join(downloadDir, dirent.name);
+              gameDirList.push({
+                path: gameFolderPath,
+                notify: true,
+              });
+            }
+          }
+          console.log(`Found ${gameDirList.length} game directories to monitor`);
+        } catch (err) {
+          console.warn("Failed to scan download directory:", err);
+        }
+      }
+
+      // Create temporary file for monitor.getFolders()
+      const tempFile = path.join(
+        process.env.TEMP || process.env.TMP || "/tmp",
+        "ascendara_game_dirs.json"
+      );
+      await fs.writeFile(tempFile, JSON.stringify(gameDirList), "utf8");
+
+      const folders = await monitor.getFolders(tempFile);
       console.log(`monitor.getFolders() returned:`, folders);
       let i = 1;
       for (let folder of folders) {
@@ -554,23 +590,40 @@ async function updateAchievementsJsonForRunningGame(game, achievedCache) {
   }
 }
 
-console.log("About to acquire single-instance lock (block 1)...");
-instance.lock().then(() => {
-  console.log("Single-instance lock acquired (block 1). Starting app...");
-  updateWatchdogStatus(true);
-  app.start().catch(err => {
-    console.error("app.start() failed (block 1):", err);
-    updateWatchdogStatus(false);
+console.log("About to acquire single-instance lock...");
+
+// Add error handler for uncaught exceptions from single-instance module
+process.on("uncaughtException", err => {
+  if (
+    err.code === "EINVAL" &&
+    err.syscall === "unlink" &&
+    err.path &&
+    err.path.includes("Achievement Watchdog-sock")
+  ) {
+    console.error("Single-instance lock cleanup error (ignoring):", err.message);
+    // This is a known issue with single-instance on Windows - ignore and continue
+    return;
+  }
+  // For other errors, log and exit
+  console.error("Uncaught exception:", err);
+  updateWatchdogStatus(false).then(() => {
+    process.exit(1);
   });
 });
 
-console.log("About to acquire single-instance lock (block 2)...");
 instance
   .lock()
   .then(() => {
-    console.log("Single-instance lock acquired (block 2). Starting app...");
+    console.log("Single-instance lock acquired. Starting app...");
+    updateWatchdogStatus(true);
+    app.start().catch(err => {
+      console.error("app.start() failed:", err);
+      updateWatchdogStatus(false);
+      process.exit(1);
+    });
   })
   .catch(err => {
-    console.error(err);
-    process.exit();
+    console.error("Failed to acquire single-instance lock:", err);
+    console.log("Another instance may already be running.");
+    process.exit(0);
   });

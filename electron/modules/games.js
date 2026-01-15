@@ -213,7 +213,8 @@ function registerGameHandlers() {
       isCustom = false,
       backupOnClose = false,
       launchWithAdmin = false,
-      specificExecutable = null
+      specificExecutable = null,
+      launchWithTrainer = false
     ) => {
       try {
         const settings = settingsManager.getSettings();
@@ -316,6 +317,7 @@ function registerGameHandlers() {
               isCustom.toString(),
               launchWithAdmin.toString(),
               ...(backupOnClose ? ["--ludusavi"] : []),
+              ...(launchWithTrainer ? ["--trainer"] : []),
               ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
             ]
           : [
@@ -324,6 +326,7 @@ function registerGameHandlers() {
               isCustom.toString(),
               launchWithAdmin.toString(),
               ...(backupOnClose ? ["--ludusavi"] : []),
+              ...(launchWithTrainer ? ["--trainer"] : []),
               ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
             ];
 

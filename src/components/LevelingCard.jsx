@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { formatNumber } from "@/services/levelCalculationService";
 import {
   Card,
   CardHeader,
@@ -53,32 +54,28 @@ const LevelingCard = ({ level, currentXP, nextLevelXp, totalXP }) => {
   const progressPercentage = (() => {
     // Handle special cases
     if (localLevel >= 999) return 100; // Max level always shows 100%
-    if (localNextLevelXp <= 0) return 0; // Prevent division by zero
+
+    // Handle undefined/null/invalid values
+    const safeCurrentXP = Number(localCurrentXP) || 0;
+    const safeNextLevelXp = Number(localNextLevelXp) || 1;
+
+    if (safeNextLevelXp <= 0) {
+      console.warn("LevelingCard: Invalid nextLevelXp value:", localNextLevelXp);
+      return 0; // Prevent division by zero
+    }
 
     // Normal case: calculate percentage with a cap at 100%
-    return Math.min((localCurrentXP / localNextLevelXp) * 100, 100);
+    const percentage = Math.min((safeCurrentXP / safeNextLevelXp) * 100, 100);
+
+    // Debug logging
+    console.log("LevelingCard Progress:", {
+      currentXP: safeCurrentXP,
+      nextLevelXp: safeNextLevelXp,
+      percentage: percentage.toFixed(2) + "%",
+    });
+
+    return percentage;
   })();
-
-  // Format large numbers for display with improved readability
-  const formatNumber = num => {
-    // Ensure we're working with a valid number
-    if (num === undefined || num === null || isNaN(num)) {
-      return "0";
-    }
-
-    // Convert to integer to avoid decimal places and scientific notation
-    const safeNum = Math.round(Number(num));
-
-    // Format based on magnitude
-    if (safeNum >= 1000000) {
-      return `${(safeNum / 1000000).toFixed(1)}M`.replace(".0", "");
-    } else if (safeNum >= 1000) {
-      return `${(safeNum / 1000).toFixed(1)}K`.replace(".0", "");
-    }
-
-    // For smaller numbers, use simple formatting without decimals
-    return safeNum.toLocaleString();
-  };
 
   // Check for level up animation
   useEffect(() => {
@@ -254,7 +251,7 @@ const LevelingCard = ({ level, currentXP, nextLevelXp, totalXP }) => {
         <CardTitle
           className={`flex items-center gap-2 ${localLevel >= 100 ? colorScheme.text : ""}`}
         >
-          {t("profile.yourLevel")}
+          {t("ascend.profile.yourLevel")}
         </CardTitle>
         <CardDescription>{t("profile.levelProgress")}</CardDescription>
       </CardHeader>

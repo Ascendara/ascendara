@@ -455,7 +455,17 @@ class ChunkedDownloader:
                     # Check if download is complete
                     final_size = os.path.getsize(self.dest_path)
                     
-                    if self.total_size is None or final_size >= self.total_size:
+                    # Debug logging to see exact values
+                    logging.info(f"[ChunkedDownloader] DEBUG: final_size={final_size}, total_size={self.total_size}, difference={abs(final_size - self.total_size) if self.total_size else 'N/A'}")
+                    
+                    # If stream completed successfully and we have a total_size, check completion
+                    # Allow small tolerance for size comparison (1KB) to handle edge cases
+                    if self.total_size is None:
+                        # No total size known - assume complete if stream finished
+                        logging.info(f"[ChunkedDownloader] Download complete: {read_size(final_size)}")
+                        return True
+                    elif final_size >= self.total_size - 1024:
+                        # Download is complete (within 1KB tolerance)
                         # Clear retry status
                         if 'retryAttempt' in self.game_info.get('downloadingData', {}):
                             del self.game_info['downloadingData']['retryAttempt']
@@ -781,6 +791,7 @@ class RobustDownloader:
         # Track extraction timing
         self._extraction_start_time = time.time()
         self._files_extracted_count = 0
+        self._last_progress_update = 0  # Track last JSON write time
         
         watching_path = os.path.join(self.download_dir, "filemap.ascendara.json")
         watching_data = {}
@@ -822,7 +833,7 @@ class RobustDownloader:
         
         logging.info(f"[RobustDownloader] Total files to extract: {total_files_to_extract}")
         self._total_files_to_extract = total_files_to_extract
-        self._update_extraction_progress("Preparing...", 0, total_files_to_extract)
+        self._update_extraction_progress("Preparing...", 0, total_files_to_extract, force=True)
         
         processed_archives = set()
         
@@ -862,6 +873,31 @@ class RobustDownloader:
                         if new_archive not in processed_archives and new_archive not in archives_to_process:
                             archives_to_process.append(new_archive)
                             logging.info(f"[RobustDownloader] Found nested archive: {new_archive}")
+                            
+                            # Count files in nested archive and update total
+                            try:
+                                nested_file_count = 0
+                                if ext == '.zip':
+                                    with zipfile.ZipFile(new_archive, 'r') as zip_ref:
+                                        for zip_info in zip_ref.infolist():
+                                            if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
+                                                nested_file_count += 1
+                                elif ext == '.rar':
+                                    from unrar import rarfile
+                                    with rarfile.RarFile(new_archive) as rar_ref:
+                                        for rar_info in rar_ref.infolist():
+                                            is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                                            if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename and not is_dir:
+                                                nested_file_count += 1
+                                
+                                if nested_file_count > 0:
+                                    self._total_files_to_extract += nested_file_count
+                                    logging.info(f"[RobustDownloader] Added {nested_file_count} files from nested archive (new total: {self._total_files_to_extract})")
+                            except Exception as e:
+                                logging.warning(f"[RobustDownloader] Could not count files in nested archive {new_archive}: {e}")
+        
+        # Force final progress update before flattening
+        self._update_extraction_progress("Finalizing...", self._files_extracted_count, self._total_files_to_extract, force=True)
         
         # Flatten nested directories
         self._flatten_directories()
@@ -895,12 +931,21 @@ class RobustDownloader:
         # Verify
         self._verify_extracted_files(watching_path)
     
-    def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int):
-        """Update extraction progress in the game info JSON."""
-        elapsed = time.time() - self._extraction_start_time
+    def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int, force: bool = False):
+        """Update extraction progress in the game info JSON.
+        
+        Args:
+            current_file: Name of the file being extracted
+            files_extracted: Number of files extracted so far
+            total_files: Total number of files to extract
+            force: Force immediate JSON write (used for completion)
+        """
+        current_time = time.time()
+        elapsed = current_time - self._extraction_start_time
         speed = files_extracted / elapsed if elapsed > 0 else 0
         percent = (files_extracted / total_files * 100) if total_files > 0 else 0
         
+        # Always update in-memory data
         self.game_info["downloadingData"]["extractionProgress"] = {
             "currentFile": current_file[:50] + "..." if len(current_file) > 50 else current_file,
             "filesExtracted": files_extracted,
@@ -908,7 +953,11 @@ class RobustDownloader:
             "percentComplete": f"{percent:.2f}",
             "extractionSpeed": f"{speed:.1f} files/s" if speed >= 1 else f"{speed:.2f} files/s"
         }
-        safe_write_json(self.game_info_path, self.game_info)
+        
+        # Only write to disk every 1.5 seconds or when forced (completion/error)
+        if force or (current_time - self._last_progress_update) >= 2:
+            safe_write_json(self.game_info_path, self.game_info)
+            self._last_progress_update = current_time
 
     def _extract_zip(self, archive_path: str, watching_data: Dict):
         """Extract a ZIP file."""

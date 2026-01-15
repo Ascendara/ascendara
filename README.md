@@ -179,48 +179,6 @@ These languages come with the app by default:
 
 </details>
 
-## Current 3rd Party Integrations
-
-<p align="center">
-  <img src="./readme/connections.png" width="60%" alt="Integrations Overview"/>
-</p>
-
-<!-- Integration Descriptions -->
-<table align="center">
-  <tr>
-    <th>Integration</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td><strong>GiantBomb</strong></td>
-    <td>Community-driven game metadata provider, used as a fallback when official data is unavailable.</td>
-  </tr>
-  <tr>
-    <td><strong>IGDB</strong></td>
-    <td>The primary and more official source for game information, covers, and metadata.</td>
-  </tr>
-  <tr>
-    <td><strong>Ludusavi</strong></td>
-    <td>Backup and restore for game save data.</td>
-  </tr>
-  <tr>
-    <td><strong>SteamCMD</strong></td>
-    <td>Used by Ascendara's Workshop Downloader page to download workshop items.</td>
-  </tr>
-  <tr>
-    <td><strong>KHInsider</strong></td>
-    <td>Game soundtrack library for listening and downloading tracks from.</td>
-  </tr>
-  <tr>
-    <td><strong>Achievement Watcher</strong></td>
-    <td>Achievement tracking and viewing with Achievement Watcher by xan105.</td>
-  </tr>
-  <tr>
-    <td><strong>Torbox</strong></td>
-    <td>Download games at high speeds with premium debrid services.</td>
-  </tr>
-</table>
-
 ## 🖼️ Preview App Pages
 
 <details>
@@ -281,32 +239,40 @@ Contributing to Ascendara is the best way to get your desired features, bug fixe
 
 The Ascendara project is organized into the following main directories:
 
-- **src/**: Core application logic and UI implementation
-  - **components/**: Core UI components
-  - **context/**: React context providers for state management
-  - **hooks/**: Custom hooks for efficient image loading and caching
-  - **public/**: Static assets and public resources
-  - **lib/**: Miscellaneous utility libraries and helper functions
-  - **pages/**: Main application pages/screens
-  - **services/**: Service modules for external API requests and core application functionality
-  - **styles/**: CSS and styling files
-  - **translations/**: Internationalization files
+### **src/** - Core application logic and UI implementation
 
-- **binaries/**: Prebuilt binaries for core application functionality
-  - **AscendaraLocalRefresh/**: Custom refresh tool to update game index
-  - **AscendaraAchievementWatcher/**: Game achievement tracking functionality
-  - **AscendaraCrashReporter/**: Crash reporting functionality
-  - **AscendaraDownloader/**: Game download managers to handle most files
-  - **AscendaraGameHandler/**: Game execution and management
-  - **AscendaraNotificationHelper/**: Download notification helper tool
+- **components/** - Reusable React components for the UI
+  - **ui/** - shadcn/ui component library for modern UI elements
+- **context/** - React context providers for global state management (authentication, language, settings, themes, tour)
+- **hooks/** - Custom React hooks for efficient image loading and caching
+- **lib/** - Utility libraries and helper functions
+- **pages/** - Main application pages and screens (Home, Library, Downloads, Settings, etc.)
+- **public/** - Static assets and public resources
+  - **sounds/** - UI sound effects
+  - **guide/** - User guide assets
+- **services/** - Service modules for external APIs and core functionality (Firebase, game info, downloads, analytics, integrations)
+- **styles/** - CSS styling files for animations, menu bar, and scrollbars
+- **translations/** - Internationalization files for 12 base languages (English, Spanish, French, German, Italian, Chinese, Arabic, Hindi, Bengali, Portuguese, Russian, Japanese)
 
-    > ℹ️ INFO: The tools below are additional tools that do not come with the official build of Ascendara. Instead, they utilize Ascendara's tool installation feature to install these supplementary tools as needed.
+### **binaries/** - Prebuilt Python binaries for core functionality
 
-  - **AscendaraLanguageTranslation/**: Translation tool used to translate to the additional 93 languages
-  - **AscendaraTorrentHandler/**: Torrent download functionality
+- **AscendaraAchievementWatcher/** - Tracks and monitors game achievements
+- **AscendaraCrashReporter/** - Automated crash reporting and diagnostics
+- **AscendaraDownloader/** - Multi-threaded game download manager supporting various file hosts
+- **AscendaraGameHandler/** - Game execution, process management, and runtime monitoring
+- **AscendaraLocalRefresh/** - Local game index refresh and update tool
+- **AscendaraNotificationHelper/** - System notification helper for download events
 
-- **scripts/**: Helper scripts for development, deployment, and maintenance
-- **electron/**: The source code for the Electron app and IPC handles
+  > ℹ️ **INFO:** The tools below are additional tools that do not come with the official build of Ascendara. Instead, they utilize Ascendara's tool installation feature to install these supplementary tools as needed.
+
+- **AscendaraLanguageTranslation/** - Translation tool used to translate to the additional 93 languages
+- **AscendaraTorrentHandler/** - Torrent download functionality
+
+### **electron/** - Electron main process and IPC communication
+
+- **modules/** - Modular IPC handlers and backend logic (configuration, Discord RPC, downloads, games, settings, system utilities, updates, window management, and more)
+
+### **scripts/** - Development and build automation scripts for Windows/Linux builds, translation checking, and code statistics
 
 ## 🛠️ Running from Source
 

@@ -345,6 +345,38 @@ const downloadTrainer = async (trainerData, gameName) => {
   }
 };
 
+/**
+ * Download trainer file directly to game directory
+ * @param {Object} trainerData - Trainer data with downloadUrl
+ * @param {string} gameName - Name of the game
+ * @param {boolean} isCustom - Whether the game is a custom game
+ * @returns {Promise<{success: boolean, path?: string, error?: string}>} Download result
+ */
+const downloadTrainerToGame = async (trainerData, gameName, isCustom = false) => {
+  if (!trainerData?.downloadUrl) {
+    console.error("[FlingTrainer] No download URL available");
+    return { success: false, error: "No download URL available" };
+  }
+
+  try {
+    if (!window.electron?.downloadTrainerToGame) {
+      console.error("[FlingTrainer] Electron API not available");
+      return { success: false, error: "Download API not available" };
+    }
+
+    const result = await window.electron.downloadTrainerToGame(
+      trainerData.downloadUrl,
+      gameName,
+      isCustom
+    );
+
+    return result;
+  } catch (error) {
+    console.error("[FlingTrainer] Error downloading trainer to game directory:", error);
+    return { success: false, error: error.message || "Unknown error" };
+  }
+};
+
 const flingTrainerService = {
   checkTrainerSupport,
   getTrainerUrl,
@@ -352,6 +384,7 @@ const flingTrainerService = {
   getAllTrainersUrl,
   openTrainerPage,
   downloadTrainer,
+  downloadTrainerToGame,
   normalizeGameName,
   gameNameToSlug,
 };

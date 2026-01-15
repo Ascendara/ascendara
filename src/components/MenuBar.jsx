@@ -68,6 +68,15 @@ const MenuBar = () => {
     checkWindows();
   }, []);
 
+  // Check initial maximization state
+  useEffect(() => {
+    const checkMaximized = async () => {
+      const isMax = await window.electron.isWindowMaximized();
+      setIsFullscreen(isMax);
+    };
+    checkMaximized();
+  }, []);
+
   useEffect(() => {
     const checkExperimentMode = async () => {
       const isExperiment = await window.electron.isExperiment();
@@ -210,7 +219,14 @@ const MenuBar = () => {
   };
 
   const handleFullscreenToggle = async () => {
-    setIsFullscreen(await window.electron.toggleFullscreen());
+    // Uses "maximizeWindow"
+    if (window.electron.maximizeWindow) {
+      const isMax = await window.electron.maximizeWindow();
+      setIsFullscreen(isMax);
+    } else {
+      // Fallback
+      console.error("The maximizeWindow function is not defined in preload.js.");
+    }
   };
 
   return (

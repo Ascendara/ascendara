@@ -190,22 +190,6 @@ const getThemeColors = themeId => {
   return themeMap[themeId] || themeMap.light;
 };
 
-// Move debounce helper function up
-function createDebouncedFunction(func, wait) {
-  let timeoutId;
-
-  const debouncedFn = (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), wait);
-  };
-
-  debouncedFn.cancel = () => {
-    clearTimeout(timeoutId);
-  };
-
-  return debouncedFn;
-}
-
 function Settings() {
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
@@ -227,8 +211,6 @@ function Settings() {
   const [showTorrentWarning, setShowTorrentWarning] = useState(false);
   const [showNoTorrentDialog, setShowNoTorrentDialog] = useState(false);
   const [showNoLudusaviDialog, setShowNoLudusaviDialog] = useState(false);
-  const [twitchSecret, setTwitchSecret] = useState("");
-  const [twitchClientId, setTwitchClientId] = useState("");
   const [availableLanguages, setAvailableLanguages] = useState([]);
   const [isExperiment, setIsExperiment] = useState(false);
   const [isDev, setIsDev] = useState(false);
@@ -299,15 +281,6 @@ function Settings() {
     }
     setExclusionLoading(false);
   };
-
-  useEffect(() => {
-    if (settings.twitchSecret) {
-      setTwitchSecret(settings.twitchSecret);
-    }
-    if (settings.twitchClientId) {
-      setTwitchClientId(settings.twitchClientId);
-    }
-  }, [settings]);
 
   // Load last refresh time and check if refresh is running
   useEffect(() => {
@@ -388,19 +361,14 @@ function Settings() {
     checkPlatform();
   }, []);
 
-  // Create a debounced save function to prevent too frequent saves
-  const debouncedSave = useMemo(
-    () =>
-      createDebouncedFunction(newSettings => {
-        window.electron.saveSettings(newSettings);
-      }, 300),
-    []
-  );
-
   useEffect(() => {
     const checkDownloaderStatus = async () => {
       try {
         const games = await window.electron.getGames();
+        if (!games || !Array.isArray(games)) {
+          setIsDownloaderRunning(false);
+          return;
+        }
         const hasDownloadingGames = games.some(game => {
           const { downloadingData } = game;
           return (
@@ -427,93 +395,88 @@ function Settings() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-save settings whenever they change
+  // Auto-save is handled by handleSettingChange, no need for this effect
+
+  // Load initial settings - only run once when settings are loaded
   useEffect(() => {
-    if (isInitialized && !isFirstMount.current) {
-      debouncedSave(settings);
-    }
-  }, [settings, isInitialized]);
+    // Only initialize once
+    if (!isFirstMount.current) return;
 
-  // Load initial settings
-  useEffect(() => {
-    const initializeSettings = async () => {
-      if (!isFirstMount.current) return;
-
-      setIsLoading(true);
-
-      try {
-        // Load settings first
-        const savedSettings = await window.electron.getSettings();
-
-        if (savedSettings) {
-          setSettings(savedSettings);
-          // Set the download directory from saved settings
-          if (savedSettings.downloadDirectory) {
-            setDownloadPath(savedSettings.downloadDirectory);
-          }
-          if (savedSettings.backupDirectory) {
-            setBackupPath(savedSettings.backupDirectory);
-          }
-          initialSettingsRef.current = savedSettings;
-        }
-
-        isFirstMount.current = false;
-      } catch (error) {
-        console.error("Error initializing settings:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeSettings();
-  }, []); // Run only once on mount
-
-  const handleSettingChange = async (key, value, ludusavi = false) => {
-    if (key === "sideScrollBar") {
-      setSettingsLocal(prev => ({
-        ...prev,
-        [key]: value,
-      }));
-      // Update scrollbar styles directly
-      if (value) {
-        document.documentElement.classList.add("custom-scrollbar");
-      } else {
-        document.documentElement.classList.remove("custom-scrollbar");
-      }
+    // Wait for settings to be loaded from context
+    if (!settings || !settings.downloadDirectory) {
       return;
     }
 
-    // Handle Ludusavi settings
-    if (ludusavi) {
-      // Only update the nested ludusavi object
-      window.electron
-        .updateSetting("ludusavi", {
-          ...(settings.ludusavi || {}),
-          [key]: value,
-        })
-        .then(success => {
-          if (success) {
-            setSettingsLocal(prev => ({
-              ...prev,
-              ludusavi: {
-                ...(prev.ludusavi || {}),
-                [key]: value,
-              },
-            }));
-          }
-        });
-      return;
-    }
+    setIsLoading(true);
 
-    window.electron.updateSetting(key, value).then(success => {
-      if (success) {
+    try {
+      // Settings are already loaded by SettingsContext, just sync local state
+      if (settings.downloadDirectory) {
+        setDownloadPath(settings.downloadDirectory);
+      }
+      if (settings.backupDirectory) {
+        setBackupPath(settings.backupDirectory);
+      }
+      initialSettingsRef.current = settings;
+
+      isFirstMount.current = false;
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("Error initializing settings:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [settings.downloadDirectory, settings.backupDirectory]); // Only depend on specific values we need
+
+  const handleSettingChange = useCallback(
+    async (key, value, ludusavi = false) => {
+      if (key === "sideScrollBar") {
         setSettingsLocal(prev => ({
           ...prev,
           [key]: value,
         }));
+        // Update scrollbar styles directly
+        if (value) {
+          document.documentElement.classList.add("custom-scrollbar");
+        } else {
+          document.documentElement.classList.remove("custom-scrollbar");
+        }
+        return;
       }
-    });
-  };
+
+      // Handle Ludusavi settings
+      if (ludusavi) {
+        // Only update the nested ludusavi object
+        window.electron
+          .updateSetting("ludusavi", {
+            ...(settings.ludusavi || {}),
+            [key]: value,
+          })
+          .then(success => {
+            if (success) {
+              setSettingsLocal(prev => ({
+                ...prev,
+                ludusavi: {
+                  ...(prev.ludusavi || {}),
+                  [key]: value,
+                },
+              }));
+            }
+          });
+        return;
+      }
+
+      window.electron.updateSetting(key, value).then(success => {
+        if (success) {
+          setSettingsLocal(prev => ({
+            ...prev,
+            [key]: value,
+          }));
+        }
+      });
+    },
+    [settings.ludusavi, setSettingsLocal]
+  );
 
   const handleDirectorySelect = useCallback(async () => {
     try {
@@ -607,12 +570,6 @@ function Settings() {
       setTheme(savedTheme);
     }
   }, [setTheme]);
-
-  useEffect(() => {
-    if (theme && isInitialized) {
-      handleSettingChange("theme", theme);
-    }
-  }, [theme, isInitialized, handleSettingChange]);
 
   const groupedThemes = {
     light: themes.filter(t => t.group === "light"),
@@ -1257,6 +1214,21 @@ function Settings() {
                     checked={settings.sideScrollBar}
                     onCheckedChange={() =>
                       handleSettingChange("sideScrollBar", !settings.sideScrollBar)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.homeSearch")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.homeSearchDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.homeSearch}
+                    onCheckedChange={() =>
+                      handleSettingChange("homeSearch", !settings.homeSearch)
                     }
                   />
                 </div>
@@ -2185,6 +2157,10 @@ function Settings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <CornerDownRight className="h-3.5 w-3.5" />
+                    <span>AppData/Roaming/GSE Saves</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CornerDownRight className="h-3.5 w-3.5" />
                     <span>AppData/Roaming/Steam/CODEX</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2277,168 +2253,6 @@ function Settings() {
                   {t("settings.achievementWatcher.addDir") || "Add Directory"}
                 </Button>
               </div>
-            </Card>
-
-            {/* Additional Game Info Card */}
-            <Card className="border-border p-6">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-primary">
-                  {t("settings.additionalGameInfo") || "Additional Game Info"}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("settings.additionalGameInfoDescription") ||
-                    "Configure API keys for enhanced game metadata, artwork, and information."}
-                </p>
-              </div>
-
-              {/* API Tabs */}
-              <Tabs
-                defaultValue={
-                  settings.giantBombKey
-                    ? "giantbomb"
-                    : settings.twitchClientId && settings.twitchSecret
-                      ? "igdb"
-                      : "giantbomb"
-                }
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="giantbomb">GiantBomb</TabsTrigger>
-                  <TabsTrigger value="igdb">IGDB</TabsTrigger>
-                </TabsList>
-
-                {/* IGDB Tab Content */}
-                <TabsContent value="igdb" className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">IGDB API</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings.igdbApiKeyDescription") ||
-                        "IGDB provides comprehensive game data including release dates, ratings, and screenshots."}
-                    </p>
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/ascendara-xtra#setting-up-igdb"
-                        )
-                      }
-                      className="cursor inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                    >
-                      {t("settings.igdbLearnHowtoGet") || "Learn how to get API keys"}
-                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                    </a>
-                  </div>
-                  <div className="space-y-3 pt-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="twitch-client-id">
-                        {t("settings.twitchClientId") || "Twitch Client ID"}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="twitch-client-id"
-                          type="password"
-                          value={twitchClientId}
-                          onChange={e => setTwitchClientId(e.target.value)}
-                          placeholder={
-                            t("settings.enterTwitchClientId") || "Enter Twitch Client ID"
-                          }
-                          className="flex-grow"
-                        />
-                        <Button
-                          variant="outline"
-                          className="text-primary"
-                          onClick={() => {
-                            handleSettingChange("twitchClientId", twitchClientId);
-                          }}
-                        >
-                          {t("settings.setKey") || "Set"}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="twitch-secret">
-                        {t("settings.twitchSecret") || "Twitch Secret"}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="twitch-secret"
-                          type="password"
-                          value={twitchSecret}
-                          onChange={e => setTwitchSecret(e.target.value)}
-                          placeholder={
-                            t("settings.enterIgdbApiKey") || "Enter Twitch Secret"
-                          }
-                          className="flex-grow"
-                        />
-                        <Button
-                          variant="outline"
-                          className="text-primary"
-                          onClick={() => {
-                            handleSettingChange("twitchSecret", twitchSecret);
-                          }}
-                        >
-                          {t("settings.setKey")}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* GiantBomb Tab Content */}
-                <TabsContent value="giantbomb" className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">GiantBomb API</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings.giantBombDescription") ||
-                        "GiantBomb provides detailed game information, reviews, and media content."}
-                    </p>
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/ascendara-xtra#setting-up-giantbomb"
-                        )
-                      }
-                      className="cursor inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                    >
-                      {t("settings.giantBombLearnHowtoGet") || "Learn how to get API key"}
-                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                    </a>
-                  </div>
-                  <div className="space-y-3 pt-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="giantbomb-key">
-                        {t("settings.giantBombApiKey") || "GiantBomb API Key"}
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="giantbomb-key"
-                          type="password"
-                          value={settings.giantBombKey || ""}
-                          onChange={e =>
-                            handleSettingChange("giantBombKey", e.target.value)
-                          }
-                          placeholder={
-                            t("settings.enterGiantBombApiKey") ||
-                            "Enter GiantBomb API Key"
-                          }
-                          className="flex-grow"
-                        />
-                        <Button
-                          variant="outline"
-                          className="text-primary"
-                          onClick={() => {
-                            handleSettingChange(
-                              "giantBombKey",
-                              settings.giantBombKey || ""
-                            );
-                          }}
-                        >
-                          {t("settings.setKey") || "Set"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
             </Card>
 
             {/* Torrenting Card */}

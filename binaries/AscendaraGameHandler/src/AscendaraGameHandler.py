@@ -256,8 +256,8 @@ def run_ludusavi_backup(game_name):
         logging.info("[EXIT] run_ludusavi_backup() - Exception")
         return False
 
-def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=False, game_launch_cmd=None):
-    logging.info(f"[ENTRY] execute(game_path={game_path}, is_custom_game={is_custom_game}, admin={admin}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, game_launch_cmd={game_launch_cmd})")
+def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=False, game_launch_cmd=None, launch_trainer=False):
+    logging.info(f"[ENTRY] execute(game_path={game_path}, is_custom_game={is_custom_game}, admin={admin}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, game_launch_cmd={game_launch_cmd}, launch_trainer={launch_trainer})")
     rpc = None  # Discord RPC client
     logging.debug("Initialized rpc=None for Discord Rich Presence")
     if is_shortcut:
@@ -512,6 +512,53 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         last_update = start_time
         last_play_time = 0
 
+        # Launch trainer if requested
+        trainer_process = None
+        if launch_trainer:
+            # For non-custom games, use the game root directory (where .ascendara.json is)
+            # For custom games, use the executable's directory
+            if not is_custom_game and json_file_path:
+                trainer_dir = os.path.dirname(json_file_path)
+            else:
+                trainer_dir = os.path.dirname(exe_path)
+            
+            trainer_path = os.path.join(trainer_dir, "ascendaraFlingTrainer.exe")
+            if os.path.exists(trainer_path):
+                try:
+                    logging.info(f"Launching trainer: {trainer_path}")
+                    # Try to launch trainer normally first
+                    try:
+                        trainer_process = subprocess.Popen(trainer_path)
+                        logging.info("Trainer launched successfully")
+                    except OSError as trainer_error:
+                        # If elevation is required (error 740), launch with admin privileges
+                        if getattr(trainer_error, "winerror", None) == 740:
+                            logging.info("Trainer requires elevation, launching with admin privileges")
+                            if platform.system().lower() == 'windows':
+                                try:
+                                    # Use ShellExecute with 'runas' to launch trainer with admin
+                                    ctypes.windll.shell32.ShellExecuteW(
+                                        None,
+                                        "runas",
+                                        trainer_path,
+                                        None,
+                                        trainer_dir,
+                                        1  # SW_SHOWNORMAL
+                                    )
+                                    logging.info("Trainer launched with admin privileges")
+                                    # Note: We don't have a process handle when using ShellExecuteW
+                                    trainer_process = None
+                                except Exception as elev_err:
+                                    logging.error(f"Failed to launch trainer with elevation: {elev_err}", exc_info=True)
+                            else:
+                                raise
+                        else:
+                            raise
+                except Exception as e:
+                    logging.error(f"Failed to launch trainer: {e}", exc_info=True)
+            else:
+                logging.warning(f"Trainer not found at: {trainer_path}")
+
         logging.info("Entering game process monitoring loop")
         while process.poll() is None:
             current_time = time.time()
@@ -531,6 +578,16 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         process.wait()
         return_code = process.returncode
         logging.info(f"Game process exited with return code: {return_code}")
+
+        # Close trainer if it was launched
+        if trainer_process and trainer_process.poll() is None:
+            try:
+                logging.info("Terminating trainer process")
+                trainer_process.terminate()
+                trainer_process.wait(timeout=5)
+                logging.info("Trainer process terminated")
+            except Exception as e:
+                logging.error(f"Error terminating trainer: {e}", exc_info=True)
 
         try:
             with open(settings_file, 'r', encoding='utf-8') as f:
@@ -609,7 +666,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
 if __name__ == "__main__":
     try:
         print("[DEBUG] Script started.")
-        # The script is called with: [script] [game_path] [is_custom_game] [admin] [--shortcut] [--ludusavi] [--gameLaunchCmd "command"]
+        # The script is called with: [script] [game_path] [is_custom_game] [admin] [--shortcut] [--ludusavi] [--trainer] [--gameLaunchCmd "command"]
         # Skip the first argument (script name)
         args = sys.argv[1:]
         print(f"[DEBUG] Arguments received: {args}")
@@ -629,7 +686,7 @@ if __name__ == "__main__":
         logging.info(f"Arguments received: {args}")
         
         if len(args) < 2:
-            error_msg = "Error: Not enough arguments\nUsage: AscendaraGameHandler.exe [game_path] [is_custom_game] [admin] [--shortcut] [--ludusavi] [--gameLaunchCmd \"command\"]"
+            error_msg = "Error: Not enough arguments\nUsage: AscendaraGameHandler.exe [game_path] [is_custom_game] [admin] [--shortcut] [--ludusavi] [--trainer] [--gameLaunchCmd \"command\"]"
             logging.error(error_msg)
             print(error_msg)
             sys.exit(1)
@@ -639,6 +696,7 @@ if __name__ == "__main__":
         admin = args[2] == '1' or args[2].lower() == 'true'
         is_shortcut = "--shortcut" in args
         use_ludusavi = "--ludusavi" in args
+        launch_trainer = "--trainer" in args
         game_launch_cmd = None
         if "--gameLaunchCmd" in args:
             cmd_index = args.index("--gameLaunchCmd")
@@ -647,10 +705,10 @@ if __name__ == "__main__":
                 logging.info(f"Custom game launch command: {game_launch_cmd}")
         
         logging.info(f"Initializing with: game_path={game_path}, is_custom_game={is_custom_game}, "  
-                     f"is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}, game_launch_cmd={game_launch_cmd}")
-        print(f"[DEBUG] Initializing with: game_path={game_path}, is_custom_game={is_custom_game}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}, game_launch_cmd={game_launch_cmd}")
+                     f"is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}, launch_trainer={launch_trainer}, game_launch_cmd={game_launch_cmd}")
+        print(f"[DEBUG] Initializing with: game_path={game_path}, is_custom_game={is_custom_game}, is_shortcut={is_shortcut}, use_ludusavi={use_ludusavi}, admin={admin}, launch_trainer={launch_trainer}, game_launch_cmd={game_launch_cmd}")
 
-        execute(game_path, is_custom_game, admin, is_shortcut, use_ludusavi, game_launch_cmd)
+        execute(game_path, is_custom_game, admin, is_shortcut, use_ludusavi, game_launch_cmd, launch_trainer)
         print("[DEBUG] execute() finished.")
     except Exception as e:
         logging.error(f"Failed to execute game: {e}")

@@ -56,6 +56,14 @@ module.exports.getFolders = async userDir_file => {
       }, //keeping "achievements.ini" [0] for backward compatibility with custom goldberg emu build
     },
     {
+      dir: path.join(process.env["APPDATA"], "GSE Saves"),
+      options: {
+        recursive: true,
+        filter: /([0-9]+)/,
+        file: [files.achievement[2]],
+      }, //idk js ctrl c + ctrl v and change folder name, pls dont die me
+    },
+    {
       dir: path.join(process.env["APPDATA"], "EMPRESS"),
       options: {
         recursive: true,

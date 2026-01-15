@@ -27,10 +27,10 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import torboxService from "@/services/torboxService";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
-import { useImageLoader } from "@/hooks/useImageLoader";
-import { analytics } from "@/services/analyticsService";
 import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
+import { analytics } from "@/services/analyticsService";
+import { useImageLoader } from "@/hooks/useImageLoader";
 
 const GameCard = memo(function GameCard({ game, compact }) {
   const navigate = useNavigate();
@@ -142,30 +142,53 @@ const GameCard = memo(function GameCard({ game, compact }) {
     return () => unsubscribe();
   }, [game.gameID, game.rating]);
 
-  const handleDownload = useCallback(() => {
-    if (isInstalled && !needsUpdate) return;
-    setIsLoading(true);
-    let buttonType = "download";
-    if (needsUpdate) buttonType = "update";
-    else if (isInstalled) buttonType = "install";
-    analytics.trackGameButtonClick(game.game, buttonType, {
-      isInstalled,
-      needsUpdate,
-    });
+  // Handle Card Click (Navigation)
+  const handleCardClick = useCallback(() => {
     const downloadLinks = game.download_links || {};
-    setTimeout(() => {
-      navigate("/download", {
-        state: {
-          gameData: {
-            ...game,
-            download_links: downloadLinks,
-            isUpdating: needsUpdate,
-          },
+    navigate("/download", {
+      state: {
+        gameData: {
+          ...game,
+          download_links: downloadLinks,
+          isUpdating: needsUpdate,
         },
-      });
+      },
     });
-  }, [navigate, game, isInstalled, needsUpdate, t]);
+  }, [navigate, game, needsUpdate]);
 
+  // Handle Download Button Click
+  const handleDownload = useCallback(
+    e => {
+      // Important: Prevent the click from going to the card
+      e?.stopPropagation();
+
+      if (isInstalled && !needsUpdate) return;
+      setIsLoading(true);
+      let buttonType = "download";
+      if (needsUpdate) buttonType = "update";
+      else if (isInstalled) buttonType = "install";
+      analytics.trackGameButtonClick(game.game, buttonType, {
+        isInstalled,
+        needsUpdate,
+      });
+
+      const downloadLinks = game.download_links || {};
+      setTimeout(() => {
+        navigate("/download", {
+          state: {
+            gameData: {
+              ...game,
+              download_links: downloadLinks,
+              isUpdating: needsUpdate,
+            },
+          },
+        });
+      });
+    },
+    [navigate, game, isInstalled, needsUpdate, t]
+  );
+
+  // Handle Play Later Click
   const handlePlayLater = useCallback(
     e => {
       e.stopPropagation();
@@ -212,9 +235,13 @@ const GameCard = memo(function GameCard({ game, compact }) {
     [game, isPlayLater, cachedImage]
   );
 
+  // --- RENDER COMPACT MODE ---
   if (compact) {
     return (
-      <div className="flex cursor-pointer gap-4 rounded-lg p-2 transition-colors hover:bg-secondary/50">
+      <div
+        className="flex cursor-pointer gap-4 rounded-lg p-2 transition-colors hover:bg-secondary/50"
+        onClick={handleCardClick}
+      >
         <img
           src={cachedImage || game.banner || game.image}
           alt={game.title || game.game}
@@ -234,10 +261,12 @@ const GameCard = memo(function GameCard({ game, compact }) {
     );
   }
 
+  // --- RENDER CARD MODE ---
   return (
     <Card
       ref={cardRef}
-      className="group flex min-h-[400px] flex-col overflow-hidden border-none bg-card text-card-foreground transition-all duration-300 animate-in fade-in-50 hover:shadow-lg"
+      onClick={handleCardClick}
+      className="group flex min-h-[400px] cursor-pointer flex-col overflow-hidden border-none bg-card text-card-foreground transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-lg"
     >
       <CardContent className="flex-1 p-0">
         <div className="relative">

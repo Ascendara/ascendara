@@ -17,6 +17,7 @@ const {
   APIKEY,
   analyticsAPI,
   imageKey,
+  steamWebApiKey,
   TIMESTAMP_FILE,
 } = require("./config");
 const { getSettingsManager } = require("./settings");
@@ -41,56 +42,7 @@ const getTwitchToken = async (clientId, clientSecret) => {
   }
 };
 
-/**
- * Search IGDB for game details
- */
-const searchGameIGDB = async (gameName, clientId, accessToken) => {
-  try {
-    const response = await axios.post(
-      "https://api.igdb.com/v4/games",
-      `search "${gameName}"; fields name,cover.*; limit 1;`,
-      {
-        headers: {
-          "Client-ID": clientId,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-    return response.data[0] || null;
-  } catch (error) {
-    console.error("Error searching IGDB:", error.message);
-    return null;
-  }
-};
-
-/**
- * Get game details from IGDB
- */
-const getGameDetails = async (gameName, credentials) => {
-  try {
-    if (!credentials.clientId || !credentials.clientSecret) {
-      return null;
-    }
-    const accessToken = await getTwitchToken(
-      credentials.clientId,
-      credentials.clientSecret
-    );
-    const gameData = await searchGameIGDB(gameName, credentials.clientId, accessToken);
-    if (gameData?.cover?.url) {
-      const coverUrl = gameData.cover.url
-        .replace("t_thumb", "t_cover_big")
-        .replace("//", "https://");
-      return {
-        name: gameData.name,
-        cover: { url: coverUrl },
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error("Error getting game details:", error.message);
-    return null;
-  }
-};
+// IGDB functions removed - now using Steam API only
 
 /**
  * Register miscellaneous IPC handlers
@@ -107,19 +59,40 @@ function registerMiscHandlers() {
   // Is dev mode
   ipcMain.handle("is-dev", () => isDev);
 
-  // IGDB API request handler (bypasses CORS)
-  ipcMain.handle("igdb-request", async (_, { endpoint, body, clientId, accessToken }) => {
+  // IGDB handler removed - now using Steam API only
+
+  // GiantBomb API request handler (bypasses CORS)
+  ipcMain.handle("giantbomb-request", async (_, { url, apiKey }) => {
     try {
-      const response = await axios.post(`https://api.igdb.com/v4/${endpoint}`, body, {
+      const response = await axios.get(url, {
         headers: {
-          "Client-ID": clientId,
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "text/plain",
+          "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
+          Accept: "application/json",
+        },
+        params: {
+          api_key: apiKey,
+          format: "json",
         },
       });
       return { success: true, data: response.data };
     } catch (error) {
-      console.error("IGDB request error:", error.message);
+      console.error("GiantBomb request error:", error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Steam API request handler (bypasses CORS)
+  ipcMain.handle("steam-request", async (_, { url }) => {
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
+          Accept: "application/json",
+        },
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("Steam request error:", error.message);
       return { success: false, error: error.message };
     }
   });
@@ -153,6 +126,8 @@ function registerMiscHandlers() {
   ipcMain.handle("get-analytics-key", () => analyticsAPI);
 
   ipcMain.handle("get-image-key", () => imageKey);
+
+  ipcMain.handle("get-steam-api-key", () => steamWebApiKey);
 
   // Open URL
   ipcMain.handle("open-url", async (_, url) => {
@@ -550,6 +525,142 @@ function registerMiscHandlers() {
     }
   });
 
+  // Compute achievements leaderboard (main process)
+  // Expects games as an array of strings or objects: { gameName|game, isCustom }
+  // Returns ranked entries: { gameName, unlocked, total, percentage }
+  ipcMain.handle("get-achievements-leaderboard", async (_, games = [], options = {}) => {
+    try {
+      const limit =
+        typeof options?.limit === "number" && Number.isFinite(options.limit)
+          ? Math.max(1, Math.floor(options.limit))
+          : 6;
+
+      if (!Array.isArray(games) || games.length === 0) return [];
+
+      // Reuse the existing achievements reader via a local invoke-style call.
+      // We intentionally call the underlying IPC handler logic by invoking the same
+      // reader through ipcMain's handler directly is not supported, so we replicate
+      // the minimal read logic here.
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory || !settings.additionalDirectories) {
+        return [];
+      }
+
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...settings.additionalDirectories,
+      ];
+
+      const readAchievements = async (gameName, isCustom) => {
+        if (!gameName) return null;
+
+        if (!isCustom) {
+          for (const directory of allDirectories) {
+            const achievementsPath = path.join(
+              directory,
+              gameName,
+              "achievements.ascendara.json"
+            );
+            if (fs.existsSync(achievementsPath)) {
+              try {
+                const data = fs.readFileSync(achievementsPath, "utf8");
+                const parsed = JSON.parse(data);
+
+                if (parsed.achievementWater && !parsed.watcher) {
+                  parsed.watcher = parsed.achievementWater;
+                  delete parsed.achievementWater;
+                  fs.writeFileSync(
+                    achievementsPath,
+                    JSON.stringify(parsed, null, 4),
+                    "utf8"
+                  );
+                }
+
+                return parsed;
+              } catch (error) {
+                console.error("Error reading achievements file:", error);
+                return null;
+              }
+            }
+          }
+          return null;
+        }
+
+        // Custom game: stored in games.json (achievementWatcher) or alongside executable
+        try {
+          const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+          const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+          const gameInfo = gamesData.games.find(g => g.game === gameName);
+
+          if (gameInfo) {
+            if (gameInfo.achievementWater && !gameInfo.achievementWatcher) {
+              gameInfo.achievementWatcher = gameInfo.achievementWater;
+              delete gameInfo.achievementWater;
+              fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 4), "utf8");
+            }
+
+            if (gameInfo.achievementWatcher) {
+              return gameInfo.achievementWatcher;
+            }
+
+            if (gameInfo.executable) {
+              const achievementsPath = path.join(
+                path.dirname(gameInfo.executable),
+                "achievements.ascendara.json"
+              );
+              if (fs.existsSync(achievementsPath)) {
+                return JSON.parse(fs.readFileSync(achievementsPath, "utf8"));
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error reading games.json:", error);
+        }
+
+        return null;
+      };
+
+      const entries = await Promise.all(
+        games.map(async g => {
+          const gameName = typeof g === "string" ? g : g?.gameName || g?.game || g?.name;
+          const isCustom = typeof g === "object" ? !!g?.isCustom : false;
+
+          const achievementData = await readAchievements(gameName, isCustom);
+
+          // The achievement data structure has achievements nested in .achievements property
+          const list = achievementData?.achievements;
+
+          if (!Array.isArray(list) || list.length === 0) return null;
+
+          const unlocked = list.filter(
+            a => !!(a?.achieved || a?.unlocked || a?.isUnlocked)
+          ).length;
+          const total = list.length;
+
+          return {
+            gameName,
+            unlocked,
+            total,
+            percentage: total > 0 ? Math.round((unlocked / total) * 100) : 0,
+          };
+        })
+      );
+
+      return entries
+        .filter(Boolean)
+        .sort((a, b) => {
+          if (b.unlocked !== a.unlocked) return b.unlocked - a.unlocked;
+          if (b.percentage !== a.percentage) return b.percentage - a.percentage;
+          if (b.total !== a.total) return b.total - a.total;
+          return String(a.gameName).localeCompare(String(b.gameName));
+        })
+        .slice(0, limit);
+    } catch (error) {
+      console.error("Error computing achievements leaderboard:", error);
+      return [];
+    }
+  });
+
   // Write game achievements (for cloud restore)
   // isCustom parameter tells us if this is a custom game (stored in games.json)
   ipcMain.handle(
@@ -644,28 +755,42 @@ function registerMiscHandlers() {
         }
 
         if (imgID) {
-          let imageLink;
-          if (settings.usingLocalIndex) {
-            imageLink = `https://api.ascendara.app/v3/image/${imgID}`;
-          } else if (settings.gameSource === "fitgirl") {
-            imageLink = `https://api.ascendara.app/v2/fitgirl/image/${imgID}`;
+          let imageBuffer;
+          let extension = ".jpg";
+
+          if (settings.usingLocalIndex && settings.localIndex) {
+            const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+            try {
+              imageBuffer = await fs.promises.readFile(localImagePath);
+            } catch (error) {
+              console.warn(`Could not load local image for ${imgID}, skipping:`, error);
+              imageBuffer = null;
+            }
           } else {
-            imageLink = `https://api.ascendara.app/v2/image/${imgID}`;
+            let imageLink;
+            if (settings.gameSource === "fitgirl") {
+              imageLink = `https://api.ascendara.app/v2/fitgirl/image/${imgID}`;
+            } else {
+              imageLink = `https://api.ascendara.app/v2/image/${imgID}`;
+            }
+
+            const response = await axios({
+              url: imageLink,
+              method: "GET",
+              responseType: "arraybuffer",
+            });
+
+            imageBuffer = Buffer.from(response.data);
+            const mimeType = response.headers["content-type"];
+            extension = getExtensionFromMimeType(mimeType);
           }
 
-          const response = await axios({
-            url: imageLink,
-            method: "GET",
-            responseType: "arraybuffer",
-          });
-
-          const imageBuffer = Buffer.from(response.data);
-          const mimeType = response.headers["content-type"];
-          const extension = getExtensionFromMimeType(mimeType);
-          await fs.promises.writeFile(
-            path.join(gamesDirectory, `${game}.ascendara${extension}`),
-            imageBuffer
-          );
+          if (imageBuffer) {
+            await fs.promises.writeFile(
+              path.join(gamesDirectory, `${game}.ascendara${extension}`),
+              imageBuffer
+            );
+          }
         }
 
         try {
@@ -710,20 +835,30 @@ function registerMiscHandlers() {
       let extension = ".jpg";
 
       if (imgID) {
-        const imageLink =
-          settings.gameSource === "fitgirl"
-            ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
-            : `https://api.ascendara.app/v2/image/${imgID}`;
+        if (settings.usingLocalIndex && settings.localIndex) {
+          const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+          try {
+            imageBuffer = await fs.promises.readFile(localImagePath);
+          } catch (error) {
+            console.warn(`Could not load local image for ${imgID}:`, error);
+            return false;
+          }
+        } else {
+          const imageLink =
+            settings.gameSource === "fitgirl"
+              ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
+              : `https://api.ascendara.app/v2/image/${imgID}`;
 
-        const response = await axios({
-          url: imageLink,
-          method: "GET",
-          responseType: "arraybuffer",
-        });
+          const response = await axios({
+            url: imageLink,
+            method: "GET",
+            responseType: "arraybuffer",
+          });
 
-        imageBuffer = Buffer.from(response.data);
-        const mimeType = response.headers["content-type"];
-        extension = getExtensionFromMimeType(mimeType);
+          imageBuffer = Buffer.from(response.data);
+          const mimeType = response.headers["content-type"];
+          extension = getExtensionFromMimeType(mimeType);
+        }
       } else if (imageData) {
         const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
         imageBuffer = Buffer.from(base64Data, "base64");
@@ -1126,6 +1261,170 @@ function registerMiscHandlers() {
     console.log(`Download finished for game: ${game}`);
     return true;
   });
+
+  // Check if trainer exists for game
+  ipcMain.handle("check-trainer-exists", async (_, gameName, isCustom) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory) {
+        return false;
+      }
+
+      let gameDirectory;
+
+      if (isCustom) {
+        const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+        if (!fs.existsSync(gamesFilePath)) {
+          return false;
+        }
+
+        const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+        const customGame = gamesData.games.find(g => g.game === gameName);
+
+        if (!customGame || !customGame.executable) {
+          return false;
+        }
+
+        gameDirectory = path.dirname(customGame.executable);
+      } else {
+        const allDirectories = [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ];
+
+        const sanitizedGame = sanitizeText(gameName);
+
+        for (const directory of allDirectories) {
+          const testGameDir = path.join(directory, sanitizedGame);
+          const testGameInfoPath = path.join(
+            testGameDir,
+            `${sanitizedGame}.ascendara.json`
+          );
+
+          if (fs.existsSync(testGameInfoPath)) {
+            gameDirectory = testGameDir;
+            break;
+          }
+        }
+
+        if (!gameDirectory) {
+          return false;
+        }
+      }
+
+      const trainerPath = path.join(gameDirectory, "ascendaraFlingTrainer.exe");
+      return fs.existsSync(trainerPath);
+    } catch (error) {
+      console.error("Error checking trainer existence:", error);
+      return false;
+    }
+  });
+
+  // Download trainer to game directory
+  ipcMain.handle(
+    "download-trainer-to-game",
+    async (_, downloadUrl, gameName, isCustom) => {
+      try {
+        const settings = settingsManager.getSettings();
+        if (!settings.downloadDirectory) {
+          throw new Error("Download directory not set");
+        }
+
+        let gameDirectory;
+
+        if (isCustom) {
+          // For custom games, use the games.json to find the executable path
+          const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+          if (!fs.existsSync(gamesFilePath)) {
+            throw new Error("Custom games file not found");
+          }
+
+          const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+          const customGame = gamesData.games.find(g => g.game === gameName);
+
+          if (!customGame || !customGame.executable) {
+            throw new Error("Custom game executable not found");
+          }
+
+          // Get directory from executable path
+          gameDirectory = path.dirname(customGame.executable);
+        } else {
+          // For downloaded games, search in all download directories
+          const allDirectories = [
+            settings.downloadDirectory,
+            ...(settings.additionalDirectories || []),
+          ];
+
+          const sanitizedGame = sanitizeText(gameName);
+
+          for (const directory of allDirectories) {
+            const testGameDir = path.join(directory, sanitizedGame);
+            const testGameInfoPath = path.join(
+              testGameDir,
+              `${sanitizedGame}.ascendara.json`
+            );
+
+            if (fs.existsSync(testGameInfoPath)) {
+              gameDirectory = testGameDir;
+              break;
+            }
+          }
+
+          if (!gameDirectory) {
+            throw new Error(`Game directory not found for ${gameName}`);
+          }
+        }
+
+        // Ensure game directory exists
+        if (!fs.existsSync(gameDirectory)) {
+          throw new Error(`Game directory does not exist: ${gameDirectory}`);
+        }
+
+        // Download the trainer file
+        const trainerPath = path.join(gameDirectory, "ascendaraFlingTrainer.exe");
+
+        console.log(`Downloading trainer to: ${trainerPath}`);
+
+        // Use axios with proper headers to avoid 403 errors
+        const response = await axios({
+          method: "GET",
+          url: downloadUrl,
+          responseType: "stream",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            Referer: "https://flingtrainer.com/",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+          },
+          maxRedirects: 5,
+          timeout: 60000,
+        });
+
+        const writer = fs.createWriteStream(trainerPath);
+        response.data.pipe(writer);
+
+        return new Promise((resolve, reject) => {
+          writer.on("finish", () => {
+            console.log(`Trainer downloaded successfully to: ${trainerPath}`);
+            resolve({ success: true, path: trainerPath });
+          });
+          writer.on("error", err => {
+            console.error("Error writing trainer file:", err);
+            reject(err);
+          });
+        });
+      } catch (error) {
+        console.error("Error downloading trainer to game directory:", error);
+        throw error;
+      }
+    }
+  );
 }
 
 module.exports = {

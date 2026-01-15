@@ -9,6 +9,16 @@ import RecentGameCard from "@/components/RecentGameCard";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import {
   Flame,
   Globe,
   ChevronLeft,
@@ -25,6 +35,13 @@ import {
   ExternalLink,
   HandCoins,
   BanknoteIcon,
+  Search,
+  Info,
+  Library,
+  Download,
+  Settings as SettingsIcon,
+  MessageSquare,
+  HelpCircle,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import Tour from "@/components/Tour";
@@ -40,14 +57,18 @@ let carouselGamesCache = null;
 // Compact Game Card for horizontal scrolling sections
 const CompactGameCard = memo(({ game, onClick }) => {
   const [imageUrl, setImageUrl] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
   const { t } = useLanguage();
+  const imageLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (imageLoadedRef.current) return;
     const loadImage = async () => {
       if (game?.imgID) {
         const url = await imageCacheService.getImage(game.imgID);
-        setImageUrl(url);
+        if (url) {
+          imageLoadedRef.current = true;
+          setImageUrl(url);
+        }
       }
     };
     loadImage();
@@ -57,8 +78,6 @@ const CompactGameCard = memo(({ game, onClick }) => {
     <div
       className="group relative flex-shrink-0 cursor-pointer"
       style={{ width: "280px" }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
     >
       <div className="relative overflow-hidden rounded-xl border border-border/30 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5">
@@ -67,20 +86,12 @@ const CompactGameCard = memo(({ game, onClick }) => {
             <img
               src={imageUrl}
               alt={game.game}
-              className={cn(
-                "h-full w-full object-cover transition-transform duration-500",
-                isHovered && "scale-110"
-              )}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
             />
           ) : (
             <Skeleton className="h-full w-full" />
           )}
-          <div
-            className={cn(
-              "absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-300",
-              isHovered ? "opacity-100" : "opacity-70"
-            )}
-          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-100" />
         </AspectRatio>
 
         <div className="absolute bottom-0 left-0 right-0 p-3">
@@ -101,12 +112,7 @@ const CompactGameCard = memo(({ game, onClick }) => {
           </h3>
         </div>
 
-        <div
-          className={cn(
-            "absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300",
-            isHovered && "opacity-100"
-          )}
-        ></div>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
       </div>
     </div>
   );
@@ -115,13 +121,17 @@ const CompactGameCard = memo(({ game, onClick }) => {
 // Mini Game Card for category grids
 const MiniGameCard = memo(({ game, onClick }) => {
   const [imageUrl, setImageUrl] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
+  const imageLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (imageLoadedRef.current) return;
     const loadImage = async () => {
       if (game?.imgID) {
         const url = await imageCacheService.getImage(game.imgID);
-        setImageUrl(url);
+        if (url) {
+          imageLoadedRef.current = true;
+          setImageUrl(url);
+        }
       }
     };
     loadImage();
@@ -130,8 +140,6 @@ const MiniGameCard = memo(({ game, onClick }) => {
   return (
     <div
       className="group/mini relative cursor-pointer overflow-hidden rounded-lg"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
     >
       <AspectRatio ratio={16 / 9}>
@@ -139,32 +147,19 @@ const MiniGameCard = memo(({ game, onClick }) => {
           <img
             src={imageUrl}
             alt={game.game}
-            className={cn(
-              "h-full w-full object-cover transition-transform duration-300",
-              isHovered && "scale-110"
-            )}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover/mini:scale-110"
           />
         ) : (
           <Skeleton className="h-full w-full" />
         )}
-        <div
-          className={cn(
-            "absolute inset-0 bg-gradient-to-t from-black/70 to-transparent transition-opacity",
-            isHovered ? "opacity-100" : "opacity-60"
-          )}
-        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-60 transition-opacity group-hover/mini:opacity-100" />
       </AspectRatio>
       <div className="absolute bottom-0 left-0 right-0 p-2">
         <p className="line-clamp-1 text-xs font-medium text-white">
           {sanitizeText(game.game)}
         </p>
       </div>
-      <div
-        className={cn(
-          "absolute inset-0 flex items-center justify-center bg-primary/20 opacity-0 transition-opacity",
-          isHovered && "opacity-100"
-        )}
-      >
+      <div className="absolute inset-0 flex items-center justify-center bg-primary/20 opacity-0 transition-opacity group-hover/mini:opacity-100">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
           <ArrowRight className="h-3 w-3" />
         </div>
@@ -176,16 +171,18 @@ const MiniGameCard = memo(({ game, onClick }) => {
 // Mini Recent Card for hero sidebar - compact version
 const MiniRecentCard = memo(({ game, onPlay }) => {
   const [imageData, setImageData] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
   const [, setTick] = useState(0);
   const sanitizedGameName = sanitizeText(game.game || game.name);
+  const imageLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (imageLoadedRef.current) return;
     const loadImage = async () => {
       const gameId = game.game || game.name;
       const localStorageKey = `game-cover-${gameId}`;
       const cachedImage = localStorage.getItem(localStorageKey);
       if (cachedImage) {
+        imageLoadedRef.current = true;
         setImageData(cachedImage);
         return;
       }
@@ -193,6 +190,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
         const imageBase64 = await window.electron.getGameImage(gameId);
         if (imageBase64) {
           const dataUrl = `data:image/jpeg;base64,${imageBase64}`;
+          imageLoadedRef.current = true;
           setImageData(dataUrl);
           try {
             localStorage.setItem(localStorageKey, dataUrl);
@@ -201,7 +199,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
       } catch (error) {}
     };
     loadImage();
-  }, [game]);
+  }, [game.game, game.name]);
 
   // Update time display every minute
   useEffect(() => {
@@ -226,28 +224,18 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
   return (
     <div
       className="group relative min-h-0 flex-1 cursor-pointer overflow-hidden rounded-lg"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={() => onPlay(game)}
     >
       {imageData ? (
         <img
           src={imageData}
           alt={sanitizedGameName}
-          className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-transform duration-300",
-            isHovered && "scale-110"
-          )}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
         />
       ) : (
         <Skeleton className="absolute inset-0 h-full w-full" />
       )}
-      <div
-        className={cn(
-          "absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent transition-opacity",
-          isHovered ? "opacity-100" : "opacity-70"
-        )}
-      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-70 transition-opacity group-hover:opacity-100" />
       <div className="absolute bottom-0 left-0 right-0 p-2">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
@@ -256,12 +244,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
             </h3>
             <p className="text-[12px] text-white/70">{getTimeSinceLastPlayed()}</p>
           </div>
-          <div
-            className={cn(
-              "ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-all",
-              isHovered ? "scale-110 bg-primary" : "opacity-0"
-            )}
-          >
+          <div className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-white opacity-0 transition-all group-hover:scale-110 group-hover:bg-primary group-hover:opacity-100">
             <Play className="h-2.5 w-2.5" />
           </div>
         </div>
@@ -439,6 +422,12 @@ const Home = memo(() => {
   const [dragStart, setDragStart] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [featuredGame, setFeaturedGame] = useState(null);
+  const [showQuickAccessDialog, setShowQuickAccessDialog] = useState(false);
+  const [quickAccessPage, setQuickAccessPage] = useState(() => {
+    return localStorage.getItem("homeQuickAccessPage") || "library";
+  });
+  const longPressTimer = useRef(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -557,7 +546,7 @@ const Home = memo(() => {
     };
 
     loadCarouselImages();
-  }, [carouselGames, currentSlide]);
+  }, [carouselGames.length, currentSlide]);
 
   // Initial load - preload all carousel images for smooth transitions
   useEffect(() => {
@@ -584,17 +573,23 @@ const Home = memo(() => {
     // Delay preloading to not block initial render
     const timer = setTimeout(preloadAllCarouselImages, 1000);
     return () => clearTimeout(timer);
-  }, [carouselGames]);
+  }, [carouselGames.length]);
 
   useEffect(() => {
     const updateRecentGames = async () => {
       const recent = await getRecentGames([...installedGames, ...apiGames]);
       setRecentGames(recent);
     };
-    updateRecentGames();
-  }, [installedGames, apiGames]);
+    // Only update when games actually change, not on every render
+    if (installedGames.length > 0 || apiGames.length > 0) {
+      updateRecentGames();
+    }
+  }, [installedGames.length, apiGames.length]);
 
   useEffect(() => {
+    // Only recalculate sections when apiGames actually changes
+    if (apiGames.length === 0) return;
+
     // Get game sections
     const {
       topGames: topSection,
@@ -612,7 +607,7 @@ const Home = memo(() => {
     setOnlineGames(onlineSection);
     setActionGames(actionSection);
     setPopularCategories(popularCats);
-  }, [apiGames]);
+  }, [apiGames.length]);
 
   const getGameSections = games => {
     if (!Array.isArray(games))
@@ -794,12 +789,12 @@ const Home = memo(() => {
   const handlePrevSlide = useCallback(() => {
     setCurrentSlide(prev => (prev === 0 ? carouselGames.length - 1 : prev - 1));
     setAutoPlay(false);
-  }, [carouselGames]);
+  }, [carouselGames.length]);
 
   const handleNextSlide = useCallback(() => {
     setCurrentSlide(prev => (prev === carouselGames.length - 1 ? 0 : prev + 1));
     setAutoPlay(false);
-  }, [carouselGames]);
+  }, [carouselGames.length]);
 
   const handleCloseTour = useCallback(() => {
     setShowTour(false);
@@ -855,7 +850,7 @@ const Home = memo(() => {
       }
     }
     setDragOffset(0);
-  }, [touchStart, touchEnd]);
+  }, [touchStart, touchEnd, handleNextSlide, handlePrevSlide]);
 
   const handleMouseDown = useCallback(e => {
     setIsDragging(true);
@@ -891,7 +886,7 @@ const Home = memo(() => {
       setDragOffset(0);
       e.preventDefault();
     },
-    [isDragging, dragStart]
+    [isDragging, dragStart, handleNextSlide, handlePrevSlide]
   );
 
   const handleMouseLeave = useCallback(
@@ -1128,6 +1123,231 @@ const Home = memo(() => {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Search Bar with Quick Access Buttons */}
+        {settings.homeSearch && (
+          <section className="mt-10">
+            <div className="flex items-center gap-4">
+              {/* Left Divider */}
+              <div className="hidden flex-1 lg:block">
+                <div className="h-px bg-gradient-to-r from-transparent via-border to-border"></div>
+              </div>
+
+              {/* Search Bar Container */}
+              <div className="mx-auto flex w-full items-center gap-3 lg:w-auto lg:flex-none">
+                {/* Main Search Bar */}
+                <div
+                  onClick={() => {
+                    navigate("/search");
+                    setTimeout(() => {
+                      const searchInput = document.querySelector(
+                        'input[placeholder*="Search"]'
+                      );
+                      if (searchInput) {
+                        searchInput.focus();
+                        searchInput.click();
+                      }
+                    }, 150);
+                  }}
+                  className="group flex-1 cursor-text lg:w-[600px] lg:flex-none"
+                >
+                  <div className="relative flex items-center gap-3 rounded-2xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 px-5 py-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                      <Search className="h-5 w-5 text-primary transition-all duration-300 group-hover:scale-110" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-base font-medium text-muted-foreground/80 transition-colors group-hover:text-foreground">
+                        {t("home.searchPlaceholder")}
+                      </span>
+                      <p className="mt-0.5 text-xs text-muted-foreground/60">
+                        {t("home.searchSubtitle")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Access Buttons */}
+                <div className="flex gap-2">
+                  {/* Customizable Quick Access Button */}
+                  <div
+                    className="group cursor-pointer"
+                    onMouseDown={() => {
+                      setIsLongPressing(false);
+                      longPressTimer.current = setTimeout(() => {
+                        setIsLongPressing(true);
+                        setShowQuickAccessDialog(true);
+                      }, 500);
+                    }}
+                    onMouseUp={() => {
+                      if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                      }
+                      if (!isLongPressing) {
+                        navigate(`/${quickAccessPage}`);
+                      }
+                      setIsLongPressing(false);
+                    }}
+                    onMouseLeave={() => {
+                      if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                      }
+                      setIsLongPressing(false);
+                    }}
+                    onTouchStart={() => {
+                      setIsLongPressing(false);
+                      longPressTimer.current = setTimeout(() => {
+                        setIsLongPressing(true);
+                        setShowQuickAccessDialog(true);
+                      }, 500);
+                    }}
+                    onTouchEnd={() => {
+                      if (longPressTimer.current) {
+                        clearTimeout(longPressTimer.current);
+                      }
+                      if (!isLongPressing) {
+                        navigate(`/${quickAccessPage}`);
+                      }
+                      setIsLongPressing(false);
+                    }}
+                  >
+                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                        {quickAccessPage === "library" && (
+                          <Library className="h-4 w-4 text-primary" />
+                        )}
+                        {quickAccessPage === "downloads" && (
+                          <Download className="h-4 w-4 text-primary" />
+                        )}
+                        {quickAccessPage === "preferences" && (
+                          <SettingsIcon className="h-4 w-4 text-primary" />
+                        )}
+                        {quickAccessPage === "ascend" && (
+                          <Sparkles className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {quickAccessPage === "library" && t("common.library")}
+                        {quickAccessPage === "downloads" && t("common.downloads")}
+                        {quickAccessPage === "preferences" && t("common.preferences")}
+                        {quickAccessPage === "ascend" && t("common.ascend")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Discord Button */}
+                  <div
+                    className="group cursor-pointer"
+                    onClick={() =>
+                      window.electron.openURL("https://ascendara.app/discord")
+                    }
+                  >
+                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {t("common.discord")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="group cursor-pointer"
+                    onClick={() => window.electron.openURL("https://ascendara.app/docs")}
+                  >
+                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                        <HelpCircle className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {t("common.help")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Divider */}
+              <div className="hidden flex-1 lg:block">
+                <div className="h-px bg-gradient-to-l from-transparent via-border to-border"></div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Quick Access Configuration Dialog */}
+        {settings.homeSearch && (
+          <AlertDialog
+            open={showQuickAccessDialog}
+            onOpenChange={setShowQuickAccessDialog}
+          >
+            <AlertDialogContent className="border-border">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                  {t("home.quickAccess.title") || "Quick Access Button"}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground">
+                  {t("home.quickAccess.description") ||
+                    "Choose which page you want to quickly access from the home screen."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="mt-4">
+                <RadioGroup
+                  value={quickAccessPage}
+                  onValueChange={value => {
+                    setQuickAccessPage(value);
+                    localStorage.setItem("homeQuickAccessPage", value);
+                  }}
+                  className="space-y-3"
+                >
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="library" id="library" />
+                    <Label
+                      htmlFor="library"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <Library className="h-4 w-4 text-primary" />
+                      <span>{t("common.library")}</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="downloads" id="downloads" />
+                    <Label
+                      htmlFor="downloads"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <Download className="h-4 w-4 text-primary" />
+                      <span>{t("common.downloads")}</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="preferences" id="preferences" />
+                    <Label
+                      htmlFor="preferences"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <SettingsIcon className="h-4 w-4 text-primary" />
+                      <span>{t("common.preferences")}</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+                    <RadioGroupItem value="ascend" id="ascend" />
+                    <Label
+                      htmlFor="ascend"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
+                    >
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span>{t("common.ascend")}</span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
 
         {/* Recently Played - Mobile/Tablet (shows when sidebar is hidden) */}

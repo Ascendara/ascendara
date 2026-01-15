@@ -401,20 +401,43 @@ def generate_random_id(length=10):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 
-def create_scraper(cookie, user_agent=None):
-    """Create a cloudscraper instance with the provided cookie and optional user-agent"""
+def check_cloudflare_protection(user_agent=None):
+    """Check if Cloudflare protection is active on SteamRIP.
+    Returns True if CF protection is active (403 response), False if accessible without cookie."""
+    logging.info("Checking if Cloudflare protection is active...")
+    
+    try:
+        # Create a basic scraper without cookie
+        test_scraper = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        )
+        
+        final_user_agent = user_agent if user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+        test_scraper.headers.update({"User-Agent": final_user_agent})
+        
+        # Try to access the API endpoint
+        test_url = "https://steamrip.com/wp-json/wp/v2/posts?per_page=1"
+        response = test_scraper.get(test_url, timeout=15)
+        
+        if response.status_code == 200:
+            logging.info("✓ Cloudflare protection is NOT active - cookie not required")
+            return False
+        elif response.status_code == 403:
+            logging.info("✗ Cloudflare protection is active - cookie required")
+            return True
+        else:
+            logging.warning(f"Unexpected status code {response.status_code}, assuming CF is active")
+            return True
+            
+    except Exception as e:
+        logging.warning(f"Error checking Cloudflare protection: {e}, assuming CF is active")
+        return True
+
+
+def create_scraper(cookie=None, user_agent=None):
+    """Create a cloudscraper instance with optional cookie and user-agent.
+    If cookie is None, creates a scraper without CF cookie (for when CF protection is disabled)."""
     logging.info("Creating cloudscraper instance...")
-    logging.info(f"Raw cookie received (first 50 chars): {repr(cookie[:50])}")
-    logging.info(f"Raw cookie length: {len(cookie)}")
-    
-    # Strip any quotes and whitespace
-    cookie = cookie.strip().strip('"\'')
-    
-    # Ensure cf_clearance= prefix is present for the Cookie header
-    if not cookie.startswith("cf_clearance="):
-        cookie = f"cf_clearance={cookie}"
-    
-    logging.info(f"Final cookie for header: {cookie[:50]}...")
     
     # Determine browser type from user-agent for cloudscraper config
     browser_type = "chrome"
@@ -441,10 +464,26 @@ def create_scraper(cookie, user_agent=None):
     # Use custom user-agent if provided, otherwise use default Chrome UA
     final_user_agent = user_agent if user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
     
-    scraper.headers.update({
-        "User-Agent": final_user_agent,
-        "Cookie": cookie
-    })
+    headers = {"User-Agent": final_user_agent}
+    
+    # Add cookie if provided
+    if cookie:
+        logging.info(f"Raw cookie received (first 50 chars): {repr(cookie[:50])}")
+        logging.info(f"Raw cookie length: {len(cookie)}")
+        
+        # Strip any quotes and whitespace
+        cookie = cookie.strip().strip('"\'')
+        
+        # Ensure cf_clearance= prefix is present for the Cookie header
+        if not cookie.startswith("cf_clearance="):
+            cookie = f"cf_clearance={cookie}"
+        
+        logging.info(f"Final cookie for header: {cookie[:50]}...")
+        headers["Cookie"] = cookie
+    else:
+        logging.info("No cookie provided - creating scraper without CF cookie")
+    
+    scraper.headers.update(headers)
     logging.info("Scraper created successfully with pool size 50")
     return scraper
 
@@ -543,6 +582,15 @@ def extract_version(content):
     return ""
 
 
+def extract_released_by(content):
+    """Extract 'Released By' field from content"""
+    match = re.search(r'Released By:?\s*</strong>\s*([^<]+)', content, re.IGNORECASE)
+    if match:
+        released_by = match.group(1).strip()
+        return html.unescape(released_by)
+    return ""
+
+
 def extract_min_requirements(content):
     """Extract minimum system requirements from content"""
     reqs = {}
@@ -605,10 +653,12 @@ def start_view_count_fetcher(cookie, num_workers=8, user_agent=None):
     """Start background threads that fetch view counts from the queue using cloudscraper"""
     global view_count_thread
     
-    # Prepare cookie string
-    cookie_str = cookie.strip().strip('"\'')
-    if not cookie_str.startswith("cf_clearance="):
-        cookie_str = f"cf_clearance={cookie_str}"
+    # Prepare cookie string (if provided)
+    cookie_str = None
+    if cookie:
+        cookie_str = cookie.strip().strip('"\'')
+        if not cookie_str.startswith("cf_clearance="):
+            cookie_str = f"cf_clearance={cookie_str}"
     
     # Determine browser type and user-agent
     browser_type = "chrome"
@@ -624,10 +674,10 @@ def start_view_count_fetcher(cookie, num_workers=8, user_agent=None):
         view_scraper = cloudscraper.create_scraper(
             browser={"browser": browser_type, "platform": "windows", "mobile": False}
         )
-        view_scraper.headers.update({
-            "User-Agent": final_user_agent,
-            "Cookie": cookie_str
-        })
+        headers = {"User-Agent": final_user_agent}
+        if cookie_str:
+            headers["Cookie"] = cookie_str
+        view_scraper.headers.update(headers)
         # Increase pool size for parallel requests
         adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=1)
         view_scraper.mount('https://', adapter)
@@ -907,6 +957,7 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
         download_links = extract_download_links(content)
         game_size = extract_game_size(content)
         version = extract_version(content)
+        released_by = extract_released_by(content)
         is_online = check_online_status(content, title)
         has_dlc = check_dlc_status(content)
         min_reqs = extract_min_requirements(content)
@@ -938,6 +989,7 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
             "game": game_name,
             "size": game_size,
             "version": version,
+            "releasedBy": released_by,
             "online": is_online,
             "dlc": has_dlc,
             "dirlink": post.get("link", ""),
@@ -973,8 +1025,9 @@ def main():
     )
     parser.add_argument(
         '--cookie', '-c',
-        required=True,
-        help='cf_clearance cookie value for Cloudflare bypass'
+        required=False,
+        default=None,
+        help='cf_clearance cookie value for Cloudflare bypass (optional - will auto-detect if needed)'
     )
     parser.add_argument(
         '--workers', '-w',
@@ -1176,23 +1229,48 @@ def main():
         global current_user_agent
         current_user_agent[0] = args.user_agent
         
-        # Create scraper
+        # Check if Cloudflare protection is active
         progress.set_phase("initializing")
-        scraper = create_scraper(args.cookie, args.user_agent)
+        cf_active = check_cloudflare_protection(args.user_agent)
+        
+        # If CF is active and no cookie provided, prompt for cookie
+        if cf_active and not args.cookie:
+            logging.error("Cloudflare protection is active but no cookie was provided")
+            print("\n" + "="*60, flush=True)
+            print("CLOUDFLARE PROTECTION DETECTED", flush=True)
+            print("Please provide a cf_clearance cookie value:", flush=True)
+            print("="*60, flush=True)
+            try:
+                args.cookie = input().strip()
+                if not args.cookie:
+                    logging.error("No cookie provided, cannot continue")
+                    progress.add_error("Cloudflare protection active but no cookie provided")
+                    progress.complete(success=False)
+                    cleanup_incoming()
+                    sys.exit(1)
+            except (EOFError, KeyboardInterrupt):
+                logging.error("No cookie provided, cannot continue")
+                progress.add_error("Cloudflare protection active but no cookie provided")
+                progress.complete(success=False)
+                cleanup_incoming()
+                sys.exit(1)
+        
+        # Create scraper (with or without cookie depending on CF status)
+        scraper = create_scraper(args.cookie if cf_active else None, args.user_agent)
         
         # Fetch categories
         logging.info("Fetching categories...")
         category_map = fetch_categories(scraper, progress)
         
         logging.info("Creating fresh scraper session for posts...")
-        scraper = create_scraper(args.cookie, args.user_agent)
+        scraper = create_scraper(args.cookie if cf_active else None, args.user_agent)
         
         # Start keep-alive thread to prevent cookie expiration
         start_keep_alive(scraper, interval=30)
         
         # Start view count fetcher in background (fetches views while posts are processed)
         if not args.skip_views:
-            start_view_count_fetcher(args.cookie, num_workers=args.view_workers, user_agent=args.user_agent)
+            start_view_count_fetcher(args.cookie if cf_active else None, num_workers=args.view_workers, user_agent=args.user_agent)
         
         # Load blacklist IDs from settings
         blacklist_ids = get_blacklist_ids()
@@ -1415,6 +1493,7 @@ def main():
             "getDate": datetime.datetime.now().strftime("%B %d, %Y, %I:%M %p"),
             "local": True,
             "source": "STEAMRIP",
+            "listVersion": "1.0",
             "games": str(len(game_data))
         }
         

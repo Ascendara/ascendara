@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld("electron", {
   maximizeWindow: () => ipcRenderer.invoke("maximize-window"),
   closeWindow: () => ipcRenderer.invoke("close-window"),
   toggleFullscreen: () => ipcRenderer.invoke("toggle-fullscreen"),
+  maximizeWindow: () => ipcRenderer.invoke("maximize-window"),
+  isWindowMaximized: () => ipcRenderer.invoke("is-window-maximized"),
   getFullscreenState: () => ipcRenderer.invoke("get-fullscreen-state"),
   clearCache: () => ipcRenderer.invoke("clear-cache"),
   reload: () => ipcRenderer.invoke("reload"),
@@ -63,6 +65,7 @@ contextBridge.exposeInMainWorld("electron", {
   updateSetting: (key, value) => ipcRenderer.invoke("update-setting", key, value),
   getDefaultLocalIndexPath: () => ipcRenderer.invoke("get-default-local-index-path"),
   getDownloadDirectory: () => ipcRenderer.invoke("get-download-directory"),
+  getSteamApiKey: () => ipcRenderer.invoke("get-steam-api-key"),
   onSettingsChanged: callback => {
     ipcRenderer.on("settings-updated", callback);
     return () => ipcRenderer.removeListener("settings-updated", callback);
@@ -108,10 +111,10 @@ contextBridge.exposeInMainWorld("electron", {
   toggleDiscordRPC: enabled => ipcRenderer.invoke("toggle-discord-rpc", enabled),
 
   //===========================================================================
-  // IGDB API (bypasses CORS)
+  // Steam API (bypasses CORS)
   //===========================================================================
-  igdbRequest: (endpoint, body, clientId, accessToken) =>
-    ipcRenderer.invoke("igdb-request", { endpoint, body, clientId, accessToken }),
+  steamRequest: url => ipcRenderer.invoke("steam-request", { url }),
+
   switchRPC: state => ipcRenderer.invoke("switch-rpc", state),
 
   //===========================================================================
@@ -216,6 +219,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("get-launch-commands", game, isCustom),
   readGameAchievements: (game, isCustom) =>
     ipcRenderer.invoke("read-game-achievements", game, isCustom),
+  getAchievementsLeaderboard: (games, options) =>
+    ipcRenderer.invoke("get-achievements-leaderboard", games, options),
   writeGameAchievements: (gameName, achievements) =>
     ipcRenderer.invoke("write-game-achievements", gameName, achievements),
   restoreCloudGameData: (gameName, cloudData) =>
@@ -224,15 +229,25 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // GAME EXECUTION
   //===========================================================================
-  playGame: (game, isCustom, backupOnClose, launchWithAdmin, specificExecutable) =>
+  playGame: (
+    game,
+    isCustom,
+    backupOnClose,
+    launchWithAdmin,
+    specificExecutable,
+    launchWithTrainer
+  ) =>
     ipcRenderer.invoke(
       "play-game",
       game,
       isCustom,
       backupOnClose,
       launchWithAdmin,
-      specificExecutable
+      specificExecutable,
+      launchWithTrainer
     ),
+  checkTrainerExists: (gameName, isCustom) =>
+    ipcRenderer.invoke("check-trainer-exists", gameName, isCustom),
   isGameRunning: game => ipcRenderer.invoke("is-game-running", game),
   startSteam: () => ipcRenderer.invoke("start-steam"),
   isSteamRunning: () => ipcRenderer.invoke("is-steam-running"),
@@ -269,6 +284,7 @@ contextBridge.exposeInMainWorld("electron", {
     ),
   stopDownload: (game, deleteContents) =>
     ipcRenderer.invoke("stop-download", game, deleteContents),
+  resumeDownload: game => ipcRenderer.invoke("resume-download", game),
   retryDownload: (link, game, online, dlc, version) =>
     ipcRenderer.invoke("retry-download", link, game, online, dlc, version),
   checkRetryExtract: game => ipcRenderer.invoke("check-retry-extract", game),
@@ -277,6 +293,8 @@ contextBridge.exposeInMainWorld("electron", {
   downloadItem: url => ipcRenderer.invoke("download-item", url),
   downloadSoundtrack: (track, game) =>
     ipcRenderer.invoke("download-soundtrack", track, game),
+  downloadTrainerToGame: (downloadUrl, gameName, isCustom) =>
+    ipcRenderer.invoke("download-trainer-to-game", downloadUrl, gameName, isCustom),
   isDownloaderRunning: () => ipcRenderer.invoke("is-downloader-running"),
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
 

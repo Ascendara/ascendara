@@ -27,8 +27,7 @@ export const initializeStatusService = async (onStatusChange, userId) => {
     console.log("[AscendStatus] Fetched status:", result.data);
 
     // Only restore user-chosen statuses (online, away, busy)
-    // "offline" is set by API inactivity timeout, not user choice - ignore it
-    // "invisible" should also not be restored on app open
+    // "offline" is set by app close or API inactivity timeout, not user choice - ignore it
     const validStatuses = ["online", "away", "busy"];
     if (
       result.data?.preferredStatus &&
@@ -86,22 +85,22 @@ export const initializeStatusService = async (onStatusChange, userId) => {
 };
 
 /**
- * Handle app close - set status to invisible/offline
+ * Handle app close - set status to offline
  */
 const handleAppClose = async () => {
   if (!currentUserId) return;
 
   try {
-    await updateUserStatus("invisible");
-    if (statusChangeCallback) statusChangeCallback("invisible");
-    console.log("[AscendStatus] App closing - status set to invisible");
+    await updateUserStatus("offline");
+    if (statusChangeCallback) statusChangeCallback("offline");
+    console.log("[AscendStatus] App closing - status set to offline");
   } catch (error) {
     console.error("[AscendStatus] Failed to set offline status:", error);
   }
 };
 
 /**
- * Handle app hidden (minimized to tray) - set status to invisible
+ * Handle app hidden (minimized to tray) - set status to offline
  */
 const handleAppHidden = async () => {
   if (!currentUserId) return;
@@ -114,11 +113,11 @@ const handleAppHidden = async () => {
   }
 
   try {
-    await updateUserStatus("invisible");
-    if (statusChangeCallback) statusChangeCallback("invisible");
-    console.log("[AscendStatus] App hidden - status set to invisible");
+    await updateUserStatus("offline");
+    if (statusChangeCallback) statusChangeCallback("offline");
+    console.log("[AscendStatus] App hidden - status set to offline");
   } catch (error) {
-    console.error("[AscendStatus] Failed to set invisible status:", error);
+    console.error("[AscendStatus] Failed to set offline status:", error);
   }
 };
 
@@ -157,7 +156,7 @@ export const setUserOnlineStatus = async status => {
 
   try {
     const result = await updateUserStatus(status);
-    if (result.success && status !== "invisible") {
+    if (result.success && status !== "offline") {
       previousStatus = status;
     }
     return result;

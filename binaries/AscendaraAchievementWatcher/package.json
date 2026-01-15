@@ -1,0 +1,30 @@
+{
+  "name": "ascendara-achievement-watcher",
+  "version": "1.0.0",
+  "description": "Achievement watcher for Ascendara",
+  "main": "src/monitor.js",
+  "scripts": {
+    "start": "node src/monitor.js",
+    "build-linux": "pkg src/monitor.js --target node18-linux-x64 --output dist/AscendaraAchievementWatcher",
+    "build-win": "pkg src/monitor.js --target node18-win-x64 --output dist/AscendaraAchievementWatcher.exe",
+    "build-mac": "pkg src/monitor.js --target node18-macos-x64 --output dist/AscendaraAchievementWatcher"
+  },
+  "dependencies": {
+    "find-up": "^4.1.0",
+    "ini": "^4.1.1",
+    "single-instance": "^0.0.1",
+    "node-watch": "^0.7.4",
+    "moment": "^2.29.1"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "src/**/*"
+    ],
+    "outputPath": "dist"
+  },
+  "author": "tagoWorks",
+  "license": "CC-BY-NC-1.0"
+}

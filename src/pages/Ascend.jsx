@@ -2,6 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { checkForUpdates } from "@/services/updateCheckingService";
+import { validateInput } from "@/services/profanityFilterService";
+import {
+  calculateLevelFromXP,
+  getLevelConstants,
+} from "@/services/levelCalculationService";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -74,7 +79,7 @@ import {
   LogOut,
   Settings,
   ChevronRight,
-  BarChart3,
+  AlertTriangle,
   Search,
   MessageCircle,
   UserPlus,
@@ -124,6 +129,7 @@ import {
   ListOrdered,
   Puzzle,
   Infinity,
+  Copy,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -203,6 +209,8 @@ const Ascend = () => {
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [accountExistsError, setAccountExistsError] = useState(null); // { email: string | null }
   const [deletedAccountWarning, setDeletedAccountWarning] = useState(false);
+  const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
+  const [pendingSignupData, setPendingSignupData] = useState(null);
 
   // Friend system state
   const [searchQuery, setSearchQuery] = useState("");
@@ -221,6 +229,7 @@ const Ascend = () => {
   const [editBio, setEditBio] = useState("");
   const [editCountry, setEditCountry] = useState("");
   const [editDiscord, setEditDiscord] = useState("");
+  const [editEpicId, setEditEpicId] = useState("");
   const [editGithub, setEditGithub] = useState("");
   const [editSteam, setEditSteam] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -248,6 +257,10 @@ const Ascend = () => {
   });
   const [verifyingAccess, setVerifyingAccess] = useState(true);
   const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
+
+  // Developer mode state
+  const [isDev, setIsDev] = useState(false);
+  const [devSubscriptionState, setDevSubscriptionState] = useState("normal"); // normal, trial, verified, subscribed
 
   // Messaging state
   const [conversations, setConversations] = useState([]);
@@ -311,6 +324,20 @@ const Ascend = () => {
   const [isOutdated, setIsOutdated] = useState(false);
   const [checkingVersion, setCheckingVersion] = useState(true);
 
+  // Check if in development mode
+  useEffect(() => {
+    const checkDevMode = async () => {
+      try {
+        const isDevMode = await window.electron.isDev();
+        setIsDev(isDevMode);
+      } catch (error) {
+        console.error("Error checking dev mode:", error);
+        setIsDev(false);
+      }
+    };
+    checkDevMode();
+  }, []);
+
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState(null);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
@@ -364,57 +391,55 @@ const Ascend = () => {
   // Calculate profile statistics based on games data (same logic as Profile.jsx)
   const calculateProfileStats = (games, customGames) => {
     const allGames = [...(games || []), ...(customGames || [])];
+    const { XP_RULES } = getLevelConstants();
 
     let totalXP = 0;
     let totalPlaytime = 0;
+    let gamesPlayedCount = 0;
 
     allGames.forEach(game => {
-      let gameXP = 100;
-      const playtimeHours = (game.playTime || 0) / 3600;
-      gameXP += Math.floor(playtimeHours * 50);
-      gameXP += Math.min((game.launchCount || 0) * 10, 100);
-      if (game.completed) gameXP += 150;
+      const playtimeSeconds = typeof game?.playTime === "number" ? game.playTime : 0;
+      const playtimeHours = playtimeSeconds / 3600;
+      const launchCount = typeof game?.launchCount === "number" ? game.launchCount : 0;
+      const isCompleted = !!game?.completed;
+
+      if (playtimeSeconds > 0) {
+        gamesPlayedCount += 1;
+      }
+
+      let gameXP = XP_RULES.basePerGame;
+      gameXP += Math.floor(playtimeHours * XP_RULES.perHourPlayed);
+      const launchBonus = Math.min(
+        launchCount * XP_RULES.perLaunch,
+        XP_RULES.launchBonusCap
+      );
+      gameXP += launchBonus;
+
+      if (isCompleted) {
+        gameXP += XP_RULES.completedBonus;
+      }
+
       totalXP += gameXP;
-      totalPlaytime += game.playTime || 0;
+      totalPlaytime += playtimeSeconds;
     });
 
     const totalPlaytimeHours = totalPlaytime / 3600;
-    if (totalPlaytimeHours >= 25) totalXP += 100;
-    if (totalPlaytimeHours >= 50) totalXP += 200;
-    if (totalPlaytimeHours >= 100) totalXP += 300;
-    if (totalPlaytimeHours >= 200) totalXP += 500;
-    if (totalPlaytimeHours >= 500) totalXP += 1000;
-
-    const baseXP = 50;
-    let level = Math.max(1, Math.floor(1 + Math.sqrt(totalXP / baseXP) * 1.5));
-    level = Math.min(level, 999);
-
-    const xpForCurrentLevel = level <= 1 ? 0 : baseXP * Math.pow(level, 2);
-    const xpForNextLevel = baseXP * Math.pow(level + 1, 2);
-    const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
-    const currentLevelProgress = Math.max(0, totalXP - xpForCurrentLevel);
-
-    if (level >= 999) {
-      return {
-        totalPlaytime,
-        gamesPlayed: allGames.filter(game => game.playTime > 0).length,
-        totalGames: allGames.length,
-        level: 999,
-        xp: totalXP,
-        currentXP: 100,
-        nextLevelXp: 100,
-        allGames,
-      };
+    for (const milestone of XP_RULES.playtimeMilestones) {
+      if (totalPlaytimeHours >= milestone.hours) {
+        totalXP += milestone.bonus;
+      }
     }
+
+    const levelData = calculateLevelFromXP(totalXP);
 
     return {
       totalPlaytime,
       gamesPlayed: allGames.filter(game => game.playTime > 0).length,
       totalGames: allGames.length,
-      level,
-      xp: totalXP,
-      currentXP: currentLevelProgress,
-      nextLevelXp: xpNeededForNextLevel,
+      level: levelData.level,
+      xp: levelData.xp,
+      currentXP: levelData.currentXP,
+      nextLevelXp: levelData.nextLevelXp,
       allGames,
     };
   };
@@ -425,7 +450,15 @@ const Ascend = () => {
     try {
       const games = (await window.electron?.getGames?.()) || [];
       const customGames = (await window.electron?.getCustomGames?.()) || [];
+      console.log("[Ascend] Loaded games:", games.length + customGames.length, "games");
       const stats = calculateProfileStats(games, customGames);
+      console.log("[Ascend] Calculated stats:", {
+        totalGames: stats.totalGames,
+        gamesPlayed: stats.gamesPlayed,
+        xp: stats.xp,
+        level: stats.level,
+        totalPlaytime: stats.totalPlaytime,
+      });
 
       setLocalStats({
         level: stats.level,
@@ -536,39 +569,16 @@ const Ascend = () => {
       const joinDate = (await window.electron?.timestampTime?.()) || null;
       const games = (await window.electron?.getGames?.()) || [];
       const customGames = (await window.electron?.getCustomGames?.()) || [];
-      const allGames = [...games, ...customGames];
 
-      // Calculate stats (same logic as Profile.jsx)
-      let totalXP = 0;
-      let totalPlaytime = 0;
-
-      allGames.forEach(game => {
-        let gameXP = 100;
-        const playtimeHours = (game.playTime || 0) / 3600;
-        gameXP += Math.floor(playtimeHours * 50);
-        gameXP += Math.min((game.launchCount || 0) * 10, 100);
-        if (game.completed) gameXP += 150;
-        totalXP += gameXP;
-        totalPlaytime += game.playTime || 0;
-      });
-
-      const totalPlaytimeHours = totalPlaytime / 3600;
-      if (totalPlaytimeHours >= 25) totalXP += 100;
-      if (totalPlaytimeHours >= 50) totalXP += 200;
-      if (totalPlaytimeHours >= 100) totalXP += 300;
-      if (totalPlaytimeHours >= 200) totalXP += 500;
-      if (totalPlaytimeHours >= 500) totalXP += 1000;
-
-      const baseXP = 50;
-      let level = Math.max(1, Math.floor(1 + Math.sqrt(totalXP / baseXP) * 1.5));
-      level = Math.min(level, 999);
+      // Use centralized calculation
+      const stats = calculateProfileStats(games, customGames);
 
       const profileData = {
-        level,
-        xp: totalXP,
-        totalPlaytime,
-        gamesPlayed: allGames.filter(g => g.playTime > 0).length,
-        totalGames: allGames.length,
+        level: stats.level,
+        xp: stats.xp,
+        totalPlaytime: stats.totalPlaytime,
+        gamesPlayed: stats.gamesPlayed,
+        totalGames: stats.totalGames,
         joinDate,
       };
 
@@ -1212,7 +1222,8 @@ const Ascend = () => {
     setEditPhotoURL(user?.photoURL || "");
     setEditBio(userData?.bio || "");
     setEditCountry(userData?.country || "");
-    setEditDiscord(userData?.socials?.discord || "");
+    setEditDiscord(userData?.socials?.linkedDiscord || "");
+    setEditEpicId(userData?.socials?.epicId || "");
     setEditGithub(userData?.socials?.github || "");
     setEditSteam(userData?.socials?.steam || "");
     setIsEditingProfile(true);
@@ -1227,6 +1238,45 @@ const Ascend = () => {
     if (editBio.length > 100) {
       toast.error(t("ascend.settings.bioTooLong"));
       return;
+    }
+
+    // Validate display name for profanity
+    const displayNameValidation = await validateInput(
+      editDisplayName.trim(),
+      userData?.owner
+    );
+    if (!displayNameValidation.valid) {
+      if (displayNameValidation.type === "notAllowed") {
+        toast.error(
+          t("ascend.settings.notAllowedDisplayName") ||
+            "Display name contains words that are not allowed"
+        );
+      } else {
+        toast.error(
+          t("ascend.settings.inappropriateDisplayName") ||
+            "Please try to avoid harsh or inappropriate words in your display name"
+        );
+      }
+      return;
+    }
+
+    // Validate bio for profanity
+    if (editBio.trim()) {
+      const bioValidation = await validateInput(editBio.trim(), userData?.owner);
+      if (!bioValidation.valid) {
+        if (bioValidation.type === "notAllowed") {
+          toast.error(
+            t("ascend.settings.notAllowedBio") ||
+              "Bio contains words that are not allowed"
+          );
+        } else {
+          toast.error(
+            t("ascend.settings.inappropriateBio") ||
+              "Please try to avoid harsh or inappropriate words in your bio"
+          );
+        }
+        return;
+      }
     }
 
     setIsSavingProfile(true);
@@ -1244,7 +1294,8 @@ const Ascend = () => {
       bio: editBio.trim(),
       country: editCountry.trim(),
       socials: {
-        discord: editDiscord.trim(),
+        linkedDiscord: userData?.socials?.linkedDiscord || "",
+        epicId: editEpicId.trim(),
         github: editGithub.trim(),
         steam: editSteam.trim(),
       },
@@ -1270,6 +1321,7 @@ const Ascend = () => {
     setEditBio("");
     setEditCountry("");
     setEditDiscord("");
+    setEditEpicId("");
     setEditGithub("");
     setEditSteam("");
   };
@@ -1277,6 +1329,50 @@ const Ascend = () => {
   // Subscribe to Ascend via Stripe Checkout
   const handleSubscribe = async () => {
     try {
+      // Validate account exists and is not deleted
+      if (!user || !user.uid) {
+        toast.error(t("account.errors.notLoggedIn") || "Please log in to subscribe");
+        return;
+      }
+
+      // Check if hardware ID is associated with a deleted account
+      let hardwareId = null;
+      if (window.electron?.getHardwareId) {
+        hardwareId = await window.electron.getHardwareId();
+      }
+
+      if (hardwareId) {
+        const deletedCheck = await checkDeletedAccount(hardwareId);
+        if (deletedCheck.isDeleted) {
+          toast.error(
+            t("account.errors.cannotSubscribeDeleted") ||
+              "Cannot subscribe - this device is associated with a deleted account. Please contact support."
+          );
+          setDeletedAccountWarning(true);
+          return;
+        }
+      }
+
+      // Verify the user account still exists in Firebase
+      try {
+        const authToken = await getAuthToken();
+        if (!authToken) {
+          toast.error(
+            t("account.errors.authenticationFailed") ||
+              "Authentication failed. Please log in again."
+          );
+          await handleLogout();
+          return;
+        }
+      } catch (authError) {
+        console.error("Authentication error:", authError);
+        toast.error(
+          t("account.errors.accountNotFound") || "Account not found. Please log in again."
+        );
+        await handleLogout();
+        return;
+      }
+
       const productResponse = await fetch(
         "https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW"
       );
@@ -1324,6 +1420,33 @@ const Ascend = () => {
 
   // Open Stripe Customer Portal for managing subscription
   const handleManageSubscription = async () => {
+    try {
+      const authToken = await getAuthToken();
+      const response = await fetch("https://api.ascendara.app/stripe/customer-portal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          returnUrl: "ascendara://checkout-canceled",
+        }),
+      });
+      if (response.ok) {
+        const { url } = await response.json();
+        window.electron?.openURL?.(url);
+      } else {
+        toast.error(t("ascend.settings.portalError"));
+      }
+    } catch (error) {
+      console.error("Error opening customer portal:", error);
+      toast.error(t("ascend.settings.portalError"));
+    }
+  };
+
+  // Open Stripe Customer Portal for viewing invoices
+  const handleViewInvoices = async () => {
     try {
       const authToken = await getAuthToken();
       const response = await fetch("https://api.ascendara.app/stripe/customer-portal", {
@@ -1457,6 +1580,7 @@ const Ascend = () => {
   };
 
   const handleGoogleSignIn = async () => {
+    console.log("[handleGoogleSignIn] Starting Google sign-in flow...");
     setIsGoogleLoading(true);
     setAccountExistsError(null);
 
@@ -1464,41 +1588,111 @@ const Ascend = () => {
     let hardwareId = null;
     if (window.electron?.getHardwareId) {
       hardwareId = await window.electron.getHardwareId();
+      console.log(
+        "[handleGoogleSignIn] Hardware ID obtained:",
+        hardwareId ? "yes" : "no"
+      );
     }
 
+    console.log("[handleGoogleSignIn] Calling googleSignIn()...");
     const result = await googleSignIn();
+    console.log("[handleGoogleSignIn] googleSignIn() returned:", {
+      hasUser: !!result.user,
+      isNewUser: result.isNewUser,
+      error: result.error,
+    });
     if (result.user) {
+      console.log("[handleGoogleSignIn] User signed in successfully");
       if (result.isNewUser) {
+        console.log("[handleGoogleSignIn] New user detected, checking hardware ID...");
         // Check if hardware ID already has an account
         if (hardwareId) {
-          const hwCheck = await checkHardwareIdAccount(hardwareId);
-          if (hwCheck.hasAccount) {
-            // Delete the newly created account and show error
+          // First check if this hardware ID is associated with a deleted account
+          console.log("[handleGoogleSignIn] Checking for deleted account...");
+          const deletedCheck = await checkDeletedAccount(hardwareId);
+          if (deletedCheck.isDeleted) {
+            console.log(
+              "[handleGoogleSignIn] Hardware ID has deleted account, removing new account"
+            );
+            // Delete the newly created account and show deleted account error
             await deleteNewAccount();
-            setAccountExistsError({ email: hwCheck.email });
+            setAccountExistsError({ email: deletedCheck.email, isDeleted: true });
             setIsGoogleLoading(false);
             return;
           }
+
+          console.log(
+            "[handleGoogleSignIn] Checking if hardware ID has existing account..."
+          );
+          const hwCheck = await checkHardwareIdAccount(hardwareId);
+          console.log("[handleGoogleSignIn] Hardware ID check result:", {
+            hasAccount: hwCheck.hasAccount,
+            userId: hwCheck.userId,
+            currentUserId: result.user.uid,
+          });
+
+          // Only treat it as a duplicate if the hardware ID belongs to a DIFFERENT user
+          if (hwCheck.hasAccount && hwCheck.userId !== result.user.uid) {
+            console.log(
+              "[handleGoogleSignIn] Hardware ID belongs to different account, removing new account"
+            );
+            // Delete the newly created account and show error
+            await deleteNewAccount();
+            setAccountExistsError({ email: hwCheck.email, isDeleted: false });
+            setIsGoogleLoading(false);
+            return;
+          }
+
+          console.log(
+            "[handleGoogleSignIn] Hardware ID check passed (either no account or belongs to current user)"
+          );
           // Register the hardware ID for this new user
+          console.log("[handleGoogleSignIn] Registering hardware ID for new user...");
           await registerHardwareId(hardwareId, result.user.uid);
         }
         // New user - prompt for display name
+        console.log("[handleGoogleSignIn] Showing display name prompt for new user");
         setGoogleDisplayName(result.user.displayName || "");
         setShowDisplayNamePrompt(true);
       } else {
+        console.log("[handleGoogleSignIn] Existing user logged in successfully");
         toast.success(t("account.success.loggedIn"));
       }
     } else if (result.error) {
+      console.log("[handleGoogleSignIn] Sign-in error:", result.error);
       toast.error(result.error);
+    } else {
+      console.log(
+        "[handleGoogleSignIn] Sign-in returned no user and no error (cancelled or redirecting)"
+      );
     }
+    console.log("[handleGoogleSignIn] Google sign-in flow complete");
     setIsGoogleLoading(false);
   };
 
-  const handleDisplayNameSubmit = async () => {
+  const handleGoogleDisplayNameSubmit = async () => {
     if (googleDisplayName.trim().length < 4) {
       toast.error(t("account.errors.displayNameTooShort"));
       return;
     }
+
+    // Validate display name for profanity (no owner bypass on signup)
+    const displayNameValidation = await validateInput(googleDisplayName.trim(), false);
+    if (!displayNameValidation.valid) {
+      if (displayNameValidation.type === "notAllowed") {
+        toast.error(
+          t("ascend.settings.notAllowedDisplayName") ||
+            "Display name contains words that are not allowed"
+        );
+      } else {
+        toast.error(
+          t("ascend.settings.inappropriateDisplayName") ||
+            "Please try to avoid harsh or inappropriate words in your display name"
+        );
+      }
+      return;
+    }
+
     setIsSubmitting(true);
     const result = await updateProfile({ displayName: googleDisplayName.trim() });
     if (result.success) {
@@ -1540,6 +1734,28 @@ const Ascend = () => {
         setIsSubmitting(false);
         return;
       }
+
+      // Validate display name for profanity (no owner bypass on signup)
+      const displayNameValidation = await validateInput(
+        formData.displayName.trim(),
+        false
+      );
+      if (!displayNameValidation.valid) {
+        if (displayNameValidation.type === "notAllowed") {
+          toast.error(
+            t("ascend.settings.notAllowedDisplayName") ||
+              "Display name contains words that are not allowed"
+          );
+        } else {
+          toast.error(
+            t("ascend.settings.inappropriateDisplayName") ||
+              "Please try to avoid harsh or inappropriate words in your display name"
+          );
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
       if (formData.password !== formData.confirmPassword) {
         toast.error(t("account.errors.passwordMismatch"));
         setIsSubmitting(false);
@@ -1559,32 +1775,11 @@ const Ascend = () => {
         return;
       }
 
-      // Check if this hardware already has an account
-      let hardwareId = null;
-      if (window.electron?.getHardwareId) {
-        hardwareId = await window.electron.getHardwareId();
-      }
-      if (hardwareId) {
-        const hwCheck = await checkHardwareIdAccount(hardwareId);
-        if (hwCheck.hasAccount) {
-          setAccountExistsError({ email: hwCheck.email });
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      // Pass hardware ID to register so it gets linked to the account
-      const result = await register(
-        formData.email,
-        formData.password,
-        formData.displayName,
-        hardwareId
-      );
-      if (result.user) {
-        toast.success(t("account.success.registered"));
-      } else if (result.error) {
-        toast.error(result.error);
-      }
+      // Show email confirmation dialog before proceeding with signup
+      setPendingSignupData({ ...formData });
+      setShowEmailConfirmDialog(true);
+      setIsSubmitting(false);
+      return;
     } else {
       // Login
       const result = await login(formData.email, formData.password);
@@ -1607,6 +1802,57 @@ const Ascend = () => {
     }
 
     setIsSubmitting(false);
+  };
+
+  // Proceed with signup after email confirmation
+  const handleConfirmSignup = async () => {
+    setShowEmailConfirmDialog(false);
+    setIsSubmitting(true);
+
+    if (!pendingSignupData) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Check if this hardware already has an account
+    let hardwareId = null;
+    if (window.electron?.getHardwareId) {
+      hardwareId = await window.electron.getHardwareId();
+    }
+    if (hardwareId) {
+      // First check if this hardware ID is associated with a deleted account
+      const deletedCheck = await checkDeletedAccount(hardwareId);
+      if (deletedCheck.isDeleted) {
+        setAccountExistsError({ email: deletedCheck.email, isDeleted: true });
+        setIsSubmitting(false);
+        setPendingSignupData(null);
+        return;
+      }
+
+      const hwCheck = await checkHardwareIdAccount(hardwareId);
+      if (hwCheck.hasAccount) {
+        setAccountExistsError({ email: hwCheck.email, isDeleted: false });
+        setIsSubmitting(false);
+        setPendingSignupData(null);
+        return;
+      }
+    }
+
+    // Pass hardware ID to register so it gets linked to the account
+    const result = await register(
+      pendingSignupData.email,
+      pendingSignupData.password,
+      pendingSignupData.displayName,
+      hardwareId
+    );
+    if (result.user) {
+      toast.success(t("account.success.registered"));
+    } else if (result.error) {
+      toast.error(result.error);
+    }
+
+    setIsSubmitting(false);
+    setPendingSignupData(null);
   };
 
   const handleLogout = async () => {
@@ -1840,15 +2086,6 @@ const Ascend = () => {
               )}
               {t("account.verification.resend")}
             </Button>
-
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              className="h-11 w-full text-muted-foreground"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              {t("account.verification.useAnother")}
-            </Button>
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
@@ -1936,10 +2173,18 @@ const Ascend = () => {
                   <p className="mt-1 text-sm">{ascendAccess.noTrialReason}</p>
                 </div>
               )}
-              <Button onClick={handleSubscribe} className="w-full text-secondary">
-                <BadgeDollarSign className="mr-2 h-4 w-4" />
-                {t("ascend.settings.subscribe")}
-              </Button>
+              {!deletedAccountWarning && (
+                <Button onClick={handleSubscribe} className="w-full text-secondary">
+                  <BadgeDollarSign className="mr-2 h-4 w-4" />
+                  {t("ascend.settings.subscribe")}
+                </Button>
+              )}
+              {deletedAccountWarning && (
+                <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-sm">
+                  {t("account.errors.cannotSubscribeDeleted") ||
+                    "Cannot subscribe - account deleted"}
+                </div>
+              )}
               <button
                 onClick={handleLogout}
                 className="text-sm text-muted-foreground hover:text-foreground"
@@ -1967,10 +2212,18 @@ const Ascend = () => {
                 ? t("ascend.access.trialBlockedMessage")
                 : t("ascend.access.expiredMessage")}
             </p>
-            <Button onClick={handleSubscribe} className="w-full text-secondary">
-              <BadgeDollarSign className="mr-2 h-4 w-4" />
-              {t("ascend.settings.subscribe")}
-            </Button>
+            {!deletedAccountWarning && (
+              <Button onClick={handleSubscribe} className="w-full text-secondary">
+                <BadgeDollarSign className="mr-2 h-4 w-4" />
+                {t("ascend.settings.subscribe")}
+              </Button>
+            )}
+            {deletedAccountWarning && (
+              <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-sm">
+                {t("account.errors.cannotSubscribeDeleted") ||
+                  "Cannot subscribe - account deleted"}
+              </div>
+            )}
             <button
               onClick={handleLogout}
               className="text-sm text-muted-foreground hover:text-foreground"
@@ -3651,31 +3904,90 @@ const Ascend = () => {
 
         case "notifications":
           return (
-            <div className="space-y-6">
-              <h1 className="text-2xl font-bold">{t("ascend.notifications.title")}</h1>
-              {loadingNotifications ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="rounded-xl border border-border/50 bg-card/50 p-6 text-center">
-                  <Bell className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    {t("ascend.notifications.empty")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {notifications.map(notification => (
-                    <div
-                      key={notification.id}
-                      className="rounded-xl border border-border/50 bg-card/50 p-4"
-                    >
-                      <p className="text-sm">{notification.message}</p>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        — {notification.author}
+            <div className="mb-24 space-y-6">
+              {/* Hero Header */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500/20 via-indigo-500/10 to-violet-500/10 p-8"
+              >
+                <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+                <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
+                <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+
+                <div className="relative">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-xl shadow-blue-500/30">
+                      <Bell className="h-8 w-8 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-bold">
+                        {t("ascend.notifications.title")}
+                      </h1>
+                      <p className="mt-2 text-muted-foreground">
+                        {t("ascend.notifications.subtitle") ||
+                          "Stay updated with important announcements and updates"}
                       </p>
                     </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Notifications Content */}
+              {loadingNotifications ? (
+                <div className="flex flex-col items-center justify-center py-32">
+                  <div className="relative">
+                    <div className="h-20 w-20 rounded-full border-4 border-blue-500/20" />
+                    <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-blue-500" />
+                  </div>
+                  <p className="mt-6 text-muted-foreground">
+                    {t("ascend.notifications.loading") || "Loading notifications..."}
+                  </p>
+                </div>
+              ) : notifications.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center justify-center rounded-2xl border border-border/50 bg-card/50 py-20"
+                >
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
+                    <Bell className="h-10 w-10 text-muted-foreground/50" />
+                  </div>
+                  <h3 className="mt-6 text-lg font-semibold">
+                    {t("ascend.notifications.empty")}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t("ascend.notifications.emptyDescription") ||
+                      "You're all caught up! Check back later for new updates."}
+                  </p>
+                </motion.div>
+              ) : (
+                <div className="space-y-3">
+                  {notifications.map((notification, index) => (
+                    <motion.div
+                      key={notification.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-blue-500/30 hover:bg-card hover:shadow-lg hover:shadow-blue-500/5"
+                    >
+                      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
+                      <div className="relative">
+                        <p className="text-sm leading-relaxed">{notification.message}</p>
+                        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>—</span>
+                          <span className="font-medium">{notification.author}</span>
+                          {notification.timestamp && (
+                            <>
+                              <span>•</span>
+                              <span>
+                                {new Date(notification.timestamp).toLocaleDateString()}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
                   ))}
                 </div>
               )}
@@ -3826,7 +4138,7 @@ const Ascend = () => {
                       </h3>
 
                       <div className="grid gap-4">
-                        {/* Discord */}
+                        {/* Discord (Read-only) */}
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/10">
                             <svg
@@ -3837,11 +4149,35 @@ const Ascend = () => {
                               <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                             </svg>
                           </div>
+                          <div className="flex-1">
+                            <Input
+                              type="text"
+                              placeholder={t("ascend.settings.discordPlaceholder")}
+                              value={editDiscord}
+                              readOnly
+                              disabled
+                              className="h-11 cursor-not-allowed rounded-xl bg-muted/50"
+                            />
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("ascend.settings.discordReadOnly") ||
+                                "Discord username is read-only"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Epic Games ID */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-foreground/10">
+                            <Gamepad2 className="h-5 w-5" />
+                          </div>
                           <Input
                             type="text"
-                            placeholder={t("ascend.settings.discordPlaceholder")}
-                            value={editDiscord}
-                            onChange={e => setEditDiscord(e.target.value)}
+                            placeholder={
+                              t("ascend.settings.epicIdPlaceholder") ||
+                              "Your Epic Games ID"
+                            }
+                            value={editEpicId}
+                            onChange={e => setEditEpicId(e.target.value)}
                             className="h-11 flex-1 rounded-xl"
                           />
                         </div>
@@ -3961,7 +4297,8 @@ const Ascend = () => {
                     </div>
 
                     {/* Social Links Display */}
-                    {(userData?.socials?.discord ||
+                    {(userData?.socials?.linkedDiscord ||
+                      userData?.socials?.epicId ||
                       userData?.socials?.github ||
                       userData?.socials?.steam) && (
                       <div className="mt-5 border-t border-border/50 pt-5">
@@ -3969,7 +4306,7 @@ const Ascend = () => {
                           {t("ascend.settings.socialLinks")}
                         </h4>
                         <div className="flex flex-wrap gap-3">
-                          {userData?.socials?.discord && (
+                          {userData?.socials?.linkedDiscord && (
                             <div className="flex items-center gap-2 rounded-xl bg-[#5865F2]/10 px-3 py-2 text-sm">
                               <svg
                                 className="h-4 w-4 text-[#5865F2]"
@@ -3978,7 +4315,13 @@ const Ascend = () => {
                               >
                                 <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                               </svg>
-                              <span>{userData.socials.discord}</span>
+                              <span>{userData.socials.linkedDiscord}</span>
+                            </div>
+                          )}
+                          {userData?.socials?.epicId && (
+                            <div className="flex items-center gap-2 rounded-xl bg-foreground/10 px-3 py-2 text-sm">
+                              <Gamepad2 className="h-4 w-4" />
+                              <span>{userData.socials.epicId}</span>
                             </div>
                           )}
                           {userData?.socials?.github && (
@@ -4006,7 +4349,7 @@ const Ascend = () => {
                     {/* Empty state for bio/socials */}
                     {!userData?.bio &&
                       !userData?.country &&
-                      !userData?.socials?.discord &&
+                      !userData?.socials?.linkedDiscord &&
                       !userData?.socials?.github &&
                       !userData?.socials?.steam && (
                         <div className="mt-5 border-t border-border/50 pt-5 text-center">
@@ -4119,7 +4462,9 @@ const Ascend = () => {
                         />
                       )}
                     </div>
-                    <h2 className="font-semibold">{t("ascend.settings.subscription")}</h2>
+                    <h2 className="mt-2 font-semibold">
+                      {t("ascend.settings.subscription")}
+                    </h2>
                   </div>
                   {ascendAccess.isVerified ? (
                     <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-3 py-1">
@@ -4138,8 +4483,34 @@ const Ascend = () => {
                   ) : null}
                 </div>
 
+                {/* Developer Mode Subscription State Switcher */}
+                {isDev && (
+                  <div className="border-t border-border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Dev: Subscription State
+                      </span>
+                      <Select
+                        value={devSubscriptionState}
+                        onValueChange={setDevSubscriptionState}
+                      >
+                        <SelectTrigger className="h-8 w-[140px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="trial">Trial Active</SelectItem>
+                          <SelectItem value="verified">Verified</SelectItem>
+                          <SelectItem value="subscribed">Subscribed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative p-5">
-                  {ascendAccess.isVerified ? (
+                  {(isDev && devSubscriptionState === "verified") ||
+                  (!isDev && ascendAccess.isVerified) ? (
                     // Verified User - Special Design
                     <div className="space-y-6">
                       <div className="flex items-center gap-4">
@@ -4216,7 +4587,8 @@ const Ascend = () => {
                         </div>
                       </div>
                     </div>
-                  ) : ascendAccess.isSubscribed ? (
+                  ) : (isDev && devSubscriptionState === "subscribed") ||
+                    (!isDev && ascendAccess.isSubscribed) ? (
                     // Active Subscription - Premium Design
                     <div className="space-y-6">
                       <div className="flex items-center gap-4">
@@ -4231,7 +4603,7 @@ const Ascend = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-xl font-bold text-transparent">
-                              {t("ascend.settings.ascendPro")}
+                              {t("ascend.settings.ascendSubscription") || "Ascend"}
                             </h3>
                           </div>
                           <p className="text-sm text-muted-foreground">
@@ -4288,31 +4660,47 @@ const Ascend = () => {
                         </div>
                       </div>
 
-                      <Button
-                        variant="outline"
-                        className="h-12 w-full gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
-                        onClick={handleManageSubscription}
-                      >
-                        <Settings className="h-4 w-4" />
-                        {t("ascend.settings.manageSubscription")}
-                      </Button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          variant="outline"
+                          className="h-12 gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
+                          onClick={handleViewInvoices}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          {t("ascend.settings.viewInvoices")}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-12 gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10"
+                          onClick={handleManageSubscription}
+                        >
+                          <Settings className="h-4 w-4" />
+                          {t("ascend.settings.manageSubscription")}
+                        </Button>
+                      </div>
                     </div>
-                  ) : ascendAccess.hasAccess && ascendAccess.daysRemaining > 0 ? (
-                    // Trial Active - Engaging Design
+                  ) : (isDev && devSubscriptionState === "trial") ||
+                    (!isDev &&
+                      ascendAccess.hasAccess &&
+                      ascendAccess.daysRemaining > 0) ? (
+                    // Trial Active - Premium Features Showcase
                     <div className="space-y-5">
                       <div className="flex items-center gap-4">
                         <div className="relative">
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/20 ring-2 ring-primary/20">
-                            <Clock className="h-7 w-7 text-primary" />
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 ring-2 ring-emerald-500/20">
+                            <BadgeCheck className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                           </div>
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold">
-                            {t("ascend.settings.freeTrial")}
+                            {t("ascend.settings.trialActive") || "Trial Active"}
                           </h3>
                           <p className="text-sm text-muted-foreground">
                             {t("ascend.settings.trialDaysRemaining", {
-                              days: ascendAccess.daysRemaining,
+                              days:
+                                isDev && devSubscriptionState === "trial"
+                                  ? 5
+                                  : ascendAccess.daysRemaining,
                             })}
                           </p>
                         </div>
@@ -4324,14 +4712,17 @@ const Ascend = () => {
                             {t("ascend.settings.trialProgress")}
                           </span>
                           <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
-                            {ascendAccess.daysRemaining} {t("ascend.settings.daysLeft")}
+                            {isDev && devSubscriptionState === "trial"
+                              ? 5
+                              : ascendAccess.daysRemaining}{" "}
+                            {t("ascend.settings.daysLeft")}
                           </span>
                         </div>
                         <div className="h-3 w-full overflow-hidden rounded-full bg-muted/50">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{
-                              width: `${((7 - ascendAccess.daysRemaining) / 7) * 100}%`,
+                              width: `${((7 - (isDev && devSubscriptionState === "trial" ? 5 : ascendAccess.daysRemaining)) / 7) * 100}%`,
                             }}
                             transition={{ duration: 1, ease: "easeOut" }}
                             className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500"
@@ -4339,72 +4730,236 @@ const Ascend = () => {
                         </div>
                       </div>
 
-                      <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 to-violet-500/5 p-5">
-                        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-                        <div className="relative">
-                          <div className="mb-3 flex items-center gap-2">
-                            <BadgeDollarSign className="h-5 w-5 text-primary" />
-                            <h4 className="font-semibold">
-                              {t("ascend.settings.upgradeToProTitle")}
-                            </h4>
+                      <div className="rounded-xl bg-gradient-to-r from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 ring-1 ring-emerald-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20">
+                            <Sparkle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                           </div>
-                          <p className="mb-4 text-sm text-muted-foreground">
-                            {t("ascend.settings.upgradeToProDescription")}
-                          </p>
-                          <Button
-                            className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
-                            onClick={handleSubscribe}
-                          >
-                            <BadgeDollarSign className="h-4 w-4" />
-                            {t("ascend.settings.upgradeToPro")}
-                          </Button>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {t("ascend.settings.enjoyingAscend") ||
+                                "Enjoying all Ascend features"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t("ascend.settings.subscribeToKeep") ||
+                                "Subscribe to keep them forever"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // No Access / Trial Expired - Compelling CTA
-                    <div className="space-y-5">
-                      <div className="text-center">
-                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/20">
-                          <BadgeDollarSign className="h-8 w-8 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-bold">
-                          {t("ascend.settings.joinAscend")}
-                        </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {t("ascend.settings.subscribeToUnlock")}
-                        </p>
                       </div>
 
-                      <div className="grid gap-2">
+                      <div className="max-h-[280px] space-y-2 overflow-y-auto pr-2">
                         {[
-                          { icon: Users, text: t("ascend.settings.feature1") },
-                          { icon: CloudIcon, text: t("ascend.settings.feature2") },
-                          { icon: Gamepad2, text: t("ascend.settings.feature3") },
-                          { icon: Sparkle, text: t("ascend.settings.feature4") },
+                          {
+                            icon: Users,
+                            title: "Friends System",
+                            desc: "Build your gaming network",
+                          },
+                          {
+                            icon: MessageCircle,
+                            title: "Real-Time Chat",
+                            desc: "Chat with friends directly",
+                          },
+                          {
+                            icon: CloudIcon,
+                            title: "Cloud Sync",
+                            desc: "Data synced across devices",
+                          },
+                          {
+                            icon: Trophy,
+                            title: "Public Leaderboard",
+                            desc: "Compete with the community",
+                          },
+                          {
+                            icon: Infinity,
+                            title: "Unlimited Downloads",
+                            desc: "No download restrictions",
+                          },
+                          {
+                            icon: Zap,
+                            title: "FLiNG Trainer",
+                            desc: "Auto trainer downloads",
+                          },
+                          {
+                            icon: ListOrdered,
+                            title: "Download Queue",
+                            desc: "Queue multiple downloads",
+                          },
+                          {
+                            icon: Sparkle,
+                            title: "And More",
+                            desc: "Plus many other features",
+                          },
                         ].map((feature, i) => (
                           <motion.div
                             key={i}
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.1 }}
-                            className="flex items-center gap-3 rounded-lg bg-muted/30 p-3"
+                            transition={{ delay: i * 0.05 }}
+                            className="flex items-center gap-3 rounded-lg bg-muted/30 p-2.5"
                           >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                              <feature.icon className="h-4 w-4 text-primary" />
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                              <feature.icon className="h-3.5 w-3.5 text-primary" />
                             </div>
-                            <span className="text-sm">{feature.text}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium">{feature.title}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {feature.desc}
+                              </p>
+                            </div>
                           </motion.div>
                         ))}
                       </div>
 
-                      <Button
-                        className="h-12 w-full gap-2 bg-gradient-to-r from-primary to-violet-600 text-white shadow-lg shadow-primary/25 transition-shadow hover:shadow-primary/40"
-                        onClick={handleSubscribe}
-                      >
-                        <BadgeDollarSign className="h-4 w-4" />
-                        {t("ascend.settings.subscribe")}
-                      </Button>
+                      {!deletedAccountWarning ? (
+                        <Button
+                          className="h-12 w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/25 transition-all hover:scale-[1.02] hover:shadow-yellow-500/40"
+                          onClick={handleSubscribe}
+                        >
+                          <Crown className="h-4 w-4" />
+                          {t("ascend.settings.keepAscendForever") ||
+                            "Keep Ascend Forever"}
+                        </Button>
+                      ) : (
+                        <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">
+                          {t("account.errors.cannotSubscribeDeleted") ||
+                            "Cannot subscribe - account deleted"}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // No Access / Trial Expired - Premium Features Showcase
+                    <div className="space-y-5">
+                      <div className="text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-600/20 ring-2 ring-yellow-500/20">
+                          <Crown className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <h3 className="text-xl font-bold">
+                          {t("ascend.settings.keepAscend") || "Keep Ascend Forever"}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t("ascend.settings.keepAscendDescription") ||
+                            "Subscribe to make all these features permanent"}
+                        </p>
+                      </div>
+
+                      <div className="max-h-[400px] space-y-2 overflow-y-auto pr-2">
+                        {[
+                          {
+                            icon: Users,
+                            title: "Friends System",
+                            desc: "Build your gaming network and see when friends are online",
+                          },
+                          {
+                            icon: MessageCircle,
+                            title: "Real-Time Chat",
+                            desc: "Chat directly with friends and coordinate play sessions",
+                          },
+                          {
+                            icon: User,
+                            title: "Profile & Bio",
+                            desc: "Personalized profile with custom bio and gaming preferences",
+                          },
+                          {
+                            icon: CloudIcon,
+                            title: "Cloud Sync",
+                            desc: "Profile and game data synced across all your devices",
+                          },
+                          {
+                            icon: Trophy,
+                            title: "Public Leaderboard",
+                            desc: "Compete with the community and climb the ranks",
+                          },
+                          {
+                            icon: RefreshCw,
+                            title: "Auto Game Updates",
+                            desc: "Automatic background checking for game updates",
+                          },
+                          {
+                            icon: Eye,
+                            title: "Upcoming Updates Peek",
+                            desc: "Exclusive preview of upcoming Ascendara features",
+                          },
+                          {
+                            icon: Puzzle,
+                            title: "Nexus Mod Managing",
+                            desc: "Browse, install, and organize mods seamlessly",
+                          },
+                          {
+                            icon: Infinity,
+                            title: "Unlimited Downloads",
+                            desc: "Download as many games as you want, no restrictions",
+                          },
+                          {
+                            icon: Zap,
+                            title: "FLiNG Trainer",
+                            desc: "Auto-downloads and installs the correct trainer for your game",
+                          },
+                          {
+                            icon: ListOrdered,
+                            title: "Download Queue",
+                            desc: "Queue multiple downloads and let them run automatically",
+                          },
+                          {
+                            icon: Users,
+                            title: "Game Communities",
+                            desc: "Connect with players in game-specific communities",
+                            badge: "PLANNED",
+                          },
+                          {
+                            icon: CloudUpload,
+                            title: "Cloud Backups",
+                            desc: "Automatic cloud backup of your game saves",
+                            badge: "PLANNED",
+                          },
+                          {
+                            icon: Sparkle,
+                            title: "And More Coming",
+                            desc: "Constantly evolving with new features for subscribers",
+                          },
+                        ].map((feature, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            className="group relative flex items-start gap-3 rounded-lg bg-gradient-to-r from-muted/50 to-muted/30 p-3 transition-colors hover:from-primary/10 hover:to-primary/5"
+                          >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                              <feature.icon className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">{feature.title}</p>
+                                {feature.badge && (
+                                  <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                    {feature.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {feature.desc}
+                              </p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      {!deletedAccountWarning ? (
+                        <Button
+                          className="h-12 w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/25 transition-all hover:scale-[1.02] hover:shadow-yellow-500/40"
+                          onClick={handleSubscribe}
+                        >
+                          <Crown className="h-4 w-4" />
+                          {t("ascend.settings.subscribeToPro") ||
+                            "Subscribe to Ascend Pro"}
+                        </Button>
+                      ) : (
+                        <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">
+                          {t("account.errors.cannotSubscribeDeleted") ||
+                            "Cannot subscribe - this device is associated with a deleted account"}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -4475,6 +5030,134 @@ const Ascend = () => {
                   </div>
                 </AlertDialogContent>
               </AlertDialog>
+
+              {/* Discord Verification Card */}
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+                <div className="flex items-center justify-between border-b border-border/50 p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#5865F2]/10">
+                      <svg
+                        className="h-4 w-4 text-[#5865F2]"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                      </svg>
+                    </div>
+                    <h2 className="mt-2 font-semibold">
+                      {t("ascend.settings.discordVerification") || "Discord Verification"}
+                    </h2>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  <div className="space-y-4">
+                    {/* Trial Warning Banner */}
+                    {!ascendAccess.isSubscribed && !ascendAccess.isVerified && (
+                      <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-yellow-500/20">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                              {t("ascend.settings.verificationRequiresSubscription") ||
+                                "Subscription Required"}
+                            </p>
+                            <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
+                              {t("ascend.settings.verificationTrialWarning") ||
+                                "The verification command only works for active subscribers. Subscribe to Ascend to get verified and unlock exclusive Discord roles."}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/10">
+                        <BadgeCheck className="h-5 w-5 text-[#5865F2]" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="mb-1 font-medium">
+                          {t("ascend.settings.verifyYourAccount") ||
+                            "Verify Your Account"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {t("ascend.settings.discordVerificationDescription") ||
+                            "Get verified on our Discord server to unlock exclusive roles and features."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/50 p-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">
+                          {t("ascend.settings.howToVerify") || "How to Verify"}
+                        </span>
+                      </div>
+                      <ol className="space-y-2 text-sm text-muted-foreground">
+                        <li className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                            1
+                          </span>
+                          <span>
+                            {t("ascend.settings.verifyStep1") ||
+                              "Join our Discord server"}
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                            2
+                          </span>
+                          <span>
+                            {t("ascend.settings.verifyStep2") ||
+                              "Run the following command in any channel:"}
+                          </span>
+                        </li>
+                      </ol>
+
+                      <div className="mt-3 rounded-lg bg-background/80 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <code className="font-mono text-xs text-muted-foreground">
+                            {t("ascend.settings.verifyCommand") || "Verification Command"}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 gap-1 px-2 text-xs"
+                            onClick={() => {
+                              const command = `=verifyascend ${user?.uid?.substring(0, 10) || ""}`;
+                              navigator.clipboard.writeText(command);
+                              toast.success(
+                                t("ascend.settings.commandCopied") ||
+                                  "Command copied to clipboard!"
+                              );
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                            {t("ascend.settings.copy") || "Copy"}
+                          </Button>
+                        </div>
+                        <div className="rounded bg-muted/50 px-3 py-2 font-mono text-sm">
+                          =verifyascend {user?.uid?.substring(0, 10) || "XXXXXXXXXX"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 border-[#5865F2]/30 bg-[#5865F2]/5 hover:bg-[#5865F2]/10"
+                      onClick={() =>
+                        window.electron?.openURL("https://ascendara.app/discord")
+                      }
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      {t("ascend.settings.joinDiscord") || "Join Discord Server"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
 
               {/* Account Actions */}
               <div className="mt-8 space-y-4 border-t border-border/50 pt-8">
@@ -5777,15 +6460,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.additions.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.additions.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
@@ -5810,15 +6505,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.fixes.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <Check className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.fixes.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <Check className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
@@ -5843,15 +6550,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.improvements.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.improvements.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
@@ -5876,15 +6595,27 @@ const Ascend = () => {
                           </span>
                         </div>
                         <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.removals.map((item, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                            >
-                              <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-                              <span className="text-sm">{item}</span>
-                            </li>
-                          ))}
+                          {upcomingEntry.changes.removals.map((item, i) => {
+                            const isObject = typeof item === "object";
+                            const text = isObject ? item.change : item;
+                            const contributor = isObject ? item.contributor : null;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
+                              >
+                                <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">{text}</span>
+                                  {contributor && (
+                                    <span className="ml-2 inline-flex items-center rounded-md bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                      @{contributor}
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </motion.div>
                     )}
@@ -6076,7 +6807,7 @@ const Ascend = () => {
                                   <span>{viewingProfile.country}</span>
                                 </div>
                               )}
-                              {viewingProfile.socials?.discord && (
+                              {viewingProfile.socials?.linkedDiscord && (
                                 <div className="flex items-center gap-1.5 rounded-lg bg-[#5865F2]/10 px-2.5 py-1 text-sm">
                                   <svg
                                     className="h-4 w-4 text-[#5865F2]"
@@ -6085,7 +6816,13 @@ const Ascend = () => {
                                   >
                                     <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                                   </svg>
-                                  <span>{viewingProfile.socials.discord}</span>
+                                  <span>{viewingProfile.socials.linkedDiscord}</span>
+                                </div>
+                              )}
+                              {viewingProfile.socials?.epicId && (
+                                <div className="flex items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-1 text-sm">
+                                  <Gamepad2 className="h-4 w-4" />
+                                  <span>{viewingProfile.socials.epicId}</span>
                                 </div>
                               )}
                               {viewingProfile.socials?.github && (
@@ -6506,6 +7243,364 @@ const Ascend = () => {
             </div>
           );
 
+        case "premium":
+          return (
+            <div className="mb-24 space-y-6">
+              {/* Hero Header */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-primary/10 to-violet-500/10 p-8"
+              >
+                <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+                <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
+                <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
+                <div className="relative">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-violet-600 shadow-xl shadow-primary/30">
+                        <Crown className="h-8 w-8 text-white" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-bold">
+                          {t("ascend.premium.title") || "Premium Features"}
+                        </h1>
+                        <p className="mt-2 text-muted-foreground">
+                          {t("ascend.premium.subtitle") ||
+                            "Unlock the full potential of Ascendara with these exclusive features"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Features Grid */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Friends System */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
+                      <Users className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.friends.title") || "Friends System"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.friends.description") ||
+                        "Send and accept friend requests, build your gaming network, and see when your friends are online. Connect with other Ascendara users and grow your community."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Real-Time Chat */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-green-500/10 blur-2xl transition-all group-hover:bg-green-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/10 text-green-500">
+                      <MessageCircle className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.chat.title") || "Real-Time Chat"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.chat.description") ||
+                        "Chat directly with your friends within Ascendara. Share game recommendations, coordinate play sessions, and stay connected with your gaming circle."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Profile & Bio */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-purple-500/10 blur-2xl transition-all group-hover:bg-purple-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
+                      <User className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.profile.title") || "Profile & Bio"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.profile.description") ||
+                        "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Cloud Sync */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-cyan-500/10 blur-2xl transition-all group-hover:bg-cyan-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-500">
+                      <Cloud className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.cloudSync.title") || "Cloud Sync"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.cloudSync.description") ||
+                        "Your profile, achievements, and game data are automatically synced to the cloud. Access your complete gaming history from anywhere, on any device."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Public Leaderboard */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-amber-500/10 blur-2xl transition-all group-hover:bg-amber-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                      <Trophy className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.leaderboard.title") || "Public Leaderboard"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.leaderboard.description") ||
+                        "Compete with the community on the public leaderboard. See how your stats stack up against other players and climb the ranks."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Auto Game Update Checking */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-indigo-500/10 blur-2xl transition-all group-hover:bg-indigo-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500">
+                      <RefreshCw className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.autoUpdate.title") ||
+                        "Auto Game Update Checking"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.autoUpdate.description") ||
+                        "Automatically check for game updates in the background. Get notified when updates are available and install them with a single click."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Upcoming Updates Peek */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-violet-500/10 blur-2xl transition-all group-hover:bg-violet-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.upcoming.title") || "Upcoming Updates Peek"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.upcoming.description") ||
+                        "Get an exclusive preview of what's coming in the next Ascendara update. Stay ahead of the curve and know what new features are on the horizon."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Nexus Mod Managing */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-pink-500/10 blur-2xl transition-all group-hover:bg-pink-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-pink-500/10 text-pink-500">
+                      <Puzzle className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.nexusMods.title") || "Nexus Mod Managing"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.nexusMods.description") ||
+                        "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Unlimited Downloads */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.45 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl transition-all group-hover:bg-emerald-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                      <Infinity className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.unlimitedDownloads.title") ||
+                        "Unlimited Downloads"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.unlimitedDownloads.description") ||
+                        "Download as many games as you want with no restrictions. Ascend removes all download limits so you can build your library freely."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* FLiNG Trainer */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-orange-500/10 blur-2xl transition-all group-hover:bg-orange-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
+                      <Zap className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.flingTrainer.title") || "FLiNG Trainer"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.flingTrainer.description") ||
+                        "Automatically downloads the correct FLiNG trainer for your game and handles installation, no manual searching or setup required."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Download Queue */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.55 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-teal-500/10 blur-2xl transition-all group-hover:bg-teal-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500">
+                      <ListOrdered className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.downloadQueue.title") || "Download Queue"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.downloadQueue.description") ||
+                        "Queue multiple downloads and let Ascendara handle them automatically. Start downloads and come back when they're all ready."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Game Communities - PLANNED */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-500/10 blur-2xl transition-all group-hover:bg-rose-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
+                      <Gamepad2 className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="mt-4 text-lg font-semibold">
+                        {t("ascend.premium.communities.title") || "Game Communities"}
+                      </h3>
+                      <span className="mt-4 rounded-full bg-rose-500/20 px-2 py-0.5 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                        {t("ascend.premium.planned") || "PLANNED"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.communities.description") ||
+                        "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Cloud Backups - PLANNED */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-500/10 blur-2xl transition-all group-hover:bg-sky-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500">
+                      <CloudUpload className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="mt-4 text-lg font-semibold">
+                        {t("ascend.premium.cloudBackups.title") || "Cloud Backups"}
+                      </h3>
+                      <span className="mt-4 rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-semibold text-sky-600 dark:text-sky-400">
+                        {t("ascend.premium.planned") || "PLANNED"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.cloudBackups.description") ||
+                        "Automatically back up your game saves to the cloud. Never lose your progress and restore your saves on any device."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* And More Coming */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="group relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-violet-500/5 p-6 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl transition-all group-hover:bg-primary/30" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 text-primary">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.moreComing.title") || "And More Coming"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.moreComing.description") ||
+                        "There are constantly new features for Ascend subscribers. Your subscription helps fund development of exciting new capabilities."}
+                    </p>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          );
+
         default:
           return null;
       }
@@ -6759,7 +7854,7 @@ const Ascend = () => {
                     {t("account.pricingDetails")}{" "}
                     <a
                       onClick={() =>
-                        window.electron.openURL("https://ascendara.app/ascend")
+                        window.electron.openURL("https://ascendara.app/ascend?ref=app")
                       }
                       className="inline-flex cursor-pointer items-center text-primary hover:underline"
                     >
@@ -6800,27 +7895,35 @@ const Ascend = () => {
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
                       <h3 className="text-destructive text-sm font-semibold">
-                        {t("account.errors.accountExists")}
+                        {accountExistsError.isDeleted
+                          ? t("account.errors.cannotCreateAccount") ||
+                            "Cannot Create Account"
+                          : t("account.errors.accountExists")}
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        {accountExistsError.email
-                          ? t("account.errors.accountExistsWithEmail", {
-                              email: accountExistsError.email,
-                            })
-                          : t("account.errors.accountExistsNoEmail")}
+                        {accountExistsError.isDeleted
+                          ? t("account.errors.deletedAccountMessage") ||
+                            "This device is associated with a deleted account. You cannot create another account. Please contact support for assistance."
+                          : accountExistsError.email
+                            ? t("account.errors.accountExistsWithEmail", {
+                                email: accountExistsError.email,
+                              })
+                            : t("account.errors.accountExistsNoEmail")}
                       </p>
                       <div className="flex flex-wrap gap-2 pt-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          onClick={() => {
-                            setAccountExistsError(null);
-                            setIsLogin(true);
-                          }}
-                        >
-                          {t("account.errors.signInInstead")}
-                        </Button>
+                        {!accountExistsError.isDeleted && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setAccountExistsError(null);
+                              setIsLogin(true);
+                            }}
+                          >
+                            {t("account.errors.signInInstead")}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -7218,6 +8321,66 @@ const Ascend = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Email Confirmation Dialog */}
+      <AlertDialog open={showEmailConfirmDialog} onOpenChange={setShowEmailConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              {t("account.confirmEmail.title") || "Confirm Your Email"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  {t("account.confirmEmail.message") ||
+                    "Please confirm that your email address is correct. Once your account is created, you will NOT be able to change your email address."}
+                </p>
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {t("account.confirmEmail.emailLabel") || "Email Address:"}
+                  </p>
+                  <p className="mt-1 font-mono text-sm font-semibold text-foreground">
+                    {pendingSignupData?.email}
+                  </p>
+                </div>
+                <p className="text-destructive text-xs">
+                  <AlertTriangle className="mr-1 inline h-3 w-3" />
+                  {t("account.confirmEmail.warning") ||
+                    "This email cannot be changed after account creation!"}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowEmailConfirmDialog(false);
+                setPendingSignupData(null);
+              }}
+            >
+              {t("account.confirmEmail.goBack") || "Go Back & Edit"}
+            </AlertDialogCancel>
+            <Button
+              onClick={handleConfirmSignup}
+              disabled={isSubmitting}
+              className="text-secondary"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t("account.confirmEmail.creating") || "Creating Account..."}
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  {t("account.confirmEmail.confirm") || "Yes, Create Account"}
+                </>
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

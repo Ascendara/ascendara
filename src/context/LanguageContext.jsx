@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import i18n, { languages, getClosestSupportedLanguage } from "@/i18n";
 import { changeLanguage } from "@/services/languageService";
@@ -76,12 +77,15 @@ export function LanguageProvider({ children }) {
     document.documentElement.lang = language;
   }, [language]);
 
-  const value = {
-    language,
-    changeLanguage: setLanguageAndSave,
-    languages,
-    t: i18n.t.bind(i18n),
-  };
+  const value = useMemo(
+    () => ({
+      language,
+      changeLanguage: setLanguageAndSave,
+      languages,
+      t: i18n.t.bind(i18n),
+    }),
+    [language, setLanguageAndSave]
+  );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

@@ -128,7 +128,7 @@ const UsernameDialog = () => {
           size="icon"
           className="transition-transform duration-200 hover:scale-110 hover:bg-transparent"
         >
-          <Pencil className="h-4 w-4" />
+          <Pencil className="mb-2 h-4 w-4" />
         </Button>
       </AlertDialogTrigger>
 
