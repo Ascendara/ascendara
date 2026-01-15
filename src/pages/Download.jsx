@@ -63,6 +63,8 @@ import {
   X,
   Eye,
   FileQuestion,
+  Clock,
+  Check,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -354,6 +356,7 @@ export default function DownloadPage() {
   const [nexusGameData, setNexusGameData] = useState(null);
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
   const [flingTrainerData, setFlingTrainerData] = useState(null);
+  const [isPlayLater, setIsPlayLater] = useState(false);
 
   // Fetch rating from new API when using local index
   useEffect(() => {
@@ -413,6 +416,55 @@ export default function DownloadPage() {
 
     checkFlingTrainerSupport();
   }, [gameData?.game]);
+
+  // Check if game is in Play Later list
+  useEffect(() => {
+    if (!gameData?.game) return;
+    const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+    const isInList = playLaterGames.some(g => g.game === gameData.game);
+    setIsPlayLater(isInList);
+  }, [gameData?.game]);
+
+  // Handle Play Later Click
+  const handlePlayLater = () => {
+    const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+
+    if (isPlayLater) {
+      const updatedList = playLaterGames.filter(g => g.game !== gameData.game);
+      localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+      localStorage.removeItem(`play-later-image-${gameData.game}`);
+      setIsPlayLater(false);
+      toast.success(t("download.toast.removedFromPlayLater"));
+    } else {
+      const gameToSave = {
+        game: gameData.game,
+        gameID: gameData.gameID,
+        imgID: gameData.imgID,
+        version: gameData.version,
+        size: gameData.size,
+        category: gameData.category,
+        dlc: gameData.dlc,
+        online: gameData.online,
+        download_links: gameData.download_links,
+        desc: gameData.desc,
+        addedAt: Date.now(),
+      };
+      playLaterGames.push(gameToSave);
+      localStorage.setItem("play-later-games", JSON.stringify(playLaterGames));
+
+      if (cachedImage) {
+        try {
+          localStorage.setItem(`play-later-image-${gameData.game}`, cachedImage);
+        } catch (e) {
+          console.warn("Could not cache play later image:", e);
+        }
+      }
+
+      setIsPlayLater(true);
+      toast.success(t("download.toast.addedToPlayLater"));
+    }
+    window.dispatchEvent(new CustomEvent("play-later-updated"));
+  };
 
   // Use a ref to track the event handler and active status
   const urlHandlerRef = useRef(null);
@@ -1746,6 +1798,24 @@ export default function DownloadPage() {
                     >
                       <Eye className="h-4 w-4" />
                       {t("download.viewCriticReviews")}
+                    </Button>
+                    <Button
+                      variant={isPlayLater ? "default" : "ghost"}
+                      size="sm"
+                      className={`gap-1.5 ${isPlayLater ? "" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={handlePlayLater}
+                    >
+                      {isPlayLater ? (
+                        <>
+                          <Check className="h-4 w-4" />
+                          {t("gameCard.addedToPlayLater")}
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-4 w-4" />
+                          {t("gameCard.playLater")}
+                        </>
+                      )}
                     </Button>
                     {gameData.emulator && (
                       <Button
