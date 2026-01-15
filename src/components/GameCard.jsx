@@ -12,6 +12,13 @@ import {
   Calendar,
   Clock,
   Check,
+  Info,
+  Download,
+  Wrench,
+  Puzzle,
+  Cloud,
+  Trophy,
+  Star,
 } from "lucide-react";
 import {
   TooltipProvider,
@@ -266,91 +273,118 @@ const GameCard = memo(function GameCard({ game, compact }) {
     <Card
       ref={cardRef}
       onClick={handleCardClick}
-      className="group flex min-h-[400px] cursor-pointer flex-col overflow-hidden border-none bg-card text-card-foreground transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-lg"
+      className="group relative flex min-h-[380px] cursor-pointer flex-col overflow-hidden bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
     >
       <CardContent className="flex-1 p-0">
-        <div className="relative">
-          <AspectRatio ratio={16 / 9}>
+        {/* Image Section */}
+        <div className="relative overflow-hidden rounded-t-lg">
+          <AspectRatio ratio={16 / 9} className="overflow-hidden rounded-t-lg">
             {loading && !cachedImage && (
               <Skeleton className="absolute inset-0 h-full w-full bg-muted" />
             )}
             {cachedImage && (
-              <img
-                src={cachedImage}
-                alt={game.game}
-                className={`h-full w-full object-cover transition-opacity duration-300 ${
-                  loading ? "opacity-0" : "opacity-100"
-                }`}
-              />
+              <>
+                <img
+                  src={cachedImage}
+                  alt={game.game}
+                  className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 ${
+                    loading ? "opacity-0" : "opacity-100"
+                  } group-hover:scale-110`}
+                />
+                {/* Subtle vignette */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              </>
             )}
           </AspectRatio>
-          <div className="absolute right-2 top-2 flex gap-2">
-            {game.dlc && (
-              <div className="flex items-center gap-1.5 rounded-md border border-border/50 bg-background/95 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
-                <Gift className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium">{t("gameCard.dlc")}</span>
-              </div>
-            )}
-            {game.online && (
-              <div className="flex items-center gap-1.5 rounded-md border border-border/50 bg-background/95 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
-                <Gamepad2 className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium">{t("gameCard.online")}</span>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="h-full p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <h3 className="line-clamp-1 text-lg font-semibold text-foreground">
-              {sanitizeText(game.game)}
-            </h3>
+
+          {/* Top Status Bar */}
+          <div className="absolute left-0 right-0 top-0 flex items-start justify-between p-3">
+            {/* Rating */}
             {gameRating > 0 && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex cursor-help items-center">
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-                          fill="#FFD700"
-                          stroke="#FFD700"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <text
-                          x="50%"
-                          y="55%"
-                          dominantBaseline="middle"
-                          textAnchor="middle"
-                          fill="#000"
-                          fontSize="10"
-                          fontWeight="bold"
-                        >
-                          {Math.round(gameRating)}
-                        </text>
-                      </svg>
+                    <div className="flex cursor-help items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 backdrop-blur-sm animate-in fade-in-50 slide-in-from-left-3">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span className="text-xs font-bold text-white">
+                        {Math.round(gameRating)}
+                      </span>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-[250px] font-semibold text-secondary">
+                  <TooltipContent>
                     <p>{t("gameCard.ratingTooltip")}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )}
+
+            {/* Status Badge */}
+            {(isInstalled || needsUpdate) && (
+              <div
+                className={`rounded-full px-2.5 py-1 backdrop-blur-sm animate-in fade-in-50 slide-in-from-right-3 ${
+                  needsUpdate
+                    ? "bg-amber-500/90 text-white"
+                    : "bg-green-500/90 text-white"
+                }`}
+              >
+                <span className="text-xs font-semibold">
+                  {needsUpdate ? t("gameCard.updateAvailable") : t("gameCard.installed")}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="mb-2 flex flex-wrap gap-1">
+
+          {/* Bottom Info Bar on Image */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 pt-8">
+            <h3 className="mb-2 line-clamp-2 text-lg font-bold leading-tight text-white">
+              {sanitizeText(game.game)}
+            </h3>
+
+            {/* Compact Feature Icons */}
+            {(game.dlc || game.online) && (
+              <div className="flex items-center gap-2">
+                {game.dlc && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 backdrop-blur-sm transition-all hover:bg-white/20">
+                          <Gift className="h-3.5 w-3.5 text-white" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t("gameCard.dlcTooltip")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {game.online && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 backdrop-blur-sm transition-all hover:bg-white/20">
+                          <Gamepad2 className="h-3.5 w-3.5 text-white" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t("gameCard.onlineTooltip")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="space-y-3 p-4">
+          {/* Categories - Compact */}
+          <div className="flex flex-wrap gap-1.5">
             {categories.map((cat, index) => (
               <Badge
                 key={`${cat}-${index}`}
                 variant="secondary"
-                className="text-secondary-foreground bg-secondary text-xs animate-in fade-in-50 slide-in-from-left-3"
+                className="text-secondary-foreground border-0 bg-secondary/50 px-2 py-0.5 text-xs"
               >
                 {cat}
               </Badge>
@@ -358,7 +392,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
             {!showAllTags && gameCategories.length > 3 && (
               <Badge
                 variant="outline"
-                className="cursor-pointer border-muted-foreground text-xs text-muted-foreground transition-colors hover:bg-accent"
+                className="cursor-pointer border-muted-foreground/30 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
                 onClick={e => {
                   e.stopPropagation();
                   setShowAllTags(true);
@@ -370,7 +404,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
             {showAllTags && (
               <Badge
                 variant="outline"
-                className="cursor-pointer border-muted-foreground text-xs text-muted-foreground transition-colors animate-in fade-in-50 hover:bg-accent"
+                className="cursor-pointer border-muted-foreground/30 px-2 py-0.5 text-xs text-muted-foreground transition-colors animate-in fade-in-50 hover:bg-accent"
                 onClick={e => {
                   e.stopPropagation();
                   setShowAllTags(false);
@@ -380,48 +414,49 @@ const GameCard = memo(function GameCard({ game, compact }) {
               </Badge>
             )}
           </div>
-          <div className="flex gap-4 text-sm text-muted-foreground">
+
+          {/* Game Info - Inline */}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {game.size && (
-              <p>
-                {t("gameCard.size")}:{" "}
-                <span className="font-medium md:text-xs">{game.size}</span>
-              </p>
+              <div className="flex items-center gap-1">
+                <Download className="h-3 w-3" />
+                <span className="font-medium">{game.size}</span>
+              </div>
             )}
             {game.version && (
-              <p>
-                {t("gameCard.version")}:{" "}
-                <span className="font-medium md:text-xs">{game.version}</span>
-              </p>
+              <div className="flex items-center">
+                <span className="font-medium">v{game.version}</span>
+              </div>
+            )}
+            {game.latest_update && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                <span>{formatLatestUpdate(game.latest_update)}</span>
+              </div>
             )}
           </div>
-          {game.latest_update && (
-            <div className="mt-1 flex items-center gap-2 text-sm text-primary/80">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-muted-foreground md:text-xs">
-                {formatLatestUpdate(game.latest_update)}
-              </span>
-            </div>
-          )}
         </div>
       </CardContent>
-      <CardFooter className="flex flex-col gap-2 p-4">
+      <CardFooter className="flex flex-col gap-2 border-t p-4">
         {/* Play Later Button */}
         {!isInstalled && (
           <Button
             variant="ghost"
             size="sm"
-            className={`w-full gap-2 ${isPlayLater ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            className={`w-full gap-2 transition-all duration-200 ${isPlayLater ? "text-primary hover:bg-primary/5" : "text-muted-foreground hover:text-foreground"}`}
             onClick={handlePlayLater}
           >
             {isPlayLater ? (
               <>
-                <Check className="h-4 w-4" />
-                {t("gameCard.addedToPlayLater")}
+                <Check className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">
+                  {t("gameCard.addedToPlayLater")}
+                </span>
               </>
             ) : (
               <>
-                <Clock className="h-4 w-4" />
-                {t("gameCard.playLater")}
+                <Clock className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">{t("gameCard.playLater")}</span>
               </>
             )}
           </Button>
@@ -474,50 +509,45 @@ const GameCard = memo(function GameCard({ game, compact }) {
           return (
             <div className="w-full">
               <Button
-                variant="secondary"
-                size="sm"
-                className={`w-full bg-accent font-medium text-accent-foreground hover:bg-accent/90 ${showProviderBadge ? "rounded-b-none" : ""}`}
-                onClick={handleDownload}
-                disabled={isLoading}
-              >
-                {isLoading && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                {!isLoading && needsUpdate && (
-                  <ArrowUpFromLine className="mr-2 h-4 w-4 stroke-[3]" />
-                )}
-                {!isLoading && isInstalled && !needsUpdate && (
-                  <Gamepad2 className="mr-2 h-3 w-3" />
-                )}
-                {!isLoading && !isInstalled && (
-                  <ArrowDown className="mr-2 h-3.5 w-3.5 stroke-[4]" />
-                )}
-
-                {isLoading
-                  ? t("gameCard.loading")
-                  : needsUpdate
-                    ? t("gameCard.update")
+                variant={needsUpdate ? "default" : isInstalled ? "secondary" : "default"}
+                className={`w-full gap-2 font-semibold transition-all duration-200 ${
+                  needsUpdate
+                    ? "bg-amber-500 text-white hover:bg-amber-600"
                     : isInstalled
-                      ? t("gameCard.installed")
-                      : t("gameCard.download")}
-              </Button>
+                      ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                      : "bg-primary text-secondary hover:bg-primary/90"
+                } ${isLoading ? "opacity-70" : ""}`}
+                onClick={handleDownload}
+                disabled={isLoading || (isInstalled && !needsUpdate)}
+              >
+                {isLoading && <Loader className="h-4 w-4 animate-spin" />}
+                {!isLoading && needsUpdate && <ArrowUpFromLine className="h-4 w-4" />}
+                {!isLoading && isInstalled && !needsUpdate && (
+                  <Check className="h-4 w-4" />
+                )}
+                {!isLoading && !isInstalled && !needsUpdate && (
+                  <Info className="h-4 w-4" />
+                )}
 
-              {showProviderBadge && (
-                <div
-                  className={`flex items-center justify-center rounded-b-md py-1 text-xs font-medium ${torboxEnabled ? "bg-primary/10 text-primary" : "text-secondary-foreground bg-secondary/20"}`}
-                >
-                  {torboxEnabled && (
-                    <>
-                      <TorboxIcon className="mr-1 h-6 w-6" />
-                      Seamless with Torbox
-                    </>
-                  )}
-                  {provider === "seamless" && (
-                    <>
-                      <Zap fill="currentColor" className="mr-1 h-3 w-3" />
-                      Seamless
-                    </>
-                  )}
-                </div>
-              )}
+                <span>
+                  {isLoading
+                    ? t("gameCard.loading")
+                    : needsUpdate
+                      ? t("gameCard.update")
+                      : isInstalled
+                        ? t("gameCard.installed")
+                        : t("gameCard.viewDetails")}
+                </span>
+
+                {showProviderBadge && (
+                  <div className="ml-auto flex items-center gap-1">
+                    {torboxEnabled && <TorboxIcon className="h-4 w-4" />}
+                    {provider === "seamless" && (
+                      <Zap fill="currentColor" className="h-3 w-3" />
+                    )}
+                  </div>
+                )}
+              </Button>
             </div>
           );
         })()}

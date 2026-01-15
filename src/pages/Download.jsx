@@ -434,7 +434,6 @@ export default function DownloadPage() {
       localStorage.setItem("play-later-games", JSON.stringify(updatedList));
       localStorage.removeItem(`play-later-image-${gameData.game}`);
       setIsPlayLater(false);
-      toast.success(t("download.toast.removedFromPlayLater"));
     } else {
       const gameToSave = {
         game: gameData.game,
@@ -461,7 +460,6 @@ export default function DownloadPage() {
       }
 
       setIsPlayLater(true);
-      toast.success(t("download.toast.addedToPlayLater"));
     }
     window.dispatchEvent(new CustomEvent("play-later-updated"));
   };
@@ -1802,7 +1800,7 @@ export default function DownloadPage() {
                     <Button
                       variant={isPlayLater ? "default" : "ghost"}
                       size="sm"
-                      className={`gap-1.5 ${isPlayLater ? "" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`gap-1.5 ${isPlayLater ? "text-secondary" : "text-muted-foreground hover:text-foreground"}`}
                       onClick={handlePlayLater}
                     >
                       {isPlayLater ? (

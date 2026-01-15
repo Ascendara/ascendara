@@ -1016,16 +1016,20 @@
   "gameCard": {
     "addedToPlayLater": "Added to Play Later",
     "dlc": "ALL DLCs",
+    "dlcTooltip": "ALL DLCs Included",
     "download": "Download",
     "installed": "Installed",
     "loading": "Fetching Game Details...",
     "online": "ONLINE",
+    "onlineTooltip": "Online Multiplayer",
     "playLater": "Play Later",
     "ratingTooltip": "This is an average rating from others who have downloaded and played this game on Ascendara.",
     "showLess": "Show Less",
     "size": "Size",
     "update": "Update",
-    "version": "Version"
+    "updateAvailable": "Update Available",
+    "version": "Version",
+    "viewDetails": "View Details"
   },
   "gameScreen": {
     "aboutSoundtracks": "tracks were fetched and are provided by",
