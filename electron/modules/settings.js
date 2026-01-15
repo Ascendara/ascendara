@@ -64,8 +64,24 @@ class SettingsManager {
         },
       },
     };
+    this.initializeSettingsFile();
     this.settings = this.loadSettings();
     this.migrateToEncryption();
+  }
+
+  /**
+   * Initialize settings file with defaults if it doesn't exist
+   */
+  initializeSettingsFile() {
+    try {
+      if (!fs.existsSync(this.filePath)) {
+        console.log("Settings file not found, creating with default values");
+        fs.writeFileSync(this.filePath, JSON.stringify(this.defaultSettings, null, 2));
+        console.log("Settings file created successfully at:", this.filePath);
+      }
+    } catch (error) {
+      console.error("Failed to initialize settings file:", error);
+    }
   }
 
   /**

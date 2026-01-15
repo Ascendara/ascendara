@@ -12,7 +12,13 @@ async function getSettings() {
     const data = await fs.readFile(settingsPath, "utf8");
     return JSON.parse(data);
   } catch (error) {
-    console.error("Error reading settings file:", error);
+    if (error.code === "ENOENT") {
+      console.warn(
+        "Settings file not found. This is normal on first run. Using default settings."
+      );
+    } else {
+      console.error("Error reading settings file:", error);
+    }
     return {};
   }
 }
