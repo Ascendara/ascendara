@@ -205,7 +205,7 @@
       "expired": "বিচারের মেয়াদ শেষ",
       "expiredMessage": "আপনার 7 দিনের অ্যাসেন্ড ট্রায়াল শেষ হয়েছে৷ বন্ধু, ক্লাউড-সিঙ্ক এবং আরও অনেক কিছুর মতো Ascend বৈশিষ্ট্যগুলি ব্যবহার চালিয়ে যেতে সদস্যতা নিন।",
       "noTrialMessage": "আপনি একটি বিনামূল্যে ট্রায়াল জন্য যোগ্য নন. Ascend বৈশিষ্ট্য অ্যাক্সেস করতে সাবস্ক্রাইব করুন.",
-      "noTrialTitle": "সদস্যতা প্রয়োজন",
+      "noTrialTitle": "সাবস্ক্রিপশন প্রয়োজন",
       "reason": "কারণ",
       "trial": "আমি বুঝি আমার 7 দিনের বিনামূল্যের ট্রায়াল আছে",
       "trialBlocked": "ট্রায়াল ইতিমধ্যে ব্যবহৃত",
@@ -590,7 +590,7 @@
       "startExploring": "অন্বেষণ শুরু করুন",
       "status": "স্ট্যাটাস",
       "steamPlaceholder": "আপনার স্টিম ব্যবহারকারীর নাম বা আইডি",
-      "subscribe": "Ascend-এ সদস্যতা নিন",
+      "subscribe": "Ascend সদস্যতা",
       "subscribeToKeep": "তাদের চিরতরে রাখতে সাবস্ক্রাইব করুন",
       "subscribeToPro": "Ascend সদস্যতা",
       "subscription": "সাবস্ক্রিপশন",
@@ -603,7 +603,7 @@
       "trialActive": "ট্রায়াল সক্রিয়",
       "trialDaysRemaining": "আপনার ট্রায়ালে {{days}} দিন বাকি",
       "trialProgress": "বিচারের অগ্রগতি",
-      "verificationRequiresSubscription": "সদস্যতা প্রয়োজন",
+      "verificationRequiresSubscription": "সাবস্ক্রিপশন প্রয়োজন",
       "verificationTrialWarning": "যাচাইকরণ কমান্ড শুধুমাত্র সক্রিয় গ্রাহকদের জন্য কাজ করে। যাচাই করতে এবং এক্সক্লুসিভ ডিসকর্ড চ্যানেল আনলক করতে Ascend-এ সদস্যতা নিন।",
       "verifiedDescription": "সমস্ত Ascend বৈশিষ্ট্যগুলিতে আপনার সম্পূর্ণ অ্যাক্সেস রয়েছে৷",
       "verifiedThankYou": "Ascendara অংশ হওয়ার জন্য আপনাকে ধন্যবাদ!",
@@ -1012,16 +1012,20 @@
   "gameCard": {
     "addedToPlayLater": "পরে খেলতে যোগ করা হয়েছে",
     "dlc": "সমস্ত DLC",
+    "dlcTooltip": "সমস্ত DLCs অন্তর্ভুক্ত",
     "download": "ডাউনলোড করুন",
     "installed": "ইনস্টল করা হয়েছে",
     "loading": "খেলার বিবরণ আনা হচ্ছে...",
     "online": "অনলাইন",
+    "onlineTooltip": "অনলাইন মাল্টিপ্লেয়ার",
     "playLater": "পরে খেলুন",
     "ratingTooltip": "এটি অন্যদের থেকে একটি গড় রেটিং যারা Ascendara তে এই গেমটি ডাউনলোড করেছেন এবং খেলেছেন৷",
     "showLess": "কম দেখান",
     "size": "আকার",
     "update": "আপডেট",
-    "version": "সংস্করণ"
+    "updateAvailable": "আপডেট উপলব্ধ",
+    "version": "সংস্করণ",
+    "viewDetails": "বিস্তারিত দেখুন"
   },
   "gameScreen": {
     "aboutSoundtracks": "ট্র্যাক আনা হয়েছে এবং দ্বারা প্রদান করা হয়",
@@ -1998,7 +2002,7 @@
       "title": "আপনার পছন্দ"
     },
     "sound": {
-      "almostThere": "আপনি প্রায় সেখানে...",
+      "almostThere": "আপনি প্রায় চলে এসেছেন...",
       "gettingCloser": "কাছাকাছি হচ্ছে...",
       "musicBy": "kinflo দ্বারা প্রভাব",
       "readyForLiftoff": "আরোহণের জন্য প্রস্তুত?",

@@ -1012,16 +1012,20 @@
   "gameCard": {
     "addedToPlayLater": "تمت الإضافة إلى التشغيل لاحقًا",
     "dlc": "جميع المحتوى القابل للتنزيل (DLC).",
+    "dlcTooltip": "جميع المحتوى القابل للتنزيل (DLC) متضمن",
     "download": "تحميل",
     "installed": "تم التثبيت",
     "loading": "جارٍ جلب تفاصيل اللعبة...",
     "online": "متصل",
+    "onlineTooltip": "متعددة اللاعبين عبر الإنترنت",
     "playLater": "العب لاحقًا",
     "ratingTooltip": "هذا تقييم متوسط ​​من الآخرين الذين قاموا بتنزيل هذه اللعبة وتشغيلها على Ascendara.",
     "showLess": "عرض أقل",
     "size": "مقاس",
     "update": "تحديث",
-    "version": "إصدار"
+    "updateAvailable": "التحديث متاح",
+    "version": "إصدار",
+    "viewDetails": "عرض التفاصيل"
   },
   "gameScreen": {
     "aboutSoundtracks": "تم جلب المسارات وتوفيرها بواسطة",

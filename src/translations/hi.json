@@ -1012,16 +1012,20 @@
   "gameCard": {
     "addedToPlayLater": "बाद में खेलने के लिए जोड़ा गया",
     "dlc": "सभी डीएलसी",
+    "dlcTooltip": "सभी डीएलसी शामिल हैं",
     "download": "डाउनलोड करना",
     "installed": "स्थापित",
     "loading": "गेम विवरण लाया जा रहा है...",
     "online": "ऑनलाइन",
+    "onlineTooltip": "ऑनलाइन मल्टीप्लेयर",
     "playLater": "बाद में खेलें",
     "ratingTooltip": "यह उन अन्य लोगों की औसत रेटिंग है जिन्होंने एस्केंडारा पर इस गेम को डाउनलोड किया और खेला है।",
     "showLess": "कम दिखाएँ",
     "size": "आकार",
     "update": "अद्यतन",
-    "version": "संस्करण"
+    "updateAvailable": "उपलब्ध अद्यतन",
+    "version": "संस्करण",
+    "viewDetails": "विवरण देखें"
   },
   "gameScreen": {
     "aboutSoundtracks": "ट्रैक लाए गए थे और द्वारा प्रदान किए गए हैं",

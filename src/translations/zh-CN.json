@@ -392,7 +392,7 @@
       "upcoming": "即将更新"
     },
     "notifications": {
-      "empty": "无通知",
+      "empty": "没有通知",
       "emptyDescription": "你们都被抓住了！稍后回来查看新的更新。",
       "loading": "正在加载通知...",
       "subtitle": "随时了解重要公告和更新",
@@ -554,7 +554,7 @@
       "daysLeft": "剩余天数",
       "discordPlaceholder": "您的 Discord 用户名",
       "discordReadOnly": "Discord 用户名是只读的",
-      "discordVerification": "不一致验证",
+      "discordVerification": "不和谐验证",
       "discordVerificationDescription": "在 Discord 服务器上进行验证，以解锁专属角色和功能。",
       "displayName": "显示名称",
       "edit": "编辑个人资料",
@@ -1009,16 +1009,20 @@
   "gameCard": {
     "addedToPlayLater": "添加到稍后播放",
     "dlc": "所有 DLC",
+    "dlcTooltip": "包含所有 DLC",
     "download": "下载",
     "installed": "已安装",
     "loading": "正在获取游戏详细信息...",
     "online": "在线的",
+    "onlineTooltip": "在线多人游戏",
     "playLater": "稍后玩",
     "ratingTooltip": "这是在 Ascendara 上下载并玩过该游戏的其他人的平均评分。",
     "showLess": "显示较少",
     "size": "尺寸",
     "update": "更新",
-    "version": "版本"
+    "updateAvailable": "可用更新",
+    "version": "版本",
+    "viewDetails": "查看详情"
   },
   "gameScreen": {
     "aboutSoundtracks": "曲目已获取并由以下人员提供",

@@ -1012,16 +1012,20 @@
   "gameCard": {
     "addedToPlayLater": "後でプレイに追加",
     "dlc": "すべてのDLC",
+    "dlcTooltip": "すべてのDLCが含まれています",
     "download": "ダウンロード",
     "installed": "インストール済み",
     "loading": "ゲームの詳細を取得中...",
     "online": "オンライン",
+    "onlineTooltip": "オンラインマルチプレイヤー",
     "playLater": "後でプレイ",
     "ratingTooltip": "これは、Ascendara でこのゲームをダウンロードしてプレイした他のユーザーからの平均評価です。",
     "showLess": "表示を減らす",
     "size": "サイズ",
     "update": "アップデート",
-    "version": "バージョン"
+    "updateAvailable": "利用可能なアップデート",
+    "version": "バージョン",
+    "viewDetails": "詳細を見る"
   },
   "gameScreen": {
     "aboutSoundtracks": "トラックは取得され、提供されています",

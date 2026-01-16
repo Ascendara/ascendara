@@ -1012,16 +1012,20 @@
   "gameCard": {
     "addedToPlayLater": "Agregado para jugar más tarde",
     "dlc": "TODOS los DLC",
+    "dlcTooltip": "TODOS los DLC incluidos",
     "download": "Descargar",
     "installed": "Instalado",
     "loading": "Obteniendo detalles del juego...",
     "online": "EN LÍNEA",
+    "onlineTooltip": "Multijugador en línea",
     "playLater": "Jugar más tarde",
     "ratingTooltip": "Esta es una calificación promedio de otras personas que descargaron y jugaron este juego en Ascendara.",
     "showLess": "Mostrar menos",
     "size": "Tamaño",
     "update": "Actualizar",
-    "version": "Versión"
+    "updateAvailable": "Actualización disponible",
+    "version": "Versión",
+    "viewDetails": "Ver detalles"
   },
   "gameScreen": {
     "aboutSoundtracks": "Las pistas fueron recuperadas y proporcionadas por",
