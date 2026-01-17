@@ -596,29 +596,31 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
           {t("library.backups.settings")}
         </h3>
 
-        <Card className="border-muted/40 transition-all hover:border-muted/60">
+        <Card className="pointer-events-none border-muted/40 transition-all hover:border-muted/60">
           <CardContent className="p-5">
             <div className="flex items-center justify-between space-x-4">
               <div className="flex-1 space-y-1">
-                <Label
-                  htmlFor="autoBackup"
-                  className="flex items-center gap-2 text-base font-semibold"
-                >
+                {/* Replaced Label by div to disable clic on text */}
+                <div className="flex items-center gap-2 text-base font-semibold">
                   <div className="rounded-full bg-primary/10 p-1.5">
                     <FolderSync className="h-4 w-4 text-primary" />
                   </div>
                   {t("library.backups.autoBackupOnGameClose")}
-                </Label>
+                </div>
                 <span className="block text-sm text-muted-foreground">
                   {t("library.backups.autoBackupDesc")}
                 </span>
               </div>
-              <Switch
-                id="autoBackup"
-                checked={autoBackupEnabled}
-                onCheckedChange={handleToggleAutoBackup}
-                className="data-[state=checked]:bg-primary"
-              />
+
+              {/* Only enable click on button */}
+              <div className="pointer-events-auto">
+                <Switch
+                  id="autoBackup"
+                  checked={autoBackupEnabled}
+                  onCheckedChange={handleToggleAutoBackup}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -626,21 +628,21 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
         {/* Cloud Backup Toggle - shown to all users */}
         <Card
           className={`border-2 transition-all duration-300 ${
-            user && hasActiveSubscription
+            user && hasActiveSubscription && autoBackupEnabled
               ? "border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-purple-500/5 hover:border-blue-500/50"
               : "border-muted/40 hover:border-muted/60"
-          }`}
+          } ${
+            !autoBackupEnabled ? "bg-muted/20 opacity-60 saturate-50" : ""
+          } pointer-events-none`}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between space-x-2">
               <div className="flex-1 space-y-1">
-                <Label
-                  htmlFor="autoCloudBackup"
-                  className="flex items-center gap-2 text-base font-medium"
-                >
+                {/* Again replaced Label by div to disable clic on text */}
+                <div className="flex items-center gap-2 text-base font-medium">
                   <div
                     className={`rounded-full p-1.5 ${
-                      user && hasActiveSubscription
+                      user && hasActiveSubscription && autoBackupEnabled
                         ? "bg-gradient-to-br from-blue-500 to-purple-500"
                         : "bg-muted"
                     }`}
@@ -649,30 +651,36 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
                   </div>
                   <span
                     className={
-                      user && hasActiveSubscription
+                      user && hasActiveSubscription && autoBackupEnabled
                         ? "bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text font-semibold text-transparent"
                         : ""
                     }
                   >
                     {t("library.backups.autoCloudBackup")}
                   </span>
-                  {user && hasActiveSubscription && (
+                  {user && hasActiveSubscription && autoBackupEnabled && (
                     <span className="ml-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-0.5 text-xs font-medium text-white">
                       Active
                     </span>
                   )}
-                </Label>
+                </div>
+
                 <span className="block text-sm text-muted-foreground">
-                  {user && hasActiveSubscription
-                    ? t("library.backups.autoCloudBackupDesc")
-                    : !user
-                      ? "Sign in to Ascend to unlock cloud backups and keep your saves safe across devices"
-                      : "Upgrade to Ascend Premium to unlock cloud backups and protect your game saves"}
+                  {!autoBackupEnabled
+                    ? t(
+                        "library.backups.enableLocalFirst",
+                        "Enable local auto-backup first to use cloud sync"
+                      )
+                    : user && hasActiveSubscription
+                      ? t("library.backups.autoCloudBackupDesc")
+                      : !user
+                        ? "Sign in to Ascend to unlock cloud backups and keep your saves safe across devices"
+                        : "Upgrade to Ascend Premium to unlock cloud backups and protect your game saves"}
                 </span>
                 {!user && (
                   <Button
                     variant="link"
-                    className="h-auto p-0 text-xs text-blue-500 hover:text-blue-600"
+                    className="pointer-events-auto h-auto p-0 text-xs text-blue-500 hover:text-blue-600"
                     onClick={() => (window.location.hash = "#/ascend")}
                   >
                     Learn more about Ascend →
@@ -681,55 +689,60 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
                 {user && !hasActiveSubscription && (
                   <Button
                     variant="link"
-                    className="h-auto p-0 text-xs text-blue-500 hover:text-blue-600"
+                    className="pointer-events-auto h-auto p-0 text-xs text-blue-500 hover:text-blue-600"
                     onClick={() => (window.location.hash = "#/ascend")}
                   >
                     Upgrade to Premium →
                   </Button>
                 )}
               </div>
-              <Switch
-                id="autoCloudBackup"
-                checked={autoCloudBackupEnabled}
-                onCheckedChange={checked => {
-                  if (!user) {
-                    toast.error("Please sign in to Ascend to use cloud backups", {
-                      description: "Cloud backups require an Ascend account",
-                    });
-                    return;
-                  }
-                  if (!hasActiveSubscription) {
-                    toast.error("Cloud backups require Ascend Premium", {
-                      description: "Upgrade to Premium to unlock cloud backups",
-                      action: {
-                        label: "Upgrade",
-                        onClick: () => (window.location.hash = "#/ascend"),
-                      },
-                    });
-                    return;
-                  }
-                  setAutoCloudBackupEnabled(checked);
-                  // Save preference to localStorage
-                  localStorage.setItem(
-                    `cloudBackup_${game.game || game.name}`,
-                    checked.toString()
-                  );
-                  toast.success(
-                    checked ? "Cloud backups enabled" : "Cloud backups disabled",
-                    {
-                      description: checked
-                        ? "Backups will be automatically uploaded to cloud"
-                        : "Backups will only be stored locally",
+
+              <div className="pointer-events-auto">
+                <Switch
+                  id="autoCloudBackup"
+                  checked={autoCloudBackupEnabled}
+                  onCheckedChange={checked => {
+                    // Disable if parent is disabled
+                    if (!autoBackupEnabled) return;
+                    if (!user) {
+                      toast.error("Please sign in to Ascend to use cloud backups", {
+                        description: "Cloud backups require an Ascend account",
+                      });
+                      return;
                     }
-                  );
-                }}
-                disabled={!user || !hasActiveSubscription}
-                className={`${
-                  user && hasActiveSubscription
-                    ? "data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-blue-500 data-[state=checked]:to-purple-500"
-                    : "opacity-50"
-                }`}
-              />
+                    if (!hasActiveSubscription) {
+                      toast.error("Cloud backups require Ascend Premium", {
+                        description: "Upgrade to Premium to unlock cloud backups",
+                        action: {
+                          label: "Upgrade",
+                          onClick: () => (window.location.hash = "#/ascend"),
+                        },
+                      });
+                      return;
+                    }
+                    setAutoCloudBackupEnabled(checked);
+                    // Save preference to localStorage
+                    localStorage.setItem(
+                      `cloudBackup_${game.game || game.name}`,
+                      checked.toString()
+                    );
+                    toast.success(
+                      checked ? "Cloud backups enabled" : "Cloud backups disabled",
+                      {
+                        description: checked
+                          ? "Backups will be automatically uploaded to cloud"
+                          : "Backups will only be stored locally",
+                      }
+                    );
+                  }}
+                  disabled={!user || !hasActiveSubscription || !autoBackupEnabled}
+                  className={`${
+                    user && hasActiveSubscription && autoBackupEnabled
+                      ? "data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-blue-500 data-[state=checked]:to-purple-500"
+                      : "opacity-50"
+                  }`}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
