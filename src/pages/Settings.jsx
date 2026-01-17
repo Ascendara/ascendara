@@ -403,7 +403,7 @@ function Settings() {
     if (!isFirstMount.current) return;
 
     // Wait for settings to be loaded from context
-    if (!settings || !settings.downloadDirectory) {
+    if (!settings) {
       return;
     }
 
@@ -426,7 +426,7 @@ function Settings() {
     } finally {
       setIsLoading(false);
     }
-  }, [settings.downloadDirectory, settings.backupDirectory]); // Only depend on specific values we need
+  }, [settings]); // Simmplify dependencies
 
   const handleSettingChange = useCallback(
     async (key, value, ludusavi = false) => {

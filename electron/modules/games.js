@@ -114,7 +114,7 @@ function registerGameHandlers() {
     try {
       if (!settings.downloadDirectory) {
         console.error("Download directory not set");
-        return;
+        return [];
       }
 
       const allDownloadDirectories = [

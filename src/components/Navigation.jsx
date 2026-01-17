@@ -164,6 +164,7 @@ const Navigation = memo(({ items }) => {
 
   useEffect(() => {
     const checkDownloaderStatus = async () => {
+      if (!settings?.downloadDirectory || settings.downloadDirectory === "") return;
       try {
         const games = await window.electron.getGames();
         if (!games || !Array.isArray(games)) {
@@ -202,7 +203,7 @@ const Navigation = memo(({ items }) => {
       checkDownloaderStatus();
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [settings?.downloadDirectory]); // Adding dependancy
 
   useEffect(() => {
     const handleResize = () => {
