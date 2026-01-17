@@ -219,7 +219,8 @@ function Settings() {
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
   const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
-  const [customColors, setCustomColors] = useState({
+  // Default custom colors for merging with saved themes (handles missing new properties)
+  const defaultCustomColors = {
     background: "255 255 255",
     foreground: "15 23 42",
     primary: "124 58 237",
@@ -251,6 +252,20 @@ function Settings() {
     // Startup/Welcome screen
     startupBackground: "255 255 255",
     startupAccent: "124 58 237",
+  };
+  const [customColors, setCustomColors] = useState(() => {
+    // Try to load from localStorage
+    try {
+      const savedColors = localStorage.getItem("custom-theme-colors");
+      if (savedColors) {
+        const parsed = JSON.parse(savedColors);
+        return { ...defaultCustomColors, ...parsed };
+      }
+    } catch (e) {
+      console.warn("Failed to load theme from localstorage", e);
+    }
+    // Else use default
+    return defaultCustomColors;
   });
   const [originalColorsOnOpen, setOriginalColorsOnOpen] = useState(null);
   const [showPublicThemesDialog, setShowPublicThemesDialog] = useState(false);
@@ -466,7 +481,9 @@ function Settings() {
         return;
       }
 
+      console.log(`Trying to update: ${key} -> ${value}`);
       window.electron.updateSetting(key, value).then(success => {
+        console.log(`Update result ${key}:`, success);
         if (success) {
           setSettingsLocal(prev => ({
             ...prev,
@@ -552,59 +569,36 @@ function Settings() {
 
   // Theme handling
   const handleThemeChange = useCallback(
-    newTheme => {
-      // Clear custom theme styles when switching away from custom
+    async newTheme => {
+      // Apply
       if (newTheme !== "custom") {
         clearCustomThemeStyles();
       }
       setTheme(newTheme);
       localStorage.setItem("ascendara-theme", newTheme);
-      handleSettingChange("theme", newTheme);
-    },
-    [handleSettingChange, setTheme]
-  );
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("ascendara-theme");
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
-  }, [setTheme]);
+      // Try to save
+      try {
+        console.log("Saving theme:", newTheme);
+        const success = await window.electron.updateSetting("theme", newTheme);
+        console.log("Save successful ?", success);
+
+        if (success) {
+          // Updating context locally
+          setSettingsLocal(prev => ({ ...prev, theme: newTheme }));
+        } else {
+          toast.error("Failed to save theme preference");
+        }
+      } catch (e) {
+        console.error("Error saving theme:", e);
+      }
+    },
+    [setSettingsLocal, setTheme]
+  );
 
   const groupedThemes = {
     light: themes.filter(t => t.group === "light"),
     dark: themes.filter(t => t.group === "dark"),
-  };
-
-  // Default custom colors for merging with saved themes (handles missing new properties)
-  const defaultCustomColors = {
-    background: "255 255 255",
-    foreground: "15 23 42",
-    primary: "124 58 237",
-    secondary: "221 214 254",
-    muted: "221 214 254",
-    mutedForeground: "88 28 135",
-    accent: "221 214 254",
-    accentForeground: "88 28 135",
-    border: "167 139 250",
-    input: "167 139 250",
-    ring: "88 28 135",
-    card: "255 255 255",
-    cardForeground: "15 23 42",
-    popover: "255 255 255",
-    popoverForeground: "15 23 42",
-    navBackground: "255 255 255",
-    navActive: "124 58 237",
-    navActiveText: "255 255 255",
-    navHover: "221 214 254",
-    success: "34 197 94",
-    warning: "234 179 8",
-    error: "239 68 68",
-    info: "59 130 246",
-    starFilled: "250 204 21",
-    starEmpty: "148 163 184",
-    startupBackground: "255 255 255",
-    startupAccent: "124 58 237",
   };
 
   // Load custom colors from settings
@@ -624,6 +618,7 @@ function Settings() {
 
   // Apply custom theme CSS variables when custom theme is active
   useEffect(() => {
+    if (theme !== "custom") return;
     if (theme === "custom" && customColors) {
       const root = document.documentElement;
       root.style.setProperty("--color-background", customColors.background);
@@ -776,6 +771,17 @@ function Settings() {
       // Update React state without triggering full save
       setTheme("custom");
       localStorage.setItem("ascendara-theme", "custom");
+
+      localStorage.setItem("custom-theme-colors", JSON.stringify(customColors));
+      setSettingsLocal(prev => ({
+        ...prev,
+        theme: "custom",
+        customTheme: [customColors], // Use customColors, not colors
+      }));
+
+      const root = document.documentElement;
+      root.style.setProperty("--color-background", customColors.background);
+      root.style.setProperty("--color-foreground", customColors.foreground);
 
       setShowCustomColorsDialog(false);
       toast.success(t("settings.customColorsSaved") || "Custom colors saved!");
