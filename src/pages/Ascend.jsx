@@ -225,6 +225,7 @@ const Ascend = () => {
   const [outgoingRequests, setOutgoingRequests] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [loadingRequestIds, setLoadingRequestIds] = useState(new Set());
 
   // Profile editing state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -1301,14 +1302,27 @@ const Ascend = () => {
   };
 
   const handleSendRequest = async toUid => {
-    const result = await sendFriendRequest(toUid);
-    if (result.success) {
-      toast.success(t("ascend.friends.requestSent"));
-      loadRequestsData();
-      // Remove from search results
-      setSearchResults(prev => prev.filter(u => u.uid !== toUid));
-    } else {
-      toast.error(result.error);
+    // Ignore click
+    if (loadingRequestIds.has(toUid)) return;
+
+    setLoadingRequestIds(prev => new Set(prev).add(toUid));
+
+    try {
+      const result = await sendFriendRequest(toUid);
+      if (result.success) {
+        toast.success(t("ascend.friends.requestSent"));
+        loadRequestsData();
+        // Remove from search results
+        setSearchResults(prev => prev.filter(u => u.uid !== toUid));
+      } else {
+        toast.error(result.error);
+      }
+    } finally {
+      setLoadingRequestIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(toUid);
+        return newSet;
+      });
     }
   };
 
@@ -3054,15 +3068,32 @@ const Ascend = () => {
                           <div className="flex shrink-0 items-center gap-2">
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                              variant={
+                                loadingRequestIds.has(result.uid) ? "ghost" : "outline"
+                              } // Change style if loading
+                              className={`rounded-xl transition-all ${
+                                loadingRequestIds.has(result.uid)
+                                  ? "cursor-not-allowed opacity-100" // Still visible if loading
+                                  : "opacity-0 group-hover:opacity-100"
+                              }`}
+                              disabled={loadingRequestIds.has(result.uid)} // Disable button to prevent spam
                               onClick={e => {
                                 e.stopPropagation();
                                 handleSendRequest(result.uid);
                               }}
                             >
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              {t("ascend.friends.addFriend")}
+                              {loadingRequestIds.has(result.uid) ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                  {/* Spinner */}
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus className="mr-2 h-4 w-4" />
+                                  {t("ascend.friends.addFriend")}
+                                </>
+                              )}
                             </Button>
                             <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
                           </div>
