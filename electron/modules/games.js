@@ -258,6 +258,8 @@ function registerGameHandlers() {
             throw new Error("Executable path not found in game info");
           }
 
+          if (gameInfo.backups === true) backupOnClose = true;
+
           if (gameInfo.launchCommands) {
             launchCommands = gameInfo.launchCommands;
           }
@@ -278,6 +280,8 @@ function registerGameHandlers() {
           if (!gameInfo || !gameInfo.executable) {
             throw new Error(`Game not found in games.json: ${game}`);
           }
+
+          if (gameInfo.backups === true) backupOnClose = true;
 
           if (gameInfo.launchCommands) {
             launchCommands = gameInfo.launchCommands;
