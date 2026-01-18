@@ -8665,7 +8665,7 @@ const Ascend = () => {
                             id="password"
                             name="password"
                             type={showPassword ? "text" : "password"}
-                            placeholder={t("account.form.passwordPlaceholder")}
+                            placeholder={t("account.form.password")}
                             value={formData.password}
                             onChange={handleInputChange}
                             className="h-9 rounded-lg border-border/50 bg-background/50 pl-9 pr-9 text-sm transition-all focus:bg-background focus:shadow-md"
