@@ -13,6 +13,12 @@ import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { SearchProvider } from "@/context/SearchContext";
+import GlobalSearch from "@/components/GlobalSearch";
+import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useGameIndexSearch } from "@/hooks/useGameIndexSearch";
+import { useSettingsSearch } from "@/hooks/useSettingsSearch";
+import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import { analytics } from "@/services/analyticsService";
 import {
   initializeStatusService,
@@ -410,6 +416,15 @@ const AscendStatusInitializer = () => {
     }
   }, [user?.uid]);
 
+  return null;
+};
+
+// Initialize global search system
+const SearchInitializer = () => {
+  useGlobalSearch();
+  useGameIndexSearch();
+  useSettingsSearch();
+  useLibrarySearch();
   return null;
 };
 
@@ -1265,21 +1280,25 @@ function App() {
           <SettingsProvider>
             <AuthProvider>
               <TourProvider>
-                <Router>
-                  <ToasterWithTheme />
-                  <ContextMenu />
-                  <ScrollToTop />
-                  <AscendStatusInitializer />
-                  <UserActivityTracker />
-                  <MessageNotificationChecker />
-                  <TrialWarningChecker />
-                  <GiantBombMigrationWarning />
-                  <AppRoutes />
-                  <MiniPlayer
-                    expanded={playerExpanded}
-                    onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
-                  />
-                </Router>
+                <SearchProvider>
+                  <Router>
+                    <ToasterWithTheme />
+                    <ContextMenu />
+                    <ScrollToTop />
+                    <AscendStatusInitializer />
+                    <UserActivityTracker />
+                    <MessageNotificationChecker />
+                    <TrialWarningChecker />
+                    <GiantBombMigrationWarning />
+                    <SearchInitializer />
+                    <GlobalSearch />
+                    <AppRoutes />
+                    <MiniPlayer
+                      expanded={playerExpanded}
+                      onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
+                    />
+                  </Router>
+                </SearchProvider>
               </TourProvider>
             </AuthProvider>
           </SettingsProvider>

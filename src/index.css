@@ -130,3 +130,21 @@
 .translated-rtl {
   font-family: inherit !important;
 }
+
+/* Highlight animation for search navigation */
+.highlight-setting {
+  animation: highlightPulse 4s ease-in-out;
+  border-radius: 0.5rem;
+}
+
+@keyframes highlightPulse {
+  0%,
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background-color: rgb(var(--color-primary) / 0.1);
+    box-shadow: 0 0 0 4px rgb(var(--color-primary) / 0.1);
+  }
+}

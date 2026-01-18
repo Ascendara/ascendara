@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
+import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
   Plus,
   FolderOpen,
@@ -185,6 +186,8 @@ const Library = () => {
   useEffect(() => {
     localStorage.setItem("game-favorites", JSON.stringify(favorites));
   }, [favorites]);
+
+  useLibrarySearch();
 
   // Verify Ascend access
   useEffect(() => {

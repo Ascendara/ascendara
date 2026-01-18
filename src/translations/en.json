@@ -53,9 +53,9 @@
       "cloudSyncDesc": "Sync your Ascendara profile and game stats across devices",
       "cloudSyncandBackups": "Cloud Sync & Backups",
       "cloudSyncandBackupsDesc": "Sync your Ascendara profile and game saves to the cloud",
-      "downloadQueues": "Download Queues",
       "friends": "Friends",
       "leaderboard": "Leaderboards",
+      "mobileView": "Mobile View",
       "moreComing": "And More Coming",
       "moreComingDesc": "New features are constantly being added to Ascend",
       "nexusMods": "Mods & Trainer Integration",
@@ -1058,7 +1058,7 @@
     "downloadUpdate": "Download Update",
     "downloadingAllTracks": "Downloading all tracks...",
     "gameNotFound": "Game Not Found",
-    "getAscend": "Get Ascend",
+    "getAscend": "Join Ascend",
     "getAscendToUpdate": "Get Ascend to Update",
     "helpOthers": "Take a moment to rate and review this game out of 5 stars. Your feedback helps others understand the game's quality and reliability.",
     "inCloudLibrary": "Saved to Cloud Library",
@@ -1138,6 +1138,27 @@
     "viewOnFling": "View on FLiNG",
     "viewOnNexus": "View on Nexus Mods"
   },
+  "globalSearch": {
+    "categories": {
+      "index": "Game Index",
+      "library": "Library",
+      "settings": "Settings"
+    },
+    "emptyState": {
+      "global": "Search for games, settings, or features",
+      "library": "Search your installed games",
+      "settings": "Search settings and preferences"
+    },
+    "navigate": "Navigate",
+    "noResults": "No results found",
+    "placeholder": {
+      "global": "Search Ascendara",
+      "library": "Search Library",
+      "settings": "Search Settings"
+    },
+    "select": "Select",
+    "tryDifferent": "Try a different search term"
+  },
   "home": {
     "actionGames": "Action Games",
     "footer": {
@@ -1179,7 +1200,12 @@
       "autoBackupEnabledDesc": "Auto-backup enabled for {{game}}",
       "autoBackupOnGameClose": "Auto-backup on Game Close",
       "autoCloudBackup": "Auto-cloud backup",
+      "autoCloudBackupActive": "Active",
       "autoCloudBackupDesc": "Automatically save data to cloud when backing up",
+      "autoCloudBackupLearnMore": "Learn more about Ascend →",
+      "autoCloudBackupSignInDesc": "Sign in to Ascend to unlock cloud backups and keep your saves safe across devices",
+      "autoCloudBackupUpgrade": "Upgrade to Premium →",
+      "autoCloudBackupUpgradeDesc": "Upgrade to Ascend Premium to unlock cloud backups and protect your game saves",
       "backingUpDescription": "Backing up {{game}}...",
       "backupFailed": "Backup failed",
       "backupNow": "Backup {{game}} Now",
@@ -1187,6 +1213,14 @@
       "backupSuccess": "Backup successful",
       "backupSuccessDesc": "Successfully backed up save data for {{game}}",
       "backupsList": "Backups List",
+      "cloudBackupsDisabledDesc": "Backups will only be stored locally",
+      "cloudBackupsDisabledToast": "Cloud backups disabled",
+      "cloudBackupsEnabledDesc": "Backups will be automatically uploaded to cloud",
+      "cloudBackupsEnabledToast": "Cloud backups enabled",
+      "cloudBackupsRequireAccount": "Cloud backups require an Ascend account",
+      "cloudBackupsRequirePremium": "Cloud backups require Ascend Premium",
+      "cloudBackupsUpgradeAction": "Upgrade",
+      "cloudBackupsUpgradePrompt": "Upgrade to Premium to unlock cloud backups",
       "cloudUploadStep": "Cloud Upload",
       "confirmRestore": "Confirm Restore",
       "confirmSpecificRestore": "Confirm Specific Backup Restore",
@@ -1215,6 +1249,7 @@
       "restoringBackup": "Restoring Backup",
       "restoringDescription": "Restoring save data for {{game}}...",
       "settings": "Settings",
+      "signInToUseCloudBackups": "Please sign in to Ascend to use cloud backups",
       "stepComplete": "Complete",
       "stepInProgress": "In progress...",
       "stepUploading": "Uploading...",

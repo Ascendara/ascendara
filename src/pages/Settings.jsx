@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -190,11 +191,74 @@ const getThemeColors = themeId => {
   return themeMap[themeId] || themeMap.light;
 };
 
+// Helper to convert RGB string to hex
+const rgbToHex = rgbString => {
+  if (!rgbString || typeof rgbString !== "string") return "#000000";
+  const parts = rgbString.split(" ").map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return "#000000";
+  return (
+    "#" +
+    parts
+      .map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      })
+      .join("")
+  );
+};
+
+// Helper to convert hex to RGB string
+const hexToRgb = hex => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return "0 0 0";
+  return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`;
+};
+
+// ColorPickerInput component - native color picker with local state for smooth dragging
+const ColorPickerInput = ({ colorKey, label, value, onColorChange }) => {
+  const safeValue = value || "128 128 128";
+  const [localColor, setLocalColor] = useState(rgbToHex(safeValue));
+  const [localRgb, setLocalRgb] = useState(safeValue);
+
+  useEffect(() => {
+    const syncValue = value || "128 128 128";
+    setLocalColor(rgbToHex(syncValue));
+    setLocalRgb(syncValue);
+  }, [value]);
+
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={localColor}
+        onChange={e => {
+          setLocalColor(e.target.value);
+          setLocalRgb(hexToRgb(e.target.value));
+        }}
+        onBlur={() => onColorChange(colorKey, localColor)}
+        style={{
+          width: "56px",
+          height: "40px",
+          padding: 0,
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          cursor: "pointer",
+        }}
+      />
+      <div className="min-w-0 flex-1">
+        <Label className="block truncate text-xs text-foreground">{label}</Label>
+        <p className="truncate text-xs text-foreground/60">{localRgb}</p>
+      </div>
+    </div>
+  );
+};
+
 function Settings() {
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
   const { settings, setSettings, setSettingsLocal } = useSettings();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isInitialized, setIsInitialized] = useState(false);
   const initialSettingsRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -682,29 +746,6 @@ function Settings() {
     }
   }, [theme, customColors]);
 
-  // Helper to convert RGB string to hex
-  const rgbToHex = rgbString => {
-    if (!rgbString || typeof rgbString !== "string") return "#000000";
-    const parts = rgbString.split(" ").map(Number);
-    if (parts.length !== 3 || parts.some(isNaN)) return "#000000";
-    return (
-      "#" +
-      parts
-        .map(x => {
-          const hex = x.toString(16);
-          return hex.length === 1 ? "0" + hex : hex;
-        })
-        .join("")
-    );
-  };
-
-  // Helper to convert hex to RGB string
-  const hexToRgb = hex => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return "0 0 0";
-    return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`;
-  };
-
   // Handle custom color change - only called on blur/change complete
   const handleCustomColorChange = (colorKey, hexValue) => {
     const rgbValue = hexToRgb(hexValue);
@@ -712,46 +753,6 @@ function Settings() {
       ...prev,
       [colorKey]: rgbValue,
     }));
-  };
-
-  // ColorPickerInput component - native color picker with local state for smooth dragging
-  const ColorPickerInput = ({ colorKey, label, value }) => {
-    const safeValue = value || "128 128 128"; // Default gray if undefined
-    const [localColor, setLocalColor] = useState(rgbToHex(safeValue));
-    const [localRgb, setLocalRgb] = useState(safeValue);
-
-    // Sync local state when parent value changes (e.g., on import)
-    useEffect(() => {
-      const syncValue = value || "128 128 128";
-      setLocalColor(rgbToHex(syncValue));
-      setLocalRgb(syncValue);
-    }, [value]);
-
-    return (
-      <div className="flex items-center gap-3">
-        <input
-          type="color"
-          value={localColor}
-          onChange={e => {
-            setLocalColor(e.target.value);
-            setLocalRgb(hexToRgb(e.target.value));
-          }}
-          onBlur={() => handleCustomColorChange(colorKey, localColor)}
-          style={{
-            width: "56px",
-            height: "40px",
-            padding: 0,
-            border: "1px solid var(--border)",
-            borderRadius: "6px",
-            cursor: "pointer",
-          }}
-        />
-        <div className="min-w-0 flex-1">
-          <Label className="block truncate text-xs text-foreground">{label}</Label>
-          <p className="truncate text-xs text-foreground/60">{localRgb}</p>
-        </div>
-      </div>
-    );
   };
 
   // Save custom colors and apply theme
@@ -940,6 +941,28 @@ function Settings() {
     loadLanguages();
   }, []);
 
+  // Handle scrollTo from navigation state (from global search)
+  useEffect(() => {
+    if (location.state?.scrollTo && !isLoading) {
+      const scrollToId = location.state.scrollTo;
+
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        const element = document.getElementById(scrollToId);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          element.classList.add("highlight-setting");
+          setTimeout(() => {
+            element.classList.remove("highlight-setting");
+          }, 4000);
+        }
+      }, 100);
+
+      // Clear the state to prevent re-scrolling on re-renders
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, isLoading, navigate, location.pathname]);
+
   // Show loading state
   if (isLoading) {
     return (
@@ -1101,11 +1124,12 @@ function Settings() {
                 <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                   {t("settings.appearance")}
                 </h3>
-                <div>
+                <div id="theme">
                   <Label>{t("settings.themes")}</Label>
 
                   {/* Custom Colors Button */}
                   <div
+                    id="custom-colors"
                     className={`mt-3 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent/50 ${theme === "custom" ? "border-primary bg-primary/5" : "border-border"}`}
                     onClick={() => {
                       setOriginalColorsOnOpen({ ...customColors });
@@ -1191,7 +1215,10 @@ function Settings() {
                   </Accordion>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div
+                  id="smooth-transitions"
+                  className="flex items-center justify-between"
+                >
                   <div className="space-y-0.5">
                     <Label>{t("settings.smoothTransitions")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1209,7 +1236,7 @@ function Settings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div id="side-scrollbar" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.sideScrollBar")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1224,7 +1251,7 @@ function Settings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div id="home-search" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.homeSearch")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1246,7 +1273,10 @@ function Settings() {
                   {t("settings.application")}
                 </h3>
 
-                <div className="flex items-center justify-between">
+                <div
+                  id="default-landing-page"
+                  className="flex items-center justify-between"
+                >
                   <div className="space-y-0.5">
                     <Label>{t("settings.defaultLandingPage")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1269,7 +1299,7 @@ function Settings() {
                   </Select>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div id="auto-update" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.ascendaraUpdates")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1284,7 +1314,7 @@ function Settings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div id="notifications" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.notifications")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1299,7 +1329,7 @@ function Settings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div id="quick-launch" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.quickLaunch")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1321,7 +1351,7 @@ function Settings() {
                   {t("settings.gaming")}
                 </h3>
 
-                <div className="flex items-center justify-between">
+                <div id="discord-rpc" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.discordRPC")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1336,7 +1366,10 @@ function Settings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div
+                  id="hide-on-game-launch"
+                  className="flex items-center justify-between"
+                >
                   <div className="space-y-0.5">
                     <Label>{t("settings.hideOnGameLaunch")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1351,7 +1384,7 @@ function Settings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div id="mature-content" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.matureContent")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1370,7 +1403,10 @@ function Settings() {
                 </div>
 
                 {isOnWindows && (
-                  <div className="flex items-center justify-between">
+                  <div
+                    id="auto-create-shortcuts"
+                    className="flex items-center justify-between"
+                  >
                     <div className="space-y-0.5">
                       <Label>{t("settings.autoCreateShortcuts")}</Label>
                       <p className="text-sm text-muted-foreground">
@@ -1402,7 +1438,10 @@ function Settings() {
                   </div>
                 )}
                 {isOnWindows ? (
-                  <div className="mb-6 flex items-center justify-between">
+                  <div
+                    id="exclude-folders"
+                    className="mb-6 flex items-center justify-between"
+                  >
                     <div className="space-y-2">
                       <Label>
                         {t("settings.excludeFolders")}{" "}
@@ -1444,7 +1483,7 @@ function Settings() {
                 ) : null}
 
                 {/* Torbox API Key Config */}
-                <div className="space-y-2">
+                <div id="torbox-api-key" className="space-y-2">
                   <Label>{t("settings.torboxApiKey")}</Label>
                   <p className="text-sm text-muted-foreground">
                     {t("settings.torboxApiKeyDescription")}&nbsp;
@@ -1486,7 +1525,7 @@ function Settings() {
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div id="prioritize-torbox" className="flex items-center justify-between">
                   <div
                     className={`space-y-2${
                       !(
@@ -1520,7 +1559,7 @@ function Settings() {
                 </div>
 
                 {/* Single Stream Download Toggle */}
-                <div className="flex items-center justify-between">
+                <div id="single-stream" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="singleStream">
                       {t("settings.singleStream", "Single Stream Download")}
@@ -1543,7 +1582,10 @@ function Settings() {
                 </div>
 
                 {/* Download Threads Config */}
-                <div className={`space-y-2 ${settings.singleStream ? "opacity-50" : ""}`}>
+                <div
+                  id="download-threads"
+                  className={`space-y-2 ${settings.singleStream ? "opacity-50" : ""}`}
+                >
                   <Label
                     htmlFor="threadCount"
                     className={
@@ -1750,7 +1792,7 @@ function Settings() {
                   )}
                 </div>
 
-                <div className="space-y-2 pt-8">
+                <div id="post-download-behavior" className="space-y-2 pt-8">
                   <div className="flex items-center justify-between">
                     <div className="space-y-2">
                       <Label>{t("settings.behaviorAfterDownload")}</Label>
@@ -1786,7 +1828,7 @@ function Settings() {
                 </div>
 
                 {/* Download Speed Limit Section */}
-                <div className="space-y-2 pt-8">
+                <div id="download-limit" className="space-y-2 pt-8">
                   <Label
                     htmlFor="downloadLimit"
                     className={isDownloaderRunning ? "opacity-50" : ""}
@@ -1803,7 +1845,7 @@ function Settings() {
                     t={t}
                   />
                 </div>
-                <div className="pt-8">
+                <div id="download-directory" className="pt-8">
                   <div className="mb-4">
                     <Label
                       htmlFor="defaultDownloadPath"
@@ -1910,7 +1952,7 @@ function Settings() {
               </div>
             </Card>
 
-            <Card className="border-border">
+            <Card id="ludusavi" className="border-border">
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1919,7 +1961,7 @@ function Settings() {
                     </h3>
 
                     {/* Backup Location */}
-                    <div className="mt-2 space-y-2">
+                    <div id="backup-directory" className="mt-2 space-y-2">
                       <Label>{t("settings.gameBackup.backupLocation")}</Label>
                       <div className="flex gap-2">
                         <Input
@@ -2262,7 +2304,7 @@ function Settings() {
             </Card>
 
             {/* Torrenting Card */}
-            <Card className="border-border p-6">
+            <Card id="torrent-downloads" className="border-border p-6">
               <div className="mb-6 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-primary">
@@ -2354,7 +2396,7 @@ function Settings() {
             </Card>
 
             {/* Analytics Card */}
-            <Card className="border-border p-6">
+            <Card id="analytics" className="border-border p-6">
               <div className="mb-2 flex items-center gap-2">
                 <ChartNoAxesCombined className="mb-2 h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold text-primary">
@@ -2393,7 +2435,7 @@ function Settings() {
             </Card>
 
             {/* Timemachine Card */}
-            <Card className="border-border p-6">
+            <Card id="timemachine" className="border-border p-6">
               <div className="mb-2 flex items-center gap-2">
                 <History className="mb-2 h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold text-primary">
@@ -2437,7 +2479,7 @@ function Settings() {
             </Card>
 
             {/* Workshop Downloader Card */}
-            <Card className="border-border p-6">
+            <Card id="workshop-downloader" className="border-border p-6">
               <div className="mb-2 flex items-center gap-2">
                 <Package className="mb-2 h-5 w-5 text-primary" />
                 <h2 className="text-lg font-semibold text-primary">
@@ -2499,7 +2541,7 @@ function Settings() {
 
             {/* Components Card */}
             {isOnWindows && (
-              <Card className="border-border p-6">
+              <Card id="components" className="border-border p-6">
                 <div className="mb-2 flex items-center gap-2">
                   <CpuIcon className="mb-2 h-5 w-5 text-primary" />
                   <h2 className="text-xl font-semibold text-primary">
@@ -2519,7 +2561,7 @@ function Settings() {
             )}
 
             {/* Language Settings Card */}
-            <Card className="border-border p-6">
+            <Card id="language" className="border-border p-6">
               <div className="mb-2 flex items-center gap-2">
                 <Languages className="mb-2 h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold text-primary">
@@ -2821,41 +2863,49 @@ function Settings() {
                   colorKey="background"
                   label="Background"
                   value={customColors.background}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="foreground"
                   label="Text"
                   value={customColors.foreground}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="primary"
                   label="Primary"
                   value={customColors.primary}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="secondary"
                   label="Secondary"
                   value={customColors.secondary}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="accent"
                   label="Accent"
                   value={customColors.accent}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="accentForeground"
                   label="Accent Text"
                   value={customColors.accentForeground}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="muted"
                   label="Muted"
                   value={customColors.muted}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="mutedForeground"
                   label="Muted Text"
                   value={customColors.mutedForeground}
+                  onColorChange={handleCustomColorChange}
                 />
               </div>
             </div>
@@ -2870,36 +2920,43 @@ function Settings() {
                   colorKey="card"
                   label="Card"
                   value={customColors.card}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="cardForeground"
                   label="Card Text"
                   value={customColors.cardForeground}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="popover"
                   label="Popover"
                   value={customColors.popover}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="popoverForeground"
                   label="Popover Text"
                   value={customColors.popoverForeground}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="border"
                   label="Border"
                   value={customColors.border}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="input"
                   label="Input"
                   value={customColors.input}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="ring"
                   label="Focus Ring"
                   value={customColors.ring}
+                  onColorChange={handleCustomColorChange}
                 />
               </div>
             </div>
@@ -2914,6 +2971,7 @@ function Settings() {
                   colorKey="navBackground"
                   label="Background"
                   value={customColors.navBackground}
+                  onColorChange={handleCustomColorChange}
                 />
               </div>
             </div>
@@ -2928,31 +2986,37 @@ function Settings() {
                   colorKey="success"
                   label="Success"
                   value={customColors.success}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="warning"
                   label="Warning"
                   value={customColors.warning}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="error"
                   label="Error"
                   value={customColors.error}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="info"
                   label="Info"
                   value={customColors.info}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="starFilled"
                   label="Star Filled"
                   value={customColors.starFilled}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="starEmpty"
                   label="Star Empty"
                   value={customColors.starEmpty}
+                  onColorChange={handleCustomColorChange}
                 />
               </div>
             </div>
@@ -2967,11 +3031,13 @@ function Settings() {
                   colorKey="startupBackground"
                   label="Background"
                   value={customColors.startupBackground}
+                  onColorChange={handleCustomColorChange}
                 />
                 <ColorPickerInput
                   colorKey="startupAccent"
                   label="Accent"
                   value={customColors.startupAccent}
+                  onColorChange={handleCustomColorChange}
                 />
               </div>
             </div>
