@@ -52,6 +52,7 @@ export function SettingsProvider({ children }) {
     fetchPageCount: 50,
     localRefreshWorkers: 8,
     homeSearch: true,
+    indexReminder: "7",
     ludusavi: {
       backupLocation: "",
       backupFormat: "zip",
@@ -219,6 +220,7 @@ const defaultSettings = {
   fetchPageCount: 50,
   localRefreshWorkers: 8,
   homeSearch: true,
+  indexReminder: "7",
   ludusavi: {
     backupLocation: "",
     backupFormat: "zip",

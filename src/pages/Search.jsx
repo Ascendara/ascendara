@@ -24,6 +24,7 @@ import {
   InfoIcon,
   ExternalLink,
   RefreshCw,
+  Clock,
   AlertTriangle,
   X,
   Calendar,
@@ -112,6 +113,8 @@ const Search = memo(() => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isIndexUpdating, setIsIndexUpdating] = useState(false);
   const [isRefreshRequestDialogOpen, setIsRefreshRequestDialogOpen] = useState(false);
+  const [isIndexOutdated, setIsIndexOutdated] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const gamesPerPage = useWindowSize();
   const [size, setSize] = useState(() => {
     const savedSize = localStorage.getItem("navSize");
@@ -367,6 +370,43 @@ const Search = memo(() => {
     };
     loadSettings();
   }, []);
+
+  // Check if index is outdated based on indexReminder setting
+  useEffect(() => {
+    const checkIndexAge = async () => {
+      try {
+        const currentSettings = await window.electron.getSettings();
+        const indexPath = currentSettings?.localIndex;
+        if (!indexPath || !apiMetadata?.local) {
+          setIsIndexOutdated(false);
+          return;
+        }
+
+        // Get last refresh time
+        if (window.electron?.getLocalRefreshProgress) {
+          const progress = await window.electron.getLocalRefreshProgress(indexPath);
+          if (progress?.lastSuccessfulTimestamp) {
+            const lastRefresh = new Date(progress.lastSuccessfulTimestamp * 1000);
+            setLastRefreshTime(lastRefresh);
+
+            // Calculate if outdated based on indexReminder setting
+            const reminderDays = parseInt(currentSettings.indexReminder || "7", 10);
+            const daysSinceRefresh =
+              (Date.now() - lastRefresh.getTime()) / (1000 * 60 * 60 * 24);
+
+            setIsIndexOutdated(daysSinceRefresh > reminderDays);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking index age:", error);
+        setIsIndexOutdated(false);
+      }
+    };
+
+    if (apiMetadata) {
+      checkIndexAge();
+    }
+  }, [apiMetadata]);
 
   useEffect(() => {
     const checkIndexStatus = async () => {
@@ -724,6 +764,26 @@ const Search = memo(() => {
                 <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <span>{t("search.usingApiWarning")}</span>
+                </div>
+              )}
+              {isIndexOutdated && apiMetadata.local && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm">
+                  <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                    <Clock className="h-4 w-4 shrink-0" />
+                    <span>
+                      {t("search.outdatedIndexWarning") ||
+                        "Your local index hasn't been refreshed in a while. Consider updating it to see the latest games."}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 border-orange-500/30 text-orange-600 hover:bg-orange-500/20 dark:text-orange-400"
+                    onClick={() => navigate("/localrefresh")}
+                  >
+                    <RefreshCw className="mr-2 h-3 w-3" />
+                    {t("search.refreshNow") || "Refresh Now"}
+                  </Button>
                 </div>
               )}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

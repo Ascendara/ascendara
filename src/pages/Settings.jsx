@@ -1111,6 +1111,52 @@ function Settings() {
                     : t("settings.manageIndex") || "Manage Index"}
                 </Button>
               </div>
+
+              {/* Index Reminder Setting */}
+              <div
+                id="index-reminder"
+                className="mt-6 space-y-2 border-t border-border/50 pt-6"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Label>
+                      {t("settings.indexReminder") || "Index Refresh Reminder"}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.indexReminderDescription") ||
+                        "Get reminded to refresh your local index after this many days"}
+                    </p>
+                  </div>
+                  <Select
+                    value={settings.indexReminder || "7"}
+                    onValueChange={value => handleSettingChange("indexReminder", value)}
+                  >
+                    <SelectTrigger className="w-[180px] bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">
+                        {t("settings.indexReminderOptions.twoDays") || "2 Days"}
+                      </SelectItem>
+                      <SelectItem value="3">
+                        {t("settings.indexReminderOptions.threeDays") || "3 Days"}
+                      </SelectItem>
+                      <SelectItem value="5">
+                        {t("settings.indexReminderOptions.fiveDays") || "5 Days"}
+                      </SelectItem>
+                      <SelectItem value="7">
+                        {t("settings.indexReminderOptions.oneWeek") || "1 Week"}
+                      </SelectItem>
+                      <SelectItem value="10">
+                        {t("settings.indexReminderOptions.tenDays") || "10 Days"}
+                      </SelectItem>
+                      <SelectItem value="14">
+                        {t("settings.indexReminderOptions.twoWeeks") || "2 Weeks"}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </Card>
 
             {/* General Settings Card */}

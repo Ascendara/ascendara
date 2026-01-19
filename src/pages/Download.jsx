@@ -357,6 +357,8 @@ export default function DownloadPage() {
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
   const [flingTrainerData, setFlingTrainerData] = useState(null);
   const [isPlayLater, setIsPlayLater] = useState(false);
+  const [isIndexOutdated, setIsIndexOutdated] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
 
   // Fetch rating from new API when using local index
   useEffect(() => {
@@ -380,6 +382,41 @@ export default function DownloadPage() {
 
     fetchRating();
   }, [gameData?.gameID, settings.usingLocalIndex]);
+
+  // Check if index is outdated based on indexReminder setting
+  useEffect(() => {
+    const checkIndexAge = async () => {
+      try {
+        const currentSettings = await window.electron.getSettings();
+        const indexPath = currentSettings?.localIndex;
+        if (!indexPath || !currentSettings.usingLocalIndex) {
+          setIsIndexOutdated(false);
+          return;
+        }
+
+        if (window.electron?.getLocalRefreshProgress) {
+          const progress = await window.electron.getLocalRefreshProgress(indexPath);
+          if (progress?.lastSuccessfulTimestamp) {
+            const lastRefresh = new Date(progress.lastSuccessfulTimestamp * 1000);
+            setLastRefreshTime(lastRefresh);
+
+            const reminderDays = parseInt(currentSettings.indexReminder || "7", 10);
+            const daysSinceRefresh =
+              (Date.now() - lastRefresh.getTime()) / (1000 * 60 * 60 * 24);
+
+            setIsIndexOutdated(daysSinceRefresh > reminderDays);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking index age:", error);
+        setIsIndexOutdated(false);
+      }
+    };
+
+    if (settings.usingLocalIndex) {
+      checkIndexAge();
+    }
+  }, [settings.usingLocalIndex]);
 
   // Check Nexus Mods support for the game
   useEffect(() => {
@@ -1478,6 +1515,27 @@ export default function DownloadPage() {
         >
           {t("download.pressEscToGoBack")}
         </div>
+
+        {isIndexOutdated && settings.usingLocalIndex && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm">
+            <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+              <Clock className="h-4 w-4 shrink-0" />
+              <span>
+                {t("download.outdatedIndexWarning") ||
+                  "Your local index is outdated. This game information may not be current."}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 border-orange-500/30 text-orange-600 hover:bg-orange-500/20 dark:text-orange-400"
+              onClick={() => navigate("/localrefresh")}
+            >
+              <RefreshCw className="mr-2 h-3 w-3" />
+              {t("download.refreshNow") || "Refresh Now"}
+            </Button>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-col gap-4">
           {/* Hero Game Header Section */}
