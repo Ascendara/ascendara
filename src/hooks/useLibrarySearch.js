@@ -7,6 +7,7 @@ export const useLibrarySearch = () => {
 
   useEffect(() => {
     let isMounted = true;
+    let pollInterval = null;
 
     const loadLibraryGames = async () => {
       setIsLoading(true);
@@ -19,19 +20,8 @@ export const useLibrarySearch = () => {
         const safeInstalledGames = Array.isArray(installedGames) ? installedGames : [];
         const safeCustomGames = Array.isArray(customGames) ? customGames : [];
 
-        const filteredInstalledGames = safeInstalledGames.filter(
-          game =>
-            !game.downloadingData?.verifying &&
-            !game.downloadingData?.downloading &&
-            !game.downloadingData?.extracting &&
-            !game.downloadingData?.updating &&
-            !game.downloadingData?.stopped &&
-            (!game.downloadingData?.verifyError ||
-              game.downloadingData.verifyError.length === 0)
-        );
-
         const allGames = [
-          ...filteredInstalledGames.map(game => ({
+          ...safeInstalledGames.map(game => ({
             ...game,
             isCustom: false,
           })),
@@ -81,8 +71,15 @@ export const useLibrarySearch = () => {
 
     loadLibraryGames();
 
+    pollInterval = setInterval(() => {
+      loadLibraryGames();
+    }, 5000);
+
     return () => {
       isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
       unregisterSearchable("library");
     };
   }, [registerSearchable, unregisterSearchable]);
