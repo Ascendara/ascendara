@@ -23,6 +23,7 @@ import subprocess
 import atexit
 import shutil
 import signal
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue, Empty
 
@@ -1014,6 +1015,97 @@ def process_post(post, scraper, category_map, imgs_dir, progress, blacklist_ids=
         return None
 
 
+def extract_shared_index(zip_path, output_dir):
+    """
+    Extract a downloaded shared index zip file.
+    Uses progress tracking to communicate with Electron.
+    """
+    progress = RefreshProgress(output_dir)
+    progress.set_status("running")
+    progress.set_phase("extracting")
+    
+    try:
+        logging.info(f"Extracting shared index from {zip_path} to {output_dir}")
+        
+        # Backup existing files
+        games_file = os.path.join(output_dir, "ascendara_games.json")
+        imgs_dir = os.path.join(output_dir, "imgs")
+        games_backup = os.path.join(output_dir, "ascendara_games_backup.json")
+        imgs_backup = os.path.join(output_dir, "imgs_backup")
+        
+        if os.path.exists(games_file):
+            shutil.copy2(games_file, games_backup)
+            logging.info("Backed up ascendara_games.json")
+        
+        if os.path.exists(imgs_dir):
+            if os.path.exists(imgs_backup):
+                shutil.rmtree(imgs_backup)
+            shutil.copytree(imgs_dir, imgs_backup)
+            logging.info("Backed up imgs directory")
+        
+        # Extract the zip file
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            total_files = len(zip_ref.namelist())
+            logging.info(f"Extracting {total_files} files...")
+            
+            # Set total for progress calculation
+            progress.set_total_posts(total_files)
+            
+            for i, file in enumerate(zip_ref.namelist()):
+                zip_ref.extract(file, output_dir)
+                
+                # Increment count without writing to file
+                progress.processed_posts += 1
+                
+                # Update progress file every 10 files for smoother UI updates
+                if i % 10 == 0 or i == total_files - 1:
+                    progress_percent = ((i + 1) / total_files) * 100
+                    progress.set_current_game(f"Extracting: {i + 1}/{total_files} files")
+                    if i % 100 == 0 or i == total_files - 1:  # Only log every 100 files
+                        logging.info(f"Extraction progress: {progress_percent:.1f}% ({i + 1}/{total_files})")
+        
+        # Clean up zip file
+        try:
+            os.remove(zip_path)
+            logging.info("Removed zip file")
+        except Exception as e:
+            logging.warning(f"Could not remove zip file: {e}")
+        
+        # Clean up backup files
+        try:
+            if os.path.exists(games_backup):
+                os.remove(games_backup)
+            if os.path.exists(imgs_backup):
+                shutil.rmtree(imgs_backup)
+            logging.info("Cleaned up backup files")
+        except Exception as e:
+            logging.warning(f"Could not clean up backups: {e}")
+        
+        progress.set_current_game("Extraction complete")
+        progress.complete(success=True)
+        logging.info("Shared index extraction completed successfully")
+        
+    except Exception as e:
+        logging.error(f"Failed to extract shared index: {e}")
+        progress.add_error(str(e))
+        progress.complete(success=False)
+        
+        # Try to restore from backup
+        try:
+            if os.path.exists(games_backup):
+                shutil.copy2(games_backup, games_file)
+                logging.info("Restored ascendara_games.json from backup")
+            if os.path.exists(imgs_backup):
+                if os.path.exists(imgs_dir):
+                    shutil.rmtree(imgs_dir)
+                shutil.copytree(imgs_backup, imgs_dir)
+                logging.info("Restored imgs directory from backup")
+        except Exception as restore_err:
+            logging.error(f"Failed to restore from backup: {restore_err}")
+        
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Ascendara Local Refresh - Scrape SteamRIP for game data'
@@ -1057,8 +1149,25 @@ def main():
         default=None,
         help='Custom User-Agent string (for Firefox/Opera cookie compatibility)'
     )
+    parser.add_argument(
+        '--extract-shared-index',
+        action='store_true',
+        help='Extract a downloaded shared index zip file'
+    )
+    parser.add_argument(
+        '--zip-path',
+        help='Path to the zip file to extract (used with --extract-shared-index)'
+    )
     
     args = parser.parse_args()
+    
+    # Handle extraction mode
+    if args.extract_shared_index:
+        if not args.zip_path or not args.output:
+            logging.error("--extract-shared-index requires both --zip-path and --output")
+            sys.exit(1)
+        extract_shared_index(args.zip_path, args.output)
+        sys.exit(0)
     
     logging.info("=== Starting Ascendara Local Refresh ===")
     logging.info(f"Output directory: {args.output}")

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -492,6 +492,7 @@ const LocalRefresh = () => {
     };
 
     const handlePublicDownloadProgress = data => {
+      console.log("Public index download progress:", data);
       setIndexDownloadProgress(data);
     };
 
@@ -535,7 +536,7 @@ const LocalRefresh = () => {
         window.electron.offPublicIndexDownloadProgress?.();
       };
     }
-  }, [t]);
+  }, []);
 
   const handleOpenRefreshDialog = () => {
     setShowRefreshDialog(true);
@@ -874,37 +875,17 @@ const LocalRefresh = () => {
                     className="gap-2 whitespace-nowrap text-secondary"
                     onClick={async () => {
                       if (downloadingIndex || isRefreshing || isUploading) return;
-                      setDownloadingIndex("public");
+                      // Don't set downloadingIndex here - let the event handler do it
                       try {
-                        const result =
-                          await window.electron.downloadSharedIndex(localIndexPath);
-                        if (result.success) {
-                          toast.success(
-                            t("localRefresh.indexDownloaded") ||
-                              "Shared index downloaded!"
-                          );
-                          if (window.electron?.setTimestampValue) {
-                            await window.electron.setTimestampValue(
-                              "hasIndexBefore",
-                              true
-                            );
-                          }
-                          setHasIndexBefore(true);
-                          imageCacheService.clearCache();
-                        } else {
-                          toast.error(
-                            result.error ||
-                              t("localRefresh.indexDownloadFailed") ||
-                              "Failed to download"
-                          );
-                        }
+                        await window.electron.downloadSharedIndex(localIndexPath);
+                        // Success/error handling is done via IPC events
+                        // (public-index-download-complete, public-index-download-error)
                       } catch (e) {
-                        console.error("Failed to download shared index:", e);
+                        console.error("Failed to start download:", e);
                         toast.error(
-                          t("localRefresh.indexDownloadFailed") || "Failed to download"
+                          t("localRefresh.indexDownloadFailed") ||
+                            "Failed to start download"
                         );
-                      } finally {
-                        setDownloadingIndex(null);
                       }
                     }}
                     disabled={downloadingIndex || isRefreshing || isUploading}
@@ -913,9 +894,11 @@ const LocalRefresh = () => {
                       <>
                         <Loader className="h-4 w-4 animate-spin" />
                         {indexDownloadProgress?.phase === "extracting"
-                          ? t("localRefresh.extracting") || "Extracting..."
+                          ? indexDownloadProgress.progress >= 1
+                            ? `${t("localRefresh.extracting") || "Extracting"} ${Math.floor(indexDownloadProgress.progress)}%`
+                            : t("localRefresh.extracting") || "Extracting..."
                           : indexDownloadProgress?.progress > 0
-                            ? `${Math.round(indexDownloadProgress.progress)}%`
+                            ? `${Math.floor(indexDownloadProgress.progress)}%`
                             : t("localRefresh.downloading") || "Downloading..."}
                       </>
                     ) : (

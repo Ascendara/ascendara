@@ -12,7 +12,7 @@ const { getSettingsManager } = require("./settings");
 const archiver = require("archiver");
 const https = require("https");
 const http = require("http");
-const yauzl = require("yauzl");
+const settingsManager = getSettingsManager();
 
 let localRefreshProcess = null;
 let localRefreshProgressInterval = null;
@@ -781,361 +781,413 @@ function registerLocalRefreshHandlers() {
   ipcMain.handle("download-shared-index", async (_, outputPath) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
 
-    try {
-      // Set downloading flag and notify renderer
-      publicIndexDownloading = true;
-      if (mainWindow) {
-        mainWindow.webContents.send("public-index-download-started");
-      }
+    // Set downloading flag and notify renderer
+    publicIndexDownloading = true;
+    if (mainWindow) {
+      mainWindow.webContents.send("public-index-download-started");
+    }
 
-      // Ensure output directory exists
-      if (!fs.existsSync(outputPath)) {
-        fs.mkdirSync(outputPath, { recursive: true });
-      }
-
-      const zipPath = path.join(outputPath, "downloaded_index.zip");
-
-      // Get auth token first
-      console.log("Getting auth token for download...");
-      const authToken = await getAuthToken();
-
-      // First, get the download URL from the API
-      console.log("Getting download URL from API...");
-      const apiResponse = await new Promise((resolve, reject) => {
-        const options = {
-          hostname: "api.ascendara.app",
-          port: 443,
-          path: "/localindex/latest",
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        };
-
-        const req = https.request(options, response => {
-          let data = "";
-          response.on("data", chunk => {
-            data += chunk;
-          });
-          response.on("end", () => {
-            if (response.statusCode === 200) {
-              try {
-                resolve(JSON.parse(data));
-              } catch (e) {
-                // Not JSON, might be direct file (legacy)
-                resolve({ legacy: true, statusCode: response.statusCode });
-              }
-            } else if (response.statusCode === 429) {
-              reject(
-                new Error("Rate limit exceeded. You can only download once per hour.")
-              );
-            } else if (response.statusCode === 401 || response.statusCode === 403) {
-              reject(new Error("Authentication failed. Please try again."));
-            } else {
-              reject(new Error(`Failed to get download URL: ${response.statusCode}`));
-            }
-          });
-        });
-        req.on("error", reject);
-        req.end();
-      });
-
-      // Determine download URL
-      let downloadUrl;
-      if (apiResponse.download_url) {
-        // R2 URL provided
-        downloadUrl = apiResponse.download_url;
-        console.log("Using R2 download URL:", downloadUrl);
-      } else {
-        // Fallback to direct API download (legacy)
-        downloadUrl = "https://api.ascendara.app/localindex/latest";
-        console.log("Using legacy API download");
-      }
-
-      // Delete existing zip if it exists (avoid EPERM issues)
-      if (fs.existsSync(zipPath)) {
-        try {
-          fs.unlinkSync(zipPath);
-        } catch (e) {
-          console.log("Could not delete existing zip:", e.message);
+    // Run the entire process in the background without blocking
+    setImmediate(async () => {
+      try {
+        // Ensure output directory exists
+        if (!fs.existsSync(outputPath)) {
+          fs.mkdirSync(outputPath, { recursive: true });
         }
-      }
 
-      // Download from the URL (R2 or API)
-      console.log("Downloading shared index...");
-      await new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(zipPath);
-        const urlObj = new URL(downloadUrl);
+        const zipPath = path.join(outputPath, "downloaded_index.zip");
 
-        const options = {
-          hostname: urlObj.hostname,
-          port: 443,
-          path: urlObj.pathname + urlObj.search,
-          method: "GET",
-          headers: apiResponse.download_url
-            ? {}
-            : { Authorization: `Bearer ${authToken}` },
-        };
+        // Get auth token first
+        console.log("Getting auth token for download...");
+        const authToken = await getAuthToken();
 
-        // Helper to handle response with progress tracking
-        const handleResponseWithProgress = (response, totalSize) => {
-          let downloadedSize = 0;
-          let lastProgressUpdate = 0;
+        // First, get the download URL from the API
+        console.log("Getting download URL from API...");
+        const apiResponse = await new Promise((resolve, reject) => {
+          const options = {
+            hostname: "api.ascendara.app",
+            port: 443,
+            path: "/localindex/latest",
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          };
 
-          response.on("data", chunk => {
-            downloadedSize += chunk.length;
-            file.write(chunk);
+          const req = https.request(options, response => {
+            let data = "";
+            response.on("data", chunk => {
+              data += chunk;
+            });
+            response.on("end", () => {
+              if (response.statusCode === 200) {
+                try {
+                  resolve(JSON.parse(data));
+                } catch (e) {
+                  // Not JSON, might be direct file (legacy)
+                  resolve({ legacy: true, statusCode: response.statusCode });
+                }
+              } else if (response.statusCode === 429) {
+                reject(
+                  new Error("Rate limit exceeded. You can only download once per hour.")
+                );
+              } else if (response.statusCode === 401 || response.statusCode === 403) {
+                reject(new Error("Authentication failed. Please try again."));
+              } else {
+                reject(new Error(`Failed to get download URL: ${response.statusCode}`));
+              }
+            });
+          });
+          req.on("error", reject);
+          req.end();
+        });
 
-            // Send progress updates (throttle to every 100ms)
-            const now = Date.now();
-            if (now - lastProgressUpdate > 100) {
-              lastProgressUpdate = now;
-              const progress = totalSize > 0 ? (downloadedSize / totalSize) * 100 : -1;
+        // Determine download URL
+        let downloadUrl;
+        if (apiResponse.download_url) {
+          // R2 URL provided
+          downloadUrl = apiResponse.download_url;
+          console.log("Using R2 download URL:", downloadUrl);
+        } else {
+          // Fallback to direct API download (legacy)
+          downloadUrl = "https://api.ascendara.app/localindex/latest";
+          console.log("Using legacy API download");
+        }
+
+        // Delete existing zip if it exists (avoid EPERM issues)
+        if (fs.existsSync(zipPath)) {
+          try {
+            fs.unlinkSync(zipPath);
+          } catch (e) {
+            console.log("Could not delete existing zip:", e.message);
+          }
+        }
+
+        // Download from the URL (R2 or API)
+        console.log("Downloading shared index...");
+        await new Promise((resolve, reject) => {
+          const file = fs.createWriteStream(zipPath);
+          const urlObj = new URL(downloadUrl);
+
+          const options = {
+            hostname: urlObj.hostname,
+            port: 443,
+            path: urlObj.pathname + urlObj.search,
+            method: "GET",
+            headers: apiResponse.download_url
+              ? {}
+              : { Authorization: `Bearer ${authToken}` },
+          };
+
+          // Helper to handle response with progress tracking
+          const handleResponseWithProgress = (response, totalSize) => {
+            let downloadedSize = 0;
+            let lastProgressUpdate = 0;
+
+            response.on("data", chunk => {
+              downloadedSize += chunk.length;
+              file.write(chunk);
+
+              // Send progress updates (throttle to every 100ms)
+              const now = Date.now();
+              if (now - lastProgressUpdate > 100) {
+                lastProgressUpdate = now;
+                const progress = totalSize > 0 ? (downloadedSize / totalSize) * 100 : -1;
+                if (mainWindow) {
+                  mainWindow.webContents.send("public-index-download-progress", {
+                    downloaded: downloadedSize,
+                    total: totalSize,
+                    progress: progress,
+                    phase: "downloading",
+                  });
+                }
+              }
+            });
+
+            response.on("end", () => {
+              // Send extracting phase
               if (mainWindow) {
                 mainWindow.webContents.send("public-index-download-progress", {
                   downloaded: downloadedSize,
                   total: totalSize,
-                  progress: progress,
-                  phase: "downloading",
+                  progress: 100,
+                  phase: "extracting",
                 });
               }
-            }
-          });
-
-          response.on("end", () => {
-            // Send extracting phase
-            if (mainWindow) {
-              mainWindow.webContents.send("public-index-download-progress", {
-                downloaded: downloadedSize,
-                total: totalSize,
-                progress: 100,
-                phase: "extracting",
+              // Wait for file to be fully closed before resolving
+              file.end(() => {
+                resolve();
               });
-            }
-            // Wait for file to be fully closed before resolving
-            file.end(() => {
-              resolve();
             });
+
+            response.on("error", err => {
+              fs.unlink(zipPath, () => {});
+              reject(err);
+            });
+          };
+
+          const req = https.request(options, response => {
+            const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+
+            if (response.statusCode === 302 || response.statusCode === 301) {
+              // Handle redirect
+              https
+                .get(response.headers.location, redirectResponse => {
+                  const redirectTotalSize =
+                    parseInt(redirectResponse.headers["content-length"], 10) || totalSize;
+                  handleResponseWithProgress(redirectResponse, redirectTotalSize);
+                })
+                .on("error", err => {
+                  fs.unlink(zipPath, () => {});
+                  reject(err);
+                });
+            } else if (response.statusCode === 200) {
+              handleResponseWithProgress(response, totalSize);
+            } else {
+              reject(new Error(`Failed to download: ${response.statusCode}`));
+            }
           });
 
-          response.on("error", err => {
+          req.on("error", err => {
             fs.unlink(zipPath, () => {});
             reject(err);
           });
-        };
 
-        const req = https.request(options, response => {
-          const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+          req.end();
+        });
 
-          if (response.statusCode === 302 || response.statusCode === 301) {
-            // Handle redirect
-            https
-              .get(response.headers.location, redirectResponse => {
-                const redirectTotalSize =
-                  parseInt(redirectResponse.headers["content-length"], 10) || totalSize;
-                handleResponseWithProgress(redirectResponse, redirectTotalSize);
-              })
-              .on("error", err => {
-                fs.unlink(zipPath, () => {});
-                reject(err);
-              });
-          } else if (response.statusCode === 200) {
-            handleResponseWithProgress(response, totalSize);
+        console.log("Download complete, extracting...");
+
+        // Verify the downloaded file exists and has content
+        if (!fs.existsSync(zipPath)) {
+          throw new Error("Downloaded file not found");
+        }
+        const fileStats = fs.statSync(zipPath);
+        if (fileStats.size < 1000) {
+          throw new Error(
+            `Downloaded file is too small (${fileStats.size} bytes), likely corrupted`
+          );
+        }
+        console.log(`Downloaded file size: ${fileStats.size} bytes`);
+
+        // Spawn AscendaraLocalRefresh binary to extract the zip (runs in separate process)
+        console.log("Starting extraction with AscendaraLocalRefresh binary...");
+
+        let executablePath;
+        let args;
+
+        if (isWindows) {
+          if (isDev) {
+            executablePath = "python";
+            args = [
+              "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
+              "--extract-shared-index",
+              "--zip-path",
+              zipPath,
+              "--output",
+              outputPath,
+            ];
           } else {
-            reject(new Error(`Failed to download: ${response.statusCode}`));
+            executablePath = path.join(
+              appDirectory,
+              "/resources/AscendaraLocalRefresh.exe"
+            );
+            args = [
+              "--extract-shared-index",
+              "--zip-path",
+              zipPath,
+              "--output",
+              outputPath,
+            ];
           }
-        });
-
-        req.on("error", err => {
-          fs.unlink(zipPath, () => {});
-          reject(err);
-        });
-
-        req.end();
-      });
-
-      console.log("Download complete, extracting...");
-
-      // Verify the downloaded file exists and has content
-      if (!fs.existsSync(zipPath)) {
-        throw new Error("Downloaded file not found");
-      }
-      const fileStats = fs.statSync(zipPath);
-      if (fileStats.size < 1000) {
-        throw new Error(
-          `Downloaded file is too small (${fileStats.size} bytes), likely corrupted`
-        );
-      }
-      console.log(`Downloaded file size: ${fileStats.size} bytes`);
-
-      // Backup existing files
-      const gamesFile = path.join(outputPath, "ascendara_games.json");
-      const imgsDir = path.join(outputPath, "imgs");
-      const gamesBackup = path.join(outputPath, "ascendara_games_backup.json");
-      const imgsBackup = path.join(outputPath, "imgs_backup");
-
-      if (fs.existsSync(gamesFile)) {
-        fs.copyFileSync(gamesFile, gamesBackup);
-      }
-      if (fs.existsSync(imgsDir)) {
-        if (fs.existsSync(imgsBackup)) {
-          fs.rmSync(imgsBackup, { recursive: true, force: true });
+        } else {
+          executablePath = "python3";
+          const scriptPath = isDev
+            ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py"
+            : path.join(appDirectory, "/resources/AscendaraLocalRefresh.py");
+          args = [
+            scriptPath,
+            "--extract-shared-index",
+            "--zip-path",
+            zipPath,
+            "--output",
+            outputPath,
+          ];
         }
-        fs.cpSync(imgsDir, imgsBackup, { recursive: true });
-      }
 
-      // Extract the zip asynchronously to avoid blocking the UI
-      await new Promise((resolve, reject) => {
-        yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-          if (err) return reject(err);
+        await new Promise((resolve, reject) => {
+          const extractProcess = spawn(executablePath, args, {
+            stdio: ["ignore", "pipe", "pipe"],
+          });
 
-          let extractedCount = 0;
-          let totalEntries = 0;
+          extractProcess.stdout.on("data", data => {
+            console.log(`Extraction: ${data.toString()}`);
+          });
 
-          zipfile.on("entry", entry => {
-            totalEntries++;
+          extractProcess.stderr.on("data", data => {
+            console.error(`Extraction error: ${data.toString()}`);
+          });
 
-            if (/\/$/.test(entry.fileName)) {
-              // Directory entry - use async mkdir
-              const dirPath = path.join(outputPath, entry.fileName);
-              fs.mkdir(dirPath, { recursive: true }, err => {
-                if (err && err.code !== "EEXIST") return reject(err);
-                // Yield to event loop before reading next entry
-                setImmediate(() => zipfile.readEntry());
-              });
-            } else {
-              // File entry
-              zipfile.openReadStream(entry, (err, readStream) => {
-                if (err) return reject(err);
-
-                const filePath = path.join(outputPath, entry.fileName);
-                const fileDir = path.dirname(filePath);
-
-                // Use async mkdir for file directories
-                fs.mkdir(fileDir, { recursive: true }, err => {
-                  if (err && err.code !== "EEXIST") return reject(err);
-
-                  const writeStream = fs.createWriteStream(filePath);
-                  readStream.pipe(writeStream);
-
-                  writeStream.on("finish", () => {
-                    extractedCount++;
-                    // Send progress updates periodically
-                    if (mainWindow && extractedCount % 10 === 0) {
-                      mainWindow.webContents.send("public-index-download-progress", {
-                        downloaded: extractedCount,
-                        total: totalEntries,
-                        progress:
-                          totalEntries > 0 ? (extractedCount / totalEntries) * 100 : -1,
-                        phase: "extracting",
-                      });
-                    }
-                    // Yield to event loop before reading next entry
-                    setImmediate(() => zipfile.readEntry());
+          // Monitor progress.json for extraction progress
+          const progressFile = path.join(outputPath, "progress.json");
+          const progressInterval = setInterval(() => {
+            if (fs.existsSync(progressFile)) {
+              try {
+                const progressData = JSON.parse(fs.readFileSync(progressFile, "utf8"));
+                if (progressData.phase === "extracting" && mainWindow) {
+                  // Convert progress from decimal (0-1) to percentage (0-100)
+                  const progressPercent = (progressData.progress || 0) * 100;
+                  mainWindow.webContents.send("public-index-download-progress", {
+                    downloaded: progressPercent,
+                    total: 100,
+                    progress: progressPercent,
+                    phase: "extracting",
                   });
+                }
+              } catch (e) {
+                // Ignore JSON parse errors
+              }
+            }
+          }, 100);
 
-                  writeStream.on("error", reject);
-                  readStream.on("error", reject);
+          extractProcess.on("close", code => {
+            clearInterval(progressInterval);
+
+            if (code === 0) {
+              console.log("Extraction completed successfully");
+              if (mainWindow) {
+                mainWindow.webContents.send("public-index-download-progress", {
+                  downloaded: 100,
+                  total: 100,
+                  progress: 100,
+                  phase: "complete",
                 });
-              });
+              }
+              resolve();
+            } else {
+              reject(new Error(`Extraction process exited with code ${code}`));
             }
           });
 
-          zipfile.on("end", () => {
-            // Send final extraction complete
-            if (mainWindow) {
-              mainWindow.webContents.send("public-index-download-progress", {
-                downloaded: extractedCount,
-                total: totalEntries,
-                progress: 100,
-                phase: "complete",
-              });
-            }
-            resolve();
+          extractProcess.on("error", err => {
+            clearInterval(progressInterval);
+            reject(err);
           });
-
-          zipfile.on("error", reject);
-          zipfile.readEntry();
         });
-      });
 
-      // Clean up temporary files and folders
-      console.log("Cleaning up temporary files and folders...");
+        // Clean up temporary files and folders asynchronously
+        console.log("Cleaning up temporary files and folders...");
 
-      // Remove the downloaded zip file
-      if (fs.existsSync(zipPath)) {
-        fs.unlinkSync(zipPath);
-      }
+        // Yield to event loop before cleanup
+        await new Promise(resolve => setImmediate(resolve));
 
-      // Remove backup files
-      if (fs.existsSync(gamesBackup)) {
-        fs.unlinkSync(gamesBackup);
-      }
-      if (fs.existsSync(imgsBackup)) {
-        fs.rmSync(imgsBackup, { recursive: true, force: true });
-      }
-
-      // Remove any temporary folders that may have been extracted
-      const tempFolders = [
-        path.join(outputPath, "incoming"),
-        path.join(outputPath, "progress"),
-        path.join(outputPath, "__MACOSX"), // macOS metadata folder
-        path.join(outputPath, "temp"),
-        path.join(outputPath, "tmp"),
-      ];
-
-      for (const folder of tempFolders) {
-        if (fs.existsSync(folder)) {
-          console.log(`Removing temporary folder: ${folder}`);
-          fs.rmSync(folder, { recursive: true, force: true });
+        // Remove the downloaded zip file
+        if (fs.existsSync(zipPath)) {
+          await fs.promises
+            .unlink(zipPath)
+            .catch(e => console.log("Zip cleanup error:", e));
         }
-      }
 
-      // Check for and remove duplicate image directories
-      const imgsDirs = fs.readdirSync(outputPath).filter(item => {
-        const fullPath = path.join(outputPath, item);
-        return (
-          fs.statSync(fullPath).isDirectory() &&
-          (item.toLowerCase().includes("img") || item === "images")
+        // Remove backup files
+        const gamesBackup = path.join(outputPath, "ascendara_games_backup.json");
+        const imgsBackup = path.join(outputPath, "imgs_backup");
+
+        if (fs.existsSync(gamesBackup)) {
+          await fs.promises
+            .unlink(gamesBackup)
+            .catch(e => console.log("Backup cleanup error:", e));
+        }
+        if (fs.existsSync(imgsBackup)) {
+          await fs.promises
+            .rm(imgsBackup, { recursive: true, force: true })
+            .catch(e => console.log("Imgs backup cleanup error:", e));
+        }
+
+        // Remove any temporary folders that may have been extracted
+        const tempFolders = [
+          path.join(outputPath, "incoming"),
+          path.join(outputPath, "progress"),
+          path.join(outputPath, "__MACOSX"), // macOS metadata folder
+          path.join(outputPath, "temp"),
+          path.join(outputPath, "tmp"),
+        ];
+
+        for (const folder of tempFolders) {
+          if (fs.existsSync(folder)) {
+            console.log(`Removing temporary folder: ${folder}`);
+            await fs.promises
+              .rm(folder, { recursive: true, force: true })
+              .catch(e => console.log(`Temp folder cleanup error (${folder}):`, e));
+          }
+          // Yield to event loop after each folder
+          await new Promise(resolve => setImmediate(resolve));
+        }
+
+        // Check for and remove duplicate image directories
+        const items = await fs.promises.readdir(outputPath).catch(() => []);
+        const imgsDirs = [];
+        for (const item of items) {
+          const fullPath = path.join(outputPath, item);
+          try {
+            const stat = await fs.promises.stat(fullPath);
+            if (
+              stat.isDirectory() &&
+              (item.toLowerCase().includes("img") || item === "images")
+            ) {
+              imgsDirs.push(item);
+            }
+          } catch (e) {
+            // Skip items that can't be stat'd
+          }
+        }
+
+        // Keep only the 'imgs' directory, remove any others
+        for (const dir of imgsDirs) {
+          if (dir !== "imgs") {
+            const dirPath = path.join(outputPath, dir);
+            console.log(`Removing duplicate image directory: ${dirPath}`);
+            await fs.promises
+              .rm(dirPath, { recursive: true, force: true })
+              .catch(e =>
+                console.log(`Duplicate img dir cleanup error (${dirPath}):`, e)
+              );
+          }
+          // Yield to event loop after each directory
+          await new Promise(resolve => setImmediate(resolve));
+        }
+
+        console.log("Shared index set up successfully");
+
+        // Write lastSuccessfulTimestamp to progress.json so Settings shows correct last refresh time
+        const progressFilePath = path.join(outputPath, "progress.json");
+        const progressData = {
+          status: "completed",
+          phase: "done",
+          progress: 1,
+          lastSuccessfulTimestamp: Math.floor(Date.now() / 1000),
+        };
+        await fs.promises.writeFile(
+          progressFilePath,
+          JSON.stringify(progressData, null, 2)
         );
-      });
 
-      // Keep only the 'imgs' directory, remove any others
-      for (const dir of imgsDirs) {
-        if (dir !== "imgs") {
-          const dirPath = path.join(outputPath, dir);
-          console.log(`Removing duplicate image directory: ${dirPath}`);
-          fs.rmSync(dirPath, { recursive: true, force: true });
+        publicIndexDownloading = false;
+        if (mainWindow) {
+          mainWindow.webContents.send("public-index-download-complete");
+        }
+      } catch (error) {
+        console.error("Failed to download shared index:", error);
+        publicIndexDownloading = false;
+        if (mainWindow) {
+          mainWindow.webContents.send("public-index-download-error", {
+            error: error.message,
+          });
         }
       }
+    });
 
-      console.log("Shared index set up successfully");
-
-      // Write lastSuccessfulTimestamp to progress.json so Settings shows correct last refresh time
-      const progressFilePath = path.join(outputPath, "progress.json");
-      const progressData = {
-        status: "completed",
-        phase: "done",
-        progress: 1,
-        lastSuccessfulTimestamp: Math.floor(Date.now() / 1000),
-      };
-      fs.writeFileSync(progressFilePath, JSON.stringify(progressData, null, 2));
-
-      publicIndexDownloading = false;
-      if (mainWindow) {
-        mainWindow.webContents.send("public-index-download-complete");
-      }
-      return { success: true };
-    } catch (error) {
-      console.error("Failed to download shared index:", error);
-      publicIndexDownloading = false;
-      if (mainWindow) {
-        mainWindow.webContents.send("public-index-download-error", {
-          error: error.message,
-        });
-      }
-      return { success: false, error: error.message };
-    }
+    // Return immediately so UI doesn't block
+    return { success: true, message: "Download started in background" };
   });
 
   // Debug handler to manually trigger upload (for testing)
