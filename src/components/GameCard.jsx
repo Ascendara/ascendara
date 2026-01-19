@@ -273,7 +273,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
     <Card
       ref={cardRef}
       onClick={handleCardClick}
-      className="group relative flex min-h-[380px] cursor-pointer flex-col overflow-hidden bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
+      className="group relative flex min-h-[380px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
     >
       <CardContent className="flex-1 p-0">
         {/* Image Section */}
