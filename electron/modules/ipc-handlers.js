@@ -1232,8 +1232,7 @@ function registerMiscHandlers() {
     const settings = settingsManager.getSettings();
     try {
       if (!settings.downloadDirectory) {
-        console.error("Download directory not set");
-        return;
+        throw new Error("Download directory not set. Please configure it in Settings.");
       }
       const downloadDirectory = settings.downloadDirectory;
       const gamesFilePath = path.join(downloadDirectory, "games.json");

@@ -99,7 +99,17 @@ function registerDownloadHandlers() {
                 if (isActive) {
                   // Parse progress - handle both "50.5%" string and numeric values
                   let progress = 0;
-                  if (downloadingData.progressCompleted) {
+
+                  // Use extraction progress if extracting, otherwise use download progress
+                  if (
+                    downloadingData.extracting &&
+                    downloadingData.extractionProgress?.percentComplete
+                  ) {
+                    const progressStr = String(
+                      downloadingData.extractionProgress.percentComplete
+                    );
+                    progress = parseFloat(progressStr.replace("%", "")) || 0;
+                  } else if (downloadingData.progressCompleted) {
                     const progressStr = String(downloadingData.progressCompleted);
                     progress = parseFloat(progressStr.replace("%", "")) || 0;
                   }
@@ -125,8 +135,16 @@ function registerDownloadHandlers() {
                     id: gameData.game || dir,
                     name: gameData.game || dir,
                     progress: progress,
-                    speed: downloadingData.progressDownloadSpeeds || "0 B/s",
-                    eta: downloadingData.timeUntilComplete || "Calculating...",
+                    speed:
+                      downloadingData.extracting &&
+                      downloadingData.extractionProgress?.extractionSpeed
+                        ? downloadingData.extractionProgress.extractionSpeed
+                        : downloadingData.progressDownloadSpeeds || "0 B/s",
+                    eta:
+                      downloadingData.extracting &&
+                      downloadingData.extractionProgress?.currentFile
+                        ? `Extracting: ${downloadingData.extractionProgress.filesExtracted}/${downloadingData.extractionProgress.totalFiles} files`
+                        : downloadingData.timeUntilComplete || "Calculating...",
                     status: downloadingData.paused
                       ? "paused"
                       : downloadingData.extracting
@@ -297,11 +315,6 @@ function registerDownloadHandlers() {
       }
 
       try {
-        if (!settings.downloadDirectory) {
-          console.error("Download directory not set");
-          return;
-        }
-
         // Download game header image (skip if updateFlow and header already exists, or if imgID is undefined)
         let headerImagePath;
         let imageBuffer;
@@ -839,8 +852,7 @@ function registerDownloadHandlers() {
     } else {
       const settings = settingsManager.getSettings();
       if (!settings.downloadDirectory) {
-        console.error("Download directory not set");
-        return;
+        throw new Error("Download directory not set. Please configure it in Settings.");
       }
       const downloadDirectory = settings.downloadDirectory;
       const gameDirectory = path.join(downloadDirectory, game);
@@ -886,8 +898,7 @@ function registerDownloadHandlers() {
     const settings = settingsManager.getSettings();
     try {
       if (!settings.downloadDirectory) {
-        console.error("Download directory not set");
-        return;
+        throw new Error("Download directory not set. Please configure it in Settings.");
       }
       const gamesDirectory = settings.downloadDirectory;
 
