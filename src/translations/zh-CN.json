@@ -53,9 +53,9 @@
       "cloudSyncDesc": "跨设备同步您的 Ascendara 个人资料和游戏统计数据",
       "cloudSyncandBackups": "云同步和备份",
       "cloudSyncandBackupsDesc": "将您的 Ascendara 个人资料和游戏保存同步到云端",
-      "downloadQueues": "下载队列",
       "friends": "朋友们",
       "leaderboard": "排行榜",
+      "mobileView": "手机查看",
       "moreComing": "还有更多即将推出",
       "moreComingDesc": "Ascend 不断添加新功能",
       "nexusMods": "模组和培训师集成",
@@ -392,7 +392,7 @@
       "upcoming": "即将更新"
     },
     "notifications": {
-      "empty": "没有通知",
+      "empty": "无通知",
       "emptyDescription": "你们都被抓住了！稍后回来查看新的更新。",
       "loading": "正在加载通知...",
       "subtitle": "随时了解重要公告和更新",
@@ -457,6 +457,10 @@
       "upcoming": {
         "description": "独家预览下一次 Ascendara 更新中的内容。保持领先地位并了解即将推出的新功能。",
         "title": "即将更新一览"
+      },
+      "webView": {
+        "description": "通过 Ascend 网络应用程序在任何设备上查看下载进度并管理您的下载",
+        "title": "移动下载管理器"
       }
     },
     "profile": {
@@ -546,7 +550,7 @@
       "bioTooLong": "简介不得超过 100 个字符",
       "cancel": "取消",
       "checkoutCanceled": "结账被取消。",
-      "checkoutError": "无法开始结帐。请再试一次。",
+      "checkoutError": "无法开始结账。请再试一次。",
       "commandCopied": "命令已复制到剪贴板！",
       "copy": "复制",
       "country": "国家",
@@ -554,7 +558,7 @@
       "daysLeft": "剩余天数",
       "discordPlaceholder": "您的 Discord 用户名",
       "discordReadOnly": "Discord 用户名是只读的",
-      "discordVerification": "不和谐验证",
+      "discordVerification": "不一致验证",
       "discordVerificationDescription": "在 Discord 服务器上进行验证，以解锁专属角色和功能。",
       "displayName": "显示名称",
       "edit": "编辑个人资料",
@@ -594,6 +598,21 @@
       "subscribeToKeep": "订阅以永久保留它们",
       "subscribeToPro": "订阅提升",
       "subscription": "订阅",
+      "subscriptionDialog": {
+        "allPlansInclude": "所有计划均包含完整的 Ascend 访问权限",
+        "bestValue": "最超值",
+        "billedEvery": "每 {{count}} 个月计费一次",
+        "billedMonthly": "按月计费",
+        "cancel": "取消",
+        "description": "选择最适合您的订阅期限。更长的计划可以为您节省更多！",
+        "month": "月",
+        "months": "几个月",
+        "perMonth": "/月",
+        "save": "保存{{percent}}",
+        "saveText": "节省",
+        "selectPlan": "选择计划",
+        "title": "选择您的提升计划"
+      },
       "subscriptionSuccessMessage": "您现在可以完全访问所有高级功能。感谢您的支持！",
       "subtitle": "管理您的帐户和个人资料",
       "supportMessage": "加紧。连接。加入登高。",
@@ -820,6 +839,7 @@
     "onlineFixWarningTitle": "启动时出现在线修复提示",
     "onlineTooltip": "通过 online-fix.me 启用在线多人游戏功能",
     "openCriticBetaWarning": "此 API 端点处于测试阶段，可能存在问题。如果 OpenCritic 显示不同的游戏，请点击标题右侧的“举报”来举报该游戏。",
+    "outdatedIndexWarning": "该游戏的索引已过时。请刷新页面以查看最新信息。",
     "platforms": "平台",
     "pressEscToGoBack": "点击Me或ESC键返回",
     "protectYourself": {
@@ -836,6 +856,7 @@
     },
     "ratingTooltip": "该游戏在 Ascendara 上被其他人评为 {{rating}} 星（满分 5 星）。在 Discord 服务器中阅读有关此游戏的评论。",
     "readReviews": "阅读评论",
+    "refreshNow": "立即刷新",
     "reportBroken": "报告",
     "reportDescription": "请提供有关该问题的更多详细信息",
     "reportError": "请提供举报原因和详细信息",
@@ -1051,7 +1072,7 @@
     "downloadUpdate": "下载更新",
     "downloadingAllTracks": "正在下载所有曲目...",
     "gameNotFound": "找不到游戏",
-    "getAscend": "获取提升",
+    "getAscend": "加入奥升德",
     "getAscendToUpdate": "获取升级更新",
     "helpOthers": "花点时间对这款游戏进行评分和评论（满分 5 星）。您的反馈有助于其他人了解游戏的质量和可靠性。",
     "inCloudLibrary": "已保存至云图书馆",
@@ -1131,6 +1152,23 @@
     "viewOnFling": "在 FLiNG 上查看",
     "viewOnNexus": "在 Nexus Mods 上查看"
   },
+  "globalSearch": {
+    "categories": { "index": "游戏索引", "library": "图书馆", "settings": "设置" },
+    "emptyState": {
+      "global": "搜索游戏、设置或功能",
+      "library": "搜索您已安装的游戏",
+      "settings": "搜索设置和首选项"
+    },
+    "navigate": "导航",
+    "noResults": "没有找到结果",
+    "placeholder": {
+      "global": "搜索阿森达拉",
+      "library": "搜索图书馆",
+      "settings": "搜索设置"
+    },
+    "select": "选择",
+    "tryDifferent": "尝试不同的搜索词"
+  },
   "home": {
     "actionGames": "动作游戏",
     "footer": {
@@ -1172,7 +1210,12 @@
       "autoBackupEnabledDesc": "已为 {{game}} 启用自动备份",
       "autoBackupOnGameClose": "游戏关闭时自动备份",
       "autoCloudBackup": "自动云备份",
-      "autoCloudBackupDesc": "备份时自动将数据保存至云端",
+      "autoCloudBackupActive": "积极的",
+      "autoCloudBackupDesc": "备份时自动将数据保存到云端",
+      "autoCloudBackupLearnMore": "了解有关登高的更多信息 →",
+      "autoCloudBackupSignInDesc": "登录 Ascend 以解锁云备份并确保跨设备的保存安全",
+      "autoCloudBackupUpgrade": "升级到高级版 →",
+      "autoCloudBackupUpgradeDesc": "升级到 Ascend Premium 以解锁云备份并保护您的游戏保存",
       "backingUpDescription": "正在备份{{game}}...",
       "backupFailed": "备份失败",
       "backupNow": "立即备份{{game}}",
@@ -1180,6 +1223,14 @@
       "backupSuccess": "备份成功",
       "backupSuccessDesc": "已成功备份 {{game}} 的保存数据",
       "backupsList": "备份列表",
+      "cloudBackupsDisabledDesc": "备份仅存储在本地",
+      "cloudBackupsDisabledToast": "云备份已禁用",
+      "cloudBackupsEnabledDesc": "备份将自动上传至云端",
+      "cloudBackupsEnabledToast": "已启用云备份",
+      "cloudBackupsRequireAccount": "云备份需要 Ascend 帐户",
+      "cloudBackupsRequirePremium": "云备份需要 Ascend Premium",
+      "cloudBackupsUpgradeAction": "升级",
+      "cloudBackupsUpgradePrompt": "升级到高级版以解锁云备份",
       "cloudUploadStep": "云端上传",
       "confirmRestore": "确认恢复",
       "confirmSpecificRestore": "确认特定备份恢复",
@@ -1208,6 +1259,7 @@
       "restoringBackup": "恢复备份",
       "restoringDescription": "正在恢复 {{game}} 的保存数据...",
       "settings": "设置",
+      "signInToUseCloudBackups": "请登录 Ascend 以使用云备份",
       "stepComplete": "完全的",
       "stepInProgress": "进行中...",
       "stepUploading": "正在上传...",
@@ -1621,10 +1673,13 @@
     "mostPopular": "最受欢迎",
     "mostRecentlyUpdated": "最近更新",
     "noResults": "没有找到结果",
+    "outdatedIndexWarning": "您的本地游戏索引已过时。某些游戏版本或链接可能不再准确。",
+    "outdatedIndexWarningDownload": "您的本地索引有一段时间没有刷新了。考虑更新它以查看最新的游戏。",
     "placeholder": "搜索游戏...",
     "quickSearchResults": "快速搜索结果",
     "recentSearches": "最近的搜索",
     "refreshLocalIndex": "刷新本地索引",
+    "refreshNow": "立即刷新",
     "refreshRequestError": "发送刷新请求时出错",
     "refreshRequestRateLimited": "您最近已经发送了刷新请求。请稍后重试。",
     "refreshRequestSuccess": "刷新请求发送成功",
@@ -1636,7 +1691,7 @@
     "source": "来源",
     "switchToLocalIndex": "切换到本地索引",
     "totalGames": "总比赛数",
-    "usingApiWarning": "您仍在使用 Ascendara API 进行游戏索引。 Ascendara 正在切换到本地索引以获得更好的性能和可靠性。",
+    "usingApiWarning": "您正在使用公共 API。考虑设置本地索引以获得更好的性能和隐私。",
     "usingLocalIndex": "使用本地索引"
   },
   "server-status": {
@@ -1685,7 +1740,7 @@
     "behaviorAfterDownloadDescription": "选择下载完成后您的计算机应发生的情况。",
     "behaviors": {
       "lock": "锁",
-      "none": "什么都不做",
+      "none": "什么也不做",
       "shutdown": "关闭",
       "sleep": "睡觉"
     },
@@ -1771,6 +1826,16 @@
     "homeSearch": "首页搜索栏",
     "homeSearchDescription": "在主页上显示搜索栏和快速访问按钮。",
     "importTheme": "进口",
+    "indexReminder": "索引刷新提醒",
+    "indexReminderDescription": "经过这么多天后，系统会提醒您刷新本地索引",
+    "indexReminderOptions": {
+      "fiveDays": "5天",
+      "oneWeek": "1周",
+      "tenDays": "10天",
+      "threeDays": "3天",
+      "twoDays": "2 天",
+      "twoWeeks": "2周"
+    },
     "installGameDependencies": "依赖关系",
     "invalidSupportCode": "支持代码无效或过期",
     "joinDiscord": "加入Discord服务器",
@@ -1807,7 +1872,7 @@
       "accentButton": "口音",
       "badge": "徽章",
       "cardDescription": "这是一些无声的描述文字。",
-      "cardTitle": "卡牌标题",
+      "cardTitle": "卡牌名称",
       "error": "错误",
       "info": "信息",
       "inputPlaceholder": "输入字段预览",

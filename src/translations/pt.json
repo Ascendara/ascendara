@@ -53,9 +53,9 @@
       "cloudSyncDesc": "Sincronize seu perfil Ascendara e estatísticas de jogo entre dispositivos",
       "cloudSyncandBackups": "Sincronização e backups na nuvem",
       "cloudSyncandBackupsDesc": "Sincronize seu perfil Ascendara e jogos salvos na nuvem",
-      "downloadQueues": "Baixar filas",
       "friends": "Amigos",
       "leaderboard": "Tabelas de classificação",
+      "mobileView": "Visualização móvel",
       "moreComing": "E mais vindo",
       "moreComingDesc": "Novos recursos são constantemente adicionados ao Ascend",
       "nexusMods": "Integração de mods e treinadores",
@@ -216,7 +216,7 @@
     },
     "checkingVersion": "Verificando versão...",
     "cloudBackups": {
-      "backupName": "Nome do Backup",
+      "backupName": "Nome do backup",
       "backupNamePlaceholder": "por exemplo, salve antes da luta contra o chefe",
       "cloudBackupsSection": "Backups na nuvem",
       "comingSoon": "Em breve",
@@ -241,7 +241,7 @@
       "restoreError": "Falha ao restaurar o backup",
       "restoreSuccess": "Backup restaurado com sucesso",
       "restoringBackup": "Restaurando backup...",
-      "selectFile": "Selecione o arquivo (máx. 100 MB)",
+      "selectFile": "Selecione o arquivo (máximo 100 MB)",
       "selectedFile": "Selecionado",
       "subscriptionRequired": "É necessária uma assinatura ativa do Ascend",
       "subscriptionRequiredDesc": "Os backups na nuvem requerem uma assinatura Ascend ativa. Atualize para acessar esse recurso.",
@@ -251,7 +251,7 @@
       "uploadBackup": "Carregar cópia de segurança",
       "uploadError": "Falha ao carregar backup",
       "uploadSuccess": "Backup enviado com sucesso",
-      "uploading": "Fazendo upload...",
+      "uploading": "Carregando...",
       "viewPlans": "Ver planos",
       "yourBackups": "Seus backups"
     },
@@ -271,7 +271,7 @@
       "cloudBackupsEnabledDesc": "Os backups serão carregados automaticamente para a nuvem",
       "cloudBackupsRequireSubscription": "Os backups na nuvem requerem uma assinatura Ascend ativa",
       "cloudBadge": "Nuvem",
-      "cloudOnly": "Apenas nuvem",
+      "cloudOnly": "Somente nuvem",
       "custom": "Personalizado",
       "delete": "Excluir",
       "deleteConfirm": "Excluir da nuvem?",
@@ -314,7 +314,7 @@
       "syncing": "Sincronizando...",
       "title": "Biblioteca na nuvem",
       "totalLaunches": "Total de Lançamentos",
-      "totalPlaytime": "Tempo total de jogo",
+      "totalPlaytime": "Tempo total de reprodução",
       "tryDifferentSearch": "Experimente um termo de pesquisa diferente ou limpe sua pesquisa",
       "upgradeForCloudBackups": "Atualize para o Ascend Premium para desbloquear backups na nuvem e proteger seus jogos salvos",
       "uploadedToCloudSuccess": "Backup carregado na nuvem com sucesso",
@@ -457,6 +457,10 @@
       "upcoming": {
         "description": "Obtenha uma prévia exclusiva do que está por vir na próxima atualização do Ascendara. Fique à frente da curva e saiba quais novos recursos estão por vir.",
         "title": "Próximas atualizações"
+      },
+      "webView": {
+        "description": "Veja a progressão do download e gerencie seus downloads em qualquer dispositivo através do webapp Ascend",
+        "title": "Gerenciador de download móvel"
       }
     },
     "profile": {
@@ -485,9 +489,9 @@
       "syncTitle": "Sincronize seu perfil",
       "synced": "Perfil sincronizado com sucesso!",
       "topGames": "Principais jogos",
-      "totalPlaytime": "Tempo total de jogo",
+      "totalPlaytime": "Tempo total de reprodução",
       "totalXP": "EXP total",
-      "xp": "EXP",
+      "xp": "XP",
       "yourLevel": "Seu nível"
     },
     "report": {
@@ -512,7 +516,7 @@
     "requests": {
       "accept": "Aceitar",
       "cancel": "Cancelar",
-      "empty": "Não há solicitações de amizade pendentes",
+      "empty": "Nenhum pedido de amizade pendente",
       "incoming": "Solicitações recebidas",
       "noIncoming": "Nenhuma solicitação recebida",
       "noOutgoing": "Nenhuma solicitação de saída",
@@ -522,7 +526,7 @@
       "wantsToAdd": "quer ser seu amigo"
     },
     "search": {
-      "hint": "Pesquise usuários pelo nome de exibição para visualizar seus perfis, adicioná-los como amigos ou iniciar uma conversa.",
+      "hint": "Pesquise usuários pelo nome de exibição para visualizar seu perfil, adicioná-los como amigos ou iniciar uma conversa.",
       "noResults": "Nenhum usuário encontrado que corresponda à sua pesquisa. Experimente um nome diferente.",
       "noResultsTitle": "Nenhum usuário encontrado",
       "placeholder": "Pesquisar por nome de exibição...",
@@ -594,6 +598,21 @@
       "subscribeToKeep": "Inscreva-se para mantê-los para sempre",
       "subscribeToPro": "Inscreva-se na Ascend",
       "subscription": "Subscrição",
+      "subscriptionDialog": {
+        "allPlansInclude": "Todos os planos incluem acesso total ao Ascend",
+        "bestValue": "Melhor valor",
+        "billedEvery": "cobrado a cada {{count}} meses",
+        "billedMonthly": "Faturado mensalmente",
+        "cancel": "Cancelar",
+        "description": "Selecione a duração da assinatura que funciona melhor para você. Planos mais longos economizam mais!",
+        "month": "Mês",
+        "months": "Meses",
+        "perMonth": "/ mês",
+        "save": "Salvar {{percent}}",
+        "saveText": "Salvar",
+        "selectPlan": "Selecione o plano",
+        "title": "Escolha o seu plano Ascend"
+      },
       "subscriptionSuccessMessage": "Agora você tem acesso total a todos os recursos premium. Obrigado pelo seu apoio!",
       "subtitle": "Gerencie sua conta e perfil",
       "supportMessage": "Avance. Conectar. Junte-se à Ascend.",
@@ -696,7 +715,7 @@
       "couldNotReportDesc": "Seu relatório não foi enviado. Por favor, tente novamente mais tarde.",
       "description": "Ajude a melhorar o Ascendara relatando quaisquer problemas que encontrar.",
       "detailsLabel": "Detalhes",
-      "detailsPlaceholder": "Forneça mais detalhes sobre o problema...",
+      "detailsPlaceholder": "Forneça mais detalhes sobre o assunto...",
       "error": "Falha ao enviar relatório",
       "missingInfo": "Informações ausentes",
       "missingInfoDesc": "Por favor preencha todos os campos obrigatórios.",
@@ -824,6 +843,7 @@
     "onlineFixWarningTitle": "Prompt de correção on-line no lançamento",
     "onlineTooltip": "Capacidades multijogador online habilitadas através do online-fix.me",
     "openCriticBetaWarning": "Este endpoint da API está em versão beta e pode haver problemas. Se o OpenCritic mostrar um jogo diferente, denuncie o jogo clicando em 'Denunciar' à direita do título.",
+    "outdatedIndexWarning": "O índice deste jogo está desatualizado. Atualize a página para ver as informações mais recentes.",
     "platforms": "Plataformas",
     "pressEscToGoBack": "Clique em Mim ou na tecla ESC para voltar",
     "protectYourself": {
@@ -840,6 +860,7 @@
     },
     "ratingTooltip": "Este jogo foi classificado com {{rating}} de 5 estrelas por outros no Ascendara. Leia comentários sobre este jogo no servidor Discord.",
     "readReviews": "Leia comentários",
+    "refreshNow": "Atualizar agora",
     "reportBroken": "Relatório",
     "reportDescription": "Forneça mais detalhes sobre o problema",
     "reportError": "Forneça um motivo e detalhes para sua denúncia",
@@ -902,7 +923,7 @@
       "downloadReady": "Download pronto para começar",
       "downloadStarted": "Download iniciado com sucesso",
       "invalidLink": "Por favor insira um link de download válido",
-      "invalidProtocolUrl": "URL enviado é inválido. Por favor, tente novamente",
+      "invalidProtocolUrl": "O URL enviado é inválido. Por favor, tente novamente",
       "linkProcessed": "Link processado com sucesso",
       "noDownloadDirectory": "Por favor, defina primeiro um diretório de download em Preferências",
       "noGameData": "Nenhum dado do jogo foi transmitido",
@@ -922,7 +943,7 @@
     },
     "viewCriticReviews": "Ver avaliações dos críticos",
     "viewOnOpenCritic": "Ver no OpenCritic",
-    "yourPC": "Seu computador"
+    "yourPC": "Seu PC"
   },
   "downloads": {
     "actions": {
@@ -948,7 +969,7 @@
     "completedDescription": "Seu jogo terminou de baixar e está pronto para jogar",
     "connectionBrokenError": "A conexão de download foi interrompida. Tente ativar o download de fluxo único nas preferências do Ascendara para um download mais estável.",
     "connectionResetError": "O download não pôde ser iniciado porque a conexão foi cancelada. Seu provedor de serviços de Internet pode estar bloqueando esta fonte de download específica, considere usar uma VPN.",
-    "contentTypeError": "O downloader relatou um erro de tipo de conteúdo. Provavelmente isso significa que o link de download expirou.",
+    "contentTypeError": "O downloader relatou um erro de tipo de conteúdo. Provavelmente, isso significa que o link de download expirou.",
     "currentTotalSpeed": "Velocidade total atual",
     "downloadError": "Erro de download",
     "downloading": "Baixando",
@@ -971,7 +992,7 @@
     "limitedTo": "Limitado a",
     "noDownloads": "Bem, isso é relaxante...",
     "noDownloadsMessage": "Você não está baixando nada no momento, inicie um download para acompanhar o progresso aqui.",
-    "noFilesError": "O downloader não encontrou nenhum arquivo para baixar. Provavelmente, isso significa que o arquivo foi removido da fonte.",
+    "noFilesError": "O downloader não encontrou nenhum arquivo para baixar. Isso provavelmente significa que o arquivo foi removido da fonte.",
     "noSpaceLeftError": "Não há mais espaço no dispositivo. Libere espaço em disco para continuar o download.",
     "pauseSuccess": "Download pausado com sucesso",
     "preparingExtraction": "Preparando a extração...",
@@ -1058,7 +1079,7 @@
     "downloadUpdate": "Baixar atualização",
     "downloadingAllTracks": "Baixando todas as faixas...",
     "gameNotFound": "Jogo não encontrado",
-    "getAscend": "Subir",
+    "getAscend": "Junte-se ao Ascend",
     "getAscendToUpdate": "Obtenha o Ascend para atualizar",
     "helpOthers": "Reserve um momento para avaliar e comentar este jogo com 5 estrelas. Seu feedback ajuda outras pessoas a compreender a qualidade e a confiabilidade do jogo.",
     "inCloudLibrary": "Salvo na Biblioteca em Nuvem",
@@ -1138,6 +1159,27 @@
     "viewOnFling": "Ver no FLiNG",
     "viewOnNexus": "Ver em Mods Nexus"
   },
+  "globalSearch": {
+    "categories": {
+      "index": "Índice de jogos",
+      "library": "Biblioteca",
+      "settings": "Configurações"
+    },
+    "emptyState": {
+      "global": "Pesquise jogos, configurações ou recursos",
+      "library": "Pesquise seus jogos instalados",
+      "settings": "Configurações e preferências de pesquisa"
+    },
+    "navigate": "Navegar",
+    "noResults": "Nenhum resultado encontrado",
+    "placeholder": {
+      "global": "Procurar Ascendara",
+      "library": "Biblioteca de pesquisa",
+      "settings": "Configurações de pesquisa"
+    },
+    "select": "Selecione",
+    "tryDifferent": "Experimente um termo de pesquisa diferente"
+  },
   "home": {
     "actionGames": "Jogos de ação",
     "footer": {
@@ -1179,7 +1221,12 @@
       "autoBackupEnabledDesc": "Backup automático ativado para {{game}}",
       "autoBackupOnGameClose": "Backup automático ao fechar o jogo",
       "autoCloudBackup": "Backup automático na nuvem",
+      "autoCloudBackupActive": "Ativo",
       "autoCloudBackupDesc": "Salve dados automaticamente na nuvem ao fazer backup",
+      "autoCloudBackupLearnMore": "Saiba mais sobre Ascend →",
+      "autoCloudBackupSignInDesc": "Faça login no Ascend para desbloquear backups na nuvem e manter seus salvamentos seguros em todos os dispositivos",
+      "autoCloudBackupUpgrade": "Atualize para Premium →",
+      "autoCloudBackupUpgradeDesc": "Atualize para o Ascend Premium para desbloquear backups na nuvem e proteger seus jogos salvos",
       "backingUpDescription": "Fazendo backup de {{game}}...",
       "backupFailed": "Falha no backup",
       "backupNow": "Faça backup {{game}} agora",
@@ -1187,16 +1234,24 @@
       "backupSuccess": "Backup bem-sucedido",
       "backupSuccessDesc": "Backup dos dados salvos de {{game}} com sucesso",
       "backupsList": "Lista de backups",
+      "cloudBackupsDisabledDesc": "Os backups serão armazenados apenas localmente",
+      "cloudBackupsDisabledToast": "Backups na nuvem desativados",
+      "cloudBackupsEnabledDesc": "Os backups serão carregados automaticamente para a nuvem",
+      "cloudBackupsEnabledToast": "Backups na nuvem ativados",
+      "cloudBackupsRequireAccount": "Backups em nuvem requerem uma conta Ascend",
+      "cloudBackupsRequirePremium": "Backups em nuvem requerem Ascend Premium",
+      "cloudBackupsUpgradeAction": "Atualizar",
+      "cloudBackupsUpgradePrompt": "Atualize para Premium para desbloquear backups na nuvem",
       "cloudUploadStep": "Carregamento na nuvem",
       "confirmRestore": "Confirmar restauração",
       "confirmSpecificRestore": "Confirme a restauração de backup específica",
       "createBackupFirst": "Crie um backup primeiro para vê-lo listado aqui.",
-      "creatingBackup": "Criando backup",
+      "creatingBackup": "Criando Backup",
       "gameBackupTitle": "Backups de salvamento de jogos",
       "listBackups": "Escolha Backup para Restaurar",
       "loadBackupsFailed": "Falha ao carregar backups",
       "loadingBackups": "Carregando backups",
-      "localBackupStep": "Backup Local",
+      "localBackupStep": "Backup local",
       "locked": "Bloqueado",
       "noBackupsFound": "Nenhum backup encontrado",
       "openBackupFolder": "Abra a pasta de backup",
@@ -1215,12 +1270,13 @@
       "restoringBackup": "Restaurando Backup",
       "restoringDescription": "Restaurando dados salvos de {{game}}...",
       "settings": "Configurações",
+      "signInToUseCloudBackups": "Faça login no Ascend para usar backups na nuvem",
       "stepComplete": "Completo",
       "stepInProgress": "Em andamento...",
-      "stepUploading": "Fazendo upload...",
+      "stepUploading": "Carregando...",
       "tryAgain": "Tente novamente",
       "waitingBackup": "Aguarde enquanto o backup dos seus dados salvos está sendo feito...",
-      "waitingRestore": "Aguarde enquanto seus dados salvos são restaurados..."
+      "waitingRestore": "Aguarde enquanto seus dados salvos estão sendo restaurados..."
     },
     "calculatingSize": "Calculando...",
     "cannotRunDev": "Não é possível executar jogos no modo de desenvolvedor",
@@ -1558,7 +1614,7 @@
     "stats": "Estatísticas do perfil",
     "topGames": "Seus melhores jogos",
     "topN": "Principais {{count}}",
-    "totalPlaytime": "Tempo total de jogo",
+    "totalPlaytime": "Tempo total de reprodução",
     "totalXP": "EXP total: {{xp}}"
   },
   "refreshDialog": {
@@ -1622,7 +1678,7 @@
     "filterOptions": "Opções de filtro",
     "filters": "Filtros",
     "gamesIndexed": "Jogos indexados",
-    "indexedInformation": "Informações indexadas",
+    "indexedInformation": "Informações Indexadas",
     "indexedInformationDescription": "Ascendara usa um banco de dados desenvolvido sob medida para armazenar links e informações de jogos. As informações indexadas são atualizadas a cada dois dias ou se uma solicitação for feita. Nenhum arquivo de jogo é armazenado nos servidores Ascendara.",
     "lastUpdated": "Última atualização",
     "leastPopular": "Menos Popular",
@@ -1631,10 +1687,13 @@
     "mostPopular": "Mais populares",
     "mostRecentlyUpdated": "Atualizado recentemente",
     "noResults": "Nenhum resultado encontrado",
+    "outdatedIndexWarning": "Seu índice de jogo local está desatualizado. Algumas versões ou links de jogos podem não ser mais precisos.",
+    "outdatedIndexWarningDownload": "Seu índice local não é atualizado há algum tempo. Considere atualizá-lo para ver os jogos mais recentes.",
     "placeholder": "Pesquisar jogos...",
     "quickSearchResults": "Resultados de pesquisa rápida",
     "recentSearches": "Pesquisas recentes",
     "refreshLocalIndex": "Atualizar índice local",
+    "refreshNow": "Atualizar agora",
     "refreshRequestError": "Erro ao enviar solicitação de atualização",
     "refreshRequestRateLimited": "Você já enviou uma solicitação de atualização recentemente. Por favor, tente novamente mais tarde.",
     "refreshRequestSuccess": "Solicitação de atualização enviada com sucesso",
@@ -1646,7 +1705,7 @@
     "source": "Fonte",
     "switchToLocalIndex": "Mudar para índice local",
     "totalGames": "Total de jogos",
-    "usingApiWarning": "Você ainda está usando a API Ascendara para indexação de jogos. A Ascendara está migrando para indexação local para melhor desempenho e confiabilidade.",
+    "usingApiWarning": "Você está usando a API pública. Considere configurar um índice local para melhor desempenho e privacidade.",
     "usingLocalIndex": "Usando índice local"
   },
   "server-status": {
@@ -1727,7 +1786,7 @@
       "extreme": "Extremo (>48 threads) – Use com cuidado",
       "high": "Alto (25-32 threads) – Downloads rápidos",
       "low": "Baixo (<8 threads) - Uso mínimo da CPU",
-      "normal": "Normal (8 a 24 threads) – Recomendado para a maioria dos usuários",
+      "normal": "Normal (8-24 threads) – Recomendado para a maioria dos usuários",
       "veryHigh": "Muito Alto (33-48 threads) – Para conexões muito rápidas"
     },
     "downloaderRunningWarning": "Você não pode alterar essas configurações enquanto um download estiver em andamento",
@@ -1781,6 +1840,16 @@
     "homeSearch": "Barra de pesquisa inicial",
     "homeSearchDescription": "Mostre a barra de pesquisa e os botões de acesso rápido na página inicial.",
     "importTheme": "Importar",
+    "indexReminder": "Lembrete de atualização de índice",
+    "indexReminderDescription": "Seja lembrado de atualizar seu índice local após tantos dias",
+    "indexReminderOptions": {
+      "fiveDays": "5 dias",
+      "oneWeek": "1 semana",
+      "tenDays": "10 dias",
+      "threeDays": "3 dias",
+      "twoDays": "2 dias",
+      "twoWeeks": "2 semanas"
+    },
     "installGameDependencies": "Dependências",
     "invalidSupportCode": "Código de suporte inválido ou expirado",
     "joinDiscord": "Junte-se ao servidor Discord",
@@ -1894,7 +1963,7 @@
       "vpnWarning": "Seu endereço IP ficará visível para outros pares. Use uma VPN para proteger sua privacidade e evitar possíveis problemas legais."
     },
     "torrenting": "Torrent",
-    "torrentingDescription": "Configure downloads de torrent no Ascendara. O torrent requer qBittorrent e uma VPN é altamente recomendada.",
+    "torrentingDescription": "Configure downloads de torrent no Ascendara. Torrent requer qBittorrent e uma VPN é altamente recomendada.",
     "uploadLogs": "Carregar registros",
     "userSettings": {
       "browseDirectory": "Navegar",
@@ -1957,7 +2026,7 @@
     "ready_to_download": "Pronto para baixar",
     "redownload": "Baixar novamente",
     "redownload_same_file": "Baixar novamente o arquivo?",
-    "redownload_same_file_confirm": "Tem certeza de que deseja baixar este arquivo novamente? Isso substituirá o download anterior.",
+    "redownload_same_file_confirm": "Tem certeza de que deseja baixar novamente este arquivo? Isso substituirá o download anterior.",
     "starting_download_to_pc": "Iniciando o download para o PC",
     "stop_download": "Parar download",
     "stop_download_confirm": "Tem certeza de que deseja interromper o download de {{name}}?",
@@ -2050,7 +2119,7 @@
     "continue": "Continuar",
     "continueWithoutSharing": "Continuar sem compartilhar",
     "darkThemes": "Temas escuros",
-    "dependenciesDesc": "Se você está jogando em um PC novo ou instalou recentemente o Windows, Ascendara pode ajudá-lo a instalar esses componentes essenciais para garantir a melhor experiência",
+    "dependenciesDesc": "Se você estiver jogando em um PC novo ou instalou recentemente o Windows, Ascendara pode ajudá-lo a instalar esses componentes essenciais para garantir a melhor experiência",
     "downloadGamesFaster": "Obtenha a extensão Ascendara",
     "enableAutoUpdates": "Habilitar atualizações automáticas",
     "errorInstallingDependencies": "Erro ao instalar dependências",
@@ -2164,7 +2233,7 @@
     "welcomeTo": "Bem-vindo ao",
     "welcomeToAscendaraDescription": "Você está quase pronto para começar a usar o Ascendara. Passaremos juntos pelo processo de integração e depois configuraremos o índice do jogo, mas primeiro leia os Termos de Serviço e a Política de Privacidade.",
     "whenYouClickADownloadLink": "Quando você inicia um download de um provedor conhecido, a extensão irá interromper automaticamente o download no seu navegador e iniciá-lo para você no Ascendara",
-    "wineIsRequired": "Brinque com Vinho",
+    "wineIsRequired": "Brinque com vinho",
     "wineMustBeInstalled": "Wine, DXVK e outras ferramentas precisam ser instaladas e configuradas em seu computador para executar jogos do Windows. Não se preocupe, o Ascendara pode instalar e configurar tudo só para você",
     "youCanAddMoreLater": "Você pode adicionar mais diretórios nas preferências posteriormente",
     "youCanChangeThisLater": "Você sempre pode atualizar seu idioma posteriormente em Configurações.",

@@ -8,7 +8,7 @@
       "creating": "アカウントを作成しています...",
       "emailLabel": "電子メールアドレス：",
       "goBack": "戻って編集する",
-      "message": "メールアドレスが正しいことを確認してください。アカウントの作成後は、メール アドレスを変更することはできません。",
+      "message": "メールアドレスが正しいことを確認してください。アカウントが作成されると、メール アドレスを変更することはできません。",
       "title": "メールを確認してください",
       "warning": "このメールアドレスはアカウント作成後に変更することはできません。"
     },
@@ -53,15 +53,15 @@
       "cloudSyncDesc": "Ascendara プロフィールとゲーム統計をデバイス間で同期します",
       "cloudSyncandBackups": "クラウド同期とバックアップ",
       "cloudSyncandBackupsDesc": "Ascendara プロフィールとゲームの保存をクラウドに同期します",
-      "downloadQueues": "ダウンロードキュー",
       "friends": "友達",
       "leaderboard": "リーダーボード",
+      "mobileView": "モバイルビュー",
       "moreComing": "さらに今後も",
       "moreComingDesc": "Ascend には新しい機能が常に追加されています",
       "nexusMods": "MODとトレーナーの統合",
       "nexusModsDesc": "ワンクリック統合により、Ascendara 内でゲーム MOD とトレーナーを直接管理およびインストールできます。",
       "profiles": "プロフィール",
-      "profilesDesc": "プロフィール、公開プロフィール、統計情報を設定します。 Ascend で他のユーザーのプロフィールや統計情報も表示します。",
+      "profilesDesc": "プロフィール、公開プロフィール、統計情報を設定します。 Ascend で他のユーザーのプロフィールや統計も表示します。",
       "unlimitedDownloads": "無制限のダウンロード"
     },
     "featuresIntro": "Ascend で得られるものは次のとおりです。",
@@ -128,7 +128,7 @@
       "description": "Ascendara のこのバージョンには、ダウンロード、アップデート、その他のコア機能などの機能に関する既知の重大な問題が含まれています。",
       "development": "このバージョンを使用すると、問題やクラッシュが発生する可能性があります。 Web サイトから Ascendara を最新バージョンに更新してください。",
       "title": "壊れたバージョンを実行しています",
-      "understand": "問題は理解しました。続行します",
+      "understand": "問題を理解しました。続行します",
       "update": "今すぐアップデート"
     },
     "crashScreen": {
@@ -228,7 +228,7 @@
       "downloadError": "バックアップのダウンロードに失敗しました",
       "downloadStarted": "ダウンロードが開始されました",
       "downloadingBackup": "クラウドからバックアップをダウンロードしています...",
-      "fileTooLarge": "ファイルが大きすぎます（最大100MB）",
+      "fileTooLarge": "ファイルが大きすぎます (最大 100MB)",
       "fillAllFields": "すべてのフィールドに入力してください",
       "filterByGame": "ゲーム名でフィルタリング...",
       "gameName": "ゲーム名",
@@ -295,7 +295,7 @@
       "searchPlaceholder": "クラウド ライブラリを検索...",
       "securingBackup": "クラウドでバックアップを保護しています...",
       "signInForCloudBackups": "Ascend にサインインしてクラウド バックアップのロックを解除し、デバイス間で保存を安全に保ちます",
-      "signInRequired": "クラウド バックアップを使用するには、Ascend にサインインしてください",
+      "signInRequired": "クラウド バックアップを使用するには、Ascend にサインインしてください。",
       "signInRequiredDesc": "クラウド バックアップには Ascend アカウントが必要です",
       "sortAchievements": "ほとんどの実績",
       "sortName": "名前順に並べ替える",
@@ -393,7 +393,7 @@
     },
     "notifications": {
       "empty": "通知はありません",
-      "emptyDescription": "皆さんも追いついてきました！新しい更新情報については、後でもう一度確認してください。",
+      "emptyDescription": "皆さんも追い込まれていますね！新しい更新情報については、後でもう一度確認してください。",
       "loading": "通知を読み込んでいます...",
       "subtitle": "重要なお知らせや最新情報を常に入手してください",
       "title": "通知"
@@ -445,7 +445,7 @@
       },
       "planned": "計画済み",
       "profile": {
-        "description": "カスタムプロフィールを使用してパーソナライズされたプロフィールを設定し、ゲームの好みを紹介して、他の人に自分の魅力を知らせましょう。あなたのプロフィールをあなただけのものにしましょう。",
+        "description": "カスタムプロフィールを使用してパーソナライズされたプロフィールを設定し、ゲームの好みを紹介し、他の人に自分の魅力を知らせましょう。あなたのプロフィールをあなただけのものにしましょう。",
         "title": "プロフィールと略歴"
       },
       "subtitle": "これらは、Ascend でアクセスできる現在利用可能な機能です。",
@@ -455,8 +455,12 @@
         "title": "無制限のダウンロード"
       },
       "upcoming": {
-        "description": "次回の Ascendara アップデートの内容を独占プレビューしてください。時代の先を行き、今後どのような新機能が登場するかを把握してください。",
+        "description": "次回の Ascendara アップデートで何が起こるかについての独占プレビューを入手してください。時代の先を行き、今後どのような新機能が登場するかを把握してください。",
         "title": "今後のアップデートのピーク"
+      },
+      "webView": {
+        "description": "Ascend Webアプリを通じて、ダウンロードの進行状況を表示し、任意のデバイスでダウンロードを管理します",
+        "title": "モバイル ダウンロード マネージャー"
       }
     },
     "profile": {
@@ -571,7 +575,7 @@
       "lifetime": "一生",
       "manageSubscription": "サブスクリプションの管理",
       "monthly": "毎月",
-      "noProfileInfo": "プロフィール、国、またはソーシャルリンクを追加してプロフィールをカスタマイズします",
+      "noProfileInfo": "プロフィール、国、またはソーシャル リンクを追加してプロフィールをカスタマイズします",
       "notAllowedBio": "自己紹介に禁止されている単語が含まれています",
       "notAllowedDisplayName": "表示名に使用できない単語が含まれています",
       "paymentNotCompleted": "支払いが完了していませんでした。もう一度試してください。",
@@ -594,6 +598,21 @@
       "subscribeToKeep": "購読して永久に保存します",
       "subscribeToPro": "アセンドを購読する",
       "subscription": "サブスクリプション",
+      "subscriptionDialog": {
+        "allPlansInclude": "すべてのプランには完全な Ascend アクセスが含まれています",
+        "bestValue": "ベストバリュー",
+        "billedEvery": "{{count}} か月ごとに請求されます",
+        "billedMonthly": "毎月請求される",
+        "cancel": "キャンセル",
+        "description": "最適なサブスクリプション期間を選択してください。長期プランならさらにお得！",
+        "month": "月",
+        "months": "月",
+        "perMonth": "/月",
+        "save": "{{percent}} を保存",
+        "saveText": "保存",
+        "selectPlan": "プランを選択",
+        "title": "Ascend プランを選択してください"
+      },
       "subscriptionSuccessMessage": "すべてのプレミアム機能に完全にアクセスできるようになりました。ご支援ありがとうございます!",
       "subtitle": "アカウントとプロフィールを管理する",
       "supportMessage": "ステップアップ。接続する。アセンドに参加します。",
@@ -614,7 +633,7 @@
       "verifyStep1": "Discordサーバーに参加する",
       "verifyStep2": "コマンド チャネルで次のコマンドを実行します。",
       "verifyYourAccount": "アカウントを確認する",
-      "viewInvoices": "請求書の表示",
+      "viewInvoices": "請求書を表示する",
       "welcomeToAscend": "アセンドへようこそ！"
     },
     "stats": { "friends": "友達", "playtime": "遊び時間", "requests": "リクエスト" },
@@ -820,6 +839,7 @@
     "onlineFixWarningTitle": "起動時のオンライン修正プロンプト",
     "onlineTooltip": "online-fix.me を通じてオンライン マルチプレイヤー機能が有効化",
     "openCriticBetaWarning": "この API エンドポイントはベータ版であるため、問題が発生する可能性があります。 OpenCritic が別のゲームを表示した場合は、タイトルの右側にある [レポート] をクリックしてゲームを報告してください。",
+    "outdatedIndexWarning": "このゲームのインデックスは古くなっています。最新の情報を確認するにはページを更新してください。",
     "platforms": "プラットフォーム",
     "pressEscToGoBack": "戻るには「Me」または「ESC」キーをクリックしてください",
     "protectYourself": {
@@ -836,6 +856,7 @@
     },
     "ratingTooltip": "このゲームは、Ascendara で他のユーザーによって 5 つ星中 {{rating}} と評価されています。 Discord サーバーでこのゲームに関するコメントを読んでください。",
     "readReviews": "レビューを読む",
+    "refreshNow": "今すぐ更新",
     "reportBroken": "報告",
     "reportDescription": "問題についてさらに詳しく教えてください",
     "reportError": "報告の理由と詳細を記入してください",
@@ -1054,7 +1075,7 @@
     "downloadUpdate": "アップデートをダウンロード",
     "downloadingAllTracks": "すべてのトラックをダウンロードしています...",
     "gameNotFound": "ゲームが見つかりません",
-    "getAscend": "アセンドを取得",
+    "getAscend": "アセンドに参加する",
     "getAscendToUpdate": "Ascend を入手してアップデートする",
     "helpOthers": "このゲームを 5 つ星のうちで評価してレビューしてください。あなたのフィードバックは、他の人がゲームの品質と信頼性を理解するのに役立ちます。",
     "inCloudLibrary": "クラウドライブラリに保存されました",
@@ -1134,6 +1155,27 @@
     "viewOnFling": "FLiNGで見る",
     "viewOnNexus": "Nexus Mods で見る"
   },
+  "globalSearch": {
+    "categories": {
+      "index": "ゲームインデックス",
+      "library": "図書館",
+      "settings": "設定"
+    },
+    "emptyState": {
+      "global": "ゲーム、設定、機能を検索します",
+      "library": "インストールされているゲームを検索する",
+      "settings": "検索設定と環境設定"
+    },
+    "navigate": "ナビゲート",
+    "noResults": "結果が見つかりませんでした",
+    "placeholder": {
+      "global": "アセンダラを検索",
+      "library": "ライブラリを検索",
+      "settings": "検索設定"
+    },
+    "select": "選択",
+    "tryDifferent": "別の検索語を試してください"
+  },
   "home": {
     "actionGames": "アクションゲーム",
     "footer": {
@@ -1175,7 +1217,12 @@
       "autoBackupEnabledDesc": "{{game}} の自動バックアップが有効になりました",
       "autoBackupOnGameClose": "ゲーム終了時の自動バックアップ",
       "autoCloudBackup": "自動クラウドバックアップ",
+      "autoCloudBackupActive": "アクティブ",
       "autoCloudBackupDesc": "バックアップ時にデータを自動的にクラウドに保存",
+      "autoCloudBackupLearnMore": "アセンドについて詳しくはこちら→",
+      "autoCloudBackupSignInDesc": "Ascend にサインインしてクラウド バックアップのロックを解除し、デバイス間で保存を安全に保ちます",
+      "autoCloudBackupUpgrade": "プレミアムにアップグレード→",
+      "autoCloudBackupUpgradeDesc": "Ascend Premium にアップグレードすると、クラウド バックアップのロックが解除され、ゲームのセーブデータが保護されます",
       "backingUpDescription": "{{game}} をバックアップしています...",
       "backupFailed": "バックアップに失敗しました",
       "backupNow": "今すぐ {{game}} をバックアップします",
@@ -1183,6 +1230,14 @@
       "backupSuccess": "バックアップ成功",
       "backupSuccessDesc": "{{game}} のセーブデータを正常にバックアップしました",
       "backupsList": "バックアップリスト",
+      "cloudBackupsDisabledDesc": "バックアップはローカルにのみ保存されます",
+      "cloudBackupsDisabledToast": "クラウドバックアップが無効になっています",
+      "cloudBackupsEnabledDesc": "バックアップは自動的にクラウドにアップロードされます",
+      "cloudBackupsEnabledToast": "クラウドバックアップが有効になっています",
+      "cloudBackupsRequireAccount": "クラウド バックアップには Ascend アカウントが必要です",
+      "cloudBackupsRequirePremium": "クラウド バックアップには Ascend Premium が必要です",
+      "cloudBackupsUpgradeAction": "アップグレード",
+      "cloudBackupsUpgradePrompt": "プレミアムにアップグレードしてクラウド バックアップのロックを解除する",
       "cloudUploadStep": "クラウドアップロード",
       "confirmRestore": "復元の確認",
       "confirmSpecificRestore": "特定のバックアップの復元を確認する",
@@ -1200,7 +1255,7 @@
       "restoreButton": "セーブデータを復元する",
       "restoreFailed": "復元に失敗しました",
       "restoreLatest": "最新のバックアップを復元する",
-      "restoreResult": "復元結果",
+      "restoreResult": "結果の復元",
       "restoreSpecificWarningDesc": "{{backup}} で作成されたバックアップから {{game}} のセーブ データを復元しようとしています。",
       "restoreSuccess": "復元に成功しました",
       "restoreSuccessDesc": "{{game}} のセーブデータが正常に復元されました",
@@ -1211,6 +1266,7 @@
       "restoringBackup": "バックアップの復元",
       "restoringDescription": "{{game}} のセーブデータを復元しています...",
       "settings": "設定",
+      "signInToUseCloudBackups": "クラウド バックアップを使用するには、Ascend にサインインしてください。",
       "stepComplete": "完了",
       "stepInProgress": "進行中...",
       "stepUploading": "アップロード中...",
@@ -1225,7 +1281,7 @@
     "changeExecutable": "実行可能ファイルの変更または追加",
     "chooseDirectory": "ディレクトリの選択",
     "chooseExecutableFile": "実行可能ファイルを選択してください...",
-    "chooseOrUploadCoverImage": "このゲームのカバー画像を選択またはアップロードします",
+    "chooseOrUploadCoverImage": "このゲームのカバー画像を選択またはアップロード",
     "clickToOpenFolder": "クリックしてフォルダーを開きます",
     "clickToUpload": "クリックしてアップロード",
     "cloudOnly": {
@@ -1267,7 +1323,7 @@
       "atLeastOne": "少なくとも 1 つの実行可能ファイルが必要です",
       "change": "実行ファイルの変更",
       "description": "このゲームの実行可能ファイルを管理します。 「再生」をクリックすると、プライマリ実行可能ファイルが起動します。",
-      "exeLocationHint": "実行可能ファイルが見つからない場合は、 「bin」、「x64」、「x86」、「Binaries」などのサブフォルダーにある可能性があります。",
+      "exeLocationHint": "実行可能ファイルが見つからない場合は、 「bin」、「x64」、「x86」、または「Binaries」などのサブフォルダーにある可能性があります。",
       "learnMore": "もっと詳しく知る",
       "makePrimary": "プライマリにする",
       "noFile": "ファイルが選択されていません",
@@ -1279,7 +1335,7 @@
     },
     "executableNotFound": "ゲームの実行可能ファイルが見つかりません",
     "executableSelect": {
-      "description": "このゲームには複数の実行可能ファイルが設定されています。どちらを実行したいですか？",
+      "description": "このゲームには複数の実行ファイルが設定されています。どちらを実行したいですか？",
       "title": "実行可能ファイルの選択"
     },
     "filters": {
@@ -1314,7 +1370,7 @@
     "importSuccessDesc": "Steam ゲームは正常にインポートされました。一部のゲーム カバーと実行可能パスが見つからないか正しくない場合があります。ゲーム情報を更新することでこれを修正できます。",
     "importSuccessTitle": "インポート完了！",
     "importingGames": "Steam ゲームをインポートしています...",
-    "importingGamesDesc": "Steam ゲームがインポートされている間、お待ちください。ライブラリのサイズによっては、これには数分かかる場合があります。",
+    "importingGamesDesc": "Steam ゲームがインポートされている間お待ちください。ライブラリのサイズによっては、これには数分かかる場合があります。",
     "includesAllDLCs": "すべてのDLCを含む",
     "launchError": "起動エラー",
     "launchErrorMessage": "{{game}} を実行できませんでした。ゲームの実行可能ファイルの名前がゲーム名と異なる場合があります。 Ascendara が正しいファイルを実行しようとしていることを確認してください。",
@@ -1352,7 +1408,7 @@
       "desc": "新しいフォルダーの名前を入力します",
       "exists": "この名前のフォルダーはすでに存在します",
       "placeholder": "フォルダ名",
-      "required": "フォルダー名は必須です",
+      "required": "フォルダ名は必須です",
       "title": "新しいフォルダー"
     },
     "noResultsFound": "結果が見つかりませんでした。検索は正確にしてください。",
@@ -1455,7 +1511,7 @@
     "fetchingPosts": "ゲーム投稿を取得しています...",
     "fetchingViews": "ビュー数を取得しています...",
     "games": "ゲーム",
-    "gamesPerPage": "ページごとのゲーム",
+    "gamesPerPage": "ページごとのゲーム数",
     "gamesProcessed": "処理されたゲーム",
     "hourAgo": "1時間前",
     "hoursAgo": "数時間前",
@@ -1552,7 +1608,7 @@
     "ram": "ラム",
     "savedLocally": "ローカルにのみ保存される",
     "stats": "プロファイル統計",
-    "topGames": "あなたの人気のゲーム",
+    "topGames": "人気のゲーム",
     "topN": "トップ{{count}}",
     "totalPlaytime": "総プレイ時間",
     "totalXP": "合計 XP: {{xp}}"
@@ -1627,10 +1683,13 @@
     "mostPopular": "最も人気のある",
     "mostRecentlyUpdated": "最近更新された",
     "noResults": "結果が見つかりませんでした",
+    "outdatedIndexWarning": "ローカル ゲーム インデックスが古くなっています。一部のゲームのバージョンやリンクは正確ではなくなっている可能性があります。",
+    "outdatedIndexWarningDownload": "ローカル インデックスはしばらく更新されていません。最新のゲームを確認するには、更新することを検討してください。",
     "placeholder": "ゲームを検索...",
     "quickSearchResults": "クイック検索結果",
     "recentSearches": "最近の検索",
     "refreshLocalIndex": "ローカルインデックスを更新",
+    "refreshNow": "今すぐ更新",
     "refreshRequestError": "更新リクエストの送信エラー",
     "refreshRequestRateLimited": "最近、すでに更新リクエストを送信しました。後でもう一度試してください。",
     "refreshRequestSuccess": "更新リクエストが正常に送信されました",
@@ -1642,7 +1701,7 @@
     "source": "ソース",
     "switchToLocalIndex": "ローカルインデックスに切り替える",
     "totalGames": "合計ゲーム数",
-    "usingApiWarning": "ゲームのインデックス作成にはまだ Ascendara API を使用しています。 Ascendara は、パフォーマンスと信頼性を向上させるために、ローカル インデックス作成に切り替えています。",
+    "usingApiWarning": "パブリック API を使用しています。パフォーマンスとプライバシーを向上させるために、ローカル インデックスを設定することを検討してください。",
     "usingLocalIndex": "ローカルインデックスの使用"
   },
   "server-status": {
@@ -1680,7 +1739,7 @@
     "ascendaraAnalyticsDescription": "使用状況データを送信して Ascendara の改善にご協力ください。このデータは匿名であり、お客様を特定するために使用することはできません。",
     "ascendaraTimechine": "アセンダラ・タイムマシン",
     "ascendaraToggleAnalytics": "オプトインして Ascendara の改善にご協力ください",
-    "ascendaraUpdates": "自動更新",
+    "ascendaraUpdates": "自動アップデート",
     "ascendaraUpdatesDescription": "Ascendara の新しいバージョンを自動的にダウンロードし、準備ができたらインストールするように求めます。",
     "ascendaraWorkshopDownloader": "ワークショップダウンローダー",
     "ascendaraWorkshopDownloaderDescription": "Workshop Downloader を使用すると、アカウントを持っていなくても Steam ワークショップからアイテムをダウンロードできます。",
@@ -1777,6 +1836,16 @@
     "homeSearch": "ホーム検索バー",
     "homeSearchDescription": "ホーム ページに検索バーとクイック アクセス ボタンを表示します。",
     "importTheme": "輸入",
+    "indexReminder": "インデックス更新リマインダー",
+    "indexReminderDescription": "この日数が経過すると、ローカル インデックスを更新するよう通知されます",
+    "indexReminderOptions": {
+      "fiveDays": "5日間",
+      "oneWeek": "1週間",
+      "tenDays": "10日間",
+      "threeDays": "3日間",
+      "twoDays": "2日間",
+      "twoWeeks": "2週間"
+    },
     "installGameDependencies": "依存関係",
     "invalidSupportCode": "サポート コードが無効または期限切れです",
     "joinDiscord": "Discordサーバーに参加する",
@@ -1790,7 +1859,7 @@
     "localIndexDescription": "SteamRIP からゲーム インデックスを更新して、利用可能な最新のゲームを取得します。インデックスをいつ更新するかを制御します。",
     "logUploadPurpose": "このデバッグ ログは、チームが問題を解決するのに役立ちます。サポート終了後、お客様のデータは削除されます。",
     "logUploadWarningDesc": "アップロードしようとしているログには次のものが含まれます。",
-    "logUploadWarningTitle": "ログアップロードの通知",
+    "logUploadWarningTitle": "ログアップロードに関する注意事項",
     "logWarningActivity": "Ascendara コア、ダウンローダー マネージャー、通知ヘルパー、およびゲーム ハンドラー アクティビティ",
     "logWarningDirectories": "ダウンロードディレクトリとファイルパス",
     "logWarningUsername": "Windows ユーザー名",
@@ -1862,7 +1931,7 @@
     "singleStream": "単一ストリームのダウンロード",
     "singleStreamDescription": "ダウンロードには単一の接続を使用します。大きなファイルの場合はより安定しますが、速度が遅くなる可能性があります。",
     "smoothTransitions": "スムーズな移行",
-    "smoothTransitionsDescription": "アプリ内のページ間の切り替えには、より自然に感じられるスムーズなアニメーションが使用されています。",
+    "smoothTransitionsDescription": "アプリ内のページ間の切り替えには、より自然に感じられるスムーズなアニメーションが付いています。",
     "supportCodeDesc": "ログを自動的にアップロードするには、ここに 6 桁のサポート コードを入力します。助けが必要ですか?",
     "supportDesc": "サポート コードを使用して、Ascendara のサポート チームに連絡します。ログは自動的にアップロードされます。",
     "supportError": "ログのアップロードに失敗しました。もう一度試してください。",
@@ -1914,7 +1983,7 @@
   },
   "torbox": {
     "account": "TorBox アカウント",
-    "completed": "完了しました",
+    "completed": "完了",
     "data": "データ",
     "data_refreshed": "TorBox データが更新されました",
     "delete_download": "ダウンロードの削除",
@@ -1978,7 +2047,7 @@
       "title": "ゲームライブラリ"
     },
     "navigationBar": {
-      "content": "ここで Ascendara のページを切り替えることができます。 Ctrl キーと 1 ～ 5 の数字を使用してページを切り替えることもできます。",
+      "content": "ここで、Ascendara のページを切り替えることができます。 Ctrl キーと 1 ～ 5 の数字を使用してページを切り替えることもできます。",
       "title": "ナビゲーションバー"
     },
     "profile": {
@@ -2012,7 +2081,7 @@
     "welcome": "Ascendara に慣れるための簡単なツアーに参加し、いくつかのトリックを紹介しましょう。"
   },
   "welcome": {
-    "allRequiredDependenciesHaveBeenInstalledDesc": "必要な依存関係はすべて正常にインストールされました。アセンダラへようこそ。",
+    "allRequiredDependenciesHaveBeenInstalledDesc": "必要な依存関係がすべて正常にインストールされました。アセンダラへようこそ。",
     "allRequiredDependenciesHaveBeenInstalledTitle": "依存関係のインストールが完了しました",
     "analytics": "アセンダラの改善にご協力ください",
     "analyticsDesc": "匿名の使用状況データを共有してエクスペリエンスを向上させる",
@@ -2027,9 +2096,9 @@
     "ascendaraNeverCollects": "Ascendara は個人情報やゲーム データを収集することはありません。すべての分析は匿名であり、Ascendara を改善するためにのみ使用されます。",
     "ascendaraNeverCollectsPersonalInfo": "Ascendara は個人情報やゲーム データを収集することはありません。すべての分析は匿名であり、Ascendara を改善するためにのみ使用されます。",
     "audioProcessing": "音声処理",
-    "automaticUpdates": "自動更新",
+    "automaticUpdates": "自動アップデート",
     "automaticUpdatesDesc": "最新の機能と改善点が利用可能になり次第入手してください",
-    "automaticUpdatesTitle": "自動更新",
+    "automaticUpdatesTitle": "自動アップデート",
     "bePartOfImproving": "Ascendara の改善に参加してください",
     "bePartOfImprovingDesc": "Ascendara を使用するだけで Ascendara の改善に貢献する何百もの他の人たちに加わりましょう",
     "browse": "ブラウズ",
@@ -2079,7 +2148,7 @@
     "installationFailed": "インストールに失敗しました",
     "installingDependencies": "依存関係をインストールしています...",
     "lightThemes": "ライトテーマ",
-    "lightningFastDesc": "V7 は速度とパフォーマンスに関して最適化されており、これまでよりもスムーズかつ高速なエクスペリエンスを実現します。",
+    "lightningFastDesc": "V7 は速度とパフォーマンスに関して最適化されており、これまで以上にスムーズかつ高速なエクスペリエンスを実現します。",
     "lightningFastTitle": "電光石火の速さ",
     "localIndex": {
       "canContinue": "インデックスがバックグラウンドで構築されている間、セットアップを続行できます。",
@@ -2163,7 +2232,7 @@
     "wineIsRequired": "ワインと遊ぶ",
     "wineMustBeInstalled": "Windows ゲームを実行するには、Wine、DXVK、およびその他のツールをコンピューターにインストールしてセットアップする必要があります。ただし、心配しないでください。Ascendara がすべてをインストールして設定できます。",
     "youCanAddMoreLater": "後で環境設定でさらにディレクトリを追加できます",
-    "youCanChangeThisLater": "後から「設定」でいつでも言語を更新できます。",
+    "youCanChangeThisLater": "後から [設定] でいつでも言語を更新できます。",
     "youCanChangeThisSettingLater": "これは後から「設定」で変更できます。",
     "youWillReceiveAdminPrompts": "公式 Microsoft インストーラーから、必要なコンポーネントをインストールするための管理者プロンプトが表示されます。インストール後にコンピュータの再起動が必要になる場合があります。",
     "yourContinuedSupport": "皆様の継続的なサポートのおかげで、Ascendara は今日の姿になりました。 Ascendara は、お客様が求めていた新しい外観と操作性を備えて、ゼロから完全に再構築されました。"
@@ -2186,9 +2255,9 @@
     "installSuccess": "インストール完了！",
     "installingSteamCMD": "SteamCMD サイドカーをインストールしています...",
     "mainDescription": "ワークショップアイテムのリンクをここに貼り付けてダウンロードしてください。 Ascendara は、ユーザーが自分で管理できるように、それらをディレクトリに追加します。",
-    "mainTitle": "ワークショップアイテムをダウンロード",
+    "mainTitle": "ワークショップアイテムをダウンロードする",
     "waitingForLogs": "ダウンロードの開始を待っています...",
     "welcome": "Ascendara のワークショップ ダウンローダーへようこそ",
-    "welcomeDescription": "ここでは、アカウントを持っていなくても Steam ワークショップからアイテムをダウンロードできます。"
+    "welcomeDescription": "ここでは、アカウントを持っていなくても、Steam ワークショップからアイテムをダウンロードできます。"
   }
 }

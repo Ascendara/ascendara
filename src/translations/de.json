@@ -17,9 +17,9 @@
       "deleting": "Einreichen...",
       "description": "Dadurch wird eine Anfrage zur Löschung Ihres Kontos und aller damit verbundenen Daten gesendet. Ihre Anfrage wird bearbeitet und Sie werden per E-Mail benachrichtigt.",
       "enterPassword": "Geben Sie zur Bestätigung Ihr Passwort ein",
-      "failed": "Löschanforderung konnte nicht gesendet werden",
+      "failed": "Löschanforderung konnte nicht übermittelt werden",
       "holdButton": "Zum Anfordern 3 Sekunden lang gedrückt halten",
-      "holdToDelete": "Halten Sie gedrückt, um eine Anfrage zu stellen",
+      "holdToDelete": "Zum Anfordern warten",
       "passwordRequired": "Bitte geben Sie Ihr Passwort ein",
       "pendingWarning": "Für Ihr Konto liegt eine ausstehende Löschanfrage vor. Treten Sie dem Discord bei, um Ihr Konto wiederherzustellen, wenn dies ein Fehler war.",
       "success": "Löschanforderung erfolgreich übermittelt",
@@ -53,9 +53,9 @@
       "cloudSyncDesc": "Synchronisieren Sie Ihr Ascendara-Profil und Ihre Spielstatistiken geräteübergreifend",
       "cloudSyncandBackups": "Cloud-Synchronisierung und Backups",
       "cloudSyncandBackupsDesc": "Synchronisieren Sie Ihr Ascendara-Profil und Ihre Spielstände mit der Cloud",
-      "downloadQueues": "Warteschlangen herunterladen",
       "friends": "Freunde",
       "leaderboard": "Bestenlisten",
+      "mobileView": "Mobile Ansicht",
       "moreComing": "Und es kommen noch mehr",
       "moreComingDesc": "Ascend wird ständig um neue Funktionen erweitert",
       "nexusMods": "Mods & Trainer-Integration",
@@ -89,7 +89,7 @@
     "joinAscend": "Treten Sie Ascend bei",
     "loading": "Laden...",
     "loginSubtitle": "Melden Sie sich bei Ihrem Konto an",
-    "noAccount": "Sie haben noch kein Konto? Treten Sie noch heute kostenlos bei",
+    "noAccount": "Sie haben noch kein Konto? Melden Sie sich noch heute kostenlos an",
     "pricingDetails": "Beginnen Sie mit einer kostenlosen 7-Tage-Testversion. Danach kostet es nur noch 2 US-Dollar pro Monat, alle Ihre Daten zu synchronisieren und zu sichern.",
     "pricingFriendly": "Für den Start ist keine Zahlung erforderlich!",
     "requestDeletion": "Fordern Sie die Löschung des Kontos an",
@@ -125,7 +125,7 @@
       }
     },
     "brokenVersion": {
-      "description": "Diese Version von Ascendara weist bekannte kritische Probleme mit ihrer Funktionalität auf, wie z. B. Downloads, Aktualisierungen und anderen Kernfunktionen.",
+      "description": "Diese Version von Ascendara weist bekannte kritische Probleme mit der Funktionalität auf, z. B. beim Herunterladen, Aktualisieren und anderen Kernfunktionen.",
       "development": "Bei der Verwendung dieser Version kann es zu Problemen oder Abstürzen kommen. Bitte aktualisieren Sie Ascendara auf der Website auf die neueste Version.",
       "title": "Sie verwenden eine defekte Version",
       "understand": "Ich verstehe die Probleme, fahren Sie fort",
@@ -163,7 +163,7 @@
       }
     },
     "qbittorrent": {
-      "active": "qBittorrent WebUI aktiv ({{version}})",
+      "active": "qBittorrent WebUI Aktiv ({{version}})",
       "checkWebUI": "Bitte überprüfen Sie, ob qBittorrent mit aktivierter Web-Benutzeroberfläche ausgeführt wird",
       "checking": "qBittorrent-Status wird überprüft...",
       "configInstructions": "Bitte setzen Sie Ihre qBittorrent-WebUI-Anmeldeinformationen auf den Benutzernamen „admin“ und das Passwort „adminadmin“, um die Torrent-Funktionalität zu aktivieren.",
@@ -219,7 +219,7 @@
       "backupName": "Sicherungsname",
       "backupNamePlaceholder": "z. B. Speichern vor dem Bosskampf",
       "cloudBackupsSection": "Cloud-Backups",
-      "comingSoon": "Demnächst verfügbar",
+      "comingSoon": "Demnächst erhältlich",
       "comingSoonDesc": "Cloud-Backup-Funktionen für Ihre Spielstände befinden sich derzeit in der Entwicklung. Bleiben Sie dran!",
       "deleteDesc": "Dadurch wird dieses Backup dauerhaft aus dem Cloud-Speicher gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
       "deleteError": "Backup konnte nicht gelöscht werden",
@@ -321,7 +321,7 @@
       "uploadingToCloud": "Hochladen in die Cloud"
     },
     "community": {
-      "comingSoon": "Demnächst verfügbar",
+      "comingSoon": "Demnächst erhältlich",
       "comingSoonDesc": "Community-Funktionen befinden sich derzeit in der Entwicklung. Bleiben Sie dran für Updates!",
       "subtitle": "Vernetzen Sie sich mit anderen Ascendara-Benutzern",
       "title": "Gemeinschaft"
@@ -440,7 +440,7 @@
         "title": "Und es kommen noch mehr"
       },
       "nexusMods": {
-        "description": "Verwalten Sie Ihre Nexus-Mods nahtlos für unterstützte Spiele. Durchsuchen, installieren und organisieren Sie Mods direkt in Ascendara.",
+        "description": "Verwalten Sie Ihre Nexus-Mods für unterstützte Spiele nahtlos. Durchsuchen, installieren und organisieren Sie Mods direkt in Ascendara.",
         "title": "Nexus Mod-Verwaltung"
       },
       "planned": "GEPLANT",
@@ -457,6 +457,10 @@
       "upcoming": {
         "description": "Erhalten Sie eine exklusive Vorschau auf das nächste Ascendara-Update. Bleiben Sie immer auf dem Laufenden und erfahren Sie, welche neuen Funktionen in Sicht sind.",
         "title": "Kommende Updates – Vorschau"
+      },
+      "webView": {
+        "description": "Sehen Sie sich den Download-Fortschritt an und verwalten Sie Ihre Downloads auf jedem Gerät über die Ascend-Webanwendung",
+        "title": "Mobiler Download-Manager"
       }
     },
     "profile": {
@@ -594,6 +598,21 @@
       "subscribeToKeep": "Abonnieren Sie, um sie für immer zu behalten",
       "subscribeToPro": "Abonnieren Sie Ascend",
       "subscription": "Abonnement",
+      "subscriptionDialog": {
+        "allPlansInclude": "Alle Pläne beinhalten vollen Ascend-Zugriff",
+        "bestValue": "Bestes Preis-Leistungs-Verhältnis",
+        "billedEvery": "wird alle {{count}} Monate in Rechnung gestellt",
+        "billedMonthly": "Wird monatlich abgerechnet",
+        "cancel": "Stornieren",
+        "description": "Wählen Sie die Abonnementdauer aus, die für Sie am besten geeignet ist. Mit längeren Plänen sparen Sie mehr!",
+        "month": "Monat",
+        "months": "Monate",
+        "perMonth": "/Mo",
+        "save": "Speichern Sie {{percent}}",
+        "saveText": "Speichern",
+        "selectPlan": "Wählen Sie Planen aus",
+        "title": "Wählen Sie Ihren Ascend-Plan"
+      },
       "subscriptionSuccessMessage": "Sie haben jetzt vollen Zugriff auf alle Premium-Funktionen. Vielen Dank für Ihre Unterstützung!",
       "subtitle": "Verwalten Sie Ihr Konto und Profil",
       "supportMessage": "Steigen Sie auf. Verbinden. Treten Sie Ascend bei.",
@@ -820,6 +839,7 @@
     "onlineFixWarningTitle": "Online-Fix-Eingabeaufforderung beim Start",
     "onlineTooltip": "Online-Multiplayer-Funktionen durch online-fix.me aktiviert",
     "openCriticBetaWarning": "Dieser API-Endpunkt befindet sich in der Betaphase und es können Probleme auftreten. Wenn OpenCritic ein anderes Spiel anzeigt, melden Sie das Spiel bitte, indem Sie rechts neben dem Titel auf „Melden“ klicken.",
+    "outdatedIndexWarning": "Der Index dieses Spiels ist veraltet. Bitte aktualisieren Sie die Seite, um die neuesten Informationen anzuzeigen.",
     "platforms": "Plattformen",
     "pressEscToGoBack": "Klicken Sie auf „Ich“ oder die ESC-Taste, um zurückzugehen",
     "protectYourself": {
@@ -836,6 +856,7 @@
     },
     "ratingTooltip": "Dieses Spiel wurde von anderen auf Ascendara mit {{rating}} von 5 Sternen bewertet. Lesen Sie Kommentare zu diesem Spiel auf dem Discord-Server.",
     "readReviews": "Lesen Sie Rezensionen",
+    "refreshNow": "Jetzt aktualisieren",
     "reportBroken": "Bericht",
     "reportDescription": "Bitte geben Sie weitere Einzelheiten zu dem Problem an",
     "reportError": "Bitte geben Sie einen Grund und Einzelheiten für Ihre Meldung an",
@@ -1036,7 +1057,7 @@
     "allDownloadsComplete": "Alle Titel heruntergeladen!",
     "backToLibrary": "Zurück zur Bibliothek",
     "backupSaves": "Backup-Speicherungen",
-    "browseMods": "Durchsuchen Sie Mods",
+    "browseMods": "Mods durchsuchen",
     "cloudLibraryPromo": "Cloud-Bibliothek",
     "cloudLibraryPromoDesc": "Synchronisieren Sie Ihre Spiele geräteübergreifend mit Ascend",
     "copyTrackName": "Titelnamen kopieren",
@@ -1054,7 +1075,7 @@
     "downloadUpdate": "Laden Sie das Update herunter",
     "downloadingAllTracks": "Alle Titel werden heruntergeladen...",
     "gameNotFound": "Spiel nicht gefunden",
-    "getAscend": "Holen Sie sich Ascend",
+    "getAscend": "Treten Sie Ascend bei",
     "getAscendToUpdate": "Holen Sie sich „Ascend to Update“.",
     "helpOthers": "Nehmen Sie sich einen Moment Zeit, um dieses Spiel mit 5 Sternen zu bewerten und zu bewerten. Ihr Feedback hilft anderen, die Qualität und Zuverlässigkeit des Spiels zu verstehen.",
     "inCloudLibrary": "In der Cloud-Bibliothek gespeichert",
@@ -1134,6 +1155,27 @@
     "viewOnFling": "Auf FLiNG ansehen",
     "viewOnNexus": "Auf Nexus Mods ansehen"
   },
+  "globalSearch": {
+    "categories": {
+      "index": "Spielindex",
+      "library": "Bibliothek",
+      "settings": "Einstellungen"
+    },
+    "emptyState": {
+      "global": "Suchen Sie nach Spielen, Einstellungen oder Funktionen",
+      "library": "Durchsuchen Sie Ihre installierten Spiele",
+      "settings": "Sucheinstellungen und Präferenzen"
+    },
+    "navigate": "Navigieren",
+    "noResults": "Keine Ergebnisse gefunden",
+    "placeholder": {
+      "global": "Suche Ascendara",
+      "library": "Bibliothek durchsuchen",
+      "settings": "Sucheinstellungen"
+    },
+    "select": "Wählen",
+    "tryDifferent": "Versuchen Sie es mit einem anderen Suchbegriff"
+  },
   "home": {
     "actionGames": "Actionspiele",
     "footer": {
@@ -1175,7 +1217,12 @@
       "autoBackupEnabledDesc": "Automatische Sicherung aktiviert für {{game}}",
       "autoBackupOnGameClose": "Automatische Sicherung bei Spielende",
       "autoCloudBackup": "Automatisches Cloud-Backup",
+      "autoCloudBackupActive": "Aktiv",
       "autoCloudBackupDesc": "Speichern Sie Daten beim Sichern automatisch in der Cloud",
+      "autoCloudBackupLearnMore": "Erfahren Sie mehr über Ascend →",
+      "autoCloudBackupSignInDesc": "Melden Sie sich bei Ascend an, um Cloud-Backups freizuschalten und Ihre Speicherungen auf allen Geräten sicher aufzubewahren",
+      "autoCloudBackupUpgrade": "Upgrade auf Premium →",
+      "autoCloudBackupUpgradeDesc": "Upgraden Sie auf Ascend Premium, um Cloud-Backups freizuschalten und Ihre Spielstände zu schützen",
       "backingUpDescription": "{{game}} wird gesichert...",
       "backupFailed": "Die Sicherung ist fehlgeschlagen",
       "backupNow": "Jetzt {{game}} sichern",
@@ -1183,6 +1230,14 @@
       "backupSuccess": "Sicherung erfolgreich",
       "backupSuccessDesc": "Speicherdaten für {{game}} erfolgreich gesichert",
       "backupsList": "Backup-Liste",
+      "cloudBackupsDisabledDesc": "Backups werden nur lokal gespeichert",
+      "cloudBackupsDisabledToast": "Cloud-Backups deaktiviert",
+      "cloudBackupsEnabledDesc": "Backups werden automatisch in die Cloud hochgeladen",
+      "cloudBackupsEnabledToast": "Cloud-Backups aktiviert",
+      "cloudBackupsRequireAccount": "Für Cloud-Backups ist ein Ascend-Konto erforderlich",
+      "cloudBackupsRequirePremium": "Cloud-Backups erfordern Ascend Premium",
+      "cloudBackupsUpgradeAction": "Upgrade",
+      "cloudBackupsUpgradePrompt": "Upgraden Sie auf Premium, um Cloud-Backups freizuschalten",
       "cloudUploadStep": "Cloud-Upload",
       "confirmRestore": "Bestätigen Sie die Wiederherstellung",
       "confirmSpecificRestore": "Bestätigen Sie die spezifische Backup-Wiederherstellung",
@@ -1211,6 +1266,7 @@
       "restoringBackup": "Backup wiederherstellen",
       "restoringDescription": "Speicherdaten für {{game}} werden wiederhergestellt...",
       "settings": "Einstellungen",
+      "signInToUseCloudBackups": "Bitte melden Sie sich bei Ascend an, um Cloud-Backups zu verwenden",
       "stepComplete": "Vollständig",
       "stepInProgress": "Im Gange...",
       "stepUploading": "Hochladen...",
@@ -1317,7 +1373,7 @@
     "importingGamesDesc": "Bitte warten Sie, während Ihre Steam-Spiele importiert werden. Dies kann je nach Größe Ihrer Bibliothek einige Minuten dauern.",
     "includesAllDLCs": "Enthält alle DLCs",
     "launchError": "Startfehler",
-    "launchErrorMessage": "{{game}} konnte nicht ausgeführt werden. Manchmal werden ausführbare Spieldateien nicht mit dem Namen des Spiels identisch benannt. Bitte stellen Sie sicher, dass Ascendara versucht, die richtige Datei auszuführen.",
+    "launchErrorMessage": "{{game}} konnte nicht ausgeführt werden. Manchmal werden ausführbare Spieledateien nicht mit dem Namen des Spiels identisch benannt. Bitte stellen Sie sicher, dass Ascendara versucht, die richtige Datei auszuführen.",
     "launching": "Start...",
     "lessThanMinute": "Weniger als eine Minute für dieses Spiel",
     "lessThanMinute2": "Weniger als eine Minute",
@@ -1402,7 +1458,7 @@
     "searchLibrary": "Durchsuchen Sie Ihre Spiele...",
     "searchOnline": "Suchindex",
     "setExecutable": "Legen Sie die ausführbare Spieldatei fest",
-    "shortcutCreated": "Verknüpfung für die primäre ausführbare Datei erstellt",
+    "shortcutCreated": "Verknüpfung für primäre ausführbare Datei erstellt",
     "shortcutError": "Fehler beim Erstellen der Verknüpfung. Vielleicht existiert der ausführbare Pfad nicht?",
     "size": "Größe",
     "sort": { "aToZ": "Sortieren Sie von A bis Z", "zToA": "Sortieren Sie Z nach A" },
@@ -1444,7 +1500,7 @@
     "description": "Aktualisieren Sie Ihren Spieleindex, um die neuesten verfügbaren Spiele anzuzeigen.",
     "done": "Erledigt",
     "download": "Herunterladen",
-    "downloadSharedIndex": "Laden Sie den Shared Index herunter",
+    "downloadSharedIndex": "Laden Sie den freigegebenen Index herunter",
     "downloadSharedIndexDesc": "Laden Sie einen Index herunter, der von jemand anderem auf Ascendara gecrackt und geteilt wurde.",
     "downloading": "Herunterladen...",
     "enableLocalIndex": "Aktivieren",
@@ -1627,10 +1683,13 @@
     "mostPopular": "Am beliebtesten",
     "mostRecentlyUpdated": "Kürzlich aktualisiert",
     "noResults": "Keine Ergebnisse gefunden",
+    "outdatedIndexWarning": "Ihr lokaler Spieleindex ist veraltet. Einige Spielversionen oder Links sind möglicherweise nicht mehr korrekt.",
+    "outdatedIndexWarningDownload": "Ihr lokaler Index wurde seit einiger Zeit nicht aktualisiert. Erwägen Sie eine Aktualisierung, um die neuesten Spiele zu sehen.",
     "placeholder": "Spiele suchen...",
     "quickSearchResults": "Schnelle Suchergebnisse",
     "recentSearches": "Aktuelle Suchanfragen",
     "refreshLocalIndex": "Lokalen Index aktualisieren",
+    "refreshNow": "Jetzt aktualisieren",
     "refreshRequestError": "Fehler beim Senden der Aktualisierungsanforderung",
     "refreshRequestRateLimited": "Sie haben kürzlich bereits eine Aktualisierungsanfrage gesendet. Bitte versuchen Sie es später noch einmal.",
     "refreshRequestSuccess": "Aktualisierungsanforderung erfolgreich gesendet",
@@ -1642,7 +1701,7 @@
     "source": "Quelle",
     "switchToLocalIndex": "Wechseln Sie zum lokalen Index",
     "totalGames": "Gesamtzahl der Spiele",
-    "usingApiWarning": "Sie verwenden immer noch die Ascendara-API für die Spielindizierung. Ascendara stellt für eine bessere Leistung und Zuverlässigkeit auf lokale Indizierung um.",
+    "usingApiWarning": "Sie verwenden die öffentliche API. Erwägen Sie die Einrichtung eines lokalen Index für bessere Leistung und Datenschutz.",
     "usingLocalIndex": "Verwenden des lokalen Index"
   },
   "server-status": {
@@ -1665,7 +1724,7 @@
       "addDir": "Verzeichnis hinzufügen",
       "defaultDirs": "Standardüberwachungsverzeichnisse",
       "defaultDirsNote": "Diese Verzeichnisse werden stets auf Erfolge überprüft. Sie können unten weitere Verzeichnisse hinzufügen.",
-      "description": "Dies sind die Ordner, die auf Erfolge überprüft werden. Alle gefundenen Erfolge werden Ihrer Bibliothek hinzugefügt. Der Achievement Watcher basiert auf dem Original von xan105 und wurde für Ascendara modifiziert.",
+      "description": "Dies sind die Ordner, die auf Erfolge überwacht werden. Alle gefundenen Erfolge werden Ihrer Bibliothek hinzugefügt. Der Achievement Watcher basiert auf dem Original von xan105 und wurde für Ascendara modifiziert.",
       "noDirs": "Keine Verzeichnisse ausgewählt",
       "title": "Leistungsbeobachter"
     },
@@ -1775,8 +1834,18 @@
     "hideOnGameLaunchDescription": "Verstecke Ascendara, wenn ein Spiel von dort aus gestartet wird.",
     "highThreadWarning": "Die Verwendung von mehr als 32 Threads gilt als extrem und kann zu Instabilität, Sperren oder Netzwerkproblemen führen. Mit Vorsicht verwenden.",
     "homeSearch": "Home-Suchleiste",
-    "homeSearchDescription": "Suchleiste und Schnellzugriffsschaltflächen auf der Startseite anzeigen.",
+    "homeSearchDescription": "Zeigen Sie die Suchleiste und die Schnellzugriffsschaltflächen auf der Startseite an.",
     "importTheme": "Import",
+    "indexReminder": "Erinnerung an die Indexaktualisierung",
+    "indexReminderDescription": "Lassen Sie sich nach diesen vielen Tagen daran erinnern, Ihren lokalen Index zu aktualisieren",
+    "indexReminderOptions": {
+      "fiveDays": "5 Tage",
+      "oneWeek": "1 Woche",
+      "tenDays": "10 Tage",
+      "threeDays": "3 Tage",
+      "twoDays": "2 Tage",
+      "twoWeeks": "2 Wochen"
+    },
     "installGameDependencies": "Abhängigkeiten",
     "invalidSupportCode": "Ungültiger oder abgelaufener Supportcode",
     "joinDiscord": "Treten Sie dem Discord-Server bei",
@@ -1875,9 +1944,9 @@
     "threads": "Themen",
     "title": "Ascendara-Einstellungen",
     "torboxApiKey": "Torbox-API-Schlüssel",
-    "torboxApiKeyDescription": "Mit den Debrid-Diensten können Sie Datei-Host-Links in Premium-Direkt-Download-Links umwandeln und so Geschwindigkeitsbegrenzungen und Wartezeiten umgehen. Geben Sie hier Ihren Torbox-API-Schlüssel ein, um diese Funktion zu aktivieren.",
+    "torboxApiKeyDescription": "Debrid-Dienste ermöglichen es Ihnen, Datei-Host-Links in Premium-Direkt-Download-Links umzuwandeln und so Geschwindigkeitsbegrenzungen und Wartezeiten zu umgehen. Geben Sie hier Ihren Torbox-API-Schlüssel ein, um diese Funktion zu aktivieren.",
     "torboxApiKeyLearnHowtoGet": "Erfahren Sie, wie Sie Ihren API-Schlüssel erhalten",
-    "torboxApiKeyPlaceholder": "Torbox-API-Schlüssel einfügen",
+    "torboxApiKeyPlaceholder": "Fügen Sie den Torbox-API-Schlüssel ein",
     "torrentDescription": "Aktivieren Sie die Torrent-Funktionalität von Ascendara. Für diese Funktion muss qBittorrent installiert sein und wird nur erfahrenen Benutzern empfohlen.",
     "torrentOnAscendara": "Torrent auf Ascendara",
     "torrentWarningDialog": {
@@ -2017,7 +2086,7 @@
     "analytics": "Helfen Sie mit, Ascendara zu verbessern",
     "analyticsDesc": "Teilen Sie anonyme Nutzungsdaten, um Ihr Erlebnis zu verbessern",
     "apiMigration": {
-      "goodNews": "Gute Nachrichten! Ascendara Xtra erfordert keine manuelle Einrichtung des API-Schlüssels mehr.",
+      "goodNews": "Gute Nachrichten! Ascendara Xtra erfordert keine manuelle API-Schlüsseleinrichtung mehr.",
       "steamBuiltIn": "Die Steam-API ist jetzt integriert und wird automatisch konfiguriert. Ihre alten GiantBomb-API-Schlüssel werden nicht mehr benötigt.",
       "title": "Ascendara Xtra-Update",
       "whatChanged": "Was sich geändert hat: Die Steam-API stellt jetzt Spielmetadaten, Screenshots und Details automatisch bereit."
@@ -2069,7 +2138,7 @@
     "howItWorks": "So funktioniert es:",
     "iHaveReadAndAgreeTo": "Ich habe die Erklärung von Ascendara gelesen und stimme ihr zu",
     "iHaveTheseTakeMeToTheTour": "Ich habe diese, bring mich zur Tour",
-    "improvedUXDesc": "Die Inhalte sind auf mehr Seiten aufgeteilt und besser organisiert, um sicherzustellen, dass Sie finden, was Sie brauchen",
+    "improvedUXDesc": "Die Inhalte sind auf mehrere Seiten aufgeteilt und besser organisiert, um sicherzustellen, dass Sie finden, was Sie brauchen",
     "improvedUXTitle": "Verbesserte Benutzererfahrung",
     "influenceFutureFeatures": "Beeinflussen Sie zukünftige Funktionen",
     "influenceFutureFeaturesDesc": "Helfen Sie Ascendara, Ihre Bedürfnisse zu verstehen und zukünftige Updates zu beeinflussen",
@@ -2090,7 +2159,7 @@
       "refreshing": "Erstellen Sie Ihren Spieleindex...",
       "setupIndex": "Spielindex einrichten",
       "stillRefreshing": "Ihr Spielindex wird noch erstellt",
-      "subtitle": "Ascendara verwendet einen lokalen Spieleindex für schnelleres Surfen und Offline-Zugriff",
+      "subtitle": "Ascendara verwendet einen lokalen Spielindex für schnelleres Surfen und Offline-Zugriff",
       "title": "Richten Sie Ihren Spielindex ein",
       "waitForRefresh": "Sie können die Spiele erst dann durchsuchen, wenn der Index vollständig ist. Dies dauert normalerweise einige Minuten."
     },
@@ -2159,7 +2228,7 @@
     "thisIsWhereAllYourDownloadedGamesWillBeStored": "Hier werden alle Ihre heruntergeladenen Spiele gespeichert",
     "welcomeTo": "Willkommen bei",
     "welcomeToAscendaraDescription": "Sie sind fast bereit, Ascendara zu verwenden. Wir gehen gemeinsam den Onboarding-Prozess durch und richten dann Ihren Spielindex ein. Bitte lesen Sie jedoch zuerst die Nutzungsbedingungen und die Datenschutzrichtlinie.",
-    "whenYouClickADownloadLink": "Wenn Sie einen Download von einem bekannten Anbieter starten, stoppt die Erweiterung den Download automatisch in Ihrem Browser und startet ihn für Sie in Ascendara",
+    "whenYouClickADownloadLink": "Wenn Sie einen Download von einem bekannten Anbieter starten, stoppt die Erweiterung automatisch den Download in Ihrem Browser und startet ihn für Sie in Ascendara",
     "wineIsRequired": "Spielen Sie mit Wein",
     "wineMustBeInstalled": "Wine, DXVK und andere Tools müssen auf Ihrem Computer installiert und eingerichtet werden, um Windows-Spiele auszuführen. Aber keine Sorge, Ascendara kann alles nur für Sie installieren und einrichten",
     "youCanAddMoreLater": "Sie können später in den Einstellungen weitere Verzeichnisse hinzufügen",

@@ -457,6 +457,10 @@
       "upcoming": {
         "description": "Get an exclusive preview of what's coming in the next Ascendara update. Stay ahead of the curve and know what new features are on the horizon.",
         "title": "Upcoming Updates Peek"
+      },
+      "webView": {
+        "description": "View download progression and manage your downloads on any device through the Ascend webapp",
+        "title": "Mobile Download Manager"
       }
     },
     "profile": {
@@ -605,6 +609,7 @@
         "months": "Months",
         "perMonth": "/mo",
         "save": "Save {{percent}}",
+        "saveText": "Save",
         "selectPlan": "Select Plan",
         "title": "Choose Your Ascend Plan"
       },

@@ -53,13 +53,13 @@
       "cloudSyncDesc": "Sincroniza tu perfil de Ascendara y las estadísticas del juego en todos los dispositivos",
       "cloudSyncandBackups": "Sincronización y copias de seguridad en la nube",
       "cloudSyncandBackupsDesc": "Sincroniza tu perfil de Ascendara y tus juegos guardados en la nube",
-      "downloadQueues": "Descargar colas",
       "friends": "Amigos",
       "leaderboard": "Tablas de clasificación",
+      "mobileView": "Vista móvil",
       "moreComing": "Y más por venir",
       "moreComingDesc": "Constantemente se agregan nuevas funciones a Ascend",
       "nexusMods": "Integración de mods y entrenadores",
-      "nexusModsDesc": "Administre e instale modificaciones y entrenadores de juegos directamente dentro de Ascendara con integración con un solo clic.",
+      "nexusModsDesc": "Administre e instale mods de juegos y entrenadores directamente dentro de Ascendara con integración con un solo clic.",
       "profiles": "Perfiles",
       "profilesDesc": "Configure su biografía, perfil público y estadísticas. También vea los perfiles y estadísticas de otros usuarios en Ascend.",
       "unlimitedDownloads": "Descargas ilimitadas"
@@ -457,6 +457,10 @@
       "upcoming": {
         "description": "Obtenga una vista previa exclusiva de lo que vendrá en la próxima actualización de Ascendara. Manténgase a la vanguardia y conozca qué nuevas funciones hay en el horizonte.",
         "title": "Próximas actualizaciones"
+      },
+      "webView": {
+        "description": "Vea el progreso de las descargas y administre sus descargas en cualquier dispositivo a través de la aplicación web Ascend",
+        "title": "Administrador de descargas móviles"
       }
     },
     "profile": {
@@ -594,6 +598,21 @@
       "subscribeToKeep": "Suscríbete para conservarlos para siempre.",
       "subscribeToPro": "Suscríbete para ascender",
       "subscription": "Suscripción",
+      "subscriptionDialog": {
+        "allPlansInclude": "Todos los planes incluyen acceso completo a Ascend",
+        "bestValue": "Mejor valor",
+        "billedEvery": "facturado cada {{count}} meses",
+        "billedMonthly": "Facturado mensualmente",
+        "cancel": "Cancelar",
+        "description": "Seleccione la duración de la suscripción que mejor se adapte a sus necesidades. ¡Los planes más largos te ahorran más!",
+        "month": "Mes",
+        "months": "Meses",
+        "perMonth": "/mes",
+        "save": "Guardar {{percent}}",
+        "saveText": "Ahorrar",
+        "selectPlan": "Seleccionar plan",
+        "title": "Elige tu plan Ascend"
+      },
       "subscriptionSuccessMessage": "Ahora tiene acceso completo a todas las funciones premium. ¡Gracias por su apoyo!",
       "subtitle": "Administra tu cuenta y perfil",
       "supportMessage": "Aumentar. Conectar. Únase a Ascender.",
@@ -820,6 +839,7 @@
     "onlineFixWarningTitle": "Aviso de reparación en línea al iniciar",
     "onlineTooltip": "Capacidades multijugador en línea habilitadas a través de online-fix.me",
     "openCriticBetaWarning": "Este punto final de API está en versión beta y puede haber problemas. Si OpenCritic muestra un juego diferente, infórmalo haciendo clic en \"Informar\" a la derecha del título.",
+    "outdatedIndexWarning": "El índice de este juego está desactualizado. Actualice la página para ver la información más reciente.",
     "platforms": "Plataformas",
     "pressEscToGoBack": "Haga clic en Yo o la tecla ESC para regresar",
     "protectYourself": {
@@ -836,6 +856,7 @@
     },
     "ratingTooltip": "Este juego tiene una calificación de {{rating}} de 5 estrellas por parte de otros en Ascendara. Lee comentarios sobre este juego en el servidor de Discord.",
     "readReviews": "Leer reseñas",
+    "refreshNow": "Actualizar ahora",
     "reportBroken": "Informe",
     "reportDescription": "Proporcione más detalles sobre el problema.",
     "reportError": "Proporcione el motivo y los detalles de su informe.",
@@ -1054,7 +1075,7 @@
     "downloadUpdate": "Descargar actualización",
     "downloadingAllTracks": "Descargando todas las pistas...",
     "gameNotFound": "Juego no encontrado",
-    "getAscend": "Obtener ascender",
+    "getAscend": "Únete a Ascender",
     "getAscendToUpdate": "Obtenga Ascend para actualizar",
     "helpOthers": "Tómate un momento para calificar y reseñar este juego con 5 estrellas. Tus comentarios ayudan a otros a comprender la calidad y confiabilidad del juego.",
     "inCloudLibrary": "Guardado en la biblioteca de la nube",
@@ -1134,6 +1155,27 @@
     "viewOnFling": "Ver en FLiNG",
     "viewOnNexus": "Ver en Nexus Mods"
   },
+  "globalSearch": {
+    "categories": {
+      "index": "Índice de juegos",
+      "library": "Biblioteca",
+      "settings": "Ajustes"
+    },
+    "emptyState": {
+      "global": "Buscar juegos, configuraciones o funciones",
+      "library": "Busca tus juegos instalados",
+      "settings": "Configuración y preferencias de búsqueda"
+    },
+    "navigate": "Navegar por",
+    "noResults": "No se encontraron resultados",
+    "placeholder": {
+      "global": "Buscar Ascendara",
+      "library": "Biblioteca de búsqueda",
+      "settings": "Configuración de búsqueda"
+    },
+    "select": "Seleccionar",
+    "tryDifferent": "Pruebe con un término de búsqueda diferente"
+  },
   "home": {
     "actionGames": "Juegos de acción",
     "footer": {
@@ -1175,7 +1217,12 @@
       "autoBackupEnabledDesc": "Copia de seguridad automática habilitada para {{game}}",
       "autoBackupOnGameClose": "Copia de seguridad automática al cerrar el juego",
       "autoCloudBackup": "Copia de seguridad automática en la nube",
+      "autoCloudBackupActive": "Activo",
       "autoCloudBackupDesc": "Guarde datos automáticamente en la nube al realizar una copia de seguridad",
+      "autoCloudBackupLearnMore": "Más información sobre Ascender →",
+      "autoCloudBackupSignInDesc": "Inicie sesión en Ascend para desbloquear copias de seguridad en la nube y mantener sus archivos guardados seguros en todos los dispositivos",
+      "autoCloudBackupUpgrade": "Actualizar a Premium →",
+      "autoCloudBackupUpgradeDesc": "Actualízate a Ascend Premium para desbloquear copias de seguridad en la nube y proteger tus partidas guardadas",
       "backingUpDescription": "Realizando copia de seguridad de {{game}}....",
       "backupFailed": "Error en la copia de seguridad",
       "backupNow": "Copia de seguridad {{game}} ahora",
@@ -1183,6 +1230,14 @@
       "backupSuccess": "Copia de seguridad exitosa",
       "backupSuccessDesc": "Se realizó una copia de seguridad exitosa de los datos guardados de {{game}}",
       "backupsList": "Lista de copias de seguridad",
+      "cloudBackupsDisabledDesc": "Las copias de seguridad solo se almacenarán localmente",
+      "cloudBackupsDisabledToast": "Copias de seguridad en la nube deshabilitadas",
+      "cloudBackupsEnabledDesc": "Las copias de seguridad se cargarán automáticamente en la nube",
+      "cloudBackupsEnabledToast": "Copias de seguridad en la nube habilitadas",
+      "cloudBackupsRequireAccount": "Las copias de seguridad en la nube requieren una cuenta de Ascend",
+      "cloudBackupsRequirePremium": "Las copias de seguridad en la nube requieren Ascend Premium",
+      "cloudBackupsUpgradeAction": "Mejora",
+      "cloudBackupsUpgradePrompt": "Actualice a Premium para desbloquear copias de seguridad en la nube",
       "cloudUploadStep": "Subir a la nube",
       "confirmRestore": "Confirmar restauración",
       "confirmSpecificRestore": "Confirmar restauración de copia de seguridad específica",
@@ -1211,6 +1266,7 @@
       "restoringBackup": "Restaurar copia de seguridad",
       "restoringDescription": "Restaurando datos guardados para {{game}}....",
       "settings": "Ajustes",
+      "signInToUseCloudBackups": "Inicie sesión en Ascend para utilizar copias de seguridad en la nube",
       "stepComplete": "Completo",
       "stepInProgress": "En curso...",
       "stepUploading": "Subiendo...",
@@ -1251,7 +1307,7 @@
     "coverSearchError": "Error al buscar imagen",
     "createShortcut": "Crear acceso directo en el escritorio",
     "delete": "Eliminar {{game}}",
-    "deleteConfirmMessage": "¿Está seguro de que desea eliminar {{game}} de su biblioteca? Esto eliminará el juego de tu biblioteca de Ascendara y eliminará todos los archivos asociados. Esta acción no se puede deshacer.",
+    "deleteConfirmMessage": "¿Estás seguro de que deseas eliminar {{game}} de tu biblioteca? Esto eliminará el juego de tu biblioteca de Ascendara y eliminará todos los archivos asociados. Esta acción no se puede deshacer.",
     "deleteFolder": "Quitar carpeta",
     "deleteGame": "Eliminar juego",
     "deleting": "Eliminando...",
@@ -1439,7 +1495,7 @@
     "blacklistWarning": "Tu índice no se compartirá porque tienes juegos personalizados en la lista negra. Elimínelos para compartir su índice con la comunidad.",
     "cookieRefreshFailed": "No se pudo actualizar la cookie",
     "cookieRefreshed": "Cookie actualizada, reanudando...",
-    "dayAgo": "hace un día",
+    "dayAgo": "hace un dia",
     "daysAgo": "hace dias",
     "description": "Actualiza el índice de tu juego para ver los últimos juegos disponibles.",
     "done": "Hecho",
@@ -1627,10 +1683,13 @@
     "mostPopular": "Más Popular",
     "mostRecentlyUpdated": "Actualizado recientemente",
     "noResults": "No se encontraron resultados",
+    "outdatedIndexWarning": "Tu índice de juego local no está actualizado. Es posible que algunas versiones o enlaces del juego ya no sean precisos.",
+    "outdatedIndexWarningDownload": "Su índice local no se ha actualizado desde hace un tiempo. Considere actualizarlo para ver los juegos más recientes.",
     "placeholder": "Buscar juegos...",
     "quickSearchResults": "Resultados de búsqueda rápida",
     "recentSearches": "Búsquedas recientes",
     "refreshLocalIndex": "Actualizar índice local",
+    "refreshNow": "Actualizar ahora",
     "refreshRequestError": "Error al enviar la solicitud de actualización",
     "refreshRequestRateLimited": "Ya enviaste una solicitud de actualización recientemente. Inténtelo de nuevo más tarde.",
     "refreshRequestSuccess": "Solicitud de actualización enviada correctamente",
@@ -1642,7 +1701,7 @@
     "source": "Fuente",
     "switchToLocalIndex": "Cambiar al índice local",
     "totalGames": "Juegos totales",
-    "usingApiWarning": "Todavía estás usando la API de Ascendara para la indexación de juegos. Ascendara está cambiando a la indexación local para mejorar el rendimiento y la confiabilidad.",
+    "usingApiWarning": "Estás utilizando la API pública. Considere configurar un índice local para mejorar el rendimiento y la privacidad.",
     "usingLocalIndex": "Usando el índice local"
   },
   "server-status": {
@@ -1777,6 +1836,16 @@
     "homeSearch": "Barra de búsqueda de inicio",
     "homeSearchDescription": "Muestra la barra de búsqueda y los botones de acceso rápido en la página de inicio.",
     "importTheme": "Importar",
+    "indexReminder": "Recordatorio de actualización del índice",
+    "indexReminderDescription": "Reciba un recordatorio para actualizar su índice local después de tantos días.",
+    "indexReminderOptions": {
+      "fiveDays": "5 dias",
+      "oneWeek": "1 semana",
+      "tenDays": "10 dias",
+      "threeDays": "3 dias",
+      "twoDays": "2 dias",
+      "twoWeeks": "2 semanas"
+    },
     "installGameDependencies": "Dependencias",
     "invalidSupportCode": "Código de soporte no válido o caducado",
     "joinDiscord": "Únase al servidor de Discord",
@@ -2054,7 +2123,7 @@
     "everyUpdateIsInspired": "Cada actualización está inspirada en sus comentarios. Gracias por ser parte del viaje.",
     "exploreOnMyOwn": "exploraré por mi cuenta",
     "failedToInstallDependencies": "No se pudieron instalar las dependencias. Inténtelo de nuevo u omítalo si el problema persiste.",
-    "freshNewLookDesc": "Tu aplicación de prueba de juegos favorita, ahora con un diseño moderno y los temas personalizables que has estado solicitando",
+    "freshNewLookDesc": "Tu aplicación favorita para probar juegos, ahora con un diseño moderno y los temas personalizables que has estado solicitando",
     "freshNewLookTitle": "Nueva apariencia fresca",
     "gameDevelopmentFramework": "Marco de desarrollo de juegos",
     "getStarted": "Empezar",
