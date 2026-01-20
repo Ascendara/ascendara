@@ -16,6 +16,10 @@ import {
 } from "@/services/downloadSyncService";
 import { getDeviceIcon, getDeviceDescription } from "@/lib/deviceParser";
 import { cn } from "@/lib/utils";
+import {
+  calculateLevelFromXP,
+  getLevelConstants,
+} from "@/services/levelCalculationService";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -4955,7 +4959,7 @@ const Ascend = () => {
                       <Button
                         onClick={handleGenerateWebappCode}
                         disabled={isGeneratingCode}
-                        className="w-full"
+                        className="w-full text-secondary"
                       >
                         {isGeneratingCode ? (
                           <>
