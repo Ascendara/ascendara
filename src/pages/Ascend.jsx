@@ -5141,6 +5141,11 @@ const Ascend = () => {
                             desc: t("ascend.premium.cloudSync.description"),
                           },
                           {
+                            icon: CloudUpload,
+                            title: t("ascend.premium.cloudBackups.title"),
+                            desc: t("ascend.premium.cloudBackups.description"),
+                          },
+                          {
                             icon: Trophy,
                             title: t("ascend.premium.leaderboard.title"),
                             desc: t("ascend.premium.leaderboard.description"),
@@ -5182,10 +5187,10 @@ const Ascend = () => {
                             badge: t("ascend.premium.planned"),
                           },
                           {
-                            icon: CloudUpload,
-                            title: t("ascend.premium.cloudBackups.title"),
-                            desc: t("ascend.premium.cloudBackups.description"),
+                            icon: Smartphone,
+                            title: t("ascend.premium.webView.title"),
                             badge: t("ascend.premium.planned"),
+                            desc: t("ascend.premium.webView.description"),
                           },
                           {
                             icon: Sparkle,
@@ -8026,6 +8031,33 @@ const Ascend = () => {
                   </div>
                 </motion.div>
 
+                {/* WebView - PLANNED */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
+                      <Smartphone className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="mt-4 text-lg font-semibold">
+                        {t("ascend.premium.webView.title") || "Game Communities"}
+                      </h3>
+                      <span className="mt-4 rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                        {t("ascend.premium.planned") || "PLANNED"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.webView.description") ||
+                        "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions."}
+                    </p>
+                  </div>
+                </motion.div>
+
                 {/* And More Coming */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -8120,7 +8152,7 @@ const Ascend = () => {
                   >
                     {savings && (
                       <div className="absolute -right-2 -top-2 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-secondary shadow-lg">
-                        Save {savings}
+                        {t("ascend.settings.subscriptionDialog.saveText")} {savings}
                       </div>
                     )}
 
