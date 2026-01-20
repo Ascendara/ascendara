@@ -2,11 +2,20 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { checkForUpdates } from "@/services/updateCheckingService";
-import { validateInput } from "@/services/profanityFilterService";
 import {
-  calculateLevelFromXP,
-  getLevelConstants,
-} from "@/services/levelCalculationService";
+  processNextInQueue,
+  getDownloadQueue,
+  removeFromQueue,
+} from "@/services/downloadQueueService";
+import {
+  initializeDownloadSync,
+  stopDownloadSync,
+  checkDownloadCommands,
+  acknowledgeCommand,
+  forceSyncDownloads,
+} from "@/services/downloadSyncService";
+import { getDeviceIcon, getDeviceDescription } from "@/lib/deviceParser";
+import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -135,6 +144,8 @@ import {
   Infinity,
   Copy,
   Smartphone,
+  Laptop,
+  Monitor,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -367,6 +378,15 @@ const Ascend = () => {
   const [upcomingChangelog, setUpcomingChangelog] = useState(null);
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
 
+  // Webapp connection state
+  const [webappConnectionCode, setWebappConnectionCode] = useState(null);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [webappCodeExpiry, setWebappCodeExpiry] = useState(300);
+  const [webappCodeTimer, setWebappCodeTimer] = useState(null);
+  const [connectedDevices, setConnectedDevices] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [disconnectingDevice, setDisconnectingDevice] = useState(null);
+
   // Check if app is on latest version
   useEffect(() => {
     const checkVersion = async () => {
@@ -552,6 +572,52 @@ const Ascend = () => {
       }
       const result = await verifyAscendAccess(hardwareId);
       setAscendAccess({ ...result, verified: true });
+
+      // If trial is expired or user has no access, disconnect all remote access sessions
+      if (!result.hasAccess && !result.isSubscribed && !result.isVerified) {
+        console.log("[Ascend] Trial expired - disconnecting all remote access sessions");
+        try {
+          // Load connected devices
+          const firebaseToken = await user.getIdToken();
+          const devicesResponse = await fetch(
+            `https://monitor.ascendara.app/connected-devices/${user.uid}`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${firebaseToken}`,
+              },
+            }
+          );
+
+          const devicesData = await devicesResponse.json();
+          if (devicesData.success && devicesData.devices) {
+            // Disconnect each device
+            for (const device of devicesData.devices) {
+              try {
+                await fetch("https://monitor.ascendara.app/disconnect-device", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${firebaseToken}`,
+                  },
+                  body: JSON.stringify({
+                    sessionId: device.sessionId,
+                    userId: user.uid,
+                  }),
+                });
+                console.log("[Ascend] Disconnected session:", device.sessionId);
+              } catch (disconnectError) {
+                console.error("[Ascend] Error disconnecting session:", disconnectError);
+              }
+            }
+            console.log(
+              "[Ascend] All remote access sessions disconnected due to expired trial"
+            );
+          }
+        } catch (error) {
+          console.error("[Ascend] Error disconnecting sessions on trial expiry:", error);
+        }
+      }
     } catch (e) {
       console.error("Failed to verify Ascend access:", e);
       // Default to allowing access on error (fail open for better UX)
@@ -2226,6 +2292,218 @@ const Ascend = () => {
     }
     setIsResendingEmail(false);
   };
+
+  // Webapp connection handlers
+  const handleGenerateWebappCode = async () => {
+    setIsGeneratingCode(true);
+    try {
+      // Get Firebase ID token directly from the user object
+      const firebaseToken = await user.getIdToken();
+      const response = await fetch("https://monitor.ascendara.app/generate-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${firebaseToken}`,
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          displayName: userData?.displayName || user.displayName,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setWebappConnectionCode(data.code);
+
+        // Use the actual expiry time from the server (handles both new and existing codes)
+        const expiryTime = data.expiresIn || 300;
+        setWebappCodeExpiry(expiryTime);
+
+        // Start countdown timer
+        const countdownTimer = setInterval(() => {
+          setWebappCodeExpiry(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownTimer);
+              clearInterval(statusPollTimer);
+              setWebappConnectionCode(null);
+              setWebappCodeTimer(null);
+              toast.error(t("ascend.settings.codeExpired") || "Connection code expired");
+              return 300;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        // Start polling for connection status
+        const statusPollTimer = setInterval(async () => {
+          try {
+            const statusResponse = await fetch(
+              `https://monitor.ascendara.app/connection-status/${data.code}`
+            );
+            const statusData = await statusResponse.json();
+
+            if (statusData.success && statusData.status === "connected") {
+              clearInterval(statusPollTimer);
+              clearInterval(countdownTimer);
+              setWebappConnectionCode(null);
+              setWebappCodeTimer(null);
+              toast.success(
+                t("ascend.settings.deviceConnected") || "Device connected successfully!"
+              );
+
+              // Reload connected devices list to show the new device
+              loadConnectedDevices();
+            }
+          } catch (error) {
+            console.error("Error checking connection status:", error);
+          }
+        }, 2000); // Poll every 2 seconds
+
+        // Store both intervals together
+        setWebappCodeTimer({ countdown: countdownTimer, statusPoll: statusPollTimer });
+
+        // Show appropriate message based on whether it's a new or existing code
+        if (data.existing) {
+          toast.info(
+            t("ascend.settings.existingCodeShown") ||
+              "Showing your existing connection code"
+          );
+        } else {
+          toast.success(
+            t("ascend.settings.codeGenerated") || "Connection code generated"
+          );
+        }
+      } else {
+        toast.error(
+          data.error ||
+            t("ascend.settings.codeGenerationFailed") ||
+            "Failed to generate code"
+        );
+      }
+    } catch (error) {
+      console.error("Error generating webapp code:", error);
+      toast.error(t("ascend.settings.codeGenerationFailed") || "Failed to generate code");
+    }
+    setIsGeneratingCode(false);
+  };
+
+  const handleCopyWebappCode = () => {
+    if (webappConnectionCode) {
+      navigator.clipboard.writeText(webappConnectionCode);
+      toast.success(t("ascend.settings.codeCopied") || "Code copied to clipboard");
+    }
+  };
+
+  const handleCancelWebappConnection = () => {
+    if (webappCodeTimer) {
+      if (typeof webappCodeTimer === "object") {
+        clearInterval(webappCodeTimer.countdown);
+        clearInterval(webappCodeTimer.statusPoll);
+      } else {
+        clearInterval(webappCodeTimer);
+      }
+      setWebappCodeTimer(null);
+    }
+    setWebappConnectionCode(null);
+    setWebappCodeExpiry(300);
+  };
+
+  // Load connected devices
+  const loadConnectedDevices = async () => {
+    if (!user) return;
+
+    setLoadingDevices(true);
+    try {
+      const firebaseToken = await user.getIdToken();
+      const response = await fetch(
+        `https://monitor.ascendara.app/connected-devices/${user.uid}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${firebaseToken}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        setConnectedDevices(data.devices || []);
+      } else {
+        toast.error(
+          t("ascend.settings.failedToLoadDevices") || "Failed to load connected devices"
+        );
+      }
+    } catch (error) {
+      console.error("Error loading connected devices:", error);
+      toast.error(
+        t("ascend.settings.failedToLoadDevices") || "Failed to load connected devices"
+      );
+    }
+    setLoadingDevices(false);
+  };
+
+  // Disconnect a device
+  const handleDisconnectDevice = async sessionId => {
+    if (!user) return;
+
+    setDisconnectingDevice(sessionId);
+    try {
+      const firebaseToken = await user.getIdToken();
+      const response = await fetch("https://monitor.ascendara.app/disconnect-device", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${firebaseToken}`,
+        },
+        body: JSON.stringify({
+          sessionId,
+          userId: user.uid,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success(
+          t("ascend.settings.deviceDisconnected") || "Device disconnected successfully"
+        );
+        // Reload devices list
+        loadConnectedDevices();
+      } else {
+        toast.error(
+          data.error ||
+            t("ascend.settings.failedToDisconnect") ||
+            "Failed to disconnect device"
+        );
+      }
+    } catch (error) {
+      console.error("Error disconnecting device:", error);
+      toast.error(
+        t("ascend.settings.failedToDisconnect") || "Failed to disconnect device"
+      );
+    }
+    setDisconnectingDevice(null);
+  };
+
+  // Load connected devices when settings section is opened
+  useEffect(() => {
+    if (activeSection === "settings" && user) {
+      loadConnectedDevices();
+    }
+  }, [activeSection, user]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (webappCodeTimer) {
+        if (typeof webappCodeTimer === "object") {
+          clearInterval(webappCodeTimer.countdown);
+          clearInterval(webappCodeTimer.statusPoll);
+        } else {
+          clearInterval(webappCodeTimer);
+        }
+      }
+    };
+  }, [webappCodeTimer]);
 
   // Block access if app is outdated
   if (checkingVersion) {
@@ -4644,6 +4922,205 @@ const Ascend = () => {
                       )}
                   </div>
                 )}
+              </div>
+
+              {/* Webapp Connection Card */}
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+                <div className="flex items-center justify-between border-b border-border/50 p-5">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="mb-3 h-5 w-5 text-primary" />
+                    <h2 className="font-semibold">
+                      {t("ascend.settings.webappConnection") || "Webapp Connection"}
+                    </h2>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Globe className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-medium">
+                          {t("ascend.settings.connectYourPhone") || "Connect Your Phone"}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t("ascend.settings.connectYourPhoneDescription") ||
+                            "Access your Ascendara library and stats from any device by connecting through monitor.ascendara.app"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {!webappConnectionCode ? (
+                      <Button
+                        onClick={handleGenerateWebappCode}
+                        disabled={isGeneratingCode}
+                        className="w-full"
+                      >
+                        {isGeneratingCode ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {t("ascend.settings.generating") || "Generating..."}
+                          </>
+                        ) : (
+                          <>
+                            <Link2 className="mr-2 h-4 w-4" />
+                            {t("ascend.settings.startConnection") || "Start Connection"}
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
+                          <div className="text-center">
+                            <p className="mb-3 text-sm font-medium text-muted-foreground">
+                              {t("ascend.settings.enterThisCode") ||
+                                "Enter this code on your phone"}
+                            </p>
+                            <div className="mb-4 flex items-center justify-center gap-2">
+                              {webappConnectionCode.split("").map((digit, index) => (
+                                <div
+                                  key={index}
+                                  className="flex h-14 w-12 items-center justify-center rounded-lg border-2 border-primary bg-background text-2xl font-bold text-primary"
+                                >
+                                  {digit}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {t("ascend.settings.codeExpiresIn") || "Code expires in"}{" "}
+                                {webappCodeExpiry}s
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">
+                            {t("ascend.settings.visitMonitor") || "Visit"}{" "}
+                            <span className="font-medium text-foreground">
+                              monitor.ascendara.app
+                            </span>{" "}
+                            {t("ascend.settings.onYourPhone") ||
+                              "on your phone to enter this code"}
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={handleCopyWebappCode}
+                            variant="outline"
+                            className="flex-1"
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            {t("ascend.settings.copyCode") || "Copy Code"}
+                          </Button>
+                          <Button
+                            onClick={handleCancelWebappConnection}
+                            variant="outline"
+                            className="flex-1"
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            {t("ascend.settings.cancel") || "Cancel"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Connected Devices Section */}
+                    <div className="mt-6 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium">
+                          {t("ascend.settings.connectedDevices") || "Connected Devices"}
+                        </h4>
+                        <Button
+                          onClick={loadConnectedDevices}
+                          variant="ghost"
+                          size="sm"
+                          disabled={loadingDevices}
+                        >
+                          <RefreshCw
+                            className={`h-4 w-4 ${loadingDevices ? "animate-spin" : ""}`}
+                          />
+                        </Button>
+                      </div>
+
+                      {loadingDevices ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : connectedDevices.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border/50 p-6 text-center">
+                          <Smartphone className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {t("ascend.settings.noConnectedDevices") ||
+                              "No devices connected"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {connectedDevices.map(device => {
+                            const iconName = getDeviceIcon(device.deviceInfo);
+                            const DeviceIcon =
+                              iconName === "Smartphone"
+                                ? Smartphone
+                                : iconName === "Tablet"
+                                  ? Gamepad2
+                                  : iconName === "Laptop"
+                                    ? Laptop
+                                    : Monitor;
+                            const deviceDescription = getDeviceDescription(
+                              device.deviceInfo
+                            );
+
+                            return (
+                              <div
+                                key={device.sessionId}
+                                className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 p-3"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                                    <DeviceIcon className="h-5 w-5 text-primary" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {device.deviceInfo?.platform || "Web Device"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {deviceDescription}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {t("ascend.settings.lastActive") || "Last active"}:{" "}
+                                      {new Date(
+                                        device.lastActive?.seconds * 1000 ||
+                                          device.lastActive
+                                      ).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  onClick={() => handleDisconnectDevice(device.sessionId)}
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={disconnectingDevice === device.sessionId}
+                                >
+                                  {disconnectingDevice === device.sessionId ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Privacy Settings Card */}

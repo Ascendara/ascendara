@@ -26,6 +26,7 @@ import {
   setGamePlayingState,
 } from "@/services/ascendStatusService";
 import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
+import { initializeDownloadSync, stopDownloadSync } from "@/services/downloadSyncService";
 import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
@@ -415,6 +416,48 @@ const AscendStatusInitializer = () => {
       };
     }
   }, [user?.uid]);
+
+  return null;
+};
+
+// Initialize download sync service when user is authenticated with Ascend access
+const DownloadSyncInitializer = () => {
+  const { user, isAuthenticated } = useAuth();
+  const [hasAscendAccess, setHasAscendAccess] = useState(false);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const accessStatus = await verifyAscendAccess();
+          const hasAccess =
+            accessStatus.hasAccess ||
+            accessStatus.isSubscribed ||
+            accessStatus.isVerified;
+          setHasAscendAccess(hasAccess);
+
+          console.log(
+            "[App] Initializing download sync service for user:",
+            user.uid,
+            "Ascend access:",
+            hasAccess
+          );
+          initializeDownloadSync(user, hasAccess);
+        } catch (error) {
+          console.error("[App] Error checking Ascend access:", error);
+          stopDownloadSync();
+        }
+      } else {
+        stopDownloadSync();
+      }
+    };
+
+    checkAccess();
+
+    return () => {
+      stopDownloadSync();
+    };
+  }, [isAuthenticated, user]);
 
   return null;
 };
@@ -1286,6 +1329,7 @@ function App() {
                     <ContextMenu />
                     <ScrollToTop />
                     <AscendStatusInitializer />
+                    <DownloadSyncInitializer />
                     <UserActivityTracker />
                     <MessageNotificationChecker />
                     <TrialWarningChecker />

@@ -44,6 +44,159 @@ function registerDownloadHandlers() {
     }
   });
 
+  // Get current downloads
+  ipcMain.handle("get-downloads", async () => {
+    try {
+      const settings = settingsManager.getSettings();
+      console.log("[get-downloads] Download directory:", settings.downloadDirectory);
+
+      if (!settings.downloadDirectory) {
+        console.log("[get-downloads] No download directory configured");
+        return [];
+      }
+
+      const allDownloadDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ].filter(Boolean);
+
+      console.log("[get-downloads] Scanning directories:", allDownloadDirectories);
+
+      const downloads = [];
+
+      for (const downloadDir of allDownloadDirectories) {
+        try {
+          const subdirectories = await fs.promises.readdir(downloadDir, {
+            withFileTypes: true,
+          });
+          const gameDirectories = subdirectories
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+
+          console.log(
+            `[get-downloads] Found ${gameDirectories.length} game directories in ${downloadDir}`
+          );
+
+          for (const dir of gameDirectories) {
+            const gameInfoPath = path.join(downloadDir, dir, `${dir}.ascendara.json`);
+            try {
+              const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
+              const gameData = JSON.parse(gameInfoData);
+
+              // Check if this game has active downloadingData
+              if (gameData.downloadingData) {
+                const { downloadingData } = gameData;
+                const isActive =
+                  downloadingData.downloading ||
+                  downloadingData.extracting ||
+                  downloadingData.updating ||
+                  downloadingData.verifying ||
+                  downloadingData.stopped ||
+                  (downloadingData.verifyError &&
+                    downloadingData.verifyError.length > 0) ||
+                  downloadingData.error;
+
+                if (isActive) {
+                  // Parse progress - handle both "50.5%" string and numeric values
+                  let progress = 0;
+                  if (downloadingData.progressCompleted) {
+                    const progressStr = String(downloadingData.progressCompleted);
+                    progress = parseFloat(progressStr.replace("%", "")) || 0;
+                  }
+
+                  // Calculate downloaded size from progress if available
+                  let downloadedSize = "0 MB";
+                  const totalSize = gameData.size || "Unknown";
+
+                  // Calculate downloaded size if we have both progress and total size
+                  // Use >= 0 instead of > 0 to handle edge cases
+                  if (progress >= 0 && totalSize !== "Unknown") {
+                    // Parse size (e.g., "2.2 GB" -> calculate downloaded)
+                    const sizeMatch = totalSize.match(/(\d+\.?\d*)\s*(GB|MB|TB)/i);
+                    if (sizeMatch) {
+                      const sizeValue = parseFloat(sizeMatch[1]);
+                      const sizeUnit = sizeMatch[2].toUpperCase();
+                      const downloadedValue = ((sizeValue * progress) / 100).toFixed(2);
+                      downloadedSize = `${downloadedValue} ${sizeUnit}`;
+                    }
+                  }
+
+                  const download = {
+                    id: gameData.game || dir,
+                    name: gameData.game || dir,
+                    progress: progress,
+                    speed: downloadingData.progressDownloadSpeeds || "0 B/s",
+                    eta: downloadingData.timeUntilComplete || "Calculating...",
+                    status: downloadingData.paused
+                      ? "paused"
+                      : downloadingData.extracting
+                        ? "extracting"
+                        : downloadingData.verifying
+                          ? "verifying"
+                          : downloadingData.stopped
+                            ? "stopped"
+                            : "downloading",
+                    size: totalSize,
+                    downloaded: downloadedSize,
+                    error: downloadingData.error || null,
+                    paused: downloadingData.paused || false,
+                    stopped: downloadingData.stopped || false,
+                    // Include all downloadingData fields for frontend
+                    downloadingData: {
+                      downloading: downloadingData.downloading || false,
+                      extracting: downloadingData.extracting || false,
+                      verifying: downloadingData.verifying || false,
+                      updating: downloadingData.updating || false,
+                      stopped: downloadingData.stopped || false,
+                      paused: downloadingData.paused || false,
+                      waiting: downloadingData.waiting || false,
+                      progressCompleted: downloadingData.progressCompleted,
+                      progressDownloadSpeeds: downloadingData.progressDownloadSpeeds,
+                      timeUntilComplete: downloadingData.timeUntilComplete,
+                      extractionProgress: downloadingData.extractionProgress || null,
+                      verifyError: downloadingData.verifyError || null,
+                      error: downloadingData.error || null,
+                    },
+                  };
+                  console.log("[get-downloads] Found active download:", download.name);
+                  console.log(
+                    "[get-downloads]   Progress:",
+                    progress,
+                    "Status:",
+                    download.status
+                  );
+                  console.log(
+                    "[get-downloads]   Total size:",
+                    totalSize,
+                    "Downloaded:",
+                    downloadedSize
+                  );
+                  console.log(
+                    "[get-downloads]   Speed:",
+                    download.speed,
+                    "Paused:",
+                    downloadingData.paused
+                  );
+                  downloads.push(download);
+                }
+              }
+            } catch (error) {
+              // Silently skip games without .ascendara.json files
+            }
+          }
+        } catch (error) {
+          console.error(`[get-downloads] Error reading directory ${downloadDir}:`, error);
+        }
+      }
+
+      console.log("[get-downloads] Returning", downloads.length, "active downloads");
+      return downloads;
+    } catch (error) {
+      console.error("[get-downloads] Error getting downloads:", error);
+      return [];
+    }
+  });
+
   // Get download history
   ipcMain.handle("get-download-history", async () => {
     try {

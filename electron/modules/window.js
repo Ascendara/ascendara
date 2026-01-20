@@ -40,6 +40,8 @@ function createWindow() {
       contextIsolation: true,
       // Disable sandbox for Linux compatibility
       sandbox: false,
+      // Disable web security to allow CORS requests to external APIs
+      webSecurity: false,
     },
   });
 

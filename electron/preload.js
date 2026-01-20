@@ -302,6 +302,7 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("download-trainer-to-game", downloadUrl, gameName, isCustom),
   isDownloaderRunning: () => ipcRenderer.invoke("is-downloader-running"),
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
+  getDownloads: () => ipcRenderer.invoke("get-downloads"),
 
   // Download Events
   onDownloadProgress: callback => {

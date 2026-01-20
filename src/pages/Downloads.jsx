@@ -73,6 +73,11 @@ import {
   getDownloadQueue,
   removeFromQueue,
 } from "@/services/downloadQueueService";
+import {
+  checkDownloadCommands,
+  acknowledgeCommand,
+  forceSyncDownloads,
+} from "@/services/downloadSyncService";
 import { cn } from "@/lib/utils";
 
 // Helper function to check if download speed is above 50 MB/s
@@ -172,7 +177,118 @@ const SpeedIndicator = memo(({ speed, isHigh }) => (
 const Downloads = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+
+  // Check for download commands from webapp
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      console.log("[Downloads] Command checking disabled - not authenticated");
+      return;
+    }
+
+    console.log("[Downloads] Starting command check interval for user:", user.uid);
+
+    const commandInterval = setInterval(async () => {
+      const commands = await checkDownloadCommands();
+
+      if (commands.length > 0) {
+        console.log("[Downloads] Processing", commands.length, "commands");
+      }
+
+      for (const cmd of commands) {
+        const downloadId = cmd.downloadId;
+        const command = cmd.command;
+
+        console.log(
+          "[Downloads] Executing command:",
+          command,
+          "for download:",
+          downloadId
+        );
+
+        // Execute command
+        try {
+          let commandSuccess = false;
+          let commandError = null;
+
+          if (command === "pause") {
+            // Pause is done by calling stopDownload with deleteContents = false
+            const result = await window.electron.stopDownload(downloadId, false);
+            console.log("[Downloads] Pause result:", result);
+            if (result) {
+              toast.success(t("downloads.pauseSuccess"));
+              commandSuccess = true;
+            } else {
+              commandError = "Failed to pause download";
+            }
+          } else if (command === "resume") {
+            const result = await window.electron.resumeDownload(downloadId);
+            console.log("[Downloads] Resume result:", result);
+            if (result?.success) {
+              toast.success(t("downloads.resumeSuccess"));
+              commandSuccess = true;
+            } else {
+              commandError = result?.error || "Failed to resume download";
+            }
+          } else if (command === "stop" || command === "cancel" || command === "kill") {
+            // Stop/cancel/kill all mean delete the download
+            const result = await window.electron.stopDownload(downloadId, true);
+            console.log("[Downloads] Stop result:", result);
+            if (result) {
+              toast.success(t("downloads.killSuccess"));
+              commandSuccess = true;
+              // Remove from UI
+              setDownloadingGames(prev => prev.filter(g => g.game !== downloadId));
+
+              // Acknowledge command with success status before waiting
+              console.log("[Downloads] Acknowledging kill command for:", downloadId);
+              await acknowledgeCommand(downloadId, "completed");
+
+              // Wait for the download to be fully removed from filesystem
+              // before syncing, so the sync reflects the removal
+              console.log("[Downloads] Waiting 1s for filesystem cleanup...");
+              await new Promise(resolve => setTimeout(resolve, 1000));
+
+              // Force sync to update webapp immediately
+              console.log("[Downloads] Syncing after kill...");
+              forceSyncDownloads();
+              return; // Exit early since we already acknowledged
+            } else {
+              commandError = "Failed to kill download";
+            }
+          }
+
+          // Acknowledge command (for pause/resume) with status
+          const status = commandSuccess ? "completed" : "failed";
+          console.log(
+            "[Downloads] Acknowledging command for:",
+            downloadId,
+            "Status:",
+            status
+          );
+          await acknowledgeCommand(downloadId, status, commandError);
+
+          // Force sync to update webapp immediately
+          forceSyncDownloads();
+
+          // Show error toast if command failed
+          if (!commandSuccess && commandError) {
+            toast.error(commandError);
+          }
+        } catch (error) {
+          console.error("[Downloads] Error executing command:", error);
+          // Acknowledge as failed
+          await acknowledgeCommand(downloadId, "failed", error.message);
+          toast.error(t("downloads.errors.commandFailed") || "Failed to execute command");
+        }
+      }
+    }, 3000); // Check every 3 seconds
+
+    return () => {
+      console.log("[Downloads] Stopping command check interval");
+      clearInterval(commandInterval);
+    };
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     window.electron.switchRPC("downloading");
@@ -459,6 +575,8 @@ const Downloads = () => {
         throw new Error("Failed to pause download");
       }
       toast.success(t("downloads.pauseSuccess"));
+      // Trigger immediate sync to update monitor endpoint
+      forceSyncDownloads();
     } catch (error) {
       console.error("Error pausing download:", error);
       toast.error(t("downloads.errors.pauseFailed"), {
@@ -491,6 +609,15 @@ const Downloads = () => {
       clearCachedDownloadData(game.game);
       setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
       toast.success(t("downloads.killSuccess"));
+
+      // Wait for the download to be fully removed from filesystem
+      // before syncing, so the sync reflects the removal
+      console.log("[Downloads] Waiting 1s for filesystem cleanup before sync...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Trigger immediate sync to update monitor endpoint
+      console.log("[Downloads] Syncing after manual kill...");
+      forceSyncDownloads();
     } catch (error) {
       console.error("Error killing download:", error);
       toast.error(t("downloads.errors.killFailed"), {
@@ -531,6 +658,8 @@ const Downloads = () => {
       const result = await window.electron.resumeDownload(game.game);
       if (result.success) {
         toast.success(t("downloads.resumeSuccess"));
+        // Trigger immediate sync to update monitor endpoint
+        forceSyncDownloads();
         // Keep in resuming state until download actually starts (check every 500ms)
         const checkInterval = setInterval(() => {
           const currentGames = downloadingGamesRef.current;
@@ -545,6 +674,8 @@ const Downloads = () => {
               newSet.delete(game.game);
               return newSet;
             });
+            // Sync again when download actually restarts
+            forceSyncDownloads();
           }
         }, 500);
 

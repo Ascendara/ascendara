@@ -36,6 +36,7 @@ import imageCacheService from "@/services/imageCacheService";
 import openCriticService from "@/services/openCriticService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import { addToQueue, hasActiveDownloads } from "@/services/downloadQueueService";
+import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
 import {
   BadgeCheckIcon,
   CheckIcon,
@@ -608,12 +609,18 @@ export default function DownloadPage() {
             gameData.gameID || ""
           );
 
+          // Notify webapp that download started immediately
+          console.log("[Download] Download initiated! Calling notifyDownloadStart");
+          notifyDownloadStart(sanitizedGameName, gameData.game);
+
           // Keep isStarting true until download actually begins
           const removeDownloadListener = window.electron.onDownloadProgress(
             downloadInfo => {
               if (downloadInfo.game === sanitizedGameName) {
                 setIsStartingDownload(false);
                 removeDownloadListener();
+                // Trigger immediate sync to monitor endpoint
+                forceSyncDownloads();
               }
             }
           );
@@ -863,11 +870,25 @@ export default function DownloadPage() {
         dir,
         gameData.gameID || ""
       );
+
+      // Notify webapp that download started immediately
+      console.log("[Download] Download initiated! Calling notifyDownloadStart");
+      notifyDownloadStart(sanitizedGameName, gameData.game);
+
       // Keep isStarting true until download actually begins
       const removeDownloadListener = window.electron.onDownloadProgress(downloadInfo => {
+        console.log(
+          "[Download] Progress event received:",
+          downloadInfo.game,
+          "Looking for:",
+          sanitizedGameName
+        );
         if (downloadInfo.game === sanitizedGameName) {
+          console.log("[Download] Download progress detected");
           setIsStartingDownload(false);
           removeDownloadListener();
+          // Trigger immediate sync to monitor endpoint
+          forceSyncDownloads();
         }
       });
 
