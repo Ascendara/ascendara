@@ -44,3 +44,4 @@ binaries/AscendaraDownloader/src/AscendaraDownloaderV1.py
 electron/appOrginal.js
 src/services/firestore.rules
 src/translations/en.json.20251230_222339.backup
+src/pages/webview-api.py
