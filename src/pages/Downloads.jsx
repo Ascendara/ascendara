@@ -72,6 +72,7 @@ import {
   processNextInQueue,
   getDownloadQueue,
   removeFromQueue,
+  reorderQueue,
 } from "@/services/downloadQueueService";
 import {
   checkDownloadCommands,
@@ -301,6 +302,8 @@ const Downloads = () => {
   const [fadingGames, setFadingGames] = useState(new Set()); // Track games that are fading out
   const [torboxStates, setTorboxStates] = useState({}); // webdownloadId -> state
   const [queuedDownloads, setQueuedDownloads] = useState([]);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
   // Refs to always access the latest values inside polling
   const [selectedGame, setSelectedGame] = useState(null);
   const [totalSpeed, setTotalSpeed] = useState("0.00 MB/s");
@@ -961,11 +964,42 @@ const Downloads = () => {
                 {queuedDownloads.map((item, index) => (
                   <Card
                     key={item.id}
+                    draggable
+                    onDragStart={e => {
+                      setDraggedIndex(index);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/html", e.currentTarget);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedIndex(null);
+                      setDragOverIndex(null);
+                    }}
+                    onDragOver={e => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (draggedIndex !== null && draggedIndex !== index) {
+                        setDragOverIndex(index);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      setDragOverIndex(null);
+                    }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      if (draggedIndex !== null && draggedIndex !== index) {
+                        const newQueue = reorderQueue(draggedIndex, index);
+                        setQueuedDownloads(newQueue);
+                      }
+                      setDraggedIndex(null);
+                      setDragOverIndex(null);
+                    }}
                     className={cn(
-                      "border-border/50",
+                      "cursor-move border-border/50 transition-all duration-200",
                       index === 0 && downloadingGames.length === 0
                         ? "border-primary/50 bg-primary/5"
-                        : "bg-card/50"
+                        : "bg-card/50",
+                      draggedIndex === index && "scale-95 opacity-50",
+                      dragOverIndex === index && "scale-[1.02] border-2 border-primary"
                     )}
                   >
                     <CardContent className="flex items-center justify-between p-4">

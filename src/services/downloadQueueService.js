@@ -54,6 +54,24 @@ export const clearQueue = () => {
   saveDownloadQueue([]);
 };
 
+// Reorder the queue by moving an item from one index to another
+export const reorderQueue = (fromIndex, toIndex) => {
+  const queue = getDownloadQueue();
+  if (
+    fromIndex < 0 ||
+    fromIndex >= queue.length ||
+    toIndex < 0 ||
+    toIndex >= queue.length
+  ) {
+    return queue;
+  }
+  const newQueue = [...queue];
+  const [movedItem] = newQueue.splice(fromIndex, 1);
+  newQueue.splice(toIndex, 0, movedItem);
+  saveDownloadQueue(newQueue);
+  return newQueue;
+};
+
 // Check if there are active downloads (excluding completed/verifying ones)
 export const hasActiveDownloads = async () => {
   try {
