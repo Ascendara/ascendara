@@ -593,6 +593,7 @@ export const updateUserData = async (uid, data) => {
       "photoURL",
       "cloudLibrary",
       "profileStats",
+      "private",
     ];
 
     for (const field of allowedFields) {
