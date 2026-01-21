@@ -48,10 +48,8 @@ function registerDownloadHandlers() {
   ipcMain.handle("get-downloads", async () => {
     try {
       const settings = settingsManager.getSettings();
-      console.log("[get-downloads] Download directory:", settings.downloadDirectory);
 
       if (!settings.downloadDirectory) {
-        console.log("[get-downloads] No download directory configured");
         return [];
       }
 
@@ -59,8 +57,6 @@ function registerDownloadHandlers() {
         settings.downloadDirectory,
         ...(settings.additionalDirectories || []),
       ].filter(Boolean);
-
-      console.log("[get-downloads] Scanning directories:", allDownloadDirectories);
 
       const downloads = [];
 
@@ -72,10 +68,6 @@ function registerDownloadHandlers() {
           const gameDirectories = subdirectories
             .filter(dirent => dirent.isDirectory())
             .map(dirent => dirent.name);
-
-          console.log(
-            `[get-downloads] Found ${gameDirectories.length} game directories in ${downloadDir}`
-          );
 
           for (const dir of gameDirectories) {
             const gameInfoPath = path.join(downloadDir, dir, `${dir}.ascendara.json`);
