@@ -5637,6 +5637,11 @@ const Ascend = () => {
                             desc: t("ascend.premium.friends.description"),
                           },
                           {
+                            icon: Smartphone,
+                            title: t("ascend.premium.webView.title"),
+                            desc: t("ascend.premium.webView.description"),
+                          },
+                          {
                             icon: MessageCircle,
                             title: t("ascend.premium.chat.title"),
                             desc: t("ascend.premium.chat.description"),
@@ -5696,12 +5701,6 @@ const Ascend = () => {
                             title: t("ascend.premium.communities.title"),
                             desc: t("ascend.premium.communities.description"),
                             badge: t("ascend.premium.planned"),
-                          },
-                          {
-                            icon: Smartphone,
-                            title: t("ascend.premium.webView.title"),
-                            badge: t("ascend.premium.planned"),
-                            desc: t("ascend.premium.webView.description"),
                           },
                           {
                             icon: Sparkle,
@@ -8269,6 +8268,29 @@ const Ascend = () => {
                     </p>
                   </div>
                 </motion.div>
+                {/* WebView */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
+                      <Smartphone className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="mt-4 text-lg font-semibold">
+                        {t("ascend.premium.webView.title") || "Game Communities"}
+                      </h3>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.webView.description") ||
+                        "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions."}
+                    </p>
+                  </div>
+                </motion.div>
 
                 {/* Real-Time Chat */}
                 <motion.div
@@ -8542,33 +8564,6 @@ const Ascend = () => {
                   </div>
                 </motion.div>
 
-                {/* WebView - PLANNED */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-                >
-                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
-                  <div className="relative">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
-                      <Smartphone className="h-6 w-6" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="mt-4 text-lg font-semibold">
-                        {t("ascend.premium.webView.title") || "Game Communities"}
-                      </h3>
-                      <span className="mt-4 rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
-                        {t("ascend.premium.planned") || "PLANNED"}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {t("ascend.premium.webView.description") ||
-                        "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions."}
-                    </p>
-                  </div>
-                </motion.div>
-
                 {/* And More Coming */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -8809,13 +8804,36 @@ const Ascend = () => {
                 </div>
               </motion.div>
 
-              {/* Two Column - Profiles & Mods */}
+              {/* Two Column - Mobile View & Profiles */}
               <div className="grid grid-cols-2 gap-3">
-                {/* Profiles */}
+                {/* Mobile View & Remote Access */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
+                  className="group relative overflow-hidden rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/20 to-amber-600/10 p-4"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                  <div className="relative flex flex-col gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/20 ring-1 ring-amber-500/30">
+                      <Smartphone className="h-5 w-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold">
+                        {t("account.features.mobileView")}
+                      </h4>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {t("account.features.mobileViewDesc")}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Profiles */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.45 }}
                   className="group relative overflow-hidden rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/20 to-purple-600/10 p-4"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
@@ -8833,30 +8851,56 @@ const Ascend = () => {
                     </div>
                   </div>
                 </motion.div>
-
-                {/* Nexus Mods */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.45 }}
-                  className="group relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 p-4"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                  <div className="relative flex flex-col gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20 ring-1 ring-emerald-500/30">
-                      <Puzzle className="h-5 w-5 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold">
-                        {t("account.features.nexusMods")}
-                      </h4>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {t("account.features.nexusModsDesc")}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
               </div>
+            </div>
+
+            {/* Two Column - Auto Updates & Download Queues */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Auto Updates */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5 }}
+                className="group relative overflow-hidden rounded-xl border border-orange-500/20 bg-gradient-to-br from-orange-500/20 to-orange-600/10 p-4"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="relative flex flex-col gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/20 ring-1 ring-orange-500/30">
+                    <Zap className="h-5 w-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold">
+                      {t("account.features.autoUpdate")}
+                    </h4>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {t("account.features.autoUpdateDesc")}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Download Queues */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.55 }}
+                className="group relative overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 p-4"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="relative flex flex-col gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/20 ring-1 ring-indigo-500/30">
+                    <ListOrdered className="h-5 w-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold">
+                      {t("account.features.downloadQueues")}
+                    </h4>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {t("account.features.downloadQueuesDesc")}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
             </div>
 
             {/* Additional Features Grid */}
@@ -8887,16 +8931,17 @@ const Ascend = () => {
                   iconClass: "text-violet-400",
                 },
                 {
-                  icon: Smartphone,
-                  labelKey: "account.features.mobileView",
-                  bgClass: "bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15",
-                  iconClass: "text-amber-400",
+                  icon: Puzzle,
+                  labelKey: "account.features.nexusMods",
+                  bgClass:
+                    "bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15",
+                  iconClass: "text-emerald-400",
                 },
                 {
                   icon: Zap,
-                  labelKey: "account.features.autoUpdate",
-                  bgClass: "bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15",
-                  iconClass: "text-orange-400",
+                  labelKey: "account.features.trainers",
+                  bgClass: "bg-pink-500/10 border-pink-500/20 hover:bg-pink-500/15",
+                  iconClass: "text-pink-400",
                 },
               ].map((feature, index) => (
                 <motion.div

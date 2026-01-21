@@ -48,20 +48,26 @@
     },
     "features": {
       "autoUpdate": "Auto Updates",
+      "autoUpdateDesc": "Keep your games and Ascendara automatically updated with the latest versions and patches.",
       "chat": "Chat",
       "cloudSync": "Cloud Sync",
       "cloudSyncDesc": "Sync your Ascendara profile and game stats across devices",
       "cloudSyncandBackups": "Cloud Sync & Backups",
       "cloudSyncandBackupsDesc": "Sync your Ascendara profile and game saves to the cloud",
+      "downloadQueues": "Download Queues",
+      "downloadQueuesDesc": "Queue multiple downloads and manage them efficiently with priority controls.",
       "friends": "Friends",
       "leaderboard": "Leaderboards",
-      "mobileView": "Mobile View",
+      "mobileView": "Mobile View & Remote Access",
+      "mobileViewDesc": "View and manage your downloads remotely, and see what your friends are playing on Ascend from anywhere.",
       "moreComing": "And More Coming",
       "moreComingDesc": "New features are constantly being added to Ascend",
-      "nexusMods": "Mods & Trainer Integration",
-      "nexusModsDesc": "Manage and install game mods and trainers directly within Ascendara with one-click integration.",
+      "nexusMods": "Mods Integration",
+      "nexusModsDesc": "Manage and install game mods directly within Ascendara with one-click integration.",
       "profiles": "Profiles",
       "profilesDesc": "Set up your bio, public profile, and stats. Also view other users' profiles and stats on Ascend.",
+      "trainers": "Trainer Integration",
+      "trainersDesc": "Access and manage game trainers seamlessly integrated into Ascendara.",
       "unlimitedDownloads": "Unlimited Downloads"
     },
     "featuresIntro": "Here's what you'll get with Ascend:",
@@ -90,7 +96,7 @@
     "loading": "Loading...",
     "loginSubtitle": "Sign in to your account",
     "noAccount": "Don't have an account? Join today for free",
-    "pricingDetails": "Start with a free 7-day trial. After that, it's just $2/month to keep all your data synced and backed up.",
+    "pricingDetails": "Start with a free 7-day trial. After that, it's just $2/month, or save 17% with $5 for 3 months, or save 25% with $9 for 6 months!",
     "pricingFriendly": "No payment required to start!",
     "requestDeletion": "Request Account Deletion",
     "setUp": "Step Up. Connect.",
@@ -459,8 +465,8 @@
         "title": "Upcoming Updates Peek"
       },
       "webView": {
-        "description": "View download progression and manage your downloads on any device through the Ascend webapp",
-        "title": "Mobile Download Manager"
+        "description": "Easily monitor and manage your active downloads, and see what your Ascend friends are up to all on your mobile device.",
+        "title": "Remote Access"
       }
     },
     "profile": {
