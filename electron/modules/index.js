@@ -31,6 +31,7 @@ const lazyLoaders = {
   ludusavi: createLazyLoader("./ludusavi"),
   translations: createLazyLoader("./translations"),
   themes: createLazyLoader("./themes"),
+  qrcode: createLazyLoader("./qrcode"),
 };
 
 module.exports = {
@@ -85,5 +86,8 @@ module.exports = {
   },
   get themes() {
     return lazyLoaders.themes();
+  },
+  get qrcode() {
+    return lazyLoaders.qrcode();
   },
 };

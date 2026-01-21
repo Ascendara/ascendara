@@ -1481,6 +1481,18 @@ function registerMiscHandlers() {
       }
     }
   );
+
+  // Generate QR code for webapp connection
+  ipcMain.handle("generate-webapp-qrcode", async (_, { code }) => {
+    try {
+      const { generateWebappQRCode } = require("./qrcode");
+      const qrCodeDataUrl = await generateWebappQRCode(code);
+      return { success: true, dataUrl: qrCodeDataUrl };
+    } catch (error) {
+      console.error("Error generating QR code:", error);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 module.exports = {

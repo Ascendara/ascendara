@@ -384,6 +384,7 @@ const Ascend = () => {
 
   // Webapp connection state
   const [webappConnectionCode, setWebappConnectionCode] = useState(null);
+  const [webappQRCode, setWebappQRCode] = useState(null);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [webappCodeExpiry, setWebappCodeExpiry] = useState(300);
   const [webappCodeTimer, setWebappCodeTimer] = useState(null);
@@ -2319,6 +2320,16 @@ const Ascend = () => {
       if (data.success) {
         setWebappConnectionCode(data.code);
 
+        // Generate QR code for the connection URL
+        try {
+          const qrResult = await window.electron.generateWebappQRCode(data.code);
+          if (qrResult.success) {
+            setWebappQRCode(qrResult.dataUrl);
+          }
+        } catch (error) {
+          console.error("Error generating QR code:", error);
+        }
+
         // Use the actual expiry time from the server (handles both new and existing codes)
         const expiryTime = data.expiresIn || 300;
         setWebappCodeExpiry(expiryTime);
@@ -2330,6 +2341,7 @@ const Ascend = () => {
               clearInterval(countdownTimer);
               clearInterval(statusPollTimer);
               setWebappConnectionCode(null);
+              setWebappQRCode(null);
               setWebappCodeTimer(null);
               toast.error(t("ascend.settings.codeExpired") || "Connection code expired");
               return 300;
@@ -2350,6 +2362,7 @@ const Ascend = () => {
               clearInterval(statusPollTimer);
               clearInterval(countdownTimer);
               setWebappConnectionCode(null);
+              setWebappQRCode(null);
               setWebappCodeTimer(null);
               toast.success(
                 t("ascend.settings.deviceConnected") || "Device connected successfully!"
@@ -2409,6 +2422,7 @@ const Ascend = () => {
       setWebappCodeTimer(null);
     }
     setWebappConnectionCode(null);
+    setWebappQRCode(null);
     setWebappCodeExpiry(300);
   };
 
@@ -4975,42 +4989,58 @@ const Ascend = () => {
                       </Button>
                     ) : (
                       <div className="space-y-4">
-                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
-                          <div className="text-center">
-                            <p className="mb-3 text-sm font-medium text-muted-foreground">
-                              {t("ascend.settings.enterThisCode") ||
-                                "Enter this code on your phone"}
-                            </p>
-                            <div className="mb-4 flex items-center justify-center gap-2">
-                              {webappConnectionCode.split("").map((digit, index) => (
-                                <div
-                                  key={index}
-                                  className="flex h-14 w-12 items-center justify-center rounded-lg border-2 border-primary bg-background text-2xl font-bold text-primary"
-                                >
-                                  {digit}
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {/* Left Column - Code Display */}
+                          <div className="space-y-4">
+                            <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
+                              <div className="text-center">
+                                <p className="mb-3 text-sm font-medium text-muted-foreground">
+                                  {t("ascend.settings.enterThisCode") ||
+                                    "Enter this code on your phone"}
+                                </p>
+                                <div className="mb-4 flex items-center justify-center gap-2">
+                                  {webappConnectionCode.split("").map((digit, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex h-14 w-12 items-center justify-center rounded-lg border-2 border-primary bg-background text-2xl font-bold text-primary"
+                                    >
+                                      {digit}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  <span>
+                                    {t("ascend.settings.codeExpiresIn") ||
+                                      "Code expires in"}{" "}
+                                    {webappCodeExpiry}s
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span>
-                                {t("ascend.settings.codeExpiresIn") || "Code expires in"}{" "}
-                                {webappCodeExpiry}s
-                              </span>
+
+                            <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
+                              <Info className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                              <p className="text-xs text-muted-foreground">
+                                {t("ascend.settings.visitMonitor")}
+                              </p>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
-                          <Info className="h-4 w-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">
-                            {t("ascend.settings.visitMonitor") || "Visit"}{" "}
-                            <span className="font-medium text-foreground">
-                              monitor.ascendara.app
-                            </span>{" "}
-                            {t("ascend.settings.onYourPhone") ||
-                              "on your phone to enter this code"}
-                          </p>
+                          {/* Right Column - QR Code */}
+                          {webappQRCode && (
+                            <div className="flex items-center justify-center rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-6">
+                              <div className="text-center">
+                                <div className="rounded-lg bg-white p-3 shadow-lg">
+                                  <img
+                                    src={webappQRCode}
+                                    alt="QR Code"
+                                    className="h-40 w-40"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex gap-2">

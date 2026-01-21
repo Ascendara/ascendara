@@ -435,6 +435,11 @@ contextBridge.exposeInMainWorld("electron", {
   uploadProfileImage: imageBase64 =>
     ipcRenderer.invoke("upload-profile-image", imageBase64),
   getProfileImage: () => ipcRenderer.invoke("get-profile-image"),
+
+  //===========================================================================
+  // QR CODE GENERATION
+  //===========================================================================
+  generateWebappQRCode: code => ipcRenderer.invoke("generate-webapp-qrcode", { code }),
 });
 
 //=============================================================================

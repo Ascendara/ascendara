@@ -66,6 +66,7 @@ import {
   FileQuestion,
   Clock,
   Check,
+  Smartphone,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -2008,6 +2009,16 @@ export default function DownloadPage() {
                       </div>
                       <span className="text-sm font-semibold text-foreground">
                         {t("download.cloudSaving")}
+                      </span>
+                    </div>
+                    {/* Remote Downloads Feature */}
+                    <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                      <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                        <Smartphone className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground">
+                        {t("download.remoteDownloads")}
                       </span>
                     </div>
 
