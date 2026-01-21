@@ -1377,13 +1377,41 @@ const Ascend = () => {
     setIsSearching(false);
   };
 
+  const getRelationshipStatus = uid => {
+    if (friends.some(f => f.uid === uid)) {
+      return "friend";
+    }
+    if (outgoingRequests.some(r => r.toUid === uid)) {
+      return "requestSent";
+    }
+    if (incomingRequests.some(r => r.fromUid === uid)) {
+      return "requestReceived";
+    }
+    return "none";
+  };
+
   const handleSendRequest = async toUid => {
+    const status = getRelationshipStatus(toUid);
+    if (status !== "none") {
+      if (status === "friend") {
+        toast.info(t("ascend.friends.alreadyFriends") || "Already friends");
+      } else if (status === "requestSent") {
+        toast.info(
+          t("ascend.friends.requestAlreadySent") || "Friend request already sent"
+        );
+      } else if (status === "requestReceived") {
+        toast.info(
+          t("ascend.friends.hasRequestPending") ||
+            "This user has sent you a friend request"
+        );
+      }
+      return;
+    }
+
     const result = await sendFriendRequest(toUid);
     if (result.success) {
       toast.success(t("ascend.friends.requestSent"));
       loadRequestsData();
-      // Remove from search results
-      setSearchResults(prev => prev.filter(u => u.uid !== toUid));
     } else {
       toast.error(result.error);
     }
@@ -3385,18 +3413,62 @@ const Ascend = () => {
 
                           {/* Action Buttons */}
                           <div className="flex shrink-0 items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleSendRequest(result.uid);
-                              }}
-                            >
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              {t("ascend.friends.addFriend")}
-                            </Button>
+                            {(() => {
+                              const status = getRelationshipStatus(result.uid);
+                              if (status === "friend") {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                                    disabled
+                                  >
+                                    <UserCheck className="mr-2 h-4 w-4 text-green-500" />
+                                    {t("ascend.friends.friends") || "Friends"}
+                                  </Button>
+                                );
+                              } else if (status === "requestSent") {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                                    disabled
+                                  >
+                                    <Clock className="mr-2 h-4 w-4 text-amber-500" />
+                                    {t("ascend.friends.requestPending") || "Pending"}
+                                  </Button>
+                                );
+                              } else if (status === "requestReceived") {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                                    disabled
+                                  >
+                                    <Inbox className="mr-2 h-4 w-4 text-blue-500" />
+                                    {t("ascend.friends.requestReceived") ||
+                                      "Request Received"}
+                                  </Button>
+                                );
+                              } else {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      handleSendRequest(result.uid);
+                                    }}
+                                  >
+                                    <UserPlus className="mr-2 h-4 w-4" />
+                                    {t("ascend.friends.addFriend")}
+                                  </Button>
+                                );
+                              }
+                            })()}
                             <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
                           </div>
                         </div>
@@ -4769,7 +4841,7 @@ const Ascend = () => {
 
                         {/* Steam */}
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1b2838]/10">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-foreground/10">
                             <svg
                               className="h-5 w-5 text-[#1b2838] dark:text-white"
                               viewBox="0 0 24 24"
@@ -4902,9 +4974,9 @@ const Ascend = () => {
                             </div>
                           )}
                           {userData?.socials?.steam && (
-                            <div className="flex items-center gap-2 rounded-xl bg-[#1b2838]/10 px-3 py-2 text-sm">
+                            <div className="flex items-center gap-2 rounded-xl bg-foreground/10 px-3 py-2 text-sm">
                               <svg
-                                className="h-4 w-4 text-[#1b2838] dark:text-white"
+                                className="h-4 w-4 dark:text-white"
                                 viewBox="0 0 24 24"
                                 fill="currentColor"
                               >
@@ -7633,24 +7705,48 @@ const Ascend = () => {
 
                         {/* Action Buttons */}
                         <div className="flex shrink-0 gap-2">
-                          {viewingProfile.isFriend ? (
-                            <Button
-                              variant="outline"
-                              onClick={() => handleStartConversation(viewingProfile.uid)}
-                              className="gap-2"
-                            >
-                              <MessageCircle className="h-4 w-4" />
-                              {t("ascend.profile.message") || "Message"}
-                            </Button>
-                          ) : (
-                            <Button
-                              onClick={() => handleSendRequest(viewingProfile.uid)}
-                              className="gap-2 text-secondary"
-                            >
-                              <UserPlus className="h-4 w-4" />
-                              {t("ascend.friends.addFriend")}
-                            </Button>
-                          )}
+                          {(() => {
+                            const status = getRelationshipStatus(viewingProfile.uid);
+                            if (status === "friend") {
+                              return (
+                                <Button
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleStartConversation(viewingProfile.uid)
+                                  }
+                                  className="gap-2"
+                                >
+                                  <MessageCircle className="h-4 w-4" />
+                                  {t("ascend.profile.message") || "Message"}
+                                </Button>
+                              );
+                            } else if (status === "requestSent") {
+                              return (
+                                <Button variant="outline" className="gap-2" disabled>
+                                  <Clock className="h-4 w-4 text-amber-500" />
+                                  {t("ascend.friends.requestPending") || "Pending"}
+                                </Button>
+                              );
+                            } else if (status === "requestReceived") {
+                              return (
+                                <Button variant="outline" className="gap-2" disabled>
+                                  <Inbox className="h-4 w-4 text-blue-500" />
+                                  {t("ascend.friends.requestReceived") ||
+                                    "Request Received"}
+                                </Button>
+                              );
+                            } else {
+                              return (
+                                <Button
+                                  onClick={() => handleSendRequest(viewingProfile.uid)}
+                                  className="gap-2 text-secondary"
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                  {t("ascend.friends.addFriend")}
+                                </Button>
+                              );
+                            }
+                          })()}
 
                           {/* Report User Button */}
                           <AlertDialog
