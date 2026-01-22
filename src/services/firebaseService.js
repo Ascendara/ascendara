@@ -39,6 +39,8 @@ import {
   limit,
   writeBatch,
   onSnapshot,
+  increment,
+  startAfter,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -2000,6 +2002,12 @@ export const sendMessage = async (conversationId, text) => {
       return { success: false, messageId: null, error: "Message cannot be empty" };
     }
 
+    // Get conversation to find other participant
+    const conversationRef = doc(db, "conversations", conversationId);
+    const conversationDoc = await getDoc(conversationRef);
+    const conversationData = conversationDoc.data();
+    const otherUserId = conversationData.participants.find(id => id !== currentUser.uid);
+
     // Add message to messages subcollection
     const messagesRef = collection(db, "conversations", conversationId, "messages");
     const messageDoc = await addDoc(messagesRef, {
@@ -2009,12 +2017,12 @@ export const sendMessage = async (conversationId, text) => {
       read: false,
     });
 
-    // Update conversation's last message
-    const conversationRef = doc(db, "conversations", conversationId);
+    // Update conversation's last message and increment unread counter for recipient
     await updateDoc(conversationRef, {
       lastMessage: text.trim(),
       lastMessageSenderId: currentUser.uid,
       lastMessageAt: serverTimestamp(),
+      [`unreadCount.${otherUserId}`]: increment(1),
     });
 
     return { success: true, messageId: messageDoc.id, error: null };
@@ -2245,6 +2253,12 @@ export const markMessagesAsRead = async conversationId => {
       });
       await batch.commit();
     }
+
+    // Reset unread counter for current user in conversation document
+    const conversationRef = doc(db, "conversations", conversationId);
+    await updateDoc(conversationRef, {
+      [`unreadCount.${currentUser.uid}`]: 0,
+    });
 
     return { success: true, error: null };
   } catch (error) {
@@ -2565,6 +2579,251 @@ export const deleteBackup = async backupId => {
     console.error("Delete backup error:", error);
     return { success: false, error: error.message };
   }
+};
+
+// ============================================================================
+// OPTIMIZED MESSAGING FUNCTIONS - Real-time listeners & caching
+// ============================================================================
+
+/**
+ * User data cache to reduce redundant Firestore reads
+ */
+const userDataCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Get user data with caching to reduce Firestore reads
+ * @param {string} userId - User ID
+ * @returns {Promise<object>}
+ */
+const getCachedUserData = async userId => {
+  const cached = userDataCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  const userDoc = await getDoc(doc(db, "users", userId));
+  const userData = userDoc.exists()
+    ? userDoc.data()
+    : { displayName: "Unknown User", photoURL: null };
+
+  userDataCache.set(userId, {
+    data: userData,
+    timestamp: Date.now(),
+  });
+
+  return userData;
+};
+
+/**
+ * Clear user data cache (call when user data is updated)
+ * @param {string} userId - Optional: specific user ID to clear, or clear all if not provided
+ */
+export const clearUserCache = userId => {
+  if (userId) {
+    userDataCache.delete(userId);
+  } else {
+    userDataCache.clear();
+  }
+};
+
+/**
+ * Subscribe to real-time messages in a conversation
+ * @param {string} conversationId - Conversation ID
+ * @param {function} onUpdate - Callback function receiving messages array
+ * @param {number} limitCount - Max messages to fetch (default: 50)
+ * @returns {function} Unsubscribe function
+ */
+export const subscribeToMessages = (conversationId, onUpdate, limitCount = 50) => {
+  if (!conversationId) return () => {};
+
+  const currentUser = auth.currentUser;
+  if (!currentUser) return () => {};
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const messagesRef = collection(db, "conversations", conversationId, "messages");
+  const q = query(
+    messagesRef,
+    where("createdAt", ">=", Timestamp.fromDate(sevenDaysAgo)),
+    orderBy("createdAt", "desc"),
+    limit(limitCount)
+  );
+
+  return onSnapshot(
+    q,
+    snapshot => {
+      const messages = snapshot.docs
+        .map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+          createdAt: docSnap.data().createdAt?.toDate(),
+          isOwn: docSnap.data().senderId === currentUser.uid,
+        }))
+        .reverse();
+      onUpdate(messages);
+    },
+    error => {
+      console.error("[subscribeToMessages] Error:", error);
+      onUpdate([]);
+    }
+  );
+};
+
+/**
+ * Subscribe to real-time conversation list updates
+ * @param {function} onUpdate - Callback function receiving conversations array
+ * @returns {function} Unsubscribe function
+ */
+export const subscribeToConversations = onUpdate => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) return () => {};
+
+  const conversationsRef = collection(db, "conversations");
+  const q = query(
+    conversationsRef,
+    where("participants", "array-contains", currentUser.uid),
+    orderBy("lastMessageAt", "desc"),
+    limit(20)
+  );
+
+  return onSnapshot(
+    q,
+    async snapshot => {
+      const conversations = [];
+
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        const otherUserId = data.participants.find(id => id !== currentUser.uid);
+
+        // Use cached user data
+        const userData = await getCachedUserData(otherUserId);
+
+        // Get status
+        const statusDoc = await getDoc(doc(db, "userStatus", otherUserId));
+        const status = statusDoc.exists() ? statusDoc.data().status : "offline";
+
+        // Use unread counter from conversation document
+        const unreadCount = data.unreadCount?.[currentUser.uid] || 0;
+
+        conversations.push({
+          id: docSnap.id,
+          otherUser: {
+            uid: otherUserId,
+            displayName: userData.displayName,
+            photoURL: userData.photoURL,
+            status,
+            owner: userData.owner || false,
+            contributor: userData.contributor || false,
+            verified: userData.verified || false,
+          },
+          lastMessage: data.lastMessage,
+          lastMessageSenderId: data.lastMessageSenderId,
+          lastMessageAt: data.lastMessageAt?.toDate(),
+          unreadCount,
+        });
+      }
+
+      onUpdate(conversations);
+    },
+    error => {
+      console.error("[subscribeToConversations] Error:", error);
+      onUpdate([]);
+    }
+  );
+};
+
+/**
+ * Get messages with cursor-based pagination
+ * @param {string} conversationId - Conversation ID
+ * @param {object} lastDoc - Last document from previous query (for pagination)
+ * @param {number} limitCount - Number of messages to fetch (default: 20)
+ * @returns {Promise<{messages: array, lastDoc: object|null, hasMore: boolean, error: string|null}>}
+ */
+export const getMessagesPaginated = async (
+  conversationId,
+  lastDoc = null,
+  limitCount = 20
+) => {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return { messages: [], lastDoc: null, hasMore: false, error: "No user logged in" };
+    }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const messagesRef = collection(db, "conversations", conversationId, "messages");
+    let q = query(
+      messagesRef,
+      where("createdAt", ">=", Timestamp.fromDate(sevenDaysAgo)),
+      orderBy("createdAt", "desc"),
+      limit(limitCount + 1) // Fetch one extra to check if there are more
+    );
+
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc));
+    }
+
+    const snapshot = await getDocs(q);
+    const hasMore = snapshot.docs.length > limitCount;
+    const docs = hasMore ? snapshot.docs.slice(0, limitCount) : snapshot.docs;
+
+    const messages = docs
+      .map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+        createdAt: docSnap.data().createdAt?.toDate(),
+        isOwn: docSnap.data().senderId === currentUser.uid,
+      }))
+      .reverse();
+
+    return {
+      messages,
+      lastDoc: docs[docs.length - 1] || null,
+      hasMore,
+      error: null,
+    };
+  } catch (error) {
+    console.error("Get messages paginated error:", error);
+    return { messages: [], lastDoc: null, hasMore: false, error: error.message };
+  }
+};
+
+/**
+ * Active message listeners management
+ */
+const activeMessageListeners = new Map();
+
+/**
+ * Manage message listeners - only keep active conversation subscribed
+ * @param {string} activeConversationId - Currently active conversation ID
+ * @param {function} onUpdate - Callback for message updates
+ */
+export const manageMessageListeners = (activeConversationId, onUpdate) => {
+  // Unsubscribe from all except active
+  activeMessageListeners.forEach((unsubscribe, id) => {
+    if (id !== activeConversationId) {
+      unsubscribe();
+      activeMessageListeners.delete(id);
+    }
+  });
+
+  // Subscribe to active conversation if not already subscribed
+  if (activeConversationId && !activeMessageListeners.has(activeConversationId)) {
+    const unsubscribe = subscribeToMessages(activeConversationId, onUpdate);
+    activeMessageListeners.set(activeConversationId, unsubscribe);
+  }
+};
+
+/**
+ * Cleanup all message listeners (call on unmount)
+ */
+export const cleanupMessageListeners = () => {
+  activeMessageListeners.forEach(unsubscribe => unsubscribe());
+  activeMessageListeners.clear();
 };
 
 // Export Firebase instances for advanced usage

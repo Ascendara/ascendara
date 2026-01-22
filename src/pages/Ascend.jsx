@@ -76,6 +76,10 @@ import {
   listBackups,
   getBackupDownloadUrl,
   deleteBackup,
+  subscribeToMessages,
+  subscribeToConversations,
+  manageMessageListeners,
+  cleanupMessageListeners,
 } from "@/services/firebaseService";
 import {
   User,
@@ -426,13 +430,47 @@ const Ascend = () => {
       loadFriendsData();
       loadRequestsData();
       // Note: User status is loaded by AscendSidebar and synced via onStatusChange prop
-      loadConversations();
       loadProfileStats();
       loadLocalStats();
       loadCloudLibrary();
       loadNotifications();
     }
   }, [user?.uid, showDisplayNamePrompt]);
+
+  // Set up real-time listener for conversations
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToConversations(conversations => {
+      setConversations(conversations);
+      setLoadingConversations(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.uid]);
+
+  // Set up real-time listener for messages in active conversation
+  useEffect(() => {
+    if (!selectedConversation?.id) return;
+
+    const unsubscribe = subscribeToMessages(selectedConversation.id, messages => {
+      setMessages(messages);
+      setLoadingMessages(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [selectedConversation?.id]);
+
+  // Cleanup all message listeners on unmount
+  useEffect(() => {
+    return () => {
+      cleanupMessageListeners();
+    };
+  }, []);
 
   // Load backups when cloudbackups section is accessed
   useEffect(() => {
@@ -1302,20 +1340,11 @@ const Ascend = () => {
     setSelectedConversation(conversation);
     setLoadingMessages(true);
     try {
-      const result = await getMessages(conversation.id);
-      if (!result.error) {
-        setMessages(result.messages);
-      }
-      // Mark messages as read
+      // Mark messages as read (real-time listener will update UI automatically)
       await markMessagesAsRead(conversation.id);
-      // Update unread count in conversations list
-      setConversations(prev =>
-        prev.map(c => (c.id === conversation.id ? { ...c, unreadCount: 0 } : c))
-      );
     } catch (e) {
-      console.error("Failed to load messages:", e);
+      console.error("Failed to mark messages as read:", e);
     }
-    setLoadingMessages(false);
   };
 
   const handleSendMessage = async () => {
@@ -1325,13 +1354,7 @@ const Ascend = () => {
       const result = await sendMessage(selectedConversation.id, messageInput);
       if (result.success) {
         setMessageInput("");
-        // Reload messages
-        const messagesResult = await getMessages(selectedConversation.id);
-        if (!messagesResult.error) {
-          setMessages(messagesResult.messages);
-        }
-        // Update conversation in list
-        loadConversations();
+        // Real-time listeners will automatically update messages and conversations
       } else {
         toast.error(result.error);
       }
@@ -1348,8 +1371,8 @@ const Ascend = () => {
       if (result.conversationId) {
         // Find the friend data
         const friend = friends.find(f => f.uid === friendUid);
-        // Reload conversations and select the new one
-        await loadConversations();
+        // Real-time listener will update conversations automatically
+        // Just select the conversation
         const newConversation = {
           id: result.conversationId,
           otherUser: friend,
