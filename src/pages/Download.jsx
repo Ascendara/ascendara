@@ -1566,7 +1566,7 @@ export default function DownloadPage() {
             <div
               className="absolute inset-0 opacity-10"
               style={{
-                backgroundImage: `url(${cachedImage || `https://api.ascendara.app/v3/image/${gameData.gameID}`})`,
+                backgroundImage: `url(${cachedImage})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 filter: "blur(20px)",
@@ -1578,9 +1578,7 @@ export default function DownloadPage() {
               <div className="flex gap-5">
                 {/* Game Cover Image */}
                 <img
-                  src={
-                    cachedImage || `https://api.ascendara.app/v3/image/${gameData.gameID}`
-                  }
+                  src={cachedImage}
                   alt={gameData.game}
                   className="h-44 w-80 shrink-0 rounded-lg object-cover shadow-lg ring-1 ring-white/10"
                 />
