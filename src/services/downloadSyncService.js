@@ -8,6 +8,8 @@ let syncInterval = null;
 let isAuthenticated = false;
 let currentUser = null;
 let hasAscendAccess = false;
+let lastDownloadCount = 0;
+let isSyncing = false;
 
 /**
  * Initialize download sync service
@@ -31,12 +33,10 @@ export const initializeDownloadSync = (user, ascendAccess = false) => {
     return;
   }
 
-  // Start syncing downloads every 5 seconds
-  if (!syncInterval) {
-    syncInterval = setInterval(syncDownloads, 5000);
-    // Sync immediately
-    syncDownloads();
-  }
+  // Don't start interval yet - will be started when downloads begin
+  console.log(
+    "[DownloadSync] Service initialized - polling will start when downloads begin"
+  );
 };
 
 /**
@@ -53,85 +53,114 @@ export const stopDownloadSync = () => {
 };
 
 /**
+ * Start the sync interval if not already running
+ */
+const startSyncInterval = () => {
+  if (!syncInterval && hasAscendAccess) {
+    console.log("[DownloadSync] Starting sync interval (5s)");
+    syncInterval = setInterval(syncDownloads, 5000);
+    isSyncing = true;
+  }
+};
+
+/**
+ * Stop the sync interval
+ */
+const stopSyncInterval = () => {
+  if (syncInterval) {
+    console.log("[DownloadSync] Stopping sync interval - no active downloads");
+    clearInterval(syncInterval);
+    syncInterval = null;
+    isSyncing = false;
+  }
+};
+
+/**
  * Sync current downloads to monitor endpoint
  */
 const syncDownloads = async () => {
-  console.log(
-    "[DownloadSync] Sync triggered, authenticated:",
-    isAuthenticated,
-    "user:",
-    currentUser?.uid
-  );
-
   if (!isAuthenticated || !currentUser) {
-    console.warn("[DownloadSync] Not authenticated or no user");
     return;
   }
 
   try {
     // Check if electron API is available
     if (!window.electron || typeof window.electron.getDownloads !== "function") {
-      console.warn("[DownloadSync] electron.getDownloads not available");
       return;
     }
 
     // Get current downloads from electron
-    console.log("[DownloadSync] Calling electron.getDownloads()...");
     const downloads = await window.electron.getDownloads();
-    console.log("[DownloadSync] Got downloads:", downloads?.length || 0, "items");
-
-    // Always sync, even if empty, so the API knows downloads were removed
     const downloadsArray = downloads || [];
+    const currentCount = downloadsArray.length;
 
-    // Format downloads for API
-    const formattedDownloads = downloadsArray.map(download => ({
-      id: download.id || download.name,
-      name: download.name,
-      progress: download.progress || 0,
-      speed: download.speed || "0 B/s",
-      eta: download.eta || "Calculating...",
-      status: download.status || "downloading",
-      size: download.size || "Unknown",
-      downloaded: download.downloaded || "0 MB",
-      error: download.error || null,
-      paused: download.paused || false,
-      stopped: download.stopped || false,
-      timestamp: new Date().toISOString(),
-    }));
-
-    console.log("[DownloadSync] Formatted downloads:", formattedDownloads);
-
-    // Get Firebase ID token
-    const firebaseToken = await currentUser.getIdToken();
-
-    // Sync to monitor endpoint
-    console.log("[DownloadSync] Syncing to monitor.ascendara.app...");
-    const response = await fetch("https://monitor.ascendara.app/downloads/sync", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${firebaseToken}`,
-      },
-      body: JSON.stringify({
-        downloads: formattedDownloads,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(
-        "[DownloadSync] Failed to sync downloads:",
-        response.status,
-        await response.text()
-      );
-    } else {
-      console.log(
-        "[DownloadSync] Successfully synced",
-        formattedDownloads.length,
-        "downloads"
-      );
+    // If we had downloads before but now have none, sync once more then stop
+    if (lastDownloadCount > 0 && currentCount === 0) {
+      console.log("[DownloadSync] Downloads completed - sending final sync and stopping");
+      await performSync(downloadsArray);
+      stopSyncInterval();
+      lastDownloadCount = 0;
+      return;
     }
+
+    // If no downloads, don't sync
+    if (currentCount === 0) {
+      return;
+    }
+
+    // Update last known count
+    lastDownloadCount = currentCount;
+
+    // Perform sync
+    await performSync(downloadsArray);
   } catch (error) {
     console.error("[DownloadSync] Error syncing downloads:", error);
+  }
+};
+
+/**
+ * Perform the actual sync operation
+ */
+const performSync = async downloadsArray => {
+  // Format downloads for API
+  const formattedDownloads = downloadsArray.map(download => ({
+    id: download.id || download.name,
+    name: download.name,
+    progress: download.progress || 0,
+    speed: download.speed || "0 B/s",
+    eta: download.eta || "Calculating...",
+    status: download.status || "downloading",
+    size: download.size || "Unknown",
+    downloaded: download.downloaded || "0 MB",
+    error: download.error || null,
+    paused: download.paused || false,
+    stopped: download.stopped || false,
+    timestamp: new Date().toISOString(),
+  }));
+
+  // Get Firebase ID token
+  const firebaseToken = await currentUser.getIdToken();
+
+  // Sync to monitor endpoint
+  const response = await fetch("https://monitor.ascendara.app/downloads/sync", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${firebaseToken}`,
+    },
+    body: JSON.stringify({
+      downloads: formattedDownloads,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error(
+      "[DownloadSync] Failed to sync downloads:",
+      response.status,
+      await response.text()
+    );
+  } else {
+    console.log("[DownloadSync] Synced", formattedDownloads.length, "download(s)");
   }
 };
 
@@ -239,26 +268,20 @@ export const acknowledgeCommand = async (
  * @param {string} downloadName - Download name
  */
 export const notifyDownloadStart = async (downloadId, downloadName) => {
-  console.log("[DownloadSync] notifyDownloadStart called:", {
-    downloadId,
-    downloadName,
-    isAuthenticated,
-    hasUser: !!currentUser,
-    hasAscendAccess,
-  });
+  console.log("[DownloadSync] Download started:", downloadName);
 
   if (!isAuthenticated || !currentUser) {
-    console.warn("[DownloadSync] Cannot notify - not authenticated or no user");
     return;
   }
 
+  // Start sync interval when download begins
+  startSyncInterval();
+
+  // Perform immediate sync
+  await syncDownloads();
+
   try {
     const firebaseToken = await currentUser.getIdToken();
-    console.log(
-      "[DownloadSync] Notifying download start:",
-      downloadName,
-      "to https://monitor.ascendara.app/downloads/notify-start"
-    );
 
     const response = await fetch("https://monitor.ascendara.app/downloads/notify-start", {
       method: "POST",
@@ -279,8 +302,6 @@ export const notifyDownloadStart = async (downloadId, downloadName) => {
         response.status,
         errorText
       );
-    } else {
-      console.log("[DownloadSync] Successfully notified download start");
     }
   } catch (error) {
     console.error("[DownloadSync] Error notifying download start:", error);
@@ -288,9 +309,10 @@ export const notifyDownloadStart = async (downloadId, downloadName) => {
 };
 
 /**
- * Force immediate sync
+ * Force immediate sync and ensure interval is running
  */
 export const forceSyncDownloads = () => {
   console.log("[DownloadSync] Force sync requested");
+  startSyncInterval();
   syncDownloads();
 };

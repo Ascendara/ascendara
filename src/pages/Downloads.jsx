@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, memo } from "react";
+import React, { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getCachedDownloadData,
@@ -183,17 +183,16 @@ const Downloads = () => {
   // Track processed commands to prevent duplicates
   const processedCommandsRef = useRef(new Set());
   const commandTimestampsRef = useRef(new Map());
+  const commandIntervalRef = useRef(null);
 
-  // Check for download commands from webapp
-  useEffect(() => {
-    if (!isAuthenticated || !user) {
-      console.log("[Downloads] Command checking disabled - not authenticated");
+  // Function to start command checking interval
+  const startCommandChecking = useCallback(() => {
+    if (commandIntervalRef.current || !isAuthenticated || !user) {
       return;
     }
 
-    console.log("[Downloads] Starting command check interval for user:", user.uid);
-
-    const commandInterval = setInterval(async () => {
+    console.log("[Downloads] Starting command check interval");
+    commandIntervalRef.current = setInterval(async () => {
       // Clean up old processed commands (older than 5 minutes) to prevent memory buildup
       const now = Date.now();
       const fiveMinutesAgo = now - 5 * 60 * 1000;
@@ -304,15 +303,25 @@ const Downloads = () => {
         }
       }
     }, 3000); // Check every 3 seconds
+  }, [isAuthenticated, user, t]);
 
+  // Function to stop command checking interval
+  const stopCommandChecking = useCallback(() => {
+    if (commandIntervalRef.current) {
+      console.log("[Downloads] Stopping command check interval - no active downloads");
+      clearInterval(commandIntervalRef.current);
+      commandIntervalRef.current = null;
+    }
+  }, []);
+
+  // Cleanup on unmount or auth change
+  useEffect(() => {
     return () => {
-      console.log("[Downloads] Stopping command check interval");
-      clearInterval(commandInterval);
-      // Clear processed commands on cleanup
+      stopCommandChecking();
       processedCommandsRef.current.clear();
       commandTimestampsRef.current.clear();
     };
-  }, [isAuthenticated, user]);
+  }, [stopCommandChecking]);
 
   useEffect(() => {
     window.electron.switchRPC("downloading");
@@ -517,6 +526,13 @@ const Downloads = () => {
           }
         });
         setActiveDownloads(activeCount);
+
+        // Start/stop command checking based on download count
+        if (downloading.length > 0) {
+          startCommandChecking();
+        } else if (downloading.length === 0) {
+          stopCommandChecking();
+        }
         const formattedSpeed = `${totalSpeedNum.toFixed(2)} MB/s`;
         setTotalSpeed(formattedSpeed);
 
