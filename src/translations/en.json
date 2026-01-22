@@ -622,6 +622,8 @@
       "profile": "Profile",
       "profileUpdated": "Profile updated successfully!",
       "save": "Save Changes",
+      "securityDescription": "Commands are sent through a secure API, and your Ascendara app decides whether and how to execute them.",
+      "securityTitle": "End-to-end encrypted.",
       "socialLinks": "Social Links",
       "startConnection": "Start Connection",
       "startExploring": "Start Exploring",
