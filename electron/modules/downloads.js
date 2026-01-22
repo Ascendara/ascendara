@@ -198,8 +198,6 @@ function registerDownloadHandlers() {
           console.error(`[get-downloads] Error reading directory ${downloadDir}:`, error);
         }
       }
-
-      console.log("[get-downloads] Returning", downloads.length, "active downloads");
       return downloads;
     } catch (error) {
       console.error("[get-downloads] Error getting downloads:", error);
