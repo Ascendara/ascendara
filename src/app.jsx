@@ -476,6 +476,7 @@ const MessageNotificationChecker = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const lastCheckedRef = useRef({});
   const checkIntervalRef = useRef(null);
 
@@ -492,6 +493,11 @@ const MessageNotificationChecker = () => {
 
     const checkForNewMessages = async () => {
       try {
+        // Skip notifications if user is on Ascend page (real-time listener handles it)
+        if (location.pathname === "/ascend") {
+          return;
+        }
+
         const result = await getUnreadMessageCount();
         if (result.error || result.newMessages.length === 0) return;
 
@@ -534,7 +540,7 @@ const MessageNotificationChecker = () => {
         clearInterval(checkIntervalRef.current);
       }
     };
-  }, [user?.uid, t, navigate]);
+  }, [user?.uid, t, navigate, location.pathname]);
 
   return null;
 };

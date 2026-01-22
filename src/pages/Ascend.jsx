@@ -457,8 +457,9 @@ const Ascend = () => {
   useEffect(() => {
     if (!selectedConversation?.id) return;
 
+    let prevMessageCount = 0;
+
     const unsubscribe = subscribeToMessages(selectedConversation.id, newMessages => {
-      const prevMessageCount = messages.length;
       setMessages(newMessages);
       setLoadingMessages(false);
 
@@ -474,19 +475,22 @@ const Ascend = () => {
           );
         }
       }
+      prevMessageCount = newMessages.length;
     });
 
     return () => {
       unsubscribe();
     };
-  }, [selectedConversation?.id, messages.length]);
+  }, [selectedConversation?.id]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      // Use instant scroll when loading messages, smooth scroll for new messages
+      const behavior = loadingMessages ? "instant" : "smooth";
+      messagesEndRef.current.scrollIntoView({ behavior });
     }
-  }, [messages]);
+  }, [messages, loadingMessages]);
 
   // Cleanup all message listeners on unmount
   useEffect(() => {
@@ -1368,6 +1372,12 @@ const Ascend = () => {
     } catch (e) {
       console.error("Failed to mark messages as read:", e);
     }
+    // Scroll to bottom after a short delay to ensure messages are rendered
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "instant" });
+      }
+    }, 100);
   };
 
   const handleSendMessage = async () => {
