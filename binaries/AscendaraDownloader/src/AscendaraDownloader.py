@@ -250,6 +250,7 @@ class ChunkedDownloader:
         self.total_size: Optional[int] = None
         self.supports_range = False
         self.downloaded_bytes = 0
+        self.session_downloaded_bytes = 0  # Track bytes downloaded in current session only
         self.start_time = time.time()
         self.last_progress_update = 0
         
@@ -324,7 +325,7 @@ class ChunkedDownloader:
         elapsed = now - self.start_time
         
         if elapsed > 0:
-            speed = self.downloaded_bytes / elapsed
+            speed = self.session_downloaded_bytes / elapsed
         else:
             speed = 0
         
@@ -406,6 +407,7 @@ class ChunkedDownloader:
                     file_handle.write(data)
                     file_handle.flush()  # Ensure data is written to disk
                     self.downloaded_bytes += len(data)
+                    self.session_downloaded_bytes += len(data)
                     self._update_progress()
             
             return True

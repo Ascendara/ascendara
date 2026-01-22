@@ -543,13 +543,17 @@ class GofileDownloader:
                                 interval_rate = bytes_since_last_update / (current_time - last_update)
                                 
                                 # Update rate window with interval rate
-                                self._rate_window.append(interval_rate)
+                                self._rate_window.append(bytes_since_last_update / (current_time - last_update))
                                 if len(self._rate_window) > self._rate_window_size:
                                     self._rate_window.pop(0)
                                 
                                 # Calculate overall average speed from session start for stability
                                 session_elapsed = current_time - start_time
-                                overall_rate = bytes_downloaded / session_elapsed if session_elapsed > 0 else 0
+                                # Only calculate speed after at least 1 second to avoid inflated speeds at start
+                                if session_elapsed >= 1.0:
+                                    overall_rate = bytes_downloaded / session_elapsed
+                                else:
+                                    overall_rate = 0
                                 
                                 # Blend: 70% overall rate + 30% recent window average for smooth but responsive display
                                 window_avg = sum(self._rate_window) / len(self._rate_window) if self._rate_window else 0
