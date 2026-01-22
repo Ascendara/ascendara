@@ -154,6 +154,7 @@ import {
   Smartphone,
   Laptop,
   Monitor,
+  CheckCheck,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -299,6 +300,7 @@ const Ascend = () => {
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const messagesEndRef = React.useRef(null);
 
   // Profile sync state
   const [profileStats, setProfileStats] = useState(null);
@@ -455,15 +457,36 @@ const Ascend = () => {
   useEffect(() => {
     if (!selectedConversation?.id) return;
 
-    const unsubscribe = subscribeToMessages(selectedConversation.id, messages => {
-      setMessages(messages);
+    const unsubscribe = subscribeToMessages(selectedConversation.id, newMessages => {
+      const prevMessageCount = messages.length;
+      setMessages(newMessages);
       setLoadingMessages(false);
+
+      // Show toast notification for new incoming messages (not from current user)
+      if (newMessages.length > prevMessageCount && prevMessageCount > 0) {
+        const latestMessage = newMessages[newMessages.length - 1];
+        if (!latestMessage.isOwn && selectedConversation) {
+          toast.info(
+            `${selectedConversation.otherUser.displayName}: ${latestMessage.text.substring(0, 50)}${latestMessage.text.length > 50 ? "..." : ""}`,
+            {
+              duration: 3000,
+            }
+          );
+        }
+      }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [selectedConversation?.id]);
+  }, [selectedConversation?.id, messages.length]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   // Cleanup all message listeners on unmount
   useEffect(() => {
@@ -4490,23 +4513,35 @@ const Ascend = () => {
                                         <p className="text-sm leading-relaxed">
                                           {message.text}
                                         </p>
-                                        <p
-                                          className={`mt-1 text-[10px] ${
+                                        <div
+                                          className={`mt-1 flex items-center gap-1 text-[10px] ${
                                             message.isOwn
                                               ? "text-secondary/60"
                                               : "text-muted-foreground/60"
                                           }`}
                                         >
-                                          {message.createdAt?.toLocaleTimeString([], {
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                          })}
-                                        </p>
+                                          <span>
+                                            {message.createdAt?.toLocaleTimeString([], {
+                                              hour: "2-digit",
+                                              minute: "2-digit",
+                                            })}
+                                          </span>
+                                          {message.isOwn && (
+                                            <span className="ml-1">
+                                              {message.read ? (
+                                                <CheckCheck className="h-3 w-3" />
+                                              ) : (
+                                                <Check className="h-3 w-3" />
+                                              )}
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </React.Fragment>
                                 );
                               })}
+                              <div ref={messagesEndRef} />
                             </>
                           ) : (
                             <div className="flex h-full flex-col items-center justify-center text-center">
