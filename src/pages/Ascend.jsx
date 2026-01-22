@@ -1370,7 +1370,7 @@ const Ascend = () => {
     setIsSearching(true);
     const result = await searchUsers(searchQuery);
     if (!result.error) {
-      setSearchResults(result.users);
+      setSearchResults(result.users.filter(u => u.uid !== user?.uid));
     } else {
       toast.error(result.error);
     }
@@ -1391,6 +1391,13 @@ const Ascend = () => {
   };
 
   const handleSendRequest = async toUid => {
+    if (toUid === user?.uid) {
+      toast.error(
+        t("ascend.friends.cannotAddSelf") || "You cannot add yourself as a friend"
+      );
+      return;
+    }
+
     const status = getRelationshipStatus(toUid);
     if (status !== "none") {
       if (status === "friend") {
