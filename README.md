@@ -336,7 +336,7 @@ Ascendara's development roadmap can be found [here](https://ascendara.app/roadma
 
 ## 📝 License & Contact
 
-Licensed under [CC BY-NC 1.0 Universal](./LICENSE) - 2025 tagoWorks
+Licensed under [MIT](./LICENSE) - 2026 tagoWorks
 
 ### Get in Touch
 
