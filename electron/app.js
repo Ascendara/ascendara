@@ -596,23 +596,43 @@ async function initializeApp() {
   // Before quit cleanup
   app.on("before-quit", () => {
     console.log("App is quitting...");
+
     // Close local server if running
     if (localServer) {
-      localServer.close();
+      console.log("Closing local HTTP server...");
+      localServer.close(() => {
+        console.log("Local server closed");
+      });
+      // Force close all connections
+      localServer.closeAllConnections?.();
       localServer = null;
     }
+
     // Notify renderer to set status to invisible
     const mainWindow = windowModule.getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("app-closing");
     }
-    // Cleanup
+
+    // Cleanup Discord RPC and achievement watcher
     discordRpc.destroyDiscordRPC();
     terminateWatcher();
   });
 
   // Will quit cleanup
-  app.on("will-quit", () => {
+  app.on("will-quit", e => {
+    console.log("App will quit - final cleanup...");
+
+    // Ensure watcher is terminated
+    terminateWatcher();
+
+    // Final check for any remaining achievement watcher processes
+    // NOTE: Do NOT kill AscendaraDownloader.exe - downloads should continue in background
+    if (process.platform === "win32") {
+      const { exec } = require("child_process");
+      exec(`taskkill /F /IM AscendaraAchievementWatcher.exe /T 2>nul`, () => {});
+    }
+
     logger.closeLogger();
   });
 }
@@ -639,18 +659,23 @@ process.on("unhandledRejection", (reason, promise) => {
 process.on("exit", code => {
   console.log(`Process exiting with code: ${code}`);
   discordRpc.destroyDiscordRPC();
+  terminateWatcher();
 });
 
 process.on("SIGINT", () => {
   console.log("Received SIGINT");
+  app.isQuitting = true;
   discordRpc.destroyDiscordRPC();
-  process.exit(0);
+  terminateWatcher();
+  app.quit();
 });
 
 process.on("SIGTERM", () => {
   console.log("Received SIGTERM");
+  app.isQuitting = true;
   discordRpc.destroyDiscordRPC();
-  process.exit(0);
+  terminateWatcher();
+  app.quit();
 });
 
 // Start the application

@@ -281,11 +281,17 @@ function registerWindowHandlers() {
       } else {
         // Set quitting flag to allow app to quit
         app.isQuitting = true;
-        win.close();
-        // If endOnClose is true, we should make sure the app fully quits
-        if (process.platform !== "darwin") {
-          app.quit();
-        }
+        console.log("Closing app completely (endOnClose is true)...");
+
+        // Destroy all windows to ensure cleanup
+        BrowserWindow.getAllWindows().forEach(window => {
+          if (!window.isDestroyed()) {
+            window.destroy();
+          }
+        });
+
+        // Force quit the app
+        app.quit();
       }
     }
   });
