@@ -3209,11 +3209,15 @@ export const sendCommunityMessage = async (communityId, content) => {
 /**
  * Get community messages for a channel (latest 50)
  * @param {string} communityId - Community ID
- * @param {string} channelId - Channel ID
+ * @param {string} channelId - Channel ID (optional, if not provided returns all messages for community)
  * @param {number} limitCount - Number of messages to fetch (default 50)
  * @returns {Promise<{data: Array|null, error: string|null}>}
  */
-export const getCommunityMessages = async (communityId, channelId, limitCount = 50) => {
+export const getCommunityMessages = async (
+  communityId,
+  channelId = null,
+  limitCount = 50
+) => {
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -3227,13 +3231,24 @@ export const getCommunityMessages = async (communityId, channelId, limitCount = 
       return { data: null, error: "Not a member of this community" };
     }
 
-    const q = query(
-      collection(db, "communityMessages"),
-      where("communityId", "==", communityId),
-      where("channelId", "==", channelId),
-      orderBy("createdAt", "desc"),
-      limit(limitCount)
-    );
+    // Build query - only filter by channelId if provided
+    let q;
+    if (channelId) {
+      q = query(
+        collection(db, "communityMessages"),
+        where("communityId", "==", communityId),
+        where("channelId", "==", channelId),
+        orderBy("createdAt", "desc"),
+        limit(limitCount)
+      );
+    } else {
+      q = query(
+        collection(db, "communityMessages"),
+        where("communityId", "==", communityId),
+        orderBy("createdAt", "desc"),
+        limit(limitCount)
+      );
+    }
 
     const snapshot = await getDocs(q);
     const messages = [];
