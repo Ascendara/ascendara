@@ -2525,7 +2525,7 @@ const Ascend = () => {
 
   // Load connected devices
   const loadConnectedDevices = async () => {
-    if (!user) return;
+    if (!user || typeof user.getIdToken !== "function") return;
 
     setLoadingDevices(true);
     try {
@@ -2559,7 +2559,7 @@ const Ascend = () => {
 
   // Disconnect a device
   const handleDisconnectDevice = async sessionId => {
-    if (!user) return;
+    if (!user || typeof user.getIdToken !== "function") return;
 
     setDisconnectingDevice(sessionId);
     try {
