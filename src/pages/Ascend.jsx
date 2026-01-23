@@ -20,6 +20,7 @@ import {
   calculateLevelFromXP,
   getLevelConstants,
 } from "@/services/levelCalculationService";
+import { validateInput } from "@/services/profanityFilterService";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -393,6 +394,7 @@ const Ascend = () => {
   const [webappQRCode, setWebappQRCode] = useState(null);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [webappCodeExpiry, setWebappCodeExpiry] = useState(300);
+  const [webappCodeCopied, setWebappCodeCopied] = useState(false);
   const [webappCodeTimer, setWebappCodeTimer] = useState(null);
   const [connectedDevices, setConnectedDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -2499,6 +2501,10 @@ const Ascend = () => {
     if (webappConnectionCode) {
       navigator.clipboard.writeText(webappConnectionCode);
       toast.success(t("ascend.settings.codeCopied") || "Code copied to clipboard");
+      setWebappCodeCopied(true);
+      setTimeout(() => {
+        setWebappCodeCopied(false);
+      }, 2000);
     }
   };
 
@@ -2598,7 +2604,7 @@ const Ascend = () => {
     if (activeSection === "settings" && user) {
       loadConnectedDevices();
     }
-  }, [activeSection, user]);
+  }, [activeSection]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -5229,8 +5235,14 @@ const Ascend = () => {
                             variant="outline"
                             className="flex-1"
                           >
-                            <Copy className="mr-2 h-4 w-4" />
-                            {t("ascend.settings.copyCode") || "Copy Code"}
+                            {webappCodeCopied ? (
+                              <Check className="mr-2 h-4 w-4" />
+                            ) : (
+                              <Copy className="mr-2 h-4 w-4" />
+                            )}
+                            {webappCodeCopied
+                              ? t("ascend.settings.codeCopied") || "Copied Code"
+                              : t("ascend.settings.copyCode") || "Copy Code"}
                           </Button>
                           <Button
                             onClick={handleCancelWebappConnection}
