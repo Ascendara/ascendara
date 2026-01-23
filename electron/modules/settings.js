@@ -54,6 +54,7 @@ class SettingsManager {
       localRefreshWorkers: 8,
       homeSearch: true,
       indexReminder: "7",
+      bigPictureKeyboardLayout: "qwerty",
       ludusavi: {
         backupLocation: "",
         backupFormat: "zip",

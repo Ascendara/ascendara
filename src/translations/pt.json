@@ -1758,6 +1758,8 @@
       "shutdown": "Desligar",
       "sleep": "Dormir"
     },
+    "bigPictureKeyboard": "Layout do teclado do Big Picture",
+    "bigPictureKeyboardDescription": "Escolha o layout do teclado para o teclado virtual do modo Big Picture",
     "browsePublicThemes": "Procure temas da comunidade",
     "checkConfig": "Verifique a configuração",
     "colorSection": { "preview": "Visualização ao vivo" },

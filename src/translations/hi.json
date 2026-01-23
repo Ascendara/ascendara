@@ -1751,6 +1751,8 @@
       "shutdown": "शट डाउन",
       "sleep": "नींद"
     },
+    "bigPictureKeyboard": "बिग पिक्चर कीबोर्ड लेआउट",
+    "bigPictureKeyboardDescription": "बिग पिक्चर मोड वर्चुअल कीबोर्ड के लिए कीबोर्ड लेआउट चुनें",
     "browsePublicThemes": "सामुदायिक थीम ब्राउज़ करें",
     "checkConfig": "कॉन्फ़िगरेशन की जाँच करें",
     "colorSection": { "preview": "लाइव पूर्वावलोकन" },

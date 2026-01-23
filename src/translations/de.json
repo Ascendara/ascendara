@@ -1754,6 +1754,8 @@
       "shutdown": "Abschalten",
       "sleep": "Schlafen"
     },
+    "bigPictureKeyboard": "Big-Picture-Tastaturlayout",
+    "bigPictureKeyboardDescription": "Wähle das Tastaturlayout für die virtuelle Tastatur im Big-Picture-Modus",
     "browsePublicThemes": "Durchsuchen Sie Community-Themen",
     "checkConfig": "Überprüfen Sie die Konfiguration",
     "colorSection": { "preview": "Live-Vorschau" },

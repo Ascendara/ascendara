@@ -1758,6 +1758,8 @@
       "shutdown": "Fermare",
       "sleep": "Sonno"
     },
+    "bigPictureKeyboard": "Layout della tastiera Big Picture",
+    "bigPictureKeyboardDescription": "Scegli il layout della tastiera per la tastiera virtuale in modalità Big Picture",
     "browsePublicThemes": "Sfoglia i temi della community",
     "checkConfig": "Controlla la configurazione",
     "colorSection": { "preview": "Anteprima dal vivo" },

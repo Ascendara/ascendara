@@ -1761,6 +1761,8 @@
       "shutdown": "Shutdown",
       "sleep": "Sleep"
     },
+    "bigPictureKeyboard": "Big Picture Keyboard Layout",
+    "bigPictureKeyboardDescription": "Choose the keyboard layout for Big Picture mode virtual keyboard",
     "browsePublicThemes": "Browse Community Themes",
     "checkConfig": "Check Configuration",
     "colorSection": {

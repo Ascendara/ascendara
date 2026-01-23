@@ -1750,6 +1750,8 @@
       "shutdown": "শাটডাউন",
       "sleep": "ঘুম"
     },
+    "bigPictureKeyboard": "বিগ পিকচার কীবোর্ড বিন্যাস",
+    "bigPictureKeyboardDescription": "বিগ পিকচার মোডের ভার্চুয়াল কীবোর্ডের জন্য কীবোর্ড বিন্যাস নির্বাচন করুন",
     "browsePublicThemes": "সম্প্রদায় থিম ব্রাউজ করুন",
     "checkConfig": "কনফিগারেশন চেক করুন",
     "colorSection": { "preview": "লাইভ প্রিভিউ" },

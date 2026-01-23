@@ -73,6 +73,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import BigPicture from "./pages/BigPicture";
 
 // Check for trial expiration warning and show dialog
 const TrialWarningChecker = () => {
@@ -1019,6 +1020,7 @@ const AppRoutes = () => {
         </Routes>
       ) : (
         <Routes location={location} key={user?.uid || "logged-out"}>
+          <Route path="big-picture" element={<BigPicture />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="search" element={<Search />} />

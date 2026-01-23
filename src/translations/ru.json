@@ -1754,6 +1754,8 @@
       "shutdown": "Неисправность",
       "sleep": "Спать"
     },
+    "bigPictureKeyboard": "Раскладка клавиатуры Big Picture",
+    "bigPictureKeyboardDescription": "Выберите раскладку клавиатуры для виртуальной клавиатуры в режиме Big Picture",
     "browsePublicThemes": "Просмотр тем сообщества",
     "checkConfig": "Проверьте конфигурацию",
     "colorSection": { "preview": "Живой просмотр" },
