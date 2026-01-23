@@ -65,9 +65,9 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
   const { user, userData } = useAuth();
 
   // Check if user has active Ascend subscription or is verified (verified users get free Ascend)
-  // Users who purchase Ascend during trial period should have access (status will be "active")
+  // Users who purchase Ascend during trial period should have access (ascendSubscription.active will be true)
   const hasActiveSubscription =
-    userData?.verified || userData?.subscription?.status === "active";
+    userData?.verified || userData?.ascendSubscription?.active === true;
 
   useEffect(() => {
     if (open) {
