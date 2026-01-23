@@ -393,11 +393,11 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
       // Extract and restore using Ludusavi
       toast.info("Restoring backup...");
 
-      const restoreResult = await window.electron.ludusavi({
-        action: "restore",
-        gameName: gameName,
-        path: backupFilePath,
-      });
+      const restoreResult = await window.electron.ludusavi(
+        "restore",
+        gameName,
+        backupFilePath
+      );
 
       if (restoreResult.success) {
         setRestoreSuccess(true);
