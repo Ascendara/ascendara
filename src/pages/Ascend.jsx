@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/tooltip";
 import AscendSidebar from "@/components/AscendSidebar";
 import LevelingCard from "@/components/LevelingCard";
+import CommunityHub from "@/components/CommunityHub";
 import { toast } from "sonner";
 import {
   searchUsers,
@@ -8177,38 +8178,8 @@ const Ascend = () => {
 
         case "community":
           return (
-            <div className="mb-24 space-y-6">
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-pink-500/10 p-6">
-                <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
-                <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-pink-500/20 blur-3xl" />
-                <div className="relative flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-pink-500 shadow-lg">
-                    <Users className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold">
-                      {t("ascend.community.title") || "Community"}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                      {t("ascend.community.subtitle") ||
-                        "Connect with other Ascendara users"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/50 bg-card/30 py-20">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                  <Users className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="mt-4 text-lg font-semibold">
-                  {t("ascend.community.comingSoon") || "Coming Soon"}
-                </h3>
-                <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
-                  {t("ascend.community.comingSoonDesc") ||
-                    "Community features are currently in development. Stay tuned for updates!"}
-                </p>
-              </div>
+            <div className="relative h-[calc(100vh-200px)]">
+              <CommunityHub user={user} userData={userData} />
             </div>
           );
 

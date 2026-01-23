@@ -2826,5 +2826,537 @@ export const cleanupMessageListeners = () => {
   activeMessageListeners.clear();
 };
 
+// ==================== COMMUNITY SYSTEM ====================
+
+/**
+ * Request to create a new community for a game
+ * @param {string} gameId - Game ID from the game database
+ * @param {string} name - Community name
+ * @param {string} description - Community description
+ * @param {string} iconUrl - Optional icon URL
+ * @returns {Promise<{success: boolean, requestId: string|null, error: string|null}>}
+ */
+export const requestCommunityCreation = async (
+  gameId,
+  name,
+  description,
+  iconUrl = null
+) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, requestId: null, error: "Not authenticated" };
+    }
+
+    // Validate inputs
+    if (!gameId || !name || !description) {
+      return { success: false, requestId: null, error: "Missing required fields" };
+    }
+
+    if (name.length > 50) {
+      return {
+        success: false,
+        requestId: null,
+        error: "Name must be 50 characters or less",
+      };
+    }
+
+    if (description.length > 200) {
+      return {
+        success: false,
+        requestId: null,
+        error: "Description must be 200 characters or less",
+      };
+    }
+
+    // Check if user already has a pending request for this game
+    const existingRequests = query(
+      collection(db, "communityRequests"),
+      where("gameId", "==", gameId),
+      where("requestedBy", "==", user.uid),
+      where("status", "==", "pending")
+    );
+    const existingSnapshot = await getDocs(existingRequests);
+    if (!existingSnapshot.empty) {
+      return {
+        success: false,
+        requestId: null,
+        error: "You already have a pending request for this game",
+      };
+    }
+
+    // Create the request
+    const requestRef = await addDoc(collection(db, "communityRequests"), {
+      gameId,
+      name,
+      description,
+      iconUrl: iconUrl || null,
+      requestedBy: user.uid,
+      requestedByName: user.displayName || "Unknown",
+      status: "pending",
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: true, requestId: requestRef.id, error: null };
+  } catch (error) {
+    console.error("Request community creation error:", error);
+    return { success: false, requestId: null, error: error.message };
+  }
+};
+
+/**
+ * Get user's community requests
+ * @returns {Promise<{data: Array|null, error: string|null}>}
+ */
+export const getUserCommunityRequests = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    const q = query(
+      collection(db, "communityRequests"),
+      where("requestedBy", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const snapshot = await getDocs(q);
+    const requests = [];
+    snapshot.forEach(doc => {
+      requests.push({ id: doc.id, ...doc.data() });
+    });
+
+    return { data: requests, error: null };
+  } catch (error) {
+    console.error("Get user community requests error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
+/**
+ * Get all approved communities
+ * @returns {Promise<{data: Array|null, error: string|null}>}
+ */
+export const getApprovedCommunities = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    const q = query(
+      collection(db, "communities"),
+      where("status", "==", "approved"),
+      orderBy("memberCount", "desc")
+    );
+
+    const snapshot = await getDocs(q);
+    const communities = [];
+    snapshot.forEach(doc => {
+      communities.push({ id: doc.id, ...doc.data() });
+    });
+
+    return { data: communities, error: null };
+  } catch (error) {
+    console.error("Get approved communities error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
+/**
+ * Get a specific community by ID
+ * @param {string} communityId - Community ID
+ * @returns {Promise<{data: object|null, error: string|null}>}
+ */
+export const getCommunity = async communityId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    const docRef = doc(db, "communities", communityId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return { data: { id: docSnap.id, ...docSnap.data() }, error: null };
+    }
+    return { data: null, error: "Community not found" };
+  } catch (error) {
+    console.error("Get community error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
+/**
+ * Request to join a community
+ * @param {string} communityId - Community ID
+ * @returns {Promise<{success: boolean, error: string|null}>}
+ */
+export const requestJoinCommunity = async communityId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // Check if already a member
+    const membershipId = `${communityId}_${user.uid}`;
+    const memberDoc = await getDoc(doc(db, "communityMembers", membershipId));
+    if (memberDoc.exists()) {
+      const status = memberDoc.data().status;
+      if (status === "approved") {
+        return { success: false, error: "You are already a member" };
+      } else if (status === "pending") {
+        return { success: false, error: "You already have a pending request" };
+      }
+    }
+
+    // Check if already has a pending request
+    const existingRequests = query(
+      collection(db, "communityJoinRequests"),
+      where("communityId", "==", communityId),
+      where("userId", "==", user.uid),
+      where("status", "==", "pending")
+    );
+    const existingSnapshot = await getDocs(existingRequests);
+    if (!existingSnapshot.empty) {
+      return { success: false, error: "You already have a pending request" };
+    }
+
+    // Create join request
+    await addDoc(collection(db, "communityJoinRequests"), {
+      communityId,
+      userId: user.uid,
+      userName: user.displayName || "Unknown",
+      userPhotoURL: user.photoURL || null,
+      status: "pending",
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("Request join community error:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Get pending join requests for a community (owner only)
+ * @param {string} communityId - Community ID
+ * @returns {Promise<{data: Array|null, error: string|null}>}
+ */
+export const getCommunityJoinRequests = async communityId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    // Verify user is the owner
+    const communityDoc = await getDoc(doc(db, "communities", communityId));
+    if (!communityDoc.exists() || communityDoc.data().ownerId !== user.uid) {
+      return { data: null, error: "Not authorized" };
+    }
+
+    const q = query(
+      collection(db, "communityJoinRequests"),
+      where("communityId", "==", communityId),
+      where("status", "==", "pending"),
+      orderBy("createdAt", "desc")
+    );
+
+    const snapshot = await getDocs(q);
+    const requests = [];
+    snapshot.forEach(doc => {
+      requests.push({ id: doc.id, ...doc.data() });
+    });
+
+    return { data: requests, error: null };
+  } catch (error) {
+    console.error("Get community join requests error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
+/**
+ * Get community members
+ * @param {string} communityId - Community ID
+ * @returns {Promise<{data: Array|null, error: string|null}>}
+ */
+export const getCommunityMembers = async communityId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    // Check if user is a member
+    const membershipId = `${communityId}_${user.uid}`;
+    const memberDoc = await getDoc(doc(db, "communityMembers", membershipId));
+    if (!memberDoc.exists() || memberDoc.data().status !== "approved") {
+      return { data: null, error: "Not a member of this community" };
+    }
+
+    const q = query(
+      collection(db, "communityMembers"),
+      where("communityId", "==", communityId),
+      where("status", "==", "approved")
+    );
+
+    const snapshot = await getDocs(q);
+    const members = [];
+    snapshot.forEach(doc => {
+      members.push({ id: doc.id, ...doc.data() });
+    });
+
+    return { data: members, error: null };
+  } catch (error) {
+    console.error("Get community members error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
+/**
+ * Get community channels
+ * @param {string} communityId - Community ID
+ * @returns {Promise<{data: Array|null, error: string|null}>}
+ */
+export const getCommunityChannels = async communityId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    // Check if user is a member
+    const membershipId = `${communityId}_${user.uid}`;
+    const memberDoc = await getDoc(doc(db, "communityMembers", membershipId));
+    if (!memberDoc.exists() || memberDoc.data().status !== "approved") {
+      return { data: null, error: "Not a member of this community" };
+    }
+
+    const q = query(
+      collection(db, "communityChannels"),
+      where("communityId", "==", communityId),
+      orderBy("order", "asc")
+    );
+
+    const snapshot = await getDocs(q);
+    const channels = [];
+    snapshot.forEach(doc => {
+      channels.push({ id: doc.id, ...doc.data() });
+    });
+
+    return { data: channels, error: null };
+  } catch (error) {
+    console.error("Get community channels error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
+/**
+ * Send a message to a community
+ * @param {string} communityId - Community ID
+ * @param {string} content - Message content
+ * @returns {Promise<{success: boolean, messageId: string|null, error: string|null}>}
+ */
+export const sendCommunityMessage = async (communityId, content) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, messageId: null, error: "Not authenticated" };
+    }
+
+    // Validate content
+    if (!content || content.trim().length === 0) {
+      return { success: false, messageId: null, error: "Message cannot be empty" };
+    }
+
+    if (content.length > 2000) {
+      return {
+        success: false,
+        messageId: null,
+        error: "Message too long (max 2000 characters)",
+      };
+    }
+
+    // Check if user is a member
+    const membershipId = `${communityId}_${user.uid}`;
+    const memberDoc = await getDoc(doc(db, "communityMembers", membershipId));
+    if (!memberDoc.exists() || memberDoc.data().status !== "approved") {
+      return { success: false, messageId: null, error: "Not a member of this community" };
+    }
+
+    // Create message
+    const messageRef = await addDoc(collection(db, "communityMessages"), {
+      communityId,
+      senderId: user.uid,
+      senderName: user.displayName || "Unknown",
+      senderPhotoURL: user.photoURL || null,
+      content: content.trim(),
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: true, messageId: messageRef.id, error: null };
+  } catch (error) {
+    console.error("Send community message error:", error);
+    return { success: false, messageId: null, error: error.message };
+  }
+};
+
+/**
+ * Get community messages for a channel (latest 50)
+ * @param {string} communityId - Community ID
+ * @param {string} channelId - Channel ID
+ * @param {number} limitCount - Number of messages to fetch (default 50)
+ * @returns {Promise<{data: Array|null, error: string|null}>}
+ */
+export const getCommunityMessages = async (communityId, channelId, limitCount = 50) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    // Check if user is a member
+    const membershipId = `${communityId}_${user.uid}`;
+    const memberDoc = await getDoc(doc(db, "communityMembers", membershipId));
+    if (!memberDoc.exists() || memberDoc.data().status !== "approved") {
+      return { data: null, error: "Not a member of this community" };
+    }
+
+    const q = query(
+      collection(db, "communityMessages"),
+      where("communityId", "==", communityId),
+      where("channelId", "==", channelId),
+      orderBy("createdAt", "desc"),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    const messages = [];
+    snapshot.forEach(doc => {
+      messages.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Reverse to show oldest first
+    return { data: messages.reverse(), error: null };
+  } catch (error) {
+    console.error("Get community messages error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
+/**
+ * Subscribe to real-time community messages
+ * @param {string} communityId - Community ID
+ * @param {function} onUpdate - Callback function receiving messages array
+ * @returns {function} Unsubscribe function
+ */
+export const subscribeToCommunityMessages = (communityId, onUpdate) => {
+  if (!communityId) return () => {};
+
+  const q = query(
+    collection(db, "communityMessages"),
+    where("communityId", "==", communityId),
+    orderBy("createdAt", "desc"),
+    limit(50)
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    snapshot => {
+      const messages = [];
+      snapshot.forEach(doc => {
+        messages.push({ id: doc.id, ...doc.data() });
+      });
+      onUpdate(messages.reverse());
+    },
+    error => {
+      console.error("[subscribeToCommunityMessages] Error:", error);
+    }
+  );
+
+  return unsubscribe;
+};
+
+/**
+ * Check if user is a member of a community
+ * @param {string} communityId - Community ID
+ * @returns {Promise<{isMember: boolean, isOwner: boolean, error: string|null}>}
+ */
+export const checkCommunityMembership = async communityId => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { isMember: false, isOwner: false, error: "Not authenticated" };
+    }
+
+    const membershipId = `${communityId}_${user.uid}`;
+    const memberDoc = await getDoc(doc(db, "communityMembers", membershipId));
+
+    if (!memberDoc.exists() || memberDoc.data().status !== "approved") {
+      return { isMember: false, isOwner: false, error: null };
+    }
+
+    // Check if owner
+    const communityDoc = await getDoc(doc(db, "communities", communityId));
+    const isOwner = communityDoc.exists() && communityDoc.data().ownerId === user.uid;
+
+    return { isMember: true, isOwner, error: null };
+  } catch (error) {
+    console.error("Check community membership error:", error);
+    return { isMember: false, isOwner: false, error: error.message };
+  }
+};
+
+/**
+ * Get user's joined communities
+ * @returns {Promise<{data: Array|null, error: string|null}>}
+ */
+export const getUserCommunities = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { data: null, error: "Not authenticated" };
+    }
+
+    // Get all memberships for this user
+    const q = query(
+      collection(db, "communityMembers"),
+      where("userId", "==", user.uid),
+      where("status", "==", "approved")
+    );
+
+    const snapshot = await getDocs(q);
+    const communityIds = [];
+    snapshot.forEach(doc => {
+      communityIds.push(doc.data().communityId);
+    });
+
+    if (communityIds.length === 0) {
+      return { data: [], error: null };
+    }
+
+    // Fetch community details (batch in groups of 10 due to Firestore 'in' limit)
+    const communities = [];
+    for (let i = 0; i < communityIds.length; i += 10) {
+      const batch = communityIds.slice(i, i + 10);
+      const q2 = query(collection(db, "communities"), where("__name__", "in", batch));
+      const snapshot2 = await getDocs(q2);
+      snapshot2.forEach(doc => {
+        communities.push({ id: doc.id, ...doc.data() });
+      });
+    }
+
+    return { data: communities, error: null };
+  } catch (error) {
+    console.error("Get user communities error:", error);
+    return { data: null, error: error.message };
+  }
+};
+
 // Export Firebase instances for advanced usage
 export { app, auth, db, analytics };
