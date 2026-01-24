@@ -384,21 +384,21 @@ const VirtualKeyboard = ({
   return (
     <div className="fixed inset-0 z-[20000] flex flex-col">
       <div className="flex-1 bg-black/60" onClick={onClose} />
-      <div className="border-t-2 border-blue-500/30 bg-[#0d0d0f] p-6 pb-10 duration-200 animate-in slide-in-from-bottom">
-        <div className="mx-auto mb-6 flex max-w-5xl items-center gap-4 rounded-xl border-2 border-blue-500/50 bg-slate-800 p-4">
-          <Search className="h-6 w-6 flex-shrink-0 text-blue-400" />
+      <div className="border-t-2 border-primary/30 bg-background p-6 pb-10 duration-200 animate-in slide-in-from-bottom">
+        <div className="mx-auto mb-6 flex max-w-5xl items-center gap-4 rounded-xl border-2 border-primary/50 bg-card p-4">
+          <Search className="h-6 w-6 flex-shrink-0 text-primary/80" />
           <span className="flex-1 truncate text-2xl font-medium text-white">
-            {value || <span className="text-slate-500">Search...</span>}
-            <span className="ml-1 animate-pulse text-blue-400">|</span>
+            {value || <span className="text-muted-foreground/80">Search...</span>}
+            <span className="ml-1 animate-pulse text-primary/80">|</span>
           </span>
           {value && (
             <button onClick={() => onChange("")}>
-              <X className="h-6 w-6 text-slate-400" />
+              <X className="h-6 w-6 text-muted-foreground" />
             </button>
           )}
         </div>
 
-        <div className="mx-auto mb-2 flex max-w-5xl justify-end gap-4 text-xs font-bold uppercase tracking-widest text-slate-500">
+        <div className="mx-auto mb-2 flex max-w-5xl justify-end gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
           <span>
             <span className="mr-1 rounded-sm bg-white px-1 text-black">X</span>Del
           </span>
@@ -413,7 +413,7 @@ const VirtualKeyboard = ({
               <button
                 key={idx}
                 onClick={() => onSelectSuggestion(game)}
-                className={`flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition-all ${inSuggestions && suggestionIndex === idx ? "scale-105 bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}
+                className={`flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition-all ${inSuggestions && suggestionIndex === idx ? "scale-105 bg-blue-600 text-white" : "bg-card text-slate-300"}`}
               >
                 <span className="max-w-[150px] truncate text-sm font-bold">
                   {game.game}
@@ -444,12 +444,12 @@ const VirtualKeyboard = ({
                       isSelected
                         ? isEnter
                           ? "scale-[1.02] bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]"
-                          : "scale-[1.02] bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.6)]"
+                          : "scale-[1.02] bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.6)]"
                         : isEnter
                           ? "bg-green-700 text-white"
                           : isDel
                             ? "bg-red-900/50 text-white"
-                            : "bg-slate-800 text-white hover:bg-slate-700"
+                            : "bg-card text-white hover:bg-slate-700"
                     }`}
                   >
                     {isDel ? (
@@ -589,7 +589,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
   const hasScreenshots = steamData?.screenshots && steamData.screenshots.length > 0;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex flex-col overflow-hidden bg-[#0e0e10] text-white">
+    <div className="fixed inset-0 z-[10000] flex flex-col overflow-hidden bg-background text-foreground">
       <div
         className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
         style={{
@@ -600,7 +600,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
         }}
       />
 
-      <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#0e0e10] via-[#0e0e10]/70 to-transparent" />
+      <div className="absolute inset-0 z-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
 
       <div
         className={`absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
@@ -610,7 +610,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
         }`}
       >
         <div className="group relative">
-          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-blue-500/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
+          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-primary/40"></div>
           <img
             src={bgImage}
             alt={game.name || game.game}
@@ -642,7 +642,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
                 ))}
             </div>
 
-            <div className="mb-8 flex gap-6 text-slate-400">
+            <div className="mb-8 flex gap-6 text-muted-foreground">
               {game.size && (
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
@@ -670,9 +670,9 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
                   <span className="text-green-400">Ready to download</span>
                 </div>
               ) : (
-                <div className="flex w-fit items-center gap-4 rounded-xl border border-blue-500/30 bg-blue-500/20 px-6 py-3 text-base font-medium backdrop-blur-md">
-                  <MousePointer className="h-6 w-6 text-blue-400" />
-                  <span className="text-blue-400">Mouse required (Website)</span>
+                <div className="flex w-fit items-center gap-4 rounded-xl border border-primary/30 bg-primary/20 px-6 py-3 text-base font-medium backdrop-blur-md">
+                  <MousePointer className="h-6 w-6 text-primary/80" />
+                  <span className="text-primary/80">Mouse required (Website)</span>
                 </div>
               )}
             </div>
@@ -687,9 +687,9 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
         </div>
 
         <div className="relative flex h-full w-full flex-shrink-0 flex-col">
-          <div className="absolute inset-0 -z-10 bg-[#0e0e10]/90 backdrop-blur-md" />
+          <div className="absolute inset-0 -z-10 bg-background/90 backdrop-blur-md" />
           <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
-            <ImageIcon className="h-8 w-8 text-blue-500" />
+            <ImageIcon className="h-8 w-8 text-primary" />
             <h2 className="text-4xl font-light tracking-wider">MEDIA</h2>
           </div>
 
@@ -699,7 +699,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
                 {steamData.screenshots.map((screen, idx) => (
                   <div
                     key={screen.id || idx}
-                    className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-slate-800 transition-all hover:scale-[1.02] hover:border-blue-500"
+                    className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-card transition-all hover:scale-[1.02] hover:border-primary"
                   >
                     <img
                       src={screen.path_thumbnail || screen.path_full}
@@ -711,7 +711,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
                 ))}
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-slate-500">
+              <div className="flex h-full items-center justify-center text-muted-foreground/80">
                 <p>No screenshots available.</p>
               </div>
             )}
@@ -720,7 +720,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
       </div>
 
       {/* Footer Controls */}
-      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-slate-400">
+      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-muted-foreground">
         {!showMedia && (
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-black text-black shadow-lg">
@@ -733,7 +733,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
           className="flex cursor-pointer items-center gap-3 transition-colors hover:text-white"
           onClick={() => handleInput("BACK")}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-card text-sm">
             B
           </span>{" "}
           {showMedia ? "UP / BACK" : "BACK"}
@@ -781,7 +781,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
       className={`relative flex aspect-[2/3] w-full cursor-pointer flex-col justify-end transition-all duration-150 ease-out ${isSelected ? "z-20 scale-105" : "z-10 scale-100 opacity-70"}`}
     >
       <div
-        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-slate-800 shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg shadow-blue-500/20 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
+        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-card shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg shadow-primary/20 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
       >
         {isVisible && imageUrl ? (
           <img
@@ -792,7 +792,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-slate-800 text-slate-500">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-card text-muted-foreground/80">
             <Download className="mb-2 h-8 w-8 opacity-50" />
             <span className="px-4 text-center text-sm font-bold">{game.game}</span>
           </div>
@@ -806,7 +806,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
             {game.game}
           </span>
           {game.size && (
-            <span className="mt-1 block text-xs text-slate-400">{game.size}</span>
+            <span className="mt-1 block text-xs text-muted-foreground">{game.size}</span>
           )}
         </div>
       )}
@@ -862,10 +862,10 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
       <div
         ref={cardRef}
         onClick={onClick}
-        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-slate-800 transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
+        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-card transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-primary shadow-[0_0_30px_rgba(59,130,246,0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
       >
         <Grid
-          className={`mb-4 h-12 w-12 ${isSelected ? "text-blue-400" : "text-slate-500"}`}
+          className={`mb-4 h-12 w-12 ${isSelected ? "text-primary/80" : "text-muted-foreground/80"}`}
         />
         <h3 className="px-4 text-center text-xl font-bold">SEE ALL GAMES</h3>
       </div>
@@ -893,7 +893,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
         />
       )}
       <div
-        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-slate-800 shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg ring-0 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
+        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-card shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg ring-0 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
       >
         {imageSrc ? (
           <img
@@ -903,7 +903,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
             style={{ objectPosition: "center top" }}
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-slate-800 text-slate-500">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-card text-muted-foreground/80">
             <span className="px-4 text-center text-sm font-bold">{gameName}</span>
           </div>
         )}
@@ -913,16 +913,16 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
           className={`pointer-events-none absolute left-1/2 z-30 w-[300px] -translate-x-1/2 text-center transition-all duration-150 ease-out ${isSelected ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"} ${isHero ? "-bottom-20" : "-bottom-14"}`}
         >
           <h3
-            className={`font-bold tracking-wide text-white drop-shadow-md ${isHero ? "text-3xl" : "text-xl"} ${gameName.length > 25 ? "text-lg leading-tight" : ""}`}
+            className={`font-bold tracking-wide text-foreground drop-shadow-md ${isHero ? "text-3xl" : "text-xl"} ${gameName.length > 25 ? "text-lg leading-tight" : ""}`}
           >
             {gameName}
           </h3>
           {isHero && (
             <div className="mt-2 flex items-center justify-center gap-2">
-              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white shadow-lg">
+              <span className="text-primary-foreground rounded bg-primary px-2 py-0.5 text-[10px] font-bold tracking-wider shadow-lg">
                 LAST PLAYED
               </span>
-              <span className="text-sm font-medium text-blue-100 drop-shadow-md">
+              <span className="text-sm font-medium text-muted-foreground drop-shadow-md">
                 {game.playTime ? `${Math.floor(game.playTime / 3600)}h played` : "Ready"}
               </span>
             </div>
@@ -947,7 +947,7 @@ const StoreSearchBar = ({ isSelected, searchQuery, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className={`flex cursor-pointer items-center gap-4 rounded-xl px-6 py-4 transition-all duration-150 ${isSelected ? "scale-[1.02] bg-blue-500 text-white shadow-lg shadow-blue-500/30" : "bg-slate-800/80 text-slate-400 hover:bg-slate-700"}`}
+      className={`flex cursor-pointer items-center gap-4 rounded-xl px-6 py-4 transition-all duration-150 ${isSelected ? "scale-[1.02] bg-primary text-white shadow-lg shadow-primary/30" : "bg-card/80 text-muted-foreground hover:bg-slate-700"}`}
     >
       <Search className="h-6 w-6" />
       <span className="text-lg font-medium">{searchQuery || "Search a game..."}</span>
@@ -969,16 +969,16 @@ const SidebarMenu = ({ isOpen, selectedIndex }) => {
   ];
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-[10000] flex w-[350px] transform flex-col bg-[#1a1b1e] p-8 shadow-2xl transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+      className={`fixed inset-y-0 left-0 z-[10000] flex w-[350px] transform flex-col border-r border-border bg-card p-8 shadow-2xl transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
     >
-      <h2 className="mb-10 border-b border-slate-700 pb-4 text-2xl font-light tracking-widest text-slate-400">
+      <h2 className="mb-10 border-b border-border pb-4 text-2xl font-light tracking-widest text-muted-foreground">
         MENU
       </h2>
       <div className="flex flex-col gap-4">
         {items.map((item, idx) => (
           <div
             key={idx}
-            className={`flex items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? (item.danger ? "scale-105 bg-red-600 text-white shadow-lg shadow-red-900/50" : "scale-105 bg-white text-black shadow-lg") : "text-slate-400 hover:bg-slate-800"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
+            className={`flex items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? (item.danger ? "scale-105 bg-red-600 text-white shadow-lg shadow-red-900/50" : "scale-105 bg-white text-black shadow-lg") : "text-muted-foreground hover:bg-card"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
           >
             <item.icon className="h-6 w-6" />
             <span className="font-bold tracking-wide">{item.label}</span>
@@ -998,7 +998,7 @@ const ActiveDownloadsBar = ({ downloads }) => {
 
   return (
     <div className="absolute bottom-20 left-24 right-24 z-50 flex flex-col gap-2">
-      <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-400">
+      <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-muted-foreground">
         <Download className="h-4 w-4" /> Active Downloads ({downloads.length})
       </h3>
       <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
@@ -1015,21 +1015,21 @@ const ActiveDownloadsBar = ({ downloads }) => {
           return (
             <div
               key={game.game}
-              className="flex min-w-[300px] max-w-[400px] flex-1 flex-col gap-2 rounded-lg border border-white/10 bg-slate-800/90 p-3 shadow-lg backdrop-blur"
+              className="flex min-w-[300px] max-w-[400px] flex-1 flex-col gap-2 rounded-lg border border-white/10 bg-card/90 p-3 shadow-lg backdrop-blur"
             >
               <div className="flex items-center justify-between text-xs font-bold uppercase">
                 <span className="max-w-[180px] truncate text-white">{game.game}</span>
-                <span className="text-blue-400">{speed}</span>
+                <span className="text-primary/80">{speed}</span>
               </div>
 
               <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-700">
                 <div
-                  className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${data.extracting ? "animate-pulse bg-amber-500" : "bg-blue-500"}`}
+                  className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${data.extracting ? "animate-pulse bg-amber-500" : "bg-primary"}`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
 
-              <div className="flex items-center justify-between text-[10px] font-bold tracking-wider text-slate-400">
+              <div className="flex items-center justify-between text-[10px] font-bold tracking-wider text-muted-foreground">
                 <span>{status}</span>
                 <span>{progress.toFixed(1)}%</span>
               </div>
@@ -1242,7 +1242,6 @@ export default function BigPicture() {
         0, // Default dir index
         game.gameID || ""
       );
-      toast.success("Download started!");
     } catch (error) {
       console.error("Download failed:", error);
       toast.error("Failed to start download");
@@ -1595,14 +1594,27 @@ export default function BigPicture() {
   }, [handleNavigation]);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-[#0e0e10] text-white">
+    <div className="fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       <Toaster
         position="top-center"
         richColors
+        theme="dark"
         toastOptions={{
           style: {
+            background: "rgb(var(--color-card))",
+            border: "2px solid rgb(var(--color-border))",
+            color: "rgb(var(--color-foreground))",
+
+            fontSize: "1.25rem",
+            padding: "20px 24px",
+            minWidth: "400px",
+            gap: "16px",
+            borderRadius: "8px",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
             zIndex: 99999,
           },
+          descriptionClassName: "!text-lg !text-muted-foreground",
+          titleClassName: "!font-bold !tracking-wide",
         }}
       />
 
@@ -1628,7 +1640,7 @@ export default function BigPicture() {
           className={`absolute left-24 top-16 z-20 transition-all duration-200 ${isMenuOpen || isKeyboardOpen ? "opacity-50 blur-sm" : ""}`}
         >
           <h1 className="flex items-center gap-4 text-3xl font-light uppercase tracking-[0.2em] text-white/90">
-            <span className="h-1 w-12 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]"></span>
+            <span className="h-1 w-12 rounded-full bg-primary shadow-[0_0_15px_rgba(59,130,246,0.8)]"></span>
             {view === "library" ? "ALL GAMES" : view === "store" ? "CATALOG" : "HOME"}
           </h1>
         </div>
@@ -1691,7 +1703,7 @@ export default function BigPicture() {
                 }}
               />
               {storeSearchQuery && (
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-sm text-muted-foreground/80">
                   {filteredStoreGames.length} result
                   {filteredStoreGames.length > 1 ? "s" : ""} for "{storeSearchQuery}"
                 </p>
@@ -1701,15 +1713,15 @@ export default function BigPicture() {
             {storeLoading ? (
               <div className="flex flex-1 items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                  <div className="h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                  <p className="text-xl text-slate-400">Loading catalog...</p>
+                  <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  <p className="text-xl text-muted-foreground">Loading catalog...</p>
                 </div>
               </div>
             ) : filteredStoreGames.length === 0 ? (
               <div className="flex flex-1 items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                   <Search className="h-16 w-16 text-slate-600" />
-                  <p className="text-xl text-slate-400">
+                  <p className="text-xl text-muted-foreground">
                     {storeSearchQuery ? "No game found" : "No game available"}
                   </p>
                 </div>
@@ -1752,19 +1764,19 @@ export default function BigPicture() {
 
       {view !== "details" && !isKeyboardOpen && (
         <div
-          className={`fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-white/5 bg-[#16171a] px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
+          className={`fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-border border-white/5 bg-background/95 px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] backdrop-blur transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
         >
           <div
-            className="flex cursor-pointer items-center gap-3 font-bold tracking-widest text-slate-400 transition-colors hover:text-white"
+            className="flex cursor-pointer items-center gap-3 font-bold tracking-widest text-muted-foreground transition-colors hover:text-white"
             onClick={() => setIsMenuOpen(true)}
           >
             <Menu className="h-6 w-6" />
             <span>MENU</span>
-            <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
+            <span className="rounded bg-card px-2 py-0.5 text-[10px] text-muted-foreground/80">
               Start
             </span>
           </div>
-          <div className="flex gap-12 text-sm font-bold tracking-widest text-slate-400">
+          <div className="flex gap-12 text-sm font-bold tracking-widest text-muted-foreground">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-black text-black shadow-lg">
                 A
@@ -1776,7 +1788,7 @@ export default function BigPicture() {
                   : "PLAY"}
             </div>
             <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-xs font-black">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600 bg-card text-xs font-black">
                 B
               </span>
               {view === "carousel" ? "EXIT" : "BACK"}
