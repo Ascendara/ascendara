@@ -6109,7 +6109,6 @@ const Ascend = () => {
                             icon: Users,
                             title: t("ascend.premium.communities.title"),
                             desc: t("ascend.premium.communities.description"),
-                            badge: t("ascend.premium.planned"),
                           },
                           {
                             icon: Sparkle,
@@ -8940,7 +8939,7 @@ const Ascend = () => {
                   </div>
                 </motion.div>
 
-                {/* Game Communities - PLANNED */}
+                {/* Game Communities */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -8956,9 +8955,6 @@ const Ascend = () => {
                       <h3 className="mt-4 text-lg font-semibold">
                         {t("ascend.premium.communities.title") || "Game Communities"}
                       </h3>
-                      <span className="mt-4 rounded-full bg-rose-500/20 px-2 py-0.5 text-xs font-semibold text-rose-600 dark:text-rose-400">
-                        {t("ascend.premium.planned") || "PLANNED"}
-                      </span>
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">
                       {t("ascend.premium.communities.description") ||
