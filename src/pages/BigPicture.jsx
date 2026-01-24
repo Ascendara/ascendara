@@ -7,7 +7,7 @@ import {
   Grid,
   Download,
   Home,
-  Zap,
+  Info,
   Check,
   Search,
   X,
@@ -22,10 +22,32 @@ import {
   Pause,
   Play,
   Wifi,
+  FolderOpen,
+  Trash2,
+  Clock,
+  Settings,
+  Gamepad2,
+  SearchIcon,
+  Cloud,
+  Smartphone,
+  Puzzle,
+  Zap,
+  RefreshCw,
+  Gift,
+  Star,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import gameService from "@/services/gameService";
 import steamService from "@/services/gameInfoService";
+import nexusModsService from "@/services/nexusModsService";
+import flingTrainerService from "@/services/flingTrainerService";
+import { useLanguage } from "@/context/LanguageContext";
+import { useSettings } from "@/context/SettingsContext";
+import { useImageLoader } from "@/hooks/useImageLoader";
+import imageCacheService from "@/services/imageCacheService";
+import gameUpdateService from "@/services/gameUpdateService";
+import recentGamesService from "@/services/recentGamesService";
+import { killAudioAndMiniplayer } from "@/services/audioPlayerService";
 
 // UTILS
 const sanitizeText = text => {
@@ -41,7 +63,110 @@ const formatBytes = (bytes, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
+// Get controller button labels based on controller type
+const getControllerButtons = (controllerType = "xbox") => {
+  const buttonMaps = {
+    xbox: {
+      confirm: "A",
+      cancel: "B",
+      delete: "X",
+      space: "Y",
+      menu: "Start",
+    },
+    playstation: {
+      confirm: "✕",
+      cancel: "○",
+      delete: "□",
+      space: "△",
+      menu: "Options",
+    },
+    generic: {
+      confirm: "A",
+      cancel: "B",
+      delete: "X",
+      space: "Y",
+      menu: "Menu",
+    },
+  };
+
+  return buttonMaps[controllerType] || buttonMaps.xbox;
+};
+
+// Debounce hook for search optimization
+const useDebouncedValue = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+// Fuzzy search with caching for performance
+const createFuzzyMatcher = () => {
+  const cache = new Map();
+
+  return (text, query) => {
+    if (!text || !query) return false;
+
+    const cacheKey = `${text.toLowerCase()}-${query.toLowerCase()}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+    text = text.toLowerCase();
+    query = query.toLowerCase();
+
+    // Direct substring match for better performance
+    if (text.includes(query)) {
+      cache.set(cacheKey, true);
+      return true;
+    }
+
+    const queryWords = query.split(/\s+/).filter(word => word.length > 0);
+    if (queryWords.length === 0) {
+      cache.set(cacheKey, false);
+      return false;
+    }
+
+    const result = queryWords.every(queryWord => {
+      if (/\d/.test(queryWord)) return text.includes(queryWord);
+
+      const words = text.split(/\s+/);
+      return words.some(word => {
+        if (/\d/.test(word)) return word.includes(queryWord);
+        if (word.includes(queryWord)) return true;
+
+        // Optimize character matching
+        let matches = 0;
+        let lastIndex = -1;
+
+        for (const char of queryWord) {
+          const index = word.indexOf(char, lastIndex + 1);
+          if (index > lastIndex) {
+            matches++;
+            lastIndex = index;
+          }
+        }
+
+        return matches >= queryWord.length * 0.8;
+      });
+    });
+
+    cache.set(cacheKey, result);
+    if (cache.size > 1000) {
+      // Clear cache if it gets too large
+      const keys = Array.from(cache.keys());
+      keys.slice(0, 100).forEach(key => cache.delete(key));
+    }
+    return result;
+  };
+};
+
 // GAMEPAD UTILS
+let lastLoggedState = null;
+let lastLogTime = 0;
+
 const getGamepadInput = () => {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   const gp = gamepads[0]; // First connected controller
@@ -51,11 +176,19 @@ const getGamepadInput = () => {
   // Joysticks deadzone
   const threshold = 0.5;
 
-  return {
-    up: gp.buttons[12]?.pressed || gp.axes[1] < -threshold,
-    down: gp.buttons[13]?.pressed || gp.axes[1] > threshold,
-    left: gp.buttons[14]?.pressed || gp.axes[0] < -threshold,
-    right: gp.buttons[15]?.pressed || gp.axes[0] > threshold,
+  // Log raw gamepad data for debugging
+  const axes0 = gp.axes[0];
+  const axes1 = gp.axes[1];
+  const dpadUp = gp.buttons[12]?.pressed;
+  const dpadDown = gp.buttons[13]?.pressed;
+  const dpadLeft = gp.buttons[14]?.pressed;
+  const dpadRight = gp.buttons[15]?.pressed;
+
+  const input = {
+    up: dpadUp || axes1 < -threshold,
+    down: dpadDown || axes1 > threshold,
+    left: dpadLeft || axes0 < -threshold,
+    right: dpadRight || axes0 > threshold,
     a: gp.buttons[0]?.pressed,
     b: gp.buttons[1]?.pressed,
     x: gp.buttons[2]?.pressed,
@@ -64,26 +197,38 @@ const getGamepadInput = () => {
     lb: gp.buttons[4]?.pressed,
     rb: gp.buttons[5]?.pressed,
   };
+
+  // Only log on state changes and max once per 500ms
+  const now = Date.now();
+  const currentState = `${input.up ? "U" : ""}${input.down ? "D" : ""}${input.left ? "L" : ""}${input.right ? "R" : ""}${input.a ? "A" : ""}${input.b ? "B" : ""}`;
+
+  if (currentState && currentState !== lastLoggedState && now - lastLogTime > 500) {
+    console.log("[GAMEPAD] Input:", {
+      direction: { up: input.up, down: input.down, left: input.left, right: input.right },
+      source: {
+        dpad: { up: dpadUp, down: dpadDown, left: dpadLeft, right: dpadRight },
+        axes: { x: axes0.toFixed(2), y: axes1.toFixed(2) },
+      },
+      buttons: { a: input.a, b: input.b },
+    });
+    lastLoggedState = currentState;
+    lastLogTime = now;
+  } else if (!currentState) {
+    lastLoggedState = null;
+  }
+
+  return input;
 };
 
-// Launching function
-const launchGame = async game => {
+// Show installed game details (replaces direct launching)
+const showInstalledGameDetails = (
+  game,
+  setSelectedInstalledGame,
+  setInstalledGameView
+) => {
   if (!game) return;
-  try {
-    const gameName = game.game || game.name;
-    console.log("Launching :", gameName);
-    await window.electron.playGame(
-      gameName,
-      game.isCustom || false,
-      game.backups || false,
-      false,
-      null,
-      false
-    );
-  } catch (error) {
-    console.error("Launching error:", error);
-    toast.error("Unable to launch the game");
-  }
+  setSelectedInstalledGame(game);
+  setInstalledGameView(true);
 };
 
 // Seamless verification
@@ -204,6 +349,494 @@ const KEYBOARD_LAYOUTS = {
   ],
 };
 
+// Exit Dialog Component (for exiting to download)
+const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
+  const [selectedButton, setSelectedButton] = useState(0);
+  const [canInput, setCanInput] = useState(false);
+  const lastInputTime = useRef(0);
+  const buttons = getControllerButtons(controllerType);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedButton(0);
+      const timer = setTimeout(() => setCanInput(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleInput = useCallback(
+    action => {
+      if (!canInput) return;
+
+      if (action === "LEFT") setSelectedButton(0);
+      else if (action === "RIGHT") setSelectedButton(1);
+      else if (action === "CONFIRM") {
+        if (selectedButton === 0) onConfirm();
+        else onClose();
+      } else if (action === "BACK") onClose();
+    },
+    [canInput, selectedButton, onConfirm, onClose]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const keyMap = {
+        ArrowLeft: "LEFT",
+        ArrowRight: "RIGHT",
+        Enter: "CONFIRM",
+        Escape: "BACK",
+      };
+      if (keyMap[e.key]) handleInput(keyMap[e.key]);
+    };
+
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [handleInput, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let animationFrameId;
+    const loop = () => {
+      const gp = getGamepadInput();
+      if (gp && canInput) {
+        const now = Date.now();
+        if (now - lastInputTime.current > 200) {
+          if (gp.left) {
+            handleInput("LEFT");
+            lastInputTime.current = now;
+          } else if (gp.right) {
+            handleInput("RIGHT");
+            lastInputTime.current = now;
+          } else if (gp.a) {
+            handleInput("CONFIRM");
+            lastInputTime.current = now;
+          } else if (gp.b) {
+            handleInput("BACK");
+            lastInputTime.current = now;
+          }
+        }
+      }
+      animationFrameId = requestAnimationFrame(loop);
+    };
+
+    loop();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [handleInput, canInput, isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-blue-500/30 bg-[#1a1b1e] p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="rounded-full bg-blue-500/20 p-3">
+            <Info className="h-8 w-8 text-blue-400" />
+          </div>
+          <h2 className="text-3xl font-bold text-white">
+            {t("bigPicture.exitToDownload")}
+          </h2>
+        </div>
+        <p className="mb-8 text-lg leading-relaxed text-slate-300">
+          {t("bigPicture.exitToDownloadMessage")}
+        </p>
+        <div className="flex gap-4">
+          <button
+            onClick={onConfirm}
+            className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
+              selectedButton === 0
+                ? "scale-105 bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+            }`}
+          >
+            <LogOut className="h-5 w-5" />
+            {t("bigPicture.exitBigPicture")}
+          </button>
+          <button
+            onClick={onClose}
+            className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
+              selectedButton === 1
+                ? "scale-105 bg-slate-600 text-white shadow-lg"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+            }`}
+          >
+            <X className="h-5 w-5" />
+            {t("bigPicture.cancel")}
+          </button>
+        </div>
+        <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500">
+          <span>
+            <span className="mr-2 rounded-full bg-white px-2 py-1 text-black">
+              {buttons.confirm}
+            </span>
+            {t("bigPicture.confirm")}
+          </span>
+          <span>
+            <span className="mr-2 rounded-full border border-slate-600 bg-slate-800 px-2 py-1">
+              {buttons.cancel}
+            </span>
+            {t("bigPicture.cancel")}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Exit Big Picture Confirmation Dialog
+const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
+  const [selectedButton, setSelectedButton] = useState(0);
+  const [canInput, setCanInput] = useState(false);
+  const lastInputTime = useRef(0);
+  const buttons = getControllerButtons(controllerType);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedButton(0);
+      const timer = setTimeout(() => setCanInput(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleInput = useCallback(
+    action => {
+      if (!canInput) return;
+
+      if (action === "LEFT") setSelectedButton(0);
+      else if (action === "RIGHT") setSelectedButton(1);
+      else if (action === "CONFIRM") {
+        if (selectedButton === 0) onConfirm();
+        else onClose();
+      } else if (action === "BACK") onClose();
+    },
+    [canInput, selectedButton, onConfirm, onClose]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const keyMap = {
+        ArrowLeft: "LEFT",
+        ArrowRight: "RIGHT",
+        Enter: "CONFIRM",
+        Escape: "BACK",
+      };
+      if (keyMap[e.key]) handleInput(keyMap[e.key]);
+    };
+
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [handleInput, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let animationFrameId;
+    const loop = () => {
+      const gp = getGamepadInput();
+      if (gp && canInput) {
+        const now = Date.now();
+        if (now - lastInputTime.current > 200) {
+          if (gp.left) {
+            handleInput("LEFT");
+            lastInputTime.current = now;
+          } else if (gp.right) {
+            handleInput("RIGHT");
+            lastInputTime.current = now;
+          } else if (gp.a) {
+            handleInput("CONFIRM");
+            lastInputTime.current = now;
+          } else if (gp.b) {
+            handleInput("BACK");
+            lastInputTime.current = now;
+          }
+        }
+      }
+      animationFrameId = requestAnimationFrame(loop);
+    };
+
+    loop();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [handleInput, canInput, isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-blue-500/30 bg-[#1a1b1e] p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="rounded-full bg-blue-500/20 p-3">
+            <Info className="h-8 w-8 text-blue-400" />
+          </div>
+          <h2 className="text-3xl font-bold text-white">
+            {t("bigPicture.exitBigPictureConfirm")}
+          </h2>
+        </div>
+        <p className="mb-8 text-lg leading-relaxed text-slate-300">
+          {t("bigPicture.exitBigPictureMessage")}
+        </p>
+        <div className="flex gap-4">
+          <button
+            onClick={onConfirm}
+            className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
+              selectedButton === 0
+                ? "scale-105 bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+            }`}
+          >
+            <LogOut className="h-5 w-5" />
+            {t("bigPicture.exitBigPicture")}
+          </button>
+          <button
+            onClick={onClose}
+            className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
+              selectedButton === 1
+                ? "scale-105 bg-slate-600 text-white shadow-lg"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+            }`}
+          >
+            <X className="h-5 w-5" />
+            {t("bigPicture.cancel")}
+          </button>
+        </div>
+        <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500">
+          <span>
+            <span className="mr-2 rounded-full bg-white px-2 py-1 text-black">
+              {buttons.confirm}
+            </span>
+            {t("bigPicture.confirm")}
+          </span>
+          <span>
+            <span className="mr-2 rounded-full border border-slate-600 bg-slate-800 px-2 py-1">
+              {buttons.cancel}
+            </span>
+            {t("bigPicture.cancel")}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Big Picture Settings Dialog
+const BigPictureSettingsDialog = ({
+  isOpen,
+  onClose,
+  t,
+  currentType,
+  onTypeChange,
+  currentKeyboardLayout,
+  onKeyboardLayoutChange,
+  controllerType,
+}) => {
+  const [selectedOption, setSelectedOption] = useState(0);
+  const [canInput, setCanInput] = useState(false);
+  const lastInputTime = useRef(0);
+  const buttons = getControllerButtons(controllerType);
+
+  const settingsOptions = [
+    {
+      type: "controller",
+      value: "xbox",
+      label: t("bigPicture.controllerTypeXbox"),
+      icon: Gamepad2,
+      category: t("bigPicture.controllerType"),
+    },
+    {
+      type: "controller",
+      value: "playstation",
+      label: t("bigPicture.controllerTypePlayStation"),
+      icon: Gamepad2,
+      category: t("bigPicture.controllerType"),
+    },
+    {
+      type: "controller",
+      value: "generic",
+      label: t("bigPicture.controllerTypeGeneric"),
+      icon: Gamepad2,
+      category: t("bigPicture.controllerType"),
+    },
+    {
+      type: "keyboard",
+      value: "qwerty",
+      label: t("bigPicture.keyboardLayoutQwerty"),
+      icon: SearchIcon,
+      category: t("bigPicture.keyboardLayout"),
+    },
+    {
+      type: "keyboard",
+      value: "azerty",
+      label: t("bigPicture.keyboardLayoutAzerty"),
+      icon: SearchIcon,
+      category: t("bigPicture.keyboardLayout"),
+    },
+  ];
+
+  useEffect(() => {
+    if (isOpen) {
+      const currentControllerIndex = settingsOptions.findIndex(
+        opt => opt.type === "controller" && opt.value === currentType
+      );
+      setSelectedOption(currentControllerIndex >= 0 ? currentControllerIndex : 0);
+      const timer = setTimeout(() => setCanInput(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, currentType]);
+
+  const handleInput = useCallback(
+    action => {
+      if (!canInput) return;
+
+      if (action === "UP") {
+        setSelectedOption(p => Math.max(0, p - 1));
+      } else if (action === "DOWN") {
+        setSelectedOption(p => Math.min(settingsOptions.length - 1, p + 1));
+      } else if (action === "CONFIRM") {
+        const selected = settingsOptions[selectedOption];
+        if (selected.type === "controller") {
+          onTypeChange(selected.value);
+        } else if (selected.type === "keyboard") {
+          onKeyboardLayoutChange(selected.value);
+        }
+        onClose();
+      } else if (action === "BACK") {
+        onClose();
+      }
+    },
+    [
+      canInput,
+      selectedOption,
+      settingsOptions,
+      onTypeChange,
+      onKeyboardLayoutChange,
+      onClose,
+    ]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const keyMap = {
+        ArrowUp: "UP",
+        ArrowDown: "DOWN",
+        Enter: "CONFIRM",
+        Escape: "BACK",
+      };
+      if (keyMap[e.key]) handleInput(keyMap[e.key]);
+    };
+
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [handleInput, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let animationFrameId;
+    const loop = () => {
+      const gp = getGamepadInput();
+      if (gp && canInput) {
+        const now = Date.now();
+        if (now - lastInputTime.current > 200) {
+          if (gp.up) {
+            handleInput("UP");
+            lastInputTime.current = now;
+          } else if (gp.down) {
+            handleInput("DOWN");
+            lastInputTime.current = now;
+          } else if (gp.a) {
+            handleInput("CONFIRM");
+            lastInputTime.current = now;
+          } else if (gp.b) {
+            handleInput("BACK");
+            lastInputTime.current = now;
+          }
+        }
+      }
+      animationFrameId = requestAnimationFrame(loop);
+    };
+
+    loop();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [handleInput, canInput, isOpen]);
+
+  if (!isOpen) return null;
+
+  let lastCategory = null;
+
+  return (
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-blue-500/30 bg-[#1a1b1e] p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="rounded-full bg-blue-500/20 p-3">
+            <Settings className="h-8 w-8 text-blue-400" />
+          </div>
+          <h2 className="text-3xl font-bold text-white">
+            {t("bigPicture.bigPictureSettings")}
+          </h2>
+        </div>
+        <div className="mb-8 space-y-3">
+          {settingsOptions.map((option, idx) => {
+            const Icon = option.icon;
+            const isSelected = idx === selectedOption;
+            const isCurrent =
+              (option.type === "controller" && option.value === currentType) ||
+              (option.type === "keyboard" && option.value === currentKeyboardLayout);
+
+            const showCategoryHeader = option.category !== lastCategory;
+            lastCategory = option.category;
+
+            return (
+              <div key={`${option.type}-${option.value}`}>
+                {showCategoryHeader && (
+                  <p className="mb-2 mt-4 text-sm font-bold uppercase tracking-wider text-slate-400">
+                    {option.category}
+                  </p>
+                )}
+                <div
+                  className={`flex items-center gap-4 rounded-xl p-4 transition-all duration-150 ${
+                    isSelected
+                      ? "scale-105 bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                      : "bg-slate-700 text-slate-300"
+                  }`}
+                >
+                  <Icon className="h-6 w-6" />
+                  <span className="flex-1 text-lg font-bold">{option.label}</span>
+                  {isCurrent && <Check className="h-5 w-5 text-green-400" />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500">
+          <span>
+            <span className="mr-2 rounded-full bg-white px-2 py-1 text-black">
+              {buttons.confirm}
+            </span>
+            {t("bigPicture.confirm")}
+          </span>
+          <span>
+            <span className="mr-2 rounded-full border border-slate-600 bg-slate-800 px-2 py-1">
+              {buttons.cancel}
+            </span>
+            {t("bigPicture.cancel")}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Virtual keyboard
 const VirtualKeyboard = ({
   value,
@@ -213,6 +846,8 @@ const VirtualKeyboard = ({
   suggestions,
   onSelectSuggestion,
   layout = "qwerty",
+  t,
+  controllerType,
 }) => {
   const [selectedRow, setSelectedRow] = useState(0);
   const [selectedCol, setSelectedCol] = useState(0);
@@ -220,6 +855,7 @@ const VirtualKeyboard = ({
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [canInput, setCanInput] = useState(false);
   const lastInputTime = useRef(0);
+  const buttons = getControllerButtons(controllerType);
 
   const gridLayout = KEYBOARD_LAYOUTS[layout] || KEYBOARD_LAYOUTS.qwerty;
 
@@ -388,7 +1024,9 @@ const VirtualKeyboard = ({
         <div className="mx-auto mb-6 flex max-w-5xl items-center gap-4 rounded-xl border-2 border-blue-500/50 bg-slate-800 p-4">
           <Search className="h-6 w-6 flex-shrink-0 text-blue-400" />
           <span className="flex-1 truncate text-2xl font-medium text-white">
-            {value || <span className="text-slate-500">Search...</span>}
+            {value || (
+              <span className="text-slate-500">{t("bigPicture.searchPlaceholder")}</span>
+            )}
             <span className="ml-1 animate-pulse text-blue-400">|</span>
           </span>
           {value && (
@@ -400,10 +1038,16 @@ const VirtualKeyboard = ({
 
         <div className="mx-auto mb-2 flex max-w-5xl justify-end gap-4 text-xs font-bold uppercase tracking-widest text-slate-500">
           <span>
-            <span className="mr-1 rounded-sm bg-white px-1 text-black">X</span>Del
+            <span className="mr-1 rounded-sm bg-white px-1 text-black">
+              {buttons.delete}
+            </span>
+            {t("bigPicture.del")}
           </span>
           <span>
-            <span className="mr-1 rounded-sm bg-white px-1 text-black">Y</span>Space
+            <span className="mr-1 rounded-sm bg-white px-1 text-black">
+              {buttons.space}
+            </span>
+            {t("bigPicture.space")}
           </span>
         </div>
 
@@ -473,19 +1117,37 @@ const VirtualKeyboard = ({
 };
 
 // --- GAME DETAILS & STORE COMPONENTS ---
-const GameDetailsView = ({ game, onBack, onDownload }) => {
+const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
   const isSeamless = checkSeamlessAvailable(game);
   const [showMedia, setShowMedia] = useState(false);
   const [steamData, setSteamData] = useState(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const [cachedImage, setCachedImage] = useState(null);
+  const buttons = getControllerButtons(controllerType);
+  const [focusedSection, setFocusedSection] = useState("button"); // 'button', 'description', 'screenshots'
+  const [selectedButton, setSelectedButton] = useState(0); // 0 = View Details, 1 = Play Later
+  const [supportsModManaging, setSupportsModManaging] = useState(false);
+  const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
+  const [isPlayLater, setIsPlayLater] = useState(false);
 
   const [canInput, setCanInput] = useState(false);
   const lastInputTime = useRef(0);
+  const descriptionRef = useRef(null);
+  const screenshotsRef = useRef(null);
 
   // Background Image
-  const bgImage = game.imgID
-    ? `https://api.ascendara.app/v2/image/${game.imgID}`
-    : game.cover || game.image;
+  const bgImage = cachedImage || game.cover || game.image;
+
+  // Load cached image
+  useEffect(() => {
+    const loadCachedImage = async () => {
+      if (game.imgID) {
+        const image = await imageCacheService.getImage(game.imgID);
+        setCachedImage(image);
+      }
+    };
+    loadCachedImage();
+  }, [game.imgID]);
 
   // Input delay on opening
   useEffect(() => {
@@ -501,16 +1163,32 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
     const fetchGameData = async () => {
       const gameName = game.game || game.name;
       if (!gameName) return;
+      console.log("[GameDetailsView] Fetching Steam data for:", gameName);
       setLoadingMedia(true);
       try {
         const data = await steamService.getGameDetails(gameName);
+        console.log("[GameDetailsView] Steam data received:", data);
+        if (data) {
+          console.log("[GameDetailsView] - short_description:", data.short_description);
+          console.log("[GameDetailsView] - about_the_game:", data.about_the_game);
+          console.log("[GameDetailsView] - screenshots:", data.screenshots);
+          console.log(
+            "[GameDetailsView] - screenshots count:",
+            data.screenshots?.length || 0
+          );
+        }
         if (isMounted && data) {
           setSteamData(data);
+        } else if (!data) {
+          console.log("[GameDetailsView] No Steam data found for game");
         }
       } catch (error) {
-        console.error("Error fetching steam data:", error);
+        console.error("[GameDetailsView] Error fetching steam data:", error);
       } finally {
-        if (isMounted) setLoadingMedia(false);
+        if (isMounted) {
+          console.log("[GameDetailsView] Loading complete, loadingMedia set to false");
+          setLoadingMedia(false);
+        }
       }
     };
     fetchGameData();
@@ -519,22 +1197,174 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
     };
   }, [game]);
 
+  // Check Nexus Mods support
+  useEffect(() => {
+    const checkModSupport = async () => {
+      const gameName = game.game || game.name;
+      if (gameName) {
+        try {
+          const result = await nexusModsService.checkModSupport(gameName);
+          setSupportsModManaging(result.supported);
+        } catch (error) {
+          console.error("[GameDetailsView] Error checking Nexus Mods support:", error);
+          setSupportsModManaging(false);
+        }
+      }
+    };
+    checkModSupport();
+  }, [game]);
+
+  // Check FLiNG Trainer support
+  useEffect(() => {
+    const checkTrainerSupport = async () => {
+      const gameName = game.game || game.name;
+      if (gameName) {
+        try {
+          const result = await flingTrainerService.checkTrainerSupport(gameName);
+          setSupportsFlingTrainer(result.supported);
+        } catch (error) {
+          console.error("[GameDetailsView] Error checking FLiNG Trainer support:", error);
+          setSupportsFlingTrainer(false);
+        }
+      }
+    };
+    checkTrainerSupport();
+  }, [game]);
+
+  // Check if game is in Play Later list
+  useEffect(() => {
+    const gameName = game.game || game.name;
+    if (!gameName) return;
+    const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+    const isInList = playLaterGames.some(g => g.game === gameName);
+    setIsPlayLater(isInList);
+  }, [game]);
+
+  // Handle Play Later Click
+  const handlePlayLater = useCallback(() => {
+    const gameName = game.game || game.name;
+    const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+
+    if (isPlayLater) {
+      const updatedList = playLaterGames.filter(g => g.game !== gameName);
+      localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+      localStorage.removeItem(`play-later-image-${gameName}`);
+      setIsPlayLater(false);
+    } else {
+      const gameToSave = {
+        game: gameName,
+        name: game.name || gameName,
+        imgID: game.imgID,
+        cover: game.cover,
+        image: game.image,
+        size: game.size,
+        category: game.category,
+        desc: game.desc,
+        addedAt: Date.now(),
+      };
+      playLaterGames.push(gameToSave);
+      localStorage.setItem("play-later-games", JSON.stringify(playLaterGames));
+
+      if (cachedImage) {
+        try {
+          localStorage.setItem(`play-later-image-${gameName}`, cachedImage);
+        } catch (e) {
+          console.warn("Could not cache play later image:", e);
+        }
+      }
+
+      setIsPlayLater(true);
+    }
+    window.dispatchEvent(new CustomEvent("play-later-updated"));
+  }, [game, isPlayLater, cachedImage]);
+
   const handleInput = useCallback(
     action => {
       if (!canInput) return;
 
       if (action === "DOWN") {
-        if (!showMedia) setShowMedia(true);
+        if (focusedSection === "button") {
+          // Move from button to description
+          setFocusedSection("description");
+        } else if (focusedSection === "description") {
+          // Move from description to screenshots if available
+          if (steamData?.screenshots && steamData.screenshots.length > 0) {
+            setShowMedia(true);
+            setFocusedSection("screenshots");
+          }
+        } else if (focusedSection === "screenshots") {
+          // Scroll screenshots down
+          if (screenshotsRef.current) {
+            screenshotsRef.current.scrollBy({ top: 200, behavior: "smooth" });
+          }
+        }
       } else if (action === "UP") {
-        if (showMedia) setShowMedia(false);
+        if (focusedSection === "screenshots") {
+          // Move back from screenshots to description
+          setShowMedia(false);
+          setFocusedSection("description");
+        } else if (focusedSection === "description") {
+          // Move back from description to button
+          setFocusedSection("button");
+        }
+      } else if (action === "LEFT") {
+        if (focusedSection === "button") {
+          // Navigate between buttons
+          setSelectedButton(prev => Math.max(0, prev - 1));
+        } else if (focusedSection === "description" && descriptionRef.current) {
+          // Scroll left in description
+          descriptionRef.current.scrollBy({ top: -100, behavior: "smooth" });
+        } else if (focusedSection === "screenshots" && screenshotsRef.current) {
+          // Scroll left in screenshots
+          screenshotsRef.current.scrollBy({ top: -200, behavior: "smooth" });
+        }
+      } else if (action === "RIGHT") {
+        if (focusedSection === "button") {
+          // Navigate between buttons (0 = View Details, 1 = Play Later)
+          setSelectedButton(prev => Math.min(1, prev + 1));
+        } else if (focusedSection === "description" && descriptionRef.current) {
+          // Scroll right in description
+          descriptionRef.current.scrollBy({ top: 100, behavior: "smooth" });
+        } else if (focusedSection === "screenshots" && screenshotsRef.current) {
+          // Scroll right in screenshots
+          screenshotsRef.current.scrollBy({ top: 200, behavior: "smooth" });
+        }
       } else if (action === "BACK") {
-        if (showMedia) setShowMedia(false);
-        else onBack();
+        if (showMedia) {
+          setShowMedia(false);
+          setFocusedSection("button");
+        } else if (focusedSection === "description") {
+          setFocusedSection("button");
+        } else {
+          onBack();
+        }
       } else if (action === "CONFIRM") {
-        if (!showMedia) onDownload(game);
+        if (focusedSection === "button") {
+          if (selectedButton === 0) {
+            onDownload(game);
+          } else if (selectedButton === 1) {
+            handlePlayLater();
+          }
+        } else if (focusedSection === "description") {
+          // Move to screenshots if available
+          if (steamData?.screenshots && steamData.screenshots.length > 0) {
+            setShowMedia(true);
+            setFocusedSection("screenshots");
+          }
+        }
       }
     },
-    [showMedia, onBack, onDownload, game, canInput]
+    [
+      showMedia,
+      onBack,
+      onDownload,
+      game,
+      canInput,
+      focusedSection,
+      steamData,
+      selectedButton,
+      handlePlayLater,
+    ]
   );
 
   // Keyboard Listener
@@ -544,6 +1374,8 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
       const map = {
         ArrowDown: "DOWN",
         ArrowUp: "UP",
+        ArrowLeft: "LEFT",
+        ArrowRight: "RIGHT",
         Escape: "BACK",
         Backspace: "BACK",
         Enter: "CONFIRM",
@@ -570,6 +1402,12 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
             lastInputTime.current = now;
           } else if (gp.up) {
             handleInput("UP");
+            lastInputTime.current = now;
+          } else if (gp.left) {
+            handleInput("LEFT");
+            lastInputTime.current = now;
+          } else if (gp.right) {
+            handleInput("RIGHT");
             lastInputTime.current = now;
           } else if (gp.b) {
             handleInput("BACK");
@@ -649,32 +1487,176 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
                   <span className="font-medium">{game.size}</span>
                 </div>
               )}
-            </div>
-
-            <p className="mb-10 line-clamp-4 max-w-xl text-xl leading-relaxed text-slate-300 drop-shadow-md">
-              {game.desc || "Failed to fetch description."}
-            </p>
-
-            <button
-              onClick={() => onDownload(game)}
-              className="group flex w-fit items-center gap-4 rounded-2xl bg-white px-10 py-5 text-2xl font-black text-black shadow-xl shadow-black/30 transition-all duration-200 hover:scale-105 hover:bg-blue-400 hover:text-white"
-            >
-              <Download className="h-7 w-7" />
-              <span>DOWNLOAD</span>
-            </button>
-
-            <div className="mt-8">
-              {isSeamless ? (
-                <div className="flex w-fit items-center gap-4 rounded-xl border border-green-500/30 bg-green-500/20 px-6 py-3 text-base font-medium backdrop-blur-md">
-                  <Check className="h-6 w-6 text-green-400" />
-                  <span className="text-green-400">Ready to download</span>
-                </div>
-              ) : (
-                <div className="flex w-fit items-center gap-4 rounded-xl border border-blue-500/30 bg-blue-500/20 px-6 py-3 text-base font-medium backdrop-blur-md">
-                  <MousePointer className="h-6 w-6 text-blue-400" />
-                  <span className="text-blue-400">Mouse required (Website)</span>
+              {game.version && (
+                <div className="flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  <span className="font-medium">v{game.version}</span>
                 </div>
               )}
+            </div>
+
+            {(game.dlc || game.online || isSeamless !== undefined) && (
+              <div className="mb-6 flex flex-wrap gap-4">
+                {game.dlc && (
+                  <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/20 px-4 py-2 text-sm font-medium text-purple-300 backdrop-blur-sm">
+                    <Download className="h-4 w-4" />
+                    <span>Includes DLC</span>
+                  </div>
+                )}
+                {game.online && (
+                  <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-2 text-sm font-medium text-green-300 backdrop-blur-sm">
+                    <Wifi className="h-4 w-4" />
+                    <span>Online Fix</span>
+                  </div>
+                )}
+                {isSeamless ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-2 text-sm font-medium text-green-300 backdrop-blur-sm">
+                    <Check className="h-4 w-4" />
+                    <span>Ready to download</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
+                    <MousePointer className="h-4 w-4" />
+                    <span>Mouse required</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mb-6 flex gap-4">
+              <button
+                onClick={() => onDownload(game)}
+                className={`group flex w-fit items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
+                  focusedSection === "button" && selectedButton === 0
+                    ? "scale-110 bg-blue-500 text-white shadow-blue-500/50 ring-4 ring-blue-400/50"
+                    : "bg-white text-black shadow-black/30 hover:scale-105 hover:bg-blue-400 hover:text-white"
+                }`}
+              >
+                <Download className="h-7 w-7" />
+                <span>{t("bigPicture.viewDetails")}</span>
+              </button>
+
+              <button
+                onClick={handlePlayLater}
+                className={`group flex w-fit items-center gap-3 rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
+                  focusedSection === "button" && selectedButton === 1
+                    ? isPlayLater
+                      ? "scale-110 bg-green-500 text-white shadow-green-500/50 ring-4 ring-green-400/50"
+                      : "scale-110 border-2 border-blue-400 bg-slate-700 text-white shadow-blue-500/30 ring-4 ring-blue-400/50"
+                    : isPlayLater
+                      ? "bg-green-500 text-white shadow-green-500/30"
+                      : "border-2 border-white/20 bg-slate-800/50 text-slate-300 shadow-black/30 hover:border-white/40 hover:bg-slate-700"
+                }`}
+              >
+                {isPlayLater ? (
+                  <>
+                    <Check className="h-6 w-6" />
+                    <span>Added to Play Later</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-6 w-6" />
+                    <span>Play Later</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div
+              ref={descriptionRef}
+              className={`mb-8 max-h-[400px] min-h-[200px] max-w-3xl overflow-y-auto rounded-xl p-6 transition-all duration-200 ${
+                focusedSection === "description"
+                  ? "bg-slate-800/50 ring-4 ring-blue-400"
+                  : "bg-slate-800/20"
+              }`}
+            >
+              <p className="text-lg leading-relaxed text-slate-200">
+                {(
+                  steamData?.summary ||
+                  steamData?.description ||
+                  steamData?.short_description ||
+                  steamData?.about_the_game ||
+                  steamData?.detailed_description ||
+                  game.desc ||
+                  "Failed to fetch description."
+                ).replace(/<[^>]*>/g, "")}
+              </p>
+            </div>
+
+            <div className="mt-8 space-y-4">
+              {/* Ascend Features Banner */}
+              <div className="group relative max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-slate-800/50 p-5 shadow-xl backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-slate-800/70">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+                <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
+                  {/* Cloud Saves - Always show */}
+                  <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                    <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
+                      <Cloud className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
+                      <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                    </div>
+                    <span className="text-sm font-semibold text-white">Cloud Saves</span>
+                  </div>
+
+                  {/* Remote Downloads - Always show */}
+                  <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                    <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
+                      <Smartphone className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
+                      <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                    </div>
+                    <span className="text-sm font-semibold text-white">
+                      Remote Downloads
+                    </span>
+                  </div>
+
+                  {/* Mod Manager - Only if game supports mods */}
+                  {supportsModManaging && (
+                    <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                      <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
+                        <Puzzle className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      </div>
+                      <span className="text-sm font-semibold text-white">
+                        Mod Manager
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Trainer - Only if game has trainer support */}
+                  {supportsFlingTrainer && (
+                    <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                      <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
+                        <Zap className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      </div>
+                      <span className="text-sm font-semibold text-white">Trainer</span>
+                    </div>
+                  )}
+
+                  {/* Auto Updates - Only for seamless games */}
+                  {isSeamless && (
+                    <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                      <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
+                        <RefreshCw className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      </div>
+                      <span className="text-sm font-semibold text-white">
+                        Auto Updates
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-3">
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                    Ascend Premium Features
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+                    <span className="text-xs font-bold text-blue-400">Available</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -693,22 +1675,35 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
             <h2 className="text-4xl font-light tracking-wider">MEDIA</h2>
           </div>
 
-          <div className="no-scrollbar flex-1 overflow-y-auto p-12 px-24 pb-32">
-            {steamData?.screenshots ? (
+          <div
+            ref={screenshotsRef}
+            className="no-scrollbar flex-1 overflow-y-auto p-12 px-24 pb-32"
+          >
+            {steamData?.screenshots && steamData.screenshots.length > 0 ? (
               <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
-                {steamData.screenshots.map((screen, idx) => (
-                  <div
-                    key={screen.id || idx}
-                    className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-slate-800 transition-all hover:scale-[1.02] hover:border-blue-500"
-                  >
-                    <img
-                      src={screen.path_thumbnail || screen.path_full}
-                      alt={`Screenshot ${idx + 1}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                ))}
+                {steamData.screenshots.map((screen, idx) => {
+                  const imageUrl =
+                    typeof screen === "string"
+                      ? screen
+                      : screen.url || screen.path_full || screen.path_thumbnail;
+                  return (
+                    <div
+                      key={screen.id || idx}
+                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-slate-800 transition-all hover:scale-[1.02] hover:border-blue-500"
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`Screenshot ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={e => {
+                          console.log("[Screenshot] Failed to load:", imageUrl);
+                          e.target.style.display = "none";
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="flex h-full items-center justify-center text-slate-500">
@@ -724,7 +1719,7 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
         {!showMedia && (
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-black text-black shadow-lg">
-              A
+              {buttons.confirm}
             </span>{" "}
             DOWNLOAD
           </div>
@@ -734,8 +1729,563 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
           onClick={() => handleInput("BACK")}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm">
-            B
+            {buttons.cancel}
           </span>{" "}
+          {showMedia ? "UP / BACK" : "BACK"}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Installed Game Details View Component
+const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
+  const [imageSrc, setImageSrc] = useState(null);
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [steamData, setSteamData] = useState(null);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
+  const [canInput, setCanInput] = useState(false);
+  const [playTime, setPlayTime] = useState(0);
+  const [selectedButton, setSelectedButton] = useState("play"); // 'play' or 'folder'
+  const lastInputTime = useRef(0);
+  const buttons = getControllerButtons(controllerType);
+
+  const gameName = game.game || game.name;
+
+  useEffect(() => {
+    console.log("[InstalledGameDetailsView] Mounted with game:", gameName);
+    console.log("[InstalledGameDetailsView] Game object:", game);
+  }, []);
+
+  // Load game image
+  useEffect(() => {
+    let isMounted = true;
+    const loadCover = async () => {
+      try {
+        console.log("[InstalledGameDetailsView] Loading cover for:", gameName);
+        const base64 = await window.electron.getGameImage(gameName);
+        if (isMounted && base64) {
+          console.log("[InstalledGameDetailsView] Cover loaded successfully");
+          setImageSrc(`data:image/jpeg;base64,${base64}`);
+        } else {
+          console.log("[InstalledGameDetailsView] No cover image found");
+        }
+      } catch (e) {
+        console.error("[InstalledGameDetailsView] Error loading game image:", e);
+      }
+    };
+    loadCover();
+    return () => {
+      isMounted = false;
+    };
+  }, [gameName]);
+
+  // Load play time from game object
+  useEffect(() => {
+    console.log("[InstalledGameDetailsView] Game playTime:", game.playTime);
+    setPlayTime(game.playTime || 0);
+  }, [game.playTime]);
+
+  // Check if game is running
+  useEffect(() => {
+    const checkRunning = async () => {
+      try {
+        const running = await window.electron.isGameRunning(gameName);
+        setIsRunning(running);
+      } catch (e) {
+        console.error("Error checking game status:", e);
+      }
+    };
+    checkRunning();
+    const interval = setInterval(checkRunning, 2000);
+    return () => clearInterval(interval);
+  }, [gameName]);
+
+  // Fetch Steam data
+  useEffect(() => {
+    let isMounted = true;
+    const fetchGameData = async () => {
+      console.log("[InstalledGameDetailsView] Fetching Steam data for:", gameName);
+      setLoadingMedia(true);
+      try {
+        const data = await steamService.getGameDetails(gameName);
+        console.log("[InstalledGameDetailsView] Steam data received:", data);
+        if (data) {
+          console.log(
+            "[InstalledGameDetailsView] - short_description:",
+            data.short_description
+          );
+          console.log(
+            "[InstalledGameDetailsView] - formatted_screenshots:",
+            data.formatted_screenshots
+          );
+          console.log(
+            "[InstalledGameDetailsView] - screenshots count:",
+            data.formatted_screenshots?.length || 0
+          );
+        }
+        if (isMounted && data) {
+          setSteamData(data);
+        } else if (!data) {
+          console.log("[InstalledGameDetailsView] No Steam data found for game");
+        }
+      } catch (error) {
+        console.error("[InstalledGameDetailsView] Error fetching steam data:", error);
+      } finally {
+        if (isMounted) {
+          console.log(
+            "[InstalledGameDetailsView] Loading complete, loadingMedia set to false"
+          );
+          setLoadingMedia(false);
+        }
+      }
+    };
+    fetchGameData();
+    return () => {
+      isMounted = false;
+    };
+  }, [gameName]);
+
+  // Input delay on opening
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCanInput(true);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Handle play game
+  const handlePlayGame = async () => {
+    if (isLaunching || isRunning) return;
+
+    setIsLaunching(true);
+
+    try {
+      // Check if in dev mode
+      if (await window.electron.isDev()) {
+        setTimeout(() => toast.error(t("library.cannotRunDev")), 0);
+        setIsLaunching(false);
+        return;
+      }
+
+      // Check if already running
+      const running = await window.electron.isGameRunning(gameName);
+      if (running) {
+        setTimeout(() => toast.error(t("library.alreadyRunning", { game: gameName })), 0);
+        setIsLaunching(false);
+        return;
+      }
+
+      // Check Steam for online games
+      if (game.online) {
+        const hideSteamWarning = localStorage.getItem("hideSteamWarning");
+        if (!hideSteamWarning) {
+          if (!(await window.electron.isSteamRunning())) {
+            setTimeout(() => toast.error(t("library.steamNotRunning")), 0);
+            setIsLaunching(false);
+            return;
+          }
+        }
+      }
+
+      // Launch the game
+      killAudioAndMiniplayer();
+      await window.electron.playGame(
+        gameName,
+        game.isCustom,
+        game.backups ?? false,
+        false,
+        null,
+        false
+      );
+
+      // Save to recently played
+      recentGamesService.addRecentGame({
+        game: gameName,
+        name: game.name,
+        imgID: game.imgID,
+        version: game.version,
+        isCustom: game.isCustom,
+        online: game.online,
+        dlc: game.dlc,
+      });
+
+      setIsLaunching(false);
+      setTimeout(() => toast.success(t("library.gameLaunched", { game: gameName })), 0);
+    } catch (error) {
+      console.error("Error launching game:", error);
+      setTimeout(() => toast.error(t("library.launchFailed")), 0);
+      setIsLaunching(false);
+    }
+  };
+
+  // Handle open directory
+  const handleOpenDirectory = async () => {
+    await window.electron.openGameDirectory(gameName, game.isCustom);
+  };
+
+  const handleInput = useCallback(
+    action => {
+      if (!canInput) return;
+
+      if (action === "DOWN") {
+        if (!showMedia) setShowMedia(true);
+      } else if (action === "UP") {
+        if (showMedia) setShowMedia(false);
+      } else if (action === "LEFT") {
+        if (!showMedia) setSelectedButton("play");
+      } else if (action === "RIGHT") {
+        if (!showMedia) setSelectedButton("folder");
+      } else if (action === "BACK" || action === "MENU") {
+        if (showMedia) setShowMedia(false);
+        else {
+          console.log("[GAME DETAILS] Back/Menu pressed, calling onBack");
+          onBack();
+        }
+      } else if (action === "CONFIRM") {
+        if (!showMedia) {
+          if (selectedButton === "play" && !isLaunching && !isRunning) {
+            handlePlayGame();
+          } else if (selectedButton === "folder") {
+            handleOpenDirectory();
+          }
+        }
+      } else if (action === "X") {
+        if (!showMedia) handleOpenDirectory();
+      }
+    },
+    [
+      showMedia,
+      onBack,
+      isLaunching,
+      isRunning,
+      canInput,
+      handlePlayGame,
+      handleOpenDirectory,
+      selectedButton,
+    ]
+  );
+
+  // Keyboard Listener
+  useEffect(() => {
+    const handleKeyDown = e => {
+      if (e.repeat) return;
+      const map = {
+        ArrowDown: "DOWN",
+        ArrowUp: "UP",
+        Escape: "BACK",
+        Backspace: "BACK",
+        Enter: "CONFIRM",
+        x: "X",
+        X: "X",
+        m: "MENU",
+        M: "MENU",
+        ContextMenu: "MENU",
+      };
+      if (map[e.key]) {
+        e.stopPropagation();
+        handleInput(map[e.key]);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [handleInput]);
+
+  // Gamepad Polling
+  useEffect(() => {
+    let rAF;
+    const loop = () => {
+      const gp = getGamepadInput();
+      if (gp && canInput) {
+        const now = Date.now();
+        if (now - lastInputTime.current > 150) {
+          if (gp.down) {
+            handleInput("DOWN");
+            lastInputTime.current = now;
+          } else if (gp.up) {
+            handleInput("UP");
+            lastInputTime.current = now;
+          } else if (gp.b) {
+            handleInput("BACK");
+            lastInputTime.current = now;
+          } else if (gp.a) {
+            handleInput("CONFIRM");
+            lastInputTime.current = now;
+          } else if (gp.x) {
+            handleInput("X");
+            lastInputTime.current = now;
+          } else if (gp.menu) {
+            handleInput("MENU");
+            lastInputTime.current = now;
+          }
+        }
+      }
+      rAF = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => cancelAnimationFrame(rAF);
+  }, [handleInput, canInput]);
+
+  const formatPlayTime = time => {
+    if (!time || time < 60) return t("library.notPlayedYet") || "Not played yet";
+    if (time < 3600) return `${Math.floor(time / 60)} ${t("library.minutes")}`;
+    if (time < 7200) return `1 ${t("library.hour")}`;
+    return `${Math.floor(time / 3600)} ${t("library.hours")}`;
+  };
+
+  const hasScreenshots =
+    steamData?.formatted_screenshots && steamData.formatted_screenshots.length > 0;
+  const bgImage = imageSrc;
+  const gameDescription = (
+    steamData?.short_description ||
+    steamData?.about_the_game ||
+    steamData?.detailed_description ||
+    steamData?.summary ||
+    steamData?.description ||
+    ""
+  )?.replace(/<[^>]*>/g, "");
+
+  useEffect(() => {
+    console.log("[InstalledGameDetailsView] Render state:");
+    console.log("  - imageSrc:", imageSrc ? "loaded" : "not loaded");
+    console.log("  - steamData:", steamData ? "loaded" : "not loaded");
+    console.log("  - hasScreenshots:", hasScreenshots);
+    console.log("  - gameDescription:", gameDescription ? "available" : "not available");
+    console.log("  - loadingMedia:", loadingMedia);
+  }, [imageSrc, steamData, hasScreenshots, gameDescription, loadingMedia]);
+
+  return (
+    <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-[#0e0e10] text-white">
+      <div
+        className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
+        style={{
+          backgroundImage: bgImage ? `url(${bgImage})` : "none",
+          backgroundColor: bgImage ? "transparent" : "#1e293b",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(60px) saturate(150%)",
+        }}
+      />
+
+      <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#0e0e10] via-[#0e0e10]/70 to-transparent" />
+
+      <div
+        className={`absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
+          showMedia
+            ? "pointer-events-none translate-y-[-10%] scale-95 opacity-0"
+            : "translate-y-0 scale-100 opacity-100"
+        }`}
+      >
+        <div className="group relative">
+          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-blue-500/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
+          {bgImage ? (
+            <img
+              src={bgImage}
+              alt={gameName}
+              className="max-h-[75vh] max-w-full rotate-2 rounded-2xl border-4 border-white/10 object-cover shadow-2xl transition-all duration-500 ease-out group-hover:rotate-0 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-[60vh] w-[40vw] items-center justify-center rounded-2xl border-4 border-white/10 bg-slate-800">
+              <span className="text-2xl text-slate-500">{gameName}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div
+        className={`ease-[cubic-bezier(0.32,0.72,0,1)] relative z-20 h-full w-full transition-transform duration-500 ${
+          showMedia ? "-translate-y-full" : "translate-y-0"
+        }`}
+      >
+        {/* VIEW 1: DETAILS */}
+        <div className="relative h-full w-full flex-shrink-0">
+          <div className="flex h-full w-[45%] flex-col justify-center p-16 pl-24">
+            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight drop-shadow-lg">
+              {gameName}
+            </h1>
+
+            {game.category && game.category.length > 0 && (
+              <div className="mb-6 flex flex-wrap gap-3">
+                {game.category.slice(0, 4).map((cat, idx) => (
+                  <span
+                    key={idx}
+                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider backdrop-blur-sm"
+                  >
+                    {cat}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="mb-8 flex gap-6 text-slate-400">
+              {game.version && (
+                <div className="flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  <span className="font-medium">v{game.version}</span>
+                </div>
+              )}
+              {playTime > 0 && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  <span className="font-medium">{formatPlayTime(playTime)}</span>
+                </div>
+              )}
+            </div>
+
+            {gameDescription ? (
+              <p className="mb-8 max-w-2xl text-lg leading-relaxed text-slate-300">
+                {gameDescription}
+              </p>
+            ) : (
+              <p className="mb-8 max-w-2xl text-sm italic text-slate-500">
+                {loadingMedia ? "Loading description..." : "No description available"}
+              </p>
+            )}
+
+            {(game.dlc || game.online) && (
+              <div className="mb-8 flex gap-4">
+                {game.dlc && (
+                  <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/20 px-4 py-2 text-sm font-medium text-purple-300">
+                    <Download className="h-4 w-4" />
+                    <span>Includes DLC</span>
+                  </div>
+                )}
+                {game.online && (
+                  <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-2 text-sm font-medium text-green-300">
+                    <Wifi className="h-4 w-4" />
+                    <span>Online Fix</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-4">
+              <button
+                onClick={handlePlayGame}
+                disabled={isLaunching || isRunning}
+                className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 ${
+                  selectedButton === "play"
+                    ? "scale-110 bg-blue-500 text-white shadow-blue-500/50 ring-4 ring-blue-400/50"
+                    : "bg-white text-black shadow-black/30 hover:scale-105 hover:bg-blue-400 hover:text-white"
+                }`}
+              >
+                {isLaunching ? (
+                  <>
+                    <Loader className="h-7 w-7 animate-spin" />
+                    <span>LAUNCHING...</span>
+                  </>
+                ) : isRunning ? (
+                  <>
+                    <Play className="h-7 w-7 fill-current" />
+                    <span>RUNNING</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-7 w-7 fill-current" />
+                    <span>PLAY</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleOpenDirectory}
+                className={`flex items-center gap-3 rounded-2xl border-2 px-8 py-5 text-xl font-bold backdrop-blur-sm transition-all duration-200 ${
+                  selectedButton === "folder"
+                    ? "scale-110 border-blue-400 bg-blue-500/30 shadow-lg shadow-blue-500/30 ring-4 ring-blue-400/50"
+                    : "border-white/20 bg-white/10 hover:scale-105 hover:border-white/40 hover:bg-white/20"
+                }`}
+              >
+                <FolderOpen className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+
+          {hasScreenshots && (
+            <div className="absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 animate-bounce flex-col items-center gap-2 opacity-60">
+              <span className="text-xs font-bold uppercase tracking-widest">
+                Screenshots
+              </span>
+              <ChevronDown className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+
+        {/* VIEW 2: MEDIA */}
+        <div className="relative flex h-full w-full flex-shrink-0 flex-col">
+          <div className="absolute inset-0 -z-10 bg-[#0e0e10]/90 backdrop-blur-md" />
+          <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
+            <ImageIcon className="h-8 w-8 text-blue-500" />
+            <h2 className="text-4xl font-light tracking-wider">SCREENSHOTS</h2>
+          </div>
+
+          <div className="no-scrollbar flex-1 overflow-y-auto p-12 px-24 pb-32">
+            {steamData?.formatted_screenshots &&
+            steamData.formatted_screenshots.length > 0 ? (
+              <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
+                {steamData.formatted_screenshots.map((screen, idx) => {
+                  const imageUrl =
+                    typeof screen === "string"
+                      ? screen
+                      : screen.path_full || screen.path_thumbnail || screen.url;
+                  return (
+                    <div
+                      key={idx}
+                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-slate-800 transition-all hover:scale-[1.02] hover:border-blue-500"
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`Screenshot ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={e => {
+                          console.log("[Screenshot] Failed to load:", imageUrl);
+                          e.target.style.display = "none";
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : loadingMedia ? (
+              <div className="flex h-full items-center justify-center text-slate-500">
+                <Loader className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate-500">
+                <p>No screenshots available.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Controls */}
+      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-slate-400">
+        {!showMedia && !isLaunching && !isRunning && (
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-black text-black shadow-lg">
+              {buttons.confirm}
+            </span>
+            PLAY
+          </div>
+        )}
+        {!showMedia && (
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm font-black">
+              {buttons.delete}
+            </span>
+            OPEN FOLDER
+          </div>
+        )}
+        <div
+          className="flex cursor-pointer items-center gap-3 transition-colors hover:text-white"
+          onClick={() => handleInput("BACK")}
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm">
+            {buttons.cancel}
+          </span>
           {showMedia ? "UP / BACK" : "BACK"}
         </div>
       </div>
@@ -747,7 +2297,12 @@ const GameDetailsView = ({ game, onBack, onDownload }) => {
 const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
   const cardRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
-  const imageUrl = game.imgID ? `https://api.ascendara.app/v2/image/${game.imgID}` : null;
+  const { cachedImage, loading } = useImageLoader(game?.imgID, {
+    quality: isVisible ? "high" : "low",
+    priority: isVisible ? "high" : "low",
+    enabled: !!game?.imgID && isVisible,
+  });
+  const imageUrl = cachedImage || game.cover || game.image || null;
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -771,7 +2326,10 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
   }, [isSelected]);
 
   useEffect(() => {
-    setIsVisible(false);
+    if (isVisible && game.imgID) {
+      setIsVisible(false);
+      setTimeout(() => setIsVisible(true), 0);
+    }
   }, [game.imgID]);
 
   return (
@@ -791,6 +2349,10 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
             style={{ objectPosition: "center top" }}
             loading="lazy"
           />
+        ) : loading ? (
+          <div className="flex h-full w-full items-center justify-center bg-slate-800">
+            <Loader className="h-8 w-8 animate-spin text-blue-400" />
+          </div>
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center bg-slate-800 text-slate-500">
             <Download className="mb-2 h-8 w-8 opacity-50" />
@@ -798,6 +2360,33 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
           </div>
         )}
       </div>
+      {/* Top Status Bar */}
+      <div className="absolute left-0 right-0 top-0 z-20 flex items-start justify-between p-2">
+        {/* Rating badge */}
+        {game.rating && game.rating > 0 && (
+          <div className="flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 backdrop-blur-sm">
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+            <span className="text-xs font-bold text-white">
+              {Math.round(game.rating)}
+            </span>
+          </div>
+        )}
+
+        {/* DLC/Online badges */}
+        <div className="flex items-center gap-1.5">
+          {game.dlc && (
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10 backdrop-blur-sm transition-all hover:bg-white/20">
+              <Gift className="h-3.5 w-3.5 text-white" />
+            </div>
+          )}
+          {game.online && (
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10 backdrop-blur-sm transition-all hover:bg-white/20">
+              <Gamepad2 className="h-3.5 w-3.5 text-white" />
+            </div>
+          )}
+        </div>
+      </div>
+
       {isSelected && (
         <div className="absolute bottom-0 left-0 right-0 z-20 rounded-b-xl bg-gradient-to-t from-black via-black/95 to-transparent p-4 pt-10 text-center">
           <span
@@ -923,7 +2512,13 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
                 LAST PLAYED
               </span>
               <span className="text-sm font-medium text-blue-100 drop-shadow-md">
-                {game.playTime ? `${Math.floor(game.playTime / 3600)}h played` : "Ready"}
+                {game.playTime && game.playTime >= 60
+                  ? game.playTime >= 3600
+                    ? `${Math.floor(game.playTime / 3600)}h played`
+                    : `${Math.floor(game.playTime / 60)}m played`
+                  : game.playTime > 0
+                    ? "< 1m played"
+                    : "0h played"}
               </span>
             </div>
           )}
@@ -943,42 +2538,109 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
 };
 
 // Store search bar
-const StoreSearchBar = ({ isSelected, searchQuery, onClick }) => {
+const StoreSearchBar = ({ isSelected, searchQuery, onClick, t }) => {
   return (
     <div
       onClick={onClick}
       className={`flex cursor-pointer items-center gap-4 rounded-xl px-6 py-4 transition-all duration-150 ${isSelected ? "scale-[1.02] bg-blue-500 text-white shadow-lg shadow-blue-500/30" : "bg-slate-800/80 text-slate-400 hover:bg-slate-700"}`}
     >
       <Search className="h-6 w-6" />
-      <span className="text-lg font-medium">{searchQuery || "Search a game..."}</span>
+      <span className="text-lg font-medium">
+        {searchQuery || t("bigPicture.searchGame")}
+      </span>
       {searchQuery && (
-        <span className="ml-auto text-sm opacity-70">Press A to modify</span>
+        <span className="ml-auto text-sm opacity-70">{t("bigPicture.pressAModify")}</span>
       )}
     </div>
   );
 };
 
-// Side menu
-const SidebarMenu = ({ isOpen, selectedIndex }) => {
+// Persistent sidebar for home screen navigation
+const HomeSidebar = ({ selectedIndex, t, onItemClick, isVisible }) => {
   const items = [
-    { icon: Home, label: "HOME", action: "home" },
-    { icon: Grid, label: "LIBRARY", action: "library" },
-    { icon: Library, label: "CATALOG", action: "downloads" },
-    { icon: LogOut, label: "EXIT BIG PICTURE", action: "exit_bp" },
-    { icon: Power, label: "CLOSE ASCENDARA", action: "quit_app", danger: true },
+    { icon: Home, label: t("bigPicture.home"), action: "home" },
+    { icon: Grid, label: t("bigPicture.library"), action: "library" },
+    { icon: SearchIcon, label: t("bigPicture.catalog"), action: "catalog" },
+    { icon: LogOut, label: t("bigPicture.exitBigPicture"), action: "exit_bp" },
+  ];
+
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed left-8 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-3">
+      {items.map((item, idx) => {
+        const isSelected = selectedIndex === idx;
+        return (
+          <div
+            key={idx}
+            onClick={() => onItemClick && onItemClick(idx)}
+            className="group relative flex cursor-pointer items-center transition-all duration-200"
+          >
+            {/* Icon container */}
+            <div
+              className={`flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-200 ${
+                isSelected
+                  ? "scale-110 bg-white shadow-[0_0_30px_rgba(255,255,255,0.5)]"
+                  : "bg-white/10 backdrop-blur-sm group-hover:scale-105 group-hover:bg-white/20"
+              }`}
+            >
+              <item.icon
+                className={`h-6 w-6 transition-colors duration-200 ${
+                  isSelected ? "text-black" : "text-white"
+                }`}
+              />
+            </div>
+
+            {/* Label tooltip - appears on hover or selection */}
+            <div
+              className={`absolute left-16 whitespace-nowrap rounded-lg bg-white px-4 py-2 text-sm font-bold text-black shadow-xl transition-all duration-200 ${
+                isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              }`}
+            >
+              {item.label}
+              {/* Arrow pointing to icon */}
+              <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 bg-white"></div>
+            </div>
+
+            {/* Selection indicator bar */}
+            {isSelected && (
+              <div className="absolute -left-2 h-8 w-1 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]" />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Side menu
+const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick }) => {
+  const items = [
+    { icon: Home, label: t("bigPicture.home"), action: "home" },
+    { icon: Grid, label: t("bigPicture.library"), action: "library" },
+    { icon: Library, label: t("bigPicture.catalog"), action: "catalog" },
+    { icon: Settings, label: t("bigPicture.settings"), action: "settings" },
+    { icon: LogOut, label: t("bigPicture.exitBigPicture"), action: "exit_bp" },
+    {
+      icon: Power,
+      label: t("bigPicture.closeAscendara"),
+      action: "quit_app",
+      danger: true,
+    },
   ];
   return (
     <div
       className={`fixed inset-y-0 left-0 z-[10000] flex w-[350px] transform flex-col bg-[#1a1b1e] p-8 shadow-2xl transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
     >
       <h2 className="mb-10 border-b border-slate-700 pb-4 text-2xl font-light tracking-widest text-slate-400">
-        MENU
+        {t("bigPicture.menu")}
       </h2>
       <div className="flex flex-col gap-4">
         {items.map((item, idx) => (
           <div
             key={idx}
-            className={`flex items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? (item.danger ? "scale-105 bg-red-600 text-white shadow-lg shadow-red-900/50" : "scale-105 bg-white text-black shadow-lg") : "text-slate-400 hover:bg-slate-800"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
+            onClick={() => onItemClick && onItemClick(idx)}
+            className={`flex cursor-pointer items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? (item.danger ? "scale-105 bg-red-600 text-white shadow-lg shadow-red-900/50" : "scale-105 bg-white text-black shadow-lg") : "text-slate-400 hover:bg-slate-800"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
           >
             <item.icon className="h-6 w-6" />
             <span className="font-bold tracking-wide">{item.label}</span>
@@ -986,20 +2648,21 @@ const SidebarMenu = ({ isOpen, selectedIndex }) => {
         ))}
       </div>
       <div className="mt-auto text-center text-xs uppercase tracking-wider text-slate-600">
-        Press B to close
+        {t("bigPicture.menuPressB")}
       </div>
     </div>
   );
 };
 
 // --- ACTIVE DOWNLOAD COMPONENT ---
-const ActiveDownloadsBar = ({ downloads }) => {
+const ActiveDownloadsBar = ({ downloads, t }) => {
   if (!downloads || downloads.length === 0) return null;
 
   return (
     <div className="absolute bottom-20 left-24 right-24 z-50 flex flex-col gap-2">
       <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-400">
-        <Download className="h-4 w-4" /> Active Downloads ({downloads.length})
+        <Download className="h-4 w-4" /> {t("bigPicture.activeDownloads")} (
+        {downloads.length})
       </h3>
       <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
         {downloads.map(game => {
@@ -1007,10 +2670,10 @@ const ActiveDownloadsBar = ({ downloads }) => {
           const progress = parseFloat(data.progressCompleted || 0);
           const speed = data.progressDownloadSpeeds || "0 KB/s";
           const status = data.extracting
-            ? "Extracting..."
+            ? t("bigPicture.extracting")
             : data.verifying
-              ? "Verifying..."
-              : "Downloading...";
+              ? t("bigPicture.verifying")
+              : t("bigPicture.downloading");
 
           return (
             <div
@@ -1093,21 +2756,11 @@ const useHideCursorOnGamepad = () => {
 
 export default function BigPicture() {
   useHideCursorOnGamepad();
-  // Switch to full-screen
+  const { t } = useLanguage();
+  const { settings, updateSetting } = useSettings();
+  const buttons = getControllerButtons(settings.controllerType || "xbox");
+  // Quit full-screen when leaving Big Picture
   useEffect(() => {
-    const enterFullScreen = async () => {
-      try {
-        if (!document.fullscreenElement) {
-          await document.documentElement.requestFullscreen();
-        }
-      } catch (err) {
-        console.error("Error entering fullscreen:", err);
-      }
-    };
-
-    enterFullScreen();
-
-    // Quit full-screen when leaving Big Picture
     return () => {
       if (document.fullscreenElement) {
         document
@@ -1122,20 +2775,36 @@ export default function BigPicture() {
   const [storeLoading, setStoreLoading] = useState(false);
   const [selectedStoreGame, setSelectedStoreGame] = useState(null);
   const [view, setView] = useState("carousel");
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [showExitBigPictureDialog, setShowExitBigPictureDialog] = useState(false);
+  const [showControllerSettings, setShowControllerSettings] = useState(false);
+  const [downloadingGame, setDownloadingGame] = useState(null);
+  const [selectedInstalledGame, setSelectedInstalledGame] = useState(null);
+  const [installedGameView, setInstalledGameView] = useState(false);
 
   // New state for active downloads
   const [downloadingGames, setDownloadingGames] = useState([]);
+
+  // Fuzzy matcher instance for search
+  const fuzzyMatch = useMemo(() => createFuzzyMatcher(), []);
 
   const [storeSearchQuery, setStoreSearchQuery] = useState("");
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isSearchBarSelected, setIsSearchBarSelected] = useState(false);
   const [keyboardLayout, setKeyboardLayout] = useState("qwerty");
 
+  // Enhanced filtering and sorting states
+  const [selectedSort, setSelectedSort] = useState("weight");
+  const [showDLC, setShowDLC] = useState(false);
+  const [showOnline, setShowOnline] = useState(false);
+
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [libraryIndex, setLibraryIndex] = useState(0);
   const [storeIndex, setStoreIndex] = useState(0);
   const [menuIndex, setMenuIndex] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [homeSidebarIndex, setHomeSidebarIndex] = useState(-1); // -1 means not focused on sidebar
+  const [isHomeSidebarActive, setIsHomeSidebarActive] = useState(false);
 
   const [displayedCount, setDisplayedCount] = useState(30);
   const loaderRef = useRef(null);
@@ -1177,77 +2846,35 @@ export default function BigPicture() {
 
   // --- DOWNLOAD LOGIC ---
   const handleStartDownload = async game => {
-    const sanitizedGameName = sanitizeText(game.game || game.name);
-
-    // Check if download directory exists (simple check)
-    const settings = await window.electron.getSettings();
-    if (!settings.downloadDirectory) {
-      toast.error("No download directory set in settings");
-      return;
-    }
-
-    // Determine Provider
-    let selectedProvider = "";
-    let directUrl = "";
-    const links = game.download_links;
-
-    if (links) {
-      const availableProviders = Object.keys(links).filter(
-        p => links[p] && links[p].length > 0
-      );
-
-      // Priority list: Gofile > Buzzheavier > 1fichier > others
-      if (availableProviders.includes("gofile")) selectedProvider = "gofile";
-      else if (availableProviders.includes("buzzheavier"))
-        selectedProvider = "buzzheavier";
-      else if (availableProviders.includes("1fichier")) selectedProvider = "1fichier";
-      else if (availableProviders.length > 0) selectedProvider = availableProviders[0];
-    }
-
-    if (selectedProvider && links[selectedProvider]) {
-      // Get first link
-      let providerLink = Array.isArray(links[selectedProvider])
-        ? links[selectedProvider][0]
-        : links[selectedProvider];
-
-      // Simple formatting
-      if (providerLink && !providerLink.startsWith("http")) {
-        if (providerLink.startsWith("//")) providerLink = "https:" + providerLink;
-        else providerLink = "https://" + providerLink;
-      }
-      directUrl = providerLink;
-    }
-
-    if (!directUrl) {
-      toast.error("No compatible download link found.");
-      return;
-    }
-
-    toast.info(`Starting download: ${game.game}`);
-    changeView("carousel"); // Go back to home to see progress
-
-    try {
-      const isVrGame = game.category?.includes("Virtual Reality");
-
-      await window.electron.downloadFile(
-        directUrl,
-        sanitizedGameName,
-        game.online || false,
-        game.dlc || false,
-        isVrGame || false,
-        false, // isUpdating
-        game.version || "",
-        game.imgID,
-        game.size || "",
-        0, // Default dir index
-        game.gameID || ""
-      );
-      toast.success("Download started!");
-    } catch (error) {
-      console.error("Download failed:", error);
-      toast.error("Failed to start download");
-    }
+    // Store the game and show dialog prompting user to exit Big Picture mode
+    setDownloadingGame(game);
+    setShowExitDialog(true);
   };
+
+  // --- INSTALLED GAME DETAILS HANDLERS ---
+  const handleShowInstalledGameDetails = game => {
+    setSelectedInstalledGame(game);
+    setInstalledGameView(true);
+  };
+
+  const handleCloseInstalledGameDetails = useCallback(() => {
+    console.log("[CLOSE GAME DETAILS] Resetting view");
+
+    // Use functional updates to ensure we're working with latest state
+    setInstalledGameView(prev => {
+      console.log(
+        "[CLOSE GAME DETAILS] Setting installedGameView from",
+        prev,
+        "to false"
+      );
+      return false;
+    });
+    setSelectedInstalledGame(null);
+
+    // Reset any active sidebar state
+    setIsHomeSidebarActive(false);
+    setHomeSidebarIndex(-1);
+  }, []);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -1261,13 +2888,60 @@ export default function BigPicture() {
     loadSettings();
   }, []);
 
+  // Debounced search for better performance
+  const debouncedSearchQuery = useDebouncedValue(storeSearchQuery, 300);
+
   const filteredStoreGames = useMemo(() => {
-    if (!storeSearchQuery.trim()) return storeGames;
-    const query = storeSearchQuery.toLowerCase();
-    return storeGames.filter(game =>
-      (game.game || game.name || "").toLowerCase().includes(query)
-    );
-  }, [storeGames, storeSearchQuery]);
+    let filtered = storeGames;
+
+    // Apply search filter
+    if (debouncedSearchQuery.trim()) {
+      filtered = filtered.filter(game => {
+        const gameTitle = game.game || game.name || "";
+        const gameDesc = game.desc || "";
+        return fuzzyMatch(gameTitle + " " + gameDesc, debouncedSearchQuery);
+      });
+    }
+
+    // Apply content filters (DLC/Online)
+    if (showDLC || showOnline) {
+      filtered = filtered.filter(game => {
+        if (showDLC && showOnline) {
+          return game.dlc || game.online;
+        } else if (showDLC) {
+          return game.dlc;
+        } else if (showOnline) {
+          return game.online;
+        }
+        return true;
+      });
+    }
+
+    // Apply sorting
+    const sortFn = (() => {
+      switch (selectedSort) {
+        case "weight":
+          return (a, b) => (b.weight || 0) - (a.weight || 0);
+        case "weight-asc":
+          return (a, b) => (a.weight || 0) - (b.weight || 0);
+        case "name":
+          return (a, b) => (a.game || a.name || "").localeCompare(b.game || b.name || "");
+        case "name-desc":
+          return (a, b) => (b.game || b.name || "").localeCompare(a.game || a.name || "");
+        case "latest_update-desc":
+          return (a, b) => {
+            if (!a.latest_update && !b.latest_update) return 0;
+            if (!a.latest_update) return 1;
+            if (!b.latest_update) return -1;
+            return new Date(b.latest_update) - new Date(a.latest_update);
+          };
+        default:
+          return null;
+      }
+    })();
+
+    return sortFn ? [...filtered].sort(sortFn) : filtered;
+  }, [storeGames, debouncedSearchQuery, fuzzyMatch, showDLC, showOnline, selectedSort]);
 
   const displayedStoreGames = useMemo(() => {
     return filteredStoreGames.slice(0, displayedCount);
@@ -1330,7 +3004,11 @@ export default function BigPicture() {
         let carousel = [...games];
         if (carousel.length > 20) {
           carousel = carousel.slice(0, 20);
-          carousel.push({ isSeeMore: true, game: "See more", name: "See more" });
+          carousel.push({
+            isSeeMore: true,
+            game: t("bigPicture.seeMore"),
+            name: t("bigPicture.seeMore"),
+          });
         }
         setCarouselGames(carousel);
       } catch (error) {}
@@ -1347,7 +3025,7 @@ export default function BigPicture() {
         let list = Array.isArray(response) ? response : response.games || [];
         setStoreGames(list);
       } catch (e) {
-        toast.error("Unable to load catalog");
+        toast.error(t("bigPicture.unableToLoadCatalog"));
       } finally {
         setStoreLoading(false);
       }
@@ -1385,19 +3063,61 @@ export default function BigPicture() {
   // --- MAIN NAVIGATION LOGIC (SHARED BETWEEN KEYBOARD & GAMEPAD) ---
   const handleNavigation = useCallback(
     action => {
-      if (isKeyboardOpen || (view === "details" && action !== "MENU")) return;
+      console.log(
+        "[NAV]",
+        action,
+        "→",
+        view,
+        "| installedGameView:",
+        installedGameView,
+        "| isKeyboardOpen:",
+        isKeyboardOpen
+      );
+
+      if (isKeyboardOpen) {
+        console.log("[NAV] Blocked by keyboard");
+        return;
+      }
+
+      if (installedGameView) {
+        console.log("[NAV] Blocked by installedGameView");
+        return;
+      }
+
+      // Allow GameDetailsView to handle its own navigation
+      if (view === "details" && action === "MENU") {
+        setIsMenuOpen(true);
+        return;
+      } else if (view === "details") {
+        // GameDetailsView handles all other navigation internally
+        return;
+      }
 
       if (isMenuOpen) {
-        if (action === "DOWN") setMenuIndex(p => Math.min(p + 1, 4));
+        if (action === "DOWN") setMenuIndex(p => Math.min(p + 1, 5));
         else if (action === "UP") setMenuIndex(p => Math.max(p - 1, 0));
         else if (action === "BACK" || action === "MENU") setIsMenuOpen(false);
         else if (action === "CONFIRM") {
           setIsMenuOpen(false);
-          if (menuIndex === 0) changeView("carousel");
-          else if (menuIndex === 1) changeView("library");
-          else if (menuIndex === 2) changeView("store");
-          else if (menuIndex === 3) navigate("/");
-          else if (menuIndex === 4) window.close();
+          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=SETTINGS, 4=EXIT BIG PICTURE, 5=CLOSE ASCENDARA
+          if (menuIndex === 0) {
+            changeView("carousel");
+          } else if (menuIndex === 1) {
+            changeView("library");
+          } else if (menuIndex === 2) {
+            changeView("store");
+          } else if (menuIndex === 3) {
+            setShowControllerSettings(true);
+          } else if (menuIndex === 4) {
+            setShowExitBigPictureDialog(true);
+          } else if (menuIndex === 5) {
+            // Close Ascendara completely
+            if (window.electron && window.electron.closeApp) {
+              window.electron.closeApp();
+            } else {
+              window.close();
+            }
+          }
         }
         return;
       }
@@ -1410,25 +3130,41 @@ export default function BigPicture() {
         if (action === "RIGHT") {
           const isAtRowEnd = (libraryIndex + 1) % GRID_COLS === 0;
           if (!isAtRowEnd && libraryIndex < maxIndex) {
-            setLibraryIndex(p => p + 1);
+            setLibraryIndex(p => {
+              console.log("[LIBRARY] RIGHT:", p, "→", p + 1);
+              return p + 1;
+            });
+          } else {
+            console.log("[LIBRARY] RIGHT blocked - at row end or max");
           }
         } else if (action === "LEFT") {
           const isAtRowStart = libraryIndex % GRID_COLS === 0;
           if (!isAtRowStart && libraryIndex > 0) {
-            setLibraryIndex(p => p - 1);
+            setLibraryIndex(p => {
+              console.log("[LIBRARY] LEFT:", p, "→", p - 1);
+              return p - 1;
+            });
+          } else {
+            console.log("[LIBRARY] LEFT blocked - at row start");
           }
         } else if (action === "DOWN") {
           if (libraryIndex + GRID_COLS <= maxIndex) {
-            setLibraryIndex(p => p + GRID_COLS);
+            setLibraryIndex(p => {
+              console.log("[LIBRARY] DOWN:", p, "→", p + GRID_COLS);
+              return p + GRID_COLS;
+            });
           }
         } else if (action === "UP") {
           if (libraryIndex >= GRID_COLS) {
-            setLibraryIndex(p => p - GRID_COLS);
+            setLibraryIndex(p => {
+              console.log("[LIBRARY] UP:", p, "→", p - GRID_COLS);
+              return p - GRID_COLS;
+            });
           }
         } else if (action === "MENU") setIsMenuOpen(true);
         else if (action === "BACK") changeView("carousel");
         else if (action === "CONFIRM" && allGames[libraryIndex])
-          launchGame(allGames[libraryIndex]);
+          handleShowInstalledGameDetails(allGames[libraryIndex]);
         return;
       }
 
@@ -1481,19 +3217,83 @@ export default function BigPicture() {
 
       // Default: Carousel
       const currentList = carouselGames;
-      if (action === "RIGHT")
-        setCarouselIndex(p => Math.min(p + 1, currentList.length - 1));
-      else if (action === "LEFT") setCarouselIndex(p => Math.max(p - 1, 0));
-      else if (action === "MENU") setIsMenuOpen(true);
+
+      // Home Sidebar navigation in carousel view
+      if (isHomeSidebarActive) {
+        if (action === "DOWN") {
+          setHomeSidebarIndex(p => Math.min(p + 1, 3)); // 4 items (0-3)
+        } else if (action === "UP") {
+          setHomeSidebarIndex(p => Math.max(p - 1, 0));
+        } else if (action === "RIGHT") {
+          // Exit sidebar, go back to carousel
+          setIsHomeSidebarActive(false);
+          setHomeSidebarIndex(-1);
+        } else if (action === "BACK") {
+          setIsHomeSidebarActive(false);
+          setHomeSidebarIndex(-1);
+        } else if (action === "CONFIRM") {
+          // Execute sidebar action
+          if (homeSidebarIndex === 0) {
+            changeView("carousel");
+          } else if (homeSidebarIndex === 1) {
+            changeView("library");
+          } else if (homeSidebarIndex === 2) {
+            changeView("store");
+          } else if (homeSidebarIndex === 3) {
+            // Exit Big Picture - only show dialog if there's a download
+            if (downloadingGame) {
+              setShowExitDialog(true);
+            } else {
+              navigate("/");
+            }
+          }
+          setIsHomeSidebarActive(false);
+          setHomeSidebarIndex(-1);
+        } else if (action === "MENU") {
+          setIsMenuOpen(true);
+        }
+        return;
+      }
+
+      if (action === "RIGHT") {
+        setCarouselIndex(p => {
+          const newIndex = Math.min(p + 1, currentList.length - 1);
+          if (newIndex !== p) console.log("[CAROUSEL] RIGHT:", p, "→", newIndex);
+          return newIndex;
+        });
+      } else if (action === "LEFT") {
+        // Check if at first item, then activate sidebar
+        if (carouselIndex === 0) {
+          setIsHomeSidebarActive(true);
+          setHomeSidebarIndex(0);
+        } else {
+          setCarouselIndex(p => {
+            const newIndex = Math.max(p - 1, 0);
+            if (newIndex !== p) console.log("[CAROUSEL] LEFT:", p, "→", newIndex);
+            return newIndex;
+          });
+        }
+      } else if (action === "UP") {
+        // Activate sidebar from carousel
+        setIsHomeSidebarActive(true);
+        setHomeSidebarIndex(0);
+      } else if (action === "DOWN") {
+        // Activate sidebar from carousel
+        setIsHomeSidebarActive(true);
+        setHomeSidebarIndex(0);
+      } else if (action === "MENU") setIsMenuOpen(true);
       else if (action === "CONFIRM") {
         const game = currentList[carouselIndex];
         if (game?.isSeeMore) changeView("library");
-        else if (game) launchGame(game);
+        else if (game) handleShowInstalledGameDetails(game);
       }
     },
     [
       isKeyboardOpen,
       isMenuOpen,
+      installedGameView,
+      isHomeSidebarActive,
+      homeSidebarIndex,
       menuIndex,
       view,
       allGames,
@@ -1510,12 +3310,23 @@ export default function BigPicture() {
       changeView,
       navigate,
       handleSelectStoreGame,
+      handleShowInstalledGameDetails,
+      downloadingGame,
     ]
   );
 
   // Keyboard Event Listener
   useEffect(() => {
     const handleKeyDown = e => {
+      // Block navigation when any dialog is open
+      if (
+        showExitDialog ||
+        showExitBigPictureDialog ||
+        showControllerSettings ||
+        isKeyboardOpen
+      )
+        return;
+
       const now = Date.now();
       if (now - lastNavTime.current < 100) return;
 
@@ -1538,18 +3349,36 @@ export default function BigPicture() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNavigation]);
+  }, [
+    handleNavigation,
+    showExitDialog,
+    showExitBigPictureDialog,
+    showControllerSettings,
+    isKeyboardOpen,
+  ]);
 
   // GAMEPAD POLLING LOOP for Main Navigation
   useEffect(() => {
     let animationFrameId;
 
     const loop = () => {
+      // Block navigation when any dialog is open
+      if (
+        showExitDialog ||
+        showExitBigPictureDialog ||
+        showControllerSettings ||
+        isKeyboardOpen
+      ) {
+        animationFrameId = requestAnimationFrame(loop);
+        return;
+      }
+
       const gp = getGamepadInput();
       if (gp) {
         const now = Date.now();
+        const timeSinceLastNav = now - lastNavTime.current;
 
-        if (now - lastNavTime.current > 170) {
+        if (timeSinceLastNav > 170) {
           let handledNav = false;
 
           if (gp.up) {
@@ -1566,7 +3395,9 @@ export default function BigPicture() {
             handledNav = true;
           }
 
-          if (handledNav) lastNavTime.current = now;
+          if (handledNav) {
+            lastNavTime.current = now;
+          }
         }
 
         // 2. ACTIONS
@@ -1592,7 +3423,13 @@ export default function BigPicture() {
 
     loop();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [handleNavigation]);
+  }, [
+    handleNavigation,
+    showExitDialog,
+    showExitBigPictureDialog,
+    showControllerSettings,
+    isKeyboardOpen,
+  ]);
 
   return (
     <div className="fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-[#0e0e10] text-white">
@@ -1601,8 +3438,19 @@ export default function BigPicture() {
         richColors
         toastOptions={{
           style: {
-            zIndex: 99999,
+            zIndex: 999999,
+            background: "rgba(0, 0, 0, 0.95)",
+            border: "2px solid rgba(59, 130, 246, 0.5)",
+            color: "white",
+            fontSize: "18px",
+            fontWeight: "bold",
+            padding: "20px 30px",
+            borderRadius: "16px",
+            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(59, 130, 246, 0.3)",
+            backdropFilter: "blur(10px)",
+            minWidth: "400px",
           },
+          className: "big-picture-toast",
         }}
       />
 
@@ -1615,13 +3463,94 @@ export default function BigPicture() {
           suggestions={searchSuggestions}
           onSelectSuggestion={handleSelectSuggestion}
           layout={keyboardLayout}
+          t={t}
+          controllerType={settings.controllerType || "xbox"}
+        />
+      )}
+
+      {showExitDialog && (
+        <ExitDialog
+          isOpen={showExitDialog}
+          onClose={() => setShowExitDialog(false)}
+          onConfirm={() => {
+            setShowExitDialog(false);
+            if (downloadingGame) {
+              navigate("/download", {
+                state: {
+                  gameData: downloadingGame,
+                },
+              });
+            } else {
+              navigate("/");
+            }
+          }}
+          t={t}
+          controllerType={settings.controllerType || "xbox"}
+        />
+      )}
+
+      {showExitBigPictureDialog && (
+        <ExitBigPictureDialog
+          isOpen={showExitBigPictureDialog}
+          onClose={() => setShowExitBigPictureDialog(false)}
+          onConfirm={() => {
+            setShowExitBigPictureDialog(false);
+            navigate("/");
+          }}
+          t={t}
+          controllerType={settings.controllerType || "xbox"}
+        />
+      )}
+
+      {showControllerSettings && (
+        <BigPictureSettingsDialog
+          isOpen={showControllerSettings}
+          onClose={() => setShowControllerSettings(false)}
+          t={t}
+          currentType={settings.controllerType || "xbox"}
+          currentKeyboardLayout={keyboardLayout}
+          controllerType={settings.controllerType || "xbox"}
+          onTypeChange={newType => {
+            updateSetting("controllerType", newType);
+            toast.success(`Controller type set to ${newType}`);
+          }}
+          onKeyboardLayoutChange={newLayout => {
+            setKeyboardLayout(newLayout);
+            updateSetting("bigPictureKeyboardLayout", newLayout);
+            toast.success(`Keyboard layout set to ${newLayout.toUpperCase()}`);
+          }}
         />
       )}
 
       <div
         className={`absolute inset-0 z-[9000] bg-black/60 transition-opacity duration-200 ${isMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
       />
-      <SidebarMenu isOpen={isMenuOpen} selectedIndex={menuIndex} />
+      <SidebarMenu
+        isOpen={isMenuOpen}
+        selectedIndex={menuIndex}
+        t={t}
+        onItemClick={idx => {
+          setIsMenuOpen(false);
+          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=SETTINGS, 4=EXIT BIG PICTURE, 5=CLOSE ASCENDARA
+          if (idx === 0) {
+            changeView("carousel");
+          } else if (idx === 1) {
+            changeView("library");
+          } else if (idx === 2) {
+            changeView("store");
+          } else if (idx === 3) {
+            setShowControllerSettings(true);
+          } else if (idx === 4) {
+            setShowExitBigPictureDialog(true);
+          } else if (idx === 5) {
+            if (window.electron && window.electron.closeApp) {
+              window.electron.closeApp();
+            } else {
+              window.close();
+            }
+          }
+        }}
+      />
 
       {view !== "details" && (
         <div
@@ -1629,7 +3558,11 @@ export default function BigPicture() {
         >
           <h1 className="flex items-center gap-4 text-3xl font-light uppercase tracking-[0.2em] text-white/90">
             <span className="h-1 w-12 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]"></span>
-            {view === "library" ? "ALL GAMES" : view === "store" ? "CATALOG" : "HOME"}
+            {view === "library"
+              ? t("bigPicture.library")
+              : view === "store"
+                ? t("bigPicture.catalog")
+                : t("bigPicture.home")}
           </h1>
         </div>
       )}
@@ -1639,6 +3572,31 @@ export default function BigPicture() {
       >
         {view === "carousel" && (
           <>
+            {/* Home screen sidebar navigation */}
+            <HomeSidebar
+              selectedIndex={isHomeSidebarActive ? homeSidebarIndex : -1}
+              t={t}
+              onItemClick={idx => {
+                if (idx === 0) {
+                  changeView("carousel");
+                } else if (idx === 1) {
+                  changeView("library");
+                } else if (idx === 2) {
+                  changeView("store");
+                } else if (idx === 3) {
+                  // Exit Big Picture - show download dialog if there's a download, otherwise show exit confirmation
+                  if (downloadingGame) {
+                    setShowExitDialog(true);
+                  } else {
+                    setShowExitBigPictureDialog(true);
+                  }
+                }
+                setIsHomeSidebarActive(false);
+                setHomeSidebarIndex(-1);
+              }}
+              isVisible={!isKeyboardOpen && !isMenuOpen}
+            />
+
             <div
               id="big-picture-scroll-container"
               className="no-scrollbar flex h-[65vh] w-screen max-w-[100vw] items-center overflow-x-auto overflow-y-visible scroll-smooth px-24"
@@ -1658,7 +3616,7 @@ export default function BigPicture() {
               </div>
             </div>
             {/* Show active downloads in carousel view */}
-            <ActiveDownloadsBar downloads={downloadingGames} />
+            <ActiveDownloadsBar downloads={downloadingGames} t={t} />
           </>
         )}
 
@@ -1689,11 +3647,15 @@ export default function BigPicture() {
                   setIsSearchBarSelected(true);
                   setIsKeyboardOpen(true);
                 }}
+                t={t}
               />
               {storeSearchQuery && (
                 <p className="mt-2 text-sm text-slate-500">
-                  {filteredStoreGames.length} result
-                  {filteredStoreGames.length > 1 ? "s" : ""} for "{storeSearchQuery}"
+                  {filteredStoreGames.length}{" "}
+                  {filteredStoreGames.length > 1
+                    ? t("bigPicture.resultsForPlural")
+                    : t("bigPicture.resultsFor")}{" "}
+                  "{storeSearchQuery}"
                 </p>
               )}
             </div>
@@ -1702,7 +3664,9 @@ export default function BigPicture() {
               <div className="flex flex-1 items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                   <div className="h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                  <p className="text-xl text-slate-400">Loading catalog...</p>
+                  <p className="text-xl text-slate-400">
+                    {t("bigPicture.loadingCatalog")}
+                  </p>
                 </div>
               </div>
             ) : filteredStoreGames.length === 0 ? (
@@ -1710,7 +3674,9 @@ export default function BigPicture() {
                 <div className="flex flex-col items-center gap-4">
                   <Search className="h-16 w-16 text-slate-600" />
                   <p className="text-xl text-slate-400">
-                    {storeSearchQuery ? "No game found" : "No game available"}
+                    {storeSearchQuery
+                      ? t("bigPicture.noGameFound")
+                      : t("bigPicture.noGameAvailable")}
                   </p>
                 </div>
               </div>
@@ -1746,11 +3712,22 @@ export default function BigPicture() {
               setSelectedStoreGame(null);
             }}
             onDownload={handleStartDownload}
+            t={t}
+            controllerType={settings.controllerType || "xbox"}
+          />
+        )}
+
+        {installedGameView && selectedInstalledGame && (
+          <InstalledGameDetailsView
+            game={selectedInstalledGame}
+            onBack={handleCloseInstalledGameDetails}
+            t={t}
+            controllerType={settings.controllerType || "xbox"}
           />
         )}
       </div>
 
-      {view !== "details" && !isKeyboardOpen && (
+      {view !== "details" && !isKeyboardOpen && !installedGameView && (
         <div
           className={`fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-white/5 bg-[#16171a] px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
         >
@@ -1759,27 +3736,27 @@ export default function BigPicture() {
             onClick={() => setIsMenuOpen(true)}
           >
             <Menu className="h-6 w-6" />
-            <span>MENU</span>
+            <span>{t("bigPicture.menu")}</span>
             <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
-              Start
+              {buttons.menu}
             </span>
           </div>
           <div className="flex gap-12 text-sm font-bold tracking-widest text-slate-400">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-black text-black shadow-lg">
-                A
+                {buttons.confirm}
               </span>
               {view === "store" && isSearchBarSelected
-                ? "SEARCH"
+                ? t("bigPicture.search")
                 : view === "store"
-                  ? "SELECT"
-                  : "PLAY"}
+                  ? t("bigPicture.select")
+                  : t("bigPicture.play")}
             </div>
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-xs font-black">
-                B
+                {buttons.cancel}
               </span>
-              {view === "carousel" ? "EXIT" : "BACK"}
+              {view === "carousel" ? t("bigPicture.exit") : t("bigPicture.back")}
             </div>
           </div>
         </div>

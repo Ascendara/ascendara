@@ -55,6 +55,7 @@ class SettingsManager {
       homeSearch: true,
       indexReminder: "7",
       bigPictureKeyboardLayout: "qwerty",
+      controllerType: "xbox",
       ludusavi: {
         backupLocation: "",
         backupFormat: "zip",

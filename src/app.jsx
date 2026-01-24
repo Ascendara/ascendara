@@ -63,7 +63,7 @@ import Welcome from "./pages/Welcome";
 import i18n from "./i18n";
 import "./index.css";
 import "./styles/scrollbar.css";
-import { AlertTriangle, BugIcon, RefreshCwIcon, Clock } from "lucide-react";
+import { AlertTriangle, BugIcon, RefreshCwIcon, Clock, Gamepad2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -249,6 +249,87 @@ const GiantBombMigrationWarning = () => {
         <AlertDialogFooter>
           <AlertDialogAction onClick={handleDismiss}>
             {t("welcome.okay")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+const ControllerDetectionPrompt = () => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [showPrompt, setShowPrompt] = useState(false);
+  const hasPromptedRef = useRef(false);
+  const checkIntervalRef = useRef(null);
+
+  useEffect(() => {
+    if (hasPromptedRef.current) return;
+    if (location.pathname === "/bigpicture") return;
+
+    const checkForController = () => {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const hasController = Array.from(gamepads).some(gamepad => gamepad !== null);
+
+      if (hasController && !hasPromptedRef.current) {
+        setShowPrompt(true);
+        hasPromptedRef.current = true;
+        if (checkIntervalRef.current) {
+          clearInterval(checkIntervalRef.current);
+          checkIntervalRef.current = null;
+        }
+      }
+    };
+
+    checkForController();
+
+    checkIntervalRef.current = setInterval(checkForController, 2000);
+
+    window.addEventListener("gamepadconnected", checkForController);
+
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+      window.removeEventListener("gamepadconnected", checkForController);
+    };
+  }, [location.pathname]);
+
+  const handleEnterBigPicture = () => {
+    setShowPrompt(false);
+    navigate("/bigpicture");
+  };
+
+  const handleDismiss = () => {
+    setShowPrompt(false);
+  };
+
+  return (
+    <AlertDialog open={showPrompt} onOpenChange={setShowPrompt}>
+      <AlertDialogContent className="border-border">
+        <AlertDialogHeader>
+          <div className="flex items-center gap-4">
+            <Gamepad2 className="mb-2 h-10 w-10 text-primary" />
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("bigPicture.controllerDetected")}
+            </AlertDialogTitle>
+          </div>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4">
+              <div className="text-foreground">
+                {t("bigPicture.controllerDetectedMessage")}
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter className="gap-3 sm:justify-end">
+          <AlertDialogCancel onClick={handleDismiss} className="text-foreground">
+            {t("common.notNow")}
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleEnterBigPicture}>
+            {t("bigPicture.enterBigPicture")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -1069,7 +1150,7 @@ const AppRoutes = () => {
         </Routes>
       ) : (
         <Routes location={location} key={user?.uid || "logged-out"}>
-          <Route path="big-picture" element={<BigPicture />} />
+          <Route path="bigpicture" element={<BigPicture />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="search" element={<Search />} />
@@ -1342,6 +1423,7 @@ function App() {
                     <MessageNotificationChecker />
                     <TrialWarningChecker />
                     <GiantBombMigrationWarning />
+                    <ControllerDetectionPrompt />
                     <SearchInitializer />
                     <GlobalSearch />
                     <AppRoutes />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
 import {
   AlertDialog,
@@ -20,6 +21,7 @@ import {
   Maximize,
   Minimize,
   ExternalLink,
+  Gamepad2,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { checkForUpdates } from "@/services/updateCheckingService";
@@ -27,6 +29,8 @@ import { exportToSvg } from "@/lib/exportToSvg";
 
 const MenuBar = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [serverStatus, setServerStatus] = useState(() => {
     // Default status if no valid cache exists
     return {
@@ -47,7 +51,9 @@ const MenuBar = () => {
   const [isDev, setIsDev] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasController, setHasController] = useState(false);
   const mainContentRef = useRef(null);
+  const checkIntervalRef = useRef(null);
 
   // Check for dev mode
   useEffect(() => {
@@ -139,6 +145,31 @@ const MenuBar = () => {
         "update-download-progress",
         handleDownloadProgress
       );
+    };
+  }, []);
+
+  useEffect(() => {
+    const checkForController = () => {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const hasControllerConnected = Array.from(gamepads).some(
+        gamepad => gamepad !== null
+      );
+      setHasController(hasControllerConnected);
+    };
+
+    checkForController();
+
+    checkIntervalRef.current = setInterval(checkForController, 2000);
+
+    window.addEventListener("gamepadconnected", checkForController);
+    window.addEventListener("gamepaddisconnected", checkForController);
+
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+      window.removeEventListener("gamepadconnected", checkForController);
+      window.removeEventListener("gamepaddisconnected", checkForController);
     };
   }, []);
 
@@ -315,6 +346,18 @@ const MenuBar = () => {
             <Hammer className="h-3 w-3" />
             {t("app.runningInDev")}
           </span>
+        )}
+
+        {hasController && location.pathname !== "/bigpicture" && (
+          <button
+            onClick={() => navigate("/bigpicture")}
+            className="ml-2 flex cursor-pointer items-center gap-1 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20"
+            style={{ WebkitAppRegion: "no-drag" }}
+            title={t("bigPicture.enterBigPicture")}
+          >
+            <Gamepad2 className="h-3 w-3" />
+            {t("bigPicture.enterBigPicture")}
+          </button>
         )}
 
         {/* Show downloading update badge when downloading */}
