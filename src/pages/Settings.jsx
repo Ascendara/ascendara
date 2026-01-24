@@ -71,6 +71,7 @@ import {
   Search,
   Library,
   Settings2,
+  Gamepad2,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -283,6 +284,7 @@ function Settings() {
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
   const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
+  const [controllerConnected, setControllerConnected] = useState(false);
   // Default custom colors for merging with saved themes (handles missing new properties)
   const defaultCustomColors = {
     background: "255 255 255",
@@ -438,6 +440,27 @@ function Settings() {
       setIsOnWindows(isWindows);
     };
     checkPlatform();
+  }, []);
+
+  // Check for controller connection
+  useEffect(() => {
+    const checkController = () => {
+      const gamepads = navigator.getGamepads();
+      const hasController = Array.from(gamepads).some(gamepad => gamepad !== null);
+      setControllerConnected(hasController);
+    };
+
+    checkController();
+    const interval = setInterval(checkController, 2000);
+
+    window.addEventListener("gamepadconnected", checkController);
+    window.addEventListener("gamepaddisconnected", checkController);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("gamepadconnected", checkController);
+      window.removeEventListener("gamepaddisconnected", checkController);
+    };
   }, []);
 
   useEffect(() => {
@@ -1501,6 +1524,87 @@ function Settings() {
                 )}
               </div>
             </Card>
+
+            <Card id="big-picture-settings" className="mb-6 border-border">
+              <div className="space-y-4 p-6">
+                <h3 className="mb-2 text-xl font-semibold text-primary">
+                  {t("settings.bigPictureSettings")}
+                </h3>
+
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`rounded-full p-2 ${controllerConnected ? "bg-green-500/20" : "bg-muted"}`}
+                    >
+                      <Gamepad2
+                        className={`h-5 w-5 ${controllerConnected ? "text-green-500" : "text-muted-foreground"}`}
+                      />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {controllerConnected
+                          ? t("settings.controllerConnected")
+                          : t("settings.noControllerDetected")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {controllerConnected
+                          ? t("settings.controllerConnectedDescription")
+                          : t("settings.noControllerDetectedDescription")}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => navigate("/bigpicture")}
+                    className="gap-2 text-secondary"
+                  >
+                    {t("settings.enterBigPicture")}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("settings.controllerType")}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.controllerTypeDescription")}
+                  </p>
+                  <Select
+                    value={settings.controllerType || "xbox"}
+                    onValueChange={value => handleSettingChange("controllerType", value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="xbox">Xbox</SelectItem>
+                      <SelectItem value="playstation">PlayStation</SelectItem>
+                      <SelectItem value="generic">Generic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("settings.keyboardLayout")}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.keyboardLayoutDescription")}
+                  </p>
+                  <Select
+                    value={settings.bigPictureKeyboardLayout || "qwerty"}
+                    onValueChange={value =>
+                      handleSettingChange("bigPictureKeyboardLayout", value)
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="qwerty">QWERTY</SelectItem>
+                      <SelectItem value="azerty">AZERTY</SelectItem>
+                      <SelectItem value="qwertz">QWERTZ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+
             <Card className="mb-6 border-border">
               <div className="space-y-3 p-6">
                 <h3 className="mb-2 text-xl font-semibold text-primary">

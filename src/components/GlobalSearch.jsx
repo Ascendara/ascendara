@@ -250,7 +250,7 @@ const GlobalSearch = () => {
             onChange={e => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={getContextLabel()}
-            className="border-0 px-2 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="border-0 px-2 text-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
@@ -295,7 +295,10 @@ const GlobalSearch = () => {
                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {label}
                       </span>
-                      <Badge variant="secondary" className="ml-auto text-xs">
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-xs text-foreground"
+                      >
                         {items.length}
                       </Badge>
                     </div>
@@ -310,7 +313,7 @@ const GlobalSearch = () => {
                             ref={el => (itemRefs.current[globalIndex] = el)}
                             onClick={() => handleSelect(item)}
                             className={cn(
-                              "flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors",
+                              "flex cursor-pointer items-center gap-3 px-4 py-2.5 text-foreground transition-colors",
                               isSelected
                                 ? "bg-accent text-accent-foreground"
                                 : "hover:bg-accent/50"

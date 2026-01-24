@@ -376,6 +376,98 @@ export const settingsSearchData = [
     scrollTo: "auto-create-shortcuts",
   },
   {
+    id: "big-picture-settings",
+    title: "Big Picture Mode / Big Picture Settings",
+    description: "Configure Big Picture mode settings and controller options",
+    keywords: [
+      "big",
+      "picture",
+      "mode",
+      "controller",
+      "gamepad",
+      "couch",
+      "tv",
+      "fullscreen",
+      "big picture mode",
+      "console mode",
+    ],
+    section: "Gaming",
+    navigate: navigate => {
+      navigate("/settings");
+      setTimeout(() => {
+        const element = document.getElementById("big-picture-settings");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          element.classList.add("highlight-setting");
+          setTimeout(() => {
+            element.classList.remove("highlight-setting");
+          }, 4000);
+        }
+      }, 100);
+    },
+  },
+  {
+    id: "controller-type",
+    title: "Controller Type",
+    description: "Select your controller type for proper button mapping",
+    keywords: [
+      "controller",
+      "type",
+      "gamepad",
+      "xbox",
+      "playstation",
+      "ps4",
+      "ps5",
+      "generic",
+      "button mapping",
+      "controller layout",
+    ],
+    section: "Gaming",
+    navigate: navigate => {
+      navigate("/settings");
+      setTimeout(() => {
+        const element = document.getElementById("big-picture-settings");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          element.classList.add("highlight-setting");
+          setTimeout(() => {
+            element.classList.remove("highlight-setting");
+          }, 4000);
+        }
+      }, 100);
+    },
+  },
+  {
+    id: "keyboard-layout",
+    title: "Keyboard Layout / Big Picture Keyboard",
+    description: "Choose keyboard layout for Big Picture virtual keyboard",
+    keywords: [
+      "keyboard",
+      "layout",
+      "qwerty",
+      "azerty",
+      "qwertz",
+      "virtual",
+      "on-screen",
+      "big picture",
+      "keyboard type",
+    ],
+    section: "Gaming",
+    navigate: navigate => {
+      navigate("/settings");
+      setTimeout(() => {
+        const element = document.getElementById("big-picture-settings");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          element.classList.add("highlight-setting");
+          setTimeout(() => {
+            element.classList.remove("highlight-setting");
+          }, 4000);
+        }
+      }, 100);
+    },
+  },
+  {
     id: "torbox-api-key",
     title: "TorBox API Key",
     description: "Configure TorBox debrid integration",
