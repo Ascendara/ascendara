@@ -142,12 +142,8 @@ const AscendSidebar = ({
   // Quick access items (icon grid at top)
   const quickAccessItems = [
     { id: "home", icon: Home, label: t("ascend.nav.home") },
-    {
-      id: "community",
-      icon: UsersRound,
-      label: t("ascend.nav.community") || "Community",
-    },
     { id: "friends", icon: Users, label: t("ascend.nav.friends"), badge: 0 },
+    { id: "requests", icon: UserPlus, label: t("ascend.nav.requests"), badge: 0 },
     { id: "messages", icon: MessageCircle, label: t("ascend.nav.messages"), badge: 0 },
   ];
 
@@ -168,7 +164,11 @@ const AscendSidebar = ({
   // Main nav items (list below)
   const mainNavItems = [
     { id: "search", icon: Search, label: t("ascend.nav.search") },
-    { id: "requests", icon: UserPlus, label: t("ascend.nav.requests"), badge: 0 },
+    {
+      id: "community",
+      icon: UsersRound,
+      label: t("ascend.nav.community") || "Community",
+    },
     {
       id: "premium",
       icon: Crown,
