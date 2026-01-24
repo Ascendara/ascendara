@@ -2827,21 +2827,170 @@ const Ascend = () => {
       // Special screen for users blocked from free trial
       if (isNoTrial) {
         return (
+          <>
+            <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+              <div className="mx-auto max-w-md space-y-6 p-8 text-center">
+                <div className="bg-destructive/10 mx-auto flex h-20 w-20 items-center justify-center rounded-full">
+                  <LockIcon className="text-destructive h-10 w-10" />
+                </div>
+                <h1 className="text-2xl font-bold">{t("ascend.access.noTrialTitle")}</h1>
+                <p className="text-muted-foreground">
+                  {t("ascend.access.noTrialMessage")}
+                </p>
+                {ascendAccess.noTrialReason && (
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {t("ascend.access.reason")}:
+                    </p>
+                    <p className="mt-1 text-sm">{ascendAccess.noTrialReason}</p>
+                  </div>
+                )}
+                {!deletedAccountWarning && (
+                  <Button onClick={handleSubscribe} className="w-full text-secondary">
+                    <BadgeDollarSign className="mr-2 h-4 w-4" />
+                    {t("ascend.settings.subscribe")}
+                  </Button>
+                )}
+                {deletedAccountWarning && (
+                  <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-sm">
+                    {t("account.errors.cannotSubscribeDeleted") ||
+                      "Cannot subscribe - account deleted"}
+                  </div>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  {t("account.signOut")}
+                </button>
+              </div>
+            </div>
+
+            {/* Subscription Plan Selection Dialog */}
+            <AlertDialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
+              <AlertDialogContent className="max-w-2xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-2xl">
+                    <Crown className="h-6 w-6 text-primary" />
+                    {t("ascend.settings.subscriptionDialog.title")}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t("ascend.settings.subscriptionDialog.description")}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div className="grid gap-4 py-4 sm:grid-cols-3">
+                  {availablePlans.map(plan => {
+                    const isMonthly = plan.intervalCount === 1;
+                    const is3Month = plan.intervalCount === 3;
+                    const is6Month = plan.intervalCount === 6;
+                    const totalPrice = plan.unitAmount / 100;
+                    const pricePerMonth = (totalPrice / plan.intervalCount).toFixed(2);
+                    const savings = is3Month ? "17%" : is6Month ? "25%" : null;
+
+                    return (
+                      <motion.div
+                        key={plan.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`relative flex cursor-pointer flex-col rounded-xl border-2 transition-all hover:scale-105 hover:shadow-lg ${
+                          is6Month
+                            ? "border-primary bg-primary/5"
+                            : "border-border bg-card hover:border-primary/50"
+                        }`}
+                        onClick={() => handlePlanSelection(plan.id)}
+                      >
+                        {savings && (
+                          <div className="absolute -right-2 -top-2 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-secondary shadow-lg">
+                            {t("ascend.settings.subscriptionDialog.saveText")} {savings}
+                          </div>
+                        )}
+
+                        <div className="flex-1 space-y-3 p-4">
+                          <div className="text-center">
+                            <h3 className="text-lg font-bold">
+                              {plan.intervalCount}{" "}
+                              {plan.intervalCount > 1
+                                ? t("ascend.settings.subscriptionDialog.months")
+                                : t("ascend.settings.subscriptionDialog.month")}
+                            </h3>
+                            {is6Month && (
+                              <p className="text-xs font-semibold text-primary">
+                                {t("ascend.settings.subscriptionDialog.bestValue")}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 text-center">
+                            <div className="flex items-baseline justify-center gap-1">
+                              <span className="text-3xl font-bold">${totalPrice}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {plan.intervalCount > 1
+                                ? `$${pricePerMonth}${t("ascend.settings.subscriptionDialog.perMonth")} - ${t("ascend.settings.subscriptionDialog.billedEvery", { count: plan.intervalCount })}`
+                                : t("ascend.settings.subscriptionDialog.billedMonthly")}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2 text-center">
+                            <div className="text-xs text-muted-foreground">
+                              {t("ascend.settings.subscriptionDialog.allPlansInclude")}
+                            </div>
+                            {savings && (
+                              <div className="flex items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2 font-bold text-primary">
+                                <Sparkles className="h-4 w-4" />
+                                <span className="text-sm">
+                                  {t("ascend.settings.subscriptionDialog.save", {
+                                    percent: savings,
+                                  })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className={`rounded-b-xl border-t py-3 text-center text-sm font-semibold ${
+                            is6Month
+                              ? "border-primary/20 bg-primary text-secondary"
+                              : "border-border bg-muted text-foreground"
+                          }`}
+                        >
+                          {t("ascend.settings.subscriptionDialog.selectPlan")}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>
+                    {t("ascend.settings.subscriptionDialog.cancel")}
+                  </AlertDialogCancel>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        );
+      }
+
+      return (
+        <>
           <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
             <div className="mx-auto max-w-md space-y-6 p-8 text-center">
               <div className="bg-destructive/10 mx-auto flex h-20 w-20 items-center justify-center rounded-full">
-                <LockIcon className="text-destructive h-10 w-10" />
+                <Clock className="text-destructive h-10 w-10" />
               </div>
-              <h1 className="text-2xl font-bold">{t("ascend.access.noTrialTitle")}</h1>
-              <p className="text-muted-foreground">{t("ascend.access.noTrialMessage")}</p>
-              {ascendAccess.noTrialReason && (
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("ascend.access.reason")}:
-                  </p>
-                  <p className="mt-1 text-sm">{ascendAccess.noTrialReason}</p>
-                </div>
-              )}
+              <h1 className="text-2xl font-bold">
+                {isTrialBlocked
+                  ? t("ascend.access.trialBlocked")
+                  : t("ascend.access.expired")}
+              </h1>
+              <p className="text-muted-foreground">
+                {isTrialBlocked
+                  ? t("ascend.access.trialBlockedMessage")
+                  : t("ascend.access.expiredMessage")}
+              </p>
               {!deletedAccountWarning && (
                 <Button onClick={handleSubscribe} className="w-full text-secondary">
                   <BadgeDollarSign className="mr-2 h-4 w-4" />
@@ -2862,45 +3011,112 @@ const Ascend = () => {
               </button>
             </div>
           </div>
-        );
-      }
 
-      return (
-        <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
-          <div className="mx-auto max-w-md space-y-6 p-8 text-center">
-            <div className="bg-destructive/10 mx-auto flex h-20 w-20 items-center justify-center rounded-full">
-              <Clock className="text-destructive h-10 w-10" />
-            </div>
-            <h1 className="text-2xl font-bold">
-              {isTrialBlocked
-                ? t("ascend.access.trialBlocked")
-                : t("ascend.access.expired")}
-            </h1>
-            <p className="text-muted-foreground">
-              {isTrialBlocked
-                ? t("ascend.access.trialBlockedMessage")
-                : t("ascend.access.expiredMessage")}
-            </p>
-            {!deletedAccountWarning && (
-              <Button onClick={handleSubscribe} className="w-full text-secondary">
-                <BadgeDollarSign className="mr-2 h-4 w-4" />
-                {t("ascend.settings.subscribe")}
-              </Button>
-            )}
-            {deletedAccountWarning && (
-              <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-sm">
-                {t("account.errors.cannotSubscribeDeleted") ||
-                  "Cannot subscribe - account deleted"}
+          {/* Subscription Plan Selection Dialog */}
+          <AlertDialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
+            <AlertDialogContent className="max-w-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-2xl">
+                  <Crown className="h-6 w-6 text-primary" />
+                  {t("ascend.settings.subscriptionDialog.title")}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t("ascend.settings.subscriptionDialog.description")}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <div className="grid gap-4 py-4 sm:grid-cols-3">
+                {availablePlans.map(plan => {
+                  const isMonthly = plan.intervalCount === 1;
+                  const is3Month = plan.intervalCount === 3;
+                  const is6Month = plan.intervalCount === 6;
+                  const totalPrice = plan.unitAmount / 100;
+                  const pricePerMonth = (totalPrice / plan.intervalCount).toFixed(2);
+                  const savings = is3Month ? "17%" : is6Month ? "25%" : null;
+
+                  return (
+                    <motion.div
+                      key={plan.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`relative flex cursor-pointer flex-col rounded-xl border-2 transition-all hover:scale-105 hover:shadow-lg ${
+                        is6Month
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card hover:border-primary/50"
+                      }`}
+                      onClick={() => handlePlanSelection(plan.id)}
+                    >
+                      {savings && (
+                        <div className="absolute -right-2 -top-2 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-secondary shadow-lg">
+                          {t("ascend.settings.subscriptionDialog.saveText")} {savings}
+                        </div>
+                      )}
+
+                      <div className="flex-1 space-y-3 p-4">
+                        <div className="text-center">
+                          <h3 className="text-lg font-bold">
+                            {plan.intervalCount}{" "}
+                            {plan.intervalCount > 1
+                              ? t("ascend.settings.subscriptionDialog.months")
+                              : t("ascend.settings.subscriptionDialog.month")}
+                          </h3>
+                          {is6Month && (
+                            <p className="text-xs font-semibold text-primary">
+                              {t("ascend.settings.subscriptionDialog.bestValue")}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1 text-center">
+                          <div className="flex items-baseline justify-center gap-1">
+                            <span className="text-3xl font-bold">${totalPrice}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {plan.intervalCount > 1
+                              ? `$${pricePerMonth}${t("ascend.settings.subscriptionDialog.perMonth")} - ${t("ascend.settings.subscriptionDialog.billedEvery", { count: plan.intervalCount })}`
+                              : t("ascend.settings.subscriptionDialog.billedMonthly")}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2 text-center">
+                          <div className="text-xs text-muted-foreground">
+                            {t("ascend.settings.subscriptionDialog.allPlansInclude")}
+                          </div>
+                          {savings && (
+                            <div className="flex items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2 font-bold text-primary">
+                              <Sparkles className="h-4 w-4" />
+                              <span className="text-sm">
+                                {t("ascend.settings.subscriptionDialog.save", {
+                                  percent: savings,
+                                })}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`rounded-b-xl border-t py-3 text-center text-sm font-semibold ${
+                          is6Month
+                            ? "border-primary/20 bg-primary text-secondary"
+                            : "border-border bg-muted text-foreground"
+                        }`}
+                      >
+                        {t("ascend.settings.subscriptionDialog.selectPlan")}
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
-            )}
-            <button
-              onClick={handleLogout}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {t("account.signOut")}
-            </button>
-          </div>
-        </div>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel>
+                  {t("ascend.settings.subscriptionDialog.cancel")}
+                </AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       );
     }
 
