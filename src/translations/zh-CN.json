@@ -1728,6 +1728,8 @@
       "shutdown": "关闭",
       "sleep": "睡觉"
     },
+    "bigPictureKeyboard": "大屏模式键盘布局",
+    "bigPictureKeyboardDescription": "选择大屏模式虚拟键盘的键盘布局",
     "browsePublicThemes": "浏览社区主题",
     "checkConfig": "检查配置",
     "colorSection": { "preview": "实时预览" },

@@ -1282,6 +1282,35 @@ function Settings() {
                   />
                 </div>
 
+                {/* Big Picture Keyboard Layout */}
+                <div
+                  id="big-picture-keyboard"
+                  className="mt-6 space-y-2 border-t border-border/50 pt-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <Label>{t("settings.bigPictureKeyboard")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.bigPictureKeyboardDescription")}
+                      </p>
+                    </div>
+                    <Select
+                      value={settings.bigPictureKeyboardLayout || "qwerty"}
+                      onValueChange={value =>
+                        handleSettingChange("bigPictureKeyboardLayout", value)
+                      }
+                    >
+                      <SelectTrigger className="w-[180px] bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="qwerty">QWERTY</SelectItem>
+                        <SelectItem value="azerty">AZERTY</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div id="side-scrollbar" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.sideScrollBar")}</Label>

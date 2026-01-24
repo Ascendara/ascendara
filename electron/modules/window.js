@@ -17,6 +17,8 @@ let isHandlingProtocolUrl = false;
  * @returns {BrowserWindow} - The created window
  */
 function createWindow() {
+  // Detect if Big Picture mode should be used
+  const startInBigPicture = process.argv.includes("--big-picture");
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
@@ -34,6 +36,8 @@ function createWindow() {
     frame: false,
     show: false,
     backgroundColor: "#09090b",
+    // Enable native full-screen if asked for
+    fullscreen: startInBigPicture,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload.js"),
       nodeIntegration: true,
@@ -53,6 +57,16 @@ function createWindow() {
     mainWindow.show();
     mainWindowHidden = false;
   });
+
+  // Adding hash to URL
+  const urlSuffix = startInBigPicture ? "#/big-picture" : "";
+
+  if (isDev) {
+    // Load from localhost:5173 in development
+    mainWindow.loadURL("http://localhost:5173" + urlSuffix);
+  } else {
+    mainWindow.loadURL("http://localhost:46859" + urlSuffix);
+  }
 
   if (isDev) {
     // Load from localhost:5173 in development

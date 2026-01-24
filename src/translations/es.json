@@ -1738,6 +1738,8 @@
       "shutdown": "Cerrar",
       "sleep": "Dormir"
     },
+    "bigPictureKeyboard": "Distribución del teclado Big Picture",
+    "bigPictureKeyboardDescription": "Elige la distribución del teclado para el teclado virtual del modo Big Picture",
     "browsePublicThemes": "Explorar temas de la comunidad",
     "checkConfig": "Comprobar configuración",
     "colorSection": { "preview": "Vista previa en vivo" },
