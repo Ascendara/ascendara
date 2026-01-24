@@ -219,6 +219,28 @@ const CommunityHub = ({ user, userData }) => {
     if (error) {
       toast.error(error);
       setMessageInput(content);
+      return;
+    }
+
+    // Forward message to Discord webhook via API
+    try {
+      const idToken = await user.getIdToken();
+      await fetch("https://api.ascendara.app/community/forward-message", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          communityId: selectedCommunity.id,
+          communityName: selectedCommunity.name,
+          message: content,
+          senderId: user.uid,
+          senderName: userData?.username || user.email || "Unknown User",
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to forward message to Discord:", err);
     }
   };
 
