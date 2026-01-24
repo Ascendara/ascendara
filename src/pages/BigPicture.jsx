@@ -2997,11 +2997,43 @@ export default function BigPicture() {
           custom = await window.electron.getCustomGames();
         } catch (e) {}
         let games = [...installed, ...custom];
-        games.sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
 
         setAllGames(games);
 
-        let carousel = [...games];
+        // Get recently played games using the service (same logic as Home.jsx)
+        const recentlyPlayed = recentGamesService.getRecentGames();
+
+        // Combine installed and custom games
+        const actuallyInstalledGames = [
+          ...(installed || []).map(game => ({
+            ...game,
+            isCustom: false,
+          })),
+          ...(custom || []).map(game => ({
+            name: game.game,
+            game: game.game,
+            version: game.version,
+            online: game.online,
+            dlc: game.dlc,
+            executable: game.executable,
+            isCustom: true,
+          })),
+        ];
+
+        // Filter out games that are no longer installed and merge with full game details
+        const recentGames = recentlyPlayed
+          .filter(recentGame =>
+            actuallyInstalledGames.some(g => g.game === recentGame.game)
+          )
+          .map(recentGame => {
+            const gameDetails = games.find(g => g.game === recentGame.game);
+            return {
+              ...gameDetails,
+              lastPlayed: recentGame.lastPlayed,
+            };
+          });
+
+        let carousel = recentGames.length > 0 ? [...recentGames] : [...games];
         if (carousel.length > 20) {
           carousel = carousel.slice(0, 20);
           carousel.push({
