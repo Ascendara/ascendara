@@ -1734,6 +1734,8 @@
       "shutdown": "اغلق",
       "sleep": "ينام"
     },
+    "bigPictureKeyboard": "تخطيط لوحة مفاتيح Big Picture",
+    "bigPictureKeyboardDescription": "اختر تخطيط لوحة المفاتيح للوحة المفاتيح الافتراضية في وضع Big Picture",
     "browsePublicThemes": "تصفح سمات المجتمع",
     "checkConfig": "التحقق من التكوين",
     "colorSection": { "preview": "المعاينة المباشرة" },

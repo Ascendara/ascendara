@@ -1738,6 +1738,8 @@
       "shutdown": "シャットダウン",
       "sleep": "寝る"
     },
+    "bigPictureKeyboard": "Big Picture キーボードレイアウト",
+    "bigPictureKeyboardDescription": "Big Picture モードの仮想キーボードのレイアウトを選択してください",
     "browsePublicThemes": "コミュニティのテーマを参照する",
     "checkConfig": "構成の確認",
     "colorSection": { "preview": "ライブプレビュー" },

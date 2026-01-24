@@ -1136,6 +1136,23 @@ const Home = memo(() => {
 
               {/* Search Bar Container */}
               <div className="mx-auto flex w-full items-center gap-3 lg:w-auto lg:flex-none">
+                {/*  BIG PICTURE */}
+                <div
+                  className="group cursor-pointer"
+                  onClick={() => {
+                    window.location.hash = "#/big-picture";
+                  }}
+                >
+                  <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-green-500/40 bg-gradient-to-br from-green-500/10 to-green-500/5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-green-500/60 hover:shadow-xl hover:shadow-green-500/20">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/20 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/30">
+                      <Gamepad2 className="h-4 w-4 text-green-500" />
+                    </div>
+                    <span className="text-[10px] font-bold text-green-500">
+                      BIG PICTURE
+                    </span>
+                  </div>
+                </div>
+
                 {/* Main Search Bar */}
                 <div
                   onClick={() => {
