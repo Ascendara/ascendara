@@ -119,7 +119,6 @@
     "welcomeBack": "Welcome Back",
     "welcomeBackIntro": "Sign in to access all your features:"
   },
-
   "app": {
     "admin": {
       "warning": {
@@ -291,21 +290,14 @@
       "allCommunities": "All Communities",
       "approved": "Approved",
       "back": "Back",
-      "bestValue": "Best Value",
-      "browse": "Browse Communities",
-      "channels": "Channels",
-      "comingSoon": "Coming Soon",
-      "comingSoonDesc": "Community features are currently in development. Stay tuned for updates!",
       "createRequest": {
         "description": "Description",
         "descriptionPlaceholder": "Describe your community...",
         "gameId": "Game ID",
         "gameIdHelp": "The game this community is for",
-        "gameIdPlaceholder": "e.g., cyberpunk-2077",
         "iconUrl": "Icon URL (optional)",
         "iconUrlPlaceholder": "https://...",
         "name": "Community Name",
-        "namePlaceholder": "e.g., Cyberpunk 2077 Fans",
         "submit": "Submit Request",
         "submitting": "Submitting...",
         "success": "Community request submitted! Awaiting admin approval.",
@@ -313,8 +305,6 @@
         "title": "Request Community Creation"
       },
       "denied": "Denied",
-      "general": "General discussion",
-      "help": "Get help and support",
       "joinCommunity": "Join this community",
       "joinRequest": {
         "approved": "Member approved!",
@@ -325,26 +315,14 @@
         "title": "Request to Join"
       },
       "joinRequests": "Join Requests",
-      "loading": "Loading...",
-      "member": "Member",
-      "memberRemoved": "Member removed successfully",
       "members": "Members",
-      "messageDeleted": "Message deleted successfully",
-      "messagePlaceholder": "Message #{{channel}}",
-      "moderator": "Moderator",
       "noCommunities": "No communities found",
-      "offTopic": "Off-topic chat",
-      "owner": "Owner",
       "pending": "Pending",
       "requestCommunity": "Request Community",
       "requests": {
-        "approved": "Approved",
-        "denied": "Denied",
-        "pending": "Pending",
         "title": "Your Requests"
       },
       "search": "Search communities...",
-      "subtitle": "Connect with other Ascendara users",
       "title": "Communities",
       "yourCommunities": "Your Communities"
     },
@@ -471,7 +449,6 @@
         "description": "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
         "title": "Nexus Mod Managing"
       },
-      "planned": "PLANNED",
       "profile": {
         "description": "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours.",
         "title": "Profile & Bio"
@@ -739,7 +716,6 @@
     "confirm": "Confirm",
     "controllerDetected": "Controller Detected",
     "controllerDetectedMessage": "Ascendara detected a controller connected to your device. Would you like to switch to Big Picture mode for a better controller experience?",
-    "controllerSettings": "CONTROLLER SETTINGS",
     "controllerType": "Controller Type",
     "controllerTypeGeneric": "Generic",
     "controllerTypePlayStation": "PlayStation",
@@ -775,7 +751,6 @@
     "select": "SELECT",
     "settings": "SETTINGS",
     "space": "Space",
-    "start": "Start",
     "unableToLoadCatalog": "Unable to load catalog",
     "verifying": "Verifying...",
     "viewDetails": "VIEW DETAILS"
