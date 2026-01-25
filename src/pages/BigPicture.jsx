@@ -2759,8 +2759,21 @@ export default function BigPicture() {
   const { t } = useLanguage();
   const { settings, updateSetting } = useSettings();
   const buttons = getControllerButtons(settings.controllerType || "xbox");
-  // Quit full-screen when leaving Big Picture
+  // Enter full-screen on mount, quit on unmount
   useEffect(() => {
+    const enterFullScreen = async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (err) {
+        console.error("Error entering fullscreen:", err);
+      }
+    };
+
+    enterFullScreen();
+
+    // Quit full-screen when leaving Big Picture
     return () => {
       if (document.fullscreenElement) {
         document
