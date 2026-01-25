@@ -1139,7 +1139,14 @@ const VirtualKeyboard = ({
 };
 
 // --- GAME DETAILS & STORE COMPONENTS ---
-const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
+const GameDetailsView = ({
+  game,
+  onBack,
+  onDownload,
+  t,
+  controllerType,
+  dialogOpen = false,
+}) => {
   const isSeamless = checkSeamlessAvailable(game);
   const [showMedia, setShowMedia] = useState(false);
   const [steamData, setSteamData] = useState(null);
@@ -1302,7 +1309,7 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
 
   const handleInput = useCallback(
     action => {
-      if (!canInput) return;
+      if (!canInput || dialogOpen) return;
 
       if (action === "DOWN") {
         if (focusedSection === "button") {
@@ -1382,6 +1389,7 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
       onDownload,
       game,
       canInput,
+      dialogOpen,
       focusedSection,
       steamData,
       selectedButton,
@@ -1487,7 +1495,7 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
         {/* VIEW 1: DETAILS */}
         <div className="relative h-full w-full flex-shrink-0">
           <div className="flex h-full w-[45%] flex-col justify-center p-16 pl-24">
-            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-secondary drop-shadow-lg">
+            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-white drop-shadow-lg">
               {game.name || game.game}
             </h1>
             <div className="mb-6 flex flex-wrap gap-3">
@@ -1495,14 +1503,14 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                 game.category.slice(0, 4).map((cat, idx) => (
                   <span
                     key={idx}
-                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-secondary backdrop-blur-sm"
+                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-white backdrop-blur-sm"
                   >
                     {cat}
                   </span>
                 ))}
             </div>
 
-            <div className="mb-8 flex gap-6 text-secondary/70">
+            <div className="mb-8 flex gap-6 text-white/80">
               {game.size && (
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
@@ -1592,7 +1600,7 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   : "bg-muted/20"
               }`}
             >
-              <p className="text-lg leading-relaxed text-secondary">
+              <p className="text-lg leading-relaxed text-white/90">
                 {(
                   steamData?.summary ||
                   steamData?.description ||
@@ -1614,10 +1622,10 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   {/* Cloud Saves - Always show */}
                   <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                     <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                      <Cloud className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                      <Cloud className="h-4.5 w-4.5 text-white transition-transform duration-200 group-hover/item:scale-110" />
                       <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                     </div>
-                    <span className="text-sm font-semibold text-secondary">
+                    <span className="text-sm font-semibold text-white">
                       {t("bigPicture.cloudSaves")}
                     </span>
                   </div>
@@ -1625,10 +1633,10 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   {/* Remote Downloads - Always show */}
                   <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                     <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                      <Smartphone className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                      <Smartphone className="h-4.5 w-4.5 text-white transition-transform duration-200 group-hover/item:scale-110" />
                       <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                     </div>
-                    <span className="text-sm font-semibold text-secondary">
+                    <span className="text-sm font-semibold text-white">
                       {t("bigPicture.remoteDownloads")}
                     </span>
                   </div>
@@ -1637,10 +1645,10 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   {supportsModManaging && (
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                       <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                        <Puzzle className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                        <Puzzle className="h-4.5 w-4.5 text-white transition-transform duration-200 group-hover/item:scale-110" />
                         <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
-                      <span className="text-sm font-semibold text-secondary">
+                      <span className="text-sm font-semibold text-white">
                         {t("bigPicture.modManager")}
                       </span>
                     </div>
@@ -1650,10 +1658,10 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   {supportsFlingTrainer && (
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                       <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                        <Zap className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                        <Zap className="h-4.5 w-4.5 text-white transition-transform duration-200 group-hover/item:scale-110" />
                         <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
-                      <span className="text-sm font-semibold text-secondary">
+                      <span className="text-sm font-semibold text-white">
                         {t("bigPicture.trainer")}
                       </span>
                     </div>
@@ -2137,7 +2145,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         {/* VIEW 1: DETAILS */}
         <div className="relative h-full w-full flex-shrink-0">
           <div className="flex h-full w-[45%] flex-col justify-center p-16 pl-24">
-            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-secondary drop-shadow-lg">
+            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-white drop-shadow-lg">
               {gameName}
             </h1>
 
@@ -2146,7 +2154,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 {game.category.slice(0, 4).map((cat, idx) => (
                   <span
                     key={idx}
-                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-secondary backdrop-blur-sm"
+                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-white backdrop-blur-sm"
                   >
                     {cat}
                   </span>
@@ -2154,7 +2162,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
               </div>
             )}
 
-            <div className="mb-8 flex gap-6 text-secondary/70">
+            <div className="mb-8 flex gap-6 text-white/80">
               {game.version && (
                 <div className="flex items-center gap-2">
                   <Info className="h-5 w-5" />
@@ -2170,7 +2178,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
             </div>
 
             {gameDescription ? (
-              <p className="mb-8 max-w-2xl text-lg leading-relaxed text-secondary">
+              <p className="mb-8 max-w-2xl text-lg leading-relaxed text-white/90">
                 {gameDescription}
               </p>
             ) : (
@@ -3155,6 +3163,12 @@ export default function BigPicture() {
         isKeyboardOpen
       );
 
+      // Block all navigation when any dialog is open
+      if (showExitDialog || showExitBigPictureDialog || showControllerSettings) {
+        console.log("[NAV] Blocked by dialog");
+        return;
+      }
+
       if (isKeyboardOpen) {
         console.log("[NAV] Blocked by keyboard");
         return;
@@ -3322,12 +3336,8 @@ export default function BigPicture() {
           } else if (homeSidebarIndex === 2) {
             changeView("store");
           } else if (homeSidebarIndex === 3) {
-            // Exit Big Picture - only show dialog if there's a download
-            if (downloadingGame) {
-              setShowExitDialog(true);
-            } else {
-              navigate("/");
-            }
+            // Exit Big Picture - always show exit confirmation dialog
+            setShowExitBigPictureDialog(true);
           }
           setIsHomeSidebarActive(false);
           setHomeSidebarIndex(-1);
@@ -3394,6 +3404,9 @@ export default function BigPicture() {
       handleSelectStoreGame,
       handleShowInstalledGameDetails,
       downloadingGame,
+      showExitDialog,
+      showExitBigPictureDialog,
+      showControllerSettings,
     ]
   );
 
@@ -3666,12 +3679,8 @@ export default function BigPicture() {
                 } else if (idx === 2) {
                   changeView("store");
                 } else if (idx === 3) {
-                  // Exit Big Picture - show download dialog if there's a download, otherwise show exit confirmation
-                  if (downloadingGame) {
-                    setShowExitDialog(true);
-                  } else {
-                    setShowExitBigPictureDialog(true);
-                  }
+                  // Exit Big Picture - always show exit confirmation dialog
+                  setShowExitBigPictureDialog(true);
                 }
                 setIsHomeSidebarActive(false);
                 setHomeSidebarIndex(-1);
@@ -3798,6 +3807,7 @@ export default function BigPicture() {
             onDownload={handleStartDownload}
             t={t}
             controllerType={settings.controllerType || "xbox"}
+            dialogOpen={showExitDialog}
           />
         )}
 
