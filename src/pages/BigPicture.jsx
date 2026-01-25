@@ -1151,7 +1151,6 @@ const GameDetailsView = ({
   const [showMedia, setShowMedia] = useState(false);
   const [steamData, setSteamData] = useState(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
-  const [cachedImage, setCachedImage] = useState(null);
   const buttons = getControllerButtons(controllerType);
   const [focusedSection, setFocusedSection] = useState("button"); // 'button', 'description', 'screenshots'
   const [selectedButton, setSelectedButton] = useState(0); // 0 = View Details, 1 = Play Later
@@ -1164,19 +1163,25 @@ const GameDetailsView = ({
   const descriptionRef = useRef(null);
   const screenshotsRef = useRef(null);
 
-  // Background Image
-  const bgImage = cachedImage || game.cover || game.image;
+  // Use the same image loading hook as GameCard.jsx
+  const { cachedImage, loading: imageLoading } = useImageLoader(game?.imgID, {
+    quality: "high",
+    priority: "high",
+    enabled: !!game?.imgID,
+  });
 
-  // Load cached image
+  // Background Image - check Play Later cache first, then use hook result
+  const [playLaterImage, setPlayLaterImage] = useState(null);
+
   useEffect(() => {
-    const loadCachedImage = async () => {
-      if (game.imgID) {
-        const image = await imageCacheService.getImage(game.imgID);
-        setCachedImage(image);
-      }
-    };
-    loadCachedImage();
-  }, [game.imgID]);
+    const gameName = game.game || game.name;
+    const cached = localStorage.getItem(`play-later-image-${gameName}`);
+    if (cached) {
+      setPlayLaterImage(cached);
+    }
+  }, [game.game, game.name]);
+
+  const bgImage = playLaterImage || cachedImage || game.cover || game.image;
 
   // Input delay on opening
   useEffect(() => {
