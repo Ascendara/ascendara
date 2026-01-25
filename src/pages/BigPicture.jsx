@@ -35,6 +35,9 @@ import {
   RefreshCw,
   Gift,
   Star,
+  Circle,
+  Square,
+  Triangle,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import gameService from "@/services/gameService";
@@ -45,7 +48,6 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import imageCacheService from "@/services/imageCacheService";
-import gameUpdateService from "@/services/gameUpdateService";
 import recentGamesService from "@/services/recentGamesService";
 import { killAudioAndMiniplayer } from "@/services/audioPlayerService";
 
@@ -63,6 +65,24 @@ const formatBytes = (bytes, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
+// PlayStation button component
+const PSButton = ({ type, className = "" }) => {
+  const buttonStyles = "inline-flex items-center justify-center";
+
+  switch (type) {
+    case "cross":
+      return <X className={`${buttonStyles} ${className}`} strokeWidth={3} />;
+    case "circle":
+      return <Circle className={`${buttonStyles} ${className}`} strokeWidth={2.5} />;
+    case "square":
+      return <Square className={`${buttonStyles} ${className}`} strokeWidth={2.5} />;
+    case "triangle":
+      return <Triangle className={`${buttonStyles} ${className}`} strokeWidth={2.5} />;
+    default:
+      return null;
+  }
+};
+
 // Get controller button labels based on controller type
 const getControllerButtons = (controllerType = "xbox") => {
   const buttonMaps = {
@@ -74,10 +94,10 @@ const getControllerButtons = (controllerType = "xbox") => {
       menu: "Start",
     },
     playstation: {
-      confirm: "✕",
-      cancel: "○",
-      delete: "□",
-      space: "△",
+      confirm: <PSButton type="cross" className="h-4 w-4" />,
+      cancel: <PSButton type="circle" className="h-4 w-4" />,
+      delete: <PSButton type="square" className="h-4 w-4" />,
+      space: <PSButton type="triangle" className="h-4 w-4" />,
       menu: "Options",
     },
     generic: {
@@ -431,17 +451,17 @@ const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-blue-500/30 bg-[#1a1b1e] p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-primary/30 bg-card p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
         <div className="mb-6 flex items-center gap-4">
-          <div className="rounded-full bg-blue-500/20 p-3">
-            <Info className="h-8 w-8 text-blue-400" />
+          <div className="rounded-full bg-primary/20 p-3">
+            <Info className="h-8 w-8 text-primary" />
           </div>
-          <h2 className="text-3xl font-bold text-white">
+          <h2 className="text-3xl font-bold text-foreground">
             {t("bigPicture.exitToDownload")}
           </h2>
         </div>
-        <p className="mb-8 text-lg leading-relaxed text-slate-300">
+        <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
           {t("bigPicture.exitToDownloadMessage")}
         </p>
         <div className="flex gap-4">
@@ -449,8 +469,8 @@ const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
             onClick={onConfirm}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 0
-                ? "scale-105 bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                ? "scale-105 bg-blue-500 text-foreground shadow-lg shadow-blue-500/30"
+                : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
             <LogOut className="h-5 w-5" />
@@ -460,23 +480,23 @@ const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
             onClick={onClose}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 1
-                ? "scale-105 bg-slate-600 text-white shadow-lg"
-                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                ? "scale-105 bg-slate-600 text-foreground shadow-lg"
+                : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
             <X className="h-5 w-5" />
             {t("bigPicture.cancel")}
           </button>
         </div>
-        <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500">
+        <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <span>
-            <span className="mr-2 rounded-full bg-white px-2 py-1 text-black">
+            <span className="mr-2 rounded-full bg-primary px-2 py-1 text-secondary">
               {buttons.confirm}
             </span>
             {t("bigPicture.confirm")}
           </span>
           <span>
-            <span className="mr-2 rounded-full border border-slate-600 bg-slate-800 px-2 py-1">
+            <span className="mr-2 rounded-full border border-border bg-muted px-2 py-1 text-muted-foreground">
               {buttons.cancel}
             </span>
             {t("bigPicture.cancel")}
@@ -569,17 +589,17 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-blue-500/30 bg-[#1a1b1e] p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-primary/30 bg-card p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
         <div className="mb-6 flex items-center gap-4">
-          <div className="rounded-full bg-blue-500/20 p-3">
-            <Info className="h-8 w-8 text-blue-400" />
+          <div className="rounded-full bg-primary/20 p-3">
+            <Info className="h-8 w-8 text-primary" />
           </div>
-          <h2 className="text-3xl font-bold text-white">
+          <h2 className="text-3xl font-bold text-foreground">
             {t("bigPicture.exitBigPictureConfirm")}
           </h2>
         </div>
-        <p className="mb-8 text-lg leading-relaxed text-slate-300">
+        <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
           {t("bigPicture.exitBigPictureMessage")}
         </p>
         <div className="flex gap-4">
@@ -587,8 +607,8 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
             onClick={onConfirm}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 0
-                ? "scale-105 bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                ? "scale-105 bg-blue-500 text-foreground shadow-lg shadow-blue-500/30"
+                : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
             <LogOut className="h-5 w-5" />
@@ -598,23 +618,23 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
             onClick={onClose}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 1
-                ? "scale-105 bg-slate-600 text-white shadow-lg"
-                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                ? "scale-105 bg-slate-600 text-foreground shadow-lg"
+                : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
             <X className="h-5 w-5" />
             {t("bigPicture.cancel")}
           </button>
         </div>
-        <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500">
+        <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <span>
-            <span className="mr-2 rounded-full bg-white px-2 py-1 text-black">
+            <span className="mr-2 rounded-full bg-primary px-2 py-1 text-secondary">
               {buttons.confirm}
             </span>
             {t("bigPicture.confirm")}
           </span>
           <span>
-            <span className="mr-2 rounded-full border border-slate-600 bg-slate-800 px-2 py-1">
+            <span className="mr-2 rounded-full border border-border bg-muted px-2 py-1 text-muted-foreground">
               {buttons.cancel}
             </span>
             {t("bigPicture.cancel")}
@@ -775,13 +795,13 @@ const BigPictureSettingsDialog = ({
   let lastCategory = null;
 
   return (
-    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-blue-500/30 bg-[#1a1b1e] p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-primary/30 bg-card p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
         <div className="mb-6 flex items-center gap-4">
-          <div className="rounded-full bg-blue-500/20 p-3">
-            <Settings className="h-8 w-8 text-blue-400" />
+          <div className="rounded-full bg-primary/20 p-3">
+            <Settings className="h-8 w-8 text-primary" />
           </div>
-          <h2 className="text-3xl font-bold text-white">
+          <h2 className="text-3xl font-bold text-foreground">
             {t("bigPicture.bigPictureSettings")}
           </h2>
         </div>
@@ -799,15 +819,15 @@ const BigPictureSettingsDialog = ({
             return (
               <div key={`${option.type}-${option.value}`}>
                 {showCategoryHeader && (
-                  <p className="mb-2 mt-4 text-sm font-bold uppercase tracking-wider text-slate-400">
+                  <p className="mb-2 mt-4 text-sm font-bold uppercase tracking-wider text-muted-foreground">
                     {option.category}
                   </p>
                 )}
                 <div
                   className={`flex items-center gap-4 rounded-xl p-4 transition-all duration-150 ${
                     isSelected
-                      ? "scale-105 bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                      : "bg-slate-700 text-slate-300"
+                      ? "scale-105 bg-blue-500 text-foreground shadow-lg shadow-blue-500/30"
+                      : "bg-muted text-muted-foreground"
                   }`}
                 >
                   <Icon className="h-6 w-6" />
@@ -818,15 +838,15 @@ const BigPictureSettingsDialog = ({
             );
           })}
         </div>
-        <div className="flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500">
+        <div className="flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <span>
-            <span className="mr-2 rounded-full bg-white px-2 py-1 text-black">
+            <span className="mr-2 rounded-full bg-primary px-2 py-1 text-secondary">
               {buttons.confirm}
             </span>
             {t("bigPicture.confirm")}
           </span>
           <span>
-            <span className="mr-2 rounded-full border border-slate-600 bg-slate-800 px-2 py-1">
+            <span className="mr-2 rounded-full border border-border bg-muted px-2 py-1 text-muted-foreground">
               {buttons.cancel}
             </span>
             {t("bigPicture.cancel")}
@@ -1019,32 +1039,34 @@ const VirtualKeyboard = ({
 
   return (
     <div className="fixed inset-0 z-[20000] flex flex-col">
-      <div className="flex-1 bg-black/60" onClick={onClose} />
-      <div className="border-t-2 border-blue-500/30 bg-[#0d0d0f] p-6 pb-10 duration-200 animate-in slide-in-from-bottom">
-        <div className="mx-auto mb-6 flex max-w-5xl items-center gap-4 rounded-xl border-2 border-blue-500/50 bg-slate-800 p-4">
-          <Search className="h-6 w-6 flex-shrink-0 text-blue-400" />
-          <span className="flex-1 truncate text-2xl font-medium text-white">
+      <div className="flex-1 bg-background/60" onClick={onClose} />
+      <div className="border-t-2 border-primary/30 bg-background/95 p-6 pb-10 duration-200 animate-in slide-in-from-bottom">
+        <div className="mx-auto mb-6 flex max-w-5xl items-center gap-4 rounded-xl border-2 border-primary/50 bg-muted p-4">
+          <Search className="h-6 w-6 flex-shrink-0 text-primary" />
+          <span className="flex-1 truncate text-2xl font-medium text-primary">
             {value || (
-              <span className="text-slate-500">{t("bigPicture.searchPlaceholder")}</span>
+              <span className="text-muted-foreground">
+                {t("bigPicture.searchPlaceholder")}
+              </span>
             )}
-            <span className="ml-1 animate-pulse text-blue-400">|</span>
+            <span className="ml-1 animate-pulse text-primary">|</span>
           </span>
           {value && (
             <button onClick={() => onChange("")}>
-              <X className="h-6 w-6 text-slate-400" />
+              <X className="h-6 w-6 text-primary" />
             </button>
           )}
         </div>
 
-        <div className="mx-auto mb-2 flex max-w-5xl justify-end gap-4 text-xs font-bold uppercase tracking-widest text-slate-500">
+        <div className="mx-auto mb-2 flex max-w-5xl justify-end gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <span>
-            <span className="mr-1 rounded-sm bg-white px-1 text-black">
+            <span className="mr-1 rounded-sm bg-primary px-1 text-secondary">
               {buttons.delete}
             </span>
             {t("bigPicture.del")}
           </span>
           <span>
-            <span className="mr-1 rounded-sm bg-white px-1 text-black">
+            <span className="mr-1 rounded-sm bg-primary px-1 text-secondary">
               {buttons.space}
             </span>
             {t("bigPicture.space")}
@@ -1057,7 +1079,7 @@ const VirtualKeyboard = ({
               <button
                 key={idx}
                 onClick={() => onSelectSuggestion(game)}
-                className={`flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition-all ${inSuggestions && suggestionIndex === idx ? "scale-105 bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}
+                className={`flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition-all ${inSuggestions && suggestionIndex === idx ? "scale-105 bg-blue-600 text-secondary" : "bg-muted text-primary"}`}
               >
                 <span className="max-w-[150px] truncate text-sm font-bold">
                   {game.game}
@@ -1087,13 +1109,13 @@ const VirtualKeyboard = ({
                     className={`flex items-center justify-center rounded-lg text-xl font-bold transition-all duration-75 ${
                       isSelected
                         ? isEnter
-                          ? "scale-[1.02] bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]"
-                          : "scale-[1.02] bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.6)]"
+                          ? "scale-[1.02] bg-green-500 text-secondary shadow-[0_0_15px_rgba(34,197,94,0.6)]"
+                          : "scale-[1.02] bg-blue-500 text-secondary shadow-[0_0_15px_rgba(59,130,246,0.6)]"
                         : isEnter
-                          ? "bg-green-700 text-white"
+                          ? "bg-green-700 text-secondary"
                           : isDel
-                            ? "bg-red-900/50 text-white"
-                            : "bg-slate-800 text-white hover:bg-slate-700"
+                            ? "bg-red-900/50 text-primary"
+                            : "bg-muted text-primary hover:bg-muted"
                     }`}
                   >
                     {isDel ? (
@@ -1427,7 +1449,7 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
   const hasScreenshots = steamData?.screenshots && steamData.screenshots.length > 0;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex flex-col overflow-hidden bg-[#0e0e10] text-white">
+    <div className="fixed inset-0 z-[10000] flex flex-col overflow-hidden bg-background text-primary">
       <div
         className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
         style={{
@@ -1448,7 +1470,7 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
         }`}
       >
         <div className="group relative">
-          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-blue-500/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
+          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
           <img
             src={bgImage}
             alt={game.name || game.game}
@@ -1465,7 +1487,7 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
         {/* VIEW 1: DETAILS */}
         <div className="relative h-full w-full flex-shrink-0">
           <div className="flex h-full w-[45%] flex-col justify-center p-16 pl-24">
-            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight drop-shadow-lg">
+            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-secondary drop-shadow-lg">
               {game.name || game.game}
             </h1>
             <div className="mb-6 flex flex-wrap gap-3">
@@ -1473,14 +1495,14 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                 game.category.slice(0, 4).map((cat, idx) => (
                   <span
                     key={idx}
-                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider backdrop-blur-sm"
+                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-secondary backdrop-blur-sm"
                   >
                     {cat}
                   </span>
                 ))}
             </div>
 
-            <div className="mb-8 flex gap-6 text-slate-400">
+            <div className="mb-8 flex gap-6 text-secondary/70">
               {game.size && (
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
@@ -1500,24 +1522,24 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                 {game.dlc && (
                   <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/20 px-4 py-2 text-sm font-medium text-purple-300 backdrop-blur-sm">
                     <Download className="h-4 w-4" />
-                    <span>Includes DLC</span>
+                    <span>{t("bigPicture.includesDlc")}</span>
                   </div>
                 )}
                 {game.online && (
                   <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-2 text-sm font-medium text-green-300 backdrop-blur-sm">
                     <Wifi className="h-4 w-4" />
-                    <span>Online Fix</span>
+                    <span>{t("bigPicture.onlineFix")}</span>
                   </div>
                 )}
                 {isSeamless ? (
                   <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-2 text-sm font-medium text-green-300 backdrop-blur-sm">
                     <Check className="h-4 w-4" />
-                    <span>Ready to download</span>
+                    <span>{t("bigPicture.readyToDownload")}</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
                     <MousePointer className="h-4 w-4" />
-                    <span>Mouse required</span>
+                    <span>{t("bigPicture.mouseRequired")}</span>
                   </div>
                 )}
               </div>
@@ -1528,8 +1550,8 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                 onClick={() => onDownload(game)}
                 className={`group flex w-fit items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
                   focusedSection === "button" && selectedButton === 0
-                    ? "scale-110 bg-blue-500 text-white shadow-blue-500/50 ring-4 ring-blue-400/50"
-                    : "bg-white text-black shadow-black/30 hover:scale-105 hover:bg-blue-400 hover:text-white"
+                    ? "scale-110 bg-blue-500 text-secondary shadow-blue-500/50 ring-4 ring-blue-400/50"
+                    : "bg-primary text-secondary shadow-primary/30 hover:scale-105 hover:bg-blue-500"
                 }`}
               >
                 <Download className="h-7 w-7" />
@@ -1541,22 +1563,22 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                 className={`group flex w-fit items-center gap-3 rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
                   focusedSection === "button" && selectedButton === 1
                     ? isPlayLater
-                      ? "scale-110 bg-green-500 text-white shadow-green-500/50 ring-4 ring-green-400/50"
-                      : "scale-110 border-2 border-blue-400 bg-slate-700 text-white shadow-blue-500/30 ring-4 ring-blue-400/50"
+                      ? "scale-110 bg-green-500 text-secondary shadow-green-500/50 ring-4 ring-green-400/50"
+                      : "scale-110 border-2 border-blue-400 bg-muted text-foreground shadow-blue-500/30 ring-4 ring-blue-400/50"
                     : isPlayLater
-                      ? "bg-green-500 text-white shadow-green-500/30"
-                      : "border-2 border-white/20 bg-slate-800/50 text-slate-300 shadow-black/30 hover:border-white/40 hover:bg-slate-700"
+                      ? "bg-green-500 text-secondary shadow-green-500/30"
+                      : "border-2 border-border bg-muted text-foreground shadow-muted/30 hover:border-primary/40 hover:bg-muted/80"
                 }`}
               >
                 {isPlayLater ? (
                   <>
                     <Check className="h-6 w-6" />
-                    <span>Added to Play Later</span>
+                    <span>{t("bigPicture.addedToPlayLater")}</span>
                   </>
                 ) : (
                   <>
                     <Clock className="h-6 w-6" />
-                    <span>Play Later</span>
+                    <span>{t("bigPicture.playLater")}</span>
                   </>
                 )}
               </button>
@@ -1566,11 +1588,11 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
               ref={descriptionRef}
               className={`mb-8 max-h-[400px] min-h-[200px] max-w-3xl overflow-y-auto rounded-xl p-6 transition-all duration-200 ${
                 focusedSection === "description"
-                  ? "bg-slate-800/50 ring-4 ring-blue-400"
-                  : "bg-slate-800/20"
+                  ? "bg-muted/50 ring-4 ring-blue-400"
+                  : "bg-muted/20"
               }`}
             >
-              <p className="text-lg leading-relaxed text-slate-200">
+              <p className="text-lg leading-relaxed text-secondary">
                 {(
                   steamData?.summary ||
                   steamData?.description ||
@@ -1578,34 +1600,36 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   steamData?.about_the_game ||
                   steamData?.detailed_description ||
                   game.desc ||
-                  "Failed to fetch description."
+                  t("bigPicture.failedToFetchDescription")
                 ).replace(/<[^>]*>/g, "")}
               </p>
             </div>
 
             <div className="mt-8 space-y-4">
               {/* Ascend Features Banner */}
-              <div className="group relative max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-slate-800/50 p-5 shadow-xl backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-slate-800/70">
+              <div className="group relative max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-muted/50 p-5 shadow-xl backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-muted/70">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
                 <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
                   {/* Cloud Saves - Always show */}
                   <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                     <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                      <Cloud className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
-                      <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      <Cloud className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                      <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                     </div>
-                    <span className="text-sm font-semibold text-white">Cloud Saves</span>
+                    <span className="text-sm font-semibold text-secondary">
+                      {t("bigPicture.cloudSaves")}
+                    </span>
                   </div>
 
                   {/* Remote Downloads - Always show */}
                   <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                     <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                      <Smartphone className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
-                      <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      <Smartphone className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                      <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                     </div>
-                    <span className="text-sm font-semibold text-white">
-                      Remote Downloads
+                    <span className="text-sm font-semibold text-secondary">
+                      {t("bigPicture.remoteDownloads")}
                     </span>
                   </div>
 
@@ -1613,11 +1637,11 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   {supportsModManaging && (
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                       <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                        <Puzzle className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
-                        <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                        <Puzzle className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
-                      <span className="text-sm font-semibold text-white">
-                        Mod Manager
+                      <span className="text-sm font-semibold text-secondary">
+                        {t("bigPicture.modManager")}
                       </span>
                     </div>
                   )}
@@ -1626,10 +1650,12 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   {supportsFlingTrainer && (
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                       <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                        <Zap className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
-                        <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                        <Zap className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
-                      <span className="text-sm font-semibold text-white">Trainer</span>
+                      <span className="text-sm font-semibold text-secondary">
+                        {t("bigPicture.trainer")}
+                      </span>
                     </div>
                   )}
 
@@ -1637,11 +1663,11 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   {isSeamless && (
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                       <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
-                        <RefreshCw className="h-4.5 w-4.5 text-blue-400 transition-transform duration-200 group-hover/item:scale-110" />
-                        <div className="absolute -inset-1 rounded-lg bg-blue-500/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                        <RefreshCw className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
-                      <span className="text-sm font-semibold text-white">
-                        Auto Updates
+                      <span className="text-sm font-semibold text-secondary">
+                        {t("bigPicture.autoUpdates")}
                       </span>
                     </div>
                   )}
@@ -1649,11 +1675,13 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
 
                 <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-3">
                   <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                    Ascend Premium Features
+                    {t("bigPicture.ascendPremiumFeatures")}
                   </span>
                   <div className="flex items-center gap-1.5">
                     <div className="h-1.5 w-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
-                    <span className="text-xs font-bold text-blue-400">Available</span>
+                    <span className="text-xs font-bold text-secondary">
+                      {t("bigPicture.available")}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1661,18 +1689,20 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
           </div>
 
           <div className="absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 animate-bounce flex-col items-center gap-2 opacity-60">
-            <span className="text-xs font-bold uppercase tracking-widest">
-              {hasScreenshots ? "Screenshots" : "Media Info"}
+            <span className="text-xs font-bold uppercase tracking-widest text-secondary">
+              {hasScreenshots ? t("bigPicture.screenshots") : t("bigPicture.mediaInfo")}
             </span>
-            <ChevronDown className="h-6 w-6" />
+            <ChevronDown className="h-6 w-6 text-secondary" />
           </div>
         </div>
 
         <div className="relative flex h-full w-full flex-shrink-0 flex-col">
-          <div className="absolute inset-0 -z-10 bg-[#0e0e10]/90 backdrop-blur-md" />
+          <div className="absolute inset-0 -z-10 bg-background/90 backdrop-blur-md" />
           <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
             <ImageIcon className="h-8 w-8 text-blue-500" />
-            <h2 className="text-4xl font-light tracking-wider">MEDIA</h2>
+            <h2 className="text-4xl font-light tracking-wider text-primary">
+              {t("bigPicture.media")}
+            </h2>
           </div>
 
           <div
@@ -1685,11 +1715,11 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                   const imageUrl =
                     typeof screen === "string"
                       ? screen
-                      : screen.url || screen.path_full || screen.path_thumbnail;
+                      : screen.path_full || screen.path_thumbnail || screen.url;
                   return (
                     <div
                       key={screen.id || idx}
-                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-slate-800 transition-all hover:scale-[1.02] hover:border-blue-500"
+                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-blue-500"
                     >
                       <img
                         src={imageUrl}
@@ -1706,8 +1736,8 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
                 })}
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-slate-500">
-                <p>No screenshots available.</p>
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <p>{t("bigPicture.noScreenshotsAvailable")}</p>
               </div>
             )}
           </div>
@@ -1715,23 +1745,23 @@ const GameDetailsView = ({ game, onBack, onDownload, t, controllerType }) => {
       </div>
 
       {/* Footer Controls */}
-      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-slate-400">
+      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
         {!showMedia && (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-black text-black shadow-lg">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-black text-secondary shadow-lg">
               {buttons.confirm}
             </span>{" "}
-            DOWNLOAD
+            {t("bigPicture.download")}
           </div>
         )}
         <div
-          className="flex cursor-pointer items-center gap-3 transition-colors hover:text-white"
+          className="flex cursor-pointer items-center gap-3 transition-colors hover:text-primary/80"
           onClick={() => handleInput("BACK")}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-sm text-muted-foreground">
             {buttons.cancel}
           </span>{" "}
-          {showMedia ? "UP / BACK" : "BACK"}
+          {showMedia ? t("bigPicture.upBack") : t("bigPicture.back")}
         </div>
       </div>
     </div>
@@ -1751,7 +1781,6 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
   const [selectedButton, setSelectedButton] = useState("play"); // 'play' or 'folder'
   const lastInputTime = useRef(0);
   const buttons = getControllerButtons(controllerType);
-
   const gameName = game.game || game.name;
 
   useEffect(() => {
@@ -2007,6 +2036,12 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
           } else if (gp.up) {
             handleInput("UP");
             lastInputTime.current = now;
+          } else if (gp.left) {
+            handleInput("LEFT");
+            lastInputTime.current = now;
+          } else if (gp.right) {
+            handleInput("RIGHT");
+            lastInputTime.current = now;
           } else if (gp.b) {
             handleInput("BACK");
             lastInputTime.current = now;
@@ -2057,7 +2092,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
   }, [imageSrc, steamData, hasScreenshots, gameDescription, loadingMedia]);
 
   return (
-    <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-[#0e0e10] text-white">
+    <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-background text-primary">
       <div
         className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
         style={{
@@ -2079,7 +2114,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         }`}
       >
         <div className="group relative">
-          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-blue-500/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
+          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
           {bgImage ? (
             <img
               src={bgImage}
@@ -2087,8 +2122,8 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
               className="max-h-[75vh] max-w-full rotate-2 rounded-2xl border-4 border-white/10 object-cover shadow-2xl transition-all duration-500 ease-out group-hover:rotate-0 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-[60vh] w-[40vw] items-center justify-center rounded-2xl border-4 border-white/10 bg-slate-800">
-              <span className="text-2xl text-slate-500">{gameName}</span>
+            <div className="flex h-[60vh] w-[40vw] items-center justify-center rounded-2xl border-4 border-white/10 bg-muted">
+              <span className="text-2xl text-muted-foreground">{gameName}</span>
             </div>
           )}
         </div>
@@ -2102,7 +2137,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         {/* VIEW 1: DETAILS */}
         <div className="relative h-full w-full flex-shrink-0">
           <div className="flex h-full w-[45%] flex-col justify-center p-16 pl-24">
-            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight drop-shadow-lg">
+            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-secondary drop-shadow-lg">
               {gameName}
             </h1>
 
@@ -2111,7 +2146,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 {game.category.slice(0, 4).map((cat, idx) => (
                   <span
                     key={idx}
-                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider backdrop-blur-sm"
+                    className="rounded-lg border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-secondary backdrop-blur-sm"
                   >
                     {cat}
                   </span>
@@ -2119,7 +2154,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
               </div>
             )}
 
-            <div className="mb-8 flex gap-6 text-slate-400">
+            <div className="mb-8 flex gap-6 text-secondary/70">
               {game.version && (
                 <div className="flex items-center gap-2">
                   <Info className="h-5 w-5" />
@@ -2135,12 +2170,14 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
             </div>
 
             {gameDescription ? (
-              <p className="mb-8 max-w-2xl text-lg leading-relaxed text-slate-300">
+              <p className="mb-8 max-w-2xl text-lg leading-relaxed text-secondary">
                 {gameDescription}
               </p>
             ) : (
-              <p className="mb-8 max-w-2xl text-sm italic text-slate-500">
-                {loadingMedia ? "Loading description..." : "No description available"}
+              <p className="mb-8 max-w-2xl text-sm italic text-secondary">
+                {loadingMedia
+                  ? t("bigPicture.loadingDescription")
+                  : t("bigPicture.noDescriptionAvailable")}
               </p>
             )}
 
@@ -2149,13 +2186,13 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 {game.dlc && (
                   <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/20 px-4 py-2 text-sm font-medium text-purple-300">
                     <Download className="h-4 w-4" />
-                    <span>Includes DLC</span>
+                    <span>{t("bigPicture.includesDlc")}</span>
                   </div>
                 )}
                 {game.online && (
                   <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-2 text-sm font-medium text-green-300">
                     <Wifi className="h-4 w-4" />
-                    <span>Online Fix</span>
+                    <span>{t("bigPicture.onlineFix")}</span>
                   </div>
                 )}
               </div>
@@ -2167,24 +2204,24 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 disabled={isLaunching || isRunning}
                 className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 ${
                   selectedButton === "play"
-                    ? "scale-110 bg-blue-500 text-white shadow-blue-500/50 ring-4 ring-blue-400/50"
-                    : "bg-white text-black shadow-black/30 hover:scale-105 hover:bg-blue-400 hover:text-white"
+                    ? "scale-110 bg-blue-500 text-secondary shadow-blue-500/50 ring-4 ring-blue-400/50"
+                    : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-blue-400 hover:text-secondary"
                 }`}
               >
                 {isLaunching ? (
                   <>
                     <Loader className="h-7 w-7 animate-spin" />
-                    <span>LAUNCHING...</span>
+                    <span>{t("bigPicture.launching")}</span>
                   </>
                 ) : isRunning ? (
                   <>
                     <Play className="h-7 w-7 fill-current" />
-                    <span>RUNNING</span>
+                    <span>{t("bigPicture.running")}</span>
                   </>
                 ) : (
                   <>
                     <Play className="h-7 w-7 fill-current" />
-                    <span>PLAY</span>
+                    <span>{t("bigPicture.play")}</span>
                   </>
                 )}
               </button>
@@ -2193,8 +2230,8 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 onClick={handleOpenDirectory}
                 className={`flex items-center gap-3 rounded-2xl border-2 px-8 py-5 text-xl font-bold backdrop-blur-sm transition-all duration-200 ${
                   selectedButton === "folder"
-                    ? "scale-110 border-blue-400 bg-blue-500/30 shadow-lg shadow-blue-500/30 ring-4 ring-blue-400/50"
-                    : "border-white/20 bg-white/10 hover:scale-105 hover:border-white/40 hover:bg-white/20"
+                    ? "scale-110 border-blue-400 bg-blue-500/30 text-secondary shadow-lg shadow-blue-500/30 ring-4 ring-blue-400/50"
+                    : "border-white/20 bg-white/10 text-secondary hover:scale-105 hover:border-white/40 hover:bg-white/20"
                 }`}
               >
                 <FolderOpen className="h-6 w-6" />
@@ -2204,20 +2241,22 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
 
           {hasScreenshots && (
             <div className="absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 animate-bounce flex-col items-center gap-2 opacity-60">
-              <span className="text-xs font-bold uppercase tracking-widest">
-                Screenshots
+              <span className="text-xs font-bold uppercase tracking-widest text-secondary">
+                {t("bigPicture.screenshots")}
               </span>
-              <ChevronDown className="h-6 w-6" />
+              <ChevronDown className="h-6 w-6 text-secondary" />
             </div>
           )}
         </div>
 
         {/* VIEW 2: MEDIA */}
         <div className="relative flex h-full w-full flex-shrink-0 flex-col">
-          <div className="absolute inset-0 -z-10 bg-[#0e0e10]/90 backdrop-blur-md" />
+          <div className="absolute inset-0 -z-10 bg-background/90 backdrop-blur-md" />
           <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
             <ImageIcon className="h-8 w-8 text-blue-500" />
-            <h2 className="text-4xl font-light tracking-wider">SCREENSHOTS</h2>
+            <h2 className="text-4xl font-light tracking-wider text-primary">
+              {t("bigPicture.screenshots").toUpperCase()}
+            </h2>
           </div>
 
           <div className="no-scrollbar flex-1 overflow-y-auto p-12 px-24 pb-32">
@@ -2232,7 +2271,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                   return (
                     <div
                       key={idx}
-                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-slate-800 transition-all hover:scale-[1.02] hover:border-blue-500"
+                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-blue-500"
                     >
                       <img
                         src={imageUrl}
@@ -2249,12 +2288,12 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 })}
               </div>
             ) : loadingMedia ? (
-              <div className="flex h-full items-center justify-center text-slate-500">
+              <div className="flex h-full items-center justify-center text-muted-foreground">
                 <Loader className="h-8 w-8 animate-spin" />
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-slate-500">
-                <p>No screenshots available.</p>
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <p>{t("bigPicture.noScreenshotsAvailable")}</p>
               </div>
             )}
           </div>
@@ -2262,31 +2301,31 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
       </div>
 
       {/* Footer Controls */}
-      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-slate-400">
+      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
         {!showMedia && !isLaunching && !isRunning && (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-black text-black shadow-lg">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-black text-secondary shadow-lg">
               {buttons.confirm}
             </span>
-            PLAY
+            {t("bigPicture.play")}
           </div>
         )}
         {!showMedia && (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm font-black">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-sm font-black text-muted-foreground">
               {buttons.delete}
             </span>
-            OPEN FOLDER
+            {t("bigPicture.openFolder")}
           </div>
         )}
         <div
-          className="flex cursor-pointer items-center gap-3 transition-colors hover:text-white"
+          className="flex cursor-pointer items-center gap-3 transition-colors hover:text-primary/80"
           onClick={() => handleInput("BACK")}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-sm text-muted-foreground">
             {buttons.cancel}
-          </span>
-          {showMedia ? "UP / BACK" : "BACK"}
+          </span>{" "}
+          {showMedia ? t("bigPicture.upBack") : t("bigPicture.back")}
         </div>
       </div>
     </div>
@@ -2339,7 +2378,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
       className={`relative flex aspect-[2/3] w-full cursor-pointer flex-col justify-end transition-all duration-150 ease-out ${isSelected ? "z-20 scale-105" : "z-10 scale-100 opacity-70"}`}
     >
       <div
-        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-slate-800 shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg shadow-blue-500/20 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
+        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-muted shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg shadow-blue-500/20 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
       >
         {isVisible && imageUrl ? (
           <img
@@ -2350,11 +2389,11 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
             loading="lazy"
           />
         ) : loading ? (
-          <div className="flex h-full w-full items-center justify-center bg-slate-800">
-            <Loader className="h-8 w-8 animate-spin text-blue-400" />
+          <div className="flex h-full w-full items-center justify-center bg-muted">
+            <Loader className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-slate-800 text-slate-500">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-muted text-secondary">
             <Download className="mb-2 h-8 w-8 opacity-50" />
             <span className="px-4 text-center text-sm font-bold">{game.game}</span>
           </div>
@@ -2366,7 +2405,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
         {game.rating && game.rating > 0 && (
           <div className="flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 backdrop-blur-sm">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            <span className="text-xs font-bold text-white">
+            <span className="text-xs font-bold text-primary">
               {Math.round(game.rating)}
             </span>
           </div>
@@ -2375,13 +2414,13 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
         {/* DLC/Online badges */}
         <div className="flex items-center gap-1.5">
           {game.dlc && (
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10 backdrop-blur-sm transition-all hover:bg-white/20">
-              <Gift className="h-3.5 w-3.5 text-white" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-secondary/10 backdrop-blur-sm transition-all hover:bg-secondary/20">
+              <Gift className="h-3.5 w-3.5 text-secondary" />
             </div>
           )}
           {game.online && (
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10 backdrop-blur-sm transition-all hover:bg-white/20">
-              <Gamepad2 className="h-3.5 w-3.5 text-white" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-secondary/10 backdrop-blur-sm transition-all hover:bg-secondary/20">
+              <Gamepad2 className="h-3.5 w-3.5 text-secondary" />
             </div>
           )}
         </div>
@@ -2390,7 +2429,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
       {isSelected && (
         <div className="absolute bottom-0 left-0 right-0 z-20 rounded-b-xl bg-gradient-to-t from-black via-black/95 to-transparent p-4 pt-10 text-center">
           <span
-            className={`block font-bold leading-tight text-white ${game.game.length > 35 ? "text-xs" : "text-sm"}`}
+            className={`block font-bold leading-tight text-secondary ${game.game.length > 35 ? "text-xs" : "text-sm"}`}
           >
             {game.game}
           </span>
@@ -2404,7 +2443,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
 });
 
 // Library card component
-const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
+const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
   const [imageSrc, setImageSrc] = useState(null);
   const cardRef = useRef(null);
 
@@ -2451,12 +2490,12 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
       <div
         ref={cardRef}
         onClick={onClick}
-        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-slate-800 transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
+        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-muted transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
       >
         <Grid
-          className={`mb-4 h-12 w-12 ${isSelected ? "text-blue-400" : "text-slate-500"}`}
+          className={`mb-4 h-12 w-12 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
         />
-        <h3 className="px-4 text-center text-xl font-bold">SEE ALL GAMES</h3>
+        <h3 className="px-4 text-center text-xl font-bold">{t("bigPicture.seeMore")}</h3>
       </div>
     );
   }
@@ -2482,7 +2521,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
         />
       )}
       <div
-        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-slate-800 shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg ring-0 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
+        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-muted shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg ring-0 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
       >
         {imageSrc ? (
           <img
@@ -2492,7 +2531,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
             style={{ objectPosition: "center top" }}
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-slate-800 text-slate-500">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-muted text-muted-foreground">
             <span className="px-4 text-center text-sm font-bold">{gameName}</span>
           </div>
         )}
@@ -2502,23 +2541,23 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
           className={`pointer-events-none absolute left-1/2 z-30 w-[300px] -translate-x-1/2 text-center transition-all duration-150 ease-out ${isSelected ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"} ${isHero ? "-bottom-20" : "-bottom-14"}`}
         >
           <h3
-            className={`font-bold tracking-wide text-white drop-shadow-md ${isHero ? "text-3xl" : "text-xl"} ${gameName.length > 25 ? "text-lg leading-tight" : ""}`}
+            className={`font-bold tracking-wide text-primary drop-shadow-md ${isHero ? "text-3xl" : "text-xl"} ${gameName.length > 25 ? "text-lg leading-tight" : ""}`}
           >
             {gameName}
           </h3>
           {isHero && (
             <div className="mt-2 flex items-center justify-center gap-2">
-              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white shadow-lg">
-                LAST PLAYED
+              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold tracking-wider text-secondary shadow-lg">
+                {t("bigPicture.lastPlayed")}
               </span>
-              <span className="text-sm font-medium text-blue-100 drop-shadow-md">
+              <span className="text-sm font-medium text-primary drop-shadow-md">
                 {game.playTime && game.playTime >= 60
                   ? game.playTime >= 3600
-                    ? `${Math.floor(game.playTime / 3600)}h played`
-                    : `${Math.floor(game.playTime / 60)}m played`
+                    ? `${Math.floor(game.playTime / 3600)}h ${t("bigPicture.played")}`
+                    : `${Math.floor(game.playTime / 60)}m ${t("bigPicture.played")}`
                   : game.playTime > 0
-                    ? "< 1m played"
-                    : "0h played"}
+                    ? `< 1m ${t("bigPicture.played")}`
+                    : `0h ${t("bigPicture.played")}`}
               </span>
             </div>
           )}
@@ -2527,7 +2566,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode }) => {
       {isGridMode && isSelected && (
         <div className="absolute bottom-0 left-0 right-0 z-20 rounded-b-xl bg-gradient-to-t from-black via-black/95 to-transparent p-3 pt-8 text-center">
           <span
-            className={`block font-bold leading-tight text-white ${gameName.length > 30 ? "text-xs" : gameName.length > 20 ? "text-sm" : "text-sm"}`}
+            className={`block font-bold leading-tight text-primary ${gameName.length > 30 ? "text-xs" : gameName.length > 20 ? "text-sm" : "text-sm"}`}
           >
             {gameName}
           </span>
@@ -2542,7 +2581,7 @@ const StoreSearchBar = ({ isSelected, searchQuery, onClick, t }) => {
   return (
     <div
       onClick={onClick}
-      className={`flex cursor-pointer items-center gap-4 rounded-xl px-6 py-4 transition-all duration-150 ${isSelected ? "scale-[1.02] bg-blue-500 text-white shadow-lg shadow-blue-500/30" : "bg-slate-800/80 text-slate-400 hover:bg-slate-700"}`}
+      className={`flex cursor-pointer items-center gap-4 rounded-xl px-6 py-4 transition-all duration-150 ${isSelected ? "scale-[1.02] bg-blue-500 text-secondary" : "bg-muted/80 text-slate-400 hover:bg-muted"}`}
     >
       <Search className="h-6 w-6" />
       <span className="text-lg font-medium">
@@ -2568,47 +2607,44 @@ const HomeSidebar = ({ selectedIndex, t, onItemClick, isVisible }) => {
 
   return (
     <div className="fixed left-8 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-3">
-      {items.map((item, idx) => {
-        const isSelected = selectedIndex === idx;
-        return (
+      {items.map((item, idx) => (
+        <div
+          key={idx}
+          onClick={() => onItemClick && onItemClick(idx)}
+          className="group relative flex cursor-pointer items-center transition-all duration-200"
+        >
+          {/* Icon container */}
           <div
-            key={idx}
-            onClick={() => onItemClick && onItemClick(idx)}
-            className="group relative flex cursor-pointer items-center transition-all duration-200"
+            className={`flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-200 ${
+              selectedIndex === idx
+                ? "scale-110 bg-white shadow-[0_0_30px_rgba(255,255,255,0.5)]"
+                : "bg-white/10 backdrop-blur-sm group-hover:scale-105 group-hover:bg-white/20"
+            }`}
           >
-            {/* Icon container */}
-            <div
-              className={`flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-200 ${
-                isSelected
-                  ? "scale-110 bg-white shadow-[0_0_30px_rgba(255,255,255,0.5)]"
-                  : "bg-white/10 backdrop-blur-sm group-hover:scale-105 group-hover:bg-white/20"
+            <item.icon
+              className={`h-6 w-6 transition-colors duration-200 ${
+                selectedIndex === idx ? "text-black" : "text-primary"
               }`}
-            >
-              <item.icon
-                className={`h-6 w-6 transition-colors duration-200 ${
-                  isSelected ? "text-black" : "text-white"
-                }`}
-              />
-            </div>
-
-            {/* Label tooltip - appears on hover or selection */}
-            <div
-              className={`absolute left-16 whitespace-nowrap rounded-lg bg-white px-4 py-2 text-sm font-bold text-black shadow-xl transition-all duration-200 ${
-                isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-              }`}
-            >
-              {item.label}
-              {/* Arrow pointing to icon */}
-              <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 bg-white"></div>
-            </div>
-
-            {/* Selection indicator bar */}
-            {isSelected && (
-              <div className="absolute -left-2 h-8 w-1 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]" />
-            )}
+            />
           </div>
-        );
-      })}
+
+          {/* Label tooltip - appears on hover or selection */}
+          <div
+            className={`absolute left-16 whitespace-nowrap rounded-lg bg-white px-4 py-2 text-sm font-bold text-black shadow-xl transition-all duration-200 ${
+              selectedIndex === idx ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            {item.label}
+            {/* Arrow pointing to icon */}
+            <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 bg-white"></div>
+          </div>
+
+          {/* Selection indicator bar */}
+          {selectedIndex === idx && (
+            <div className="absolute -left-2 h-8 w-1 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]" />
+          )}
+        </div>
+      ))}
     </div>
   );
 };
@@ -2630,9 +2666,9 @@ const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick }) => {
   ];
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-[10000] flex w-[350px] transform flex-col bg-[#1a1b1e] p-8 shadow-2xl transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+      className={`fixed inset-y-0 left-0 z-[10000] flex w-[350px] transform flex-col bg-card p-8 shadow-2xl transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
     >
-      <h2 className="mb-10 border-b border-slate-700 pb-4 text-2xl font-light tracking-widest text-slate-400">
+      <h2 className="mb-10 border-b border-border pb-4 text-2xl font-light tracking-widest text-primary">
         {t("bigPicture.menu")}
       </h2>
       <div className="flex flex-col gap-4">
@@ -2640,14 +2676,14 @@ const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick }) => {
           <div
             key={idx}
             onClick={() => onItemClick && onItemClick(idx)}
-            className={`flex cursor-pointer items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? (item.danger ? "scale-105 bg-red-600 text-white shadow-lg shadow-red-900/50" : "scale-105 bg-white text-black shadow-lg") : "text-slate-400 hover:bg-slate-800"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
+            className={`flex cursor-pointer items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? (item.danger ? "scale-105 bg-red-600 text-secondary shadow-lg shadow-red-900/50" : "scale-105 bg-white text-black shadow-lg") : "text-slate-400 hover:bg-muted"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
           >
             <item.icon className="h-6 w-6" />
             <span className="font-bold tracking-wide">{item.label}</span>
           </div>
         ))}
       </div>
-      <div className="mt-auto text-center text-xs uppercase tracking-wider text-slate-600">
+      <div className="mt-auto text-center text-xs uppercase tracking-wider text-muted-foreground">
         {t("bigPicture.menuPressB")}
       </div>
     </div>
@@ -2678,14 +2714,14 @@ const ActiveDownloadsBar = ({ downloads, t }) => {
           return (
             <div
               key={game.game}
-              className="flex min-w-[300px] max-w-[400px] flex-1 flex-col gap-2 rounded-lg border border-white/10 bg-slate-800/90 p-3 shadow-lg backdrop-blur"
+              className="flex min-w-[300px] max-w-[400px] flex-1 flex-col gap-2 rounded-lg border border-white/10 bg-muted/90 p-3 shadow-lg backdrop-blur"
             >
               <div className="flex items-center justify-between text-xs font-bold uppercase">
-                <span className="max-w-[180px] truncate text-white">{game.game}</span>
-                <span className="text-blue-400">{speed}</span>
+                <span className="max-w-[180px] truncate text-primary">{game.game}</span>
+                <span className="text-primary">{speed}</span>
               </div>
 
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-700">
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${data.extracting ? "animate-pulse bg-amber-500" : "bg-blue-500"}`}
                   style={{ width: `${progress}%` }}
@@ -3111,8 +3147,9 @@ export default function BigPicture() {
         return;
       }
 
+      // Allow InstalledGameDetailsView to handle its own navigation
       if (installedGameView) {
-        console.log("[NAV] Blocked by installedGameView");
+        console.log("[NAV] Blocked by installedGameView - letting component handle it");
         return;
       }
 
@@ -3464,7 +3501,7 @@ export default function BigPicture() {
   ]);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-[#0e0e10] text-white">
+    <div className="fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-background text-primary">
       <Toaster
         position="top-center"
         richColors
@@ -3555,7 +3592,7 @@ export default function BigPicture() {
       )}
 
       <div
-        className={`absolute inset-0 z-[9000] bg-black/60 transition-opacity duration-200 ${isMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`absolute inset-0 z-[9000] bg-background/60 transition-opacity duration-200 ${isMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
       />
       <SidebarMenu
         isOpen={isMenuOpen}
@@ -3588,7 +3625,7 @@ export default function BigPicture() {
         <div
           className={`absolute left-24 top-16 z-20 transition-all duration-200 ${isMenuOpen || isKeyboardOpen ? "opacity-50 blur-sm" : ""}`}
         >
-          <h1 className="flex items-center gap-4 text-3xl font-light uppercase tracking-[0.2em] text-white/90">
+          <h1 className="flex items-center gap-4 text-3xl font-light uppercase tracking-[0.2em] text-primary">
             <span className="h-1 w-12 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]"></span>
             {view === "library"
               ? t("bigPicture.library")
@@ -3642,6 +3679,7 @@ export default function BigPicture() {
                     isSelected={index === carouselIndex && !isMenuOpen}
                     onClick={() => setCarouselIndex(index)}
                     isGridMode={false}
+                    t={t}
                   />
                 ))}
                 <div className="w-[60vw] flex-shrink-0"></div>
@@ -3663,6 +3701,7 @@ export default function BigPicture() {
                   isSelected={index === libraryIndex && !isMenuOpen}
                   onClick={() => setLibraryIndex(index)}
                   isGridMode={true}
+                  t={t}
                 />
               ))}
             </div>
@@ -3682,7 +3721,7 @@ export default function BigPicture() {
                 t={t}
               />
               {storeSearchQuery && (
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {filteredStoreGames.length}{" "}
                   {filteredStoreGames.length > 1
                     ? t("bigPicture.resultsForPlural")
@@ -3696,7 +3735,7 @@ export default function BigPicture() {
               <div className="flex flex-1 items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                   <div className="h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                  <p className="text-xl text-slate-400">
+                  <p className="text-xl text-muted-foreground">
                     {t("bigPicture.loadingCatalog")}
                   </p>
                 </div>
@@ -3704,8 +3743,8 @@ export default function BigPicture() {
             ) : filteredStoreGames.length === 0 ? (
               <div className="flex flex-1 items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                  <Search className="h-16 w-16 text-slate-600" />
-                  <p className="text-xl text-slate-400">
+                  <Search className="h-16 w-16 text-primary" />
+                  <p className="text-xl text-muted-foreground">
                     {storeSearchQuery
                       ? t("bigPicture.noGameFound")
                       : t("bigPicture.noGameAvailable")}
@@ -3728,7 +3767,7 @@ export default function BigPicture() {
                 </div>
                 <div ref={loaderRef} className="flex w-full justify-center py-10">
                   {hasMore && (
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-600 border-t-blue-500"></div>
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary"></div>
                   )}
                 </div>
               </>
@@ -3761,21 +3800,21 @@ export default function BigPicture() {
 
       {view !== "details" && !isKeyboardOpen && !installedGameView && (
         <div
-          className={`fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-white/5 bg-[#16171a] px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
+          className={`fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-white/5 bg-card/90 px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
         >
           <div
-            className="flex cursor-pointer items-center gap-3 font-bold tracking-widest text-slate-400 transition-colors hover:text-white"
+            className="flex cursor-pointer items-center gap-3 font-bold tracking-widest text-primary transition-colors hover:text-primary/80"
             onClick={() => setIsMenuOpen(true)}
           >
             <Menu className="h-6 w-6" />
             <span>{t("bigPicture.menu")}</span>
-            <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
+            <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
               {buttons.menu}
             </span>
           </div>
-          <div className="flex gap-12 text-sm font-bold tracking-widest text-slate-400">
+          <div className="flex gap-12 text-sm font-bold tracking-widest text-primary">
             <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-black text-black shadow-lg">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-black text-secondary shadow-lg">
                 {buttons.confirm}
               </span>
               {view === "store" && isSearchBarSelected
@@ -3785,7 +3824,7 @@ export default function BigPicture() {
                   : t("bigPicture.play")}
             </div>
             <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-xs font-black">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted text-xs font-black text-muted-foreground">
                 {buttons.cancel}
               </span>
               {view === "carousel" ? t("bigPicture.exit") : t("bigPicture.back")}
