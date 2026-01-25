@@ -18,7 +18,9 @@ let isHandlingProtocolUrl = false;
  */
 function createWindow() {
   // Detect if Big Picture mode should be used
-  const startInBigPicture = process.argv.includes("--big-picture");
+  const startInBigPicture = process.argv.some(
+    arg => arg.toLowerCase() === "--big-picture"
+  );
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
@@ -59,20 +61,13 @@ function createWindow() {
   });
 
   // Adding hash to URL
-  const urlSuffix = startInBigPicture ? "#/big-picture" : "";
+  const urlSuffix = startInBigPicture ? "#/bigpicture" : "";
 
   if (isDev) {
     // Load from localhost:5173 in development
     mainWindow.loadURL("http://localhost:5173" + urlSuffix);
   } else {
     mainWindow.loadURL("http://localhost:46859" + urlSuffix);
-  }
-
-  if (isDev) {
-    // Load from localhost:5173 in development
-    mainWindow.loadURL("http://localhost:5173");
-  } else {
-    mainWindow.loadURL("http://localhost:46859");
   }
 
   // Handle load failures (e.g., local server not running)
