@@ -1912,16 +1912,21 @@ const Ascend = () => {
     }
   };
 
-  // Handle checkout success callback from protocol
-  const handleCheckoutSuccess = async sessionId => {
+  // Handle checkout success callback from protocol with retry logic
+  const handleCheckoutSuccess = async (sessionId, retryCount = 0, maxRetries = 5) => {
+    const MAX_RETRIES = maxRetries;
+    const BASE_DELAY = 2000;
+
     try {
       // User might not be loaded yet when protocol callback fires
       if (!user?.uid) {
         console.log("User not loaded yet, waiting...");
         // Wait a bit for user to load and retry
-        setTimeout(() => handleCheckoutSuccess(sessionId), 1000);
+        setTimeout(() => handleCheckoutSuccess(sessionId, retryCount, maxRetries), 1000);
         return;
       }
+
+      console.log(`Verifying checkout (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
 
       const authToken = await getAuthToken();
       const response = await fetch("https://api.ascendara.app/stripe/verify-checkout", {
@@ -1939,19 +1944,105 @@ const Ascend = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
+          console.log("Checkout verification successful!");
           // Backend updates Firestore directly via Admin SDK
           setShowSubscriptionSuccess(true);
           // Refresh access status
           verifyAccess();
+          return;
         } else {
+          // Backend returned an error - this might be a permanent failure
+          console.error("Checkout verification failed:", data.message);
+
+          // Retry on certain error messages that might be transient
+          const transientErrors = ["database", "timeout", "temporary", "try again"];
+          const isTransient = transientErrors.some(keyword =>
+            data.message?.toLowerCase().includes(keyword)
+          );
+
+          if (isTransient && retryCount < MAX_RETRIES) {
+            const delay = BASE_DELAY * Math.pow(2, retryCount);
+            console.log(`Transient error detected, retrying in ${delay}ms...`);
+            setTimeout(
+              () => handleCheckoutSuccess(sessionId, retryCount + 1, maxRetries),
+              delay
+            );
+            return;
+          }
+
           toast.error(data.message || t("ascend.settings.paymentNotCompleted"));
         }
       } else {
-        toast.error(t("ascend.settings.verifyCheckoutError"));
+        // Network or server error - definitely retry
+        console.error(`Checkout verification failed with status ${response.status}`);
+
+        if (retryCount < MAX_RETRIES) {
+          const delay = BASE_DELAY * Math.pow(2, retryCount);
+          console.log(`Server error (${response.status}), retrying in ${delay}ms...`);
+
+          // Show a toast on first retry to inform user
+          if (retryCount === 0) {
+            toast.info(
+              t("ascend.settings.verifyingPayment") ||
+                "Verifying your payment, please wait...",
+              {
+                duration: delay,
+              }
+            );
+          }
+
+          setTimeout(
+            () => handleCheckoutSuccess(sessionId, retryCount + 1, maxRetries),
+            delay
+          );
+          return;
+        } else {
+          // Max retries exceeded - show persistent error with instructions
+          console.error("Max retries exceeded for checkout verification");
+          toast.error(
+            t("ascend.settings.verifyCheckoutRetryFailed") ||
+              "Unable to verify your payment. Please contact support with your session ID if you were charged.",
+            { duration: 10000 }
+          );
+          // Log session ID for support
+          console.error("Session ID for support:", sessionId);
+        }
       }
     } catch (error) {
       console.error("Error verifying checkout:", error);
-      toast.error(t("ascend.settings.verifyCheckoutError"));
+
+      // Retry on network errors
+      if (retryCount < MAX_RETRIES) {
+        const delay = BASE_DELAY * Math.pow(2, retryCount);
+        console.log(`Network error, retrying in ${delay}ms...`);
+
+        // Show a toast on first retry to inform user
+        if (retryCount === 0) {
+          toast.info(
+            t("ascend.settings.verifyingPayment") ||
+              "Verifying your payment, please wait...",
+            {
+              duration: delay,
+            }
+          );
+        }
+
+        setTimeout(
+          () => handleCheckoutSuccess(sessionId, retryCount + 1, maxRetries),
+          delay
+        );
+        return;
+      } else {
+        // Max retries exceeded
+        console.error("Max retries exceeded for checkout verification");
+        toast.error(
+          t("ascend.settings.verifyCheckoutRetryFailed") ||
+            "Unable to verify your payment. Please contact support with your session ID if you were charged.",
+          { duration: 10000 }
+        );
+        // Log session ID for support
+        console.error("Session ID for support:", sessionId);
+      }
     }
   };
 
