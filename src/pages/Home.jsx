@@ -1219,8 +1219,8 @@ const Home = memo(() => {
                         {quickAccessPage === "downloads" && (
                           <Download className="h-4 w-4 text-primary" />
                         )}
-                        {quickAccessPage === "preferences" && (
-                          <SettingsIcon className="h-4 w-4 text-primary" />
+                        {quickAccessPage === "bigpicture" && (
+                          <Gamepad2 className="h-4 w-4 text-primary" />
                         )}
                         {quickAccessPage === "ascend" && (
                           <Sparkles className="h-4 w-4 text-primary" />
@@ -1229,7 +1229,7 @@ const Home = memo(() => {
                       <span className="text-[10px] font-medium text-muted-foreground">
                         {quickAccessPage === "library" && t("common.library")}
                         {quickAccessPage === "downloads" && t("common.downloads")}
-                        {quickAccessPage === "preferences" && t("common.preferences")}
+                        {quickAccessPage === "bigpicture" && t("common.bigpicture")}
                         {quickAccessPage === "ascend" && t("common.ascend")}
                       </span>
                     </div>
@@ -1322,13 +1322,13 @@ const Home = memo(() => {
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
-                    <RadioGroupItem value="preferences" id="preferences" />
+                    <RadioGroupItem value="bigpicture" id="bigpicture" />
                     <Label
-                      htmlFor="preferences"
+                      htmlFor="bigpicture"
                       className="flex flex-1 cursor-pointer items-center gap-2"
                     >
-                      <SettingsIcon className="h-4 w-4 text-primary" />
-                      <span>{t("common.preferences")}</span>
+                      <Gamepad2 className="h-4 w-4 text-primary" />
+                      <span>{t("common.bigpicture")}</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
