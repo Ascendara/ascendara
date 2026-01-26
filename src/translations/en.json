@@ -1983,7 +1983,7 @@
     "matureContentDescription": "Allow games with mature themes to appear in search results.",
     "noAdditionalLocations": "No additional locations yet...",
     "noControllerDetected": "No Controller Detected",
-    "noControllerDetectedDescription": "Connect a controller to use Big Picture mode",
+    "noControllerDetectedDescription": "Connect a controller and Ascendara will automatically detect it",
     "noLudusaviTool": "Ludusavi Sidecar is Required",
     "noLudusaviToolDesc": "Ludusavi is required to use the backup/restore feature on Ascendara. Clicking continue will install Ludusavi automatically.",
     "noPublicThemes": "No community themes available yet.",

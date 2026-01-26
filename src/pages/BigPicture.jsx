@@ -38,6 +38,7 @@ import {
   Circle,
   Square,
   Triangle,
+  KeyboardIcon,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import gameService from "@/services/gameService";
@@ -107,9 +108,32 @@ const getControllerButtons = (controllerType = "xbox") => {
       space: "Y",
       menu: "Menu",
     },
+    keyboard: {
+      confirm: "Enter",
+      cancel: "Esc",
+      delete: "Del",
+      space: "Space",
+      menu: "Tab",
+    },
   };
 
   return buttonMaps[controllerType] || buttonMaps.xbox;
+};
+
+// Get button badge border radius based on controller type
+const getButtonBadgeClass = (controllerType = "xbox") => {
+  return controllerType === "keyboard" ? "rounded-md" : "rounded-full";
+};
+
+// Get button width class based on button text (for keyboard keys)
+const getButtonWidthClass = (buttonText, baseSize = "w-8") => {
+  if (
+    typeof buttonText === "string" &&
+    (buttonText === "Enter" || buttonText === "Space")
+  ) {
+    return baseSize === "w-8" ? "w-14" : baseSize === "w-10" ? "w-16" : "w-14";
+  }
+  return baseSize;
 };
 
 // Debounce hook for search optimization
@@ -490,13 +514,17 @@ const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
         </div>
         <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <span>
-            <span className="mr-2 rounded-full bg-primary px-2 py-1 text-secondary">
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} bg-primary px-2 py-1 text-secondary`}
+            >
               {buttons.confirm}
             </span>
             {t("bigPicture.confirm")}
           </span>
           <span>
-            <span className="mr-2 rounded-full border border-border bg-muted px-2 py-1 text-muted-foreground">
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} border border-border bg-muted px-2 py-1 text-muted-foreground`}
+            >
               {buttons.cancel}
             </span>
             {t("bigPicture.cancel")}
@@ -628,13 +656,17 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
         </div>
         <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <span>
-            <span className="mr-2 rounded-full bg-primary px-2 py-1 text-secondary">
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} bg-primary px-2 py-1 text-secondary`}
+            >
               {buttons.confirm}
             </span>
             {t("bigPicture.confirm")}
           </span>
           <span>
-            <span className="mr-2 rounded-full border border-border bg-muted px-2 py-1 text-muted-foreground">
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} border border-border bg-muted px-2 py-1 text-muted-foreground`}
+            >
               {buttons.cancel}
             </span>
             {t("bigPicture.cancel")}
@@ -681,6 +713,13 @@ const BigPictureSettingsDialog = ({
       value: "generic",
       label: t("bigPicture.controllerTypeGeneric"),
       icon: Gamepad2,
+      category: t("bigPicture.controllerType"),
+    },
+    {
+      type: "controller",
+      value: "keyboard",
+      label: "Keyboard",
+      icon: KeyboardIcon,
       category: t("bigPicture.controllerType"),
     },
     {
@@ -840,13 +879,17 @@ const BigPictureSettingsDialog = ({
         </div>
         <div className="flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <span>
-            <span className="mr-2 rounded-full bg-primary px-2 py-1 text-secondary">
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} bg-primary px-2 py-1 text-secondary`}
+            >
               {buttons.confirm}
             </span>
             {t("bigPicture.confirm")}
           </span>
           <span>
-            <span className="mr-2 rounded-full border border-border bg-muted px-2 py-1 text-muted-foreground">
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} border border-border bg-muted px-2 py-1 text-muted-foreground`}
+            >
               {buttons.cancel}
             </span>
             {t("bigPicture.cancel")}
@@ -1761,7 +1804,9 @@ const GameDetailsView = ({
       <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
         {!showMedia && (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-black text-secondary shadow-lg">
+            <span
+              className={`flex h-10 ${getButtonWidthClass(buttons.confirm, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} bg-primary text-sm font-black text-secondary shadow-lg`}
+            >
               {buttons.confirm}
             </span>{" "}
             {t("bigPicture.download")}
@@ -1771,7 +1816,9 @@ const GameDetailsView = ({
           className="flex cursor-pointer items-center gap-3 transition-colors hover:text-primary/80"
           onClick={() => handleInput("BACK")}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-sm text-muted-foreground">
+          <span
+            className={`flex h-10 ${getButtonWidthClass(buttons.cancel, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-sm text-muted-foreground`}
+          >
             {buttons.cancel}
           </span>{" "}
           {showMedia ? t("bigPicture.upBack") : t("bigPicture.back")}
@@ -2317,7 +2364,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
       <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
         {!showMedia && !isLaunching && !isRunning && (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-black text-secondary shadow-lg">
+            <span
+              className={`flex h-10 ${getButtonWidthClass(buttons.confirm, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} bg-primary text-sm font-black text-secondary shadow-lg`}
+            >
               {buttons.confirm}
             </span>
             {t("bigPicture.play")}
@@ -2325,7 +2374,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         )}
         {!showMedia && (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-sm font-black text-muted-foreground">
+            <span
+              className={`flex h-10 ${getButtonWidthClass(buttons.delete, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-sm font-black text-muted-foreground`}
+            >
               {buttons.delete}
             </span>
             {t("bigPicture.openFolder")}
@@ -2335,7 +2386,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
           className="flex cursor-pointer items-center gap-3 transition-colors hover:text-primary/80"
           onClick={() => handleInput("BACK")}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-sm text-muted-foreground">
+          <span
+            className={`flex h-10 ${getButtonWidthClass(buttons.cancel, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-sm text-muted-foreground`}
+          >
             {buttons.cancel}
           </span>{" "}
           {showMedia ? t("bigPicture.upBack") : t("bigPicture.back")}
@@ -2590,7 +2643,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
 };
 
 // Store search bar
-const StoreSearchBar = ({ isSelected, searchQuery, onClick, t }) => {
+const StoreSearchBar = ({ isSelected, searchQuery, onClick, t, buttons }) => {
   return (
     <div
       onClick={onClick}
@@ -2601,7 +2654,9 @@ const StoreSearchBar = ({ isSelected, searchQuery, onClick, t }) => {
         {searchQuery || t("bigPicture.searchGame")}
       </span>
       {searchQuery && (
-        <span className="ml-auto text-sm opacity-70">{t("bigPicture.pressAModify")}</span>
+        <span className="ml-auto text-sm opacity-70">
+          Press {buttons.confirm} to modify
+        </span>
       )}
     </div>
   );
@@ -2663,7 +2718,7 @@ const HomeSidebar = ({ selectedIndex, t, onItemClick, isVisible }) => {
 };
 
 // Side menu
-const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick }) => {
+const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick, buttons }) => {
   const items = [
     { icon: Home, label: t("bigPicture.home"), action: "home" },
     { icon: Grid, label: t("bigPicture.library"), action: "library" },
@@ -2697,7 +2752,7 @@ const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick }) => {
         ))}
       </div>
       <div className="mt-auto text-center text-xs uppercase tracking-wider text-muted-foreground">
-        {t("bigPicture.menuPressB")}
+        Press {buttons.cancel} to close
       </div>
     </div>
   );
@@ -2807,7 +2862,8 @@ export default function BigPicture() {
   useHideCursorOnGamepad();
   const { t } = useLanguage();
   const { settings, updateSetting } = useSettings();
-  const buttons = getControllerButtons(settings.controllerType || "xbox");
+  const controllerType = settings.controllerType || "xbox";
+  const buttons = getControllerButtons(controllerType);
   // Enter full-screen on mount, quit on unmount
   useEffect(() => {
     const enterFullScreen = async () => {
@@ -2816,14 +2872,25 @@ export default function BigPicture() {
           await document.documentElement.requestFullscreen();
         }
       } catch (err) {
-        console.error("Error entering fullscreen:", err);
+        // Silently ignore fullscreen errors (browser requires user gesture)
       }
     };
 
     enterFullScreen();
 
+    // Prevent Escape key from exiting fullscreen
+    const preventEscapeFullscreen = e => {
+      if (e.key === "Escape" && document.fullscreenElement) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener("keydown", preventEscapeFullscreen, { capture: true });
+
     // Quit full-screen when leaving Big Picture
     return () => {
+      document.removeEventListener("keydown", preventEscapeFullscreen, { capture: true });
       if (document.fullscreenElement) {
         document
           .exitFullscreen()
@@ -3438,6 +3505,7 @@ export default function BigPicture() {
         Enter: "CONFIRM",
         Escape: "BACK",
         Backspace: "BACK",
+        Tab: "MENU",
         m: "MENU",
         ContextMenu: "MENU",
       };
@@ -3629,6 +3697,7 @@ export default function BigPicture() {
         isOpen={isMenuOpen}
         selectedIndex={menuIndex}
         t={t}
+        buttons={buttons}
         onItemClick={idx => {
           setIsMenuOpen(false);
           // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=SETTINGS, 4=EXIT BIG PICTURE, 5=CLOSE ASCENDARA
@@ -3746,6 +3815,7 @@ export default function BigPicture() {
                   setIsKeyboardOpen(true);
                 }}
                 t={t}
+                buttons={buttons}
               />
               {storeSearchQuery && (
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -3842,7 +3912,9 @@ export default function BigPicture() {
           </div>
           <div className="flex gap-12 text-sm font-bold tracking-widest text-primary">
             <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-black text-secondary shadow-lg">
+              <span
+                className={`flex h-8 ${getButtonWidthClass(buttons.confirm, "w-8")} items-center justify-center ${getButtonBadgeClass(controllerType)} bg-primary text-xs font-black text-secondary shadow-lg`}
+              >
                 {buttons.confirm}
               </span>
               {view === "store" && isSearchBarSelected
@@ -3852,7 +3924,9 @@ export default function BigPicture() {
                   : t("bigPicture.play")}
             </div>
             <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted text-xs font-black text-muted-foreground">
+              <span
+                className={`flex h-8 ${getButtonWidthClass(buttons.cancel, "w-8")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-xs font-black text-muted-foreground`}
+              >
                 {buttons.cancel}
               </span>
               {view === "carousel" ? t("bigPicture.exit") : t("bigPicture.back")}

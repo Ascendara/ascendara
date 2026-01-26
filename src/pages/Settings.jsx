@@ -1577,6 +1577,7 @@ function Settings() {
                       <SelectItem value="xbox">Xbox</SelectItem>
                       <SelectItem value="playstation">PlayStation</SelectItem>
                       <SelectItem value="generic">Generic</SelectItem>
+                      <SelectItem value="keyboard">Keyboard</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
