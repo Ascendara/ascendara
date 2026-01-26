@@ -3661,8 +3661,16 @@ export default function BigPicture() {
         <ExitBigPictureDialog
           isOpen={showExitBigPictureDialog}
           onClose={() => setShowExitBigPictureDialog(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
             setShowExitBigPictureDialog(false);
+            // Exit fullscreen before navigating
+            if (document.fullscreenElement) {
+              try {
+                await document.exitFullscreen();
+              } catch (err) {
+                console.error("Error exiting fullscreen:", err);
+              }
+            }
             navigate("/");
           }}
           t={t}
