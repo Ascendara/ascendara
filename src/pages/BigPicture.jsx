@@ -48,10 +48,9 @@ import flingTrainerService from "@/services/flingTrainerService";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useImageLoader } from "@/hooks/useImageLoader";
-import imageCacheService from "@/services/imageCacheService";
 import recentGamesService from "@/services/recentGamesService";
-import { killAudioAndMiniplayer } from "@/services/audioPlayerService";
 import { sanitizeText } from "@/lib/utils";
+import * as torboxService from "@/services/torboxService";
 
 // UTILS
 const formatBytes = (bytes, decimals = 2) => {
@@ -673,7 +672,15 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
 };
 
 // Kill Download Confirmation Dialog
-const KillDownloadDialog = ({ isOpen, game, onClose, onConfirm, t, controllerType }) => {
+const KillDownloadDialog = ({
+  isOpen,
+  game,
+  onClose,
+  onConfirm,
+  t,
+  controllerType,
+  isLoading = false,
+}) => {
   const [selectedButton, setSelectedButton] = useState(0);
   const [canInput, setCanInput] = useState(false);
   const lastInputTime = useRef(0);
@@ -689,7 +696,7 @@ const KillDownloadDialog = ({ isOpen, game, onClose, onConfirm, t, controllerTyp
 
   const handleInput = useCallback(
     action => {
-      if (!canInput) return;
+      if (!canInput || isLoading) return;
 
       if (action === "LEFT") setSelectedButton(0);
       else if (action === "RIGHT") setSelectedButton(1);
@@ -698,7 +705,7 @@ const KillDownloadDialog = ({ isOpen, game, onClose, onConfirm, t, controllerTyp
         else onClose();
       } else if (action === "BACK") onClose();
     },
-    [canInput, selectedButton, onConfirm, onClose]
+    [canInput, isLoading, selectedButton, onConfirm, onClose]
   );
 
   useEffect(() => {
@@ -770,21 +777,33 @@ const KillDownloadDialog = ({ isOpen, game, onClose, onConfirm, t, controllerTyp
         <div className="flex gap-4">
           <button
             onClick={onConfirm}
+            disabled={isLoading}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
-              selectedButton === 0
-                ? "scale-105 bg-red-500 text-white shadow-lg shadow-red-500/30"
-                : "bg-muted text-muted-foreground hover:bg-muted"
+              isLoading
+                ? "cursor-not-allowed bg-muted/50 text-muted-foreground/50"
+                : selectedButton === 0
+                  ? "scale-105 bg-red-500 text-white shadow-lg shadow-red-500/30"
+                  : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
-            <Trash2 className="h-5 w-5" />
-            {t("bigPicture.killDownload")}
+            {isLoading ? (
+              <Loader className="h-5 w-5 animate-spin" />
+            ) : (
+              <Trash2 className="h-5 w-5" />
+            )}
+            {isLoading
+              ? t("bigPicture.deleting") || "Deleting..."
+              : t("bigPicture.killDownload")}
           </button>
           <button
             onClick={onClose}
+            disabled={isLoading}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
-              selectedButton === 1
-                ? "scale-105 bg-slate-600 text-foreground shadow-lg"
-                : "bg-muted text-muted-foreground hover:bg-muted"
+              isLoading
+                ? "cursor-not-allowed bg-muted/50 text-muted-foreground/50"
+                : selectedButton === 1
+                  ? "scale-105 bg-slate-600 text-foreground shadow-lg"
+                  : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
             <X className="h-5 w-5" />
@@ -867,10 +886,12 @@ const ProviderSelectionDialog = ({
             "[PROVIDER DIALOG] Starting download with provider:",
             providers[selectedProvider]
           );
+          setCanInput(false);
           onConfirm(providers[selectedProvider]);
         } else if (focusedSection === "cancel") {
           // Cancel button
           console.log("[PROVIDER DIALOG] Closing dialog");
+          setCanInput(false);
           onClose();
         }
       } else if (action === "BACK") {
@@ -2389,9 +2410,6 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
           }
         }
       }
-
-      // Launch the game
-      killAudioAndMiniplayer();
       await window.electron.playGame(
         gameName,
         game.isCustom,
@@ -3210,6 +3228,20 @@ const ActiveDownloadsBar = ({ downloads, t }) => {
           const data = game.downloadingData || {};
           const progress = parseFloat(data.progressCompleted || 0);
           const speed = data.progressDownloadSpeeds || "0 KB/s";
+
+          // Calculate downloaded from progress and total size
+          const total = game.size || "0 MB";
+          const calculateDownloaded = () => {
+            if (!game.size || progress === 0) return "0 MB";
+            const sizeMatch = game.size.match(/([\d.]+)\s*(GB|MB|KB)/);
+            if (!sizeMatch) return "0 MB";
+            const sizeValue = parseFloat(sizeMatch[1]);
+            const sizeUnit = sizeMatch[2];
+            const downloadedValue = ((sizeValue * progress) / 100).toFixed(2);
+            return `${downloadedValue} ${sizeUnit}`;
+          };
+          const downloaded = calculateDownloaded();
+
           const status = data.extracting
             ? t("bigPicture.extracting")
             : data.verifying
@@ -3234,7 +3266,9 @@ const ActiveDownloadsBar = ({ downloads, t }) => {
               </div>
 
               <div className="flex items-center justify-between text-[10px] font-bold tracking-wider text-slate-400">
-                <span>{status}</span>
+                <span>
+                  {downloaded} / {total}
+                </span>
                 <span>{progress.toFixed(1)}%</span>
               </div>
             </div>
@@ -3249,6 +3283,7 @@ const ActiveDownloadsBar = ({ downloads, t }) => {
 const BigPictureDownloadCard = ({
   game,
   isSelected,
+  torboxState,
   onPause,
   onResume,
   onKill,
@@ -3262,8 +3297,19 @@ const BigPictureDownloadCard = ({
   const data = game.downloadingData || {};
   const progress = parseFloat(data.progressCompleted || 0);
   const speed = data.progressDownloadSpeeds || "0 KB/s";
-  const downloaded = data.progressDownloaded || "0 MB";
-  const total = data.progressTotal || "0 MB";
+
+  // Calculate downloaded from progress and total size
+  const total = game.size || "0 MB";
+  const calculateDownloaded = () => {
+    if (!game.size || progress === 0) return "0 MB";
+    const sizeMatch = game.size.match(/([\d.]+)\s*(GB|MB|KB)/);
+    if (!sizeMatch) return "0 MB";
+    const sizeValue = parseFloat(sizeMatch[1]);
+    const sizeUnit = sizeMatch[2];
+    const downloadedValue = ((sizeValue * progress) / 100).toFixed(2);
+    return `${downloadedValue} ${sizeUnit}`;
+  };
+  const downloaded = calculateDownloaded();
 
   const isDownloading = data.downloading;
   const isExtracting = data.extracting;
@@ -3351,7 +3397,12 @@ const BigPictureDownloadCard = ({
         <div className="flex-1">
           <h3 className="mb-1 text-xl font-bold text-primary">{game.game}</h3>
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-semibold ${status.color}`}>{status.text}</span>
+            <span className="text-sm text-muted-foreground">{game.size}</span>
+            {!hasError && !isPaused && !hasError && (
+              <span className={`text-sm font-semibold ${status.color}`}>
+                • {status.text}
+              </span>
+            )}
             {isDownloading && !hasError && (
               <span className="text-xs text-muted-foreground">• {speed}</span>
             )}
@@ -3359,17 +3410,13 @@ const BigPictureDownloadCard = ({
         </div>
       </div>
 
-      {/* Progress Bar */}
-      {!hasError && (
+      {/* Progress Bar - Only show for downloading, not extracting */}
+      {!hasError && !isExtracting && (
         <div className="mb-4">
           <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
             <div
               className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${
-                isExtracting
-                  ? "animate-pulse bg-amber-500"
-                  : isVerifying
-                    ? "bg-green-500"
-                    : "bg-blue-500"
+                isVerifying ? "bg-green-500" : "bg-blue-500"
               }`}
               style={{ width: `${progress}%` }}
             />
@@ -3380,6 +3427,76 @@ const BigPictureDownloadCard = ({
             </span>
             <span className="font-bold">{progress.toFixed(1)}%</span>
           </div>
+        </div>
+      )}
+
+      {/* Extraction Progress */}
+      {isExtracting && !hasError && (
+        <div className="mb-4 space-y-3">
+          {data.extractionProgress?.totalFiles > 0 ? (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">
+                    {parseFloat(data.extractionProgress.percentComplete || 0).toFixed(1)}%
+                  </span>
+                  <span className="text-muted-foreground">
+                    {data.extractionProgress.filesExtracted} /{" "}
+                    {data.extractionProgress.totalFiles} files
+                  </span>
+                </div>
+                <div className="relative h-3 overflow-hidden rounded-full bg-muted/50">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-300"
+                    style={{
+                      width: `${parseFloat(data.extractionProgress.percentComplete || 0)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
+                  <Loader className="h-4 w-4 animate-spin text-amber-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-foreground">
+                      {t("downloads.extracting")}
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      {data.extractionProgress.extractionSpeed}
+                    </span>
+                  </div>
+                  <p
+                    className="truncate text-xs text-muted-foreground"
+                    title={data.extractionProgress.currentFile}
+                  >
+                    {data.extractionProgress.currentFile ||
+                      t("downloads.extractingDescription")}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="relative h-3 overflow-hidden rounded-full bg-muted/50">
+                <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20" />
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
+                  <Loader className="h-4 w-4 animate-spin text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t("downloads.extracting")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("downloads.preparingExtraction") || "Preparing extraction..."}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -3549,6 +3666,7 @@ export default function BigPicture() {
 
   // New state for active downloads
   const [downloadingGames, setDownloadingGames] = useState([]);
+  const [torboxStates, setTorboxStates] = useState({}); // webdownloadId -> state
   const [downloadsIndex, setDownloadsIndex] = useState(0);
   const [stoppingDownloads, setStoppingDownloads] = useState(new Set());
   const [resumingDownloads, setResumingDownloads] = useState(new Set());
@@ -3557,6 +3675,7 @@ export default function BigPicture() {
   const [showProviderDialog, setShowProviderDialog] = useState(false);
   const [providerDialogGame, setProviderDialogGame] = useState(null);
   const [providerDialogProviders, setProviderDialogProviders] = useState([]);
+  const providerDialogJustClosed = useRef(false);
 
   // Fuzzy matcher instance for search
   const fuzzyMatch = useMemo(() => createFuzzyMatcher(), []);
@@ -3617,53 +3736,123 @@ export default function BigPicture() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // --- DOWNLOAD LOGIC ---
-  const handleStartDownload = async (game, preferredProvider = null) => {
-    // Check if the game has seamless download links
-    const isSeamless = checkSeamlessAvailable(game);
+  // --- TORBOX POLLING ---
+  useEffect(() => {
+    if (!settings?.torboxApiKey) return;
 
-    if (isSeamless) {
-      // Seamless download - start it directly
+    const pollTorboxStates = async () => {
       try {
-        const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
-        const links = game.download_links;
+        // Get all downloading games that have a torboxWebdownloadId
+        const torboxDownloads = downloadingGames.filter(game => game.torboxWebdownloadId);
 
-        // Find the provider to use (preferred or first available)
-        let selectedProvider = null;
-        let downloadUrl = null;
+        if (torboxDownloads.length === 0) return;
 
-        // If a preferred provider is specified and available, use it
-        if (preferredProvider && links[preferredProvider]) {
-          selectedProvider = preferredProvider;
-          const providerLinks = links[preferredProvider];
-          downloadUrl = Array.isArray(providerLinks)
-            ? providerLinks.find(link => link && typeof link === "string")
-            : typeof providerLinks === "string"
-              ? providerLinks
-              : null;
-        }
-
-        // Otherwise find first available seamless provider
-        if (!downloadUrl) {
-          for (const provider of seamlessProviders) {
-            if (links[provider]) {
-              selectedProvider = provider;
-              const providerLinks = links[provider];
-              downloadUrl = Array.isArray(providerLinks)
-                ? providerLinks.find(link => link && typeof link === "string")
-                : typeof providerLinks === "string"
-                  ? providerLinks
-                  : null;
-              if (downloadUrl) break;
+        // Poll each TorBox download
+        const newStates = {};
+        for (const game of torboxDownloads) {
+          try {
+            const state = await torboxService.checkDownloadState(
+              settings.torboxApiKey,
+              game.torboxWebdownloadId
+            );
+            if (state && state.length > 0) {
+              newStates[game.torboxWebdownloadId] = state[0];
             }
+          } catch (error) {
+            console.error(
+              `Error checking TorBox state for ${game.torboxWebdownloadId}:`,
+              error
+            );
           }
         }
 
-        if (!downloadUrl) {
-          toast.error(t("bigPicture.downloadError"));
-          return;
-        }
+        setTorboxStates(newStates);
+      } catch (error) {
+        console.error("Error polling TorBox states:", error);
+      }
+    };
 
+    // Poll immediately and then every 5 seconds
+    pollTorboxStates();
+    const intervalId = setInterval(pollTorboxStates, 5000);
+    return () => clearInterval(intervalId);
+  }, [downloadingGames, settings?.torboxApiKey]);
+
+  // --- DOWNLOAD LOGIC ---
+  const handleStartDownload = async (game, preferredProvider = null) => {
+    const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
+    const links = game.download_links;
+
+    // Determine torbox providers based on prioritizeTorboxOverSeamless setting
+    const prioritizeTorbox = settings.prioritizeTorboxOverSeamless;
+    const torboxProviders = prioritizeTorbox
+      ? Object.keys(links || {}).filter(provider => links[provider]?.length > 0)
+      : ["1fichier", "megadb"];
+
+    // Check if we should use TorBox for this provider
+    const shouldUseTorbox = provider =>
+      torboxProviders.includes(provider) && torboxService.isEnabled(settings);
+
+    // Find the provider to use (preferred or first available)
+    let selectedProvider = null;
+    let downloadUrl = null;
+
+    // If a preferred provider is specified and available, use it
+    if (preferredProvider && links[preferredProvider]) {
+      selectedProvider = preferredProvider;
+      const providerLinks = links[preferredProvider];
+      downloadUrl = Array.isArray(providerLinks)
+        ? providerLinks.find(link => link && typeof link === "string")
+        : typeof providerLinks === "string"
+          ? providerLinks
+          : null;
+    }
+
+    // Otherwise find first available provider (seamless or torbox based on settings)
+    if (!downloadUrl) {
+      // If TorBox is prioritized and enabled, check for torbox providers first
+      if (prioritizeTorbox && torboxService.isEnabled(settings)) {
+        for (const provider of torboxProviders) {
+          if (links[provider]) {
+            selectedProvider = provider;
+            const providerLinks = links[provider];
+            downloadUrl = Array.isArray(providerLinks)
+              ? providerLinks.find(link => link && typeof link === "string")
+              : typeof providerLinks === "string"
+                ? providerLinks
+                : null;
+            if (downloadUrl) break;
+          }
+        }
+      } else {
+        // Otherwise, prioritize seamless providers
+        for (const provider of seamlessProviders) {
+          if (links[provider]) {
+            selectedProvider = provider;
+            const providerLinks = links[provider];
+            downloadUrl = Array.isArray(providerLinks)
+              ? providerLinks.find(link => link && typeof link === "string")
+              : typeof providerLinks === "string"
+                ? providerLinks
+                : null;
+            if (downloadUrl) break;
+          }
+        }
+      }
+    }
+
+    if (!downloadUrl || !selectedProvider) {
+      toast.error(t("bigPicture.downloadError"));
+      return;
+    }
+
+    // Check if this is a seamless provider that should NOT use TorBox
+    const isSeamlessWithoutTorbox =
+      seamlessProviders.includes(selectedProvider) && !shouldUseTorbox(selectedProvider);
+
+    if (isSeamlessWithoutTorbox) {
+      // Seamless download - start it directly
+      try {
         // Properly format the link
         downloadUrl = downloadUrl.replace(/^(?:https?:)?\/{2}/, "https://");
 
@@ -3692,7 +3881,7 @@ export default function BigPicture() {
         toast.error(t("bigPicture.downloadError"));
       }
     } else {
-      // Non-seamless download - show exit dialog
+      // Non-seamless or TorBox download - show exit dialog
       setDownloadingGame(game);
       setShowExitDialog(true);
     }
@@ -4299,13 +4488,14 @@ export default function BigPicture() {
   // Keyboard Event Listener
   useEffect(() => {
     const handleKeyDown = e => {
-      // Block navigation when any dialog is open
+      // Block navigation when any dialog is open or just closed
       if (
         showExitDialog ||
         showExitBigPictureDialog ||
         showControllerSettings ||
         showKillDialog ||
         showProviderDialog ||
+        providerDialogJustClosed.current ||
         isKeyboardOpen
       )
         return;
@@ -4348,13 +4538,14 @@ export default function BigPicture() {
     let animationFrameId;
 
     const loop = () => {
-      // Block navigation when any dialog is open
+      // Block navigation when any dialog is open or just closed
       if (
         showExitDialog ||
         showExitBigPictureDialog ||
         showControllerSettings ||
         showKillDialog ||
         showProviderDialog ||
+        providerDialogJustClosed.current ||
         isKeyboardOpen
       ) {
         animationFrameId = requestAnimationFrame(loop);
@@ -4769,12 +4960,17 @@ export default function BigPicture() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6 pb-8">
+              <div className="mt-4 grid grid-cols-1 gap-6 pb-8">
                 {downloadingGames.map((game, index) => (
                   <BigPictureDownloadCard
                     key={game.game}
                     game={game}
                     isSelected={index === downloadsIndex && !isMenuOpen}
+                    torboxState={
+                      game.torboxWebdownloadId
+                        ? torboxStates[game.torboxWebdownloadId]
+                        : undefined
+                    }
                     onPause={() => handlePauseDownload(game)}
                     onResume={() => handleResumeDownload(game)}
                     onKill={() => handleKillDownload(game)}
@@ -4805,7 +5001,12 @@ export default function BigPicture() {
             }}
             t={t}
             controllerType={settings.controllerType || "xbox"}
-            dialogOpen={showExitDialog || showProviderDialog || showKillDialog}
+            dialogOpen={
+              showExitDialog ||
+              showProviderDialog ||
+              showKillDialog ||
+              providerDialogJustClosed.current
+            }
           />
         )}
 
@@ -4831,6 +5032,7 @@ export default function BigPicture() {
           onConfirm={executeKillDownload}
           t={t}
           controllerType={settings.controllerType || "xbox"}
+          isLoading={gameToKill && stoppingDownloads.has(gameToKill.game)}
         />
       )}
 
@@ -4844,12 +5046,20 @@ export default function BigPicture() {
             setShowProviderDialog(false);
             setProviderDialogGame(null);
             setProviderDialogProviders([]);
+            providerDialogJustClosed.current = true;
+            setTimeout(() => {
+              providerDialogJustClosed.current = false;
+            }, 500);
           }}
           onConfirm={provider => {
-            handleStartDownload(providerDialogGame, provider);
             setShowProviderDialog(false);
             setProviderDialogGame(null);
             setProviderDialogProviders([]);
+            providerDialogJustClosed.current = true;
+            setTimeout(() => {
+              providerDialogJustClosed.current = false;
+            }, 500);
+            handleStartDownload(providerDialogGame, provider);
           }}
           t={t}
           controllerType={settings.controllerType || "xbox"}
