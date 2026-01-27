@@ -805,7 +805,7 @@ const Ascend = () => {
   const loadUpcomingChangelog = async () => {
     setLoadingUpcoming(true);
     try {
-      const response = await fetch("https://api.ascendara.app/json/changelog");
+      const response = await fetch("https://api.ascendara.app/json/changelog/v2");
       if (response.ok) {
         const data = await response.json();
         // Filter to only show entries where release is false (unreleased)
@@ -7727,187 +7727,195 @@ const Ascend = () => {
                     </div>
                   </motion.div>
 
-                  {/* Changes Sections - Full Width Stacked */}
+                  {/* Changes Sections - Organized by Parent Tags */}
                   <div className="space-y-4">
-                    {/* Additions */}
-                    {upcomingEntry.changes?.additions?.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-6"
-                      >
-                        <div className="mb-4 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-                            <Zap className="h-5 w-5 text-emerald-500" />
-                          </div>
-                          <h2 className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
-                            {t("ascend.upcoming.additions") || "New Features"}
-                          </h2>
-                          <span className="ml-auto rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                            {upcomingEntry.changes.additions.length} new
-                          </span>
-                        </div>
-                        <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.additions.map((item, i) => {
-                            const isObject = typeof item === "object";
-                            const text = isObject ? item.change : item;
-                            const contributor = isObject ? item.contributor : null;
-                            return (
-                              <li
-                                key={i}
-                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                              >
-                                <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-                                <div className="flex-1">
-                                  <span className="text-sm">{text}</span>
-                                  {contributor && (
-                                    <span className="ml-2 inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                                      @{contributor}
-                                    </span>
-                                  )}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </motion.div>
-                    )}
+                    {upcomingEntry.features &&
+                      Object.entries(upcomingEntry.features).map(
+                        ([parentTag, changes], tagIndex) => {
+                          const hasAdditions = changes.additions?.length > 0;
+                          const hasFixes = changes.fixes?.length > 0;
+                          const hasImprovements = changes.improvements?.length > 0;
+                          const hasRemovals = changes.removals?.length > 0;
+                          const hasAnyChanges =
+                            hasAdditions || hasFixes || hasImprovements || hasRemovals;
 
-                    {/* Fixes */}
-                    {upcomingEntry.changes?.fixes?.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6"
-                      >
-                        <div className="mb-4 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
-                            <Shield className="h-5 w-5 text-amber-500" />
-                          </div>
-                          <h2 className="text-lg font-semibold text-amber-600 dark:text-amber-400">
-                            {t("ascend.upcoming.fixes") || "Bug Fixes"}
-                          </h2>
-                          <span className="ml-auto rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                            {upcomingEntry.changes.fixes.length} fixed
-                          </span>
-                        </div>
-                        <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.fixes.map((item, i) => {
-                            const isObject = typeof item === "object";
-                            const text = isObject ? item.change : item;
-                            const contributor = isObject ? item.contributor : null;
-                            return (
-                              <li
-                                key={i}
-                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                              >
-                                <Check className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-                                <div className="flex-1">
-                                  <span className="text-sm">{text}</span>
-                                  {contributor && (
-                                    <span className="ml-2 inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                      @{contributor}
-                                    </span>
-                                  )}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </motion.div>
-                    )}
+                          if (!hasAnyChanges) return null;
 
-                    {/* Improvements */}
-                    {upcomingEntry.changes?.improvements?.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-6"
-                      >
-                        <div className="mb-4 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
-                            <Star className="h-5 w-5 text-blue-500" />
-                          </div>
-                          <h2 className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                            {t("ascend.upcoming.improvements") || "Improvements"}
-                          </h2>
-                          <span className="ml-auto rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
-                            {upcomingEntry.changes.improvements.length} improved
-                          </span>
-                        </div>
-                        <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.improvements.map((item, i) => {
-                            const isObject = typeof item === "object";
-                            const text = isObject ? item.change : item;
-                            const contributor = isObject ? item.contributor : null;
-                            return (
-                              <li
-                                key={i}
-                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                              >
-                                <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
-                                <div className="flex-1">
-                                  <span className="text-sm">{text}</span>
-                                  {contributor && (
-                                    <span className="ml-2 inline-flex items-center rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
-                                      @{contributor}
-                                    </span>
-                                  )}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </motion.div>
-                    )}
+                          return (
+                            <motion.div
+                              key={parentTag}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: tagIndex * 0.1 }}
+                              className="rounded-2xl border border-border/50 bg-card/50 p-6"
+                            >
+                              <h3 className="mb-4 text-xl font-semibold">{parentTag}</h3>
+                              <div className="space-y-4">
+                                {/* Additions */}
+                                {hasAdditions && (
+                                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                                    <div className="mb-3 flex items-center gap-2">
+                                      <Zap className="h-4 w-4 text-emerald-500" />
+                                      <h4 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                        {t("ascend.upcoming.additions") || "New Features"}
+                                      </h4>
+                                      <span className="ml-auto rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                        {changes.additions.length}
+                                      </span>
+                                    </div>
+                                    <ul className="space-y-2">
+                                      {changes.additions.map((item, i) => {
+                                        const isObject = typeof item === "object";
+                                        const text = isObject ? item.change : item;
+                                        const contributor = isObject
+                                          ? item.contributor
+                                          : null;
+                                        return (
+                                          <li
+                                            key={i}
+                                            className="flex items-start gap-2 text-sm"
+                                          >
+                                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                                            <div className="flex-1">
+                                              <span>{text}</span>
+                                              {contributor && (
+                                                <span className="ml-2 inline-flex items-center rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                                  @{contributor}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                )}
 
-                    {/* Removals */}
-                    {upcomingEntry.changes?.removals?.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
-                        className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6"
-                      >
-                        <div className="mb-4 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10">
-                            <X className="h-5 w-5 text-red-500" />
-                          </div>
-                          <h2 className="text-lg font-semibold text-red-600 dark:text-red-400">
-                            {t("ascend.upcoming.removals") || "Removed"}
-                          </h2>
-                          <span className="ml-auto rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
-                            {upcomingEntry.changes.removals.length} removed
-                          </span>
-                        </div>
-                        <ul className="grid gap-3 md:grid-cols-2">
-                          {upcomingEntry.changes.removals.map((item, i) => {
-                            const isObject = typeof item === "object";
-                            const text = isObject ? item.change : item;
-                            const contributor = isObject ? item.contributor : null;
-                            return (
-                              <li
-                                key={i}
-                                className="flex items-start gap-3 rounded-xl bg-background/50 p-3"
-                              >
-                                <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-                                <div className="flex-1">
-                                  <span className="text-sm">{text}</span>
-                                  {contributor && (
-                                    <span className="ml-2 inline-flex items-center rounded-md bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
-                                      @{contributor}
-                                    </span>
-                                  )}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </motion.div>
-                    )}
+                                {/* Fixes */}
+                                {hasFixes && (
+                                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                                    <div className="mb-3 flex items-center gap-2">
+                                      <Shield className="h-4 w-4 text-amber-500" />
+                                      <h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                                        {t("ascend.upcoming.fixes") || "Bug Fixes"}
+                                      </h4>
+                                      <span className="ml-auto rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                        {changes.fixes.length}
+                                      </span>
+                                    </div>
+                                    <ul className="space-y-2">
+                                      {changes.fixes.map((item, i) => {
+                                        const isObject = typeof item === "object";
+                                        const text = isObject ? item.change : item;
+                                        const contributor = isObject
+                                          ? item.contributor
+                                          : null;
+                                        return (
+                                          <li
+                                            key={i}
+                                            className="flex items-start gap-2 text-sm"
+                                          >
+                                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                            <div className="flex-1">
+                                              <span>{text}</span>
+                                              {contributor && (
+                                                <span className="ml-2 inline-flex items-center rounded-md bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                                  @{contributor}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {/* Improvements */}
+                                {hasImprovements && (
+                                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                                    <div className="mb-3 flex items-center gap-2">
+                                      <Star className="h-4 w-4 text-blue-500" />
+                                      <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                                        {t("ascend.upcoming.improvements") ||
+                                          "Improvements"}
+                                      </h4>
+                                      <span className="ml-auto rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                                        {changes.improvements.length}
+                                      </span>
+                                    </div>
+                                    <ul className="space-y-2">
+                                      {changes.improvements.map((item, i) => {
+                                        const isObject = typeof item === "object";
+                                        const text = isObject ? item.change : item;
+                                        const contributor = isObject
+                                          ? item.contributor
+                                          : null;
+                                        return (
+                                          <li
+                                            key={i}
+                                            className="flex items-start gap-2 text-sm"
+                                          >
+                                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                                            <div className="flex-1">
+                                              <span>{text}</span>
+                                              {contributor && (
+                                                <span className="ml-2 inline-flex items-center rounded-md bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                                                  @{contributor}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {/* Removals */}
+                                {hasRemovals && (
+                                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                                    <div className="mb-3 flex items-center gap-2">
+                                      <X className="h-4 w-4 text-red-500" />
+                                      <h4 className="text-sm font-semibold text-red-600 dark:text-red-400">
+                                        {t("ascend.upcoming.removals") || "Removed"}
+                                      </h4>
+                                      <span className="ml-auto rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                        {changes.removals.length}
+                                      </span>
+                                    </div>
+                                    <ul className="space-y-2">
+                                      {changes.removals.map((item, i) => {
+                                        const isObject = typeof item === "object";
+                                        const text = isObject ? item.change : item;
+                                        const contributor = isObject
+                                          ? item.contributor
+                                          : null;
+                                        return (
+                                          <li
+                                            key={i}
+                                            className="flex items-start gap-2 text-sm"
+                                          >
+                                            <X className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                                            <div className="flex-1">
+                                              <span>{text}</span>
+                                              {contributor && (
+                                                <span className="ml-2 inline-flex items-center rounded-md bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                                  @{contributor}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          );
+                        }
+                      )}
                   </div>
                 </>
               ) : (
