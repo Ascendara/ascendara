@@ -487,7 +487,7 @@ const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
             onClick={onConfirm}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 0
-                ? "scale-105 bg-blue-500 text-foreground shadow-lg shadow-blue-500/30"
+                ? "scale-105 bg-primary text-foreground shadow-lg shadow-primary/30"
                 : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -629,7 +629,7 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
             onClick={onConfirm}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 0
-                ? "scale-105 bg-blue-500 text-foreground shadow-lg shadow-blue-500/30"
+                ? "scale-105 bg-primary text-foreground shadow-lg shadow-primary/30"
                 : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -1226,7 +1226,7 @@ const BigPictureSettingsDialog = ({
                 <div
                   className={`flex items-center gap-4 rounded-xl p-4 transition-all duration-150 ${
                     isSelected
-                      ? "scale-105 bg-blue-500 text-foreground shadow-lg shadow-blue-500/30"
+                      ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
@@ -1483,7 +1483,7 @@ const VirtualKeyboard = ({
               <button
                 key={idx}
                 onClick={() => onSelectSuggestion(game)}
-                className={`flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition-all ${inSuggestions && suggestionIndex === idx ? "scale-105 bg-blue-600 text-secondary" : "bg-muted text-primary"}`}
+                className={`flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition-all ${inSuggestions && suggestionIndex === idx ? "scale-105 bg-primary text-secondary" : "bg-muted text-primary"}`}
               >
                 <span className="max-w-[150px] truncate text-sm font-bold">
                   {game.game}
@@ -1514,7 +1514,7 @@ const VirtualKeyboard = ({
                       isSelected
                         ? isEnter
                           ? "scale-[1.02] bg-green-500 text-secondary shadow-[0_0_15px_rgba(34,197,94,0.6)]"
-                          : "scale-[1.02] bg-blue-500 text-secondary shadow-[0_0_15px_rgba(59,130,246,0.6)]"
+                          : "scale-[1.02] bg-primary text-secondary shadow-[0_0_15px_hsl(var(--primary)/0.6)]"
                         : isEnter
                           ? "bg-green-700 text-secondary"
                           : isDel
@@ -1918,7 +1918,7 @@ const GameDetailsView = ({
         }`}
       >
         <div className="group relative">
-          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
+          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-primary/40"></div>
           <img
             src={bgImage}
             alt={game.name || game.game}
@@ -1985,7 +1985,7 @@ const GameDetailsView = ({
                     <span>{t("bigPicture.readyToDownload")}</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/20 px-4 py-2 text-sm font-medium text-blue-300 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/20 px-4 py-2 text-sm font-medium text-primary backdrop-blur-sm">
                     <MousePointer className="h-4 w-4" />
                     <span>{t("bigPicture.mouseRequired")}</span>
                   </div>
@@ -2034,8 +2034,8 @@ const GameDetailsView = ({
                 }}
                 className={`group flex w-fit items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
                   focusedSection === "button" && selectedButton === 0
-                    ? "scale-110 bg-blue-500 text-secondary shadow-blue-500/50 ring-4 ring-blue-400/50"
-                    : "bg-primary text-secondary shadow-primary/30 hover:scale-105 hover:bg-blue-500"
+                    ? "scale-110 bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
+                    : "bg-primary text-secondary shadow-primary/30 hover:scale-105 hover:bg-primary"
                 }`}
               >
                 <Download className="h-7 w-7" />
@@ -2052,7 +2052,7 @@ const GameDetailsView = ({
                   focusedSection === "button" && selectedButton === 1
                     ? isPlayLater
                       ? "scale-110 bg-green-500 text-secondary shadow-green-500/50 ring-4 ring-green-400/50"
-                      : "scale-110 border-2 border-blue-400 bg-muted text-foreground shadow-blue-500/30 ring-4 ring-blue-400/50"
+                      : "scale-110 border-2 border-primary bg-muted text-foreground shadow-primary/30 ring-4 ring-primary/50"
                     : isPlayLater
                       ? "bg-green-500 text-secondary shadow-green-500/30"
                       : "border-2 border-border bg-muted text-foreground shadow-muted/30 hover:border-primary/40 hover:bg-muted/80"
@@ -2076,7 +2076,7 @@ const GameDetailsView = ({
               ref={descriptionRef}
               className={`mb-8 max-h-[400px] min-h-[200px] max-w-3xl overflow-y-auto rounded-xl p-6 transition-all duration-200 ${
                 focusedSection === "description"
-                  ? "bg-muted/50 ring-4 ring-blue-400"
+                  ? "bg-muted/50 ring-4 ring-primary"
                   : "bg-muted/20"
               }`}
             >
@@ -2166,7 +2166,7 @@ const GameDetailsView = ({
                     {t("bigPicture.ascendPremiumFeatures")}
                   </span>
                   <div className="flex items-center gap-1.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8)]" />
                     <span className="text-xs font-bold text-secondary">
                       {t("bigPicture.available")}
                     </span>
@@ -2187,7 +2187,7 @@ const GameDetailsView = ({
         <div className="relative flex h-full w-full flex-shrink-0 flex-col">
           <div className="absolute inset-0 -z-10 bg-background/90 backdrop-blur-md" />
           <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
-            <ImageIcon className="h-8 w-8 text-blue-500" />
+            <ImageIcon className="h-8 w-8 text-primary" />
             <h2 className="text-4xl font-light tracking-wider text-primary">
               {t("bigPicture.media")}
             </h2>
@@ -2207,7 +2207,7 @@ const GameDetailsView = ({
                   return (
                     <div
                       key={screen.id || idx}
-                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-blue-500"
+                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-primary"
                     >
                       <img
                         src={imageUrl}
@@ -2603,7 +2603,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         }`}
       >
         <div className="group relative">
-          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-blue-500/40"></div>
+          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-primary/40"></div>
           {bgImage ? (
             <img
               src={bgImage}
@@ -2693,8 +2693,8 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 disabled={isLaunching || isRunning}
                 className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 ${
                   selectedButton === "play"
-                    ? "scale-110 bg-blue-500 text-secondary shadow-blue-500/50 ring-4 ring-blue-400/50"
-                    : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-blue-400 hover:text-secondary"
+                    ? "scale-110 bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
+                    : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-primary hover:text-secondary"
                 }`}
               >
                 {isLaunching ? (
@@ -2719,7 +2719,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 onClick={handleOpenDirectory}
                 className={`flex items-center gap-3 rounded-2xl border-2 px-8 py-5 text-xl font-bold backdrop-blur-sm transition-all duration-200 ${
                   selectedButton === "folder"
-                    ? "scale-110 border-blue-400 bg-blue-500/30 text-secondary shadow-lg shadow-blue-500/30 ring-4 ring-blue-400/50"
+                    ? "scale-110 border-primary bg-primary/30 text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
                     : "border-white/20 bg-white/10 text-secondary hover:scale-105 hover:border-white/40 hover:bg-white/20"
                 }`}
               >
@@ -2742,7 +2742,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         <div className="relative flex h-full w-full flex-shrink-0 flex-col">
           <div className="absolute inset-0 -z-10 bg-background/90 backdrop-blur-md" />
           <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
-            <ImageIcon className="h-8 w-8 text-blue-500" />
+            <ImageIcon className="h-8 w-8 text-primary" />
             <h2 className="text-4xl font-light tracking-wider text-primary">
               {t("bigPicture.screenshots").toUpperCase()}
             </h2>
@@ -2760,7 +2760,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                   return (
                     <div
                       key={idx}
-                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-blue-500"
+                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-primary"
                     >
                       <img
                         src={imageUrl}
@@ -2873,7 +2873,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
       className={`relative flex aspect-[2/3] w-full cursor-pointer flex-col justify-end transition-all duration-150 ease-out ${isSelected ? "z-20 scale-105" : "z-10 scale-100 opacity-70"}`}
     >
       <div
-        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-muted shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg shadow-blue-500/20 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
+        className={`relative z-10 h-full w-full overflow-hidden rounded-xl border-[3px] bg-muted shadow-2xl transition-all duration-150 ${isSelected ? "border-white/90 shadow-lg shadow-primary/20 brightness-110" : "border-transparent brightness-75 hover:brightness-100"}`}
       >
         {isVisible && imageUrl ? (
           <img
@@ -2985,7 +2985,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
       <div
         ref={cardRef}
         onClick={onClick}
-        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-muted transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
+        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-muted transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-primary shadow-[0_0_30px_hsl(var(--primary)/0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
       >
         <Grid
           className={`mb-4 h-12 w-12 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
@@ -3042,7 +3042,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
           </h3>
           {isHero && (
             <div className="mt-2 flex items-center justify-center gap-2">
-              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold tracking-wider text-secondary shadow-lg">
+              <span className="rounded bg-primary px-2 py-0.5 text-[10px] font-bold tracking-wider text-secondary shadow-lg">
                 {t("bigPicture.lastPlayed")}
               </span>
               <span className="text-sm font-medium text-primary drop-shadow-md">
@@ -3076,7 +3076,7 @@ const StoreSearchBar = ({ isSelected, searchQuery, onClick, t, buttons }) => {
   return (
     <div
       onClick={onClick}
-      className={`flex cursor-pointer items-center gap-4 rounded-xl px-6 py-4 transition-all duration-150 ${isSelected ? "scale-[1.02] bg-blue-500 text-secondary" : "bg-muted/80 text-slate-400 hover:bg-muted"}`}
+      className={`flex cursor-pointer items-center gap-4 rounded-xl px-6 py-4 transition-all duration-150 ${isSelected ? "scale-[1.02] bg-primary text-secondary" : "bg-muted/80 text-slate-400 hover:bg-muted"}`}
     >
       <Search className="h-6 w-6" />
       <span className="text-lg font-medium">
@@ -3146,7 +3146,7 @@ const HomeSidebar = ({
 
           {/* Selection indicator bar */}
           {selectedIndex === idx && (
-            <div className="absolute -left-2 h-8 w-1 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]" />
+            <div className="absolute -left-2 h-8 w-1 rounded-full bg-primary shadow-[0_0_15px_hsl(var(--primary)/0.8)]" />
           )}
         </div>
       ))}
@@ -3260,7 +3260,7 @@ const ActiveDownloadsBar = ({ downloads, t }) => {
 
               <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${data.extracting ? "animate-pulse bg-amber-500" : "bg-blue-500"}`}
+                  className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${data.extracting ? "animate-pulse bg-amber-500" : "bg-primary"}`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -3324,8 +3324,7 @@ const BigPictureDownloadCard = ({
     if (isPaused) return { text: t("downloads.paused"), color: "text-slate-400" };
     if (isExtracting) return { text: t("downloads.extracting"), color: "text-amber-500" };
     if (isVerifying) return { text: t("downloads.verifying"), color: "text-green-500" };
-    if (isDownloading)
-      return { text: t("downloads.downloading"), color: "text-blue-500" };
+    if (isDownloading) return { text: t("downloads.downloading"), color: "text-primary" };
     return { text: t("downloads.pending"), color: "text-slate-400" };
   };
 
@@ -3416,7 +3415,7 @@ const BigPictureDownloadCard = ({
           <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
             <div
               className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${
-                isVerifying ? "bg-green-500" : "bg-blue-500"
+                isVerifying ? "bg-green-500" : "bg-primary"
               }`}
               style={{ width: `${progress}%` }}
             />
@@ -4751,7 +4750,7 @@ export default function BigPicture() {
           className={`absolute left-24 top-16 z-20 transition-all duration-200 ${isMenuOpen || isKeyboardOpen ? "opacity-50 blur-sm" : ""}`}
         >
           <h1 className="flex items-center gap-4 text-3xl font-light uppercase tracking-[0.2em] text-primary">
-            <span className="h-1 w-12 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]"></span>
+            <span className="h-1 w-12 rounded-full bg-primary shadow-[0_0_15px_hsl(var(--primary)/0.8)]"></span>
             {view === "library"
               ? t("bigPicture.library")
               : view === "store"
@@ -4862,7 +4861,7 @@ export default function BigPicture() {
             {storeLoading ? (
               <div className="flex flex-1 items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                  <div className="h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+                  <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   <p className="text-xl text-muted-foreground">
                     {t("bigPicture.loadingCatalog")}
                   </p>
