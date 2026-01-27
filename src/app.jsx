@@ -63,7 +63,17 @@ import Welcome from "./pages/Welcome";
 import i18n from "./i18n";
 import "./index.css";
 import "./styles/scrollbar.css";
-import { AlertTriangle, BugIcon, RefreshCwIcon, Clock, Gamepad2 } from "lucide-react";
+import {
+  AlertTriangle,
+  BugIcon,
+  RefreshCwIcon,
+  Clock,
+  Gamepad2,
+  X,
+  Circle,
+  Square,
+  Triangle,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -256,13 +266,55 @@ const GiantBombMigrationWarning = () => {
   );
 };
 
+// PlayStation button component
+const PSButton = ({ type, className = "" }) => {
+  const buttonStyles = "inline-flex items-center justify-center";
+
+  switch (type) {
+    case "cross":
+      return <X className={`${buttonStyles} ${className}`} strokeWidth={3} />;
+    case "circle":
+      return <Circle className={`${buttonStyles} ${className}`} strokeWidth={2.5} />;
+    case "square":
+      return <Square className={`${buttonStyles} ${className}`} strokeWidth={2.5} />;
+    case "triangle":
+      return <Triangle className={`${buttonStyles} ${className}`} strokeWidth={2.5} />;
+    default:
+      return null;
+  }
+};
+
+// Get controller button labels based on controller type
+const getControllerButtons = (controllerType = "xbox") => {
+  const buttonMaps = {
+    xbox: {
+      confirm: "A",
+      cancel: "B",
+    },
+    playstation: {
+      confirm: <PSButton type="cross" className="h-4 w-4" />,
+      cancel: <PSButton type="circle" className="h-4 w-4" />,
+    },
+    generic: {
+      confirm: "A",
+      cancel: "B",
+    },
+  };
+
+  return buttonMaps[controllerType] || buttonMaps.xbox;
+};
+
 const ControllerDetectionPrompt = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { settings } = useSettings();
   const [showPrompt, setShowPrompt] = useState(false);
   const hasPromptedRef = useRef(false);
   const checkIntervalRef = useRef(null);
+  const controllerType = settings?.controllerType || "xbox";
+  const buttons = getControllerButtons(controllerType);
+  const [selectedButton, setSelectedButton] = useState("confirm");
 
   useEffect(() => {
     if (hasPromptedRef.current) return;
@@ -296,6 +348,31 @@ const ControllerDetectionPrompt = () => {
     };
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!showPrompt) return;
+
+    const handleGamepadInput = () => {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gamepad = Array.from(gamepads).find(gp => gp !== null);
+
+      if (!gamepad) return;
+
+      if (gamepad.buttons[0]?.pressed) {
+        handleEnterBigPicture();
+      } else if (gamepad.buttons[1]?.pressed) {
+        handleDismiss();
+      } else if (gamepad.buttons[12]?.pressed || gamepad.buttons[14]?.pressed) {
+        setSelectedButton("cancel");
+      } else if (gamepad.buttons[13]?.pressed || gamepad.buttons[15]?.pressed) {
+        setSelectedButton("confirm");
+      }
+    };
+
+    const intervalId = setInterval(handleGamepadInput, 100);
+
+    return () => clearInterval(intervalId);
+  }, [showPrompt]);
+
   const handleEnterBigPicture = () => {
     setShowPrompt(false);
     navigate("/bigpicture");
@@ -325,11 +402,29 @@ const ControllerDetectionPrompt = () => {
         </AlertDialogHeader>
 
         <AlertDialogFooter className="gap-3 sm:justify-end">
-          <AlertDialogCancel onClick={handleDismiss} className="text-foreground">
-            {t("common.notNow")}
+          <AlertDialogCancel
+            onClick={handleDismiss}
+            className={`text-foreground ${selectedButton === "cancel" ? "ring-2 ring-primary" : ""}`}
+          >
+            <span className="flex items-center gap-2">
+              {t("common.notNow")}
+              <span className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                {typeof buttons.cancel === "string" ? buttons.cancel : buttons.cancel}
+              </span>
+            </span>
           </AlertDialogCancel>
-          <AlertDialogAction onClick={handleEnterBigPicture}>
-            {t("bigPicture.enterBigPicture")}
+          <AlertDialogAction
+            onClick={handleEnterBigPicture}
+            className={
+              selectedButton === "confirm" ? "ring-primary-foreground ring-2" : ""
+            }
+          >
+            <span className="flex items-center gap-2">
+              {t("bigPicture.enterBigPicture")}
+              <span className="bg-primary-foreground/20 ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium">
+                {typeof buttons.confirm === "string" ? buttons.confirm : buttons.confirm}
+              </span>
+            </span>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
