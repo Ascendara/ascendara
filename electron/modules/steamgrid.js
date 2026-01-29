@@ -1,9 +1,9 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
+const config = require("./config");
 
-// REPLACE WITH A KEY FOR TESTING
-const SGDB_API_KEY = "STEAMGRIDDB_API_KEY";
+const SGDB_API_KEY = config.steamGridDbApiKey;
 const BASE_URL = "https://www.steamgriddb.com/api/v2";
 
 async function fetchGameAssets(gameName, gameDir) {
