@@ -39,6 +39,7 @@ import {
   Square,
   Triangle,
   KeyboardIcon,
+  ListEnd,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import gameService from "@/services/gameService";
@@ -2121,6 +2122,16 @@ const GameDetailsView = ({
                     </span>
                   </div>
 
+                  <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                    <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 shadow-sm ring-1 ring-blue-500/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-blue-500/30">
+                      <ListEnd className="h-4.5 w-4.5 text-white transition-transform duration-200 group-hover/item:scale-110" />
+                      <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                    </div>
+                    <span className="text-sm font-semibold text-white">
+                      {t("bigPicture.queueDownloads")}
+                    </span>
+                  </div>
+
                   {/* Mod Manager - Only if game supports mods */}
                   {supportsModManaging && (
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
@@ -2154,7 +2165,7 @@ const GameDetailsView = ({
                         <RefreshCw className="h-4.5 w-4.5 text-secondary transition-transform duration-200 group-hover/item:scale-110" />
                         <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
-                      <span className="text-sm font-semibold text-secondary">
+                      <span className="text-sm font-semibold text-white">
                         {t("bigPicture.autoUpdates")}
                       </span>
                     </div>
@@ -2167,7 +2178,7 @@ const GameDetailsView = ({
                   </span>
                   <div className="flex items-center gap-1.5">
                     <div className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8)]" />
-                    <span className="text-xs font-bold text-secondary">
+                    <span className="text-xs font-bold text-white">
                       {t("bigPicture.available")}
                     </span>
                   </div>

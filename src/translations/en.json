@@ -773,6 +773,7 @@
     "playLater": "Play Later",
     "played": "played",
     "pressAModify": "Press A to modify",
+    "queueDownloads": "Queue Downloads",
     "readyToDownload": "Ready to download",
     "remoteDownloads": "Remote Downloads",
     "resultsFor": "result for",
@@ -979,6 +980,7 @@
       "startNow": "Start Now",
       "title": "Download in Progress"
     },
+    "queueDownloads": "Queue Downloads",
     "ratingTooltip": "This game is rated {{rating}} out of 5 stars by others on Ascendara. Read comments about this game in the Discord server.",
     "readReviews": "Read Reviews",
     "refreshNow": "Refresh Now",

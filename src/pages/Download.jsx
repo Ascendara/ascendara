@@ -67,6 +67,7 @@ import {
   Clock,
   Check,
   Smartphone,
+  ListEnd,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -1997,12 +1998,12 @@ export default function DownloadPage() {
                 {/* Animated background gradient */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
-                <div className="relative flex items-center justify-between gap-4">
+                <div className="relative flex items-center justify-between gap-2">
                   <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-3">
                     {/* Cloud Saves Feature */}
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
-                      <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
-                        <Cloud className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                      <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                        <Cloud className="h-4 w-4 text-primary transition-transform duration-200 group-hover/item:scale-110" />
                         <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
                       <span className="text-sm font-semibold text-foreground">
@@ -2011,20 +2012,30 @@ export default function DownloadPage() {
                     </div>
                     {/* Remote Downloads Feature */}
                     <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
-                      <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
-                        <Smartphone className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                      <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                        <Smartphone className="h-4 w-4 text-primary transition-transform duration-200 group-hover/item:scale-110" />
                         <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                       </div>
                       <span className="text-sm font-semibold text-foreground">
                         {t("download.remoteDownloads")}
                       </span>
                     </div>
+                    {/* Queue Downloads Feature */}
+                    <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
+                      <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                        <ListEnd className="h-4 w-4 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground">
+                        {t("download.queueDownloads")}
+                      </span>
+                    </div>
 
                     {/* Mod Manager Feature */}
                     {supportsModManaging && (
                       <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
-                        <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
-                          <Puzzle className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                          <Puzzle className="h-4 w-4 text-primary transition-transform duration-200 group-hover/item:scale-110" />
                           <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                         </div>
                         <span className="text-sm font-semibold text-foreground">
@@ -2036,8 +2047,8 @@ export default function DownloadPage() {
                     {/* Trainer Feature */}
                     {supportsFlingTrainer && (
                       <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
-                        <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
-                          <Zap className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                          <Zap className="h-4 w-4 text-primary transition-transform duration-200 group-hover/item:scale-110" />
                           <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                         </div>
                         <span className="text-sm font-semibold text-foreground">
@@ -2049,8 +2060,8 @@ export default function DownloadPage() {
                     {/* Auto Updates Feature */}
                     {providers.some(p => seamlessProviders.includes(p)) && (
                       <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
-                        <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
-                          <RefreshCw className="h-4.5 w-4.5 text-primary transition-transform duration-200 group-hover/item:scale-110" />
+                        <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
+                          <RefreshCw className="h-4 w-4 text-primary transition-transform duration-200 group-hover/item:scale-110" />
                           <div className="absolute -inset-1 rounded-lg bg-primary/20 opacity-0 blur transition-opacity duration-200 group-hover/item:opacity-100" />
                         </div>
                         <span className="text-sm font-semibold text-foreground">
