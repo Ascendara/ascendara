@@ -48,10 +48,20 @@ import nexusModsService from "@/services/nexusModsService";
 import flingTrainerService from "@/services/flingTrainerService";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import recentGamesService from "@/services/recentGamesService";
 import { sanitizeText } from "@/lib/utils";
 import * as torboxService from "@/services/torboxService";
+import installedGamesService from "@/services/installedGamesService";
+import {
+  addToQueue,
+  hasActiveDownloads,
+  getDownloadQueue,
+  removeFromQueue,
+  reorderQueue,
+  processNextInQueue,
+} from "@/services/downloadQueueService";
 
 // UTILS
 const formatBytes = (bytes, decimals = 2) => {
@@ -1039,6 +1049,158 @@ const ProviderSelectionDialog = ({
   );
 };
 
+// Queue Prompt Dialog for Ascend users
+const QueuePromptDialog = ({
+  isOpen,
+  onClose,
+  onStartNow,
+  onAddToQueue,
+  t,
+  controllerType,
+  isAuthenticated,
+}) => {
+  const [selectedButton, setSelectedButton] = useState(0);
+  const [canInput, setCanInput] = useState(false);
+  const lastInputTime = useRef(0);
+  const buttons = getControllerButtons(controllerType);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedButton(0);
+      const timer = setTimeout(() => setCanInput(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleInput = useCallback(
+    action => {
+      if (!canInput) return;
+
+      if (action === "LEFT") setSelectedButton(0);
+      else if (action === "RIGHT") setSelectedButton(1);
+      else if (action === "CONFIRM") {
+        if (selectedButton === 0) onStartNow();
+        else onAddToQueue();
+      } else if (action === "BACK") onClose();
+    },
+    [canInput, selectedButton, onStartNow, onAddToQueue, onClose]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const keyMap = {
+        ArrowLeft: "LEFT",
+        ArrowRight: "RIGHT",
+        Enter: "CONFIRM",
+        Escape: "BACK",
+      };
+      if (keyMap[e.key]) handleInput(keyMap[e.key]);
+    };
+
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [handleInput, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let animationFrameId;
+    const loop = () => {
+      const gp = getGamepadInput();
+      if (gp && canInput) {
+        const now = Date.now();
+        if (now - lastInputTime.current > 200) {
+          if (gp.left) {
+            handleInput("LEFT");
+            lastInputTime.current = now;
+          } else if (gp.right) {
+            handleInput("RIGHT");
+            lastInputTime.current = now;
+          } else if (gp.a) {
+            handleInput("CONFIRM");
+            lastInputTime.current = now;
+          } else if (gp.b) {
+            handleInput("BACK");
+            lastInputTime.current = now;
+          }
+        }
+      }
+      animationFrameId = requestAnimationFrame(loop);
+    };
+
+    loop();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [handleInput, canInput, isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="mx-8 max-w-2xl rounded-2xl border-2 border-primary/30 bg-card p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="rounded-full bg-primary/20 p-3">
+            <Download className="h-8 w-8 text-primary" />
+          </div>
+          <h2 className="text-3xl font-bold text-foreground">
+            {t("download.queue.downloadInProgress")}
+          </h2>
+        </div>
+        <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
+          {t("download.queue.downloadInProgressMessage")}
+        </p>
+        <div className="flex gap-4">
+          <button
+            onClick={onStartNow}
+            className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
+              selectedButton === 0
+                ? "scale-105 bg-primary text-foreground shadow-lg shadow-primary/30"
+                : "bg-muted text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Zap className="h-5 w-5" />
+            {t("download.queue.startNow")}
+          </button>
+          {isAuthenticated && (
+            <button
+              onClick={onAddToQueue}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
+                selectedButton === 1
+                  ? "scale-105 bg-primary text-foreground shadow-lg shadow-primary/30"
+                  : "bg-muted text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <ListEnd className="h-5 w-5" />
+              {t("download.queue.addToQueue")}
+            </button>
+          )}
+        </div>
+        <div className="mt-6 flex justify-center gap-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          <span>
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} bg-primary px-2 py-1 text-secondary`}
+            >
+              {buttons.confirm}
+            </span>
+            {t("bigPicture.confirm")}
+          </span>
+          <span>
+            <span
+              className={`mr-2 ${getButtonBadgeClass(controllerType)} border border-border bg-muted px-2 py-1 text-muted-foreground`}
+            >
+              {buttons.cancel}
+            </span>
+            {t("bigPicture.cancel")}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Big Picture Settings Dialog
 const BigPictureSettingsDialog = ({
   isOpen,
@@ -1563,6 +1725,9 @@ const GameDetailsView = ({
   const [supportsModManaging, setSupportsModManaging] = useState(false);
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
   const [isPlayLater, setIsPlayLater] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [needsUpdate, setNeedsUpdate] = useState(false);
+  const isMounted = useRef(true);
 
   // Provider selection for seamless downloads
   const [selectedProviderIndex, setSelectedProviderIndex] = useState(0);
@@ -1678,6 +1843,30 @@ const GameDetailsView = ({
     checkTrainerSupport();
   }, [game]);
 
+  // Check if game is installed and needs update
+  useEffect(() => {
+    const gameName = game.game || game.name;
+    const gameVersion = game.version;
+
+    if (!gameName) return;
+
+    installedGamesService
+      .checkGameStatus(gameName, gameVersion)
+      .then(({ isInstalled: installed, needsUpdate: update }) => {
+        if (isMounted.current) {
+          setIsInstalled(installed);
+          setNeedsUpdate(update);
+        }
+      })
+      .catch(error => {
+        console.error("[GameDetailsView] Error checking game installation:", error);
+      });
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, [game.game, game.name, game.version]);
+
   // Check if game is in Play Later list
   useEffect(() => {
     const gameName = game.game || game.name;
@@ -1779,6 +1968,9 @@ const GameDetailsView = ({
       } else if (action === "CONFIRM") {
         if (focusedSection === "button") {
           if (selectedButton === 0) {
+            // Don't allow download if already installed and no update available
+            if (isInstalled && !needsUpdate) return;
+
             // Start Download button
             console.log(
               "[DOWNLOAD] isSeamless:",
@@ -1791,7 +1983,8 @@ const GameDetailsView = ({
               onShowProviderDialog(game, availableProviders);
             } else {
               console.log("[DOWNLOAD] Starting download directly");
-              onDownload(game);
+              // Pass the game with isUpdating flag if update is needed
+              onDownload(needsUpdate ? { ...game, isUpdating: true } : game);
             }
           } else if (selectedButton === 1) {
             // Play Later button
@@ -1829,6 +2022,8 @@ const GameDetailsView = ({
       handlePlayLater,
       isSeamless,
       availableProviders,
+      isInstalled,
+      needsUpdate,
     ]
   );
 
@@ -2027,24 +2222,49 @@ const GameDetailsView = ({
             <div className="mb-6 flex gap-4">
               <button
                 onClick={() => {
+                  // Don't allow download if already installed and no update available
+                  if (isInstalled && !needsUpdate) return;
+
                   if (isSeamless && availableProviders.length > 1) {
                     onShowProviderDialog(game, availableProviders);
                   } else {
-                    onDownload(game);
+                    // Pass the game with isUpdating flag if update is needed
+                    onDownload(needsUpdate ? { ...game, isUpdating: true } : game);
                   }
                 }}
+                disabled={isInstalled && !needsUpdate}
                 className={`group flex w-fit items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
-                  focusedSection === "button" && selectedButton === 0
-                    ? "scale-110 bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
-                    : "bg-primary text-secondary shadow-primary/30 hover:scale-105 hover:bg-primary"
+                  isInstalled && !needsUpdate
+                    ? "cursor-not-allowed bg-muted text-muted-foreground opacity-50"
+                    : focusedSection === "button" && selectedButton === 0
+                      ? needsUpdate
+                        ? "scale-110 bg-amber-500 text-secondary shadow-amber-500/50 ring-4 ring-amber-400/50"
+                        : "scale-110 bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
+                      : needsUpdate
+                        ? "bg-amber-500 text-secondary shadow-amber-500/30 hover:scale-105 hover:bg-amber-500"
+                        : "bg-primary text-secondary shadow-primary/30 hover:scale-105 hover:bg-primary"
                 }`}
               >
-                <Download className="h-7 w-7" />
-                <span>
-                  {isSeamless
-                    ? t("bigPicture.startDownload")
-                    : t("bigPicture.viewDetails")}
-                </span>
+                {isInstalled && !needsUpdate ? (
+                  <>
+                    <Check className="h-7 w-7" />
+                    <span>{t("bigPicture.installed")}</span>
+                  </>
+                ) : needsUpdate ? (
+                  <>
+                    <RefreshCw className="h-7 w-7" />
+                    <span>{t("bigPicture.update")}</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-7 w-7" />
+                    <span>
+                      {isSeamless
+                        ? t("bigPicture.startDownload")
+                        : t("bigPicture.viewDetails")}
+                    </span>
+                  </>
+                )}
               </button>
 
               <button
@@ -3625,6 +3845,7 @@ export default function BigPicture() {
   useHideCursorOnGamepad();
   const { t } = useLanguage();
   const { settings, updateSetting } = useSettings();
+  const { isAuthenticated, user } = useAuth();
   const controllerType = settings.controllerType || "xbox";
   const buttons = getControllerButtons(controllerType);
   // Enter full-screen on mount, quit on unmount
@@ -3687,6 +3908,16 @@ export default function BigPicture() {
   const [providerDialogProviders, setProviderDialogProviders] = useState([]);
   const providerDialogJustClosed = useRef(false);
 
+  // Queue management state
+  const [queuedDownloads, setQueuedDownloads] = useState([]);
+  const [pendingDownloadData, setPendingDownloadData] = useState(null);
+  const [showQueuePrompt, setShowQueuePrompt] = useState(false);
+  const [draggedQueueIndex, setDraggedQueueIndex] = useState(null);
+  const [dragOverQueueIndex, setDragOverQueueIndex] = useState(null);
+
+  // Ref to track previous active download count for queue processing
+  const prevActiveCountRef = useRef(0);
+
   // Fuzzy matcher instance for search
   const fuzzyMatch = useMemo(() => createFuzzyMatcher(), []);
 
@@ -3746,6 +3977,39 @@ export default function BigPicture() {
     return () => clearInterval(intervalId);
   }, []);
 
+  // --- QUEUE POLLING ---
+  useEffect(() => {
+    const fetchQueuedDownloads = () => {
+      const queue = getDownloadQueue();
+      setQueuedDownloads(queue);
+    };
+    fetchQueuedDownloads();
+    const queueIntervalId = setInterval(fetchQueuedDownloads, 1000);
+    return () => clearInterval(queueIntervalId);
+  }, []);
+
+  // Process next queued download when downloads complete
+  useEffect(() => {
+    const activeCount = downloadingGames.filter(
+      g =>
+        g.downloadingData?.downloading ||
+        g.downloadingData?.extracting ||
+        g.downloadingData?.updating
+    ).length;
+
+    // When transitioning from active to no active downloads
+    if (prevActiveCountRef.current > 0 && activeCount === 0) {
+      processNextInQueue().then(nextItem => {
+        if (nextItem) {
+          toast.success(
+            t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+          );
+        }
+      });
+    }
+    prevActiveCountRef.current = activeCount;
+  }, [downloadingGames, t]);
+
   // --- TORBOX POLLING ---
   useEffect(() => {
     if (!settings?.torboxApiKey) return;
@@ -3789,7 +4053,11 @@ export default function BigPicture() {
   }, [downloadingGames, settings?.torboxApiKey]);
 
   // --- DOWNLOAD LOGIC ---
-  const handleStartDownload = async (game, preferredProvider = null) => {
+  const handleStartDownload = async (
+    game,
+    preferredProvider = null,
+    forceStart = false
+  ) => {
     const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
     const links = game.download_links;
 
@@ -3861,6 +4129,37 @@ export default function BigPicture() {
       seamlessProviders.includes(selectedProvider) && !shouldUseTorbox(selectedProvider);
 
     if (isSeamlessWithoutTorbox) {
+      // Check if there's an active download
+      const hasActive = await hasActiveDownloads();
+
+      if (hasActive && !forceStart) {
+        // Non-Ascend users can only have 1 download at a time - show error toast
+        if (!isAuthenticated) {
+          toast.error(t("download.toast.downloadQueueLimit"));
+          return;
+        }
+
+        // Ascend users get the queue dialog with options
+        const sanitizedGameName = sanitizeText(game.game);
+        const isVrGame = game.category?.includes("Virtual Reality");
+
+        setPendingDownloadData({
+          url: downloadUrl,
+          gameName: sanitizedGameName,
+          online: game.online || false,
+          dlc: game.dlc || false,
+          isVr: isVrGame || false,
+          updateFlow: false,
+          version: game.version || "",
+          imgID: game.imgID,
+          size: game.size || "",
+          additionalDirIndex: 0,
+          gameID: game.gameID || "",
+        });
+        setShowQueuePrompt(true);
+        return;
+      }
+
       // Seamless download - start it directly
       try {
         // Properly format the link
@@ -4239,17 +4538,20 @@ export default function BigPicture() {
         showExitBigPictureDialog ||
         showControllerSettings ||
         showKillDialog ||
-        showProviderDialog
+        showProviderDialog ||
+        showQueuePrompt
       ) {
         const dialogType = showKillDialog
           ? "kill"
           : showProviderDialog
             ? "provider"
-            : showExitDialog
-              ? "exit"
-              : showExitBigPictureDialog
-                ? "exitBP"
-                : "settings";
+            : showQueuePrompt
+              ? "queue"
+              : showExitDialog
+                ? "exit"
+                : showExitBigPictureDialog
+                  ? "exitBP"
+                  : "settings";
         console.log(`[NAV] Blocked by ${dialogType} dialog`);
         return;
       }
@@ -4970,27 +5272,72 @@ export default function BigPicture() {
                 </div>
               </div>
             ) : (
-              <div className="mt-4 grid grid-cols-1 gap-6 pb-8">
-                {downloadingGames.map((game, index) => (
-                  <BigPictureDownloadCard
-                    key={game.game}
-                    game={game}
-                    isSelected={index === downloadsIndex && !isMenuOpen}
-                    torboxState={
-                      game.torboxWebdownloadId
-                        ? torboxStates[game.torboxWebdownloadId]
-                        : undefined
-                    }
-                    onPause={() => handlePauseDownload(game)}
-                    onResume={() => handleResumeDownload(game)}
-                    onKill={() => handleKillDownload(game)}
-                    onOpenFolder={() => handleOpenFolder(game)}
-                    isStopping={stoppingDownloads.has(game.game)}
-                    isResuming={resumingDownloads.has(game.game)}
-                    t={t}
-                    buttons={buttons}
-                  />
-                ))}
+              <div className="space-y-8 pb-8">
+                {/* Active Downloads Section */}
+                <div>
+                  <h2 className="mb-4 text-2xl font-bold text-primary">
+                    {t("downloads.activeDownloads")}
+                  </h2>
+                  <div className="grid grid-cols-1 gap-6">
+                    {downloadingGames.map((game, index) => (
+                      <BigPictureDownloadCard
+                        key={game.game}
+                        game={game}
+                        isSelected={index === downloadsIndex && !isMenuOpen}
+                        torboxState={
+                          game.torboxWebdownloadId
+                            ? torboxStates[game.torboxWebdownloadId]
+                            : undefined
+                        }
+                        onPause={() => handlePauseDownload(game)}
+                        onResume={() => handleResumeDownload(game)}
+                        onKill={() => handleKillDownload(game)}
+                        onOpenFolder={() => handleOpenFolder(game)}
+                        isStopping={stoppingDownloads.has(game.game)}
+                        isResuming={resumingDownloads.has(game.game)}
+                        t={t}
+                        buttons={buttons}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Queued Downloads Section - Only show for Ascend users */}
+                {isAuthenticated && queuedDownloads.length > 0 && (
+                  <div className="mt-8">
+                    <div className="mb-4 flex items-center gap-3">
+                      <ListEnd className="h-6 w-6 text-primary" />
+                      <h2 className="text-2xl font-bold text-primary">
+                        {t("downloads.queuedDownloads")} ({queuedDownloads.length})
+                      </h2>
+                    </div>
+                    <div className="space-y-3">
+                      {queuedDownloads.map((item, index) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-4 rounded-xl border-2 border-border/50 bg-card/50 p-4 transition-all duration-200 hover:border-primary/30"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-lg font-bold text-primary">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-bold text-foreground">{item.gameName}</h3>
+                            <p className="text-sm text-muted-foreground">{item.size}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              removeFromQueue(item.id);
+                              toast.success(t("downloads.removedFromQueue"));
+                            }}
+                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-500 transition-all hover:bg-red-500/30"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -5073,6 +5420,54 @@ export default function BigPicture() {
           }}
           t={t}
           controllerType={settings.controllerType || "xbox"}
+        />
+      )}
+
+      {/* Queue Prompt Dialog */}
+      {showQueuePrompt && pendingDownloadData && (
+        <QueuePromptDialog
+          isOpen={showQueuePrompt}
+          onClose={() => {
+            setShowQueuePrompt(false);
+            setPendingDownloadData(null);
+          }}
+          onStartNow={async () => {
+            setShowQueuePrompt(false);
+            if (pendingDownloadData) {
+              try {
+                await window.electron.downloadFile(
+                  pendingDownloadData.url,
+                  pendingDownloadData.gameName,
+                  pendingDownloadData.online,
+                  pendingDownloadData.dlc,
+                  pendingDownloadData.isVr,
+                  pendingDownloadData.updateFlow,
+                  pendingDownloadData.version,
+                  pendingDownloadData.imgID,
+                  pendingDownloadData.size,
+                  pendingDownloadData.additionalDirIndex,
+                  pendingDownloadData.gameID
+                );
+                toast.success(t("bigPicture.downloadStarted"));
+                changeView("downloads");
+              } catch (error) {
+                console.error("Error starting download:", error);
+                toast.error(t("bigPicture.downloadError"));
+              }
+            }
+            setPendingDownloadData(null);
+          }}
+          onAddToQueue={() => {
+            if (pendingDownloadData) {
+              addToQueue(pendingDownloadData);
+              toast.success(t("download.toast.downloadQueued"));
+            }
+            setShowQueuePrompt(false);
+            setPendingDownloadData(null);
+          }}
+          t={t}
+          controllerType={settings.controllerType || "xbox"}
+          isAuthenticated={isAuthenticated}
         />
       )}
 

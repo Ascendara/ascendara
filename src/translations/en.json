@@ -746,6 +746,7 @@
     "failedToFetchDescription": "Failed to fetch description.",
     "home": "HOME",
     "includesDlc": "Includes DLC",
+    "installed": "INSTALLED",
     "keyboardLayout": "Keyboard Layout",
     "keyboardLayoutAzerty": "AZERTY",
     "keyboardLayoutQwerty": "QWERTY",
@@ -774,6 +775,7 @@
     "played": "played",
     "pressAModify": "Press A to modify",
     "queueDownloads": "Queue Downloads",
+    "queuedDownloads": "Queued Downloads",
     "readyToDownload": "Ready to download",
     "remoteDownloads": "Remote Downloads",
     "resultsFor": "result for",
@@ -794,6 +796,7 @@
     "trainer": "Trainer",
     "unableToLoadCatalog": "Unable to load catalog",
     "upBack": "UP / BACK",
+    "update": "UPDATE",
     "useArrowsToSelect": "Use arrows to select",
     "verifying": "Verifying...",
     "viewDetails": "VIEW DETAILS"
