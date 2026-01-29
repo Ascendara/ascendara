@@ -745,7 +745,11 @@ export default function GameScreen() {
           navigate("/library");
           return;
         }
-
+        // Trigger the download of missing assets
+        const gameName = game.game || game.name;
+        if (gameName) {
+          window.electron.ipcRenderer.invoke("ensure-game-assets", gameName);
+        }
         setLoading(true);
 
         // Check if executable exists
@@ -933,17 +937,37 @@ export default function GameScreen() {
   useEffect(() => {
     let isMounted = true;
     const gameId = game.game || game.name;
-    const localStorageKey = `game-cover-${gameId}`; // Use consistent key naming
+
+    // Change the cache key to not load the old header
+    const localStorageKey = `game-cover-vertical-${gameId}`;
 
     const loadGameImage = async () => {
-      // Try localStorage first
+      // 1. Try localStorage first
       const cachedImage = localStorage.getItem(localStorageKey);
       if (cachedImage) {
         if (isMounted) setImageData(cachedImage);
         return;
       }
 
-      // If Steam cover is available, use it
+      // 2. Try fetching Vertical GRID from backend (Priority)
+      try {
+        const gridBase64 = await window.electron.ipcRenderer.invoke(
+          "get-game-image",
+          gameId,
+          "grid"
+        );
+
+        if (gridBase64 && isMounted) {
+          const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
+          setImageData(dataUrl);
+          try {
+            localStorage.setItem(localStorageKey, dataUrl);
+          } catch (e) {}
+          return;
+        }
+      } catch (e) {}
+
+      // 3. Fallback (Header)
       if (steamData?.cover?.url) {
         const coverUrl = steamService.formatImageUrl(steamData.cover.url, "cover_big");
         if (coverUrl && isMounted) {

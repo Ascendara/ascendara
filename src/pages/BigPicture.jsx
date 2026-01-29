@@ -2262,6 +2262,7 @@ const GameDetailsView = ({
 
 // Installed Game Details View Component
 const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
+  const [logoSrc, setLogoSrc] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -2278,6 +2279,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
   useEffect(() => {
     console.log("[InstalledGameDetailsView] Mounted with game:", gameName);
     console.log("[InstalledGameDetailsView] Game object:", game);
+    if (gameName) {
+      window.electron.ipcRenderer.invoke("ensure-game-assets", gameName);
+    }
   }, []);
 
   // Load game image
@@ -2298,6 +2302,30 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
       }
     };
     loadCover();
+    return () => {
+      isMounted = false;
+    };
+  }, [gameName]);
+
+  // Load game logo
+  useEffect(() => {
+    let isMounted = true;
+    const loadLogo = async () => {
+      try {
+        const base64 = await window.electron.ipcRenderer.invoke(
+          "get-game-image",
+          gameName,
+          "logo"
+        );
+
+        if (isMounted && base64) {
+          setLogoSrc(`data:image/png;base64,${base64}`);
+        }
+      } catch (e) {
+        // Silently fail if no logo found
+      }
+    };
+    loadLogo();
     return () => {
       isMounted = false;
     };
@@ -2626,9 +2654,19 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         {/* VIEW 1: DETAILS */}
         <div className="relative h-full w-full flex-shrink-0">
           <div className="flex h-full w-[45%] flex-col justify-center p-16 pl-24">
-            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-white drop-shadow-lg">
-              {gameName}
-            </h1>
+            {logoSrc ? (
+              <div className="mb-6">
+                <img
+                  src={logoSrc}
+                  alt={gameName}
+                  className="max-h-80 max-w-full object-contain object-left drop-shadow-2xl"
+                />
+              </div>
+            ) : (
+              <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-white drop-shadow-lg">
+                {gameName}
+              </h1>
+            )}
 
             {game.category && game.category.length > 0 && (
               <div className="mb-6 flex flex-wrap gap-3">
@@ -2942,6 +2980,10 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
   const [imageSrc, setImageSrc] = useState(null);
   const cardRef = useRef(null);
 
+  // Determine if it's the "Hero" card
+  const isHero = !isGridMode && index === 0 && !game.isSeeMore;
+  const gameName = game.game || game.name;
+
   useEffect(() => {
     if (!isGridMode && isSelected && cardRef.current) {
       const container = document.getElementById("big-picture-scroll-container");
@@ -2964,20 +3006,34 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
 
     let isMounted = true;
     const loadCover = async () => {
-      const gameName = game.game || game.name;
+      // For "Hero" --> header
+      // Others --> grid
+      const imageType = isHero ? "header" : "grid";
+
       try {
-        const base64 = await window.electron.getGameImage(gameName);
-        if (isMounted && base64) setImageSrc(`data:image/jpeg;base64,${base64}`);
-      } catch (e) {}
+        const base64 = await window.electron.ipcRenderer.invoke(
+          "get-game-image",
+          gameName,
+          imageType
+        );
+
+        if (isMounted) {
+          if (base64) {
+            setImageSrc(`data:image/jpeg;base64,${base64}`);
+          } else {
+            setImageSrc(game.cover || game.image || null);
+          }
+        }
+      } catch (e) {
+        // Fallback
+        if (isMounted) setImageSrc(game.cover || game.image || null);
+      }
     };
     loadCover();
     return () => {
       isMounted = false;
     };
-  }, [game]);
-
-  const isHero = !isGridMode && index === 0 && !game.isSeeMore;
-  const gameName = game.game || game.name;
+  }, [game, isHero]);
 
   // Card to Library
   if (game.isSeeMore) {
