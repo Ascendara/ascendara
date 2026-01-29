@@ -18,6 +18,8 @@ const {
 } = require("./utils");
 const { getSettingsManager } = require("./settings");
 
+const steamgrid = require("./steamgrid");
+
 const downloadProcesses = new Map();
 const goFileProcesses = new Map();
 const retryDownloadProcesses = new Map();
@@ -367,6 +369,14 @@ function registerDownloadHandlers() {
           console.log(`No imgID provided, skipping header image download`);
         }
 
+        // Download Steamgriddb assets
+        console.log(
+          `[Download] Starting background asset fetch for ${game} (Name Search)`
+        );
+        // Launch in background to not interfer with game downloading
+        steamgrid
+          .fetchGameAssets(game, gameDirectory)
+          .catch(err => console.error(`[Download] Assets download failed:`, err));
         let executablePath;
         let spawnCommand;
 

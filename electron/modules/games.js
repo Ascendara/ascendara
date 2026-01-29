@@ -19,6 +19,8 @@ const {
 } = require("./discord-rpc");
 const { hideWindow, showWindow } = require("./window");
 
+const steamgrid = require("./steamgrid");
+
 const runGameProcesses = new Map();
 
 /**
@@ -203,6 +205,49 @@ function registerGameHandlers() {
     }
   });
 
+  // Check and Download Assets (When opening game page)
+  ipcMain.handle("ensure-game-assets", async (_, game) => {
+    const settings = settingsManager.getSettings();
+    if (!settings.downloadDirectory) return false;
+
+    // Logic for finding the file (almost the same as get-game-image)
+    let gameDirectory = null;
+    const allDirectories = [
+      settings.downloadDirectory,
+      ...(settings.additionalDirectories || []),
+    ];
+
+    // 1. Custom
+    const gamesPath = path.join(settings.downloadDirectory, "games.json");
+    if (fs.existsSync(gamesPath)) {
+      try {
+        const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+        const gameInfo = gamesData.games.find(g => g.game === game);
+        if (gameInfo && gameInfo.executable) {
+          gameDirectory = path.dirname(gameInfo.executable);
+        }
+      } catch (e) {}
+    }
+
+    // 2. Standard
+    if (!gameDirectory) {
+      for (const dir of allDirectories) {
+        const stdDir = path.join(dir, game);
+        if (fs.existsSync(stdDir)) {
+          gameDirectory = stdDir;
+          break;
+        }
+      }
+    }
+
+    if (gameDirectory) {
+      // Start downloading (which first checks if the files exist)
+      steamgrid.fetchGameAssets(game, gameDirectory, null).catch(console.error);
+      return true;
+    }
+    return false;
+  });
+
   // Play game
   ipcMain.handle(
     "play-game",
@@ -361,6 +406,13 @@ function registerGameHandlers() {
 
         if (settings.hideOnGameLaunch !== false) {
           hideWindow();
+        }
+
+        // Download Steamgriddb assets
+        if (isWindows) {
+          steamgrid
+            .fetchGameAssets(game, gameDirectory)
+            .catch(err => console.error(`Failed to fetch assets for ${game}:`, err));
         }
 
         // Create shortcut on first launch
@@ -535,48 +587,75 @@ function registerGameHandlers() {
   });
 
   // Get game image
-  ipcMain.handle("get-game-image", async (_, game) => {
+  ipcMain.handle("get-game-image", async (_, game, type = "header") => {
     const settings = settingsManager.getSettings();
-    try {
-      if (!settings.downloadDirectory || !settings.additionalDirectories) return null;
+    if (!settings.downloadDirectory) return null;
 
-      const allDirectories = [
-        settings.downloadDirectory,
-        ...settings.additionalDirectories,
-      ];
-      const possibleExtensions = [".jpg", ".jpeg", ".png"];
+    // Define search patterns
+    const legacyPatterns = [
+      "header.ascendara.jpg",
+      "header.ascendara.png",
+      "header.jpeg",
+      "header.jpg",
+      "header.png",
+    ];
+    let searchPatterns = [];
 
-      for (const directory of allDirectories) {
-        const gamesDirectory = path.join(directory, "games");
-        if (fs.existsSync(gamesDirectory)) {
-          for (const ext of possibleExtensions) {
-            const imagePath = path.join(gamesDirectory, `${game}.ascendara${ext}`);
-            if (fs.existsSync(imagePath)) {
-              return fs.readFileSync(imagePath).toString("base64");
-            }
+    if (type === "grid") {
+      searchPatterns = ["grid.ascendara.jpg", "grid.ascendara.png", ...legacyPatterns];
+    } else if (type === "hero") {
+      searchPatterns = ["hero.ascendara.jpg", "hero.ascendara.png", ...legacyPatterns];
+    } else if (type === "logo") {
+      searchPatterns = ["logo.ascendara.png", "logo.ascendara.jpg"];
+    } else {
+      searchPatterns = legacyPatterns;
+    }
+
+    // 1. Search in games.json (Custom Games)
+    const gamesPath = path.join(settings.downloadDirectory, "games.json");
+    if (fs.existsSync(gamesPath)) {
+      try {
+        const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+        const gameInfo = gamesData.games.find(g => g.game === game);
+        if (gameInfo && gameInfo.executable) {
+          const customDir = path.dirname(gameInfo.executable);
+          for (const pattern of searchPatterns) {
+            const p = path.join(customDir, pattern);
+            if (fs.existsSync(p)) return fs.readFileSync(p).toString("base64");
           }
         }
+      } catch (e) {}
+    }
 
-        const gameDirectory = path.join(directory, game);
-        if (fs.existsSync(gameDirectory)) {
-          const imageFiles = fs.readdirSync(gameDirectory);
-          for (const file of imageFiles) {
-            if (
-              ["header.ascendara.jpg", "header.ascendara.png", "header.jpeg"].includes(
-                file
-              )
-            ) {
-              return fs.readFileSync(path.join(gameDirectory, file)).toString("base64");
-            }
-          }
+    // 2. Search in standard direcotries
+    const allDirectories = [
+      settings.downloadDirectory,
+      ...(settings.additionalDirectories || []),
+    ];
+    for (const dir of allDirectories) {
+      const stdDir = path.join(dir, game);
+      if (fs.existsSync(stdDir)) {
+        for (const pattern of searchPatterns) {
+          const p = path.join(stdDir, pattern);
+          if (fs.existsSync(p)) return fs.readFileSync(p).toString("base64");
         }
       }
-
-      return null;
-    } catch (error) {
-      console.error("Error reading game image:", error);
-      return null;
     }
+
+    // 3. Fallback: "games" folder (For custom images)
+    const centralGamesDir = path.join(settings.downloadDirectory, "games");
+    if (fs.existsSync(centralGamesDir)) {
+      const baseName = `${game}.ascendara`;
+      const exts = [".jpg", ".png", ".jpeg"];
+      for (const ext of exts) {
+        const p = path.join(centralGamesDir, baseName + ext);
+        if (fs.existsSync(p)) {
+          return fs.readFileSync(p).toString("base64");
+        }
+      }
+    }
+
+    return null;
   });
 
   // Create game shortcut handler

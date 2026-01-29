@@ -192,7 +192,7 @@ contextBridge.exposeInMainWorld("electron", {
   // Game Cover/Image
   updateGameCover: (gameName, imgID, imageData) =>
     ipcRenderer.invoke("update-game-cover", gameName, imgID, imageData),
-  getGameImage: game => ipcRenderer.invoke("get-game-image", game),
+  getGameImage: (game, type) => ipcRenderer.invoke("get-game-image", game, type),
   getLocalImageUrl: imagePath => ipcRenderer.invoke("get-local-image-url", imagePath),
 
   // Game Rating & Backups
