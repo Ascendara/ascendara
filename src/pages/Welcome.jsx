@@ -43,6 +43,7 @@ import { languages } from "@/i18n";
 import { useTheme } from "@/context/ThemeContext";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
+import { validateInput } from "@/services/profanityFilterService";
 
 const executableToLabelMap = {
   "dotNetFx40_Full_x86_x64.exe": t => ".NET Framework 4.0",
@@ -257,6 +258,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [indexComplete, setIndexComplete] = useState(restoredIndexComplete);
   const [customReferral, setCustomReferral] = useState("");
   const [referralSent, setReferralSent] = useState(false);
+  const [referralLink, setReferralLink] = useState("");
+  const [customReferralError, setCustomReferralError] = useState("");
+  const [referralLinkError, setReferralLinkError] = useState("");
   const [settings, setSettings] = useState({
     downloadDirectory: "",
     showOldDownloadLinks: false,
@@ -1481,7 +1485,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
                 {referralSource === "other" && (
                   <motion.div
-                    className="mt-4"
+                    className="mt-4 space-y-2"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
@@ -1489,10 +1493,70 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     <Input
                       type="text"
                       placeholder={t("welcome.referral.otherPlaceholder")}
-                      className="w-full"
+                      className={`w-full ${customReferralError ? "border-red-500" : ""}`}
                       value={customReferral}
-                      onChange={e => setCustomReferral(e.target.value)}
+                      onChange={async e => {
+                        const value = e.target.value;
+                        setCustomReferral(value);
+                        if (value) {
+                          const validation = await validateInput(value);
+                          if (!validation.valid) {
+                            setCustomReferralError(validation.error);
+                          } else {
+                            setCustomReferralError("");
+                          }
+                        } else {
+                          setCustomReferralError("");
+                        }
+                      }}
                     />
+                    {customReferralError && (
+                      <p className="text-sm text-red-500">{customReferralError}</p>
+                    )}
+                  </motion.div>
+                )}
+
+                {[
+                  "tiktok",
+                  "reddit",
+                  "instagram",
+                  "google",
+                  "discord",
+                  "fmhy",
+                  "other",
+                ].includes(referralSource) && (
+                  <motion.div
+                    className="mt-4 space-y-2"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Input
+                      type="text"
+                      placeholder={
+                        t("welcome.referral.linkPlaceholder") ||
+                        "Where did you find Ascendara? (optional)"
+                      }
+                      className={`w-full ${referralLinkError ? "border-red-500" : ""}`}
+                      value={referralLink}
+                      onChange={async e => {
+                        const value = e.target.value;
+                        setReferralLink(value);
+                        if (value) {
+                          const validation = await validateInput(value);
+                          if (!validation.valid) {
+                            setReferralLinkError(validation.error);
+                          } else {
+                            setReferralLinkError("");
+                          }
+                        } else {
+                          setReferralLinkError("");
+                        }
+                      }}
+                    />
+                    {referralLinkError && (
+                      <p className="text-sm text-red-500">{referralLinkError}</p>
+                    )}
                   </motion.div>
                 )}
               </motion.div>
@@ -1529,13 +1593,17 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
                         if (tokenResponse.ok) {
                           const { token } = await tokenResponse.json();
+                          const payload = { source: sourceToSend };
+                          if (referralLink) {
+                            payload.link = referralLink;
+                          }
                           await fetch("https://api.ascendara.app/app/downloadedfrom", {
                             method: "POST",
                             headers: {
                               "Content-Type": "application/json",
                               Authorization: `Bearer ${token}`,
                             },
-                            body: JSON.stringify({ source: sourceToSend }),
+                            body: JSON.stringify(payload),
                           });
                         }
                       } catch (error) {
@@ -1548,7 +1616,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   disabled={
                     referralSent ||
                     !referralSource ||
-                    (referralSource === "other" && !customReferral)
+                    (referralSource === "other" && !customReferral) ||
+                    customReferralError ||
+                    referralLinkError
                   }
                 >
                   {t("welcome.next")}

@@ -2356,6 +2356,7 @@
     "pythonMustBeInstalled": "Python must be installed on your computer in order to run Ascendara's core tools on this operating system",
     "referral": {
       "friendThankYou": "Thank your friend for sharing Ascendara around! People like them and you are the reason why Ascendara can grow.",
+      "linkPlaceholder": "Can you share the link or post where you found Ascendara?",
       "otherPlaceholder": "Where exactly did you find Ascendara?",
       "sources": {
         "discord": "Discord",
