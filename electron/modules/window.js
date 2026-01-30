@@ -277,20 +277,16 @@ function registerWindowHandlers() {
   });
 
   // Close the window
-  ipcMain.handle("close-window", async () => {
+  ipcMain.handle("close-window", async (_, forceQuit = false) => {
     const win = BrowserWindow.getFocusedWindow();
     if (win) {
       const settingsManager = getSettingsManager();
       const settings = settingsManager.getSettings();
-      if (!settings.endOnClose) {
-        mainWindowHidden = true;
-        destroyDiscordRPC();
-        win.hide();
-        console.log("Window hidden to tray");
-      } else {
+
+      if (forceQuit === true || settings.endOnClose) {
         // Set quitting flag to allow app to quit
         app.isQuitting = true;
-        console.log("Closing app completely (endOnClose is true)...");
+        console.log("Closing app completely...");
 
         // Destroy all windows to ensure cleanup
         BrowserWindow.getAllWindows().forEach(window => {
@@ -301,6 +297,12 @@ function registerWindowHandlers() {
 
         // Force quit the app
         app.quit();
+      } else {
+        // Default behavior
+        mainWindowHidden = true;
+        destroyDiscordRPC();
+        win.hide();
+        console.log("Window hidden to tray");
       }
     }
   });
