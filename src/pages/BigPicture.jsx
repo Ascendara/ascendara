@@ -40,6 +40,19 @@ import {
   Triangle,
   KeyboardIcon,
   ListEnd,
+  Bolt,
+  FileCheck2,
+  FolderSync,
+  Monitor,
+  Pencil,
+  FileSearch,
+  AlertTriangle,
+  StopCircle,
+  ExternalLink,
+  GripVertical,
+  Save,
+  RotateCcw,
+  Plus,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import gameService from "@/services/gameService";
@@ -54,6 +67,22 @@ import recentGamesService from "@/services/recentGamesService";
 import { sanitizeText } from "@/lib/utils";
 import * as torboxService from "@/services/torboxService";
 import installedGamesService from "@/services/installedGamesService";
+import gameUpdateService from "@/services/gameUpdateService";
+import { loadFolders, saveFolders } from "@/lib/folderManager";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import GamesBackupDialog from "@/components/GamesBackupDialog";
 import {
   addToQueue,
   hasActiveDownloads,
@@ -2491,21 +2520,318 @@ const GameDetailsView = ({
   );
 };
 
+// Executable Manager Dialog Component
+const ExecutableManagerDialog = ({
+  open,
+  onClose,
+  gameName,
+  isCustom,
+  t,
+  onSave,
+  bigPictureMode = false,
+}) => {
+  const [executables, setExecutables] = useState([]);
+  const [exeExists, setExeExists] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && gameName) {
+      setLoading(true);
+      gameUpdateService.getGameExecutables(gameName, isCustom).then(async exes => {
+        const exeList = exes.length > 0 ? exes : [""];
+        setExecutables(exeList);
+        const existsMap = {};
+        for (const exe of exeList) {
+          if (exe) {
+            existsMap[exe] = await window.electron.checkFileExists(exe);
+          }
+        }
+        setExeExists(existsMap);
+        setLoading(false);
+      });
+    }
+  }, [open, gameName, isCustom]);
+
+  useEffect(() => {
+    const checkExists = async () => {
+      const newExistsMap = { ...exeExists };
+      let hasChanges = false;
+      for (const exe of executables) {
+        if (exe && !(exe in newExistsMap)) {
+          newExistsMap[exe] = await window.electron.checkFileExists(exe);
+          hasChanges = true;
+        }
+      }
+      if (hasChanges) {
+        setExeExists(newExistsMap);
+      }
+    };
+    if (!loading && executables.length > 0) {
+      checkExists();
+    }
+  }, [executables, loading]);
+
+  const handleAddExecutable = async () => {
+    const startPath = executables.length > 0 && executables[0] ? executables[0] : null;
+    const exePath = await window.electron.openFileDialog(startPath);
+    if (exePath) {
+      setExecutables(prev => [...prev, exePath]);
+      const exists = await window.electron.checkFileExists(exePath);
+      setExeExists(prev => ({ ...prev, [exePath]: exists }));
+    }
+  };
+
+  const handleChangeExecutable = async index => {
+    const currentExe = executables[index];
+    const exePath = await window.electron.openFileDialog(currentExe || null);
+    if (exePath) {
+      setExecutables(prev => {
+        const updated = [...prev];
+        updated[index] = exePath;
+        return updated;
+      });
+      const exists = await window.electron.checkFileExists(exePath);
+      setExeExists(prev => ({ ...prev, [exePath]: exists }));
+    }
+  };
+
+  const handleRemoveExecutable = index => {
+    if (executables.length <= 1) return;
+    setExecutables(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMakePrimary = index => {
+    if (index === 0) return;
+    setExecutables(prev => {
+      const updated = [...prev];
+      const [item] = updated.splice(index, 1);
+      updated.unshift(item);
+      return updated;
+    });
+  };
+
+  const handleSave = async () => {
+    const validExecutables = executables.filter(exe => exe && exe.trim() !== "");
+    if (validExecutables.length === 0) {
+      toast.error(t("library.executableManager.atLeastOne"));
+      return;
+    }
+    setSaving(true);
+    const success = await gameUpdateService.updateGameExecutables(
+      gameName,
+      validExecutables,
+      isCustom
+    );
+    setSaving(false);
+    if (success) {
+      toast.success(t("library.executableManager.saved"));
+      if (onSave) {
+        onSave(validExecutables);
+      }
+      onClose();
+    } else {
+      toast.error(t("library.executableManager.saveFailed"));
+    }
+  };
+
+  const getFileName = path => {
+    if (!path) return "";
+    return path.split(/[/\\]/).pop();
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-lg">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            {t("library.executableManager.title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            {t("library.executableManager.description")}
+
+            {bigPictureMode && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border-2 border-primary/50 bg-primary/10 p-3">
+                <MousePointer className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold text-primary">
+                    {t("bigPicture.mouseRequired") || "Mouse Navigation Required"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {t("library.executableManager.bigPictureWarning") ||
+                      "This dialog requires mouse or keyboard navigation. Controller input is not supported for managing executables."}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {executables.some(exe => exe && exeExists[exe] === false) && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    {t("library.executableManager.exeLocationHint")}
+                  </span>
+                  <button
+                    onClick={() =>
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/troubleshooting/common-issues#executable-not-found-launch-error"
+                      )
+                    }
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    {t("library.executableManager.learnMore")}
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="my-2 max-h-64 space-y-2 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            executables.map((exe, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
+              >
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    {exe && exeExists[exe] === false && (
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-500" />
+                    )}
+                    {index === 0 && (
+                      <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
+                        {t("library.executableManager.primary")}
+                      </span>
+                    )}
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {getFileName(exe) || t("library.executableManager.noFile")}
+                    </span>
+                  </div>
+                  <span className="truncate text-xs text-muted-foreground">{exe}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {index !== 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleMakePrimary(index)}
+                      title={t("library.executableManager.makePrimary")}
+                    >
+                      <GripVertical className="h-4 w-4 text-primary" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleChangeExecutable(index)}
+                    title={t("library.executableManager.change")}
+                  >
+                    <Pencil className="h-4 w-4 text-primary" />
+                  </Button>
+                  {executables.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive h-8 w-8"
+                      onClick={() => handleRemoveExecutable(index)}
+                      title={t("library.executableManager.remove")}
+                    >
+                      <X className="h-4 w-4 text-primary" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          className="w-full text-primary"
+          onClick={handleAddExecutable}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t("library.executableManager.addExecutable")}
+        </Button>
+
+        <AlertDialogFooter className="mt-4 flex gap-2">
+          <Button variant="outline" className="text-primary" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            className="bg-primary text-secondary"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                {t("common.saving")}
+              </>
+            ) : (
+              t("common.save")
+            )}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
 // Installed Game Details View Component
 const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
+  const navigate = useNavigate();
+  const { settings } = useSettings();
   const [logoSrc, setLogoSrc] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
+  const [hasHeroImage, setHasHeroImage] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [steamData, setSteamData] = useState(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
+  const [showManagementMenu, setShowManagementMenu] = useState(false);
   const [canInput, setCanInput] = useState(false);
   const [playTime, setPlayTime] = useState(0);
-  const [selectedButton, setSelectedButton] = useState("play"); // 'play' or 'folder'
+  const [selectedButton, setSelectedButton] = useState("play"); // 'play' or 'folder' or 'manage'
+  const [selectedMenuItem, setSelectedMenuItem] = useState(0);
+  const [trainerToggleFocused, setTrainerToggleFocused] = useState(false);
   const lastInputTime = useRef(0);
   const buttons = getControllerButtons(controllerType);
   const gameName = game.game || game.name;
+
+  // Executable management
+  const [executableExists, setExecutableExists] = useState(true);
+  const [showExecutableManager, setShowExecutableManager] = useState(false);
+  const [showExecutableSelect, setShowExecutableSelect] = useState(false);
+  const [availableExecutables, setAvailableExecutables] = useState([]);
+  const [pendingLaunchOptions, setPendingLaunchOptions] = useState(null);
+
+  // Trainer support
+  const [trainerExists, setTrainerExists] = useState(false);
+  const [launchWithTrainerEnabled, setLaunchWithTrainerEnabled] = useState(() => {
+    const saved = localStorage.getItem(`launch-with-trainer-${game?.game || game?.name}`);
+    return saved === "true";
+  });
+
+  // Dialogs and warnings
+  const [showVrWarning, setShowVrWarning] = useState(false);
+  const [showOnlineFixWarning, setShowOnlineFixWarning] = useState(false);
+  const [showSteamNotRunningWarning, setShowSteamNotRunningWarning] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isUninstalling, setIsUninstalling] = useState(false);
+  const [backupDialogOpen, setBackupDialogOpen] = useState(false);
+  const [showBrowseExeWarning, setShowBrowseExeWarning] = useState(false);
+  const [dialogButtonIndex, setDialogButtonIndex] = useState(0);
 
   useEffect(() => {
     console.log("[InstalledGameDetailsView] Mounted with game:", gameName);
@@ -2513,26 +2839,60 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
     if (gameName) {
       window.electron.ipcRenderer.invoke("ensure-game-assets", gameName);
     }
-  }, []);
 
-  // Load game image
+    // Check if executable exists
+    const checkExecutable = async () => {
+      if (game.executable) {
+        const exists = await window.electron.checkFileExists(game.executable);
+        setExecutableExists(exists);
+      }
+    };
+    checkExecutable();
+
+    // Check if trainer exists
+    const checkTrainer = async () => {
+      try {
+        const exists = await window.electron.checkTrainerExists(gameName);
+        setTrainerExists(exists);
+      } catch (e) {
+        setTrainerExists(false);
+      }
+    };
+    checkTrainer();
+  }, [gameName, game.executable]);
+
+  // Load game hero image for background
   useEffect(() => {
     let isMounted = true;
-    const loadCover = async () => {
+    const loadHero = async () => {
       try {
-        console.log("[InstalledGameDetailsView] Loading cover for:", gameName);
-        const base64 = await window.electron.getGameImage(gameName);
+        console.log("[InstalledGameDetailsView] Loading hero image for:", gameName);
+        const base64 = await window.electron.ipcRenderer.invoke(
+          "get-game-image",
+          gameName,
+          "hero"
+        );
         if (isMounted && base64) {
-          console.log("[InstalledGameDetailsView] Cover loaded successfully");
+          console.log("[InstalledGameDetailsView] Hero image loaded successfully");
           setImageSrc(`data:image/jpeg;base64,${base64}`);
+          setHasHeroImage(true);
         } else {
-          console.log("[InstalledGameDetailsView] No cover image found");
+          console.log(
+            "[InstalledGameDetailsView] No hero image found, loading header/grid for card layout"
+          );
+          setHasHeroImage(false);
+          // Load header/grid image for the old card-style layout
+          const gridBase64 = await window.electron.getGameImage(gameName);
+          if (isMounted && gridBase64) {
+            setImageSrc(`data:image/jpeg;base64,${gridBase64}`);
+          }
         }
       } catch (e) {
         console.error("[InstalledGameDetailsView] Error loading game image:", e);
+        setHasHeroImage(false);
       }
     };
-    loadCover();
+    loadHero();
     return () => {
       isMounted = false;
     };
@@ -2637,7 +2997,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
   }, []);
 
   // Handle play game
-  const handlePlayGame = async () => {
+  const handlePlayGame = async (forcePlay = false, specificExecutable = null) => {
     if (isLaunching || isRunning) return;
 
     setIsLaunching(true);
@@ -2663,19 +3023,54 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         const hideSteamWarning = localStorage.getItem("hideSteamWarning");
         if (!hideSteamWarning) {
           if (!(await window.electron.isSteamRunning())) {
-            setTimeout(() => toast.error(t("library.steamNotRunning")), 0);
+            setShowSteamNotRunningWarning(true);
             setIsLaunching(false);
             return;
           }
         }
       }
+
+      // Check if game is VR and show warning
+      if (game.isVr && !forcePlay) {
+        setShowVrWarning(true);
+        setIsLaunching(false);
+        return;
+      }
+
+      // Check for online fix warning on first launch
+      if (game.online && (game.launchCount < 1 || !game.launchCount)) {
+        const onlineFixWarningShown = localStorage.getItem("onlineFixWarningShown");
+        if (!onlineFixWarningShown) {
+          setShowOnlineFixWarning(true);
+          localStorage.setItem("onlineFixWarningShown", "true");
+          setIsLaunching(false);
+          return;
+        }
+      }
+
+      // Check for multiple executables if no specific one was provided
+      if (!specificExecutable) {
+        const executables = await gameUpdateService.getGameExecutables(
+          gameName,
+          game.isCustom
+        );
+        if (executables.length > 1) {
+          setPendingLaunchOptions({ forcePlay });
+          setAvailableExecutables(executables);
+          setShowExecutableSelect(true);
+          setIsLaunching(false);
+          return;
+        }
+      }
+
+      // Launch the game
       await window.electron.playGame(
         gameName,
         game.isCustom,
         game.backups ?? false,
         false,
-        null,
-        false
+        specificExecutable,
+        trainerExists && launchWithTrainerEnabled
       );
 
       // Save to recently played
@@ -2698,52 +3093,377 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
     }
   };
 
+  // Handle executable selection
+  const handleExecutableSelect = async selectedExecutable => {
+    setShowExecutableSelect(false);
+    if (selectedExecutable && pendingLaunchOptions) {
+      await handlePlayGame(pendingLaunchOptions.forcePlay, selectedExecutable);
+    }
+    setPendingLaunchOptions(null);
+    setAvailableExecutables([]);
+  };
+
   // Handle open directory
   const handleOpenDirectory = async () => {
     await window.electron.openGameDirectory(gameName, game.isCustom);
+  };
+
+  // Handle delete game
+  const handleDeleteGame = async () => {
+    try {
+      setIsUninstalling(true);
+      const gameId = game.game || game.name;
+
+      // Remove the game from all folders
+      const folders = loadFolders();
+      const updatedFolders = folders.map(folder => ({
+        ...folder,
+        items: (folder.items || []).filter(item => (item.game || item.name) !== gameId),
+      }));
+      saveFolders(updatedFolders);
+
+      // Clean up folder-specific favorites
+      try {
+        const favoritesObj = JSON.parse(localStorage.getItem("folder-favorites") || "{}");
+        let favoritesUpdated = false;
+
+        Object.keys(favoritesObj).forEach(folderKey => {
+          if (favoritesObj[folderKey].includes(gameId)) {
+            favoritesObj[folderKey] = favoritesObj[folderKey].filter(id => id !== gameId);
+            favoritesUpdated = true;
+          }
+        });
+
+        if (favoritesUpdated) {
+          localStorage.setItem("folder-favorites", JSON.stringify(favoritesObj));
+        }
+      } catch (error) {
+        console.error("Error updating folder favorites:", error);
+      }
+
+      // Delete the game from the main library
+      if (game.isCustom) {
+        await window.electron.removeCustomGame(gameId);
+      } else {
+        await window.electron.deleteGame(gameId);
+      }
+
+      setIsUninstalling(false);
+      setIsDeleteDialogOpen(false);
+      setTimeout(() => toast.success(t("library.gameDeleted", { game: gameName })), 0);
+      onBack();
+    } catch (error) {
+      console.error("Error deleting game:", error);
+      setTimeout(() => toast.error(t("library.deleteFailed")), 0);
+      setIsUninstalling(false);
+    }
   };
 
   const handleInput = useCallback(
     action => {
       if (!canInput) return;
 
+      // Handle dialog navigation
+      if (
+        showVrWarning ||
+        showOnlineFixWarning ||
+        showSteamNotRunningWarning ||
+        isDeleteDialogOpen ||
+        showBrowseExeWarning ||
+        showExecutableSelect ||
+        showExecutableManager
+      ) {
+        if (action === "LEFT") {
+          setDialogButtonIndex(prev => Math.max(0, prev - 1));
+        } else if (action === "RIGHT") {
+          const maxIndex = showVrWarning
+            ? 1
+            : showOnlineFixWarning
+              ? 0
+              : showSteamNotRunningWarning
+                ? 0
+                : isDeleteDialogOpen
+                  ? 1
+                  : showBrowseExeWarning
+                    ? 1
+                    : showExecutableSelect
+                      ? availableExecutables.length
+                      : showExecutableManager
+                        ? 1
+                        : 0;
+          setDialogButtonIndex(prev => Math.min(maxIndex, prev + 1));
+        } else if (action === "UP") {
+          if (showExecutableSelect) {
+            setDialogButtonIndex(prev => Math.max(0, prev - 1));
+          }
+        } else if (action === "DOWN") {
+          if (showExecutableSelect) {
+            setDialogButtonIndex(prev => Math.min(availableExecutables.length, prev + 1));
+          }
+        } else if (action === "CONFIRM") {
+          // Trigger the selected button
+          if (showVrWarning) {
+            if (dialogButtonIndex === 0) {
+              setShowVrWarning(false);
+            } else {
+              setShowVrWarning(false);
+              handlePlayGame(true);
+            }
+          } else if (showOnlineFixWarning) {
+            setShowOnlineFixWarning(false);
+            handlePlayGame(true);
+          } else if (showSteamNotRunningWarning) {
+            setShowSteamNotRunningWarning(false);
+          } else if (isDeleteDialogOpen) {
+            if (dialogButtonIndex === 0) {
+              setIsDeleteDialogOpen(false);
+            } else {
+              handleDeleteGame();
+            }
+          } else if (showBrowseExeWarning) {
+            if (dialogButtonIndex === 0) {
+              setShowBrowseExeWarning(false);
+            } else {
+              setShowBrowseExeWarning(false);
+              window.electron.openFileDialog(game.executable).then(async exePath => {
+                if (exePath) {
+                  await gameUpdateService.updateGameExecutable(gameName, exePath);
+                  const exists = await window.electron.checkFileExists(exePath);
+                  setExecutableExists(exists);
+                  toast.success(
+                    t("library.executableUpdated") || "Executable updated successfully"
+                  );
+                }
+              });
+            }
+          } else if (showExecutableSelect) {
+            if (dialogButtonIndex < availableExecutables.length) {
+              handleExecutableSelect(availableExecutables[dialogButtonIndex]);
+            } else {
+              setShowExecutableSelect(false);
+              setPendingLaunchOptions(null);
+              setAvailableExecutables([]);
+            }
+          } else if (showExecutableManager) {
+            if (dialogButtonIndex === 0) {
+              setShowExecutableManager(false);
+            } else {
+              window.electron.openFileDialog(game.executable).then(async exePath => {
+                if (exePath) {
+                  await gameUpdateService.updateGameExecutable(gameName, exePath);
+                  const exists = await window.electron.checkFileExists(exePath);
+                  setExecutableExists(exists);
+                  toast.success(
+                    t("library.executableUpdated") || "Executable updated successfully"
+                  );
+                }
+                setShowExecutableManager(false);
+              });
+            }
+          }
+          setDialogButtonIndex(0);
+        } else if (action === "BACK") {
+          if (showVrWarning) setShowVrWarning(false);
+          else if (showOnlineFixWarning) setShowOnlineFixWarning(false);
+          else if (showSteamNotRunningWarning) setShowSteamNotRunningWarning(false);
+          else if (isDeleteDialogOpen) setIsDeleteDialogOpen(false);
+          else if (showBrowseExeWarning) setShowBrowseExeWarning(false);
+          else if (showExecutableSelect) {
+            setShowExecutableSelect(false);
+            setPendingLaunchOptions(null);
+            setAvailableExecutables([]);
+          } else if (showExecutableManager) setShowExecutableManager(false);
+          setDialogButtonIndex(0);
+        }
+        return;
+      }
+
+      // Backup dialog navigation (simplified for BigPicture)
+      if (backupDialogOpen) {
+        if (action === "UP") {
+          setDialogButtonIndex(prev => Math.max(0, prev - 1));
+        } else if (action === "DOWN") {
+          setDialogButtonIndex(prev => Math.min(2, prev + 1));
+        } else if (action === "CONFIRM") {
+          if (dialogButtonIndex === 0) {
+            // Backup Now
+            setBackupDialogOpen(false);
+            setDialogButtonIndex(0);
+            window.electron.ludusavi("backup", gameName).then(result => {
+              if (result?.success) {
+                toast.success(t("library.backups.backupSuccess"));
+              } else {
+                toast.error(t("library.backups.backupFailed"));
+              }
+            });
+          } else if (dialogButtonIndex === 1) {
+            // Restore Latest
+            setBackupDialogOpen(false);
+            setDialogButtonIndex(0);
+            window.electron.ludusavi("restore", gameName).then(result => {
+              if (result?.success) {
+                toast.success(t("library.backups.restoreSuccess"));
+              } else {
+                toast.error(t("library.backups.restoreFailed"));
+              }
+            });
+          } else if (dialogButtonIndex === 2) {
+            // Close
+            setBackupDialogOpen(false);
+            setDialogButtonIndex(0);
+          }
+        } else if (action === "BACK") {
+          setBackupDialogOpen(false);
+          setDialogButtonIndex(0);
+        }
+        return;
+      }
+
+      // Management menu navigation
+      if (showManagementMenu) {
+        if (action === "DOWN") {
+          const menuItemCount = 4; // Backup, Shortcut, Executable, Delete
+          setSelectedMenuItem(prev => (prev + 1) % menuItemCount);
+        } else if (action === "UP") {
+          const menuItemCount = 4;
+          setSelectedMenuItem(prev => (prev - 1 + menuItemCount) % menuItemCount);
+        } else if (action === "CONFIRM") {
+          // Execute selected menu item
+          console.log("[GAME DETAILS] Menu item selected:", selectedMenuItem);
+          setShowManagementMenu(false);
+          setDialogButtonIndex(0);
+
+          if (selectedMenuItem === 0) {
+            console.log("[GAME DETAILS] Opening backup dialog");
+            setBackupDialogOpen(true);
+          } else if (selectedMenuItem === 1) {
+            console.log("[GAME DETAILS] Creating shortcut");
+            window.electron.createGameShortcut(game).then(success => {
+              if (success) toast.success(t("library.shortcutCreated"));
+              else toast.error(t("library.shortcutError"));
+            });
+          } else if (selectedMenuItem === 2) {
+            console.log("[GAME DETAILS] Opening executable manager");
+            setShowExecutableManager(true);
+          } else if (selectedMenuItem === 3) {
+            console.log("[GAME DETAILS] Opening delete dialog");
+            if (game.isCustom) {
+              handleDeleteGame();
+            } else {
+              setIsDeleteDialogOpen(true);
+            }
+          }
+        } else if (action === "BACK") {
+          setShowManagementMenu(false);
+          setSelectedMenuItem(0);
+        }
+        return;
+      }
+
+      // Normal navigation
       if (action === "DOWN") {
-        if (!showMedia) setShowMedia(true);
+        if (trainerToggleFocused) {
+          setTrainerToggleFocused(false);
+          setSelectedButton("play"); // Restore button selection
+        } else if (!showMedia) {
+          setShowMedia(true);
+        }
       } else if (action === "UP") {
-        if (showMedia) setShowMedia(false);
+        if (showMedia) {
+          setShowMedia(false);
+        } else if (!trainerToggleFocused && trainerExists) {
+          setTrainerToggleFocused(true);
+          setSelectedButton(""); // Clear button selection when focusing trainer
+        }
       } else if (action === "LEFT") {
-        if (!showMedia) setSelectedButton("play");
+        if (trainerToggleFocused) {
+          // Do nothing on trainer toggle
+        } else if (!showMedia) {
+          if (selectedButton === "folder") setSelectedButton("play");
+          else if (selectedButton === "manage") setSelectedButton("folder");
+        }
       } else if (action === "RIGHT") {
-        if (!showMedia) setSelectedButton("folder");
+        if (trainerToggleFocused) {
+          // Do nothing on trainer toggle
+        } else if (!showMedia) {
+          if (selectedButton === "play") setSelectedButton("folder");
+          else if (selectedButton === "folder") setSelectedButton("manage");
+        }
       } else if (action === "BACK" || action === "MENU") {
-        if (showMedia) setShowMedia(false);
-        else {
+        if (trainerToggleFocused) {
+          setTrainerToggleFocused(false);
+        } else if (showMedia) {
+          setShowMedia(false);
+        } else {
           console.log("[GAME DETAILS] Back/Menu pressed, calling onBack");
           onBack();
         }
       } else if (action === "CONFIRM") {
-        if (!showMedia) {
+        if (trainerToggleFocused) {
+          const newValue = !launchWithTrainerEnabled;
+          setLaunchWithTrainerEnabled(newValue);
+          localStorage.setItem(`launch-with-trainer-${gameName}`, newValue.toString());
+          toast.success(
+            newValue
+              ? t("gameScreen.trainerEnabledToast")
+              : t("gameScreen.trainerDisabledToast")
+          );
+        } else if (!showMedia) {
           if (selectedButton === "play" && !isLaunching && !isRunning) {
-            handlePlayGame();
+            if (!executableExists) {
+              setShowBrowseExeWarning(true);
+            } else {
+              handlePlayGame();
+            }
           } else if (selectedButton === "folder") {
             handleOpenDirectory();
+          } else if (selectedButton === "manage") {
+            setShowManagementMenu(true);
+            setSelectedMenuItem(0);
           }
         }
       } else if (action === "X") {
-        if (!showMedia) handleOpenDirectory();
+        if (!showMedia && !trainerToggleFocused) handleOpenDirectory();
+      } else if (action === "Y") {
+        if (!showMedia && !showManagementMenu && !trainerToggleFocused) {
+          setShowManagementMenu(true);
+          setSelectedMenuItem(0);
+        }
       }
     },
     [
       showMedia,
+      showManagementMenu,
+      selectedMenuItem,
       onBack,
       isLaunching,
       isRunning,
       canInput,
       handlePlayGame,
       handleOpenDirectory,
+      handleDeleteGame,
       selectedButton,
+      game,
+      settings,
+      t,
     ]
   );
+
+  // Force close backup dialog with Escape key (backup dialog has its own complex navigation)
+  useEffect(() => {
+    const handleEscapeKey = e => {
+      if (e.key === "Escape" && backupDialogOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setBackupDialogOpen(false);
+      }
+    };
+    if (backupDialogOpen) {
+      window.addEventListener("keydown", handleEscapeKey, { capture: true });
+      return () =>
+        window.removeEventListener("keydown", handleEscapeKey, { capture: true });
+    }
+  }, [backupDialogOpen]);
 
   // Keyboard Listener
   useEffect(() => {
@@ -2839,43 +3559,66 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
     console.log("  - loadingMedia:", loadingMedia);
   }, [imageSrc, steamData, hasScreenshots, gameDescription, loadingMedia]);
 
+  useEffect(() => {
+    console.log("[DIALOG STATE] backupDialogOpen:", backupDialogOpen);
+    console.log("[DIALOG STATE] showExecutableManager:", showExecutableManager);
+    console.log("[DIALOG STATE] isDeleteDialogOpen:", isDeleteDialogOpen);
+  }, [backupDialogOpen, showExecutableManager, isDeleteDialogOpen]);
+
   return (
     <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-background text-primary">
-      <div
-        className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
-        style={{
-          backgroundImage: bgImage ? `url(${bgImage})` : "none",
-          backgroundColor: bgImage ? "transparent" : "#1e293b",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "blur(60px) saturate(150%)",
-        }}
-      />
-
-      <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#0e0e10] via-[#0e0e10]/70 to-transparent" />
-
-      <div
-        className={`absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
-          showMedia
-            ? "pointer-events-none translate-y-[-10%] scale-95 opacity-0"
-            : "translate-y-0 scale-100 opacity-100"
-        }`}
-      >
-        <div className="group relative">
-          <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-primary/40"></div>
-          {bgImage ? (
-            <img
-              src={bgImage}
-              alt={gameName}
-              className="max-h-[75vh] max-w-full rotate-2 rounded-2xl border-4 border-white/10 object-cover shadow-2xl transition-all duration-500 ease-out group-hover:rotate-0 group-hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-[60vh] w-[40vw] items-center justify-center rounded-2xl border-4 border-white/10 bg-muted">
-              <span className="text-2xl text-muted-foreground">{gameName}</span>
+      {hasHeroImage ? (
+        // New layout: Full-screen hero background
+        <>
+          <div
+            className="absolute inset-0 z-0 transition-opacity duration-1000"
+            style={{
+              backgroundImage: bgImage ? `url(${bgImage})` : "none",
+              backgroundColor: bgImage ? "transparent" : "#1e293b",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+          <div className="absolute inset-0 z-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
+        </>
+      ) : (
+        // Old layout: Blurred background + card-style image on the right
+        <>
+          <div
+            className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
+            style={{
+              backgroundImage: bgImage ? `url(${bgImage})` : "none",
+              backgroundColor: bgImage ? "transparent" : "#1e293b",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              filter: "blur(60px) saturate(150%)",
+            }}
+          />
+          <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#0e0e10] via-[#0e0e10]/70 to-transparent" />
+          <div
+            className={`absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
+              showMedia
+                ? "pointer-events-none translate-y-[-10%] scale-95 opacity-0"
+                : "translate-y-0 scale-100 opacity-100"
+            }`}
+          >
+            <div className="group relative">
+              <div className="absolute inset-0 -z-10 translate-y-10 scale-90 rounded-full bg-primary/20 blur-3xl transition-colors duration-500 group-hover:bg-primary/40"></div>
+              {bgImage ? (
+                <img
+                  src={bgImage}
+                  alt={gameName}
+                  className="max-h-[75vh] max-w-full rotate-2 rounded-2xl border-4 border-white/10 object-cover shadow-2xl transition-all duration-500 ease-out group-hover:rotate-0 group-hover:scale-105"
+                />
+              ) : (
+                <div className="flex h-[60vh] w-[40vw] items-center justify-center rounded-2xl border-4 border-white/10 bg-muted">
+                  <span className="text-2xl text-muted-foreground">{gameName}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
 
       <div
         className={`ease-[cubic-bezier(0.32,0.72,0,1)] relative z-20 h-full w-full transition-transform duration-500 ${
@@ -2956,33 +3699,84 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
               </div>
             )}
 
-            <div className="flex gap-4">
-              <button
-                onClick={handlePlayGame}
-                disabled={isLaunching || isRunning}
-                className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 ${
-                  selectedButton === "play"
-                    ? "scale-110 bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
-                    : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-primary hover:text-secondary"
+            {trainerExists && (
+              <div
+                className={`mb-6 flex items-center justify-between rounded-lg border p-3 backdrop-blur-sm transition-all duration-200 ${
+                  trainerToggleFocused
+                    ? "scale-105 border-primary bg-primary/20 shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                    : "border-border bg-card/50"
                 }`}
               >
-                {isLaunching ? (
-                  <>
-                    <Loader className="h-7 w-7 animate-spin" />
-                    <span>{t("bigPicture.launching")}</span>
-                  </>
-                ) : isRunning ? (
-                  <>
-                    <Play className="h-7 w-7 fill-current" />
-                    <span>{t("bigPicture.running")}</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-7 w-7 fill-current" />
-                    <span>{t("bigPicture.play")}</span>
-                  </>
-                )}
-              </button>
+                <div className="flex items-center gap-3">
+                  <Bolt className="h-5 w-5 text-primary" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-white">
+                      {t("gameScreen.launchWithTrainer")}
+                    </span>
+                    <span className="text-xs text-white/60">
+                      {t("gameScreen.launchWithTrainerDescription")}
+                    </span>
+                  </div>
+                </div>
+                <Switch
+                  checked={launchWithTrainerEnabled}
+                  onCheckedChange={enabled => {
+                    setLaunchWithTrainerEnabled(enabled);
+                    localStorage.setItem(
+                      `launch-with-trainer-${gameName}`,
+                      enabled.toString()
+                    );
+                    toast.success(
+                      enabled
+                        ? t("gameScreen.trainerEnabledToast")
+                        : t("gameScreen.trainerDisabledToast")
+                    );
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-4">
+              {executableExists ? (
+                <button
+                  onClick={handlePlayGame}
+                  disabled={isLaunching || isRunning}
+                  className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 ${
+                    selectedButton === "play"
+                      ? "scale-110 bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
+                      : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-primary hover:text-secondary"
+                  }`}
+                >
+                  {isLaunching ? (
+                    <>
+                      <Loader className="h-7 w-7 animate-spin" />
+                      <span>{t("bigPicture.launching")}</span>
+                    </>
+                  ) : isRunning ? (
+                    <>
+                      <StopCircle className="h-7 w-7" />
+                      <span>{t("bigPicture.running")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-7 w-7 fill-current" />
+                      <span>{t("bigPicture.play")}</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowBrowseExeWarning(true)}
+                  className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
+                    selectedButton === "play"
+                      ? "scale-110 bg-yellow-500 text-secondary shadow-yellow-500/50 ring-4 ring-yellow-500/50"
+                      : "bg-yellow-500/80 text-secondary shadow-black/30 hover:scale-105 hover:bg-yellow-500"
+                  }`}
+                >
+                  <FileSearch className="h-7 w-7" />
+                  <span>{t("library.setExecutable")}</span>
+                </button>
+              )}
 
               <button
                 onClick={handleOpenDirectory}
@@ -2993,6 +3787,20 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 }`}
               >
                 <FolderOpen className="h-6 w-6" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowManagementMenu(true);
+                  setSelectedMenuItem(0);
+                }}
+                className={`flex items-center gap-3 rounded-2xl border-2 px-8 py-5 text-xl font-bold backdrop-blur-sm transition-all duration-200 ${
+                  selectedButton === "manage"
+                    ? "scale-110 border-primary bg-primary/30 text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                    : "border-white/20 bg-white/10 text-secondary hover:scale-105 hover:border-white/40 hover:bg-white/20"
+                }`}
+              >
+                <Settings className="h-6 w-6" />
               </button>
             </div>
           </div>
@@ -3058,6 +3866,100 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         </div>
       </div>
 
+      {/* Management Menu Overlay */}
+      {showManagementMenu && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="w-[600px] rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl">
+            <h2 className="mb-6 text-3xl font-bold text-primary">
+              {t("bigPicture.gameManagement") || "Game Management"}
+            </h2>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setBackupDialogOpen(true);
+                  setShowManagementMenu(false);
+                }}
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                  selectedMenuItem === 0
+                    ? "bg-primary text-secondary shadow-lg"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                <FolderSync className="h-6 w-6" />
+                <span className="text-lg font-semibold">
+                  {t("gameScreen.backupSaves")}
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  window.electron.createGameShortcut(game).then(success => {
+                    if (success) toast.success(t("library.shortcutCreated"));
+                    else toast.error(t("library.shortcutError"));
+                  });
+                  setShowManagementMenu(false);
+                }}
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                  selectedMenuItem === 1
+                    ? "bg-primary text-secondary shadow-lg"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                <Monitor className="h-6 w-6" />
+                <span className="text-lg font-semibold">
+                  {t("library.createShortcut")}
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowExecutableManager(true);
+                  setShowManagementMenu(false);
+                }}
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                  selectedMenuItem === 2
+                    ? "bg-primary text-secondary shadow-lg"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                <Pencil className="h-6 w-6" />
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">
+                    {t("library.changeExecutable")}
+                  </span>
+                  {!executableExists && (
+                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  if (game.isCustom) {
+                    handleDeleteGame();
+                  } else {
+                    setIsDeleteDialogOpen(true);
+                  }
+                  setShowManagementMenu(false);
+                }}
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                  selectedMenuItem === 3
+                    ? "bg-red-500 text-white shadow-lg"
+                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                }`}
+              >
+                <Trash2 className="h-6 w-6" />
+                <span className="text-lg font-semibold">
+                  {game.isCustom
+                    ? t("library.removeGameFromLibrary")
+                    : t("library.deleteGame")}
+                </span>
+              </button>
+            </div>
+            <div className="mt-6 text-center text-sm text-muted-foreground">
+              {t("bigPicture.pressBackToClose") || "Press B to close"}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer Controls */}
       <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
         {!showMedia && !isLaunching && !isRunning && (
@@ -3092,6 +3994,285 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
           {showMedia ? t("bigPicture.upBack") : t("bigPicture.back")}
         </div>
       </div>
+
+      {/* Warning and Management Dialogs */}
+      {/* Simplified Backup Dialog for BigPicture */}
+      <AlertDialog open={backupDialogOpen} onOpenChange={setBackupDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <FolderSync className="h-5 w-5 text-primary" />
+              {t("gameScreen.backupSaves")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.backups.bigPictureMessage") ||
+                "Use UP/DOWN to navigate, A to select, B to cancel"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <button
+              className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
+                dialogButtonIndex === 0
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <Save className="h-6 w-6" />
+              <span className="text-lg font-semibold">
+                {t("library.backups.backupNow", { game: gameName })}
+              </span>
+            </button>
+            <button
+              className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
+                dialogButtonIndex === 1
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <RotateCcw className="h-6 w-6" />
+              <span className="text-lg font-semibold">
+                {t("library.backups.restoreLatest")}
+              </span>
+            </button>
+            <button
+              className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
+                dialogButtonIndex === 2
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <X className="h-6 w-6" />
+              <span className="text-lg font-semibold">{t("common.close")}</span>
+            </button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* VR Warning Dialog */}
+      <AlertDialog open={showVrWarning} onOpenChange={setShowVrWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("library.vrWarning.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.vrWarning.description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setShowVrWarning(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowVrWarning(false);
+                handlePlayGame(true);
+              }}
+            >
+              {t("library.vrWarning.confirm")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Online Fix Warning Dialog */}
+      <AlertDialog open={showOnlineFixWarning} onOpenChange={setShowOnlineFixWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("download.onlineFixWarningTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("download.onlineFixWarningDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              onClick={() => {
+                setShowOnlineFixWarning(false);
+                handlePlayGame(true);
+              }}
+            >
+              {t("common.ok")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Steam Not Running Dialog */}
+      <AlertDialog
+        open={showSteamNotRunningWarning}
+        onOpenChange={setShowSteamNotRunningWarning}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("library.steamNotRunning")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.steamNotRunningDescription") ||
+                "Steam needs to be running to play online-fix games. Please start Steam and try again."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button onClick={() => setShowSteamNotRunningWarning(false)}>
+              {t("common.ok")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Browse Executable Warning Dialog - BigPicture Style */}
+      <AlertDialog open={showBrowseExeWarning} onOpenChange={setShowBrowseExeWarning}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl">
+              <MousePointer className="h-6 w-6 text-primary" />
+              {t("bigPicture.mouseRequired") || "Mouse Navigation Required"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              {t("library.browseExecutableWarning") ||
+                "You will need to use your mouse to browse and select the game executable file. Controller input is not supported for file browsing."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-4 py-4">
+            <button
+              onClick={undefined}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 0
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <X className="h-6 w-6" />
+              <span>{t("common.cancel")}</span>
+            </button>
+            <button
+              onClick={undefined}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 1
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <FileSearch className="h-6 w-6" />
+              <span>{t("library.browseExecutable") || "Browse..."}</span>
+            </button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog - BigPicture Style */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl">
+              <AlertTriangle className="h-6 w-6 text-red-500" />
+              {t("library.deleteGameConfirm", { game: gameName })}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              {t("library.deleteGameDescription", { game: gameName })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-4 py-4">
+            <button
+              onClick={undefined}
+              disabled={isUninstalling}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 0
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              } ${isUninstalling ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <X className="h-6 w-6" />
+              <span>{t("common.cancel")}</span>
+            </button>
+            <button
+              onClick={undefined}
+              disabled={isUninstalling}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 1
+                  ? "scale-105 bg-red-500 text-white shadow-lg shadow-red-500/30 ring-4 ring-red-500/50"
+                  : "bg-red-500/80 text-white hover:bg-red-500"
+              } ${isUninstalling ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              {isUninstalling ? (
+                <>
+                  <Loader className="h-6 w-6 animate-spin" />
+                  <span>{t("library.deleting")}</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-6 w-6" />
+                  <span>{t("library.delete")}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Executable Selection Dialog - BigPicture Style */}
+      <AlertDialog open={showExecutableSelect} onOpenChange={setShowExecutableSelect}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl">
+              <FileSearch className="h-6 w-6 text-primary" />
+              {t("library.selectExecutable")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.selectExecutableDescription") ||
+                "Multiple executables found. Please select which one to launch."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-4">
+            {availableExecutables.map((exe, index) => (
+              <button
+                key={index}
+                onClick={undefined}
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
+                  dialogButtonIndex === index
+                    ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                <FileSearch className="h-6 w-6" />
+                <div className="flex-1">
+                  <div className="text-lg font-semibold">{exe.split(/[/\\]/).pop()}</div>
+                  <div className="truncate text-sm text-muted-foreground">{exe}</div>
+                </div>
+                {index === 0 && (
+                  <span className="shrink-0 rounded bg-primary/20 px-2 py-1 text-xs font-medium">
+                    {t("library.executableManager.primary")}
+                  </span>
+                )}
+              </button>
+            ))}
+            <button
+              onClick={undefined}
+              className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
+                dialogButtonIndex === availableExecutables.length
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <X className="h-6 w-6" />
+              <span className="text-lg font-semibold">{t("common.cancel")}</span>
+            </button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Executable Manager Dialog */}
+      <ExecutableManagerDialog
+        open={showExecutableManager}
+        onClose={() => setShowExecutableManager(false)}
+        gameName={gameName}
+        isCustom={game.isCustom}
+        t={t}
+        bigPictureMode={true}
+        onSave={async executables => {
+          // Update executable existence check
+          if (executables && executables.length > 0) {
+            const exists = await window.electron.checkFileExists(executables[0]);
+            setExecutableExists(exists);
+          }
+        }}
+      />
     </div>
   );
 };
@@ -3997,6 +5178,7 @@ export default function BigPicture() {
 
   const [displayedCount, setDisplayedCount] = useState(30);
   const loaderRef = useRef(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const GAMES_PER_LOAD = 30;
 
   const navigate = useNavigate();
@@ -4355,6 +5537,9 @@ export default function BigPicture() {
     // Reset any active sidebar state
     setIsHomeSidebarActive(false);
     setHomeSidebarIndex(-1);
+
+    // Trigger games refresh to update library after potential deletion
+    setRefreshTrigger(prev => prev + 1);
   }, []);
 
   useEffect(() => {
@@ -4527,7 +5712,7 @@ export default function BigPicture() {
       } catch (error) {}
     };
     fetchGames();
-  }, []);
+  }, [refreshTrigger]);
 
   useEffect(() => {
     const fetchStore = async () => {

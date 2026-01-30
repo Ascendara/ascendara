@@ -20,6 +20,7 @@ import {
   Loader2,
   RotateCcw,
   Save,
+  X,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -37,7 +38,7 @@ import {
   deleteBackup,
 } from "@/services/firebaseService";
 
-const GamesBackupDialog = ({ game, open, onOpenChange }) => {
+const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false }) => {
   const [activeScreen, setActiveScreen] = useState("options"); // options, backup, restore, restoreConfirm, backupsList
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -60,6 +61,11 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
   const [selectedBackup, setSelectedBackup] = useState(null);
   const [isUploadingToCloud, setIsUploadingToCloud] = useState(false);
   const [restoringCloudBackup, setRestoringCloudBackup] = useState(null);
+
+  // BigPicture mode controller navigation
+  const [selectedButtonIndex, setSelectedButtonIndex] = useState(0);
+  const [selectedBackupIndex, setSelectedBackupIndex] = useState(0);
+
   const { t } = useLanguage();
   const { settings } = useSettings();
   const { user, userData } = useAuth();
@@ -77,6 +83,8 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
       setRestoreFailed(false);
       setBackupSuccess(false);
       setRestoreSuccess(false);
+      setSelectedButtonIndex(0);
+      setSelectedBackupIndex(0);
 
       (async () => {
         try {
@@ -91,6 +99,177 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
       })();
     }
   }, [open, game]);
+
+  // Controller input handling for BigPicture mode
+  useEffect(() => {
+    if (!bigPictureMode || !open) return;
+
+    const getGamepadInput = () => {
+      const gamepads = navigator.getGamepads();
+      const gp = gamepads[0] || gamepads[1] || gamepads[2] || gamepads[3];
+      if (!gp) return null;
+
+      return {
+        up: gp.buttons[12]?.pressed || gp.axes[1] < -0.5,
+        down: gp.buttons[13]?.pressed || gp.axes[1] > 0.5,
+        left: gp.buttons[14]?.pressed || gp.axes[0] < -0.5,
+        right: gp.buttons[15]?.pressed || gp.axes[0] > 0.5,
+        a: gp.buttons[0]?.pressed,
+        b: gp.buttons[1]?.pressed,
+      };
+    };
+
+    const handleInput = action => {
+      if (activeScreen === "options") {
+        handleOptionsScreenInput(action);
+      } else if (activeScreen === "backupsList") {
+        handleBackupsListInput(action);
+      } else if (activeScreen === "restoreConfirm") {
+        handleRestoreConfirmInput(action);
+      } else if (activeScreen === "backup" || activeScreen === "restore") {
+        handleProgressScreenInput(action);
+      }
+    };
+
+    const handleOptionsScreenInput = action => {
+      const buttonCount = 4; // Backup Now, Restore, View Backups, Close
+
+      if (action === "DOWN") {
+        setSelectedButtonIndex(prev => (prev + 1) % buttonCount);
+      } else if (action === "UP") {
+        setSelectedButtonIndex(prev => (prev - 1 + buttonCount) % buttonCount);
+      } else if (action === "CONFIRM") {
+        if (selectedButtonIndex === 0) {
+          handleBackupGame(false);
+        } else if (selectedButtonIndex === 1) {
+          showRestoreConfirmation();
+        } else if (selectedButtonIndex === 2) {
+          loadBackupsList();
+          setActiveScreen("backupsList");
+        } else if (selectedButtonIndex === 3) {
+          onOpenChange(false);
+        }
+      } else if (action === "BACK") {
+        onOpenChange(false);
+      }
+    };
+
+    const handleBackupsListInput = action => {
+      const allBackups = [...backupsList, ...cloudBackupsList];
+
+      if (action === "DOWN") {
+        setSelectedBackupIndex(prev => Math.min(prev + 1, allBackups.length));
+      } else if (action === "UP") {
+        setSelectedBackupIndex(prev => Math.max(0, prev - 1));
+      } else if (action === "CONFIRM") {
+        if (selectedBackupIndex < allBackups.length) {
+          setSelectedBackup(allBackups[selectedBackupIndex]);
+          showRestoreConfirmation();
+        } else {
+          setActiveScreen("options");
+        }
+      } else if (action === "BACK") {
+        setActiveScreen("options");
+        setSelectedButtonIndex(0);
+      }
+    };
+
+    const handleRestoreConfirmInput = action => {
+      if (action === "LEFT") {
+        setSelectedButtonIndex(0); // Cancel
+      } else if (action === "RIGHT") {
+        setSelectedButtonIndex(1); // Confirm
+      } else if (action === "CONFIRM") {
+        if (selectedButtonIndex === 0) {
+          setActiveScreen("options");
+          setSelectedButtonIndex(0);
+        } else {
+          handleRestoreBackup(selectedBackup);
+        }
+      } else if (action === "BACK") {
+        setActiveScreen("options");
+        setSelectedButtonIndex(0);
+      }
+    };
+
+    const handleProgressScreenInput = action => {
+      if (action === "CONFIRM" || action === "BACK") {
+        if (backupSuccess || restoreSuccess || backupFailed || restoreFailed) {
+          setActiveScreen("options");
+          setSelectedButtonIndex(0);
+        }
+      }
+    };
+
+    const handleKeyDown = e => {
+      if (e.repeat) return;
+      const map = {
+        ArrowDown: "DOWN",
+        ArrowUp: "UP",
+        ArrowLeft: "LEFT",
+        ArrowRight: "RIGHT",
+        Enter: "CONFIRM",
+        Escape: "BACK",
+      };
+      if (map[e.key]) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleInput(map[e.key]);
+      }
+    };
+
+    let lastInputTime = 0;
+    let rAF;
+    const loop = () => {
+      const gp = getGamepadInput();
+      if (gp) {
+        const now = Date.now();
+        if (now - lastInputTime > 150) {
+          if (gp.down) {
+            handleInput("DOWN");
+            lastInputTime = now;
+          } else if (gp.up) {
+            handleInput("UP");
+            lastInputTime = now;
+          } else if (gp.left) {
+            handleInput("LEFT");
+            lastInputTime = now;
+          } else if (gp.right) {
+            handleInput("RIGHT");
+            lastInputTime = now;
+          } else if (gp.a) {
+            handleInput("CONFIRM");
+            lastInputTime = now;
+          } else if (gp.b) {
+            handleInput("BACK");
+            lastInputTime = now;
+          }
+        }
+      }
+      rAF = requestAnimationFrame(loop);
+    };
+
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    loop();
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
+      cancelAnimationFrame(rAF);
+    };
+  }, [
+    bigPictureMode,
+    open,
+    activeScreen,
+    selectedButtonIndex,
+    selectedBackupIndex,
+    backupsList,
+    cloudBackupsList,
+    selectedBackup,
+    backupSuccess,
+    restoreSuccess,
+    backupFailed,
+    restoreFailed,
+  ]);
 
   const handleToggleAutoBackup = async newBackupState => {
     try {
@@ -514,11 +693,15 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
   const renderOptionsScreen = () => (
     <div className="space-y-6 py-4">
       {/* Main Action - Backup Now */}
-      <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 transition-all hover:border-primary/50 hover:shadow-lg">
+      <Card
+        className={`border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 transition-all ${bigPictureMode && selectedButtonIndex === 0 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/50 hover:shadow-lg"}`}
+      >
         <CardContent className="p-6">
           <Button
             className="flex h-14 w-full items-center justify-center gap-3 bg-gradient-to-r from-primary/90 to-primary text-lg font-semibold text-secondary hover:from-primary hover:to-primary/90"
-            onClick={() => handleBackupGame(autoCloudBackupEnabled)}
+            onClick={
+              bigPictureMode ? undefined : () => handleBackupGame(autoCloudBackupEnabled)
+            }
             disabled={isBackingUp || isUploadingToCloud}
           >
             {autoCloudBackupEnabled && user ? (
@@ -533,60 +716,114 @@ const GamesBackupDialog = ({ game, open, onOpenChange }) => {
         </CardContent>
       </Card>
 
-      {/* Quick Actions Grid */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
-          <CardContent className="p-5">
-            <Button
-              className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
-              variant="outline"
-              onClick={showRestoreConfirmation}
-              disabled={!settings.ludusavi.enabled}
-            >
-              <div className="rounded-full bg-primary/10 p-3">
-                <RotateCcw className="h-6 w-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">
-                {t("library.backups.restoreLatest")}
-              </span>
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Quick Actions - Simplified for BigPicture */}
+      {bigPictureMode ? (
+        <div className="space-y-4">
+          <Card
+            className={`border-muted/60 transition-all ${selectedButtonIndex === 1 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/40 hover:shadow-md"}`}
+          >
+            <CardContent className="p-5">
+              <Button
+                className="flex h-full w-full items-center justify-center gap-3 py-4"
+                variant="outline"
+                onClick={undefined}
+                disabled={!settings.ludusavi.enabled}
+              >
+                <RotateCcw className="h-5 w-5 text-primary" />
+                <span className="text-base font-medium">
+                  {t("library.backups.restoreLatest")}
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
 
-        <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
-          <CardContent className="p-5">
-            <Button
-              className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
-              variant="outline"
-              onClick={handleListBackups}
-            >
-              <div className="rounded-full bg-primary/10 p-3">
-                <ListOrdered className="h-6 w-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">
-                {t("library.backups.listBackups")}
-              </span>
-            </Button>
-          </CardContent>
-        </Card>
+          <Card
+            className={`border-muted/60 transition-all ${selectedButtonIndex === 2 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/40 hover:shadow-md"}`}
+          >
+            <CardContent className="p-5">
+              <Button
+                className="flex h-full w-full items-center justify-center gap-3 py-4"
+                variant="outline"
+                onClick={undefined}
+              >
+                <ListOrdered className="h-5 w-5 text-primary" />
+                <span className="text-base font-medium">
+                  {t("library.backups.listBackups")}
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
 
-        <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
-          <CardContent className="p-5">
-            <Button
-              className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
-              variant="outline"
-              onClick={openBackupFolder}
-            >
-              <div className="rounded-full bg-primary/10 p-3">
-                <FolderOpen className="h-6 w-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">
-                {t("library.backups.openBackupFolder")}
-              </span>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          <Card
+            className={`border-muted/60 transition-all ${selectedButtonIndex === 3 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/40 hover:shadow-md"}`}
+          >
+            <CardContent className="p-5">
+              <Button
+                className="flex h-full w-full items-center justify-center gap-3 py-4"
+                variant="outline"
+                onClick={undefined}
+              >
+                <X className="h-5 w-5 text-primary" />
+                <span className="text-base font-medium">{t("common.close")}</span>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
+            <CardContent className="p-5">
+              <Button
+                className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
+                variant="outline"
+                onClick={showRestoreConfirmation}
+                disabled={!settings.ludusavi.enabled}
+              >
+                <div className="rounded-full bg-primary/10 p-3">
+                  <RotateCcw className="h-6 w-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium">
+                  {t("library.backups.restoreLatest")}
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
+            <CardContent className="p-5">
+              <Button
+                className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
+                variant="outline"
+                onClick={handleListBackups}
+              >
+                <div className="rounded-full bg-primary/10 p-3">
+                  <ListOrdered className="h-6 w-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium">
+                  {t("library.backups.listBackups")}
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
+            <CardContent className="p-5">
+              <Button
+                className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
+                variant="outline"
+                onClick={openBackupFolder}
+              >
+                <div className="rounded-full bg-primary/10 p-3">
+                  <FolderOpen className="h-6 w-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium">
+                  {t("library.backups.openBackupFolder")}
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Separator className="my-4" />
 
