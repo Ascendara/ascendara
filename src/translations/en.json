@@ -133,6 +133,23 @@
       "understand": "I Understand the Issues, Continue",
       "update": "Update Now"
     },
+    "changelog": {
+      "additions": "Additions",
+      "close": "Close",
+      "contributors": "Contributors",
+      "englishOnly": "Changelogs are currently available in English only",
+      "failedToLoad": "Failed to load changelog",
+      "fixes": "Fixes",
+      "fullChangelog": "Full Changelog",
+      "improvements": "Improvements",
+      "loading": "Loading changelog...",
+      "next": "Next",
+      "previous": "Previous",
+      "removals": "Removals",
+      "retry": "Retry",
+      "title": "What's New in Ascendara",
+      "viewAllUpdates": "View All Updates"
+    },
     "crashScreen": {
       "checkConnection": "Check your internet connection",
       "clearCache": "Clear Ascendara's app cache and cookies",

@@ -8,6 +8,7 @@ import WatcherWarnDialog from "@/components/WatcherWarnDialog";
 import BrokenVersionDialog from "@/components/BrokenVersionDialog";
 import FirstIndexDialog from "@/components/FirstIndexDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
+import ChangelogDialog from "@/components/ChangelogDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
@@ -816,6 +817,7 @@ const AppRoutes = () => {
 
   const [welcomeData, setWelcomeData] = useState(null);
   const [showWatcherWarn, setShowWatcherWarn] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -929,13 +931,9 @@ const AppRoutes = () => {
             setIsUpdating(false);
             setIsLoading(false);
             await checkAndSetWelcomeStatus();
+            setShowChangelog(true);
             toast(t("app.toasts.justUpdated"), {
               description: t("app.toasts.justUpdatedDesc", { version: __APP_VERSION__ }),
-              action: {
-                label: t("app.toasts.viewChangelog"),
-                onClick: () =>
-                  window.electron.openURL("https://ascendara.app/changelog?individual"),
-              },
               duration: 10000,
               id: "update-completed",
             });
@@ -1277,6 +1275,11 @@ const AppRoutes = () => {
         <FirstIndexDialog onClose={() => setShowFirstIndexDialog(false)} />
       )}
       <WatcherWarnDialog open={showWatcherWarn} onOpenChange={setShowWatcherWarn} />
+      <ChangelogDialog
+        open={showChangelog}
+        onOpenChange={setShowChangelog}
+        currentVersion={__APP_VERSION__}
+      />
     </>
   );
 };
