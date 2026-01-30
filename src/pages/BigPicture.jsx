@@ -3212,11 +3212,11 @@ export default function BigPicture() {
           } else if (menuIndex === 4) {
             setShowExitBigPictureDialog(true);
           } else if (menuIndex === 5) {
-            // Close Ascendara completely
-            if (window.electron && window.electron.closeApp) {
-              window.electron.closeApp();
+            // Close Ascendara completely (Force Quit)
+            if (window.electron && window.electron.closeWindow) {
+              window.electron.closeWindow(true);
             } else {
-              window.close();
+              window.close(); // Fallback if electron not available
             }
           }
         }

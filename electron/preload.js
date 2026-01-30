@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   minimizeWindow: () => ipcRenderer.invoke("minimize-window"),
   maximizeWindow: () => ipcRenderer.invoke("maximize-window"),
-  closeWindow: () => ipcRenderer.invoke("close-window"),
+  closeWindow: forceQuit => ipcRenderer.invoke("close-window", forceQuit),
   toggleFullscreen: () => ipcRenderer.invoke("toggle-fullscreen"),
   maximizeWindow: () => ipcRenderer.invoke("maximize-window"),
   isWindowMaximized: () => ipcRenderer.invoke("is-window-maximized"),
