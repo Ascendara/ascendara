@@ -133,6 +133,18 @@
       "understand": "Je comprends les problèmes, continuez",
       "update": "Mettre à jour maintenant"
     },
+    "changelog": {
+      "additions": "Ajouts",
+      "close": "Fermer",
+      "failedToLoad": "Échec du chargement du journal des modifications",
+      "fixes": "Correctifs",
+      "fullChangelog": "Journal des modifications complet",
+      "improvements": "Améliorations",
+      "loading": "Chargement du journal des modifications...",
+      "removals": "Déménagements",
+      "retry": "Réessayer",
+      "title": "Quoi de neuf à Ascendara"
+    },
     "crashScreen": {
       "checkConnection": "Vérifiez votre connexion Internet",
       "clearCache": "Effacer le cache et les cookies de l'application Ascendara",
@@ -190,8 +202,7 @@
       "outOfDateDesc": "Veuillez télécharger la dernière version sur le site officiel",
       "updateNow": "Mettre à jour maintenant",
       "updateReady": "Ascendara est prêt à se mettre à jour",
-      "updateReadyDesc": "Ascendara a téléchargé la mise à jour et est prêt à l'installer et à redémarrer maintenant",
-      "viewChangelog": "Afficher le journal des modifications"
+      "updateReadyDesc": "Ascendara a téléchargé la mise à jour et est prêt à l'installer et à redémarrer maintenant"
     },
     "torrentWarning": "LE TORRENT EST ACTIVÉ - UTILISER LE VPN",
     "watchdog": {
@@ -652,7 +663,6 @@
       "verifiedThankYou": "Merci de faire partie d'Ascendara !",
       "verifiedThankYouSub": "Vos contributions contribuent à rendre cela possible",
       "verifiedUser": "Utilisateur vérifié",
-      "verifyCheckoutError": "Échec de la vérification du paiement. Veuillez contacter l'assistance si vous avez été facturé.",
       "verifyCommand": "Commande de vérification",
       "verifyStep1": "Rejoignez le serveur Discord",
       "verifyStep2": "Exécutez la commande suivante dans le canal des commandes :",
@@ -713,6 +723,8 @@
     "closeAscendara": "FERMER ASCENDARA",
     "cloudSaves": "Sauvegardes dans le cloud",
     "confirm": "Confirmer",
+    "confirmKillDownload": "Tuer le téléchargement ?",
+    "confirmKillDownloadMessage": "Êtes-vous sûr de vouloir arrêter et supprimer {{game}} ? Cela supprimera tous les fichiers téléchargés.",
     "controllerDetected": "Contrôleur détecté",
     "controllerDetectedMessage": "Ascendara a détecté un contrôleur connecté à votre appareil. Souhaitez-vous passer en mode Big Picture pour une meilleure expérience de contrôleur ?",
     "controllerType": "Type de contrôleur",
@@ -720,8 +732,12 @@
     "controllerTypePlayStation": "PlayStation",
     "controllerTypeXbox": "Xbox",
     "del": "Del",
+    "deleting": "Suppression...",
     "download": "TÉLÉCHARGER",
+    "downloadError": "Échec du démarrage du téléchargement",
+    "downloadStarted": "Le téléchargement a démarré avec succès",
     "downloading": "Téléchargement...",
+    "downloads": "TÉLÉCHARGEMENTS",
     "enterBigPicture": "Entrez dans une grande image",
     "exit": "SORTIE",
     "exitBigPicture": "QUITTER LA GRANDE IMAGE",
@@ -731,11 +747,14 @@
     "exitToDownloadMessage": "Pour télécharger des jeux, vous devez quitter le mode Big Picture et utiliser l'interface Ascendara standard. Souhaitez-vous sortir maintenant ?",
     "extracting": "Extraction...",
     "failedToFetchDescription": "Échec de la récupération de la description.",
+    "gameManagement": "GESTION DU JEU",
     "home": "MAISON",
     "includesDlc": "Inclut le DLC",
+    "installed": "INSTALLÉ",
     "keyboardLayout": "Disposition du clavier",
     "keyboardLayoutAzerty": "AZERTY",
     "keyboardLayoutQwerty": "QWERTY",
+    "killDownload": "Tuer Télécharger",
     "lastPlayed": "DERNIÈRE JOUÉE",
     "launching": "LANCEMENT...",
     "library": "BIBLIOTHÈQUE",
@@ -744,9 +763,9 @@
     "media": "MÉDIAS",
     "mediaInfo": "Informations médias",
     "menu": "MENU",
-    "menuPressB": "Appuyez sur B pour fermer",
     "modManager": "Gestionnaire de modules",
     "mouseRequired": "Souris requise",
+    "navigate": "Naviguer",
     "noDescriptionAvailable": "Aucune description disponible",
     "noGameAvailable": "Aucun jeu disponible",
     "noGameFound": "Aucun jeu trouvé",
@@ -756,7 +775,7 @@
     "play": "JOUER",
     "playLater": "Jouer plus tard",
     "played": "joué",
-    "pressAModify": "Appuyez sur A pour modifier",
+    "queueDownloads": "Téléchargements en file d'attente",
     "readyToDownload": "Prêt à télécharger",
     "remoteDownloads": "Téléchargements à distance",
     "resultsFor": "résultat pour",
@@ -768,11 +787,17 @@
     "searchPlaceholder": "Recherche...",
     "seeMore": "Voir plus",
     "select": "SÉLECTIONNER",
+    "selectProvider": "Sélectionnez le fournisseur de téléchargement",
+    "selectProviderMessage": "Choisissez le fournisseur depuis lequel vous souhaitez télécharger {{game}} :",
     "settings": "PARAMÈTRES",
     "space": "Espace",
+    "startDownload": "COMMENCER LE TÉLÉCHARGEMENT",
+    "toConfirm": "pour confirmer",
     "trainer": "Entraîneur",
     "unableToLoadCatalog": "Impossible de charger le catalogue",
     "upBack": "HAUT / RETOUR",
+    "update": "MISE À JOUR",
+    "useArrowsToSelect": "Utilisez les flèches pour sélectionner",
     "verifying": "Vérification...",
     "viewDetails": "VOIR LES DÉTAILS"
   },
@@ -780,6 +805,7 @@
     "action_cannot_be_undone": "Cette action ne peut pas être annulée.",
     "ascend": "Monter",
     "back": "Dos",
+    "bigpicture": "Vue d'ensemble",
     "cancel": "Annuler",
     "close": "Fermer",
     "delete": "Supprimer",
@@ -935,7 +961,7 @@
       "title": "Téléchargement avec Ascendara"
     },
     "noGameInfoAvailable": "Configurez Ascendara Xtra dans les Préférences pour voir plus d'informations sur ce jeu.",
-    "noReviewsExplanation": "Ce jeu n'a pas de critiques professionnelles disponibles sur OpenCritic. Cela peut être dû au fait qu'il s'agit d'une nouvelle version, d'un titre indépendant ou qu'il n'a tout simplement pas encore été évalué.",
+    "noReviewsExplanation": "Ce jeu ne dispose d'aucune critique professionnelle disponible sur OpenCritic. Cela peut être dû au fait qu'il s'agit d'une nouvelle version, d'un titre indépendant ou qu'il n'a tout simplement pas encore été évalué.",
     "notExactMatch": "Le nom du jeu ne correspondait pas exactement. Signalez le jeu si nécessaire.",
     "online": "EN LIGNE",
     "onlineFixWarningDescription": "Ce jeu est livré avec Online-Fix installé, lorsque vous le lancez, vous verrez une invite vous indiquant qu'il a été créé par l'équipe Online-Fix. Ceci est normal et ne devrait s'afficher qu'une seule fois pour chaque jeu avec.",
@@ -957,6 +983,7 @@
       "startNow": "Commencez maintenant",
       "title": "Téléchargement en cours"
     },
+    "queueDownloads": "Téléchargements en file d'attente",
     "ratingTooltip": "Ce jeu est noté {{rating}} étoiles sur 5 par d'autres sur Ascendara. Lisez les commentaires sur ce jeu sur le serveur Discord.",
     "readReviews": "Lire les avis",
     "refreshNow": "Actualiser maintenant",
@@ -1043,7 +1070,7 @@
     },
     "viewCriticReviews": "Voir les avis des critiques",
     "viewOnOpenCritic": "Voir sur OpenCritic",
-    "yourPC": "Votre ordinateur"
+    "yourPC": "Votre PC"
   },
   "downloads": {
     "actions": {
@@ -1051,7 +1078,7 @@
       "killDownload": "Tuer Télécharger",
       "killDownloadDescription": "Cela arrêtera définitivement le téléchargement et supprimera tous les fichiers téléchargés. Cette action ne peut pas être annulée.",
       "killDownloadTitle": "Arrêter le téléchargement pour {{gameName}} ?",
-      "legacyGameVerification": "La vérification des fichiers n'est disponible que pour les jeux téléchargés après la version 8.1.2 d'Ascendara.",
+      "legacyGameVerification": "La vérification des fichiers n'est disponible que pour les jeux téléchargés après Ascendara version 8.1.2.",
       "openFolder": "Ouvrir le dossier",
       "pauseDownload": "Suspendre le téléchargement",
       "resumeDownload": "Reprendre le téléchargement",
@@ -1074,6 +1101,7 @@
     "downloadError": "Erreur de téléchargement",
     "downloading": "Téléchargement",
     "downloadsInProgress": "{{count}} téléchargement en cours",
+    "error": "Erreur",
     "errorReported": "Problème signalé avec succès",
     "errorReportedDescription": "Merci d'avoir contribué à l'amélioration d'Ascendara. L'équipe de développeurs d'Ascendara étudiera ce problème.",
     "errors": {
@@ -1083,10 +1111,11 @@
     "extracting": "Extraction des fichiers du jeu...",
     "extractingDescription": "L'extraction des fichiers du jeu peut prendre jusqu'à 30 minutes selon la taille du fichier.",
     "firstTimeDownload": {
-      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton « Arrêter le téléchargement ».",
+      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton \"Arrêter le téléchargement\".",
       "title": "Téléchargement sur Ascendara",
       "understand": "Je comprends"
     },
+    "kill": "Tuer Télécharger",
     "killSuccess": "Téléchargement supprimé et fichiers supprimés",
     "largeFileNotice": "Ce fichier est plus volumineux que les autres et prend plus de temps à extraire...",
     "limitedTo": "Limité à",
@@ -1094,11 +1123,17 @@
     "noDownloadsMessage": "Vous ne téléchargez rien pour le moment, démarrez un téléchargement pour suivre sa progression ici.",
     "noFilesError": "Le téléchargeur n'a trouvé aucun fichier à télécharger. Cela signifie très probablement que le fichier a été supprimé de la source.",
     "noSpaceLeftError": "Il ne reste plus d'espace sur l'appareil. Veuillez libérer de l'espace disque pour continuer le téléchargement.",
+    "openFolder": "Ouvrir le dossier",
+    "pause": "Pause",
     "pauseSuccess": "Téléchargement interrompu avec succès",
+    "paused": "En pause",
+    "pausing": "En pause...",
+    "pending": "En attente",
     "preparingExtraction": "Préparation de l'extraction...",
     "queuedCount": "{{count}} en file d'attente",
     "queuedDownloadStarted": "Démarrage du téléchargement en file d'attente : {{name}}",
     "queuedDownloads": "Téléchargements en file d'attente",
+    "resume": "CV",
     "resumeError": "Échec de la reprise du téléchargement",
     "resumeErrorDescription": "Impossible de reprendre le téléchargement. Le lien de téléchargement a peut-être expiré ou les données mises en cache sont manquantes.",
     "resumeSuccess": "Téléchargement repris",
@@ -1109,6 +1144,7 @@
     "startingSoon": "Bientôt...",
     "stopped": "Téléchargement arrêté",
     "stoppedDescription": "Le téléchargement a été arrêté. Cliquez sur Reprendre pour continuer là où il s'est arrêté.",
+    "unknownError": "Une erreur inconnue s'est produite",
     "updating": "Mise à jour du jeu...",
     "verificationFailed": "Les fichiers n'ont pas pu être vérifiés",
     "verificationFailed1": "{{numFailed}} fichier n'a pas pu être vérifié",
@@ -1157,6 +1193,7 @@
     "backToLibrary": "Retour à la bibliothèque",
     "backupSaves": "Sauvegardes",
     "browseMods": "Parcourir les modules",
+    "clickToToggleLogo": "Cliquez pour basculer entre le logo et le texte",
     "cloudLibraryPromo": "Bibliothèque cloud",
     "cloudLibraryPromoDesc": "Synchronisez vos jeux sur tous les appareils avec Ascend",
     "copyTrackName": "Copier le nom de la piste",
@@ -1278,7 +1315,7 @@
   "home": {
     "actionGames": "Jeux d'action",
     "footer": {
-      "description": "Ascendara est construit et entretenu par un seul développeur dans le cadre d'un projet passionné. Votre soutien permet à Ascendara de rester gratuit, sans publicité et en constante amélioration pour tous.",
+      "description": "Ascendara est construit et entretenu par un seul développeur dans le cadre d'un projet passionné. Votre soutien finance les serveurs Ascendaras, maintient l'application sans publicité et motive l'amélioration continue pour tout le monde.",
       "donate": "Soutenir le développement",
       "github": "Voir sur GitHub",
       "madeWith": "Réalisé avec ❤️ par Santiago",
@@ -1329,6 +1366,7 @@
       "backupSuccess": "Sauvegarde réussie",
       "backupSuccessDesc": "Sauvegarde réussie des données pour {{game}}",
       "backupsList": "Liste des sauvegardes",
+      "bigPictureMessage": "Sauvegardez ou restaurez les données enregistrées pour ce jeu. Pour une gestion plus avancée des sauvegardes, quittez BigPicture et utilisez l'écran de la bibliothèque.",
       "cloudBackupsDisabledDesc": "Les sauvegardes ne seront stockées que localement",
       "cloudBackupsDisabledToast": "Sauvegardes cloud désactivées",
       "cloudBackupsEnabledDesc": "Les sauvegardes seront automatiquement téléchargées sur le cloud",
@@ -1367,6 +1405,7 @@
       "waitingBackup": "Veuillez patienter pendant la sauvegarde de vos données de sauvegarde...",
       "waitingRestore": "Veuillez patienter pendant la restauration de vos données de sauvegarde..."
     },
+    "browseExecutableWarning": "Vous devrez utiliser votre souris pour parcourir et sélectionner le fichier exécutable du jeu. L'entrée du contrôleur n'est pas prise en charge pour la navigation dans les fichiers.",
     "calculatingSize": "Calculateur...",
     "cannotRunDev": "Impossible d'exécuter des jeux en mode développeur",
     "cannotVerifyFiles": "Impossible de vérifier les fichiers du jeu",
@@ -1399,10 +1438,12 @@
     "confirmRemoveFolderTitle": "Supprimer le dossier ?",
     "coverSearchError": "Erreur lors de la recherche d'une image",
     "createShortcut": "Créer un raccourci sur le bureau",
-    "delete": "Supprimer {{game}}",
+    "delete": "Supprimer",
     "deleteConfirmMessage": "Êtes-vous sûr de vouloir supprimer {{game}} de votre bibliothèque ? Cela supprimera le jeu de votre bibliothèque Ascendara et supprimera tous les fichiers associés. Cette action ne peut pas être annulée.",
     "deleteFolder": "Supprimer le dossier",
     "deleteGame": "Supprimer le jeu",
+    "deleteGameConfirm": "Supprimer {{game}} ?",
+    "deleteGameDescription": "Cela supprimera définitivement {{game}} de votre bibliothèque et supprimera tous les fichiers associés. Cette action ne peut pas être annulée.",
     "deleting": "Suppression...",
     "dragGamesHere": "Faites glisser les jeux ici",
     "editCoverImage": "Modifier l'image de couverture",
@@ -1414,6 +1455,7 @@
     "executableManager": {
       "addExecutable": "Ajouter un exécutable",
       "atLeastOne": "Au moins un exécutable est requis",
+      "bigPictureWarning": "Vous devrez utiliser votre souris pour ajouter des exécutables en mode Big Picture",
       "change": "Modifier l'exécutable",
       "description": "Gérez les fichiers exécutables de ce jeu. L'exécutable principal sera lancé lorsque vous cliquerez sur Jouer.",
       "exeLocationHint": "Vous ne trouvez pas l'exécutable ? Il peut se trouver dans un sous-dossier tel que « bin », « x64 », « x86 » ou « Binaries ».",
@@ -1846,8 +1888,6 @@
       "shutdown": "Fermer",
       "sleep": "Dormir"
     },
-    "bigPictureKeyboard": "Disposition du clavier à grande image",
-    "bigPictureKeyboardDescription": "Choisissez la disposition du clavier pour le clavier virtuel du mode Big Picture",
     "bigPictureSettings": "Mode grande image",
     "browsePublicThemes": "Parcourir les thèmes de la communauté",
     "checkConfig": "Vérifier la configuration",
@@ -1971,7 +2011,7 @@
     "matureContentDescription": "Autorisez les jeux avec des thèmes pour adultes à apparaître dans les résultats de recherche.",
     "noAdditionalLocations": "Pas d'emplacements supplémentaires pour l'instant...",
     "noControllerDetected": "Aucun contrôleur détecté",
-    "noControllerDetectedDescription": "Connectez un contrôleur pour utiliser le mode Big Picture",
+    "noControllerDetectedDescription": "Connectez un contrôleur et Ascendara le détectera automatiquement",
     "noLudusaviTool": "Le side-car Ludusavi est requis",
     "noLudusaviToolDesc": "Ludusavi est requis pour utiliser la fonction de sauvegarde/restauration sur Ascendara. En cliquant sur Continuer, Ludusavi sera automatiquement installé.",
     "noPublicThemes": "Aucun thème communautaire disponible pour l'instant.",
@@ -2035,7 +2075,7 @@
     "singleStream": "Téléchargement d'un seul flux",
     "singleStreamDescription": "Utilisez une seule connexion pour les téléchargements. Plus stable pour les fichiers volumineux mais peut être plus lent.",
     "smoothTransitions": "Transitions fluides",
-    "smoothTransitionsDescription": "Le passage d’une page à l’autre dans l’application présente une animation fluide pour le rendre plus naturel.",
+    "smoothTransitionsDescription": "Le basculement entre les pages de l'application présente une animation fluide pour le rendre plus naturel.",
     "supportCodeDesc": "Entrez votre code d'assistance à 6 chiffres ici pour télécharger automatiquement les journaux. Besoin d'aide ?",
     "supportDesc": "Utilisez votre code d'assistance pour vous connecter avec l'équipe d'assistance d'Ascendara. Les journaux sont téléchargés automatiquement.",
     "supportError": "Échec du téléchargement des journaux. Veuillez réessayer.",
@@ -2080,7 +2120,7 @@
       "usernameError": "Échec de l'enregistrement du nom d'utilisateur"
     },
     "viewComponentsPage": "Afficher la page des composants",
-    "warningDescription": "Ascendara est conçu comme une plateforme de test pour les jeux vidéo, permettant aux utilisateurs d'évaluer le gameplay, les performances et la compatibilité avant de prendre une décision d'achat. Ascendara encourage fortement les utilisateurs à soutenir les développeurs de jeux en achetant les jeux qu'ils apprécient.",
+    "warningDescription": "Ascendara est conçu comme une plate-forme de test pour les jeux vidéo, permettant aux utilisateurs d'évaluer le gameplay, les performances et la compatibilité avant de prendre une décision d'achat. Ascendara encourage fortement les utilisateurs à soutenir les développeurs de jeux en achetant les jeux qu'ils apprécient.",
     "warningSupportDevelopers": "Les développeurs de jeux investissent beaucoup de temps, de ressources et de créativité pour créer les expériences que nous apprécions tous. Votre achat soutient directement leur capacité à continuer à créer d’excellents jeux et à soutenir l’industrie du jeu vidéo.",
     "warningSupportDevelopersCallToAction": "Veuillez soutenir les développeurs en achetant des jeux que vous appréciez.",
     "warningTitle": "Salut, s'il te plaît, lis ceci !"
@@ -2135,7 +2175,7 @@
   },
   "tour": {
     "ascend": {
-      "content": "Ici Ascend — vous pouvez nous rejoindre dès maintenant, aujourd'hui, après le tutoriel ! Connectez-vous avec vos amis, synchronisez vos données sur tous les appareils et débloquez des fonctionnalités exclusives.",
+      "content": "Ici Ascend — vous pouvez nous rejoindre dès maintenant, aujourd'hui, après le didacticiel ! Connectez-vous avec vos amis, synchronisez vos données sur tous les appareils et débloquez des fonctionnalités exclusives.",
       "title": "Monter"
     },
     "downloads": {
@@ -2171,7 +2211,7 @@
       "title": "Statut du serveur"
     },
     "settings": {
-      "content": "Personnalisez Ascendara : ajustez les thèmes, choisissez votre dossier de téléchargement, ajoutez des dossiers de téléchargement et affinez d'autres préférences ici. Il existe également des fonctionnalités utiles que vous pouvez activer et désactiver. Revenez après la visite pour voir ce que vous pourriez vouloir.",
+      "content": "Personnalisez Ascendara : ajustez les thèmes, choisissez votre dossier de téléchargement, ajoutez des dossiers de téléchargement et affinez d'autres préférences ici. Il existe également des fonctionnalités utiles que vous pouvez activer et désactiver. Revenez après la visite pour voir ce que vous pourriez souhaiter.",
       "title": "Vos préférences"
     },
     "sound": {
@@ -2237,7 +2277,7 @@
     "havePython": "J'ai Python",
     "haveWine": "J'ai ça, emmène-moi faire le tour",
     "helpIdentifyAndFix": "Aide à identifier et à résoudre les problèmes plus rapidement",
-    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées à Analytics avec un indicateur urgent, les plaçant en haut de la liste",
+    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées aux analyses avec un indicateur urgent, les plaçant en haut de la liste",
     "helpImprove": "Aidez à améliorer Ascendara",
     "howItWorks": "Comment ça marche :",
     "iHaveReadAndAgreeTo": "J'ai lu et j'accepte les conditions d'Ascendara",
@@ -2271,7 +2311,7 @@
     "manualUpdates": "Mises à jour manuelles",
     "neverAutomaticallyUpdate": "Ne jamais mettre à jour automatiquement",
     "next": "Suivant",
-    "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d’espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
+    "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d'espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
     "noticeAppIsFree": {
       "point1": "Les téléchargements et tout ce qui concerne les jeux sur Ascendara seront toujours gratuits",
       "point2": "Ascendara ne demandera aucune information personnelle pour télécharger ou jouer à des jeux",
@@ -2290,6 +2330,7 @@
     "pythonMustBeInstalled": "Python doit être installé sur votre ordinateur pour exécuter les outils de base d'Ascendara sur ce système d'exploitation",
     "referral": {
       "friendThankYou": "Merci à votre ami d'avoir partagé Ascendara ! Les gens les aiment et vous êtes la raison pour laquelle Ascendara peut grandir.",
+      "linkPlaceholder": "Pouvez-vous partager le lien ou le message où vous avez trouvé Ascendara ?",
       "otherPlaceholder": "Où avez-vous trouvé Ascendara exactement ?",
       "sources": {
         "discord": "Discorde",
@@ -2309,7 +2350,7 @@
     "restart": "Redémarrage",
     "runtimeComponents": "Composants d'exécution",
     "sayHelloTo": "Dites bonjour à",
-    "securityPatchesDesc": "Restez protégé avec des mises à jour de sécurité importantes",
+    "securityPatchesDesc": "Restez protégé grâce à des mises à jour de sécurité importantes",
     "securityPatchesTitle": "Correctifs de sécurité",
     "seeEntireList": "Voir la liste complète des 105 langues",
     "seeWhatsNew": "Voir les nouveautés",

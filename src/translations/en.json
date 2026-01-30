@@ -136,19 +136,14 @@
     "changelog": {
       "additions": "Additions",
       "close": "Close",
-      "contributors": "Contributors",
-      "englishOnly": "Changelogs are currently available in English only",
       "failedToLoad": "Failed to load changelog",
       "fixes": "Fixes",
       "fullChangelog": "Full Changelog",
       "improvements": "Improvements",
       "loading": "Loading changelog...",
-      "next": "Next",
-      "previous": "Previous",
       "removals": "Removals",
       "retry": "Retry",
-      "title": "What's New in Ascendara",
-      "viewAllUpdates": "View All Updates"
+      "title": "What's New in Ascendara"
     },
     "crashScreen": {
       "checkConnection": "Check your internet connection",
@@ -207,8 +202,7 @@
       "outOfDateDesc": "Please download the latest version from the official website",
       "updateNow": "Update Now",
       "updateReady": "Ascendara is ready to update",
-      "updateReadyDesc": "Ascendara downloaded the update and is ready to install and restart now",
-      "viewChangelog": "View Changelog"
+      "updateReadyDesc": "Ascendara downloaded the update and is ready to install and restart now"
     },
     "torrentWarning": "TORRENTING IS ENABLED - USE VPN",
     "watchdog": {
@@ -671,7 +665,6 @@
       "verifiedThankYou": "Thank you for being part of Ascendara!",
       "verifiedThankYouSub": "Your contributions help make this possible",
       "verifiedUser": "Verified User",
-      "verifyCheckoutError": "Failed to verify payment. Please contact support if you were charged.",
       "verifyCommand": "Verification Command",
       "verifyStep1": "Join the Discord server",
       "verifyStep2": "Run the following command in the commands channel:",
@@ -748,7 +741,6 @@
     "deleting": "Deleting...",
     "download": "DOWNLOAD",
     "downloadError": "Failed to start download",
-    "downloadGamesFromCatalog": "Download games from the catalog to see them here",
     "downloadStarted": "Download started successfully",
     "downloading": "Downloading...",
     "downloads": "DOWNLOADS",
@@ -777,11 +769,9 @@
     "media": "MEDIA",
     "mediaInfo": "Media Info",
     "menu": "MENU",
-    "menuPressB": "Press B to close",
     "modManager": "Mod Manager",
     "mouseRequired": "Mouse required",
     "navigate": "Navigate",
-    "noActiveDownloads": "No Active Downloads",
     "noDescriptionAvailable": "No description available",
     "noGameAvailable": "No games available",
     "noGameFound": "No games found",
@@ -791,10 +781,7 @@
     "play": "PLAY",
     "playLater": "Play Later",
     "played": "played",
-    "pressAModify": "Press A to modify",
-    "pressBacktoClose": "Press BACK to close Big Picture",
     "queueDownloads": "Queue Downloads",
-    "queuedDownloads": "Queued Downloads",
     "readyToDownload": "Ready to download",
     "remoteDownloads": "Remote Downloads",
     "resultsFor": "result for",
@@ -1910,8 +1897,6 @@
       "shutdown": "Shutdown",
       "sleep": "Sleep"
     },
-    "bigPictureKeyboard": "Big Picture Keyboard Layout",
-    "bigPictureKeyboardDescription": "Choose the keyboard layout for Big Picture mode virtual keyboard",
     "bigPictureSettings": "Big Picture Mode",
     "browsePublicThemes": "Browse Community Themes",
     "checkConfig": "Check Configuration",
