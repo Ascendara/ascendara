@@ -242,8 +242,22 @@ function registerGameHandlers() {
 
     if (gameDirectory) {
       // Start downloading (which first checks if the files exist)
-      steamgrid.fetchGameAssets(game, gameDirectory, null).catch(console.error);
-      return true;
+      try {
+        const result = await steamgrid.fetchGameAssets(game, gameDirectory, null);
+        if (result) {
+          // Notify all windows that assets were updated
+          const { BrowserWindow } = require("electron");
+          BrowserWindow.getAllWindows().forEach(win => {
+            if (!win.isDestroyed()) {
+              win.webContents.send("game-assets-updated", { game, success: true });
+            }
+          });
+        }
+        return result;
+      } catch (error) {
+        console.error("[ensure-game-assets] Error:", error);
+        return false;
+      }
     }
     return false;
   });

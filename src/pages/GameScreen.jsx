@@ -653,6 +653,13 @@ export default function GameScreen() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [isStartingUpdate, setIsStartingUpdate] = useState(false);
 
+  // Logo state
+  const [logoData, setLogoData] = useState(null);
+  const [showLogo, setShowLogo] = useState(() => {
+    const saved = localStorage.getItem(`game-show-logo-${game?.game || game?.name}`);
+    return saved !== "false";
+  });
+
   // GO BACK!
 
   const BackLibrary = () => {
@@ -883,9 +890,53 @@ export default function GameScreen() {
       }
     };
 
+    // Handle game assets updates (grid, hero, logo) from SteamGrid
+    const handleGameAssetsUpdated = async (_, data) => {
+      if (data && data.game === (game.game || game.name) && data.success) {
+        console.log(
+          `[GameScreen] Received game-assets-updated IPC event for ${data.game}`
+        );
+        // Clear localStorage cache and reload the grid image
+        const gameId = game.game || game.name;
+        const localStorageKey = `game-cover-vertical-${gameId}`;
+        localStorage.removeItem(localStorageKey);
+
+        // Fetch the new grid image
+        try {
+          const gridBase64 = await window.electron.ipcRenderer.invoke(
+            "get-game-image",
+            gameId,
+            "grid"
+          );
+          if (gridBase64) {
+            const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
+            setImageData(dataUrl);
+            localStorage.setItem(localStorageKey, dataUrl);
+          }
+        } catch (e) {
+          console.error("[GameScreen] Error loading new grid image:", e);
+        }
+
+        // Also reload the logo image
+        try {
+          const logoBase64 = await window.electron.ipcRenderer.invoke(
+            "get-game-image",
+            gameId,
+            "logo"
+          );
+          if (logoBase64) {
+            setLogoData(`data:image/png;base64,${logoBase64}`);
+          }
+        } catch (e) {
+          console.error("[GameScreen] Error loading logo:", e);
+        }
+      }
+    };
+
     window.electron.ipcRenderer.on("game-launch-error", handleGameLaunchError);
     window.electron.ipcRenderer.on("game-closed", handleGameClosed);
     window.electron.ipcRenderer.on("cover-image-updated", handleCoverImageUpdated);
+    window.electron.ipcRenderer.on("game-assets-updated", handleGameAssetsUpdated);
 
     return () => {
       window.electron.ipcRenderer.removeListener(
@@ -896,6 +947,10 @@ export default function GameScreen() {
       window.electron.ipcRenderer.removeListener(
         "cover-image-updated",
         handleCoverImageUpdated
+      );
+      window.electron.ipcRenderer.removeListener(
+        "game-assets-updated",
+        handleGameAssetsUpdated
       );
     };
   }, [isInitialized, setShowRateDialog, game]); // Add required dependencies
@@ -912,6 +967,44 @@ export default function GameScreen() {
   useEffect(() => {
     localStorage.setItem("game-favorites", JSON.stringify(favorites));
   }, [favorites]);
+
+  // Load logo image
+  useEffect(() => {
+    if (!game) return;
+    const gameId = game.game || game.name;
+
+    const loadLogo = async () => {
+      try {
+        const logoBase64 = await window.electron.ipcRenderer.invoke(
+          "get-game-image",
+          gameId,
+          "logo"
+        );
+        if (logoBase64) {
+          setLogoData(`data:image/png;base64,${logoBase64}`);
+        } else {
+          setLogoData(null);
+        }
+      } catch (e) {
+        setLogoData(null);
+      }
+    };
+
+    loadLogo();
+  }, [game]);
+
+  // Save logo preference
+  useEffect(() => {
+    if (game) {
+      const gameId = game.game || game.name;
+      localStorage.setItem(`game-show-logo-${gameId}`, showLogo.toString());
+    }
+  }, [showLogo, game]);
+
+  // Toggle logo/text display
+  const toggleLogoDisplay = () => {
+    setShowLogo(prev => !prev);
+  };
 
   // Fetch Khinsider soundtrack on mount
   useEffect(() => {
@@ -942,14 +1035,7 @@ export default function GameScreen() {
     const localStorageKey = `game-cover-vertical-${gameId}`;
 
     const loadGameImage = async () => {
-      // 1. Try localStorage first
-      const cachedImage = localStorage.getItem(localStorageKey);
-      if (cachedImage) {
-        if (isMounted) setImageData(cachedImage);
-        return;
-      }
-
-      // 2. Try fetching Vertical GRID from backend (Priority)
+      // 1. Try fetching Vertical GRID from backend first (Priority)
       try {
         const gridBase64 = await window.electron.ipcRenderer.invoke(
           "get-game-image",
@@ -966,6 +1052,13 @@ export default function GameScreen() {
           return;
         }
       } catch (e) {}
+
+      // 2. Try localStorage cache as fallback
+      const cachedImage = localStorage.getItem(localStorageKey);
+      if (cachedImage) {
+        if (isMounted) setImageData(cachedImage);
+        return;
+      }
 
       // 3. Fallback (Header)
       if (steamData?.cover?.url) {
@@ -1529,9 +1622,31 @@ export default function GameScreen() {
           {/* Game title and basic info */}
           <div className="mt-4">
             <div className="flex items-center gap-3">
-              <h1 className="text-4xl font-bold text-primary drop-shadow-md">
-                {game.game}
-              </h1>
+              {showLogo && logoData ? (
+                <button
+                  onClick={toggleLogoDisplay}
+                  className="cursor-pointer transition-opacity hover:opacity-80"
+                  title={t("gameScreen.clickToToggleLogo")}
+                >
+                  <img
+                    src={logoData}
+                    alt={game.game}
+                    className="max-h-20 max-w-md object-contain drop-shadow-md"
+                  />
+                </button>
+              ) : (
+                <button
+                  onClick={logoData ? toggleLogoDisplay : undefined}
+                  className={cn(
+                    "text-4xl font-bold text-primary drop-shadow-md",
+                    logoData && "cursor-pointer transition-opacity hover:opacity-80"
+                  )}
+                  title={logoData ? t("gameScreen.clickToToggleLogo") : undefined}
+                  disabled={!logoData}
+                >
+                  <h1>{game.game}</h1>
+                </button>
+              )}
               {game.online && (
                 <Gamepad2
                   className="mb-2 h-5 w-5 text-primary"

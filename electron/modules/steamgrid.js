@@ -7,7 +7,7 @@ const SGDB_API_KEY = config.steamGridDbApiKey;
 const BASE_URL = "https://www.steamgriddb.com/api/v2";
 
 async function fetchGameAssets(gameName, gameDir) {
-  // First: check if we already have everything
+  // Check if we already have all the new assets
   const expectedFiles = [
     "grid.ascendara.jpg",
     "hero.ascendara.jpg",
@@ -26,6 +26,18 @@ async function fetchGameAssets(gameName, gameDir) {
 
   if (allExist) {
     return true;
+  }
+
+  // Check if game has legacy header.ascendara image
+  const hasLegacyHeader =
+    fs.existsSync(path.join(gameDir, "header.ascendara.jpg")) ||
+    fs.existsSync(path.join(gameDir, "header.ascendara.png")) ||
+    fs.existsSync(path.join(gameDir, "header.ascendara.jpeg"));
+
+  if (hasLegacyHeader) {
+    console.log(
+      `[SteamGrid] Found legacy header for "${gameName}", downloading missing assets`
+    );
   }
   const headers = { Authorization: `Bearer ${SGDB_API_KEY}` };
   let gameId = null;
