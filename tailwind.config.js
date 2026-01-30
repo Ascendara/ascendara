@@ -4,6 +4,9 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
+      transitionTimingFunction: {
+        "smooth-out": "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
       colors: {
         primary: "rgb(var(--color-primary) / <alpha-value>)",
         secondary: "rgb(var(--color-secondary) / <alpha-value>)",

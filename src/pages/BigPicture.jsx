@@ -2153,7 +2153,7 @@ const GameDetailsView = ({
       </div>
 
       <div
-        className={`ease-[cubic-bezier(0.32,0.72,0,1)] relative z-20 h-full w-full transition-transform duration-500 ${
+        className={`relative z-20 h-full w-full transition-transform duration-500 ease-smooth-out ${
           showMedia ? "-translate-y-full" : "translate-y-0"
         }`}
       >
@@ -3621,7 +3621,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
       )}
 
       <div
-        className={`ease-[cubic-bezier(0.32,0.72,0,1)] relative z-20 h-full w-full transition-transform duration-500 ${
+        className={`relative z-20 h-full w-full transition-transform duration-500 ease-smooth-out ${
           showMedia ? "-translate-y-full" : "translate-y-0"
         }`}
       >
