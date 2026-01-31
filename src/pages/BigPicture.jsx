@@ -5835,6 +5835,8 @@ export default function BigPicture() {
           } else if (menuIndex === 4) {
             setShowControllerSettings(true);
           } else if (menuIndex === 5) {
+            setShowExitBigPictureDialog(true);
+          } else if (menuIndex === 6) {
             // Close Ascendara completely (Force Quit)
             if (window.electron && window.electron.closeWindow) {
               window.electron.closeWindow(true);
