@@ -152,7 +152,7 @@ const MenuBar = () => {
     const checkForController = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       const hasControllerConnected = Array.from(gamepads).some(
-        gamepad => gamepad !== null
+        g => g && g.connected && (g.axes.length >= 2 || g.buttons.length >= 10)
       );
       setHasController(hasControllerConnected);
     };

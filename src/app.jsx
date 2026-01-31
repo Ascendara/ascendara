@@ -323,7 +323,9 @@ const ControllerDetectionPrompt = () => {
 
     const checkForController = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const hasController = Array.from(gamepads).some(gamepad => gamepad !== null);
+      const hasController = Array.from(gamepads).some(
+        g => g && g.connected && (g.axes.length >= 2 || g.buttons.length >= 10)
+      );
 
       if (hasController && !hasPromptedRef.current) {
         setShowPrompt(true);
@@ -354,7 +356,9 @@ const ControllerDetectionPrompt = () => {
 
     const handleGamepadInput = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const gamepad = Array.from(gamepads).find(gp => gp !== null);
+      const gamepad = Array.from(gamepads).find(
+        g => g && g.connected && (g.axes.length >= 2 || g.buttons.length >= 10)
+      );
 
       if (!gamepad) return;
 

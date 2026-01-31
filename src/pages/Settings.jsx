@@ -446,7 +446,9 @@ function Settings() {
   useEffect(() => {
     const checkController = () => {
       const gamepads = navigator.getGamepads();
-      const hasController = Array.from(gamepads).some(gamepad => gamepad !== null);
+      const hasController = Array.from(gamepads).some(
+        g => g && g.connected && (g.axes.length >= 2 || g.buttons.length >= 10)
+      );
       setControllerConnected(hasController);
     };
 
