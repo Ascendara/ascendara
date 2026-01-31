@@ -249,7 +249,15 @@ let lastLogTime = 0;
 
 const getGamepadInput = () => {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const gp = gamepads[0]; // First connected controller
+
+  // On cherche la première manette qui :
+  // 1. Est connectée
+  // 2. N'est pas nulle
+  // 3. Possède au moins 4 axes (2 joysticks) OU au moins 10 boutons (pour être sûr que c'est une manette de jeu)
+  // 4. A un mapping "standard" (optionnel, mais aide souvent pour les manettes Xbox/PS)
+  const gp = Array.from(gamepads).find(
+    g => g && g.connected && (g.axes.length >= 2 || g.buttons.length >= 10)
+  );
 
   if (!gp) return null;
 

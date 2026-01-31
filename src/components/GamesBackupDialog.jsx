@@ -106,7 +106,9 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
 
     const getGamepadInput = () => {
       const gamepads = navigator.getGamepads();
-      const gp = gamepads[0] || gamepads[1] || gamepads[2] || gamepads[3];
+      const gp = Array.from(gamepads).find(
+        g => g && g.connected && (g.axes.length >= 2 || g.buttons.length >= 10)
+      );
       if (!gp) return null;
 
       return {
