@@ -1187,6 +1187,20 @@
     "showLess": "Show Less",
     "update": "Update",
     "updateAvailable": "Update Available",
+    "verified": {
+      "alwaysWorking": "Always Working",
+      "alwaysWorkingDesc": "Verified to work properly after updates and works with all of the features of Ascendara",
+      "badge": "Verified Game",
+      "clickForInfo": "Click for info",
+      "dialogDescription": "This game has been verified by the Ascendara community and works with all of Ascendara's features.",
+      "dialogTitle": "Verified Game",
+      "gotIt": "Got it",
+      "highlyRated": "Highly Rated",
+      "highlyRatedDesc": "Consistently receives excellent ratings from the community",
+      "mostPopular": "Most Popular",
+      "mostPopularDesc": "Among the most downloaded and played games on Ascendara",
+      "selectionCriteria": "Verified games are carefully selected based on community feedback, download statistics, and quality assurance testing."
+    },
     "viewDetails": "View Details"
   },
   "gameScreen": {

@@ -48,6 +48,7 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import imageCacheService from "@/services/imageCacheService";
 import { formatLatestUpdate } from "@/lib/utils";
+import verifiedGamesService from "@/services/verifiedGamesService";
 
 // Module-level cache with timestamp
 let gamesCache = {
@@ -347,6 +348,11 @@ const Search = memo(() => {
   useEffect(() => {
     setLoading(true);
     refreshGames(true).finally(() => setLoading(false));
+
+    // Preload verified games list
+    verifiedGamesService.loadVerifiedGames().catch(error => {
+      console.error("Failed to load verified games:", error);
+    });
   }, []);
 
   useEffect(() => {
