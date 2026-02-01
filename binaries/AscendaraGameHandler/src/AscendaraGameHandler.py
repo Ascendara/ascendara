@@ -219,7 +219,12 @@ def run_ludusavi_backup(game_name):
         logging.info("[EXIT] run_ludusavi_backup() - Skipped")
         return False
     try:
-        ludusavi_path = os.path.join("./ludusavi.exe")
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            
+        ludusavi_path = os.path.join(base_dir, "ludusavi.exe")
         if not os.path.exists(ludusavi_path):
             logging.error(f"Ludusavi executable not found at: {ludusavi_path}")
             logging.info("[EXIT] run_ludusavi_backup() - No executable")
@@ -232,15 +237,17 @@ def run_ludusavi_backup(game_name):
             compression_level = 'deflate'
         cmd = [
             ludusavi_path,
+            "backup",
+            game_name,
             "--path", backup_location,
             "--format", backup_format,
             "--full-limit", str(backups_to_keep),
             "--compression", compression_level,
             "--force"
         ]
+
         if ludusavi_settings.get('backupOptions', {}).get('skipManifestCheck', False):
             cmd.append("--no-manifest-update")
-        cmd.extend(["backup", game_name])
         logging.info(f"Running Ludusavi backup for {game_name} with command: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
