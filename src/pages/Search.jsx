@@ -925,6 +925,7 @@ const Search = memo(() => {
                   placeholder={t("search.placeholder")}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
+                  onClick={e => e.target.select()}
                   onFocus={() => setShowRecentSearches(true)}
                   onBlur={() => {
                     // Delay hiding to allow clicking on recent searches
