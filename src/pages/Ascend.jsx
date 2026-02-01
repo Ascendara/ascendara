@@ -80,6 +80,9 @@ import {
   deleteBackup,
   subscribeToMessages,
   subscribeToConversations,
+  subscribeToFriendsList,
+  subscribeToIncomingRequests,
+  subscribeToOutgoingRequests,
   manageMessageListeners,
   cleanupMessageListeners,
 } from "@/services/firebaseService";
@@ -441,6 +444,47 @@ const Ascend = () => {
       loadNotifications();
     }
   }, [user?.uid, showDisplayNamePrompt]);
+
+  // Set up real-time listener for friends list
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToFriendsList(friends => {
+      setFriends(friends);
+      setLoadingFriends(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.uid]);
+
+  // Set up real-time listener for incoming friend requests
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToIncomingRequests(requests => {
+      setIncomingRequests(requests);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.uid]);
+
+  // Set up real-time listener for outgoing friend requests
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToOutgoingRequests(requests => {
+      setOutgoingRequests(requests);
+      setLoadingRequests(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.uid]);
 
   // Set up real-time listener for conversations
   useEffect(() => {
@@ -1477,7 +1521,6 @@ const Ascend = () => {
     const result = await sendFriendRequest(toUid);
     if (result.success) {
       toast.success(t("ascend.friends.requestSent"));
-      loadRequestsData();
     } else {
       toast.error(result.error);
     }
@@ -1599,8 +1642,6 @@ const Ascend = () => {
     const result = await acceptFriendRequest(requestId, fromUid);
     if (result.success) {
       toast.success(t("ascend.friends.requestAccepted"));
-      loadFriendsData();
-      loadRequestsData();
     } else {
       toast.error(result.error);
     }
@@ -1610,7 +1651,6 @@ const Ascend = () => {
     const result = await denyFriendRequest(requestId);
     if (result.success) {
       toast.success(t("ascend.friends.requestDenied"));
-      loadRequestsData();
     } else {
       toast.error(result.error);
     }
@@ -1620,7 +1660,6 @@ const Ascend = () => {
     const result = await removeFriend(friendUid);
     if (result.success) {
       toast.success(t("ascend.friends.removed"));
-      loadFriendsData();
     } else {
       toast.error(result.error);
     }

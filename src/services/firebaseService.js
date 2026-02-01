@@ -1922,6 +1922,123 @@ export const getFriendsList = async () => {
 };
 
 /**
+ * Subscribe to friends list changes
+ * @param {function} onUpdate - Callback function receiving friends array
+ * @returns {function} Unsubscribe function
+ */
+export const subscribeToFriendsList = onUpdate => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) return () => {};
+
+  const friendsRef = doc(db, "friends", currentUser.uid);
+
+  return onSnapshot(
+    friendsRef,
+    async snapshot => {
+      if (!snapshot.exists() || !snapshot.data().list?.length) {
+        onUpdate([]);
+        return;
+      }
+
+      const friendUids = snapshot.data().list;
+      const friends = [];
+
+      // Get user data for each friend
+      for (const uid of friendUids) {
+        const userDoc = await getDoc(doc(db, "users", uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          // Also get their status
+          const statusDoc = await getDoc(doc(db, "userStatus", uid));
+          const status = statusDoc.exists() ? statusDoc.data() : { status: "offline" };
+
+          friends.push({
+            uid,
+            displayName: userData.displayName,
+            photoURL: userData.photoURL,
+            status: status.status,
+            customMessage: status.customMessage,
+            owner: userData.owner || false,
+            contributor: userData.contributor || false,
+            verified: userData.verified || false,
+          });
+        }
+      }
+
+      onUpdate(friends);
+    },
+    error => {
+      console.error("[subscribeToFriendsList] Error:", error);
+      onUpdate([]);
+    }
+  );
+};
+
+/**
+ * Subscribe to incoming friend requests
+ * @param {function} onUpdate - Callback function receiving requests array
+ * @returns {function} Unsubscribe function
+ */
+export const subscribeToIncomingRequests = onUpdate => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) return () => {};
+
+  const requestsRef = collection(db, "friendRequests");
+  const q = query(
+    requestsRef,
+    where("toUid", "==", currentUser.uid),
+    where("status", "==", "pending")
+  );
+
+  return onSnapshot(
+    q,
+    snapshot => {
+      const requests = [];
+      snapshot.forEach(doc => {
+        requests.push({ id: doc.id, ...doc.data() });
+      });
+      onUpdate(requests);
+    },
+    error => {
+      console.error("[subscribeToIncomingRequests] Error:", error);
+      onUpdate([]);
+    }
+  );
+};
+
+/**
+ * Subscribe to outgoing friend requests
+ * @param {function} onUpdate - Callback function receiving requests array
+ * @returns {function} Unsubscribe function
+ */
+export const subscribeToOutgoingRequests = onUpdate => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) return () => {};
+
+  const requestsRef = collection(db, "friendRequests");
+  const q = query(
+    requestsRef,
+    where("fromUid", "==", currentUser.uid),
+    where("status", "==", "pending")
+  );
+
+  return onSnapshot(
+    q,
+    snapshot => {
+      const requests = [];
+      snapshot.forEach(doc => {
+        requests.push({ id: doc.id, ...doc.data() });
+      });
+      onUpdate(requests);
+    },
+    error => {
+      console.error("[subscribeToOutgoingRequests] Error:", error);
+      onUpdate([]);
+    }
+  );
+};
+
+/**
  * Remove friend
  * @param {string} friendUid - Friend's user ID
  * @returns {Promise<{success: boolean, error: string|null}>}
