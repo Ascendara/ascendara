@@ -658,8 +658,10 @@ const Search = memo(() => {
   const handleQuickSearchClick = useCallback(
     game => {
       saveRecentSearch(searchQuery);
-      setShowRecentSearches(false);
       handleDownload(game);
+      setTimeout(() => {
+        setShowRecentSearches(false);
+      }, 100);
     },
     [searchQuery, saveRecentSearch, handleDownload]
   );
