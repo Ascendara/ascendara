@@ -318,7 +318,11 @@ const MenuBar = () => {
           ) : (
             <div
               className={`h-1.5 w-1.5 rounded-full ${
-                serverStatus.api?.ok && serverStatus.storage?.ok && serverStatus.lfs?.ok
+                serverStatus.monitor?.ok &&
+                serverStatus.api?.ok &&
+                serverStatus.storage?.ok &&
+                serverStatus.lfs?.ok &&
+                serverStatus.r2?.ok
                   ? "bg-green-500 hover:bg-green-600"
                   : "animate-pulse bg-red-500 hover:bg-red-600"
               }`}
@@ -455,15 +459,15 @@ const MenuBar = () => {
         </div>
       )}
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <AlertDialogContent className="max-w-md bg-background">
+        <AlertDialogContent className="max-w-2xl bg-background">
           <AlertDialogHeader>
             <div
-              className="fixed right-2 top-2 cursor-pointer p-2 text-foreground"
+              className="absolute right-4 top-4 cursor-pointer rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               onClick={() => setIsDialogOpen(false)}
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </div>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            <AlertDialogTitle className="text-3xl font-bold text-foreground">
               {t("server-status.title")}
             </AlertDialogTitle>
 
@@ -471,103 +475,240 @@ const MenuBar = () => {
               {t("server-status.description")}
             </AlertDialogDescription>
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-6 space-y-5">
               {serverStatus.noInternet ? (
-                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-                  <div className="flex items-center gap-3">
-                    <WifiOff className="h-8 w-8 text-red-500" />
+                <div className="rounded-xl border-2 border-red-500/30 bg-gradient-to-br from-red-500/10 to-red-500/5 p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-full bg-red-500/20 p-3">
+                      <WifiOff className="h-7 w-7 text-red-500" />
+                    </div>
                     <div>
-                      <h3 className="font-semibold text-foreground">
+                      <h3 className="text-lg font-semibold text-foreground">
                         {t("server-status.no-internet")}
                       </h3>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         {t("server-status.check-connection")}
                       </p>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div
-                  className={`rounded-lg border p-4 ${
-                    serverStatus.api?.ok &&
-                    serverStatus.storage?.ok &&
-                    serverStatus.lfs?.ok
-                      ? "border-green-500/20 bg-green-500/5"
-                      : "border-red-500/20 bg-red-500/5"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-foreground">
-                      {serverStatus.api?.ok &&
+                <>
+                  <div
+                    className={`rounded-xl border-2 p-5 transition-all ${
+                      serverStatus.monitor?.ok &&
+                      serverStatus.api?.ok &&
                       serverStatus.storage?.ok &&
-                      serverStatus.lfs?.ok
-                        ? t("server-status.healthy")
-                        : t("server-status.unhealthy")}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {serverStatus.noInternet ? (
+                      serverStatus.lfs?.ok &&
+                      serverStatus.r2?.ok
+                        ? "border-green-500/30 bg-gradient-to-br from-green-500/10 to-green-500/5"
+                        : "border-red-500/30 bg-gradient-to-br from-red-500/10 to-red-500/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
                       <div>
-                        {t("server-status.no-internet")}
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("server-status.check-connection")}
+                        <h3 className="text-xl font-bold text-foreground">
+                          {serverStatus.monitor?.ok &&
+                          serverStatus.api?.ok &&
+                          serverStatus.storage?.ok &&
+                          serverStatus.lfs?.ok &&
+                          serverStatus.r2?.ok
+                            ? t("server-status.healthy")
+                            : t("server-status.unhealthy")}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {serverStatus.monitor?.ok &&
+                          serverStatus.api?.ok &&
+                          serverStatus.storage?.ok &&
+                          serverStatus.lfs?.ok &&
+                          serverStatus.r2?.ok
+                            ? t("server-status.healthy-description")
+                            : t("server-status.unhealthy-description")}
                         </p>
                       </div>
-                    ) : serverStatus.api?.ok &&
-                      serverStatus.storage?.ok &&
-                      serverStatus.lfs?.ok ? (
-                      t("server-status.healthy-description")
-                    ) : (
-                      <div>
-                        {t("server-status.unhealthy-description")}
-                        <ul className="mt-2 space-y-2">
-                          {!serverStatus.api?.ok && (
-                            <li key="apiDown" className="flex items-start">
-                              <span className="mr-2 mt-1.5 h-2.5 w-2.5 rounded-full bg-red-500" />
-                              <div>
-                                <span className="font-medium">API</span>
-                                <p className="text-xs text-muted-foreground">
-                                  {t("server-status.api-description")}
-                                </p>
-                              </div>
-                            </li>
-                          )}
-                          {!serverStatus.storage?.ok && (
-                            <li key="storageDown" className="flex items-start">
-                              <span className="mr-2 mt-1.5 h-2.5 w-2.5 rounded-full bg-red-500" />
-                              <div>
-                                <span className="font-medium">Storage</span>
-                                <p className="text-xs text-muted-foreground">
-                                  {t("server-status.storage-description")}
-                                </p>
-                              </div>
-                            </li>
-                          )}
-                          {!serverStatus.lfs?.ok && (
-                            <li key="lfsDown" className="flex items-start">
-                              <span className="mr-2 mt-1.5 h-2.5 w-2.5 rounded-full bg-red-500" />
-                              <div>
-                                <span className="font-medium">LFS</span>
-                                <p className="text-xs text-muted-foreground">
-                                  {t("server-status.lfs-description")}
-                                </p>
-                              </div>
-                            </li>
-                          )}
-                        </ul>
+                      <div
+                        className={`h-4 w-4 rounded-full shadow-lg ${
+                          serverStatus.monitor?.ok &&
+                          serverStatus.api?.ok &&
+                          serverStatus.storage?.ok &&
+                          serverStatus.lfs?.ok &&
+                          serverStatus.r2?.ok
+                            ? "bg-green-500 shadow-green-500/50"
+                            : "animate-pulse bg-red-500 shadow-red-500/50"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t("server-status.service-status")}
+                    </h4>
+                    <div className="grid grid-cols-4 gap-3">
+                      {/* API Status - Main Endpoint - Takes 2 columns */}
+                      <div
+                        className={`group col-span-2 rounded-xl border-2 p-4 transition-all hover:scale-[1.02] ${
+                          serverStatus.api?.ok
+                            ? "border-green-500/30 bg-green-500/5 hover:border-green-500/50"
+                            : "border-red-500/30 bg-red-500/5 hover:border-red-500/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`h-3 w-3 rounded-full shadow-lg ${
+                                serverStatus.api?.ok
+                                  ? "bg-green-500 shadow-green-500/50"
+                                  : "bg-red-500 shadow-red-500/50"
+                              }`}
+                            />
+                            <div>
+                              <span className="font-semibold text-foreground">
+                                {t("server-status.api-name")}
+                              </span>
+                              <p className="text-xs text-muted-foreground">
+                                {t("server-status.api-subtitle")}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs font-medium text-muted-foreground">
+                          {serverStatus.api?.ok
+                            ? t("server-status.operational")
+                            : serverStatus.api?.error || t("server-status.down")}
+                        </p>
                       </div>
-                    )}
-                  </p>
-                </div>
+
+                      {/* LFS Status */}
+                      <div
+                        className={`group rounded-xl border-2 p-4 transition-all hover:scale-[1.02] ${
+                          serverStatus.lfs?.ok
+                            ? "border-green-500/30 bg-green-500/5 hover:border-green-500/50"
+                            : "border-red-500/30 bg-red-500/5 hover:border-red-500/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`h-3 w-3 rounded-full shadow-lg ${
+                                serverStatus.lfs?.ok
+                                  ? "bg-green-500 shadow-green-500/50"
+                                  : "bg-red-500 shadow-red-500/50"
+                              }`}
+                            />
+                            <span className="font-semibold text-foreground">
+                              {t("server-status.lfs-name")}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs font-medium text-muted-foreground">
+                          {serverStatus.lfs?.ok
+                            ? t("server-status.operational")
+                            : serverStatus.lfs?.error || t("server-status.down")}
+                        </p>
+                      </div>
+
+                      {/* R2 Status */}
+                      <div
+                        className={`group rounded-xl border-2 p-4 transition-all hover:scale-[1.02] ${
+                          serverStatus.r2?.ok
+                            ? "border-green-500/30 bg-green-500/5 hover:border-green-500/50"
+                            : "border-red-500/30 bg-red-500/5 hover:border-red-500/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`h-3 w-3 rounded-full shadow-lg ${
+                                serverStatus.r2?.ok
+                                  ? "bg-green-500 shadow-green-500/50"
+                                  : "bg-red-500 shadow-red-500/50"
+                              }`}
+                            />
+                            <span className="font-semibold text-foreground">
+                              {t("server-status.r2-name")}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs font-medium text-muted-foreground">
+                          {serverStatus.r2?.ok
+                            ? t("server-status.operational")
+                            : serverStatus.r2?.error || t("server-status.down")}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Second row - Monitor and CDN in 2x2 grid */}
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      {/* Monitor Status */}
+                      <div
+                        className={`group rounded-xl border-2 p-4 transition-all hover:scale-[1.02] ${
+                          serverStatus.monitor?.ok
+                            ? "border-green-500/30 bg-green-500/5 hover:border-green-500/50"
+                            : "border-red-500/30 bg-red-500/5 hover:border-red-500/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`h-3 w-3 rounded-full shadow-lg ${
+                                serverStatus.monitor?.ok
+                                  ? "bg-green-500 shadow-green-500/50"
+                                  : "bg-red-500 shadow-red-500/50"
+                              }`}
+                            />
+                            <span className="font-semibold text-foreground">
+                              {t("server-status.monitor-name")}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs font-medium text-muted-foreground">
+                          {serverStatus.monitor?.ok
+                            ? t("server-status.operational")
+                            : serverStatus.monitor?.error || t("server-status.down")}
+                        </p>
+                      </div>
+
+                      {/* Storage Status */}
+                      <div
+                        className={`group rounded-xl border-2 p-4 transition-all hover:scale-[1.02] ${
+                          serverStatus.storage?.ok
+                            ? "border-green-500/30 bg-green-500/5 hover:border-green-500/50"
+                            : "border-red-500/30 bg-red-500/5 hover:border-red-500/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`h-3 w-3 rounded-full shadow-lg ${
+                                serverStatus.storage?.ok
+                                  ? "bg-green-500 shadow-green-500/50"
+                                  : "bg-red-500 shadow-red-500/50"
+                              }`}
+                            />
+                            <span className="font-semibold text-foreground">
+                              {t("server-status.cdn-name")}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs font-medium text-muted-foreground">
+                          {serverStatus.storage?.ok
+                            ? t("server-status.operational")
+                            : serverStatus.storage?.error || t("server-status.down")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
               {/* Status Page Link */}
-              <div className="flex items-center justify-between rounded-lg border bg-card/30 p-3">
-                <span className="text-sm text-muted-foreground">
+              <div className="flex items-center justify-between rounded-xl border-2 border-border/50 bg-card/50 p-4 transition-all hover:border-primary/50 hover:bg-card/80">
+                <span className="text-sm font-medium text-muted-foreground">
                   {t("server-status.need-more-details")}
                 </span>
                 <button
                   onClick={() => window.electron.openURL("https://status.ascendara.app")}
-                  className="flex items-center gap-1 text-sm text-foreground hover:underline"
+                  className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
                 >
                   {t("server-status.visit-status-page")}
                   <ExternalLink className="h-4 w-4" />

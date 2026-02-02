@@ -32,6 +32,7 @@ import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseSe
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
+import { startStatusCheck } from "@/services/serverStatus";
 import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -1421,6 +1422,17 @@ function App() {
     };
 
     checkUpdates();
+  }, []);
+
+  useEffect(() => {
+    // Start server status checks
+    console.log("[App] Initializing server status checks...");
+    const stopStatusCheck = startStatusCheck();
+
+    return () => {
+      console.log("[App] Cleaning up server status checks...");
+      if (stopStatusCheck) stopStatusCheck();
+    };
   }, []);
 
   useEffect(() => {

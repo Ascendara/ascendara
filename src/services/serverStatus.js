@@ -1,12 +1,13 @@
 const ENDPOINTS = {
-  api: "https://api.ascendara.app/health",
-  storage: "https://cdn.ascendara.app/health",
-  lfs: "https://lfs.ascendara.app/health",
+  monitor: "https://monitor.ascendara.app/",
+  api: "https://api.ascendara.app/",
+  storage: "https://cdn.ascendara.app/",
+  lfs: "https://lfs.ascendara.app/",
+  r2: "https://r2.ascendara.app/",
 };
 
 const checkEndpoint = async url => {
   try {
-    console.log(`Checking endpoint ${url}...`);
     const response = await window.electron.request(url, {
       method: "GET",
       headers: {
@@ -16,21 +17,71 @@ const checkEndpoint = async url => {
       timeout: 5000,
     });
 
-    console.log(`Response from ${url}:`, response);
-
-    if (response.ok) {
+    // Check for error code 1033 (offline)
+    if (
+      response.status === 1033 ||
+      response.statusCode === 1033 ||
+      String(response.status) === "1033" ||
+      String(response.statusCode) === "1033"
+    ) {
       return {
-        ok: true,
-        data:
-          typeof response.data === "string" ? JSON.parse(response.data) : response.data,
+        ok: false,
+        error: "Service Offline (1033)",
+        isOffline: true,
       };
     }
+
+    // Check for 530 status with "error code: 1033" in data
+    if (
+      response.status === 530 &&
+      response.data &&
+      String(response.data).includes("1033")
+    ) {
+      return {
+        ok: false,
+        error: "Service Offline (1033)",
+        isOffline: true,
+      };
+    }
+
+    // Any response (2xx, 3xx, 4xx) means the server is reachable and online
+    // Only 5xx errors (except 530 with 1033) indicate actual server problems
+    const isReachable = response.status < 500 || response.ok;
+
+    if (isReachable) {
+      return {
+        ok: true,
+        data: response.data,
+      };
+    }
+
     return {
       ok: false,
-      error: `Service Unavailable (${response.status})`,
+      error: `Server Error (${response.status})`,
     };
   } catch (error) {
-    console.warn(`Failed to check ${url}:`, error);
+    // Check if error contains status code 1033
+    if (error.status === 1033 || error.code === 1033 || error.statusCode === 1033) {
+      return {
+        ok: false,
+        error: "Service Offline (1033)",
+        isOffline: true,
+      };
+    }
+
+    // Check string versions
+    if (
+      String(error.status) === "1033" ||
+      String(error.code) === "1033" ||
+      String(error.statusCode) === "1033"
+    ) {
+      return {
+        ok: false,
+        error: "Service Offline (1033)",
+        isOffline: true,
+      };
+    }
+
     return {
       ok: false,
       error: "Service Unreachable",
@@ -40,14 +91,37 @@ const checkEndpoint = async url => {
 
 const checkInternetConnectivity = async () => {
   try {
-    // Try to fetch a reliable external resource
-    const response = await window.electron.request("https://www.google.com/", {
+    const response = await window.electron.request("https://monitor.ascendara.app/", {
       method: "HEAD",
       timeout: 5000,
     });
-    return response.ok;
+
+    // Treat error code 1033 as offline
+    if (
+      response.status === 1033 ||
+      response.statusCode === 1033 ||
+      String(response.status) === "1033" ||
+      String(response.statusCode) === "1033"
+    ) {
+      return false;
+    }
+
+    // 302 redirect means online (server is responding and redirecting to home page)
+    // Any 2xx or 3xx status code means the server is reachable
+    const isOnline = response.ok || (response.status >= 200 && response.status < 400);
+    return isOnline;
   } catch (error) {
-    console.warn("Internet connectivity check failed:", error);
+    // Check if error contains status code 1033
+    if (
+      error.status === 1033 ||
+      error.code === 1033 ||
+      error.statusCode === 1033 ||
+      String(error.status) === "1033" ||
+      String(error.code) === "1033" ||
+      String(error.statusCode) === "1033"
+    ) {
+      return false;
+    }
     return false;
   }
 };
@@ -56,9 +130,11 @@ const checkInternetConnectivity = async () => {
 let currentStatus = {
   ok: true, // Start optimistically
   noInternet: false,
+  monitor: { ok: true },
   api: { ok: true },
   storage: { ok: true },
   lfs: { ok: true },
+  r2: { ok: true },
 };
 let lastCheck = null;
 let checkInterval = null;
@@ -81,9 +157,11 @@ export const checkServerStatus = async (force = false) => {
       currentStatus = {
         ok: false,
         noInternet: true,
+        monitor: { ok: false, error: "No internet connection" },
         api: { ok: false, error: "No internet connection" },
         storage: { ok: false, error: "No internet connection" },
         lfs: { ok: false, error: "No internet connection" },
+        r2: { ok: false, error: "No internet connection" },
       };
       lastCheck = Date.now();
       notifySubscribers();
@@ -92,17 +170,21 @@ export const checkServerStatus = async (force = false) => {
 
     // We have internet, check all services
     const results = await Promise.all([
+      checkEndpoint(ENDPOINTS.monitor),
       checkEndpoint(ENDPOINTS.api),
       checkEndpoint(ENDPOINTS.storage),
       checkEndpoint(ENDPOINTS.lfs),
+      checkEndpoint(ENDPOINTS.r2),
     ]);
 
     currentStatus = {
       ok: results.every(r => r.ok),
       noInternet: false,
-      api: results[0],
-      storage: results[1],
-      lfs: results[2],
+      monitor: results[0],
+      api: results[1],
+      storage: results[2],
+      lfs: results[3],
+      r2: results[4],
     };
 
     lastCheck = Date.now();
