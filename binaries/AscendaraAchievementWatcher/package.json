@@ -12,9 +12,10 @@
   "dependencies": {
     "find-up": "^4.1.0",
     "ini": "^4.1.1",
-    "single-instance": "^0.0.1",
+    "moment": "^2.29.1",
     "node-watch": "^0.7.4",
-    "moment": "^2.29.1"
+    "regedit": "^5.1.4",
+    "single-instance": "^0.0.1"
   },
   "devDependencies": {
     "pkg": "^5.8.1"

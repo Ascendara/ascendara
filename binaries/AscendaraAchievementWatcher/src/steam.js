@@ -152,8 +152,14 @@ async function getSteamData(appID, lang, key) {
   if (!(schema && schema.achievements && schema.achievements.length > 0))
     throw "Schema doesn't have any achievement";
 
+  // Use name provided by GetSchema if it exists
+  const schemaName = data.game.gameName;
+
+  // Search in AppList only if name is empty
+  const finalName = schemaName || (await findInAppList(+appID, key));
+
   const result = {
-    name: await findInAppList(+appID),
+    name: finalName,
     appid: appID,
     binary: null,
     img: {
@@ -171,7 +177,7 @@ async function getSteamData(appID, lang, key) {
   return result;
 }
 
-async function findInAppList(appID) {
+async function findInAppList(appID, key) {
   if (!appID || !(Number.isInteger(appID) && appID > 0)) throw "ERR_INVALID_APPID";
 
   const cache = path.join(
@@ -180,25 +186,53 @@ async function findInAppList(appID) {
   );
   const filepath = path.join(cache, "appList.json");
 
+  // 1. Try reading local cache
   try {
     const list = JSON.parse(await fs.readFile(filepath));
     const app = list.find(app => app.appid === appID);
-    if (!app) throw "ERR_NAME_NOT_FOUND";
-    return app.name;
-  } catch {
+    if (app) return app.name;
+  } catch (e) {}
+
+  // 2. Try download
+  try {
     // Ensure cache directory exists before writing
     await fs.mkdir(cache, { recursive: true });
-    const url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/?format=json";
-    console.log("Fetching appList.json from Steam Web API...");
-    const data = await fetchJson(url);
-    // Defensive: support both v1 and v2 formats
-    let list = data.applist?.apps || data.applist?.apps || [];
-    if (!Array.isArray(list)) throw "Invalid app list format from Steam API";
-    list.sort((a, b) => b.appid - a.appid); // recent first
+
+    console.log("Fetching App List from Steam...");
+
+    // 1st try: New API
+    let list = [];
+    if (key) {
+      try {
+        const url = `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${key}&max_results=50000`;
+        const data = await fetchJson(url);
+        list = data.response?.apps || [];
+      } catch (e) {
+        console.warn("IStoreService failed, trying fallback...");
+      }
+    }
+
+    // 2nd try: Old public API (Fallback)
+    if (!list.length) {
+      const url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/?format=json";
+      const data = await fetchJson(url);
+      list = data.applist?.apps || data.applist?.apps || [];
+    }
+
+    if (!Array.isArray(list) || list.length === 0)
+      throw "Invalid app list format from Steam API";
+
+    // Save cache
+    list.sort((a, b) => b.appid - a.appid);
     await fs.writeFile(filepath, JSON.stringify(list, null, 2));
     console.log("appList.json cached at", filepath);
+
     const app = list.find(app => app.appid === appID);
-    if (!app) throw "ERR_NAME_NOT_FOUND";
+    if (!app) return `AppID ${appID}`; // Fallback
     return app.name;
+  } catch (err) {
+    console.error("Failed to fetch App List:", err);
+    // Fix: return ID instead of crashing
+    return `AppID ${appID}`;
   }
 }

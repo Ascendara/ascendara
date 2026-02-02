@@ -15,6 +15,7 @@ const fs = require("fs").promises;
 const sse = require("./sse.js");
 const ini = require("ini");
 const { getSettings } = require("./userConfig.js");
+const regedit = require("regedit");
 
 const files = {
   achievement: [
