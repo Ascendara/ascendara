@@ -68,6 +68,8 @@ import {
   Check,
   Smartphone,
   ListEnd,
+  ShieldCheck,
+  Trophy,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -84,6 +86,7 @@ import {
 } from "@/services/providerPatternService";
 import nexusModsService from "@/services/nexusModsService";
 import flingTrainerService from "@/services/flingTrainerService";
+import verifiedGamesService from "@/services/verifiedGamesService";
 
 // Async validation using API patterns
 const isValidURL = async (url, provider, patterns) => {
@@ -362,6 +365,8 @@ export default function DownloadPage() {
   const [isPlayLater, setIsPlayLater] = useState(false);
   const [isIndexOutdated, setIsIndexOutdated] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
 
   // Fetch rating from new API when using local index
   useEffect(() => {
@@ -456,6 +461,15 @@ export default function DownloadPage() {
 
     checkFlingTrainerSupport();
   }, [gameData?.game]);
+
+  // Check if game is verified
+  useEffect(() => {
+    if (!gameData?.gameID) return;
+
+    verifiedGamesService.loadVerifiedGames().then(() => {
+      setIsVerified(verifiedGamesService.isVerified(gameData.gameID));
+    });
+  }, [gameData?.gameID]);
 
   // Check if game is in Play Later list
   useEffect(() => {
@@ -1591,6 +1605,29 @@ export default function DownloadPage() {
                     <div className="min-w-0 flex-1">
                       <h1 className="flex items-center gap-3 text-2xl font-bold leading-tight">
                         <span className="truncate">{gameData.game}</span>
+                        {isVerified && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setShowVerifiedDialog(true);
+                                  }}
+                                  className="group/verified relative flex cursor-pointer items-center justify-center rounded-full bg-primary/20 p-1 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-primary/30"
+                                  style={{
+                                    boxShadow: "0 0 8px rgba(59, 130, 246, 0.3)",
+                                  }}
+                                >
+                                  <ShieldCheck className="h-4 w-4 text-primary" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{t("gameCard.verified.tooltip")}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         {gameRating > 0 && (
                           <TooltipProvider>
                             <Tooltip>
@@ -3573,6 +3610,102 @@ export default function DownloadPage() {
                       : t("download.newUserGuide.nextStep")}
             </Button>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Verified Game Info Dialog */}
+      <AlertDialog open={showVerifiedDialog} onOpenChange={setShowVerifiedDialog}>
+        <AlertDialogContent className="max-w-md border-primary/20">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div
+                className="relative flex items-center justify-center rounded-full bg-gradient-to-br from-primary via-primary/90 to-primary/80 p-3"
+                style={{
+                  boxShadow:
+                    "0 0 25px rgba(59, 130, 246, 0.6), 0 0 50px rgba(59, 130, 246, 0.4), 0 0 75px rgba(59, 130, 246, 0.2)",
+                  filter: "drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))",
+                }}
+              >
+                <ShieldCheck className="h-7 w-7 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.6)]" />
+                <div className="absolute -inset-1 animate-pulse rounded-full bg-primary/40 blur-xl" />
+                <div
+                  className="absolute -inset-2 animate-pulse rounded-full bg-primary/20 blur-2xl"
+                  style={{ animationDelay: "0.5s" }}
+                />
+              </div>
+              <AlertDialogTitle className="text-2xl font-bold">
+                {t("gameCard.verified.dialogTitle")}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="space-y-4 pt-4 text-left">
+              <p className="text-base leading-relaxed">
+                {
+                  t("gameCard.verified.dialogDescription").split(
+                    "verified by the Ascendara community"
+                  )[0]
+                }
+                <span className="font-semibold text-primary">
+                  {
+                    t("gameCard.verified.dialogDescription").match(
+                      /verified by the Ascendara community/
+                    )?.[0]
+                  }
+                </span>
+                {
+                  t("gameCard.verified.dialogDescription").split(
+                    "verified by the Ascendara community"
+                  )[1]
+                }
+              </p>
+
+              <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start gap-3">
+                  <Trophy className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
+                  <div>
+                    <h4 className="font-semibold text-foreground">
+                      {t("gameCard.verified.highlyRated")}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {t("gameCard.verified.highlyRatedDesc")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Star className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
+                  <div>
+                    <h4 className="font-semibold text-foreground">
+                      {t("gameCard.verified.mostPopular")}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {t("gameCard.verified.mostPopularDesc")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
+                  <div>
+                    <h4 className="font-semibold text-foreground">
+                      {t("gameCard.verified.alwaysWorking")}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {t("gameCard.verified.alwaysWorkingDesc")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                {t("gameCard.verified.selectionCriteria")}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end pt-2">
+            <AlertDialogCancel className="border-primary/20 hover:bg-primary/10">
+              {t("gameCard.verified.gotIt")}
+            </AlertDialogCancel>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </div>
