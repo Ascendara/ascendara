@@ -22,7 +22,11 @@
   },
   "pkg": {
     "assets": [
-      "src/**/*"
+      "src/**/*",
+      "node_modules/regedit/vbs/**/*"
+    ],
+    "scripts": [
+      "node_modules/regedit/**/*.js"
     ],
     "outputPath": "dist"
   },
