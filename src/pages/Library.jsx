@@ -308,6 +308,11 @@ const Library = () => {
     };
   }, []);
 
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentPage]);
+
   // Keep current page in range. Avoid resetting during initial load when totalPages is 0.
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
