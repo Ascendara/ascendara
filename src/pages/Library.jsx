@@ -1659,7 +1659,7 @@ const Library = () => {
               <AlertDialogContent className="border-border bg-background sm:max-w-[425px]">
                 <AlertDialogHeader className="space-y-2">
                   <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                    {t("library.addGame")}
+                    {t("library.addGame.title")}
                   </AlertDialogTitle>
                   <AlertDialogDescription className="text-xs text-muted-foreground">
                     {t("library.addGameDescription2")}
@@ -2021,7 +2021,7 @@ const AddGameCard = React.forwardRef((props, ref) => {
         <div className="rounded-full bg-muted p-6 group-hover:bg-primary/10">
           <Plus className="h-8 w-8" />
         </div>
-        <h3 className="mt-4 text-lg font-semibold">{t("library.addGame")}</h3>
+        <h3 className="mt-4 text-lg font-semibold">{t("library.addGame.title")}</h3>
         <p className="mt-2 text-center text-sm">{t("library.addGameDescription1")}</p>
       </CardContent>
     </Card>
@@ -2798,6 +2798,7 @@ const AddGameForm = ({ onSuccess }) => {
     selectedCover: null,
   });
   const [coverImageUrls, setCoverImageUrls] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Add debounce timer ref
   const searchDebounceRef = useRef(null);
@@ -2913,18 +2914,67 @@ const AddGameForm = ({ onSuccess }) => {
   };
 
   const handleSubmit = async e => {
-    e.preventDefault();
-    // imgID is used for image file lookups in both local index and API
-    const coverImageId = coverSearch.selectedCover?.imgID;
-    await window.electron.addGame(
-      formData.name,
-      formData.isOnline,
-      formData.hasDLC,
-      formData.version,
-      formData.executable,
-      coverImageId
-    );
-    onSuccess();
+    if (e) e.preventDefault();
+
+    console.log("[AddGameForm] handleSubmit called", { formData, isSubmitting });
+
+    if (isSubmitting) {
+      console.log("[AddGameForm] Already submitting, returning");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      console.log("[AddGameForm] Checking for duplicate games...");
+      // Check if a game with this name already exists in the library
+      const installedGames = await window.electron.getGames();
+      const customGames = await window.electron.getCustomGames();
+
+      console.log("[AddGameForm] Got games:", {
+        installedCount: installedGames?.length,
+        customCount: customGames?.length,
+      });
+
+      const allExistingGames = [...(installedGames || []), ...(customGames || [])];
+
+      const gameExists = allExistingGames.some(
+        game => (game.game || game.name)?.toLowerCase() === formData.name.toLowerCase()
+      );
+
+      console.log("[AddGameForm] Duplicate check result:", {
+        gameExists,
+        gameName: formData.name,
+      });
+
+      if (gameExists) {
+        console.log("[AddGameForm] Duplicate found, showing error");
+        setIsSubmitting(false);
+        onSuccess(); // Close the add game dialog
+        toast.error(t("library.addGame.duplicateError"));
+        return;
+      }
+
+      console.log("[AddGameForm] Adding game to library...");
+      // imgID is used for image file lookups in both local index and API
+      const coverImageId = coverSearch.selectedCover?.imgID;
+      await window.electron.addGame(
+        formData.name,
+        formData.isOnline,
+        formData.hasDLC,
+        formData.version,
+        formData.executable,
+        coverImageId
+      );
+
+      console.log("[AddGameForm] Game added successfully");
+      setIsSubmitting(false);
+      onSuccess();
+    } catch (error) {
+      console.error("[AddGameForm] Error in handleSubmit:", error);
+      setIsSubmitting(false);
+      toast.error("Failed to add game. Please try again.");
+    }
   };
 
   return (
@@ -3239,11 +3289,19 @@ const AddGameForm = ({ onSuccess }) => {
           {t("common.cancel")}
         </Button>
         <Button
+          type="button"
           onClick={handleSubmit}
-          disabled={!formData.executable || !formData.name}
+          disabled={!formData.executable || !formData.name || isSubmitting}
           className="bg-primary text-secondary"
         >
-          {t("library.addGame")}
+          {isSubmitting ? (
+            <>
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              {t("common.loading")}
+            </>
+          ) : (
+            t("library.addGame.title")
+          )}
         </Button>
       </AlertDialogFooter>
     </div>

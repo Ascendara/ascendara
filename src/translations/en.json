@@ -1358,7 +1358,10 @@
   },
   "library": {
     "addFavorite": "Add to Favorites",
-    "addGame": "Add to Library",
+    "addGame": {
+      "duplicateError": "A game with this name already exists in your library. Please choose a different name.",
+      "title": "Add to Library"
+    },
     "addGameDescription1": "Add your own games or import from Steam.",
     "addGameDescription2": "Add a game to your Ascendara library to easily launch it and track play time. No files will be modified when adding a game.",
     "addToFavorites": "Add to Favorites",
