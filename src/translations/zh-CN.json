@@ -41,7 +41,7 @@
       "invalidEmail": "请输入有效的电子邮件地址",
       "passwordMismatch": "密码不匹配",
       "passwordRequired": "请输入您的密码",
-      "passwordRequirements": "密码必须有8位以上字符，包含大写、小写、数字、特殊字符",
+      "passwordRequirements": "密码必须有8个以上字符，包含大写、小写、数字和特殊字符",
       "signInInstead": "改为登录",
       "termsRequired": "请同意条款和隐私政策",
       "updateFailed": "更新个人资料失败"
@@ -225,7 +225,7 @@
       "trialBlockedMessage": "该设备已进行试用。订阅以访问 Ascend 功能。",
       "trialEndingSoon": "审判即将结束",
       "trialEndingSoonAction": "立即订阅以确保您的数据安全并继续享受 Ascend 功能。",
-      "trialEndingSoonMessage": "您的 Ascend 试用期将在 {{days}} 天后结束。试用期满后，您的云库和同步数据将在几天内删除。"
+      "trialEndingSoonMessage": "您的 Ascend 试用将在 {{days}} 天后结束。试用期满后，您的云库和同步数据将在几天内删除。"
     },
     "checkingVersion": "正在检查版本...",
     "cloudBackups": {
@@ -1089,7 +1089,7 @@
     "ascendRequired": {
       "description": "您已经有一个下载正在进行中。想要一次下载多个游戏？",
       "learnMore": "加入奥升德",
-      "suggestion": "加入 Ascend，解锁无限并发下载并支持 Ascendara 背后的独立开发者。或者先暂停当前的下载以开始此下载。",
+      "suggestion": "加入 Ascend，解锁无限同时下载并支持 Ascendara 背后的独立开发者。或者先暂停当前的下载以开始此下载。",
       "title": "一次下载多个游戏"
     },
     "completed": "下载完成",
@@ -1175,9 +1175,23 @@
     "onlineTooltip": "在线多人游戏",
     "playLater": "稍后玩",
     "ratingTooltip": "这是在 Ascendara 上下载并玩过该游戏的其他人的平均评分。",
-    "showLess": "显示更少",
+    "showLess": "显示较少",
     "update": "更新",
     "updateAvailable": "可用更新",
+    "verified": {
+      "alwaysWorking": "一直在工作",
+      "alwaysWorkingDesc": "经验证更新后可正常工作，并可与 Ascendara 的所有功能配合使用",
+      "badge": "已验证游戏",
+      "clickForInfo": "点击查看信息",
+      "dialogDescription": "该游戏已经过 Ascendara 社区的验证，适用于 Ascendara 的所有功能。",
+      "dialogTitle": "已验证游戏",
+      "gotIt": "知道了",
+      "highlyRated": "高度评价",
+      "highlyRatedDesc": "持续获得社区的优异评价",
+      "mostPopular": "最受欢迎",
+      "mostPopularDesc": "Ascendara 上下载和玩次数最多的游戏之一",
+      "selectionCriteria": "经过验证的游戏是根据社区反馈、下载统计数据和质量保证测试精心挑选的。"
+    },
     "viewDetails": "查看详情"
   },
   "gameScreen": {
@@ -1331,7 +1345,10 @@
   },
   "library": {
     "addFavorite": "添加到收藏夹",
-    "addGame": "添加到库",
+    "addGame": {
+      "duplicateError": "您的库中已存在同名游戏。请选择不同的名称。",
+      "title": "添加到库"
+    },
     "addGameDescription1": "添加您自己的游戏或从 Steam 导入。",
     "addGameDescription2": "将游戏添加到您的 Ascendara 库中以轻松启动它并跟踪游戏时间。添加游戏时不会修改任何文件。",
     "addToFavorites": "添加到收藏夹",
@@ -1830,17 +1847,26 @@
   },
   "server-status": {
     "api-description": "Ascendara 的主要 API 处理游戏信息、分析和报告。",
+    "api-name": "升腾API",
+    "api-subtitle": "主要终点",
+    "cdn-name": "CDN",
     "check-connection": "检查您的互联网连接并重新启动 Ascendara。",
     "description": "查看当前状态和服务器健康信息",
+    "down": "离线",
     "healthy": "所有服务器均可运行",
     "healthy-description": "所有服务器都按预期运行并响应。",
     "lfs-description": "大型文件服务器处理更大的文件，例如更新文件。",
+    "lfs-name": "线性FS",
+    "monitor-name": "监视器",
     "need-more-details": "需要更多详细信息吗？",
     "no-internet": "您目前处于离线状态。",
+    "operational": "操作",
+    "r2-name": "R2",
+    "service-status": "服务状态",
     "storage-description": "存储服务处理小型后台资产。",
     "title": "服务器状态",
     "unhealthy": "检测到服务器问题",
-    "unhealthy-description": "以下服务器当前遇到问题：",
+    "unhealthy-description": "某些服务目前遇到问题。",
     "visit-status-page": "访问状态页面"
   },
   "settings": {
@@ -1874,7 +1900,7 @@
     "behaviorAfterDownloadDescription": "选择下载完成后您的计算机应发生的情况。",
     "behaviors": {
       "lock": "锁",
-      "none": "什么都不做",
+      "none": "什么也不做",
       "shutdown": "关闭",
       "sleep": "睡觉"
     },

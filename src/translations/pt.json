@@ -245,7 +245,7 @@
       "restoreSuccess": "Backup restaurado com sucesso",
       "restoringBackup": "Restaurando backup...",
       "subscriptionRequired": "É necessária uma assinatura ativa do Ascend",
-      "subscriptionRequiredDesc": "Os backups na nuvem requerem uma assinatura Ascend ativa. Atualize para acessar esse recurso.",
+      "subscriptionRequiredDesc": "Os backups na nuvem requerem uma assinatura Ascend ativa. Atualize para acessar este recurso.",
       "subtitle": "Faça backup e restaure seus jogos salvos",
       "title": "Backups na nuvem",
       "uploadError": "Falha ao carregar backup",
@@ -435,7 +435,7 @@
         "title": "Comunidades de jogos"
       },
       "downloadQueue": {
-        "description": "Coloque vários downloads na fila e deixe o Ascendara cuidar deles automaticamente. Inicie os downloads e volte quando estiverem prontos.",
+        "description": "Coloque vários downloads na fila e deixe o Ascendara lidar com eles automaticamente. Inicie os downloads e volte quando estiverem todos prontos.",
         "title": "Fila de download"
       },
       "flingTrainer": {
@@ -505,7 +505,7 @@
       "topGames": "Principais jogos",
       "totalPlaytime": "Tempo total de jogo",
       "totalXP": "EXP total",
-      "xp": "EXP",
+      "xp": "XP",
       "yourLevel": "Seu nível"
     },
     "report": {
@@ -530,7 +530,7 @@
     "requests": {
       "accept": "Aceitar",
       "cancel": "Cancelar",
-      "empty": "Nenhum pedido de amizade pendente",
+      "empty": "Não há solicitações de amizade pendentes",
       "incoming": "Solicitações recebidas",
       "noIncoming": "Nenhuma solicitação recebida",
       "noOutgoing": "Nenhuma solicitação de saída",
@@ -745,7 +745,7 @@
     "enterBigPicture": "Entre no quadro geral",
     "exit": "SAÍDA",
     "exitBigPicture": "SAIR DA IMAGEM GRANDE",
-    "exitBigPictureConfirm": "Sair do quadro geral?",
+    "exitBigPictureConfirm": "Sair do panorama geral?",
     "exitBigPictureMessage": "Tem certeza de que deseja sair do modo Big Picture e retornar à interface normal do Ascendara?",
     "exitToDownload": "Saia do Big Picture para fazer o download",
     "exitToDownloadMessage": "Para baixar jogos, você precisa sair do modo Big Picture e usar a interface normal do Ascendara. Você gostaria de sair agora?",
@@ -758,7 +758,7 @@
     "keyboardLayout": "Layout do teclado",
     "keyboardLayoutAzerty": "AZERTY",
     "keyboardLayoutQwerty": "QWERTY",
-    "killDownload": "Matar Baixar",
+    "killDownload": "Matar baixar",
     "lastPlayed": "ÚLTIMO JOGADO",
     "launching": "LANÇAMENTO...",
     "library": "BIBLIOTECA",
@@ -844,7 +844,7 @@
       "couldNotReportDesc": "Seu relatório não foi enviado. Por favor, tente novamente mais tarde.",
       "description": "Ajude a melhorar o Ascendara relatando quaisquer problemas que encontrar.",
       "detailsLabel": "Detalhes",
-      "detailsPlaceholder": "Forneça mais detalhes sobre o assunto...",
+      "detailsPlaceholder": "Forneça mais detalhes sobre o problema...",
       "error": "Falha ao enviar relatório",
       "missingInfo": "Informações ausentes",
       "missingInfoDesc": "Por favor preencha todos os campos obrigatórios.",
@@ -1074,12 +1074,12 @@
     },
     "viewCriticReviews": "Ver avaliações dos críticos",
     "viewOnOpenCritic": "Ver no OpenCritic",
-    "yourPC": "Seu PC"
+    "yourPC": "Seu computador"
   },
   "downloads": {
     "actions": {
       "cancelAndDelete": "Cancelar e excluir",
-      "killDownload": "Matar Baixar",
+      "killDownload": "Matar baixar",
       "killDownloadDescription": "Isso interromperá permanentemente o download e excluirá todos os arquivos baixados. Esta ação não pode ser desfeita.",
       "killDownloadTitle": "Matar download para {{gameName}}?",
       "legacyGameVerification": "A verificação de arquivos está disponível apenas para jogos baixados após a versão 8.1.2 do Ascendara",
@@ -1119,13 +1119,13 @@
       "title": "Baixando no Ascendara",
       "understand": "Eu entendo"
     },
-    "kill": "Matar Baixar",
+    "kill": "Matar baixar",
     "killSuccess": "Download morto e arquivos excluídos",
     "largeFileNotice": "Este arquivo é maior que os outros e está demorando mais para ser extraído...",
     "limitedTo": "Limitado a",
     "noDownloads": "Bem, isso é relaxante...",
     "noDownloadsMessage": "Você não está baixando nada no momento, inicie um download para acompanhar o progresso aqui.",
-    "noFilesError": "O downloader não encontrou nenhum arquivo para baixar. Isso provavelmente significa que o arquivo foi removido da fonte.",
+    "noFilesError": "O downloader não encontrou nenhum arquivo para baixar. Provavelmente, isso significa que o arquivo foi removido da fonte.",
     "noSpaceLeftError": "Não há mais espaço no dispositivo. Libere espaço em disco para continuar o download.",
     "openFolder": "Abrir pasta",
     "pause": "Pausa",
@@ -1185,6 +1185,20 @@
     "showLess": "Mostrar menos",
     "update": "Atualizar",
     "updateAvailable": "Atualização disponível",
+    "verified": {
+      "alwaysWorking": "Sempre trabalhando",
+      "alwaysWorkingDesc": "Verificado para funcionar corretamente após atualizações e funciona com todos os recursos do Ascendara",
+      "badge": "Jogo verificado",
+      "clickForInfo": "Clique para informações",
+      "dialogDescription": "Este jogo foi verificado pela comunidade Ascendara e funciona com todos os recursos do Ascendara.",
+      "dialogTitle": "Jogo verificado",
+      "gotIt": "Entendi",
+      "highlyRated": "Altamente avaliado",
+      "highlyRatedDesc": "Recebe consistentemente avaliações excelentes da comunidade",
+      "mostPopular": "Mais populares",
+      "mostPopularDesc": "Entre os jogos mais baixados e jogados no Ascendara",
+      "selectionCriteria": "Os jogos verificados são cuidadosamente selecionados com base no feedback da comunidade, estatísticas de download e testes de garantia de qualidade."
+    },
     "viewDetails": "Ver detalhes"
   },
   "gameScreen": {
@@ -1293,7 +1307,7 @@
     "updateStarted": "O download da atualização foi iniciado!",
     "viewAll": "Ver tudo",
     "viewOnFling": "Ver no FLiNG",
-    "viewOnNexus": "Ver em mods Nexus"
+    "viewOnNexus": "Ver em Mods Nexus"
   },
   "globalSearch": {
     "categories": {
@@ -1342,7 +1356,10 @@
   },
   "library": {
     "addFavorite": "Adicionar aos Favoritos",
-    "addGame": "Adicionar à biblioteca",
+    "addGame": {
+      "duplicateError": "Já existe um jogo com este nome na sua biblioteca. Escolha um nome diferente.",
+      "title": "Adicionar à biblioteca"
+    },
     "addGameDescription1": "Adicione seus próprios jogos ou importe do Steam.",
     "addGameDescription2": "Adicione um jogo à sua biblioteca Ascendara para iniciá-lo facilmente e monitorar o tempo de jogo. Nenhum arquivo será modificado ao adicionar um jogo.",
     "addToFavorites": "Adicionar aos Favoritos",
@@ -1813,7 +1830,7 @@
     "filterOptions": "Opções de filtro",
     "filters": "Filtros",
     "gamesIndexed": "Jogos indexados",
-    "indexedInformation": "Informações Indexadas",
+    "indexedInformation": "Informações indexadas",
     "indexedInformationDescription": "Ascendara usa um banco de dados desenvolvido sob medida para armazenar links e informações de jogos. As informações indexadas são atualizadas a cada dois dias ou se uma solicitação for feita. Nenhum arquivo de jogo é armazenado nos servidores Ascendara.",
     "lastUpdated": "Última atualização",
     "leastPopular": "Menos Popular",
@@ -1844,17 +1861,26 @@
   },
   "server-status": {
     "api-description": "A API principal do Ascendara lida com informações, análises e relatórios do jogo.",
+    "api-name": "API Ascendara",
+    "api-subtitle": "Ponto final principal",
+    "cdn-name": "CDN",
     "check-connection": "Verifique sua conexão com a internet e reinicie o Ascendara.",
     "description": "Visualize o status atual e as informações de integridade do servidor",
+    "down": "Off-line",
     "healthy": "Todos os servidores operacionais",
     "healthy-description": "Todos os servidores estão funcionando e respondendo conforme o esperado.",
     "lfs-description": "O Large File Server lida com arquivos maiores, como arquivos de atualização.",
+    "lfs-name": "LFS",
+    "monitor-name": "Monitor",
     "need-more-details": "Precisa de mais detalhes?",
     "no-internet": "Você está off-line no momento.",
+    "operational": "Operacional",
+    "r2-name": "R2",
+    "service-status": "Status do serviço",
     "storage-description": "O serviço de armazenamento lida com pequenos ativos em segundo plano.",
     "title": "Status do servidor",
     "unhealthy": "Problemas de servidor detectados",
-    "unhealthy-description": "Os seguintes servidores estão enfrentando problemas no momento:",
+    "unhealthy-description": "Alguns serviços estão enfrentando problemas no momento.",
     "visit-status-page": "Visite a página de status"
   },
   "settings": {
@@ -1878,7 +1904,7 @@
     "ascendaraTimechine": "Máquina do Tempo Ascendara",
     "ascendaraToggleAnalytics": "Inscreva-se e ajude a melhorar o Ascendara",
     "ascendaraUpdates": "Atualizações Automáticas",
-    "ascendaraUpdatesDescription": "Baixe automaticamente novas versões do Ascendara e peça para você instalá-las quando estiver pronto.",
+    "ascendaraUpdatesDescription": "Baixe automaticamente novas versões do Ascendara e peça para instalá-las quando estiver pronto.",
     "ascendaraWorkshopDownloader": "Downloader de oficina",
     "ascendaraWorkshopDownloaderDescription": "O Workshop Downloader permite baixar itens do Steam Workshop sem a necessidade de ter uma conta.",
     "ascendaraWorkshopDownloaderEnable": "Mostrar na barra de navegação",
@@ -1925,7 +1951,7 @@
       "extreme": "Extremo (>48 threads) – Use com cuidado",
       "high": "Alto (25-32 threads) – Downloads rápidos",
       "low": "Baixo (<8 threads) - Uso mínimo da CPU",
-      "normal": "Normal (8-24 threads) – Recomendado para a maioria dos usuários",
+      "normal": "Normal (8 a 24 threads) – Recomendado para a maioria dos usuários",
       "veryHigh": "Muito Alto (33-48 threads) – Para conexões muito rápidas"
     },
     "downloaderRunningWarning": "Você não pode alterar essas configurações enquanto um download estiver em andamento",
@@ -2093,7 +2119,7 @@
     "title": "Preferências do Ascendara",
     "torboxApiKey": "Chave API Torbox",
     "torboxApiKeyDescription": "Os serviços Debrid permitem converter links de host de arquivos em links premium de download direto, ignorando limites de velocidade e tempos de espera. Insira sua chave API Torbox aqui para ativar este recurso.",
-    "torboxApiKeyLearnHowtoGet": "Aprenda como obter sua chave API",
+    "torboxApiKeyLearnHowtoGet": "Saiba como obter sua chave API",
     "torboxApiKeyPlaceholder": "Colar a chave da API Torbox",
     "torrentDescription": "Ative a funcionalidade de torrent do Ascendara. Este recurso requer a instalação do qBittorrent e é recomendado apenas para usuários experientes.",
     "torrentOnAscendara": "Torrent em Ascendara",
@@ -2107,7 +2133,7 @@
       "vpnWarning": "Seu endereço IP ficará visível para outros pares. Use uma VPN para proteger sua privacidade e evitar possíveis problemas legais."
     },
     "torrenting": "Torrent",
-    "torrentingDescription": "Configure downloads de torrent no Ascendara. Torrent requer qBittorrent e uma VPN é altamente recomendada.",
+    "torrentingDescription": "Configure downloads de torrent no Ascendara. O torrent requer qBittorrent e uma VPN é altamente recomendada.",
     "uploadLogs": "Carregar registros",
     "userSettings": {
       "browseDirectory": "Navegar",
@@ -2170,7 +2196,7 @@
     "ready_to_download": "Pronto para baixar",
     "redownload": "Baixar novamente",
     "redownload_same_file": "Baixar novamente o arquivo?",
-    "redownload_same_file_confirm": "Tem certeza de que deseja baixar este arquivo novamente? Isso substituirá o download anterior.",
+    "redownload_same_file_confirm": "Tem certeza de que deseja baixar novamente este arquivo? Isso substituirá o download anterior.",
     "starting_download_to_pc": "Iniciando o download para o PC",
     "stop_download": "Parar download",
     "stop_download_confirm": "Tem certeza de que deseja interromper o download de {{name}}?",
@@ -2263,7 +2289,7 @@
     "continue": "Continuar",
     "continueWithoutSharing": "Continuar sem compartilhar",
     "darkThemes": "Temas escuros",
-    "dependenciesDesc": "Se você estiver jogando em um PC novo ou instalou recentemente o Windows, Ascendara pode ajudá-lo a instalar esses componentes essenciais para garantir a melhor experiência",
+    "dependenciesDesc": "Se você está jogando em um PC novo ou instalou recentemente o Windows, Ascendara pode ajudá-lo a instalar esses componentes essenciais para garantir a melhor experiência",
     "downloadGamesFaster": "Obtenha a extensão Ascendara",
     "enableAutoUpdates": "Habilitar atualizações automáticas",
     "errorInstallingDependencies": "Erro ao instalar dependências",
@@ -2280,7 +2306,7 @@
     "graphicsAndMultimedia": "Gráficos e multimídia",
     "havePython": "Eu tenho Python",
     "haveWine": "Eu tenho isso, leve-me para o tour",
-    "helpIdentifyAndFix": "Ajude a identificar e corrigir problemas mais rapidamente",
+    "helpIdentifyAndFix": "Ajude a identificar e corrigir problemas com mais rapidez",
     "helpIdentifyAndFixDesc": "Todos os erros serão enviados automaticamente para o Analytics com um sinalizador urgente, colocando-os no topo da lista",
     "helpImprove": "Ajude a melhorar o Ascendara",
     "howItWorks": "Como funciona:",
@@ -2297,7 +2323,7 @@
     "installingDependencies": "Instalando dependências...",
     "lightThemes": "Temas claros",
     "lightningFastDesc": "O V7 é otimizado para velocidade e desempenho para tornar sua experiência mais suave e rápida do que nunca",
-    "lightningFastTitle": "Rápido como um raio",
+    "lightningFastTitle": "Relâmpago",
     "localIndex": {
       "canContinue": "Você pode continuar com a configuração enquanto o índice é criado em segundo plano",
       "point1": "Navegue e pesquise jogos instantaneamente sem esperar pelas respostas da API",
@@ -2318,7 +2344,7 @@
     "notEnoughSpaceWarning": "Uau! Você tem menos de 40 GB de espaço livre na unidade selecionada. Considere liberar espaço ou selecionar uma unidade diferente.",
     "noticeAppIsFree": {
       "point1": "Downloads e tudo relacionado a jogos no Ascendara serão sempre gratuitos",
-      "point2": "Ascendara não solicitará dados pessoais para baixar ou jogar jogos",
+      "point2": "Ascendara não pedirá dados pessoais para baixar ou jogar jogos",
       "point3": "Se você optar por ingressar no Ascend, precisará criar uma conta para esses recursos",
       "point4": "Os dados anônimos só são compartilhados se você aceitar, e você pode alterar isso a qualquer momento em Configurações",
       "subtitle": "Se você pagou pelo Ascendara, foi enganado. Entre em contato com seu banco imediatamente.",
@@ -2378,7 +2404,7 @@
     "welcomeTo": "Bem-vindo ao",
     "welcomeToAscendaraDescription": "Você está quase pronto para começar a usar o Ascendara. Passaremos juntos pelo processo de integração e depois configuraremos o índice do jogo, mas primeiro leia os Termos de Serviço e a Política de Privacidade.",
     "whenYouClickADownloadLink": "Quando você inicia um download de um provedor conhecido, a extensão irá interromper automaticamente o download no seu navegador e iniciá-lo para você no Ascendara",
-    "wineIsRequired": "Brinque com vinho",
+    "wineIsRequired": "Brinque com Vinho",
     "wineMustBeInstalled": "Wine, DXVK e outras ferramentas precisam ser instaladas e configuradas em seu computador para executar jogos do Windows. Não se preocupe, o Ascendara pode instalar e configurar tudo só para você",
     "youCanAddMoreLater": "Você pode adicionar mais diretórios nas preferências posteriormente",
     "youCanChangeThisLater": "Você sempre pode atualizar seu idioma posteriormente em Configurações.",

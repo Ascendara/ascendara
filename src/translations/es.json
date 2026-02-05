@@ -645,7 +645,7 @@
         "perMonth": "/mes",
         "save": "Guardar {{percent}}",
         "saveText": "Ahorrar",
-        "selectPlan": "Seleccionar Plan",
+        "selectPlan": "Seleccionar plan",
         "title": "Elige tu plan Ascend"
       },
       "subscriptionSuccessMessage": "Ahora tiene acceso completo a todas las funciones premium. ¡Gracias por su apoyo!",
@@ -1181,6 +1181,20 @@
     "showLess": "Mostrar menos",
     "update": "Actualizar",
     "updateAvailable": "Actualización disponible",
+    "verified": {
+      "alwaysWorking": "Siempre trabajando",
+      "alwaysWorkingDesc": "Verificado para funcionar correctamente después de las actualizaciones y funciona con todas las funciones de Ascendara",
+      "badge": "Juego verificado",
+      "clickForInfo": "Haga clic para obtener información",
+      "dialogDescription": "Este juego ha sido verificado por la comunidad de Ascendara y funciona con todas las funciones de Ascendara.",
+      "dialogTitle": "Juego verificado",
+      "gotIt": "Entiendo",
+      "highlyRated": "Altamente calificado",
+      "highlyRatedDesc": "Recibe constantemente excelentes calificaciones de la comunidad.",
+      "mostPopular": "Más Popular",
+      "mostPopularDesc": "Entre los juegos más descargados y jugados en Ascendara",
+      "selectionCriteria": "Los juegos verificados se seleccionan cuidadosamente en función de los comentarios de la comunidad, las estadísticas de descarga y las pruebas de control de calidad."
+    },
     "viewDetails": "Ver detalles"
   },
   "gameScreen": {
@@ -1338,7 +1352,10 @@
   },
   "library": {
     "addFavorite": "Añadir a favoritos",
-    "addGame": "Agregar a la biblioteca",
+    "addGame": {
+      "duplicateError": "Ya existe un juego con este nombre en tu biblioteca. Elija un nombre diferente.",
+      "title": "Agregar a la biblioteca"
+    },
     "addGameDescription1": "Añade tus propios juegos o impórtalos desde Steam.",
     "addGameDescription2": "Agrega un juego a tu biblioteca de Ascendara para iniciarlo fácilmente y realizar un seguimiento del tiempo de juego. No se modificarán archivos al agregar un juego.",
     "addToFavorites": "Añadir a favoritos",
@@ -1630,7 +1647,7 @@
     "blacklistWarning": "Tu índice no se compartirá porque tienes juegos personalizados en la lista negra. Elimínelos para compartir su índice con la comunidad.",
     "cookieRefreshFailed": "No se pudo actualizar la cookie",
     "cookieRefreshed": "Cookie actualizada, reanudando...",
-    "dayAgo": "hace un dia",
+    "dayAgo": "hace un día",
     "daysAgo": "hace dias",
     "description": "Actualiza el índice de tu juego para ver los últimos juegos disponibles.",
     "done": "Hecho",
@@ -1840,17 +1857,26 @@
   },
   "server-status": {
     "api-description": "La API principal de Ascendara maneja información, análisis e informes del juego.",
+    "api-name": "API de Ascendara",
+    "api-subtitle": "Punto final principal",
+    "cdn-name": "CDN",
     "check-connection": "Verifique su conexión a Internet y reinicie Ascendara.",
     "description": "Ver el estado actual y la información de salud del servidor",
+    "down": "Desconectado",
     "healthy": "Todos los servidores operativos",
     "healthy-description": "Todos los servidores están funcionando y respondiendo como se esperaba.",
     "lfs-description": "Large File Server maneja archivos más grandes, como archivos de actualización.",
+    "lfs-name": "LFS",
+    "monitor-name": "Monitor",
     "need-more-details": "¿Necesitas más detalles?",
     "no-internet": "Actualmente estás desconectado.",
+    "operational": "Operacional",
+    "r2-name": "R2",
+    "service-status": "Estado del servicio",
     "storage-description": "El servicio de almacenamiento maneja pequeños activos en segundo plano.",
     "title": "Estado del servidor",
     "unhealthy": "Problemas del servidor detectados",
-    "unhealthy-description": "Los siguientes servidores están experimentando problemas actualmente:",
+    "unhealthy-description": "Algunos servicios están experimentando problemas actualmente.",
     "visit-status-page": "Visitar la página de estado"
   },
   "settings": {
@@ -1895,7 +1921,7 @@
     "communityThemes": "Temas de la comunidad",
     "communityThemesDescription": "Explore y aplique temas creados por la comunidad. ¿Quieres enviar el tuyo propio?",
     "components": "Componentes de la aplicación",
-    "componentsDescription": "Vea todos los complementos de aplicaciones oficiales y compruebe qué dependencias del juego están instaladas. También puede reinstalar las dependencias necesarias desde esta página.",
+    "componentsDescription": "Vea todos los complementos de aplicaciones oficiales y compruebe qué dependencias del juego están instaladas. También puede reinstalar las dependencias requeridas desde esta página.",
     "controllerConnected": "Controlador conectado",
     "controllerConnectedDescription": "Listo para usar el modo Imagen Grande",
     "controllerType": "Tipo de controlador",
@@ -2126,7 +2152,7 @@
     "warningTitle": "¡Hola, por favor lee esto!"
   },
   "torbox": {
-    "account": "Cuenta Torbox",
+    "account": "Cuenta TorBox",
     "completed": "Terminado",
     "data": "Datos",
     "data_refreshed": "Datos de TorBox actualizados",
@@ -2353,7 +2379,7 @@
     "securityPatchesDesc": "Manténgase protegido con importantes actualizaciones de seguridad",
     "securityPatchesTitle": "Parches de seguridad",
     "seeEntireList": "Ver la lista completa de 105 idiomas",
-    "seeWhatsNew": "Ver las novedades",
+    "seeWhatsNew": "Ver lo nuevo",
     "selectADirectory": "Seleccione un directorio...",
     "selectWhereYouWantYourGamesToBeDownloaded": "Selecciona dónde quieres que se descarguen tus juegos",
     "shareAndImprove": "Compartir y mejorar",
