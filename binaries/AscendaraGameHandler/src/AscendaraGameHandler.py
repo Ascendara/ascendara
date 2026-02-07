@@ -154,30 +154,47 @@ def is_process_running(exe_path):
         logging.info(f"[EXIT] is_process_running() - Exception")
         return False
 
-def update_play_time(file_path, is_custom_game, game_entry=None):
+def update_play_time(file_path, is_custom_game, game_entry=None, seconds_to_add=180):
     """Update the playTime field in either the game's JSON file or games.json for custom games"""
-    logging.info(f"[ENTRY] update_play_time(file_path={file_path}, is_custom_game={is_custom_game})")
+    logging.info(f"[ENTRY] update_play_time(file_path={file_path}, is_custom_game={is_custom_game}, add={seconds_to_add})")
+    
     try:
+        # 1. Read file
         logging.debug(f"Updating play time for {'custom' if is_custom_game else 'regular'} game at {file_path}")
         with open(file_path, "r", encoding='utf-8') as f:
             data = json.load(f)
+            
         if is_custom_game:
+            # 2. Custom Game Case
             for game in data["games"]:
                 if game["executable"] == game_entry["executable"]:
                     if "playTime" not in game:
                         game["playTime"] = 0
-                    game["playTime"] += 1
-                    logging.info(f"Updated play time for custom game {game_entry.get('name', 'Unknown')}: {game['playTime']} minutes")
+                    
+                    game["playTime"] += seconds_to_add
+                    
+                    # Get name
+                    actual_name = game.get('game') or game.get('name') or game_entry.get('name', 'Unknown')
+                    logging.info(f"Updated play time for custom game {actual_name}: {game['playTime']} seconds")
                     break
         else:
+            # 3. Not Custom Game
             if "playTime" not in data:
                 data["playTime"] = 0
-            data["playTime"] += 1
-            logging.info(f"Updated play time for game: {data['playTime']} minutes")
+            
+            data["playTime"] += seconds_to_add
+            
+            # Get Name
+            actual_name = data.get('game') or data.get('name') or "Regular Game"
+            logging.info(f"Updated play time for game {actual_name}: {data['playTime']} seconds")
+
+        # 4. Write file
         with open(file_path, "w", encoding='utf-8') as f:
             json.dump(data, f, indent=4)
+        
         logging.debug("Play time update saved successfully")
-        logging.info(f"[EXIT] update_play_time() - Success")
+        logging.info(f"[EXIT] update_play_time() - Success (+{seconds_to_add} seconds)")
+        
     except Exception as e:
         logging.error(f"Failed to update play time: {e}", exc_info=True)
         logging.info(f"[EXIT] update_play_time() - Exception")
@@ -566,20 +583,25 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             else:
                 logging.warning(f"Trainer not found at: {trainer_path}")
 
-        logging.info("Entering game process monitoring loop")
+        logging.info("Entering game process monitoring loop (180s intervals)")
         while process.poll() is None:
             current_time = time.time()
             elapsed = int(current_time - last_update)
-            if elapsed >= 1:
-                last_play_time = elapsed
+            
+            # Wait 180 seconds (3 minutes)
+            if elapsed >= 180: 
                 if is_custom_game and games_json_path:
                     logging.debug(f"Updating play time for custom game during run: {game_name}")
-                    update_play_time(games_json_path, True, game_entry)
+                    update_play_time(games_json_path, True, game_entry, seconds_to_add=180)
                 elif json_file_path:
                     logging.debug(f"Updating play time for regular game during run: {game_name}")
-                    update_play_time(json_file_path, False)
+                    update_play_time(json_file_path, False, seconds_to_add=180)
+                
                 last_update = current_time
-            time.sleep(0.1)
+                last_play_time += 180
+                logging.info(f"Interval reached: Added 180 seconds to {game_name}")
+                
+            time.sleep(1)
         logging.info("Game process ended")
 
         process.wait()
@@ -622,9 +644,6 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 data = json.load(f)
             for game in data["games"]:
                 if game["executable"] == exe_path:
-                    if last_play_time < 1 and "playTime" in game:
-                        game["playTime"] = max(0, game["playTime"] - 1)
-                        logging.info(f"Play time for custom game {game_name} was less than 1 minute; decremented playTime")
                     game["isRunning"] = False
                     logging.info(f"Set isRunning=False for custom game {game_name}")
                     break
@@ -633,9 +652,6 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         elif json_file_path:
             with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
-            if last_play_time < 1:
-                data["playTime"] = max(0, data["playTime"] - 1)
-                logging.info(f"Play time for game {game_name} was less than 1 minute; decremented playTime")
             data["isRunning"] = False
             logging.info(f"Set isRunning=False for game {game_name}")
             with open(json_file_path, "w", encoding='utf-8') as f:
