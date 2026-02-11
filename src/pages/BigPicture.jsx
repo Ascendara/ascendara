@@ -91,6 +91,8 @@ import {
   reorderQueue,
   processNextInQueue,
 } from "@/services/downloadQueueService";
+import LaunchOverlay from "@/components/LaunchOverlay";
+import { motion, AnimatePresence } from "framer-motion";
 
 // UTILS
 const formatBytes = (bytes, decimals = 2) => {
@@ -250,11 +252,6 @@ let lastLogTime = 0;
 const getGamepadInput = () => {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
 
-  // On cherche la première manette qui :
-  // 1. Est connectée
-  // 2. N'est pas nulle
-  // 3. Possède au moins 4 axes (2 joysticks) OU au moins 10 boutons (pour être sûr que c'est une manette de jeu)
-  // 4. A un mapping "standard" (optionnel, mais aide souvent pour les manettes Xbox/PS)
   const gp = Array.from(gamepads).find(
     g => g && g.connected && (g.axes.length >= 2 || g.buttons.length >= 10)
   );
@@ -2801,6 +2798,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
   const { settings } = useSettings();
   const [logoSrc, setLogoSrc] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
+  const [gridSrc, setGridSrc] = useState(null);
   const [hasHeroImage, setHasHeroImage] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -2901,6 +2899,26 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
       }
     };
     loadHero();
+    return () => {
+      isMounted = false;
+    };
+  }, [gameName]);
+
+  // Load game grid
+  useEffect(() => {
+    let isMounted = true;
+    const loadGrid = async () => {
+      try {
+        console.log("[InstalledGameDetailsView] Loading grid image for:", gameName);
+        const gridBase64 = await window.electron.getGameImage(gameName, "grid");
+        if (isMounted && gridBase64) {
+          setGridSrc(`data:image/jpeg;base64,${gridBase64}`);
+        }
+      } catch (e) {
+        console.error("[InstalledGameDetailsView] Error loading grid image:", e);
+      }
+    };
+    loadGrid();
     return () => {
       isMounted = false;
     };
@@ -3092,7 +3110,14 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         dlc: game.dlc,
       });
 
-      setIsLaunching(false);
+      // Considers that the game is running
+      setIsRunning(true);
+
+      // Keep the "Launching" status a little longer for the animation
+      setTimeout(() => {
+        setIsLaunching(false);
+      }, 10000);
+
       setTimeout(() => toast.success(t("library.gameLaunched", { game: gameName })), 0);
     } catch (error) {
       console.error("Error launching game:", error);
@@ -4281,6 +4306,18 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
           }
         }}
       />
+
+      <AnimatePresence>
+        {isLaunching && (
+          <LaunchOverlay
+            isVisible={true}
+            gameName={gameName}
+            logoSrc={logoSrc}
+            gridSrc={gridSrc}
+            bgSrc={bgImage}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -419,7 +419,15 @@ function registerGameHandlers() {
         event.sender.send("game-launch-success", { game });
 
         if (settings.hideOnGameLaunch !== false) {
-          hideWindow();
+          const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+          // Verify URL
+          const isBP = win && win.webContents.getURL().includes("bigpicture");
+
+          if (isBP) {
+            setTimeout(hideWindow, 10200);
+          } else {
+            hideWindow();
+          }
         }
 
         // Download Steamgriddb assets
