@@ -22,6 +22,7 @@ import imageCacheService from "@/services/imageCacheService";
 const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
+  const [localCoverImageUrls, setLocalCoverImageUrls] = useState({});
   const [activeTab, setActiveTab] = useState("search");
   const [coverSearch, setCoverSearch] = useState({
     query: "",
@@ -35,6 +36,37 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
     isLoading: false,
     error: null,
   });
+
+  useEffect(() => {
+    if (settings.usingLocalIndex && coverSearch.results.length > 0) {
+      const loadImages = async () => {
+        const urls = {};
+
+        // Loading images in parallel but with a limit
+        const loadPromises = coverSearch.results.map(async cover => {
+          if (cover.imgID) {
+            try {
+              const imageUrl = await imageCacheService.getImage(cover.imgID, {
+                quality: "low",
+                priority: "normal",
+              });
+              if (imageUrl) {
+                urls[cover.imgID] = imageUrl;
+              }
+            } catch (e) {
+              console.warn(`Failed to load image for ${cover.imgID}:`, e);
+            }
+          }
+        });
+
+        // Waiting for all images to load
+        await Promise.all(loadPromises);
+        setLocalCoverImageUrls(urls);
+      };
+
+      loadImages();
+    }
+  }, [coverSearch.results, settings.usingLocalIndex]);
 
   // Add debounce timer ref
   const searchDebounceRef = useRef(null);
@@ -279,8 +311,8 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
                   >
                     <img
                       src={
-                        settings.usingLocalIndex && cover.gameID
-                          ? gameService.getImageUrlByGameId(cover.gameID)
+                        settings.usingLocalIndex && cover.imgID
+                          ? localCoverImageUrls[cover.imgID] || ""
                           : gameService.getImageUrl(cover.imgID)
                       }
                       alt={cover.title}
