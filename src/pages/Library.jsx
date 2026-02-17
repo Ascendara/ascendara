@@ -2824,7 +2824,72 @@ const AddGameForm = ({ onSuccess }) => {
     searchDebounceRef.current = setTimeout(async () => {
       setCoverSearch(prev => ({ ...prev, isLoading: true }));
       try {
-        // Try Steam API first for better metadata
+        // If using local index, search in the local JSON file first
+        if (settings.usingLocalIndex && settings.localIndex) {
+          try {
+            // Load the local index JSON file
+            const indexPath = `${settings.localIndex}/ascendara_games.json`;
+            const indexData = await window.electron.ipcRenderer.readFile(
+              indexPath,
+              "utf8"
+            );
+            const indexJson = JSON.parse(indexData);
+
+            // Search for games matching the query (case-insensitive)
+            const queryLower = query.toLowerCase();
+            const matchingGames = indexJson.games
+              .filter(game => game.game.toLowerCase().includes(queryLower))
+              .slice(0, 9);
+
+            if (matchingGames.length > 0) {
+              // Transform results to match the expected format
+              const results = matchingGames.map(game => ({
+                game: game.game,
+                gameID: game.gameID,
+                imgID: game.imgID, // Use the actual imgID from local index (e.g., "mgw2o9lzyy")
+                img: null, // Will be loaded from local file
+                size: game.size,
+                version: game.version,
+                online: game.online,
+                dlc: game.dlc,
+              }));
+
+              const firstResult = results[0];
+              setCoverSearch(prev => ({
+                ...prev,
+                results: results,
+                selectedCover: firstResult, // Auto-select first result
+                isLoading: false,
+              }));
+
+              // Load local images
+              const imageUrls = {};
+              for (const cover of results) {
+                if (cover.imgID) {
+                  try {
+                    const localImagePath = `${settings.localIndex}/imgs/${cover.imgID}.jpg`;
+                    const localImageUrl =
+                      await window.electron.getLocalImageUrl(localImagePath);
+                    if (localImageUrl) {
+                      imageUrls[cover.gameID] = localImageUrl;
+                    }
+                  } catch (error) {
+                    console.warn(`Could not load local image for ${cover.imgID}:`, error);
+                  }
+                }
+              }
+              setCoverImageUrls(imageUrls);
+              return;
+            }
+          } catch (localIndexError) {
+            console.log(
+              "Local index search failed, falling back to Steam API:",
+              localIndexError
+            );
+          }
+        }
+
+        // Try Steam API for better metadata (only if not using local index or local search failed)
         let steamData = null;
         try {
           steamData = await steamService.getGameDetails(query);
