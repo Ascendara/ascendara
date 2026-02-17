@@ -4509,10 +4509,10 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
       </div>
       {!isGridMode && (
         <div
-          className={`pointer-events-none absolute left-1/2 z-30 w-[300px] -translate-x-1/2 text-center transition-all duration-150 ease-out ${isSelected ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"} ${isHero ? "-bottom-20" : "-bottom-14"}`}
+          className={`pointer-events-none absolute left-1/2 z-30 w-full max-w-full -translate-x-1/2 text-center transition-all duration-150 ease-out ${isSelected ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"} ${isHero ? "-bottom-20" : "-bottom-14"}`}
         >
           <h3
-            className={`font-bold tracking-wide text-primary drop-shadow-md ${isHero ? "text-3xl" : "text-xl"} ${gameName.length > 25 ? "text-lg leading-tight" : ""}`}
+            className={`truncate font-bold tracking-wide text-primary drop-shadow-md ${isHero ? "text-3xl" : "text-xl"} ${gameName.length > 25 ? "text-lg leading-tight" : ""}`}
           >
             {gameName}
           </h3>
@@ -5707,7 +5707,23 @@ export default function BigPicture() {
             };
           });
 
-        let carousel = recentGames.length > 0 ? [...recentGames] : [...games];
+        // Sort all games with recent games first (in order of last played), then alphabetically
+        const recentGameIndexMap = new Map(
+          recentGames.map((g, index) => [g.game, index])
+        );
+        let carousel = [...actuallyInstalledGames].sort((a, b) => {
+          const aIndex = recentGameIndexMap.get(a.game);
+          const bIndex = recentGameIndexMap.get(b.game);
+          // If both are recent, sort by their index in recentGames (0 = most recent)
+          if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex;
+          // If only a is recent, it comes first
+          if (aIndex !== undefined) return -1;
+          // If only b is recent, it comes first
+          if (bIndex !== undefined) return 1;
+          // Neither is recent, sort alphabetically
+          return (a.game || a.name).localeCompare(b.game || b.name);
+        });
+
         if (carousel.length > 20) {
           carousel = carousel.slice(0, 20);
           carousel.push({
