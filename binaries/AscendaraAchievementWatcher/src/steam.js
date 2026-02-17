@@ -158,6 +158,13 @@ async function getSteamData(appID, lang, key) {
   // Search in AppList only if name is empty
   const finalName = schemaName || (await findInAppList(+appID, key));
 
+  // Browse achievements to manage hidden achievements without descriptions
+  schema.achievements.forEach(ach => {
+    if (ach.hidden === 1 && !ach.description) {
+      ach.description = "[Hidden achievement]";
+    }
+  });
+
   const result = {
     name: finalName,
     appid: appID,
