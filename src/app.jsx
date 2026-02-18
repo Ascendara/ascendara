@@ -1011,16 +1011,6 @@ const AppRoutes = () => {
   };
 
   useEffect(() => {
-    const checkPlatform = async () => {
-      const isWindows = await window.electron.isOnWindows();
-      if (!isWindows) {
-        setShowPlatformWarning(true);
-      }
-    };
-    checkPlatform();
-  }, []);
-
-  useEffect(() => {
     const checkVersion = async () => {
       const isBroken = await window.electron.isBrokenVersion();
       console.log("Is broken version:", isBroken);

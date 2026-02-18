@@ -440,7 +440,14 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "noticeAppIsFree") {
       setStep("extension");
     } else if (step === "extension") {
-      setStep("localIndex");
+      setStep(isOnWindows ? "localIndex" : "dependencies");
+    } else if (step === "dependencies") {
+      if (isOnWindows) {
+        handleAnalyticsChoice(analyticsConsent);
+        handleExit(true);
+      } else {
+        setStep("localIndex");
+      }
     } else if (step === "localIndex") {
       setStep("referral");
     } else if (step === "referral") {
@@ -452,10 +459,12 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "analytics") {
       setStep("updates");
     } else if (step === "updates") {
-      setStep("dependencies");
-    } else if (step === "dependencies") {
-      handleAnalyticsChoice(analyticsConsent);
-      handleExit(true);
+      if (isOnWindows) {
+        setStep("dependencies");
+      } else {
+        handleAnalyticsChoice(analyticsConsent);
+        handleExit(true);
+      }
     }
   };
 
@@ -2277,7 +2286,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                           onClick={async () => {
                             const result = await window.electron.installWine();
                             if (result.success) {
-                              handleExit(true);
+                              handleNext();
                             }
                           }}
                           size="lg"
@@ -2288,7 +2297,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         </Button>
 
                         <Button
-                          onClick={async () => handleExit(true)}
+                          onClick={() => handleNext()}
                           size="lg"
                           className="px-8 py-6 text-secondary"
                         >
