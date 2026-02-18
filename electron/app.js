@@ -162,19 +162,24 @@ function createTray() {
 }
 
 /**
- * Start the achievement watcher process (Windows only)
+ * Start the achievement watcher process (Windows and Linux)
  */
 function startAchievementWatcher() {
-  if (process.platform !== "win32") {
+  if (process.platform !== "win32" && process.platform !== "linux") {
     return;
   }
 
   const { spawn } = require("child_process");
   const os = require("os");
 
-  const watcherExePath = isDev
-    ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe"
-    : path.join(process.resourcesPath, "AscendaraAchievementWatcher.exe");
+  const isLinux = process.platform === "linux";
+  const watcherExePath = isLinux
+    ? isDev
+      ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher"
+      : path.join(process.resourcesPath, "AscendaraAchievementWatcher")
+    : isDev
+      ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe"
+      : path.join(process.resourcesPath, "AscendaraAchievementWatcher.exe");
 
   if (!fs.existsSync(watcherExePath)) {
     console.error("Achievement watcher not found at:", watcherExePath);
@@ -187,7 +192,7 @@ function startAchievementWatcher() {
       ...process.env,
       ASCENDARA_STEAM_WEB_API_KEY: config.steamWebApiKey,
     },
-    windowsHide: true,
+    windowsHide: !isLinux,
   });
 
   watcherProcess.stdout.on("data", data => {
