@@ -383,6 +383,7 @@ contextBridge.exposeInMainWorld("electron", {
   fetchSystemSpecs: () => ipcRenderer.invoke("fetch-system-specs"),
   isDev: () => ipcRenderer.invoke("is-dev"),
   isExperiment: () => ipcRenderer.invoke("is-experiment"),
+  getTestingVersion: () => ipcRenderer.invoke("get-testing-version"),
   switchBuild: buildType => ipcRenderer.invoke("switch-build", buildType),
   showTestNotification: () => ipcRenderer.invoke("show-test-notification"),
 

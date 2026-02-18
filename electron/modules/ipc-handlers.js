@@ -99,7 +99,9 @@ function registerMiscHandlers() {
 
   // Is experiment
   let experiment = false;
+  let testingVersion = "";
   ipcMain.handle("is-experiment", () => experiment);
+  ipcMain.handle("get-testing-version", () => testingVersion);
 
   // Switch build
   ipcMain.handle("switch-build", async (_, buildType) => {

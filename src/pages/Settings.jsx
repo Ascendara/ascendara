@@ -279,6 +279,7 @@ function Settings() {
   const [availableLanguages, setAvailableLanguages] = useState([]);
   const [isExperiment, setIsExperiment] = useState(false);
   const [isDev, setIsDev] = useState(false);
+  const [testingVersion, setTestingVersion] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [exclusionLoading, setExclusionLoading] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
@@ -428,6 +429,10 @@ function Settings() {
     const checkExperiment = async () => {
       const isExperiment = await window.electron.isExperiment();
       setIsExperiment(isExperiment);
+      if (isExperiment) {
+        const version = await window.electron.getTestingVersion();
+        setTestingVersion(version);
+      }
     };
     checkExperiment();
   }, []);
@@ -1051,7 +1056,7 @@ function Settings() {
           {isExperiment ? (
             <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
               <div className="px-2 font-medium">
-                <span>Experiment Build {__APP_VERSION__}</span>
+                <span>Experiment Build {testingVersion}</span>
               </div>
             </div>
           ) : (
@@ -2331,65 +2336,67 @@ function Settings() {
                   "Configure which directories are monitored for achievement tracking. Add folders where your games are installed to enable achievement tracking for those games."}
               </p>
               {/* Default Directories Section */}
-              {isOnWindows && <div className="mb-6">
-                <div className="mb-1 flex items-center gap-2">
-                  <FolderOpen className="text-primary-foreground h-4 w-4" />
-                  <span className="text-primary-foreground font-medium">
-                    {t("settings.achievementWatcher.defaultDirs") ||
-                      "Default directories always tracked:"}
-                  </span>
+              {isOnWindows && (
+                <div className="mb-6">
+                  <div className="mb-1 flex items-center gap-2">
+                    <FolderOpen className="text-primary-foreground h-4 w-4" />
+                    <span className="text-primary-foreground font-medium">
+                      {t("settings.achievementWatcher.defaultDirs") ||
+                        "Default directories always tracked:"}
+                    </span>
+                  </div>
+                  <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>Public/Documents/Steam/CODEX</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>Public/Documents/Steam/RUNE</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>Public/Documents/EMPRESS</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>Public/Documents/OnlineFix</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>AppData/Roaming/GSE Saves</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>AppData/Roaming/Steam/CODEX</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>AppData/Roaming/EMPRESS</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>AppData/Roaming/Goldberg SteamEmu Saves</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>AppData/Roaming/SmartSteamEmu</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>ProgramData/Steam</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5" />
+                      <span>LocalAppData/SKIDROW</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs italic text-muted-foreground">
+                    {t("settings.achievementWatcher.defaultDirsNote") ||
+                      "These directories and files are always tracked by default and cannot be removed."}
+                  </div>
                 </div>
-                <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>Public/Documents/Steam/CODEX</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>Public/Documents/Steam/RUNE</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>Public/Documents/EMPRESS</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>Public/Documents/OnlineFix</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>AppData/Roaming/GSE Saves</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>AppData/Roaming/Steam/CODEX</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>AppData/Roaming/EMPRESS</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>AppData/Roaming/Goldberg SteamEmu Saves</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>AppData/Roaming/SmartSteamEmu</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>ProgramData/Steam</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CornerDownRight className="h-3.5 w-3.5" />
-                    <span>LocalAppData/SKIDROW</span>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs italic text-muted-foreground">
-                  {t("settings.achievementWatcher.defaultDirsNote") ||
-                    "These directories and files are always tracked by default and cannot be removed."}
-                </div>
-              </div>}
+              )}
               <div className="space-y-3">
                 {/* List user-added directories */}
                 {settings.watchingFolders && settings.watchingFolders.length > 0 ? (
