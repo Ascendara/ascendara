@@ -781,7 +781,7 @@ function registerSystemHandlers() {
       } else if (process.platform === "linux") {
         updateStatus("Installing Wine & Winetricks...");
         await runCommand(
-          "sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y wine64 wine32 winetricks",
+          "pkexec sh -c 'dpkg --add-architecture i386 && apt-get update && apt-get install -y wine64 wine32 winetricks'",
           updateStatus,
           5,
           30
@@ -821,6 +821,8 @@ function registerSystemHandlers() {
           `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py" : path.join(resourcePath, "/resources/AscendaraGofileHelper.py")}"`,
           `chmod +x "${isDev ? "./binaries/AscendaraGameHandler/src/AscendaraGameHandler.py" : path.join(resourcePath, "/resources/AscendaraGameHandler.py")}"`,
           `chmod +x "${isDev ? "./binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py" : path.join(resourcePath, "/resources/AscendaraLanguageTranslation.py")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py" : path.join(resourcePath, "/resources/AscendaraLocalRefresh.py")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher" : path.join(resourcePath, "/resources/AscendaraAchievementWatcher")}"`,
         ].join(" && ");
 
         exec(chmodCommand, error => {
@@ -870,80 +872,39 @@ function registerSystemHandlers() {
         `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`
       );
 
+      const updateStatus = message => {
+        installWindow.webContents.executeJavaScript(`
+          document.querySelector('.status').textContent = ${JSON.stringify(message)};
+        `);
+      };
+
+      const updateProgress = percent => {
+        installWindow.webContents.executeJavaScript(`
+          document.querySelector('.progress').style.width = '${percent}%';
+        `);
+      };
+
       const command =
         process.platform === "darwin"
           ? "brew install python"
-          : "sudo apt-get update && sudo apt-get install -y python3";
+          : "pkexec apt-get install -y python3 python3-pip python3-venv";
 
       await new Promise((resolve, reject) => {
-        const updateStatus = message => {
-          installWindow.webContents.executeJavaScript(`
-            document.querySelector('.status').textContent = ${JSON.stringify(message)};
-          `);
-        };
-
-        const updateProgress = percent => {
-          installWindow.webContents.executeJavaScript(`
-            document.querySelector('.progress').style.width = '${percent}%';
-          `);
-        };
-
-        const proc = exec(command, async (error, stdout, stderr) => {
+        const proc = exec(command, (error) => {
           if (error) {
-            updateStatus(`Error: ${error.message}`);
+            updateStatus(`Error installing Python: ${error.message}`);
             setTimeout(() => {
               installWindow.close();
               reject(error);
             }, 3000);
           } else {
-            updateStatus(
-              "Python installed successfully! Installing required packages..."
-            );
-            updateProgress(40);
-
-            const packages = ["requests", "psutil", "pypresence", "patool", "pySmartDL"];
-
-            try {
-              const pipCommand = "pip3";
-
-              for (let i = 0; i < packages.length; i++) {
-                const pkg = packages[i];
-                const progress = 40 + Math.floor(((i + 1) / packages.length) * 60);
-
-                updateStatus(`Installing package: ${pkg}`);
-                updateProgress(progress);
-
-                await new Promise((resolvePackage, rejectPackage) => {
-                  exec(`${pipCommand} install --user ${pkg}`, (err, stdout, stderr) => {
-                    if (err) {
-                      console.error(`Error installing ${pkg}:`, err);
-                      rejectPackage(err);
-                    } else {
-                      resolvePackage();
-                    }
-                  });
-                });
-              }
-
-              updateStatus("All dependencies installed successfully!");
-              updateProgress(100);
-              setTimeout(() => {
-                installWindow.close();
-                resolve();
-              }, 2000);
-            } catch (pipError) {
-              updateStatus(`Package installation error: ${pipError.message}`);
-              setTimeout(() => {
-                installWindow.close();
-                reject(pipError);
-              }, 3000);
-            }
+            resolve();
           }
         });
 
         let progress = 0;
         proc.stdout.on("data", data => {
-          progress = Math.min(progress + 10, 90);
+          progress = Math.min(progress + 10, 35);
           updateProgress(progress);
           updateStatus(data.toString().trim());
         });
@@ -952,6 +913,52 @@ function registerSystemHandlers() {
           updateStatus(data.toString().trim());
         });
       });
+
+      updateStatus("Setting up virtual environment...");
+      updateProgress(40);
+
+      const venvPath = path.join(os.homedir(), ".ascendara", "venv");
+      const packages = ["requests", "psutil", "pypresence", "patool", "pySmartDL", "cloudscraper"];
+
+      await new Promise((resolveVenv, rejectVenv) => {
+        exec(`mkdir -p "${path.join(os.homedir(), ".ascendara")}" && python3 -m venv "${venvPath}"`, (err, _stdout, stderr) => {
+          if (err) {
+            console.error("venv creation failed:", stderr);
+            rejectVenv(err);
+          } else {
+            resolveVenv();
+          }
+        });
+      });
+
+      updateStatus("Installing required packages...");
+      updateProgress(50);
+
+      const venvPip = path.join(venvPath, "bin", "pip");
+
+      await new Promise((resolvePackage, rejectPackage) => {
+        const pipProc = exec(`"${venvPip}" install ${packages.join(" ")}`, (err, _stdout, stderr) => {
+          if (err) {
+            console.error("Error installing packages:", stderr);
+            rejectPackage(err);
+          } else {
+            resolvePackage();
+          }
+        });
+
+        pipProc.stdout.on("data", data => {
+          updateStatus(data.toString().trim());
+        });
+
+        pipProc.stderr.on("data", data => {
+          updateStatus(data.toString().trim());
+        });
+      });
+
+      updateStatus("All dependencies installed successfully!");
+      updateProgress(100);
+      await new Promise(r => setTimeout(r, 2000));
+      installWindow.close();
 
       return { success: true, message: "Python installed successfully" };
     } catch (error) {
