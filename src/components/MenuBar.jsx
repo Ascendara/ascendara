@@ -47,7 +47,6 @@ const MenuBar = () => {
   const [isLatest, setIsLatest] = useState(true);
   const [isExperiment, setIsExperiment] = useState(false);
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
-  const [leftSideActions, setLeftSideActions] = useState(false);
   const [isDev, setIsDev] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -68,7 +67,6 @@ const MenuBar = () => {
   useEffect(() => {
     const checkWindows = async () => {
       const isWindows = await window.electron.isOnWindows();
-      setLeftSideActions(!isWindows);
       setIsFullscreen(!isWindows);
     };
     checkWindows();
@@ -265,46 +263,14 @@ const MenuBar = () => {
       className="fixed z-50 flex h-10 w-full select-none items-center"
       style={{ WebkitAppRegion: "drag" }}
     >
-      {leftSideActions && (
-        <div className="window-controls ml-3 mt-2 flex items-center">
-          <button
-            onClick={() => window.electron.closeWindow()}
-            className="rounded p-1 hover:bg-gray-200"
-          >
-            <div className="h-3 w-3 rounded-full bg-red-500 hover:bg-red-600" />
-          </button>
-          <button
-            onClick={() => window.electron.minimizeWindow()}
-            className={`ml-1 rounded p-1 ${!isFullscreen ? "cursor-not-allowed" : "cursor-pointer"}`}
-            disabled={!isFullscreen}
-          >
-            <div
-              className={`h-3 w-3 rounded-full ${!isFullscreen ? "bg-gray-400" : "bg-yellow-500 hover:bg-yellow-600"}`}
-            />
-          </button>
-          <button
-            className="ml-2"
-            onClick={handleFullscreenToggle}
-            title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
-          >
-            <div className="h-3 w-3 rounded-full bg-green-500 hover:bg-green-600" />
-          </button>
-        </div>
-      )}
       <div className="mt-2 flex h-full flex-1 items-center px-3">
         <div className="flex items-center">
-          {leftSideActions ? (
-            <div className="flex items-center">
-              <span className="text-sm font-medium">Ascendara</span>
-            </div>
-          ) : (
-            <div className="flex items-center">
+          <div className="flex items-center">
               {iconData && (
                 <img src={iconData} alt="Ascendara" className="mr-2 h-6 w-6" />
               )}
               <span className="text-sm font-medium">Ascendara</span>
             </div>
-          )}
         </div>
 
         <div
@@ -424,8 +390,7 @@ const MenuBar = () => {
           </div>
         )}
       </div>
-      {!leftSideActions && (
-        <div className="window-controls mr-2 flex items-center">
+      <div className="window-controls mr-2 flex items-center">
           <div className="flex items-center space-x-2">
             <button
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -457,7 +422,6 @@ const MenuBar = () => {
             </button>
           </div>
         </div>
-      )}
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent className="max-w-2xl bg-background">
           <AlertDialogHeader>
