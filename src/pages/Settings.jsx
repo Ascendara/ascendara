@@ -2331,7 +2331,7 @@ function Settings() {
                   "Configure which directories are monitored for achievement tracking. Add folders where your games are installed to enable achievement tracking for those games."}
               </p>
               {/* Default Directories Section */}
-              <div className="mb-6">
+              {isOnWindows && <div className="mb-6">
                 <div className="mb-1 flex items-center gap-2">
                   <FolderOpen className="text-primary-foreground h-4 w-4" />
                   <span className="text-primary-foreground font-medium">
@@ -2389,7 +2389,7 @@ function Settings() {
                   {t("settings.achievementWatcher.defaultDirsNote") ||
                     "These directories and files are always tracked by default and cannot be removed."}
                 </div>
-              </div>
+              </div>}
               <div className="space-y-3">
                 {/* List user-added directories */}
                 {settings.watchingFolders && settings.watchingFolders.length > 0 ? (
