@@ -2,12 +2,12 @@
   "name": "ascendara-achievement-watcher",
   "version": "1.0.0",
   "description": "Achievement watcher for Ascendara",
-  "main": "src/monitor.js",
+  "main": "src/watchdog.js",
   "scripts": {
-    "start": "node src/monitor.js",
-    "build-linux": "pkg src/monitor.js --target node18-linux-x64 --output dist/AscendaraAchievementWatcher",
-    "build-win": "pkg src/monitor.js --target node18-win-x64 --output dist/AscendaraAchievementWatcher.exe",
-    "build-mac": "pkg src/monitor.js --target node18-macos-x64 --output dist/AscendaraAchievementWatcher"
+    "start": "node src/watchdog.js",
+    "build-linux": "pkg src/watchdog.js --target node18-linux-x64 --output dist/AscendaraAchievementWatcher",
+    "build-win": "pkg src/watchdog.js --target node18-win-x64 --output dist/AscendaraAchievementWatcher.exe",
+    "build-mac": "pkg src/watchdog.js --target node18-macos-x64 --output dist/AscendaraAchievementWatcher"
   },
   "dependencies": {
     "find-up": "^4.1.0",

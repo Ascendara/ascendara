@@ -15,7 +15,7 @@ const fs = require("fs").promises;
 const sse = require("./sse.js");
 const ini = require("ini");
 const { getSettings } = require("./userConfig.js");
-const regedit = require("regedit");
+const regedit = process.platform === "win32" ? require("regedit") : null;
 
 const files = {
   achievement: [
@@ -39,6 +39,10 @@ const files = {
 };
 
 module.exports.getFolders = async userDir_file => {
+  if (process.platform !== "win32") {
+    return [];
+  }
+
   let steamEmu = [
     {
       dir: path.join(process.env["Public"], "Documents/Steam/CODEX"),
@@ -114,11 +118,13 @@ module.exports.getFolders = async userDir_file => {
   ];
 
   try {
-    const mydocs = await regedit.promises.RegQueryStringValueAndExpand(
-      "HKCU",
-      "Software/Microsoft/Windows/CurrentVersion/Explorer/User Shell Folders",
-      "Personal"
-    );
+    const mydocs = regedit
+      ? await regedit.promises.RegQueryStringValueAndExpand(
+          "HKCU",
+          "Software/Microsoft/Windows/CurrentVersion/Explorer/User Shell Folders",
+          "Personal"
+        )
+      : null;
     if (mydocs) {
       steamEmu = steamEmu.concat([
         {

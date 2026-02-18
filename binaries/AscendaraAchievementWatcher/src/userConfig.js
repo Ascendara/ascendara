@@ -7,7 +7,9 @@ const fs = require("fs").promises;
  */
 async function getSettings() {
   try {
-    const appData = process.env.APPDATA;
+    const appData =
+      process.env.APPDATA ||
+      path.join(process.env.HOME || require("os").homedir(), ".config");
     const settingsPath = path.join(appData, "ascendara", "ascendarasettings.json");
     const data = await fs.readFile(settingsPath, "utf8");
     return JSON.parse(data);

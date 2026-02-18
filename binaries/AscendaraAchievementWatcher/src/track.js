@@ -3,7 +3,10 @@
 const path = require("path");
 const fs = require("fs").promises;
 
-const cache = path.join(process.env["APPDATA"], "Achievement Watcher/steam_cache/data");
+const appData =
+  process.env["APPDATA"] ||
+  path.join(process.env.HOME || require("os").homedir(), ".config");
+const cache = path.join(appData, "Achievement Watcher/steam_cache/data");
 
 module.exports.load = async appID => {
   try {

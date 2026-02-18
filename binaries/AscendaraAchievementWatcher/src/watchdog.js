@@ -14,7 +14,8 @@ const { getSettings } = require("./userConfig.js");
 const { spawn } = require("child_process");
 
 // Get config from ENV or IPC
-const timestampFilePath = path.join(process.env.USERPROFILE, "timestamp.ascendara.json");
+const homeDir = process.env.USERPROFILE || process.env.HOME || require("os").homedir();
+const timestampFilePath = path.join(homeDir, "timestamp.ascendara.json");
 const STEAM_WEB_API_KEY = process.env.ASCENDARA_STEAM_WEB_API_KEY;
 let watchdogRunning = false;
 
