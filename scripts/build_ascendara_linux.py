@@ -5,6 +5,7 @@ import os
 import subprocess
 import shutil
 import sys
+import json
 
 def run_command(command, cwd=None):
     """Run a command and return success status"""
@@ -250,7 +251,8 @@ def create_tar_archive():
         print("Error: linux-unpacked directory not found")
         return False
     
-    archive_name = 'dist/Ascendara-9.6.3-linux-x64.tar.gz'
+    version = get_app_version() or 'unknown'
+    archive_name = f'dist/Ascendara-{version}-linux-x64.tar.gz'
     
     try:
         import tarfile
@@ -261,6 +263,17 @@ def create_tar_archive():
     except Exception as e:
         print(f"Failed to create archive: {e}")
         return False
+
+def get_app_version():
+    """Read app version from package.json"""
+    try:
+        with open('package.json', 'r') as f:
+            pkg = json.load(f)
+        return pkg['version']
+    except Exception as e:
+        print(f"Warning: Could not read version from package.json: {e}")
+        return None
+
 
 def main():
     """Main build process for Linux AppImage"""
@@ -324,12 +337,15 @@ def main():
     print("Linux build process completed successfully!")
     
     # Check what was created
-    if os.path.exists('dist/Ascendara-9.6.3.AppImage'):
-        print("✅ AppImage created: dist/Ascendara-9.6.3.AppImage")
+    version = get_app_version() or 'unknown'
+    appimage_path = f'dist/Ascendara-{version}.AppImage'
+    tar_path = f'dist/Ascendara-{version}-linux-x64.tar.gz'
+    if os.path.exists(appimage_path):
+        print(f"✅ AppImage created: {appimage_path}")
     elif os.path.exists('dist/linux-unpacked'):
         print("✅ Linux unpacked version created: dist/linux-unpacked/")
-        if os.path.exists('dist/Ascendara-9.6.3-linux-x64.tar.gz'):
-            print("✅ Tar archive created: dist/Ascendara-9.6.3-linux-x64.tar.gz")
+        if os.path.exists(tar_path):
+            print(f"✅ Tar archive created: {tar_path}")
     
     return 0
 
