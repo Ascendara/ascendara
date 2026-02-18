@@ -7,7 +7,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow, Notification, app } = require("electron");
-const { isDev, isWindows, appDirectory, APIKEY } = require("./config");
+const { isDev, isWindows, appDirectory, APIKEY, getPythonPath } = require("./config");
 const { getSettingsManager } = require("./settings");
 const archiver = require("archiver");
 const https = require("https");
@@ -384,7 +384,7 @@ function registerLocalRefreshHandlers() {
           }
           if (userAgent) args.push("--user-agent", userAgent);
         } else {
-          executablePath = "python3";
+          executablePath = getPythonPath();
           const scriptPath = isDev
             ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py"
             : path.join(appDirectory, "/resources/AscendaraLocalRefresh.py");
@@ -1001,7 +1001,7 @@ function registerLocalRefreshHandlers() {
             ];
           }
         } else {
-          executablePath = "python3";
+          executablePath = getPythonPath();
           const scriptPath = isDev
             ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py"
             : path.join(appDirectory, "/resources/AscendaraLocalRefresh.py");

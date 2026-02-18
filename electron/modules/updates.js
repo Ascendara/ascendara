@@ -16,6 +16,7 @@ const {
   TIMESTAMP_FILE,
   LANG_DIR,
   appDirectory,
+  getPythonPath,
 } = require("./config");
 const { updateTimestampFile } = require("./utils");
 const { getSettingsManager } = require("./settings");
@@ -190,8 +191,8 @@ async function getNewLangKeys() {
               : path.join(appDirectory, "/resources/AscendaraLanguageTranslation.exe");
             args = [langCode, "--updateKeys"];
           } else {
-            // For non-Windows, use python3 directly
-            translatorExePath = "python3";
+            // For non-Windows, use venv python if available
+            translatorExePath = getPythonPath();
             const scriptPath = isDev
               ? "./binaries/AscendaraLanguageTranslation/src/debian/AscendaraLanguageTranslation.py"
               : path.join(appDirectory, "/resources/AscendaraLanguageTranslation.py");

@@ -9,7 +9,7 @@ const axios = require("axios");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow, app } = require("electron");
-const { isDev, isWindows, TIMESTAMP_FILE, appDirectory, imageKey } = require("./config");
+const { isDev, isWindows, TIMESTAMP_FILE, appDirectory, imageKey, getPythonPath } = require("./config");
 const {
   sanitizeText,
   sanitizeGameName,
@@ -424,7 +424,7 @@ function registerDownloadHandlers() {
                   gameID || "",
                 ];
         } else {
-          executablePath = "python3";
+          executablePath = getPythonPath();
           const scriptPath = isDev
             ? path.join(
                 settings.gameSource === "fitgirl"
@@ -1053,7 +1053,7 @@ function registerDownloadHandlers() {
           gameID || "",
         ];
       } else {
-        executablePath = "python3";
+        executablePath = getPythonPath();
         const scriptPath = isDev
           ? path.join(
               downloadLink.includes("gofile.io")

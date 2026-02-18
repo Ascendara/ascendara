@@ -5,6 +5,7 @@
 
 const path = require("path");
 const os = require("os");
+const fs = require("fs");
 const { app } = require("electron");
 
 // Current app version
@@ -43,6 +44,13 @@ const steamGridDbApiKey =
   process.env.REACT_APP_STEAMGRIDDB_API_KEY || config.ASCENDARA_STEAMGRIDDB_API_KEY;
 const imageKey = process.env.REACT_APP_IMAGE_KEY || config.IMAGE_KEY;
 const clientId = process.env.REACT_APP_DISCKEY || config.DISCKEY;
+
+// Returns the Python interpreter path: venv if set up, otherwise system python3
+function getPythonPath() {
+  if (isWindows) return "python";
+  const venvPython = path.join(os.homedir(), ".ascendara", "venv", "bin", "python3");
+  return fs.existsSync(venvPython) ? venvPython : "python3";
+}
 
 // Tool executables mapping
 const toolExecutables = {
@@ -100,4 +108,5 @@ module.exports = {
   clientId,
   toolExecutables,
   DEPENDENCY_REGISTRY_PATHS,
+  getPythonPath,
 };
