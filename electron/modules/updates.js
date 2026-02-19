@@ -190,13 +190,19 @@ async function getNewLangKeys() {
                 )
               : path.join(appDirectory, "/resources/AscendaraLanguageTranslation.exe");
             args = [langCode, "--updateKeys"];
-          } else {
-            // For non-Windows, use venv python if available
+          } else if (isDev) {
             translatorExePath = getPythonPath();
-            const scriptPath = isDev
-              ? "./binaries/AscendaraLanguageTranslation/src/debian/AscendaraLanguageTranslation.py"
-              : path.join(appDirectory, "/resources/AscendaraLanguageTranslation.py");
-            args = [scriptPath, langCode, "--updateKeys"];
+            args = [
+              "./binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py",
+              langCode,
+              "--updateKeys",
+            ];
+          } else {
+            translatorExePath = path.join(
+              appDirectory,
+              "/resources/AscendaraLanguageTranslation"
+            );
+            args = [langCode, "--updateKeys"];
           }
 
           // Add each missing key as a separate --newKey argument

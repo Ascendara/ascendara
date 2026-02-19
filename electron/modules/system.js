@@ -809,20 +809,18 @@ function registerSystemHandlers() {
     }
 
     try {
-      const resourcePath =
-        process.env.NODE_ENV === "development"
-          ? path.join(app.getAppPath(), "binaries")
-          : path.join(process.resourcesPath, "binaries");
+      const resourcePath = path.join(process.resourcesPath || app.getAppPath());
 
       await new Promise((resolve, reject) => {
         const chmodCommand = [
-          `chmod +x "${isDev ? "./binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py" : path.join(resourcePath, "/resources/AscendaraCrashReporter.py")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraDownloader.py" : path.join(resourcePath, "/resources/AscendaraDownloader.py")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py" : path.join(resourcePath, "/resources/AscendaraGofileHelper.py")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraGameHandler/src/AscendaraGameHandler.py" : path.join(resourcePath, "/resources/AscendaraGameHandler.py")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py" : path.join(resourcePath, "/resources/AscendaraLanguageTranslation.py")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py" : path.join(resourcePath, "/resources/AscendaraLocalRefresh.py")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher" : path.join(resourcePath, "/resources/AscendaraAchievementWatcher")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py" : path.join(resourcePath, "resources/AscendaraCrashReporter")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraDownloader.py" : path.join(resourcePath, "resources/AscendaraDownloader")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py" : path.join(resourcePath, "resources/AscendaraGofileHelper")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraGameHandler/src/AscendaraGameHandler.py" : path.join(resourcePath, "resources/AscendaraGameHandler")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py" : path.join(resourcePath, "resources/AscendaraLanguageTranslation")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py" : path.join(resourcePath, "resources/AscendaraLocalRefresh")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py" : path.join(resourcePath, "resources/AscendaraTorrentHandler")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher" : path.join(resourcePath, "resources/AscendaraAchievementWatcher")}"`,
         ].join(" && ");
 
         exec(chmodCommand, error => {
@@ -918,7 +916,7 @@ function registerSystemHandlers() {
       updateProgress(40);
 
       const venvPath = path.join(os.homedir(), ".ascendara", "venv");
-      const packages = ["requests", "psutil", "pypresence", "patool", "pySmartDL", "cloudscraper"];
+      const packages = ["requests", "psutil", "pypresence", "patool", "pySmartDL", "cloudscraper", "qbittorrentapi"];
 
       await new Promise((resolveVenv, rejectVenv) => {
         exec(`mkdir -p "${path.join(os.homedir(), ".ascendara")}" && python3 -m venv "${venvPath}"`, (err, _stdout, stderr) => {

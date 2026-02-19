@@ -384,21 +384,32 @@ function registerLocalRefreshHandlers() {
           }
           if (userAgent) args.push("--user-agent", userAgent);
         } else {
-          executablePath = getPythonPath();
-          const scriptPath = isDev
-            ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py"
-            : path.join(appDirectory, "/resources/AscendaraLocalRefresh.py");
-          args = [
-            scriptPath,
-            "--output",
-            outputPath,
-            "--per-page",
-            String(fetchPerPage),
-            "--workers",
-            String(workerCount),
-            "--view-workers",
-            "32",
-          ];
+          if (isDev) {
+            executablePath = getPythonPath();
+            args = [
+              "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
+              "--output",
+              outputPath,
+              "--per-page",
+              String(fetchPerPage),
+              "--workers",
+              String(workerCount),
+              "--view-workers",
+              "32",
+            ];
+          } else {
+            executablePath = path.join(appDirectory, "/resources/AscendaraLocalRefresh");
+            args = [
+              "--output",
+              outputPath,
+              "--per-page",
+              String(fetchPerPage),
+              "--workers",
+              String(workerCount),
+              "--view-workers",
+              "32",
+            ];
+          }
           // Only add cookie if provided (CF protection may not be active)
           if (cfClearance) {
             args.push("--cookie", cfClearance);
@@ -1001,18 +1012,26 @@ function registerLocalRefreshHandlers() {
             ];
           }
         } else {
-          executablePath = getPythonPath();
-          const scriptPath = isDev
-            ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py"
-            : path.join(appDirectory, "/resources/AscendaraLocalRefresh.py");
-          args = [
-            scriptPath,
-            "--extract-shared-index",
-            "--zip-path",
-            zipPath,
-            "--output",
-            outputPath,
-          ];
+          if (isDev) {
+            executablePath = getPythonPath();
+            args = [
+              "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
+              "--extract-shared-index",
+              "--zip-path",
+              zipPath,
+              "--output",
+              outputPath,
+            ];
+          } else {
+            executablePath = path.join(appDirectory, "/resources/AscendaraLocalRefresh");
+            args = [
+              "--extract-shared-index",
+              "--zip-path",
+              zipPath,
+              "--output",
+              outputPath,
+            ];
+          }
         }
 
         await new Promise((resolve, reject) => {

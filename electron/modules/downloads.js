@@ -424,52 +424,77 @@ function registerDownloadHandlers() {
                   gameID || "",
                 ];
         } else {
-          executablePath = getPythonPath();
-          const scriptPath = isDev
-            ? path.join(
-                settings.gameSource === "fitgirl"
-                  ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py"
-                  : link.includes("gofile.io")
-                    ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
-                    : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
-              )
-            : path.join(
-                appDirectory,
-                "..",
-                settings.gameSource === "fitgirl"
-                  ? "/resources/AscendaraTorrentHandler.py"
-                  : link.includes("gofile.io")
-                    ? "/resources/AscendaraGofileHelper.py"
-                    : "/resources/AscendaraDownloader.py"
-              );
-
-          spawnCommand =
-            settings.gameSource === "fitgirl"
-              ? [
-                  scriptPath,
-                  link,
-                  game,
-                  online,
-                  dlc,
-                  isVr,
-                  updateFlow,
-                  version || -1,
-                  size,
-                  settings.downloadDirectory,
-                ]
-              : [
-                  scriptPath,
-                  link.includes("gofile.io") ? "https://" + link : link,
-                  game,
-                  online,
-                  dlc,
-                  isVr,
-                  updateFlow,
-                  version || -1,
-                  size,
-                  targetDirectory,
-                  gameID || "",
-                ];
+          if (isDev) {
+            executablePath = getPythonPath();
+            const scriptPath = path.join(
+              settings.gameSource === "fitgirl"
+                ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py"
+                : link.includes("gofile.io")
+                  ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
+                  : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+            );
+            spawnCommand =
+              settings.gameSource === "fitgirl"
+                ? [
+                    scriptPath,
+                    link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    settings.downloadDirectory,
+                  ]
+                : [
+                    scriptPath,
+                    link.includes("gofile.io") ? "https://" + link : link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    targetDirectory,
+                    gameID || "",
+                  ];
+          } else {
+            executablePath = path.join(
+              process.resourcesPath,
+              settings.gameSource === "fitgirl"
+                ? "AscendaraTorrentHandler"
+                : link.includes("gofile.io")
+                  ? "AscendaraGofileHelper"
+                  : "AscendaraDownloader"
+            );
+            spawnCommand =
+              settings.gameSource === "fitgirl"
+                ? [
+                    link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    settings.downloadDirectory,
+                  ]
+                : [
+                    link.includes("gofile.io") ? "https://" + link : link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    targetDirectory,
+                    gameID || "",
+                  ];
+          }
         }
 
         // Add notification flags if enabled
@@ -1053,34 +1078,46 @@ function registerDownloadHandlers() {
           gameID || "",
         ];
       } else {
-        executablePath = getPythonPath();
-        const scriptPath = isDev
-          ? path.join(
-              downloadLink.includes("gofile.io")
-                ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
-                : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
-            )
-          : path.join(
-              appDirectory,
-              "..",
-              downloadLink.includes("gofile.io")
-                ? "/resources/AscendaraGofileHelper.py"
-                : "/resources/AscendaraDownloader.py"
-            );
-
-        spawnCommand = [
-          scriptPath,
-          downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
-          game,
-          online,
-          dlc,
-          isVr,
-          "false", // updateFlow
-          version || "-1",
-          size,
-          targetDirectory,
-          gameID || "",
-        ];
+        if (isDev) {
+          executablePath = getPythonPath();
+          const scriptPath = path.join(
+            downloadLink.includes("gofile.io")
+              ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
+              : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+          );
+          spawnCommand = [
+            scriptPath,
+            downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+            game,
+            online,
+            dlc,
+            isVr,
+            "false", // updateFlow
+            version || "-1",
+            size,
+            targetDirectory,
+            gameID || "",
+          ];
+        } else {
+          executablePath = path.join(
+            process.resourcesPath,
+            downloadLink.includes("gofile.io")
+              ? "AscendaraGofileHelper"
+              : "AscendaraDownloader"
+          );
+          spawnCommand = [
+            downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+            game,
+            online,
+            dlc,
+            isVr,
+            "false", // updateFlow
+            version || "-1",
+            size,
+            targetDirectory,
+            gameID || "",
+          ];
+        }
       }
 
       // Add notification flags if enabled

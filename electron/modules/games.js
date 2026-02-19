@@ -362,35 +362,30 @@ function registerGameHandlers() {
 
         if (isWindows) {
           executablePath = path.join(appDirectory, "/resources/AscendaraGameHandler.exe");
+        } else if (isDev) {
+          executablePath = getPythonPath();
+          handlerScript = "binaries/AscendaraGameHandler/src/AscendaraGameHandler.py";
         } else {
-          executablePath = "python3";
-          handlerScript = isDev
-            ? "binaries/AscendaraGameHandler/src/AscendaraGameHandler.py"
-            : path.join(appDirectory, "..", "resources/AscendaraGameHandler.py");
+          executablePath = path.join(appDirectory, "..", "resources/AscendaraGameHandler");
         }
 
         if (isWindows && !fs.existsSync(executablePath)) {
           throw new Error("Game handler not found");
         }
 
+        const gameHandlerArgs = [
+          executable,
+          isCustom.toString(),
+          launchWithAdmin.toString(),
+          ...(backupOnClose ? ["--ludusavi"] : []),
+          ...(launchWithTrainer ? ["--trainer"] : []),
+          ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
+        ];
         const spawnArgs = isWindows
-          ? [
-              executable,
-              isCustom.toString(),
-              launchWithAdmin.toString(),
-              ...(backupOnClose ? ["--ludusavi"] : []),
-              ...(launchWithTrainer ? ["--trainer"] : []),
-              ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
-            ]
-          : [
-              handlerScript,
-              executable,
-              isCustom.toString(),
-              launchWithAdmin.toString(),
-              ...(backupOnClose ? ["--ludusavi"] : []),
-              ...(launchWithTrainer ? ["--trainer"] : []),
-              ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
-            ];
+          ? gameHandlerArgs
+          : handlerScript
+            ? [handlerScript, ...gameHandlerArgs]
+            : gameHandlerArgs;
 
         const runGame = spawn(executablePath, spawnArgs, {
           detached: false,
