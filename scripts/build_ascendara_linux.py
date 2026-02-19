@@ -100,6 +100,91 @@ def build_achievement_watcher():
     print("AscendaraAchievementWatcher built successfully")
     return True
 
+def build_python_binaries_linux():
+    """Use PyInstaller to compile each Python binary into a standalone ELF executable.
+    Uses a dedicated build venv to avoid PEP 668 externally-managed-environment errors."""
+    print("Building Python binaries for Linux with PyInstaller...")
+
+    binaries_dir = os.path.join(os.getcwd(), 'binaries')
+
+    # Create a dedicated build venv so we don't touch the system Python
+    venv_dir = os.path.join(os.getcwd(), '.build_venv')
+    venv_python = os.path.join(venv_dir, 'bin', 'python3')
+    venv_pip = os.path.join(venv_dir, 'bin', 'pip')
+
+    if not os.path.exists(venv_python):
+        print("Creating build venv...")
+        if not run_command(['python3', '-m', 'venv', venv_dir]):
+            print("Failed to create build venv")
+            return False
+
+    # Install PyInstaller into the build venv
+    print("Installing PyInstaller into build venv...")
+    if not run_command([venv_pip, 'install', '--quiet', 'pyinstaller']):
+        print("Failed to install PyInstaller")
+        return False
+
+    # Install all binary requirements into the build venv so PyInstaller bundles them
+    print("Installing binary dependencies into build venv...")
+    for binary_name in sorted(os.listdir(binaries_dir)):
+        req_file = os.path.join(binaries_dir, binary_name, 'requirements.txt')
+        if os.path.exists(req_file):
+            print(f"  Installing requirements for {binary_name}...")
+            if not run_command([venv_pip, 'install', '--quiet', '-r', req_file]):
+                print(f"Warning: Failed to install requirements for {binary_name}, continuing...")
+
+    # Map: (output name, script path relative to binaries_dir, extra PyInstaller args)
+    binaries = [
+        ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         []),
+        ('AscendaraGofileHelper',        'AscendaraDownloader/src/AscendaraGofileHelper.py',        []),
+        ('AscendaraGameHandler',         'AscendaraGameHandler/src/AscendaraGameHandler.py',        []),
+        ('AscendaraCrashReporter',       'AscendaraCrashReporter/src/AscendaraCrashReporter.py',    ['--windowed']),
+        ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
+        ('AscendaraLocalRefresh',        'AscendaraLocalRefresh/src/AscendaraLocalRefresh.py',      []),
+        ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  []),
+        ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py', ['--windowed']),
+    ]
+
+    for binary_name, rel_script, extra_args in binaries:
+        script_path = os.path.join(binaries_dir, rel_script)
+        if not os.path.exists(script_path):
+            print(f"Warning: Script not found, skipping: {script_path}")
+            continue
+
+        dist_dir = os.path.join(binaries_dir, rel_script.split('/')[0], 'dist')
+        os.makedirs(dist_dir, exist_ok=True)
+
+        cmd = [
+            venv_python, '-m', 'PyInstaller',
+            '--onefile',
+            '--noconfirm',
+            '--name', binary_name,
+            '--distpath', dist_dir,
+            '--workpath', os.path.join(dist_dir, 'build_tmp'),
+            '--specpath', os.path.join(dist_dir, 'spec_tmp'),
+        ] + extra_args + [script_path]
+
+        print(f"Compiling {binary_name}...")
+        if not run_command(cmd):
+            print(f"Failed to compile {binary_name}")
+            return False
+
+        # Clean up PyInstaller temp dirs
+        for tmp in ['build_tmp', 'spec_tmp']:
+            tmp_path = os.path.join(dist_dir, tmp)
+            if os.path.exists(tmp_path):
+                shutil.rmtree(tmp_path)
+
+        print(f"  -> {os.path.join(dist_dir, binary_name)}")
+
+    # Remove the build venv — it's only needed during compilation
+    print("Cleaning up build venv...")
+    shutil.rmtree(venv_dir, ignore_errors=True)
+
+    print("All Python binaries compiled successfully")
+    return True
+
+
 def copy_linux_binaries():
     """Copy Linux Python scripts to debian directories"""
     print("Copying Linux binaries...")
@@ -174,7 +259,15 @@ def move_files():
         
         shutil.copytree(assets_dir, electron_assets_dir)
         print("Copied assets directory to electron directory")
-        
+
+        # Copy icon.png for Linux window/tray icon
+        icon_src = os.path.join('readme', 'logo', 'png', 'ascendara_512x.png')
+        if os.path.exists(icon_src):
+            shutil.copy(icon_src, os.path.join('electron', 'icon.png'))
+            print("Copied icon.png to electron directory")
+        else:
+            print("Warning: ascendara_512x.png not found, skipping icon copy")
+
         return True
     except Exception as e:
         print(f"Failed to move files: {e}")
@@ -230,7 +323,7 @@ def cleanup_after_build():
     print("Cleaning up temporary files...")
     
     # Remove temporary files from electron directory
-    temp_files = ['electron/index.html', 'electron/assets']
+    temp_files = ['electron/index.html', 'electron/assets', 'electron/icon.png']
     
     for temp_file in temp_files:
         if os.path.exists(temp_file):
@@ -297,10 +390,10 @@ def main():
     if not build_achievement_watcher():
         print("Failed to build AscendaraAchievementWatcher. Exiting.")
         return 1
-    
-    # Step 4: Copy Linux binaries
-    if not copy_linux_binaries():
-        print("Failed to copy Linux binaries. Exiting.")
+
+    # Step 4: Compile Python binaries to standalone ELF executables
+    if not build_python_binaries_linux():
+        print("Failed to build Python binaries. Exiting.")
         return 1
     
     # Step 5: Build the React app
