@@ -10,7 +10,7 @@ const { app } = require("electron");
 
 // Current app version
 // Do not change this value
-const appVersion = "9.9.8";
+const appVersion = "10.0.0";
 
 // Environment detection
 const isDev = !app.isPackaged;
