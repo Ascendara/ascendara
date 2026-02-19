@@ -269,6 +269,7 @@ function Settings() {
   const [torboxApiKey, setTorboxApiKey] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isOnWindows, setIsOnWindows] = useState(null);
+  const [isOnLinux, setIsOnLinux] = useState(false);
   const [downloadPath, setDownloadPath] = useState("");
   const [backupPath, setBackupPath] = useState("");
   const [canCreateFiles, setCanCreateFiles] = useState(true);
@@ -443,6 +444,7 @@ function Settings() {
       const isWindows = await window.electron.isOnWindows();
       console.log("Is on Windows:", isWindows);
       setIsOnWindows(isWindows);
+      setIsOnLinux(!isWindows && navigator.userAgent.toLowerCase().includes("linux"));
     };
     checkPlatform();
   }, []);
@@ -2777,8 +2779,8 @@ function Settings() {
               </div>
             </Card>
 
-            {/* Developer Settings Card - Only shown in development mode */}
-            {isDev && (
+            {/* Developer Settings Card - Only shown in development mode or on Linux */}
+            {(isDev || isOnLinux) && (
               <Card className="border-border p-6">
                 <div className="space-y-6">
                   <div>
@@ -2790,24 +2792,35 @@ function Settings() {
                       <Button
                         className="w-full"
                         variant="outline"
-                        onClick={() => window.electron.clearCache()}
+                        onClick={() => window.electron.openDevTools()}
                       >
-                        Clear Cache
+                        Open DevTools
                       </Button>
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={() => window.electron.openGameDirectory("local")}
-                      >
-                        Open Local Directory
-                      </Button>
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={() => window.electron.showTestNotification()}
-                      >
-                        Show Test Notification
-                      </Button>
+                      {isDev && (
+                        <>
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            onClick={() => window.electron.clearCache()}
+                          >
+                            Clear Cache
+                          </Button>
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            onClick={() => window.electron.openGameDirectory("local")}
+                          >
+                            Open Local Directory
+                          </Button>
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            onClick={() => window.electron.showTestNotification()}
+                          >
+                            Show Test Notification
+                          </Button>
+                        </>
+                      )}
                     </div>
                     <div className="flex flex-col space-y-2">
                       <Label>Screen Trigger</Label>
