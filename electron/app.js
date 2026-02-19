@@ -67,9 +67,16 @@ let watcherProcess = null;
 function launchCrashReporter(errorType, errorMessage) {
   const { spawn } = require("child_process");
 
-  const crashReporterPath = isDev
-    ? path.join("./binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter.exe")
-    : path.join(config.appDirectory, "/resources/AscendaraCrashReporter.exe");
+  let crashReporterPath;
+  if (isDev) {
+    crashReporterPath = process.platform === "win32"
+      ? path.join("./binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter.exe")
+      : path.join("./binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py");
+  } else {
+    crashReporterPath = process.platform === "win32"
+      ? path.join(config.appDirectory, "/resources/AscendaraCrashReporter.exe")
+      : path.join(process.resourcesPath, "AscendaraCrashReporter");
+  }
 
   if (!fs.existsSync(crashReporterPath)) {
     console.error("Crash reporter not found at:", crashReporterPath);
@@ -89,23 +96,31 @@ function launchCrashReporter(errorType, errorMessage) {
  */
 function createTray() {
   // Use the correct icon path - try multiple locations
+  const isLinux = process.platform === "linux";
   let iconPath;
   if (isDev) {
-    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
+    iconPath = isLinux
+      ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
+      : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   } else {
     // In production, icon should be in resources
-    iconPath = path.join(process.resourcesPath, "icon.ico");
+    iconPath = isLinux
+      ? path.join(process.resourcesPath, "icon.png")
+      : path.join(process.resourcesPath, "icon.ico");
     // Fallback to app directory if not in resources
     if (!fs.existsSync(iconPath)) {
-      iconPath = path.join(config.appDirectory, "icon.ico");
+      iconPath = isLinux
+        ? path.join(config.appDirectory, "icon.png")
+        : path.join(config.appDirectory, "icon.ico");
     }
   }
 
   // Verify icon exists
   if (!fs.existsSync(iconPath)) {
     console.error("Tray icon not found at:", iconPath);
-    // Use a fallback - create from the window icon
-    iconPath = path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
+    iconPath = isLinux
+      ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
+      : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   }
 
   const icon = nativeImage.createFromPath(iconPath);

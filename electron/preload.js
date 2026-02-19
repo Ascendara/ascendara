@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld("electron", {
   isWindowMaximized: () => ipcRenderer.invoke("is-window-maximized"),
   getFullscreenState: () => ipcRenderer.invoke("get-fullscreen-state"),
   clearCache: () => ipcRenderer.invoke("clear-cache"),
+  openDevTools: () => ipcRenderer.invoke("open-devtools"),
   reload: () => ipcRenderer.invoke("reload"),
   onWindowStateChange: callback => {
     ipcRenderer.on("window-state-changed", (_, maximized) => callback(maximized));

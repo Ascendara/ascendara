@@ -30,9 +30,10 @@ function createWindow() {
   const windowWidth = isLaptop ? Math.min(1500, screenWidth * 0.9) : 1600;
   const windowHeight = isLaptop ? Math.min(700, screenHeight * 0.9) : 800;
 
+  const iconFile = process.platform === "linux" ? "icon.png" : "icon.ico";
   const mainWindow = new BrowserWindow({
     title: "Ascendara",
-    icon: path.join(__dirname, "..", "icon.ico"),
+    icon: path.join(__dirname, "..", iconFile),
     width: windowWidth,
     height: windowHeight,
     frame: false,
@@ -48,6 +49,8 @@ function createWindow() {
       sandbox: false,
       // Disable web security to allow CORS requests to external APIs
       webSecurity: false,
+      // Must be explicitly true for openDevTools() to work in packaged builds
+      devTools: true,
     },
   });
 
@@ -57,6 +60,7 @@ function createWindow() {
   // Only show the window when it's ready to be displayed
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
+    
     mainWindowHidden = false;
   });
 
@@ -234,6 +238,18 @@ async function showErrorDialog(title, message) {
  * Register window-related IPC handlers
  */
 function registerWindowHandlers() {
+  // Open DevTools (available in production on Linux for debugging)
+  ipcMain.handle("open-devtools", () => {
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (mainWindow) {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools({ mode: "detach" });
+      }
+    }
+  });
+
   // Minimize the window
   ipcMain.handle("minimize-window", () => {
     const win = BrowserWindow.getFocusedWindow();
