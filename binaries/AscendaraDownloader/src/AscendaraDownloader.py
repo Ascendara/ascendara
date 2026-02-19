@@ -157,8 +157,11 @@ def get_settings_path() -> Optional[str]:
             if os.path.exists(candidate):
                 return candidate
     elif sys.platform == 'darwin':
-        user_data_dir = os.path.expanduser('~/Library/Application Support/ascendara')
-        candidate = os.path.join(user_data_dir, 'ascendarasettings.json')
+        candidate = os.path.join(os.path.expanduser('~/Library/Application Support/ascendara'), 'ascendarasettings.json')
+        if os.path.exists(candidate):
+            return candidate
+    else:
+        candidate = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
         if os.path.exists(candidate):
             return candidate
     return None

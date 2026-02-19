@@ -32,6 +32,8 @@ import psutil
 
 if sys.platform == 'darwin':
     ascendara_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
+elif sys.platform == 'linux':
+    ascendara_dir = os.path.join(os.path.expanduser('~/.ascendara'))
 else:
     ascendara_dir = os.path.join(os.environ.get('APPDATA', ''), 'Ascendara by tagoWorks')
 
@@ -204,6 +206,8 @@ def get_ludusavi_settings():
     try:
         if sys.platform == 'darwin':
             settings_path = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara', 'ascendarasettings.json')
+        elif sys.platform == 'linux':
+            settings_path = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
         else:
             settings_path = os.path.join(os.environ.get('APPDATA', ''), 'ascendara', 'ascendarasettings.json')
         logging.debug(f"Checking Ludusavi settings at: {settings_path}")
@@ -294,6 +298,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
     game_name = None
     if sys.platform == 'darwin':
         settings_file = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara', 'ascendarasettings.json')
+    elif sys.platform == 'linux':
+        settings_file = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
     else:
         settings_file = os.path.join(os.environ.get('APPDATA', ''), 'ascendara', 'ascendarasettings.json')
     logging.debug(f"Initial settings_file path: {settings_file}")
@@ -342,7 +348,12 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 json_file_path = os.path.join(parent_dir, f"{parent_name}.ascendara.json")
     else:
         exe_path = game_path
-        user_data_dir = os.path.join(os.environ['APPDATA'], 'ascendara')
+        if sys.platform == 'darwin':
+            user_data_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
+        elif sys.platform == 'linux':
+            user_data_dir = os.path.join(os.path.expanduser('~/.ascendara'))
+        else:
+            user_data_dir = os.path.join(os.environ.get('APPDATA', ''), 'ascendara')
         settings_file = os.path.join(user_data_dir, 'ascendarasettings.json')
         with open(settings_file, 'r', encoding='utf-8') as f:
             settings = json.load(f)
@@ -427,30 +438,29 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
     try:
         # Determine if we need to use Wine
         is_windows_exe = exe_path.lower().endswith('.exe')
-        is_mac = platform.system().lower() == 'darwin'
-        use_wine = is_windows_exe and is_mac
-        logging.debug(f"Executable type: {'Windows' if is_windows_exe else 'Other'}, running on macOS: {is_mac}, use_wine: {use_wine}")
+        current_platform = platform.system().lower()
+        use_wine = is_windows_exe and current_platform in ('darwin', 'linux')
+        logging.debug(f"Executable type: {'Windows' if is_windows_exe else 'Other'}, platform: {current_platform}, use_wine: {use_wine}")
         
         if os.path.dirname(exe_path):
             os.chdir(os.path.dirname(exe_path))
             logging.debug(f"Changed working directory to {os.path.dirname(exe_path)}")
         
-        def launch_with_wine_dxvk(exe_path, wine_prefix=None, wine_bin="wine"): 
+        def launch_with_wine_dxvk(exe_path, wine_prefix=None, wine_bin="wine"):
             env = os.environ.copy()
-            # Set WINEPREFIX if provided
             if wine_prefix:
                 env["WINEPREFIX"] = wine_prefix
-            # DXVK environment variables
             env["DXVK_LOG_LEVEL"] = "info"
-            # Add more DXVK or Vulkan/MoltenVK variables as needed
-            # Example: env["DXVK_HUD"] = "1"
+            # On Linux, try to use the system DISPLAY/WAYLAND_DISPLAY if not set
+            if platform.system().lower() == 'linux':
+                if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
+                    env["DISPLAY"] = ":0"
             logging.info(f"Launching with Wine binary: {wine_bin}, WINEPREFIX: {env.get('WINEPREFIX', 'default')}")
             return subprocess.Popen([wine_bin, exe_path], env=env)
 
-        # Default Wine prefix (edit as needed)
+        # Default Wine prefix
         default_wine_prefix = os.path.expanduser("~/.wine")
-        # Allow override via settings or env if desired in the future
-        wine_bin = "wine"  # Could be replaced with a path to Crossover or custom Wine
+        wine_bin = "wine"
 
         if use_wine:
             logging.info(f"Using Wine + DXVK to launch Windows executable: {exe_path}")

@@ -371,8 +371,13 @@ def main():
             # Handle specific key updates
             logging.info(f"Updating specific keys: {args.newKey}")
             try:
-                # Always load from AppData Local for translations
-                appdata_path = os.path.expandvars(r"%LOCALAPPDATA%\Ascendara")
+                # Load translations from platform-appropriate path
+                if sys.platform == 'win32':
+                    appdata_path = os.path.expandvars(r"%LOCALAPPDATA%\Ascendara")
+                elif sys.platform == 'darwin':
+                    appdata_path = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
+                else:
+                    appdata_path = os.path.join(os.path.expanduser('~/.ascendara'))
                 output_path = os.path.join(appdata_path, f"{args.lang}.json")
                 
                 logging.debug(f"AppData path: {appdata_path}")
@@ -507,8 +512,13 @@ def main():
         progress.set_phase("saving")
         logging.info("Saving translations...")
         
-        # Always save to AppData Local for translations
-        appdata_path = os.path.expandvars(r"%LOCALAPPDATA%\Ascendara\\languages")
+        # Save translations to platform-appropriate path
+        if sys.platform == 'win32':
+            appdata_path = os.path.expandvars(r"%LOCALAPPDATA%\Ascendara\languages")
+        elif sys.platform == 'darwin':
+            appdata_path = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara', 'languages')
+        else:
+            appdata_path = os.path.join(os.path.expanduser('~/.ascendara'), 'languages')
         os.makedirs(appdata_path, exist_ok=True)
         output_path = os.path.join(appdata_path, f"{args.lang}.json")
         
