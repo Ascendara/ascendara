@@ -173,7 +173,9 @@ function registerProtocolHandlers() {
  * @returns {boolean} - Whether this is the primary instance
  */
 function setupSingleInstance() {
-  const gotTheLock = app.requestSingleInstanceLock();
+  const { appVersion } = require("./config");
+  const lockKey = process.platform === "linux" ? { appVersion } : undefined;
+  const gotTheLock = app.requestSingleInstanceLock(lockKey);
 
   if (!gotTheLock) {
     console.log("Another instance is running, quitting this instance");

@@ -235,6 +235,7 @@
           ]
         }
       ],
+      "icon": "readme/logo/png/ascendara_512x.png",
       "category": "Utility",
       "maintainer": "tagoWorks",
       "vendor": "tagoWorks",
@@ -242,35 +243,39 @@
       "description": "Ascendara is a desktop application that helps you skip extracting files, navigating setup processes, or any unnecessary hassles when installing software.",
       "extraResources": [
         {
-          "from": "binaries/AscendaraDownloader/src/debian/AscendaraDownloader.py",
+          "from": "readme/logo/png/ascendara_512x.png",
+          "to": "icon.png"
+        },
+        {
+          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
           "to": "."
         },
         {
-          "from": "binaries/AscendaraDownloader/src/debian/AscendaraGofileHelper.py",
+          "from": "binaries/AscendaraDownloader/dist/AscendaraGofileHelper",
           "to": "."
         },
         {
-          "from": "binaries/AscendaraGameHandler/src/debian/AscendaraGameHandler.py",
+          "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler",
           "to": "."
         },
         {
-          "from": "binaries/AscendaraCrashReporter/src/debian/AscendaraCrashReporter.py",
+          "from": "binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter",
           "to": "."
         },
         {
-          "from": "binaries/AscendaraNotificationHelper/src/debian/AscendaraNotificationHelper.py",
+          "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper",
           "to": "."
         },
         {
-          "from": "binaries/AscendaraLanguageTranslation/src/debian/AscendaraLanguageTranslation.py",
+          "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
           "to": "."
         },
         {
-          "from": "binaries/AscendaraLocalRefresh/src/debian/AscendaraLocalRefresh.py",
+          "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh",
           "to": "."
         },
         {
-          "from": "binaries/AscendaraTorrentHandler/src/debian/AscendaraTorrentHandler.py",
+          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
           "to": "."
         },
         {
