@@ -557,7 +557,7 @@ const UserActivityTracker = React.memo(() => {
       window.electron?.ipcRenderer?.off("game-launch-success", handleGameLaunch);
       window.electron?.ipcRenderer?.off("game-closed", handleGameClosed);
     };
-  }, [user?.uid]);
+  }, [user?.uid, settings, userData]);
 
   // Listen for download events
   useEffect(() => {
