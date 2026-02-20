@@ -528,6 +528,7 @@ export default function DownloadPage() {
   const VERIFIED_PROVIDERS = ["megadb", "gofile", "buzzheavier", "pixeldrain"];
 
   async function whereToDownload(directUrl = null) {
+    console.log("[DL] whereToDownload called, directUrl:", directUrl);
     // Check if game is wanting to update
     if (gameData.isUpdating) {
       // Handle update flow
@@ -547,12 +548,17 @@ export default function DownloadPage() {
 
   async function handleDownload(directUrl = null, dir = null, forceStart = false) {
     const sanitizedGameName = sanitizeText(gameData.game);
+    console.log("[DL] handleDownload called", { directUrl, dir, forceStart, selectedProvider, sanitizedGameName });
+    console.log("[DL] settings.downloadDirectory:", settings.downloadDirectory);
+    console.log("[DL] showNoDownloadPath:", showNoDownloadPath);
     if (showNoDownloadPath) {
+      console.log("[DL] EARLY RETURN: showNoDownloadPath");
       return;
     }
 
     // Check if download directory is set and valid
     if (!settings.downloadDirectory || settings.downloadDirectory.trim() === "") {
+      console.log("[DL] EARLY RETURN: no downloadDirectory");
       setShowNoDownloadPath(true);
       toast.error(t("download.toast.noDownloadDirectory"));
       return;
@@ -566,6 +572,7 @@ export default function DownloadPage() {
 
     // Check if there's an active download
     const hasActive = await hasActiveDownloads();
+    console.log("[DL] hasActive:", hasActive, "isAuthenticated:", isAuthenticated);
 
     if (hasActive && !forceStart) {
       // Non-Ascend users can only have 1 download at a time - show error toast
@@ -659,7 +666,7 @@ export default function DownloadPage() {
       torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings);
     if (
       !directUrl &&
-      (selectedProvider === "gofile" || selectedProvider === "buzzheavier") &&
+      (selectedProvider === "gofile" || selectedProvider === "buzzheavier" || selectedProvider === "pixeldrain") &&
       !shouldUseTorbox()
     ) {
       let providerLinks = gameData.download_links?.[selectedProvider] || [];
@@ -669,7 +676,9 @@ export default function DownloadPage() {
           ? providerLinks
           : null;
 
+      console.log("[DL] seamless provider link:", validProviderLink, "providerLinks:", providerLinks);
       if (!validProviderLink) {
+        console.log("[DL] EARLY RETURN: no valid seamless provider link");
         toast.error(t("download.toast.invalidLink"));
         return;
       }
@@ -846,13 +855,11 @@ export default function DownloadPage() {
     // For manual downloads with other providers, check if we have a valid link
     else if (!directUrl) {
       if (!selectedProvider) {
-        console.log("No provider selected");
+        console.log("[DL] EARLY RETURN: no provider selected");
         return;
       }
       if (!inputLink || !isValidLink) {
-        console.log("Input link:", inputLink);
-        console.log("Is valid link:", isValidLink);
-        console.log("Invalid link for manual download");
+        console.log("[DL] EARLY RETURN: inputLink:", inputLink, "isValidLink:", isValidLink);
         return;
       }
     }
@@ -891,6 +898,17 @@ export default function DownloadPage() {
       console.log("[Download] Download initiated! Calling notifyDownloadStart");
       notifyDownloadStart(sanitizedGameName, gameData.game);
 
+      // Listen for binary spawn errors (async, fires after handler returns)
+      const removeErrorListener = window.electron.onDownloadError(errData => {
+        if (errData.game === sanitizedGameName) {
+          console.error("[Download] download-error received:", errData.error);
+          toast.error(`Download failed: ${errData.error}`);
+          setIsStartingDownload(false);
+          clearDownloadLock();
+          removeErrorListener();
+        }
+      });
+
       // Keep isStarting true until download actually begins
       const removeDownloadListener = window.electron.onDownloadProgress(downloadInfo => {
         console.log(
@@ -903,6 +921,7 @@ export default function DownloadPage() {
           console.log("[Download] Download progress detected");
           setIsStartingDownload(false);
           removeDownloadListener();
+          removeErrorListener();
           // Trigger immediate sync to monitor endpoint
           forceSyncDownloads();
         }
@@ -1542,6 +1561,30 @@ export default function DownloadPage() {
       style={{ transform: `scale(0.95)`, transformOrigin: "top center" }}
       ref={mainContentRef}
     >
+      <AlertDialog open={showNoDownloadPath} onOpenChange={setShowNoDownloadPath}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("download.noDownloadPath.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("download.noDownloadPath.desc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowNoDownloadPath(false)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <Button
+              onClick={() => {
+                setShowNoDownloadPath(false);
+                navigate("/settings");
+              }}
+            >
+              <FolderIcon className="mr-2 h-4 w-4" />
+              {t("download.noDownloadPath.goToSettings")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="w-full max-w-6xl">
         <div
           className="cursor-pointer text-center font-bold text-muted-foreground transition-colors hover:text-foreground"

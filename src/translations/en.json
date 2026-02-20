@@ -1067,6 +1067,11 @@
       "torboxProcessingError": "Error processing Torbox link",
       "torrentSent": "Torrent sent to qBittorrent"
     },
+    "noDownloadPath": {
+      "title": "No Download Directory Set",
+      "desc": "You haven't set a download directory yet. Please go to Settings to choose where your games will be saved.",
+      "goToSettings": "Go to Settings"
+    },
     "topCriticScore": "Top Critic Score",
     "trainer": "Trainer Menu",
     "understand": "I Understand, Continue",
