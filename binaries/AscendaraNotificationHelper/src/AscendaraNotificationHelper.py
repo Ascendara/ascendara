@@ -140,10 +140,10 @@ def _launch_crash_reporter_on_exit(error_code, error_message):
     try:
         crash_reporter_path = os.path.join('./AscendaraCrashReporter.exe')
         if os.path.exists(crash_reporter_path):
-            # Use subprocess.Popen with CREATE_NO_WINDOW flag to hide console
+            kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
             subprocess.Popen(
                 [crash_reporter_path, "notificationhelper", str(error_code), error_message],
-                creationflags=subprocess.CREATE_NO_WINDOW
+                **kwargs
             )
         else:
             logging.error(f"Crash reporter not found at: {crash_reporter_path}")
