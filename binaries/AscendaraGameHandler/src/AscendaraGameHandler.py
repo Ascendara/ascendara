@@ -59,9 +59,10 @@ def _launch_crash_reporter_on_exit(error_code, error_message):
         crash_reporter_path = os.path.join('./AscendaraCrashReporter.exe')
         logging.info(f"Attempting to launch crash reporter with error code {error_code}")
         if os.path.exists(crash_reporter_path):
+            kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
             subprocess.Popen(
                 [crash_reporter_path, "gamehandler", str(error_code), error_message],
-                creationflags=subprocess.CREATE_NO_WINDOW
+                **kwargs
             )
             logging.info("Crash reporter launched successfully")
             logging.info("[EXIT] _launch_crash_reporter_on_exit() - Success")
