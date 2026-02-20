@@ -67,9 +67,10 @@ def _launch_crash_reporter_on_exit(error_code, error_message):
     try:
         crash_reporter_path = os.path.join('./AscendaraCrashReporter.exe')
         if os.path.exists(crash_reporter_path):
+            kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
             subprocess.Popen(
                 [crash_reporter_path, "maindownloader", str(error_code), error_message],
-                creationflags=subprocess.CREATE_NO_WINDOW
+                **kwargs
             )
         else:
             logging.error(f"Crash reporter not found at: {crash_reporter_path}")
@@ -93,9 +94,10 @@ def _launch_notification(theme, title, message):
         
         if os.path.exists(notification_helper_path):
             logging.debug(f"Launching notification: theme={theme}, title='{title}'")
+            kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
             subprocess.Popen(
                 [notification_helper_path, "--theme", theme, "--title", title, "--message", message],
-                creationflags=subprocess.CREATE_NO_WINDOW
+                **kwargs
             )
         else:
             logging.error(f"Notification helper not found at: {notification_helper_path}")
