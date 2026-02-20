@@ -1,3 +1,4 @@
+import { autoUploadBackupToCloud } from "@/services/cloudBackupService";
 import ContextMenu from "@/components/ContextMenu";
 import Layout from "@/components/Layout";
 import MenuBar from "@/components/MenuBar";
@@ -452,7 +453,8 @@ const ScrollToTop = () => {
 // Track user activity and update Firebase customMessage
 const UserActivityTracker = React.memo(() => {
   const { pathname, state } = useLocation();
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
+  const { settings } = useSettings();
   const lastPathRef = useRef(null);
 
   useEffect(() => {
@@ -518,10 +520,33 @@ const UserActivityTracker = React.memo(() => {
       setActivity(ActivityType.PLAYING_GAME, gameName);
     };
 
-    const handleGameClosed = (_, data) => {
+    const handleGameClosed = async (_, data) => {
       setGamePlayingState(false);
       // Restore to browsing library when game closes
       setActivity(ActivityType.BROWSING_LIBRARY);
+
+      // Auto-upload backup to cloud if enabled
+      const gameName = data?.game;
+      if (gameName && user && settings) {
+        try {
+          const result = await autoUploadBackupToCloud(
+            gameName,
+            settings,
+            user,
+            userData
+          );
+          if (result.success) {
+            console.log(`[CloudBackup] Auto-uploaded backup for ${gameName}`);
+          } else {
+            console.warn(
+              `[CloudBackup] Auto-upload failed for ${gameName}:`,
+              result.error
+            );
+          }
+        } catch (error) {
+          console.error(`[CloudBackup] Error auto-uploading for ${gameName}:`, error);
+        }
+      }
     };
 
     // Listen for game events from Electron

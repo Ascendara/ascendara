@@ -1,3 +1,7 @@
+import {
+  uploadBackupToCloud,
+  hasActiveSubscription,
+} from "@/services/cloudBackupService";
 import React, { useState, useEffect } from "react";
 import {
   AlertDialog,
@@ -32,10 +36,8 @@ import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { Card, CardContent } from "./ui/card";
 import {
-  uploadBackup,
   listBackups as listCloudBackups,
   getBackupDownloadUrl,
-  deleteBackup,
 } from "@/services/firebaseService";
 
 const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false }) => {
@@ -69,11 +71,6 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
   const { t } = useLanguage();
   const { settings } = useSettings();
   const { user, userData } = useAuth();
-
-  // Check if user has active Ascend subscription or is verified (verified users get free Ascend)
-  // Users who purchase Ascend during trial period should have access (ascendSubscription.active will be true)
-  const hasActiveSubscription =
-    userData?.verified || userData?.ascendSubscription?.active === true;
 
   useEffect(() => {
     if (open) {
@@ -355,57 +352,15 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
     }
   };
 
-  const handleUploadBackupToCloud = async backupResult => {
+  const handleUploadBackupToCloud = async () => {
     if (!user) {
       toast.error("Please sign in to Ascend to use cloud backups");
       return false;
     }
-
     setIsUploadingToCloud(true);
     try {
       const gameName = game.game || game.name;
-      const backupLocation = settings.ludusavi?.backupLocation;
-
-      if (!backupLocation) {
-        throw new Error("Backup location not configured in settings");
-      }
-
-      // Construct the path to the game's backup folder
-      const gameBackupFolder = `${backupLocation}/${gameName}`;
-
-      // Get list of backup files in the game folder
-      const backupFiles = await window.electron.listBackupFiles(gameBackupFolder);
-      if (!backupFiles || backupFiles.length === 0) {
-        throw new Error("No backup files found in backup directory");
-      }
-
-      // Find the most recent .zip backup file
-      const zipBackups = backupFiles.filter(f => f.endsWith(".zip"));
-      if (zipBackups.length === 0) {
-        throw new Error("No zip backup files found");
-      }
-
-      // Sort by filename (which includes timestamp) and get the most recent
-      const latestBackup = zipBackups.sort().reverse()[0];
-      const backupPath = `${gameBackupFolder}/${latestBackup}`;
-
-      // Read the backup file
-      const backupFile = await window.electron.readBackupFile(backupPath);
-      if (!backupFile) {
-        throw new Error("Failed to read backup file");
-      }
-
-      // Create a File object from the backup data
-      const blob = new Blob([backupFile], { type: "application/zip" });
-      const file = new File([blob], latestBackup, { type: "application/zip" });
-
-      // Upload to cloud
-      const uploadResult = await uploadBackup(
-        file,
-        gameName,
-        `Auto backup - ${new Date().toLocaleString()}`
-      );
-
+      const uploadResult = await uploadBackupToCloud(gameName, settings, user, userData);
       if (uploadResult.success) {
         toast.success("Backup uploaded to cloud successfully");
         return true;
@@ -654,7 +609,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       }
 
       // Load cloud backups if user is authenticated and has subscription
-      if (user && hasActiveSubscription) {
+      if (user && hasActiveSubscription(userData)) {
         try {
           const cloudResult = await listCloudBackups(gameName);
           if (!cloudResult.error && cloudResult.backups) {
@@ -874,14 +829,14 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
                     <Cloud className="h-4 w-4 text-primary" />
                   </div>
                   {t("library.backups.autoCloudBackup")}
-                  {user && hasActiveSubscription && (
+                  {user && hasActiveSubscription(userData) && (
                     <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-secondary">
                       {t("library.backups.autoCloudBackupActive")}
                     </span>
                   )}
                 </Label>
                 <span className="block text-sm text-muted-foreground">
-                  {user && hasActiveSubscription
+                  {user && hasActiveSubscription(userData)
                     ? t("library.backups.autoCloudBackupDesc")
                     : !user
                       ? t("library.backups.autoCloudBackupSignInDesc")
@@ -896,7 +851,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
                     {t("library.backups.autoCloudBackupLearnMore")}
                   </Button>
                 )}
-                {user && !hasActiveSubscription && (
+                {user && !hasActiveSubscription(userData) && (
                   <Button
                     variant="link"
                     className="h-auto p-0 text-xs text-primary hover:text-primary/80"
@@ -916,7 +871,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
                     });
                     return;
                   }
-                  if (!hasActiveSubscription) {
+                  if (!hasActiveSubscription(userData)) {
                     toast.error(t("library.backups.cloudBackupsRequirePremium"), {
                       description: t("library.backups.cloudBackupsUpgradePrompt"),
                       action: {
@@ -942,7 +897,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
                     }
                   );
                 }}
-                disabled={!user || !hasActiveSubscription}
+                disabled={!user || !hasActiveSubscription(userData)}
                 className="data-[state=checked]:bg-primary"
               />
             </div>
