@@ -7,6 +7,11 @@ const https = require("https");
 const http = require("http");
 const { join } = require("path");
 const { createWriteStream } = require("fs");
+const os = require("os");
+
+const appData =
+  process.env["APPDATA"] ||
+  path.join(process.env.HOME || os.homedir(), ".config");
 
 // Simple fetch wrapper for Node.js
 async function fetchJson(url) {
@@ -93,7 +98,7 @@ module.exports.loadSteamData = async (appID, lang, key) => {
   }
 
   const cache = path.join(
-    process.env["APPDATA"],
+    appData,
     "Achievement Watcher/steam_cache/schema",
     lang
   );
@@ -125,7 +130,7 @@ module.exports.loadSteamData = async (appID, lang, key) => {
 module.exports.fetchIcon = async (url, appID) => {
   try {
     const cache = path.join(
-      process.env["APPDATA"],
+      appData,
       `Achievement Watcher/steam_cache/icon/${appID}`
     );
 
@@ -188,7 +193,7 @@ async function findInAppList(appID, key) {
   if (!appID || !(Number.isInteger(appID) && appID > 0)) throw "ERR_INVALID_APPID";
 
   const cache = path.join(
-    process.env["APPDATA"],
+    appData,
     "Achievement Watcher/steam_cache/schema"
   );
   const filepath = path.join(cache, "appList.json");
