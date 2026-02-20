@@ -440,14 +440,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "noticeAppIsFree") {
       setStep("extension");
     } else if (step === "extension") {
-      setStep(isOnWindows ? "localIndex" : "dependencies");
-    } else if (step === "dependencies") {
-      if (isOnWindows) {
-        handleAnalyticsChoice(analyticsConsent);
-        handleExit(true);
-      } else {
-        setStep("localIndex");
-      }
+      setStep("localIndex");
     } else if (step === "localIndex") {
       setStep("referral");
     } else if (step === "referral") {
@@ -459,12 +452,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "analytics") {
       setStep("updates");
     } else if (step === "updates") {
-      if (isOnWindows) {
-        setStep("dependencies");
-      } else {
-        handleAnalyticsChoice(analyticsConsent);
-        handleExit(true);
-      }
+      setStep(isOnWindows ? "dependencies" : "linuxDeps");
+    } else if (step === "linuxDeps") {
+      setStep("dependencies");
+    } else if (step === "dependencies") {
+      handleExit(true);
     }
   };
 
@@ -2048,8 +2040,109 @@ const Welcome = ({ welcomeData, onComplete }) => {
             </motion.div>
           )}
 
-          {step === "dependencies" &&
-            (isOnWindows ? (
+          {step === "linuxDeps" && (
+            <motion.div
+              key="non-windows-dependencies"
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              {!dependenciesInstalled ? (
+                <>
+                  <motion.div
+                    className="mb-8 flex items-center justify-center"
+                    variants={itemVariants}
+                  >
+                    <h2 className="text-4xl font-bold text-primary">
+                      {t("welcome.pythonIsRequired")}
+                    </h2>
+                  </motion.div>
+                  <motion.div
+                    className="mb-12 max-w-3xl space-y-6"
+                    variants={itemVariants}
+                  >
+                    <p className="text-xl text-foreground/80">
+                      {t("welcome.pythonMustBeInstalled")}
+                    </p>
+                    <div className="flex justify-center space-x-4">
+                      <Button
+                        onClick={async () => {
+                          const result = await window.electron.installPython();
+                          if (result.success) {
+                            setDependenciesInstalled(true);
+                          }
+                        }}
+                        size="lg"
+                        className="px-8 py-6 text-secondary"
+                      >
+                        <FolderDownIcon className="mr-2 h-5 w-5" />
+                        {t("welcome.installPython")}
+                      </Button>
+
+                      <Button
+                        onClick={async () => {
+                          setDependenciesInstalled(true);
+                        }}
+                        size="lg"
+                        className="px-8 py-6 text-secondary"
+                      >
+                        <SquareArrowRight className="mr-2 h-5 w-5" />
+                        {t("welcome.havePython")}
+                      </Button>
+                    </div>
+                  </motion.div>
+                </>
+              ) : (
+                <>
+                  <motion.div
+                    className="mb-8 flex items-center justify-center"
+                    variants={itemVariants}
+                  >
+                    <h2 className="text-4xl font-bold text-primary">
+                      {t("welcome.wineIsRequired")}{" "}
+                      <Wine size={32} className="mb-1 inline" />
+                    </h2>
+                  </motion.div>
+                  <motion.div
+                    className="mb-12 max-w-4xl space-y-6"
+                    variants={itemVariants}
+                  >
+                    <p className="text-xl text-foreground/80">
+                      {t("welcome.wineMustBeInstalled")}
+                    </p>
+                    <div className="flex justify-center space-x-4">
+                      <Button
+                        onClick={async () => {
+                          const result = await window.electron.installWine();
+                          if (result.success) {
+                            handleNext();
+                          }
+                        }}
+                        size="lg"
+                        className="px-8 py-6 text-secondary"
+                      >
+                        <FolderDownIcon className="mr-2 h-5 w-5" />
+                        {t("welcome.installWine")}
+                      </Button>
+
+                      <Button
+                        onClick={() => handleNext()}
+                        size="lg"
+                        className="px-8 py-6 text-secondary"
+                      >
+                        <Rocket className="mr-2 h-5 w-5" />
+                        {t("welcome.haveWine")}
+                      </Button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {step === "dependencies" && (
               <motion.div
                 key="dependencies"
                 className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
@@ -2209,107 +2302,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   </motion.div>
                 )}
               </motion.div>
-            ) : (
-              <motion.div
-                key="non-windows-dependencies"
-                className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                {!dependenciesInstalled ? (
-                  <>
-                    <motion.div
-                      className="mb-8 flex items-center justify-center"
-                      variants={itemVariants}
-                    >
-                      <h2 className="text-4xl font-bold text-primary">
-                        {t("welcome.pythonIsRequired")}
-                      </h2>
-                    </motion.div>
-                    <motion.div
-                      className="mb-12 max-w-3xl space-y-6"
-                      variants={itemVariants}
-                    >
-                      <p className="text-xl text-foreground/80">
-                        {t("welcome.pythonMustBeInstalled")}
-                      </p>
-                      <div className="flex justify-center space-x-4">
-                        <Button
-                          onClick={async () => {
-                            const result = await window.electron.installPython();
-                            if (result.success) {
-                              setDependenciesInstalled(true);
-                            }
-                          }}
-                          size="lg"
-                          className="px-8 py-6 text-secondary"
-                        >
-                          <FolderDownIcon className="mr-2 h-5 w-5" />
-                          {t("welcome.installPython")}
-                        </Button>
-
-                        <Button
-                          onClick={async () => {
-                            setDependenciesInstalled(true);
-                          }}
-                          size="lg"
-                          className="px-8 py-6 text-secondary"
-                        >
-                          <SquareArrowRight className="mr-2 h-5 w-5" />
-                          {t("welcome.havePython")}
-                        </Button>
-                      </div>
-                    </motion.div>
-                  </>
-                ) : (
-                  <>
-                    <motion.div
-                      className="mb-8 flex items-center justify-center"
-                      variants={itemVariants}
-                    >
-                      <h2 className="text-4xl font-bold text-primary">
-                        {t("welcome.wineIsRequired")}{" "}
-                        <Wine size={32} className="mb-1 inline" />
-                      </h2>
-                    </motion.div>
-                    <motion.div
-                      className="mb-12 max-w-4xl space-y-6"
-                      variants={itemVariants}
-                    >
-                      <p className="text-xl text-foreground/80">
-                        {t("welcome.wineMustBeInstalled")}
-                      </p>
-                      <div className="flex justify-center space-x-4">
-                        <Button
-                          onClick={async () => {
-                            const result = await window.electron.installWine();
-                            if (result.success) {
-                              handleNext();
-                            }
-                          }}
-                          size="lg"
-                          className="px-8 py-6 text-secondary"
-                        >
-                          <FolderDownIcon className="mr-2 h-5 w-5" />
-                          {t("welcome.installWine")}
-                        </Button>
-
-                        <Button
-                          onClick={() => handleNext()}
-                          size="lg"
-                          className="px-8 py-6 text-secondary"
-                        >
-                          <Rocket className="mr-2 h-5 w-5" />
-                          {t("welcome.haveWine")}
-                        </Button>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </motion.div>
-            ))}
+          )}
 
           {step === "installationComplete" && (
             <motion.div
