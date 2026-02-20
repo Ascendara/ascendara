@@ -1649,7 +1649,7 @@ def main():
         
         # Mark that user has successfully indexed
         try:
-            timestamp_path = os.path.join(os.environ['USERPROFILE'], 'timestamp.ascendara.json')
+            timestamp_path = os.path.join(os.path.expanduser('~'), 'timestamp.ascendara.json')
             timestamp_data = {}
             if os.path.exists(timestamp_path):
                 with open(timestamp_path, 'r', encoding='utf-8') as f:
