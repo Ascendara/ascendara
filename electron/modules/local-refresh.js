@@ -398,7 +398,7 @@ function registerLocalRefreshHandlers() {
               "32",
             ];
           } else {
-            executablePath = path.join(appDirectory, "/resources/AscendaraLocalRefresh");
+            executablePath = path.join(process.resourcesPath, "AscendaraLocalRefresh");
             args = [
               "--output",
               outputPath,
@@ -1023,7 +1023,7 @@ function registerLocalRefreshHandlers() {
               outputPath,
             ];
           } else {
-            executablePath = path.join(appDirectory, "/resources/AscendaraLocalRefresh");
+            executablePath = path.join(process.resourcesPath, "AscendaraLocalRefresh");
             args = [
               "--extract-shared-index",
               "--zip-path",

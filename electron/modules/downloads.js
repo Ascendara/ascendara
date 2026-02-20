@@ -331,7 +331,7 @@ function registerDownloadHandlers() {
             }
           }
 
-          if (!headerImagePath) {
+          if (!headerImagePath && imageKey) {
             const imageLink =
               settings.gameSource === "fitgirl"
                 ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
@@ -364,6 +364,8 @@ function registerDownloadHandlers() {
               console.error(`Failed to download header image: ${imgError.message}`);
               // Continue without header image
             }
+          } else if (!headerImagePath) {
+            console.log(`Skipping header image download: imageKey not available`);
           }
         } else {
           console.log(`No imgID provided, skipping header image download`);
@@ -536,6 +538,14 @@ function registerDownloadHandlers() {
           timestamp: new Date().toISOString(),
         });
         await updateTimestampFile(timestampData);
+
+        console.log(`Spawning executable: ${executablePath}`);
+        if (!isWindows && !isDev && !fs.existsSync(executablePath)) {
+          const errMsg = `Binary not found: ${executablePath}`;
+          console.error(errMsg);
+          event.sender.send("download-error", { game: sanitizedGame, error: errMsg });
+          return;
+        }
 
         const downloadProcess = spawn(executablePath, spawnCommand, {
           detached: true,

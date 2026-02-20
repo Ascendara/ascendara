@@ -60,7 +60,6 @@ function createWindow() {
   // Only show the window when it's ready to be displayed
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
-    
     mainWindowHidden = false;
   });
 

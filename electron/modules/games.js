@@ -366,7 +366,7 @@ function registerGameHandlers() {
           executablePath = getPythonPath();
           handlerScript = "binaries/AscendaraGameHandler/src/AscendaraGameHandler.py";
         } else {
-          executablePath = path.join(appDirectory, "..", "resources/AscendaraGameHandler");
+          executablePath = path.join(process.resourcesPath, "AscendaraGameHandler");
         }
 
         if (isWindows && !fs.existsSync(executablePath)) {

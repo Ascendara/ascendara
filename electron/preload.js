@@ -315,6 +315,11 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("download-complete", listener);
     return () => ipcRenderer.removeListener("download-complete", listener);
   },
+  onDownloadError: callback => {
+    const listener = (_, data) => callback(data);
+    ipcRenderer.on("download-error", listener);
+    return () => ipcRenderer.removeListener("download-error", listener);
+  },
 
   //===========================================================================
   // FILE & DIRECTORY MANAGEMENT
