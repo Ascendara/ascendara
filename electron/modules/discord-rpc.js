@@ -27,6 +27,8 @@ function destroyDiscordRPC() {
       // Ignore any errors during cleanup
     } finally {
       rpc = null;
+      rpcIsConnected = false;
+      rpcConnectionAttempts = 0;
     }
     console.log("Discord RPC has been destroyed");
   }
@@ -121,11 +123,15 @@ function updateDiscordRPCToLibrary() {
       // Wait a bit longer to ensure clean state
       setTimeout(() => {
         // Then set new activity
-        rpc.setActivity({
-          state: "Searching for games...",
-          largeImageKey: "ascendara",
-          largeImageText: "Ascendara",
-        });
+        rpc
+          .setActivity({
+            state: "Searching for games...",
+            largeImageKey: "ascendara",
+            largeImageText: "Ascendara",
+          })
+          .catch(err => {
+            console.log("Failed to set Discord RPC library activity:", err);
+          });
       }, 500);
     })
     .catch(error => {
@@ -140,19 +146,23 @@ function updateDiscordRPCToLibrary() {
 function setPlayingActivity(gameName) {
   if (!rpc || !rpcIsConnected) return;
 
-  rpc.setActivity({
-    details: "Playing a Game",
-    state: `${gameName}`,
-    startTimestamp: new Date(),
-    largeImageKey: "ascendara",
-    largeImageText: "Ascendara",
-    buttons: [
-      {
-        label: "Play on Ascendara",
-        url: "https://ascendara.app/",
-      },
-    ],
-  });
+  rpc
+    .setActivity({
+      details: "Playing a Game",
+      state: `${gameName}`,
+      startTimestamp: new Date(),
+      largeImageKey: "ascendara",
+      largeImageText: "Ascendara",
+      buttons: [
+        {
+          label: "Play on Ascendara",
+          url: "https://ascendara.app/",
+        },
+      ],
+    })
+    .catch(err => {
+      console.log("Failed to set Discord RPC playing activity:", err);
+    });
 }
 
 /**

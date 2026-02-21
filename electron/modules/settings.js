@@ -7,6 +7,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const { app, ipcMain } = require("electron");
 const { encrypt, decrypt } = require("./encryption");
+const { initializeDiscordRPC, destroyDiscordRPC } = require("./discord-rpc");
 
 class SettingsManager {
   constructor() {
@@ -260,6 +261,14 @@ function registerSettingsHandlers() {
     if (success) {
       // Notify renderer about the change
       event.sender.send("settings-changed", manager.getSettings());
+      // Handle Discord RPC toggle immediately
+      if (key === "rpcEnabled") {
+        if (value) {
+          initializeDiscordRPC();
+        } else {
+          destroyDiscordRPC();
+        }
+      }
     }
     return success;
   });
