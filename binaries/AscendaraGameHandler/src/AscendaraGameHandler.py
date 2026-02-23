@@ -23,6 +23,7 @@ import json
 import logging
 import platform
 import subprocess
+import shlex
 from datetime import datetime
 import ctypes
 import atexit
@@ -458,7 +459,6 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     env["DISPLAY"] = ":0"
             cmd = [wine_bin, exe_path]
             if extra_args:
-                import shlex
                 cmd += shlex.split(extra_args)
             logging.info(f"Launching with Wine binary: {wine_bin}, WINEPREFIX: {env.get('WINEPREFIX', 'default')}, cmd: {cmd}")
             return subprocess.Popen(cmd, env=env)
@@ -473,7 +473,6 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     env["DISPLAY"] = ":0"
             cmd = [proton_bin, "run", exe_path]
             if extra_args:
-                import shlex
                 cmd += shlex.split(extra_args)
             logging.info(f"Launching with Proton binary: {proton_bin}, STEAM_COMPAT_DATA_PATH: {steam_compat_data_path}, cmd: {cmd}")
             return subprocess.Popen(cmd, env=env)
@@ -611,8 +610,16 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     # Try to launch trainer normally first
                     try:
                         if trainer_use_wine:
-                            logging.info("Launching trainer with Wine")
-                            trainer_process = launch_with_wine_dxvk(trainer_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin)
+                            if use_proton and current_platform == 'linux':
+                                logging.info("Launching trainer with Proton")
+                                try:
+                                    trainer_process = launch_with_proton(trainer_path, proton_bin, proton_data_path)
+                                except Exception as proton_err:
+                                    logging.error(f"Proton trainer launch failed, falling back to Wine: {proton_err}", exc_info=True)
+                                    trainer_process = launch_with_wine_dxvk(trainer_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin)
+                            else:
+                                logging.info("Launching trainer with Wine")
+                                trainer_process = launch_with_wine_dxvk(trainer_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin)
                         else:
                             trainer_process = subprocess.Popen(trainer_path)
                         logging.info("Trainer launched successfully")
