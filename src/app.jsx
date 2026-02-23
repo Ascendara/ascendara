@@ -1134,7 +1134,10 @@ const AppRoutes = () => {
             description: t("app.toasts.outOfDateDesc"),
             action: {
               label: t("app.toasts.updateNow"),
-              onClick: () => window.electron.openURL("https://ascendara.app/"),
+              onClick: async () => {
+                toast.dismiss("update-available");
+                await window.electron.updateAscendara();
+              },
             },
             duration: 10000,
             id: "update-available",
