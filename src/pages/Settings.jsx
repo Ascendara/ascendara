@@ -295,6 +295,7 @@ function Settings() {
   const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
   const [branchSwitchProgress, setBranchSwitchProgress] = useState(0);
   const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
+  const [currentBranch, setCurrentBranch] = useState("live");
   // Default custom colors for merging with saved themes (handles missing new properties)
   const defaultCustomColors = {
     background: "255 255 255",
@@ -437,6 +438,7 @@ function Settings() {
   useEffect(() => {
     const checkExperiment = async () => {
       const branch = (await window.electron.getBranch?.()) ?? "live";
+      setCurrentBranch(branch);
       const isExp = branch === "experimental";
       setIsExperiment(isExp);
       if (isExp) {
@@ -3303,7 +3305,7 @@ function Settings() {
                     requiresSubscription: true,
                   },
                 ].map(branch => {
-                  const isActive = (settings.appBranch || "live") === branch.id;
+                  const isActive = currentBranch === branch.id;
                   const isLocked = branch.requiresSubscription && !hasAscendSubscription;
                   return (
                     <button
