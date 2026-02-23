@@ -71,15 +71,33 @@ async function getSettings() {
  */
 async function checkVersionAndUpdate() {
   try {
-    const response = await axios.get("https://api.ascendara.app/");
-    const latestVersion = response.data.appVer;
+    const settings = await getSettings();
+    const currentBranch = settings.appBranch || "live";
+
+    let latestVersion;
+
+    if (currentBranch === "live") {
+      const response = await axios.get("https://api.ascendara.app/");
+      latestVersion = response.data.appVer;
+    } else {
+      // For public-testing and experimental, check branch-specific versions
+      // If the branch no longer exists or version matches live, treat as up-to-date
+      try {
+        const response = await axios.get("https://api.ascendara.app/branch-versions");
+        const branchData = response.data;
+        latestVersion = branchData[currentBranch] || branchData.live || appVersion;
+      } catch {
+        // Fallback to live API if branch-versions endpoint fails
+        const response = await axios.get("https://api.ascendara.app/");
+        latestVersion = response.data.appVer;
+      }
+    }
 
     isLatest = latestVersion === appVersion;
     console.log(
-      `Version check: Current=${appVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
+      `Version check [${currentBranch}]: Current=${appVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
-      const settings = await getSettings();
       if (settings.autoUpdate && !updateDownloadInProgress) {
         // Start background download
         downloadUpdatePromise = downloadUpdateInBackground();
@@ -272,6 +290,7 @@ async function downloadUpdateInBackground() {
     const headers = {
       "X-Ascendara-Client": "app",
       "X-Ascendara-Version": appVersion,
+      "X-Ascendara-Platform": isWindows ? "windows" : "linux",
     };
 
     const updateUrl = `https://lfs.ascendara.app/download?update`;
@@ -407,6 +426,82 @@ function registerUpdateHandlers() {
 
   ipcMain.handle("is-broken-version", () => {
     return isBrokenVersion;
+  });
+
+  ipcMain.handle("switch-branch", async (_, branch) => {
+    const branchUrls = {
+      live: "https://lfs.ascendara.app/download?update",
+      "public-testing": "https://lfs.ascendara.app/download?branch=public-testing",
+      experimental: "https://lfs.ascendara.app/download?branch=experimental",
+    };
+
+    const url = branchUrls[branch];
+    if (!url) return { success: false, error: "Unknown branch" };
+
+    try {
+      const headers = {
+        "X-Ascendara-Client": "app",
+        "X-Ascendara-Version": appVersion,
+        "X-Ascendara-Platform": isWindows ? "windows" : "linux",
+      };
+
+      const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
+      const installerPath = path.join(tempDir, "AscendaraBranchInstaller.exe");
+
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir);
+      }
+
+      const mainWindow = BrowserWindow.getAllWindows()[0];
+
+      const writer = fs.createWriteStream(installerPath);
+
+      const response = await axios({
+        url,
+        method: "GET",
+        responseType: "stream",
+        headers: {
+          ...headers,
+          "Accept-Encoding": "gzip, deflate, br",
+          Connection: "keep-alive",
+          "Cache-Control": "no-cache",
+        },
+        maxRedirects: 5,
+        timeout: 30000,
+      });
+
+      const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+      let downloadedSize = 0;
+
+      response.data.on("data", chunk => {
+        downloadedSize += chunk.length;
+        if (totalSize > 0) {
+          const progress = Math.round((downloadedSize * 100) / totalSize);
+          mainWindow?.webContents.send("branch-switch-progress", progress);
+        }
+      });
+
+      response.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on("finish", resolve);
+        writer.on("error", reject);
+      });
+
+      const installerProcess = spawn(installerPath, [], {
+        detached: true,
+        stdio: "ignore",
+        shell: true,
+      });
+
+      installerProcess.unref();
+      app.quit();
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error switching branch:", error);
+      return { success: false, error: error.message };
+    }
   });
 }
 
