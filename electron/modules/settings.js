@@ -67,6 +67,15 @@ class SettingsManager {
           compressionLevel: "default",
         },
       },
+      wine: {
+        wineBin: "wine",
+        winePrefix: "",
+      },
+      proton: {
+        enabled: false,
+        protonBin: "",
+        steamCompatDataPath: "",
+      },
     };
     this.initializeSettingsFile();
     this.settings = this.loadSettings();

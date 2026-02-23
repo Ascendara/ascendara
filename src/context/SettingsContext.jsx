@@ -65,6 +65,15 @@ export function SettingsProvider({ children }) {
         compressionLevel: "default",
       },
     },
+    wine: {
+      wineBin: "wine",
+      winePrefix: "",
+    },
+    proton: {
+      enabled: false,
+      protonBin: "",
+      steamCompatDataPath: "",
+    },
   });
   const settingsRef = useRef(settings);
 
@@ -234,6 +243,15 @@ const defaultSettings = {
       skipManifestCheck: false,
       compressionLevel: "default",
     },
+  },
+  wine: {
+    wineBin: "wine",
+    winePrefix: "",
+  },
+  proton: {
+    enabled: false,
+    protonBin: "",
+    steamCompatDataPath: "",
   },
 };
 
