@@ -9676,44 +9676,6 @@ const Ascend = () => {
                     transition={{ duration: 0.2 }}
                     className="space-y-2 rounded-lg border border-border/30 bg-muted/30 p-3"
                   >
-                    {/* Terms checkbox */}
-                    <div className="flex items-start gap-2.5">
-                      <Checkbox
-                        id="terms"
-                        checked={agreedToTerms}
-                        onCheckedChange={setAgreedToTerms}
-                        disabled={isSubmitting}
-                        className="mt-2 h-4 w-4 shrink-0 cursor-pointer data-[state=checked]:border-primary data-[state=checked]:bg-primary"
-                      />
-                      <label
-                        htmlFor="terms"
-                        className="cursor-pointer text-xs leading-relaxed text-muted-foreground"
-                      >
-                        {t("account.form.termsPrefix")}{" "}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            window.electron?.openURL("https://ascendara.app/ascend/terms")
-                          }
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {t("account.form.termsLink")}
-                        </button>{" "}
-                        {t("account.form.termsAnd")}{" "}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            window.electron?.openURL(
-                              "https://ascendara.app/ascend/privacy"
-                            )
-                          }
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {t("account.form.privacyLink")}
-                        </button>
-                      </label>
-                    </div>
-
                     {/* Link with PC checkbox */}
                     <div className="flex items-start gap-2.5">
                       <Checkbox
@@ -9771,7 +9733,7 @@ const Ascend = () => {
                 disabled={
                   isGoogleLoading ||
                   isSubmitting ||
-                  (!isLogin && (!agreedToTerms || !linkWithPC || !startFreeTrial))
+                  (!isLogin && (!linkWithPC || !startFreeTrial))
                 }
               >
                 {isGoogleLoading ? (
@@ -9964,7 +9926,7 @@ const Ascend = () => {
                   disabled={
                     isSubmitting ||
                     isGoogleLoading ||
-                    (!isLogin && (!agreedToTerms || !linkWithPC || !startFreeTrial))
+                    (!isLogin && (!linkWithPC || !startFreeTrial))
                   }
                 >
                   {isSubmitting ? (
@@ -9975,6 +9937,41 @@ const Ascend = () => {
                   {isLogin ? t("account.form.signIn") : t("account.form.createAccount")}
                 </Button>
               </form>
+
+              {/* Terms notice - only on signup */}
+              <AnimatePresence mode="wait">
+                {!isLogin && (
+                  <motion.div
+                    key="terms-notice"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-center text-[10px] leading-relaxed text-muted-foreground"
+                  >
+                    {t("account.form.termsPrefix")}{" "}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.electron?.openURL("https://ascendara.app/ascend/terms")
+                      }
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {t("account.form.termsLink")}
+                    </button>{" "}
+                    {t("account.form.termsAnd")}{" "}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.electron?.openURL("https://ascendara.app/ascend/privacy")
+                      }
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {t("account.form.privacyLink")}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Footer links */}
               <div className="space-y-1 pt-2 text-center">
