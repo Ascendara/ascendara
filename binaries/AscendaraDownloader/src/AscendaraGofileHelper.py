@@ -721,26 +721,39 @@ class GofileDownloader:
                             return False
                     return True
                 else:  # Linux
-                    # Try to find unrar first
-                    unrar_path = shutil.which('unrar')
-                    if not unrar_path:
-                        logging.info("Attempting to install unrar...")
+                    # Only unrar/unrar-free can handle RAR5 archives; 7z cannot
+                    unrar_path = shutil.which('unrar') or shutil.which('unrar-free')
+                    if unrar_path:
+                        return True
+                    logging.info("Attempting to install unrar...")
+                    # Try each package manager in order
+                    pkg_managers = [
+                        ['apt-get', ['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'unrar']],
+                        ['apt-get', ['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'unrar-free']],
+                        ['dnf',     ['sudo', 'dnf', 'install', '-y', 'unrar']],
+                        ['yum',     ['sudo', 'yum', 'install', '-y', 'unrar']],
+                        ['pacman',  ['sudo', 'pacman', '-S', '--noconfirm', 'unrar']],
+                        ['zypper',  ['sudo', 'zypper', 'install', '-y', 'unrar']],
+                    ]
+                    for mgr_name, cmd in pkg_managers:
+                        if not shutil.which(mgr_name):  # check package manager exists
+                            continue
                         try:
-                            # Try apt-get first (Debian/Ubuntu)
-                            subprocess.run(['sudo', 'apt-get', 'update'], check=True)
-                            subprocess.run(['sudo', 'apt-get', 'install', '-y', 'unrar'], check=True)
-                            logging.info("Successfully installed unrar")
+                            subprocess.run(cmd, check=True, capture_output=True)
+                            logging.info(f"Successfully installed unrar via {mgr_name}")
                             return True
-                        except subprocess.CalledProcessError:
-                            try:
-                                # Try yum (RHEL/CentOS)
-                                subprocess.run(['sudo', 'yum', 'install', '-y', 'unrar'], check=True)
-                                logging.info("Successfully installed unrar")
-                                return True
-                            except subprocess.CalledProcessError as e:
-                                logging.error(f"Failed to install unrar: {str(e)}")
-                                return False
-                    return True
+                        except subprocess.CalledProcessError as e:
+                            logging.warning(f"Failed to install via {mgr_name}: {e}")
+                            continue
+                    # Last resort: check if patoolib can handle it without unrar
+                    try:
+                        import patoolib
+                        logging.info("unrar not installed but patoolib is available; will attempt extraction")
+                        return True
+                    except ImportError:
+                        pass
+                    logging.error("No suitable extraction tool found (unrar, unrar-free, 7z, or patoolib)")
+                    return False
             except Exception as e:
                 logging.error(f"Error checking/installing extraction tools: {str(e)}")
                 return False
@@ -765,7 +778,7 @@ class GofileDownloader:
 
         # Check if extraction tools are available
         if not self._check_extraction_tools():
-            error_msg = "Required extraction tools are not available. Please install 'unrar' manually."
+            error_msg = "Required extraction tools are not available. Please install 'unrar' (e.g. sudo apt-get install unrar)."
             logging.error(error_msg)
             self.game_info["downloadingData"]["extracting"] = False
             self.game_info["downloadingData"]["verifyError"] = [{
@@ -773,7 +786,7 @@ class GofileDownloader:
                 "error": error_msg
             }]
             safe_write_json(self.game_info_path, self.game_info)
-            return
+            raise RuntimeError(error_msg)
 
         # Create watching file for tracking extracted files
         watching_path = os.path.join(self.download_dir, "filemap.ascendara.json")
@@ -796,13 +809,25 @@ class GofileDownloader:
                                     if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
                                         total_files_to_extract += 1
                         elif file.endswith('.rar'):
-                            from unrar import rarfile
-                            with rarfile.RarFile(archive_path, 'r') as rar_ref:
-                                for rar_info in rar_ref.infolist():
-                                    # Check if it's a directory by filename ending with / or \
-                                    is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
-                                    if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename and not is_dir:
-                                        total_files_to_extract += 1
+                            # Count files using subprocess (avoids unrar Python module dependency)
+                            unrar_bin = shutil.which('unrar') or shutil.which('unrar-free')
+                            sevenz_bin = shutil.which('7z') or shutil.which('7za') or shutil.which('7zr')
+                            list_lines = []
+                            if unrar_bin:
+                                result = subprocess.run([unrar_bin, 'l', archive_path], capture_output=True, text=True)
+                                list_lines = result.stdout.splitlines()
+                            elif sevenz_bin:
+                                result = subprocess.run([sevenz_bin, 'l', archive_path], capture_output=True, text=True)
+                                list_lines = result.stdout.splitlines()
+                            for line in list_lines:
+                                # Skip directory entries and unwanted files
+                                if line.strip().endswith('/') or line.strip().endswith('\\'):
+                                    continue
+                                if '.url' in line or '_CommonRedist' in line:
+                                    continue
+                                # unrar 'l' output has filenames after size/date columns; count non-blank lines with content
+                                if line.strip() and not line.startswith('-') and not line.startswith('RAR') and not line.startswith('Archive') and not line.startswith('Details') and not line.startswith('Attr') and not line.startswith('Total'):
+                                    total_files_to_extract += 1
                     except Exception as e:
                         logging.warning(f"[AscendaraGofileHelper] Could not count files in {archive_path}: {e}")
         
@@ -950,64 +975,106 @@ class GofileDownloader:
                 else:
                     # For non-Windows, use appropriate extraction tool
                     try:
-                        # Create a temporary directory for extraction
-                        import tempfile
-                        with tempfile.TemporaryDirectory() as temp_dir:
-                            if file.endswith('.rar'):
-                                if sys.platform == "darwin":
-                                    # Use unar on macOS
-                                    unar_cmd = ['unar', '-force-overwrite', '-o', temp_dir, archive_path]
-                                    try:
-                                        result = subprocess.run(unar_cmd, check=True, capture_output=True, text=True)
-                                        logging.info(f"unar extraction output: {result.stdout}")
-                                    except subprocess.CalledProcessError as e:
-                                        logging.error(f"unar extraction failed: {e.stderr}")
-                                        raise
-                                else:
-                                    # Use unrar on Linux
-                                    unrar_cmd = ['unrar', 'x', '-y', archive_path, temp_dir]
-                                    try:
-                                        result = subprocess.run(unrar_cmd, check=True, capture_output=True, text=True)
-                                        logging.info(f"unrar extraction output: {result.stdout}")
-                                    except subprocess.CalledProcessError as e:
-                                        logging.error(f"unrar extraction failed: {e.stderr}")
-                                        raise
+                        import threading as _threading
+                        if file.endswith('.rar'):
+                            if sys.platform == "darwin":
+                                unar_bin = shutil.which('unar')
+                                if not unar_bin:
+                                    raise RuntimeError("unar not found. Install with: brew install unar")
+                                proc = subprocess.Popen(
+                                    ['unar', '-force-overwrite', '-o', extract_dir, archive_path],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                                )
+                                def _read_unar():
+                                    for raw in proc.stdout:
+                                        line = raw.decode(errors='replace').rstrip()
+                                        if line and not line.startswith(' '):
+                                            fname = os.path.basename(line.strip())
+                                            if fname and not fname.endswith('.url') and '_CommonRedist' not in fname:
+                                                self._files_extracted_count += 1
+                                                self._update_extraction_progress(fname, self._files_extracted_count, total_files_to_extract)
+                                t = _threading.Thread(target=_read_unar, daemon=True)
+                                t.start()
+                                rc = proc.wait()
+                                t.join(timeout=5)
+                                if rc not in (0, 1):
+                                    raise RuntimeError(f"unar exited with code {rc}: {proc.stderr.read().decode(errors='replace').strip()}")
                             else:
-                                # Use patoolib for other formats
-                                patoolib.extract_archive(archive_path, outdir=temp_dir)
-                            
-                            # Find the SteamRIP folder if it exists
-                            steamrip_folder = None
-                            for item in os.listdir(temp_dir):
-                                if 'steamrip' in item.lower() and os.path.isdir(os.path.join(temp_dir, item)):
-                                    steamrip_folder = os.path.join(temp_dir, item)
-                                    break
-                            
-                            # Set the source directory to either SteamRIP folder or temp_dir
-                            src_root = steamrip_folder if steamrip_folder else temp_dir
-                            
-                            # Move files from source to final location and track them
-                            for dirpath, _, filenames in os.walk(src_root):
-                                for fname in filenames:
-                                    if not fname.endswith('.url') and '_CommonRedist' not in fname:
-                                        src_path = os.path.join(dirpath, fname)
-                                        # Calculate relative path from source root
-                                        rel_path = os.path.relpath(src_path, src_root)
-                                        dst_path = os.path.join(extract_dir, rel_path)
-                                        
-                                        # Create destination directory if needed
-                                        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                                        
-                                        # Move file and track it
-                                        try:
-                                            shutil.move(src_path, dst_path)
-                                            key = os.path.relpath(dst_path, self.download_dir)
-                                            watching_data[key] = {"size": os.path.getsize(dst_path)}
-                                            self._files_extracted_count += 1
-                                            self._update_extraction_progress(fname, self._files_extracted_count, total_files_to_extract)
-                                            logging.info(f"[AscendaraGofileHelper] Extracted: {key}")
-                                        except (OSError, IOError) as e:
-                                            logging.error(f"Error moving file {src_path}: {str(e)}")
+                                unrar_bin = shutil.which('unrar') or shutil.which('unrar-free')
+                                if not unrar_bin:
+                                    raise RuntimeError("No RAR extraction tool available. Install with: sudo apt-get install unrar")
+                                proc = subprocess.Popen(
+                                    [unrar_bin, 'x', '-y', archive_path, extract_dir + '/'],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                                )
+                                def _read_unrar():
+                                    import re as _re
+                                    _last_seen = [""]
+                                    for raw in proc.stdout:
+                                        for segment in _re.split(r'[\r\n]', raw.decode(errors='replace')):
+                                            line = segment.strip()
+                                            line = _re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', line)
+                                            line = _re.sub(r'[^\x20-\x7E]', '', line)
+                                            if not (line.startswith('Extracting') or line.startswith('extracting')):
+                                                continue
+                                            rest = line.split(None, 1)[-1] if len(line.split(None, 1)) > 1 else ''
+                                            rest = _re.sub(r'\s{2,}\d+\s*%.*$', '', rest)
+                                            rest = _re.sub(r'\s+OK\s*$', '', rest)
+                                            rest = rest.strip()
+                                            fname = os.path.basename(rest)
+                                            if fname and fname != _last_seen[0] and not fname.endswith('.url') and '_CommonRedist' not in fname:
+                                                _last_seen[0] = fname
+                                                self._files_extracted_count += 1
+                                                self._update_extraction_progress(fname, self._files_extracted_count, total_files_to_extract)
+                                t = _threading.Thread(target=_read_unrar, daemon=True)
+                                t.start()
+                                rc = proc.wait()
+                                t.join(timeout=5)
+                                if rc not in (0, 1):
+                                    raise RuntimeError(f"unrar exited with code {rc}: {proc.stderr.read().decode(errors='replace').strip()}")
+                        elif file.endswith('.zip'):
+                            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                                members_to_extract = [
+                                    zi for zi in zip_ref.infolist()
+                                    if not zi.filename.endswith('.url') and '_CommonRedist' not in zi.filename
+                                ]
+                                zip_ref.extractall(extract_dir, members=members_to_extract)
+                                for zi in members_to_extract:
+                                    if not zi.is_dir():
+                                        self._files_extracted_count += 1
+                                        key = os.path.relpath(os.path.join(extract_dir, zi.filename), self.download_dir)
+                                        watching_data[key] = {"size": zi.file_size}
+                                        if self._files_extracted_count % 100 == 0 or self._files_extracted_count == total_files_to_extract:
+                                            self._update_extraction_progress(zi.filename, self._files_extracted_count, total_files_to_extract)
+                        else:
+                            patoolib.extract_archive(archive_path, outdir=extract_dir)
+
+                        # Build watching data from extracted files (covers RAR case)
+                        for dirpath, _, filenames in os.walk(extract_dir):
+                            for fname in filenames:
+                                if fname.endswith('.url') or fname.endswith('.rar') or fname.endswith('.zip') or '_CommonRedist' in dirpath:
+                                    continue
+                                full_path = os.path.join(dirpath, fname)
+                                key = os.path.relpath(full_path, self.download_dir).replace('\\', '/')
+                                if key not in watching_data:
+                                    watching_data[key] = {"size": os.path.getsize(full_path)}
+
+                        # Clean up unwanted files
+                        for root, dirs, files_in_dir in os.walk(extract_dir):
+                            if '_CommonRedist' in root:
+                                try:
+                                    shutil.rmtree(root)
+                                except Exception:
+                                    pass
+                                continue
+                            for fname in files_in_dir:
+                                if fname.endswith('.url'):
+                                    try:
+                                        os.remove(os.path.join(root, fname))
+                                    except Exception:
+                                        pass
+
+                        self._update_extraction_progress("Complete", self._files_extracted_count, total_files_to_extract, force=True)
                     except Exception as e:
                         logging.error(f"Error during extraction on non-Windows system: {str(e)}")
                         raise
@@ -1019,7 +1086,7 @@ class GofileDownloader:
                     logging.warning(f"[AscendaraGofileHelper] Could not delete archive {archive_path}: {del_e}")
             except Exception as e:
                 logging.error(f"[AscendaraGofileHelper] Error extracting {archive_path}: {str(e)}")
-                continue
+                raise
 
         # Flatten nested directories - but be careful not to delete the game directory itself
         nested_dir = os.path.join(self.download_dir, sanitize_folder_name(self.game))
