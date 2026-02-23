@@ -72,6 +72,8 @@ import {
   Library,
   Settings2,
   Gamepad2,
+  Terminal,
+  Wine,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -574,6 +576,34 @@ function Settings() {
               }));
             }
           });
+        return;
+      }
+
+      // Handle Wine settings
+      if (key === "wine" || key === "_wine_field") {
+        const [field, val] = key === "_wine_field" ? value : [null, null];
+        const updatedWine = field
+          ? { ...(settings.wine || {}), [field]: val }
+          : value;
+        window.electron.updateSetting("wine", updatedWine).then(success => {
+          if (success) {
+            setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
+          }
+        });
+        return;
+      }
+
+      // Handle Proton settings
+      if (key === "proton" || key === "_proton_field") {
+        const [field, val] = key === "_proton_field" ? value : [null, null];
+        const updatedProton = field
+          ? { ...(settings.proton || {}), [field]: val }
+          : value;
+        window.electron.updateSetting("proton", updatedProton).then(success => {
+          if (success) {
+            setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
+          }
+        });
         return;
       }
 
@@ -2324,6 +2354,234 @@ function Settings() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </Card>
+
+            {/* Wine / Proton Card */}
+            <Card id="wine-proton" className={`border-border ${!isOnLinux ? "opacity-60" : ""}`}>
+              <div className="p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <Wine className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-primary">
+                      Wine &amp; Proton
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Configure how Windows games are run on Linux
+                    </p>
+                  </div>
+                  {!isOnLinux && (
+                    <div className="ml-auto flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1">
+                      <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Linux only</span>
+                    </div>
+                  )}
+                </div>
+
+                <fieldset disabled={!isOnLinux} className="space-y-6">
+                  {/* Wine section */}
+                  <div className="space-y-4 rounded-lg border border-border/60 p-4">
+                    <div className="flex items-center gap-2">
+                      <Terminal className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium text-foreground">Wine</h4>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="wine-bin">Wine Binary</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Path to the Wine executable. Defaults to <code className="rounded bg-muted px-1 text-xs">wine</code> on your PATH.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          id="wine-bin"
+                          placeholder="wine"
+                          value={settings.wine?.wineBin || ""}
+                          onChange={e =>
+                            setSettingsLocal(prev => ({
+                              ...prev,
+                              wine: { ...(prev.wine || {}), wineBin: e.target.value },
+                            }))
+                          }
+                          onBlur={e => {
+                            const updatedWine = { ...(settings.wine || {}), wineBin: e.target.value || "wine" };
+                            window.electron.updateSetting("wine", updatedWine).then(success => {
+                              if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
+                            });
+                          }}
+                          className="flex-1 font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            const file = await window.electron.openFileDialog?.();
+                            if (file) {
+                              const updatedWine = { ...(settings.wine || {}), wineBin: file };
+                              window.electron.updateSetting("wine", updatedWine).then(success => {
+                                if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
+                              });
+                            }
+                          }}
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="wine-prefix">Wine Prefix (WINEPREFIX)</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Directory used as the Wine prefix. Leave empty to use <code className="rounded bg-muted px-1 text-xs">~/.wine</code>.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          id="wine-prefix"
+                          placeholder="~/.wine"
+                          value={settings.wine?.winePrefix || ""}
+                          onChange={e =>
+                            setSettingsLocal(prev => ({
+                              ...prev,
+                              wine: { ...(prev.wine || {}), winePrefix: e.target.value },
+                            }))
+                          }
+                          onBlur={e => {
+                            const updatedWine = { ...(settings.wine || {}), winePrefix: e.target.value };
+                            window.electron.updateSetting("wine", updatedWine).then(success => {
+                              if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
+                            });
+                          }}
+                          className="flex-1 font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            const dir = await window.electron.openDirectoryDialog();
+                            if (dir) {
+                              const updatedWine = { ...(settings.wine || {}), winePrefix: dir };
+                              window.electron.updateSetting("wine", updatedWine).then(success => {
+                                if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
+                              });
+                            }
+                          }}
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Proton section */}
+                  <div className="space-y-4 rounded-lg border border-border/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Terminal className="h-4 w-4 text-primary" />
+                        <h4 className="font-medium text-foreground">Proton</h4>
+                        <Badge variant="secondary" className="text-xs">
+                          <FlaskConical className="mr-1 h-3 w-3" />
+                          Experimental
+                        </Badge>
+                      </div>
+                      <Switch
+                        checked={settings.proton?.enabled || false}
+                        disabled={!isOnLinux}
+                        onCheckedChange={value => {
+                          const updatedProton = { ...(settings.proton || {}), enabled: value };
+                          window.electron.updateSetting("proton", updatedProton).then(success => {
+                            if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
+                          });
+                        }}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Use Proton instead of Wine to run games. When enabled, Proton takes priority over Wine. Falls back to Wine if Proton fails.
+                    </p>
+
+                    <div className={`space-y-4 ${!settings.proton?.enabled ? "pointer-events-none opacity-50" : ""}`}>
+                      <div className="space-y-2">
+                        <Label htmlFor="proton-bin">Proton Binary</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Path to the Proton executable (e.g. <code className="rounded bg-muted px-1 text-xs">~/.steam/steam/steamapps/common/Proton 9.0/proton</code>).
+                        </p>
+                        <div className="flex gap-2">
+                          <Input
+                            id="proton-bin"
+                            placeholder="/path/to/proton"
+                            value={settings.proton?.protonBin || ""}
+                            onChange={e =>
+                              setSettingsLocal(prev => ({
+                                ...prev,
+                                proton: { ...(prev.proton || {}), protonBin: e.target.value },
+                              }))
+                            }
+                            onBlur={e => {
+                              const updatedProton = { ...(settings.proton || {}), protonBin: e.target.value };
+                              window.electron.updateSetting("proton", updatedProton).then(success => {
+                                if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
+                              });
+                            }}
+                            className="flex-1 font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              const file = await window.electron.openFileDialog?.();
+                              if (file) {
+                                const updatedProton = { ...(settings.proton || {}), protonBin: file };
+                                window.electron.updateSetting("proton", updatedProton).then(success => {
+                                  if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
+                                });
+                              }
+                            }}
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="proton-compat">Steam Compat Data Path</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Directory for Proton compatibility data (<code className="rounded bg-muted px-1 text-xs">STEAM_COMPAT_DATA_PATH</code>). Leave empty to use <code className="rounded bg-muted px-1 text-xs">~/.proton</code>.
+                        </p>
+                        <div className="flex gap-2">
+                          <Input
+                            id="proton-compat"
+                            placeholder="~/.proton"
+                            value={settings.proton?.steamCompatDataPath || ""}
+                            onChange={e =>
+                              setSettingsLocal(prev => ({
+                                ...prev,
+                                proton: { ...(prev.proton || {}), steamCompatDataPath: e.target.value },
+                              }))
+                            }
+                            onBlur={e => {
+                              const updatedProton = { ...(settings.proton || {}), steamCompatDataPath: e.target.value };
+                              window.electron.updateSetting("proton", updatedProton).then(success => {
+                                if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
+                              });
+                            }}
+                            className="flex-1 font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              const dir = await window.electron.openDirectoryDialog();
+                              if (dir) {
+                                const updatedProton = { ...(settings.proton || {}), steamCompatDataPath: dir };
+                                window.electron.updateSetting("proton", updatedProton).then(success => {
+                                  if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
+                                });
+                              }
+                            }}
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </fieldset>
               </div>
             </Card>
 
