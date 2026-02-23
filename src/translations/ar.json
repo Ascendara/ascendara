@@ -2278,6 +2278,7 @@
     "chooseWhenToUpdateAscendaraYourself": "اختر متى تقوم بتحديث Ascendara بنفسك. سيتم إعلامك عند توفر التحديثات، ولكن لن يتم تثبيتها تلقائيًا.",
     "chooseYourTheme": "اختر الموضوع الخاص بك",
     "clickTheExtensionIcon": "انقر فوق رمز الامتداد وقم بتمكين معالج التنزيل عند تثبيته",
+    "compatibilityLayer": "طبقة التوافق",
     "continue": "يكمل",
     "continueWithoutSharing": "استمر بدون مشاركة",
     "darkThemes": "المواضيع المظلمة",
@@ -2333,6 +2334,8 @@
     "manualUpdates": "التحديثات اليدوية",
     "neverAutomaticallyUpdate": "لا يتم التحديث تلقائيًا مطلقًا",
     "next": "التالي",
+    "noRunnersDesc": "لن تتمكن من تشغيل ألعاب Windows. يرجى تثبيت Proton-GE (موصى به) أو Wine أدناه.",
+    "noRunnersTitle": "لم يتم اكتشاف أداة توافق",
     "notEnoughSpaceWarning": "واو! لديك أقل من 40 جيجابايت من المساحة الحرة على محرك الأقراص المحدد. فكر في مسح بعض المساحة أو تحديد محرك أقراص مختلف.",
     "noticeAppIsFree": {
       "point1": "التنزيلات وكل ما يتعلق بالألعاب على Ascendara سيكون دائمًا مجانيًا",
@@ -2348,6 +2351,7 @@
     "personalizeYourExperience": "إضفاء الطابع الشخصي على تجربتك مع موضوع يناسب أسلوبك",
     "pleaseWaitAndRespondToAdminPrompts": "الرجاء الانتظار والرد على أي مطالبات من المسؤول تظهر. لا تغلق التطبيق.",
     "privacyPolicy": "سياسة الخصوصية",
+    "protonDetected": "تم اكتشاف Proton - جاهز للعب!",
     "pythonIsRequired": "بايثون مطلوبة",
     "pythonMustBeInstalled": "يجب تثبيت Python على جهاز الكمبيوتر الخاص بك حتى تتمكن من تشغيل أدوات Ascendara الأساسية على نظام التشغيل هذا",
     "referral": {
@@ -2396,6 +2400,7 @@
     "welcomeTo": "مرحبا بكم في",
     "welcomeToAscendaraDescription": "أنت جاهز تقريبًا لبدء استخدام Ascendara. سنجري معًا عملية الإعداد ثم نقوم بإعداد فهرس اللعبة الخاص بك، ولكن يرجى قراءة شروط الخدمة وسياسة الخصوصية أولاً.",
     "whenYouClickADownloadLink": "عند بدء التنزيل من مزود معروف، سيوقف الامتداد التنزيل تلقائيًا في متصفحك ويبدأه لك في Ascendara",
+    "wineDetected": "تم اكتشاف Wine",
     "wineIsRequired": "العب مع النبيذ",
     "wineMustBeInstalled": "يجب تثبيت Wine وDXVK والأدوات الأخرى وإعدادها على جهاز الكمبيوتر الخاص بك لتشغيل ألعاب Window. لا تقلق، فـ Ascendara يمكنه تثبيته وإعداده خصيصًا لك",
     "youCanAddMoreLater": "يمكنك إضافة المزيد من الأدلة في التفضيلات لاحقًا",

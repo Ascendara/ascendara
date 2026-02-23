@@ -60,6 +60,20 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // SETTINGS & CONFIGURATION
   //===========================================================================
+  // Linux/Proton
+  getRunners: () => ipcRenderer.invoke("get-runners"),
+  detectProton: () => ipcRenderer.invoke("detect-proton"),
+  downloadProtonGE: () => ipcRenderer.invoke("download-proton-ge"),
+  deleteGamePrefix: gameName => ipcRenderer.invoke("delete-game-prefix", gameName),
+  getPrefixSize: gameName => ipcRenderer.invoke("get-prefix-size", gameName),
+  resolveRunner: override => ipcRenderer.invoke("resolve-runner", override),
+  openPrefixFolder: gameName => ipcRenderer.invoke("open-prefix-folder", gameName),
+  getProtonGEInfo: () => ipcRenderer.invoke("get-proton-ge-info"),
+  selectCustomRunner: () => ipcRenderer.invoke("select-custom-runner"),
+  checkProtonGEUpdate: () => ipcRenderer.invoke("check-proton-ge-update"),
+  cleanupOldProtonGE: keepVersion =>
+    ipcRenderer.invoke("cleanup-old-proton-ge", keepVersion),
+
   getSettings: () => ipcRenderer.invoke("get-settings"),
   saveSettings: (options, directory) =>
     ipcRenderer.invoke("save-settings", options, directory),

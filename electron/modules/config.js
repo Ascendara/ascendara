@@ -15,6 +15,35 @@ const appVersion = "10.0.1";
 // Environment detection
 const isDev = !app.isPackaged;
 const isWindows = os.platform().startsWith("win");
+const isMac = process.platform === "darwin";
+const isLinux = process.platform === "linux";
+
+// Linux-specific paths
+const linuxConfigDir = isLinux ? path.join(os.homedir(), ".ascendara") : null;
+const linuxCompatDataDir = isLinux ? path.join(linuxConfigDir, "compatdata") : null;
+const linuxRunnersDir = isLinux ? path.join(linuxConfigDir, "runners") : null;
+
+// Steam common paths for Proton detection
+const STEAM_COMMON_PATHS = isLinux
+  ? [
+      path.join(os.homedir(), ".steam/root/steamapps/common"),
+      path.join(os.homedir(), ".steam/steam/steamapps/common"),
+      path.join(os.homedir(), ".local/share/Steam/steamapps/common"),
+      path.join(
+        os.homedir(),
+        ".var/app/com.valvesoftware.Steam/data/Steam/steamapps/common"
+      ),
+    ]
+  : [];
+
+const STEAM_INSTALL_PATHS = isLinux
+  ? [
+      path.join(os.homedir(), ".steam/steam"),
+      path.join(os.homedir(), ".steam/root"),
+      path.join(os.homedir(), ".local/share/Steam"),
+      path.join(os.homedir(), ".var/app/com.valvesoftware.Steam/data/Steam"),
+    ]
+  : [];
 
 // File paths
 const TIMESTAMP_FILE = !isWindows
@@ -109,4 +138,11 @@ module.exports = {
   toolExecutables,
   DEPENDENCY_REGISTRY_PATHS,
   getPythonPath,
+  isLinux,
+  isMac,
+  linuxConfigDir,
+  linuxCompatDataDir,
+  linuxRunnersDir,
+  STEAM_COMMON_PATHS,
+  STEAM_INSTALL_PATHS,
 };

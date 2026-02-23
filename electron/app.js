@@ -17,6 +17,7 @@ const http = require("http");
 const https = require("https");
 const path = require("path");
 const fs = require("fs-extra");
+const { isLinux } = require("./modules/config");
 
 // Disable sandbox for Linux compatibility (must be set before app ready)
 if (process.platform === "linux") {
@@ -69,13 +70,15 @@ function launchCrashReporter(errorType, errorMessage) {
 
   let crashReporterPath;
   if (isDev) {
-    crashReporterPath = process.platform === "win32"
-      ? path.join("./binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter.exe")
-      : path.join("./binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py");
+    crashReporterPath =
+      process.platform === "win32"
+        ? path.join("./binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter.exe")
+        : path.join("./binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py");
   } else {
-    crashReporterPath = process.platform === "win32"
-      ? path.join(config.appDirectory, "/resources/AscendaraCrashReporter.exe")
-      : path.join(process.resourcesPath, "AscendaraCrashReporter");
+    crashReporterPath =
+      process.platform === "win32"
+        ? path.join(config.appDirectory, "/resources/AscendaraCrashReporter.exe")
+        : path.join(process.resourcesPath, "AscendaraCrashReporter");
   }
 
   if (!fs.existsSync(crashReporterPath)) {
@@ -261,6 +264,10 @@ function registerCriticalHandlers() {
   downloads.registerDownloadHandlers();
   games.registerGameHandlers();
   system.registerSystemHandlers();
+  if (isLinux) {
+    const { registerProtonHandlers } = require("./modules/proton");
+    registerProtonHandlers();
+  }
   ipcHandlers.registerMiscHandlers();
   translations.registerTranslationHandlers();
   localRefresh.registerLocalRefreshHandlers();

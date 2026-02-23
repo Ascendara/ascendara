@@ -2286,6 +2286,7 @@
     "chooseWhenToUpdateAscendaraYourself": "Escolha você mesmo quando atualizar o Ascendara. Você será notificado quando atualizações estiverem disponíveis, mas elas não serão instaladas automaticamente.",
     "chooseYourTheme": "Escolha o seu tema",
     "clickTheExtensionIcon": "Clique no ícone da extensão e ative o gerenciador de download ao instalá-lo",
+    "compatibilityLayer": "Camada de compatibilidade",
     "continue": "Continuar",
     "continueWithoutSharing": "Continuar sem compartilhar",
     "darkThemes": "Temas escuros",
@@ -2341,6 +2342,8 @@
     "manualUpdates": "Atualizações manuais",
     "neverAutomaticallyUpdate": "Nunca atualize automaticamente",
     "next": "Próximo",
+    "noRunnersDesc": "Você não poderá iniciar jogos do Windows. Instale Proton-GE (recomendado) ou Wine abaixo.",
+    "noRunnersTitle": "Nenhuma ferramenta de compatibilidade detectada",
     "notEnoughSpaceWarning": "Uau! Você tem menos de 40 GB de espaço livre na unidade selecionada. Considere liberar espaço ou selecionar uma unidade diferente.",
     "noticeAppIsFree": {
       "point1": "Downloads e tudo relacionado a jogos no Ascendara serão sempre gratuitos",
@@ -2356,6 +2359,7 @@
     "personalizeYourExperience": "Personalize sua experiência com um tema que combine com seu estilo",
     "pleaseWaitAndRespondToAdminPrompts": "Aguarde e responda a quaisquer solicitações do administrador que aparecerem. Não feche o aplicativo.",
     "privacyPolicy": "política de Privacidade",
+    "protonDetected": "Proton detectado - Pronto para jogar!",
     "pythonIsRequired": "Python é obrigatório",
     "pythonMustBeInstalled": "Python deve estar instalado em seu computador para executar as principais ferramentas do Ascendara neste sistema operacional",
     "referral": {
@@ -2404,6 +2408,7 @@
     "welcomeTo": "Bem-vindo ao",
     "welcomeToAscendaraDescription": "Você está quase pronto para começar a usar o Ascendara. Passaremos juntos pelo processo de integração e depois configuraremos o índice do jogo, mas primeiro leia os Termos de Serviço e a Política de Privacidade.",
     "whenYouClickADownloadLink": "Quando você inicia um download de um provedor conhecido, a extensão irá interromper automaticamente o download no seu navegador e iniciá-lo para você no Ascendara",
+    "wineDetected": "Wine detectado",
     "wineIsRequired": "Brinque com Vinho",
     "wineMustBeInstalled": "Wine, DXVK e outras ferramentas precisam ser instaladas e configuradas em seu computador para executar jogos do Windows. Não se preocupe, o Ascendara pode instalar e configurar tudo só para você",
     "youCanAddMoreLater": "Você pode adicionar mais diretórios nas preferências posteriormente",

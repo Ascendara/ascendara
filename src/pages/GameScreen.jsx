@@ -611,6 +611,26 @@ export default function GameScreen() {
   const [launchOptionsDialogOpen, setLaunchOptionsDialogOpen] = useState(false);
   const [launchCommand, setLaunchCommand] = useState("");
   const { setTrack, play } = useAudioPlayer();
+  const [isOnLinux, setIsOnLinux] = useState(false);
+  const [prefixSize, setPrefixSize] = useState(null);
+  const [showResetPrefixDialog, setShowResetPrefixDialog] = useState(false);
+  const [isResettingPrefix, setIsResettingPrefix] = useState(false);
+  // Detect Linux platform and load prefix info
+  useEffect(() => {
+    const platform = window.electron.getPlatform();
+    if (platform === "linux") {
+      setIsOnLinux(true);
+      const gameName = game?.game || game?.name;
+      if (gameName) {
+        window.electron
+          .getPrefixSize(gameName)
+          .then(size => {
+            setPrefixSize(size);
+          })
+          .catch(() => {});
+      }
+    }
+  }, [game]);
 
   // Nexus Mods state
   const [supportsModManaging, setSupportsModManaging] = useState(false);
@@ -1540,6 +1560,22 @@ export default function GameScreen() {
     }
   };
 
+  const handleResetPrefix = async () => {
+    const gameName = game?.game || game?.name;
+    if (!gameName) return;
+    setIsResettingPrefix(true);
+    try {
+      const result = await window.electron.deleteGamePrefix(gameName);
+      if (result.success) {
+        setPrefixSize(0);
+      }
+    } catch (e) {
+      console.error("Failed to reset prefix:", e);
+    }
+    setIsResettingPrefix(false);
+    setShowResetPrefixDialog(false);
+  };
+
   // Handle close error dialog
   const handleCloseErrorDialog = () => {
     setShowErrorDialog(false);
@@ -1956,6 +1992,29 @@ export default function GameScreen() {
                     <FolderOpen className="h-5 w-5" />
                     {t("library.openGameDirectory")}
                   </Button>
+
+                  {/* Reset Prefix Button - Linux only */}
+                  {isOnLinux && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowResetPrefixDialog(true)}
+                      className="hover:text-destructive gap-2 text-muted-foreground"
+                    >
+                      <FolderSync className="h-4 w-4" />
+                      Reset Prefix
+                      {prefixSize > 0 && (
+                        <span className="text-xs opacity-60">
+                          (
+                          {prefixSize < 1024 * 1024
+                            ? `${(prefixSize / 1024).toFixed(0)} KB`
+                            : prefixSize < 1024 * 1024 * 1024
+                              ? `${(prefixSize / (1024 * 1024)).toFixed(1)} MB`
+                              : `${(prefixSize / (1024 * 1024 * 1024)).toFixed(2)} GB`}
+                          )
+                        </span>
+                      )}
+                    </Button>
+                  )}
                 </div>
 
                 <Separator />
@@ -3583,6 +3642,52 @@ export default function GameScreen() {
           }
         }}
       />
+
+      {/* Reset Prefix Confirmation Dialog - Linux only */}
+      {showResetPrefixDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
+            <h3 className="text-lg font-semibold">Reset Compatibility Prefix</h3>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                You are about to delete the Windows compatibility prefix for
+                <strong className="text-foreground"> {game?.game || game?.name}</strong>.
+              </p>
+              <p>
+                This will remove all Windows configurations, DLLs, registry entries, and
+                temporary files associated with this game.
+              </p>
+              <p className="font-medium text-yellow-500">
+                ⚠️ Your save files may be lost if they are stored inside the prefix.
+                Consider backing up your saves first.
+              </p>
+              {prefixSize > 0 && (
+                <p>
+                  This will free approximately{" "}
+                  <strong>
+                    {prefixSize < 1024 * 1024 * 1024
+                      ? `${(prefixSize / (1024 * 1024)).toFixed(1)} MB`
+                      : `${(prefixSize / (1024 * 1024 * 1024)).toFixed(2)} GB`}
+                  </strong>{" "}
+                  of disk space.
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setShowResetPrefixDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleResetPrefix}
+                disabled={isResettingPrefix}
+              >
+                {isResettingPrefix ? "Resetting..." : "Delete Prefix"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Uninstall Confirmation Dialog */}
       <UninstallConfirmationDialog

@@ -2282,6 +2282,7 @@
     "chooseWhenToUpdateAscendaraYourself": "Wählen Sie selbst, wann Sie Ascendara aktualisieren möchten. Sie werden benachrichtigt, wenn Updates verfügbar sind, diese werden jedoch nicht automatisch installiert.",
     "chooseYourTheme": "Wählen Sie Ihr Thema",
     "clickTheExtensionIcon": "Klicken Sie auf das Erweiterungssymbol und aktivieren Sie den Download-Handler, wenn Sie ihn installieren",
+    "compatibilityLayer": "Kompatibilitätsschicht",
     "continue": "Weitermachen",
     "continueWithoutSharing": "Ohne Teilen fortfahren",
     "darkThemes": "Dunkle Themen",
@@ -2337,6 +2338,8 @@
     "manualUpdates": "Manuelle Updates",
     "neverAutomaticallyUpdate": "Niemals automatisch aktualisieren",
     "next": "Nächste",
+    "noRunnersDesc": "Sie können keine Windows-Spiele starten. Bitte installieren Sie unten Proton-GE (empfohlen) oder Wine.",
+    "noRunnersTitle": "Kein Kompatibilitätstool erkannt",
     "notEnoughSpaceWarning": "Woah! Sie haben weniger als 40 GB freien Speicherplatz auf dem ausgewählten Laufwerk. Erwägen Sie, Speicherplatz freizugeben oder ein anderes Laufwerk auszuwählen.",
     "noticeAppIsFree": {
       "point1": "Downloads und alles, was mit Spielen auf Ascendara zu tun hat, werden immer kostenlos sein",
@@ -2352,6 +2355,7 @@
     "personalizeYourExperience": "Personalisieren Sie Ihr Erlebnis mit einem Thema, das zu Ihrem Stil passt",
     "pleaseWaitAndRespondToAdminPrompts": "Bitte warten Sie und reagieren Sie auf alle angezeigten Administratoraufforderungen. Schließen Sie die Anwendung nicht.",
     "privacyPolicy": "Datenschutzrichtlinie",
+    "protonDetected": "Proton erkannt – Bereit zum Spielen!",
     "pythonIsRequired": "Python ist erforderlich",
     "pythonMustBeInstalled": "Python muss auf Ihrem Computer installiert sein, um die Kerntools von Ascendara auf diesem Betriebssystem auszuführen",
     "referral": {
@@ -2400,6 +2404,7 @@
     "welcomeTo": "Willkommen bei",
     "welcomeToAscendaraDescription": "Sie sind fast bereit, Ascendara zu verwenden. Wir gehen gemeinsam den Onboarding-Prozess durch und richten dann Ihren Spielindex ein. Bitte lesen Sie jedoch zuerst die Nutzungsbedingungen und die Datenschutzrichtlinie.",
     "whenYouClickADownloadLink": "Wenn Sie einen Download von einem bekannten Anbieter starten, stoppt die Erweiterung automatisch den Download in Ihrem Browser und startet ihn für Sie in Ascendara",
+    "wineDetected": "Wine erkannt",
     "wineIsRequired": "Spielen Sie mit Wein",
     "wineMustBeInstalled": "Wine, DXVK und andere Tools müssen auf Ihrem Computer installiert und eingerichtet werden, um Windows-Spiele auszuführen. Aber keine Sorge, Ascendara kann alles nur für Sie installieren und einrichten",
     "youCanAddMoreLater": "Sie können später in den Einstellungen weitere Verzeichnisse hinzufügen",
