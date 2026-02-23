@@ -447,7 +447,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             os.chdir(os.path.dirname(exe_path))
             logging.debug(f"Changed working directory to {os.path.dirname(exe_path)}")
         
-        def launch_with_wine_dxvk(exe_path, wine_prefix=None, wine_bin="wine"):
+        def launch_with_wine_dxvk(exe_path, wine_prefix=None, wine_bin="wine", extra_args=None):
             env = os.environ.copy()
             if wine_prefix:
                 env["WINEPREFIX"] = wine_prefix
@@ -456,16 +456,61 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             if platform.system().lower() == 'linux':
                 if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
                     env["DISPLAY"] = ":0"
-            logging.info(f"Launching with Wine binary: {wine_bin}, WINEPREFIX: {env.get('WINEPREFIX', 'default')}")
-            return subprocess.Popen([wine_bin, exe_path], env=env)
+            cmd = [wine_bin, exe_path]
+            if extra_args:
+                import shlex
+                cmd += shlex.split(extra_args)
+            logging.info(f"Launching with Wine binary: {wine_bin}, WINEPREFIX: {env.get('WINEPREFIX', 'default')}, cmd: {cmd}")
+            return subprocess.Popen(cmd, env=env)
 
-        # Default Wine prefix
+        def launch_with_proton(exe_path, proton_bin, steam_compat_data_path, extra_args=None):
+            env = os.environ.copy()
+            env["STEAM_COMPAT_DATA_PATH"] = steam_compat_data_path
+            env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = os.path.expanduser("~/.steam/steam")
+            env["DXVK_LOG_LEVEL"] = "info"
+            if platform.system().lower() == 'linux':
+                if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
+                    env["DISPLAY"] = ":0"
+            cmd = [proton_bin, "run", exe_path]
+            if extra_args:
+                import shlex
+                cmd += shlex.split(extra_args)
+            logging.info(f"Launching with Proton binary: {proton_bin}, STEAM_COMPAT_DATA_PATH: {steam_compat_data_path}, cmd: {cmd}")
+            return subprocess.Popen(cmd, env=env)
+
+        # Read Wine/Proton config from settings
         default_wine_prefix = os.path.expanduser("~/.wine")
         wine_bin = "wine"
+        use_proton = False
+        proton_bin = None
+        proton_data_path = None
+
+        try:
+            with open(settings_file, "r", encoding="utf-8") as f:
+                _settings = json.load(f)
+            wine_cfg = _settings.get("wine", {})
+            wine_bin = wine_cfg.get("wineBin", "wine") or "wine"
+            default_wine_prefix = wine_cfg.get("winePrefix", os.path.expanduser("~/.wine")) or os.path.expanduser("~/.wine")
+            proton_cfg = _settings.get("proton", {})
+            if proton_cfg.get("enabled") and proton_cfg.get("protonBin"):
+                use_proton = True
+                proton_bin = proton_cfg["protonBin"]
+                proton_data_path = proton_cfg.get("steamCompatDataPath", os.path.expanduser("~/.proton"))
+            logging.info(f"Wine config: bin={wine_bin}, prefix={default_wine_prefix}, use_proton={use_proton}")
+        except Exception as cfg_err:
+            logging.warning(f"Could not read Wine/Proton config from settings, using defaults: {cfg_err}")
 
         if use_wine:
-            logging.info(f"Using Wine + DXVK to launch Windows executable: {exe_path}")
-            process = launch_with_wine_dxvk(exe_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin)
+            if use_proton and current_platform == 'linux':
+                logging.info(f"Using Proton to launch Windows executable: {exe_path}")
+                try:
+                    process = launch_with_proton(exe_path, proton_bin, proton_data_path, extra_args=game_launch_cmd)
+                except Exception as proton_err:
+                    logging.error(f"Proton launch failed, falling back to Wine: {proton_err}", exc_info=True)
+                    process = launch_with_wine_dxvk(exe_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin, extra_args=game_launch_cmd)
+            else:
+                logging.info(f"Using Wine + DXVK to launch Windows executable: {exe_path}")
+                process = launch_with_wine_dxvk(exe_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin, extra_args=game_launch_cmd)
         else:
             # Regular game execution (no wrapping)
             logging.info(f"Launching executable directly: {exe_path}")
@@ -561,9 +606,15 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             if os.path.exists(trainer_path):
                 try:
                     logging.info(f"Launching trainer: {trainer_path}")
+                    trainer_is_windows_exe = trainer_path.lower().endswith('.exe')
+                    trainer_use_wine = trainer_is_windows_exe and current_platform in ('darwin', 'linux')
                     # Try to launch trainer normally first
                     try:
-                        trainer_process = subprocess.Popen(trainer_path)
+                        if trainer_use_wine:
+                            logging.info("Launching trainer with Wine")
+                            trainer_process = launch_with_wine_dxvk(trainer_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin)
+                        else:
+                            trainer_process = subprocess.Popen(trainer_path)
                         logging.info("Trainer launched successfully")
                     except OSError as trainer_error:
                         # If elevation is required (error 740), launch with admin privileges
