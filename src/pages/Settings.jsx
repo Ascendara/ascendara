@@ -96,6 +96,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSettings } from "@/context/SettingsContext";
+import { verifyAscendAccess } from "@/services/firebaseService";
 
 const themes = [
   // Light themes
@@ -289,6 +290,11 @@ function Settings() {
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
   const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
   const [controllerConnected, setControllerConnected] = useState(false);
+  const [showBranchDialog, setShowBranchDialog] = useState(false);
+  const [pendingBranch, setPendingBranch] = useState(null);
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+  const [branchSwitchProgress, setBranchSwitchProgress] = useState(0);
+  const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
   // Default custom colors for merging with saved themes (handles missing new properties)
   const defaultCustomColors = {
     background: "255 255 255",
@@ -430,15 +436,41 @@ function Settings() {
 
   useEffect(() => {
     const checkExperiment = async () => {
-      const isExperiment = await window.electron.isExperiment();
-      setIsExperiment(isExperiment);
-      if (isExperiment) {
+      const branch = (await window.electron.getBranch?.()) ?? "live";
+      const isExp = branch === "experimental";
+      setIsExperiment(isExp);
+      if (isExp) {
         const version = await window.electron.getTestingVersion();
         setTestingVersion(version);
       }
     };
     checkExperiment();
   }, []);
+
+  useEffect(() => {
+    const checkSubscription = async () => {
+      try {
+        const result = await verifyAscendAccess();
+        setHasAscendSubscription(
+          result.isSubscribed === true ||
+            result.isVerified === true ||
+            result.hasAccess === true
+        );
+      } catch (e) {
+        setHasAscendSubscription(false);
+      }
+    };
+    checkSubscription();
+  }, []);
+
+  useEffect(() => {
+    if (!isSwitchingBranch) return;
+    const handler = progress => setBranchSwitchProgress(progress);
+    window.electron.onBranchSwitchProgress?.(handler);
+    return () => {
+      window.electron.removeBranchSwitchProgressListener?.(handler);
+    };
+  }, [isSwitchingBranch]);
 
   // Check if we're on Windows
   useEffect(() => {
@@ -582,9 +614,7 @@ function Settings() {
       // Handle Wine settings
       if (key === "wine" || key === "_wine_field") {
         const [field, val] = key === "_wine_field" ? value : [null, null];
-        const updatedWine = field
-          ? { ...(settings.wine || {}), [field]: val }
-          : value;
+        const updatedWine = field ? { ...(settings.wine || {}), [field]: val } : value;
         window.electron.updateSetting("wine", updatedWine).then(success => {
           if (success) {
             setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
@@ -2358,7 +2388,10 @@ function Settings() {
             </Card>
 
             {/* Wine / Proton Card */}
-            <Card id="wine-proton" className={`border-border ${!isOnLinux ? "opacity-60" : ""}`}>
+            <Card
+              id="wine-proton"
+              className={`border-border ${!isOnLinux ? "opacity-60" : ""}`}
+            >
               <div className="p-6">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="rounded-lg bg-primary/10 p-2">
@@ -2391,7 +2424,9 @@ function Settings() {
                     <div className="space-y-2">
                       <Label htmlFor="wine-bin">Wine Binary</Label>
                       <p className="text-sm text-muted-foreground">
-                        Path to the Wine executable. Defaults to <code className="rounded bg-muted px-1 text-xs">wine</code> on your PATH.
+                        Path to the Wine executable. Defaults to{" "}
+                        <code className="rounded bg-muted px-1 text-xs">wine</code> on
+                        your PATH.
                       </p>
                       <div className="flex gap-2">
                         <Input
@@ -2405,10 +2440,19 @@ function Settings() {
                             }))
                           }
                           onBlur={e => {
-                            const updatedWine = { ...(settings.wine || {}), wineBin: e.target.value || "wine" };
-                            window.electron.updateSetting("wine", updatedWine).then(success => {
-                              if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
-                            });
+                            const updatedWine = {
+                              ...(settings.wine || {}),
+                              wineBin: e.target.value || "wine",
+                            };
+                            window.electron
+                              .updateSetting("wine", updatedWine)
+                              .then(success => {
+                                if (success)
+                                  setSettingsLocal(prev => ({
+                                    ...prev,
+                                    wine: updatedWine,
+                                  }));
+                              });
                           }}
                           className="flex-1 font-mono text-sm"
                         />
@@ -2417,10 +2461,19 @@ function Settings() {
                           onClick={async () => {
                             const file = await window.electron.openFileDialog?.();
                             if (file) {
-                              const updatedWine = { ...(settings.wine || {}), wineBin: file };
-                              window.electron.updateSetting("wine", updatedWine).then(success => {
-                                if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
-                              });
+                              const updatedWine = {
+                                ...(settings.wine || {}),
+                                wineBin: file,
+                              };
+                              window.electron
+                                .updateSetting("wine", updatedWine)
+                                .then(success => {
+                                  if (success)
+                                    setSettingsLocal(prev => ({
+                                      ...prev,
+                                      wine: updatedWine,
+                                    }));
+                                });
                             }
                           }}
                         >
@@ -2432,7 +2485,8 @@ function Settings() {
                     <div className="space-y-2">
                       <Label htmlFor="wine-prefix">Wine Prefix (WINEPREFIX)</Label>
                       <p className="text-sm text-muted-foreground">
-                        Directory used as the Wine prefix. Leave empty to use <code className="rounded bg-muted px-1 text-xs">~/.wine</code>.
+                        Directory used as the Wine prefix. Leave empty to use{" "}
+                        <code className="rounded bg-muted px-1 text-xs">~/.wine</code>.
                       </p>
                       <div className="flex gap-2">
                         <Input
@@ -2446,10 +2500,19 @@ function Settings() {
                             }))
                           }
                           onBlur={e => {
-                            const updatedWine = { ...(settings.wine || {}), winePrefix: e.target.value };
-                            window.electron.updateSetting("wine", updatedWine).then(success => {
-                              if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
-                            });
+                            const updatedWine = {
+                              ...(settings.wine || {}),
+                              winePrefix: e.target.value,
+                            };
+                            window.electron
+                              .updateSetting("wine", updatedWine)
+                              .then(success => {
+                                if (success)
+                                  setSettingsLocal(prev => ({
+                                    ...prev,
+                                    wine: updatedWine,
+                                  }));
+                              });
                           }}
                           className="flex-1 font-mono text-sm"
                         />
@@ -2458,10 +2521,19 @@ function Settings() {
                           onClick={async () => {
                             const dir = await window.electron.openDirectoryDialog();
                             if (dir) {
-                              const updatedWine = { ...(settings.wine || {}), winePrefix: dir };
-                              window.electron.updateSetting("wine", updatedWine).then(success => {
-                                if (success) setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
-                              });
+                              const updatedWine = {
+                                ...(settings.wine || {}),
+                                winePrefix: dir,
+                              };
+                              window.electron
+                                .updateSetting("wine", updatedWine)
+                                .then(success => {
+                                  if (success)
+                                    setSettingsLocal(prev => ({
+                                      ...prev,
+                                      wine: updatedWine,
+                                    }));
+                                });
                             }
                           }}
                         >
@@ -2486,22 +2558,38 @@ function Settings() {
                         checked={settings.proton?.enabled || false}
                         disabled={!isOnLinux}
                         onCheckedChange={value => {
-                          const updatedProton = { ...(settings.proton || {}), enabled: value };
-                          window.electron.updateSetting("proton", updatedProton).then(success => {
-                            if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
-                          });
+                          const updatedProton = {
+                            ...(settings.proton || {}),
+                            enabled: value,
+                          };
+                          window.electron
+                            .updateSetting("proton", updatedProton)
+                            .then(success => {
+                              if (success)
+                                setSettingsLocal(prev => ({
+                                  ...prev,
+                                  proton: updatedProton,
+                                }));
+                            });
                         }}
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Use Proton instead of Wine to run games. When enabled, Proton takes priority over Wine. Falls back to Wine if Proton fails.
+                      Use Proton instead of Wine to run games. When enabled, Proton takes
+                      priority over Wine. Falls back to Wine if Proton fails.
                     </p>
 
-                    <div className={`space-y-4 ${!settings.proton?.enabled ? "pointer-events-none opacity-50" : ""}`}>
+                    <div
+                      className={`space-y-4 ${!settings.proton?.enabled ? "pointer-events-none opacity-50" : ""}`}
+                    >
                       <div className="space-y-2">
                         <Label htmlFor="proton-bin">Proton Binary</Label>
                         <p className="text-sm text-muted-foreground">
-                          Path to the Proton executable (e.g. <code className="rounded bg-muted px-1 text-xs">~/.steam/steam/steamapps/common/Proton 9.0/proton</code>).
+                          Path to the Proton executable (e.g.{" "}
+                          <code className="rounded bg-muted px-1 text-xs">
+                            ~/.steam/steam/steamapps/common/Proton 9.0/proton
+                          </code>
+                          ).
                         </p>
                         <div className="flex gap-2">
                           <Input
@@ -2511,14 +2599,26 @@ function Settings() {
                             onChange={e =>
                               setSettingsLocal(prev => ({
                                 ...prev,
-                                proton: { ...(prev.proton || {}), protonBin: e.target.value },
+                                proton: {
+                                  ...(prev.proton || {}),
+                                  protonBin: e.target.value,
+                                },
                               }))
                             }
                             onBlur={e => {
-                              const updatedProton = { ...(settings.proton || {}), protonBin: e.target.value };
-                              window.electron.updateSetting("proton", updatedProton).then(success => {
-                                if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
-                              });
+                              const updatedProton = {
+                                ...(settings.proton || {}),
+                                protonBin: e.target.value,
+                              };
+                              window.electron
+                                .updateSetting("proton", updatedProton)
+                                .then(success => {
+                                  if (success)
+                                    setSettingsLocal(prev => ({
+                                      ...prev,
+                                      proton: updatedProton,
+                                    }));
+                                });
                             }}
                             className="flex-1 font-mono text-sm"
                           />
@@ -2527,10 +2627,19 @@ function Settings() {
                             onClick={async () => {
                               const file = await window.electron.openFileDialog?.();
                               if (file) {
-                                const updatedProton = { ...(settings.proton || {}), protonBin: file };
-                                window.electron.updateSetting("proton", updatedProton).then(success => {
-                                  if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
-                                });
+                                const updatedProton = {
+                                  ...(settings.proton || {}),
+                                  protonBin: file,
+                                };
+                                window.electron
+                                  .updateSetting("proton", updatedProton)
+                                  .then(success => {
+                                    if (success)
+                                      setSettingsLocal(prev => ({
+                                        ...prev,
+                                        proton: updatedProton,
+                                      }));
+                                  });
                               }
                             }}
                           >
@@ -2542,7 +2651,13 @@ function Settings() {
                       <div className="space-y-2">
                         <Label htmlFor="proton-compat">Steam Compat Data Path</Label>
                         <p className="text-sm text-muted-foreground">
-                          Directory for Proton compatibility data (<code className="rounded bg-muted px-1 text-xs">STEAM_COMPAT_DATA_PATH</code>). Leave empty to use <code className="rounded bg-muted px-1 text-xs">~/.proton</code>.
+                          Directory for Proton compatibility data (
+                          <code className="rounded bg-muted px-1 text-xs">
+                            STEAM_COMPAT_DATA_PATH
+                          </code>
+                          ). Leave empty to use{" "}
+                          <code className="rounded bg-muted px-1 text-xs">~/.proton</code>
+                          .
                         </p>
                         <div className="flex gap-2">
                           <Input
@@ -2552,14 +2667,26 @@ function Settings() {
                             onChange={e =>
                               setSettingsLocal(prev => ({
                                 ...prev,
-                                proton: { ...(prev.proton || {}), steamCompatDataPath: e.target.value },
+                                proton: {
+                                  ...(prev.proton || {}),
+                                  steamCompatDataPath: e.target.value,
+                                },
                               }))
                             }
                             onBlur={e => {
-                              const updatedProton = { ...(settings.proton || {}), steamCompatDataPath: e.target.value };
-                              window.electron.updateSetting("proton", updatedProton).then(success => {
-                                if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
-                              });
+                              const updatedProton = {
+                                ...(settings.proton || {}),
+                                steamCompatDataPath: e.target.value,
+                              };
+                              window.electron
+                                .updateSetting("proton", updatedProton)
+                                .then(success => {
+                                  if (success)
+                                    setSettingsLocal(prev => ({
+                                      ...prev,
+                                      proton: updatedProton,
+                                    }));
+                                });
                             }}
                             className="flex-1 font-mono text-sm"
                           />
@@ -2568,10 +2695,19 @@ function Settings() {
                             onClick={async () => {
                               const dir = await window.electron.openDirectoryDialog();
                               if (dir) {
-                                const updatedProton = { ...(settings.proton || {}), steamCompatDataPath: dir };
-                                window.electron.updateSetting("proton", updatedProton).then(success => {
-                                  if (success) setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
-                                });
+                                const updatedProton = {
+                                  ...(settings.proton || {}),
+                                  steamCompatDataPath: dir,
+                                };
+                                window.electron
+                                  .updateSetting("proton", updatedProton)
+                                  .then(success => {
+                                    if (success)
+                                      setSettingsLocal(prev => ({
+                                        ...prev,
+                                        proton: updatedProton,
+                                      }));
+                                  });
                               }
                             }}
                           >
@@ -3119,6 +3255,137 @@ function Settings() {
               </Card>
             )}
 
+            {/* App Branch Card */}
+            <Card className="overflow-hidden border-border p-0">
+              <div className="border-b border-border px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold text-primary">App Branch</h2>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose your release channel. Switching will download and run the
+                  appropriate installer — the app will restart automatically.
+                </p>
+              </div>
+              <div className="divide-y divide-border">
+                {[
+                  {
+                    id: "live",
+                    label: "Live",
+                    description: "The stable release. Recommended for all users.",
+                    color: "text-emerald-500",
+                    dotColor: "bg-emerald-500",
+                    ringColor: "ring-emerald-500/30",
+                    activeBg: "bg-emerald-500/8",
+                    activeBorder: "border-l-emerald-500",
+                  },
+                  {
+                    id: "public-testing",
+                    label: "Public Testing",
+                    description:
+                      "Get early access to upcoming features before they ship to Live.",
+                    color: "text-yellow-500",
+                    dotColor: "bg-yellow-500",
+                    ringColor: "ring-yellow-500/30",
+                    activeBg: "bg-yellow-500/8",
+                    activeBorder: "border-l-yellow-500",
+                  },
+                  {
+                    id: "experimental",
+                    label: "Experimental",
+                    description:
+                      "Cutting-edge builds with the latest changes. May be unstable.",
+                    color: "text-red-400",
+                    dotColor: "bg-red-400",
+                    ringColor: "ring-red-400/30",
+                    activeBg: "bg-red-400/8",
+                    activeBorder: "border-l-red-400",
+                    requiresSubscription: true,
+                  },
+                ].map(branch => {
+                  const isActive = (settings.appBranch || "live") === branch.id;
+                  const isLocked = branch.requiresSubscription && !hasAscendSubscription;
+                  return (
+                    <button
+                      key={branch.id}
+                      disabled={isActive || isLocked}
+                      onClick={() => {
+                        if (isLocked || isActive) return;
+                        setPendingBranch(branch);
+                        setShowBranchDialog(true);
+                      }}
+                      className={[
+                        "group flex w-full items-center gap-4 border-l-4 px-6 py-4 text-left transition-all duration-150",
+                        isActive
+                          ? `${branch.activeBorder} ${branch.activeBg} cursor-default`
+                          : isLocked
+                            ? "cursor-not-allowed border-l-transparent opacity-50"
+                            : "cursor-pointer border-l-transparent hover:bg-muted/40",
+                      ].join(" ")}
+                    >
+                      <div className="relative flex-shrink-0">
+                        <span
+                          className={[
+                            "flex h-9 w-9 items-center justify-center rounded-full ring-2",
+                            isActive
+                              ? `${branch.dotColor} bg-opacity-20 ${branch.ringColor}`
+                              : "bg-muted ring-border",
+                          ].join(" ")}
+                        >
+                          <span
+                            className={[
+                              "h-3 w-3 rounded-full",
+                              isActive ? "bg-white" : branch.dotColor,
+                            ].join(" ")}
+                          />
+                        </span>
+                        {isActive && (
+                          <span
+                            className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${branch.dotColor} animate-pulse`}
+                          />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={[
+                              "text-sm font-semibold",
+                              isActive ? branch.color : "text-foreground",
+                            ].join(" ")}
+                          >
+                            {branch.label}
+                          </span>
+                          {isActive && (
+                            <Badge
+                              variant="secondary"
+                              className={`text-xs ${branch.color} border-current/20 bg-current/10`}
+                            >
+                              Active
+                            </Badge>
+                          )}
+                          {isLocked && (
+                            <Badge
+                              variant="outline"
+                              className="gap-1 border-yellow-500/30 text-xs text-yellow-500"
+                            >
+                              <Star className="h-3 w-3" />
+                              Ascend
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {branch.description}
+                        </p>
+                      </div>
+                      {!isActive && !isLocked && (
+                        <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+
             {/* Notice Card */}
             <Card className="border-border border-yellow-500/50 bg-yellow-500/5 p-6">
               <div className="space-y-4">
@@ -3145,6 +3412,88 @@ function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Branch Switch Dialog */}
+      <AlertDialog
+        open={showBranchDialog}
+        onOpenChange={v => {
+          if (!isSwitchingBranch) setShowBranchDialog(v);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              Switch to {pendingBranch?.label}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-muted-foreground">
+              <p>
+                Ascendara will download the <strong>{pendingBranch?.label}</strong>{" "}
+                installer and launch it. The app will close automatically to complete the
+                switch.
+              </p>
+              {pendingBranch?.id === "experimental" && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                  <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>
+                    Experimental builds may be unstable and contain bugs. Use at your own
+                    risk.
+                  </span>
+                </div>
+              )}
+              {isSwitchingBranch && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span>Downloading installer...</span>
+                    <span>{branchSwitchProgress}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300"
+                      style={{ width: `${branchSwitchProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-primary" disabled={isSwitchingBranch}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isSwitchingBranch}
+              onClick={async e => {
+                e.preventDefault();
+                if (!pendingBranch) return;
+                setIsSwitchingBranch(true);
+                setBranchSwitchProgress(0);
+                try {
+                  handleSettingChange("appBranch", pendingBranch.id);
+                  const result = await window.electron.switchBranch(pendingBranch.id);
+                  if (!result?.success) {
+                    toast.error(result?.error || "Failed to switch branch");
+                    setIsSwitchingBranch(false);
+                    setShowBranchDialog(false);
+                  }
+                } catch (err) {
+                  toast.error("Failed to switch branch");
+                  setIsSwitchingBranch(false);
+                  setShowBranchDialog(false);
+                }
+              }}
+            >
+              {isSwitchingBranch ? (
+                <div className="flex items-center gap-2">
+                  <Loader className="h-4 w-4 animate-spin" />
+                  Downloading...
+                </div>
+              ) : (
+                "Switch & Reinstall"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Torrent Warning Dialog */}
       <AlertDialog open={showTorrentWarning} onOpenChange={setShowTorrentWarning}>
