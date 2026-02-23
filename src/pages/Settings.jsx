@@ -2436,13 +2436,12 @@ function Settings() {
                       {t("welcome.compatibilityLayer")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Configure how Windows games are launched on Linux using Proton or
-                      Wine.
+                      {t("settings.linuxCompat.description")}
                     </p>
 
                     {/* Runner Selection */}
                     <div className="space-y-3">
-                      <label className="text-sm font-medium">Default Runner</label>
+                      <label className="text-sm font-medium">{t("settings.linuxCompat.defaultRunner")}</label>
                       <select
                         value={selectedRunner}
                         onChange={async e => {
@@ -2454,15 +2453,15 @@ function Settings() {
                         }}
                         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                       >
-                        <option value="auto">Auto-detect (Recommended)</option>
+                        <option value="auto">{t("settings.linuxCompat.autoDetect")}</option>
                         {runners.map(r => (
                           <option key={r.path} value={r.path}>
                             {r.name} (
                             {r.source === "steam"
-                              ? "Steam"
+                              ? t("settings.linuxCompat.sourceSteam")
                               : r.source === "custom"
-                                ? "Custom"
-                                : "System"}
+                                ? t("settings.linuxCompat.sourceCustom")
+                                : t("settings.linuxCompat.sourceSystem")}
                             ){r.version ? ` — v${r.version}` : ""}
                           </option>
                         ))}
@@ -2471,11 +2470,10 @@ function Settings() {
 
                     {/* Detected Runners List */}
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Detected Runners</h4>
+                      <h4 className="text-sm font-medium">{t("settings.linuxCompat.detectedRunners")}</h4>
                       {runners.length === 0 ? (
                         <p className="text-sm text-yellow-500">
-                          No Proton or Wine installation detected. Download Proton-GE
-                          below.
+                          {t("settings.linuxCompat.noRunnersWarning")}
                         </p>
                       ) : (
                         <ul className="space-y-1">
@@ -2524,19 +2522,19 @@ function Settings() {
                           }
                         }}
                         disabled={isDownloadingProton}
-                        className="gap-2"
+                        className="gap-2 text-secondary"
                       >
                         {isDownloadingProton ? (
                           <>
                             <Loader className="h-4 w-4 animate-spin" />
-                            Downloading...
+                            {t("settings.linuxCompat.downloading")}
                           </>
                         ) : (
                           <>
                             <Download className="h-4 w-4" />
                             {runners.some(r => r.name.toLowerCase().includes("ge-proton"))
-                              ? "Update Proton-GE"
-                              : "Download Proton-GE"}
+                              ? t("settings.linuxCompat.updateProtonGE")
+                              : t("settings.linuxCompat.downloadProtonGE")}
                           </>
                         )}
                       </Button>
@@ -2571,12 +2569,12 @@ function Settings() {
                         {protonUpdateStatus === "checking" ? (
                           <>
                             <Loader className="h-4 w-4 animate-spin" />
-                            Checking...
+                            {t("settings.linuxCompat.checking")}
                           </>
                         ) : (
                           <>
                             <FolderSync className="h-4 w-4" />
-                            Check for Updates
+                            {t("settings.linuxCompat.checkForUpdates")}
                           </>
                         )}
                       </Button>
@@ -2600,7 +2598,7 @@ function Settings() {
                         className="gap-2"
                       >
                         <FolderOpen className="h-4 w-4" />
-                        Select Custom Runner
+                        {t("settings.linuxCompat.selectCustomRunner")}
                       </Button>
 
                       <Button
@@ -2612,7 +2610,7 @@ function Settings() {
                         className="gap-2"
                       >
                         <FolderSync className="h-4 w-4" />
-                        Refresh
+                        {t("settings.linuxCompat.refresh")}
                       </Button>
                     </div>
 
@@ -2620,7 +2618,7 @@ function Settings() {
                     {protonUpdateStatus === "up-to-date" && (
                       <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
                         <FileCheck2 className="h-4 w-4 text-green-500" />
-                        <p className="text-sm text-green-500">Proton-GE is up to date!</p>
+                        <p className="text-sm text-green-500">{t("settings.linuxCompat.upToDate")}</p>
                       </div>
                     )}
 
@@ -2629,12 +2627,11 @@ function Settings() {
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="h-4 w-4 text-yellow-500" />
                           <p className="text-sm text-yellow-500">
-                            Update available:{" "}
-                            <strong>{protonGEInfo.latestVersion}</strong>
+                            {t("settings.linuxCompat.updateAvailable", { version: protonGEInfo.latestVersion })}
                             {protonGEInfo.installedVersions.length > 0 && (
                               <span className="text-yellow-500/70">
                                 {" "}
-                                (current: {protonGEInfo.installedVersions[0]})
+                                {t("settings.linuxCompat.updateAvailableCurrent", { version: protonGEInfo.installedVersions[0] })}
                               </span>
                             )}
                           </p>
@@ -2645,7 +2642,7 @@ function Settings() {
                           className="gap-1"
                         >
                           <Download className="h-3 w-3" />
-                          Update
+                          {t("settings.linuxCompat.update")}
                         </Button>
                       </div>
                     )}
@@ -2653,112 +2650,111 @@ function Settings() {
                     {/* Info Box */}
                     <div className="rounded-lg border border-border bg-muted/50 p-3">
                       <p className="text-xs text-muted-foreground">
-                        <strong>Proton</strong> (recommended) provides the best Windows
-                        game compatibility with automatic DXVK, VKD3D-Proton, and FSR
-                        support. <strong>Wine</strong> works but may require manual
-                        configuration for DirectX games.
+                        <strong>Proton</strong> {t("settings.linuxCompat.infoBoxProton")}{" "}
+                        <strong>Wine</strong> {t("settings.linuxCompat.infoBoxWine")}
                       </p>
                     </div>
                   </div>
                 </Card>
                 {/* Proton-GE Download Confirmation Dialog */}
-                {showProtonConfirm && protonGEInfo && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
-                      <h3 className="text-lg font-semibold">
-                        {protonGEInfo.updateAvailable
-                          ? "Update Proton-GE"
-                          : "Download Proton-GE"}
-                      </h3>
-                      <div className="space-y-2 text-sm text-muted-foreground">
+                <AlertDialog open={showProtonConfirm && !!protonGEInfo} onOpenChange={(open) => {
+                  if (!open) {
+                    setShowProtonConfirm(false);
+                    setProtonGEInfo(null);
+                  }
+                }}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        {protonGEInfo?.updateAvailable
+                          ? t("settings.linuxCompat.protonConfirm.titleUpdate")
+                          : t("settings.linuxCompat.protonConfirm.titleDownload")}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-3">
                         <p>
-                          {protonGEInfo.updateAvailable ? (
+                          {protonGEInfo?.updateAvailable ? (
                             <>
-                              A new version of Proton-GE is available:{" "}
+                              {t("settings.linuxCompat.protonConfirm.updateAvailablePrefix")}{" "}
                               <strong className="text-foreground">
                                 {protonGEInfo.name}
                               </strong>
-                              {protonGEInfo.installedVersions.length > 0 && (
+                              {protonGEInfo.installedVersions?.length > 0 && (
                                 <span>
                                   {" "}
-                                  (replacing {protonGEInfo.installedVersions.join(", ")})
+                                  {t("settings.linuxCompat.protonConfirm.replacing", { versions: protonGEInfo.installedVersions.join(", ") })}
                                 </span>
                               )}
                             </>
                           ) : (
                             <>
-                              You are about to download{" "}
+                              {t("settings.linuxCompat.protonConfirm.aboutToDownloadPrefix")}{" "}
                               <strong className="text-foreground">
-                                {protonGEInfo.name}
+                                {protonGEInfo?.name}
                               </strong>
                               .
                             </>
                           )}
                         </p>
                         <p>
-                          File:{" "}
-                          <code className="rounded bg-muted px-1">
-                            {protonGEInfo.fileName}
+                          {t("settings.linuxCompat.protonConfirm.file")}{" "}
+                          <code className="rounded bg-muted px-1 text-xs">
+                            {protonGEInfo?.fileName}
                           </code>
                         </p>
                         <p>
-                          Size:{" "}
+                          {t("settings.linuxCompat.protonConfirm.size")}{" "}
                           <strong className="text-foreground">
-                            {protonGEInfo.sizeFormatted}
+                            {protonGEInfo?.sizeFormatted}
                           </strong>{" "}
-                          (approximately{" "}
-                          {(protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1)} GB after
-                          extraction)
+                          {protonGEInfo && t("settings.linuxCompat.protonConfirm.sizeApprox", { gb: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1) })}
                         </p>
-                        <p className="text-muted-foreground">
-                          Proton-GE is a custom build of Proton with additional patches
-                          for better game compatibility. It will be installed to{" "}
-                          <code className="rounded bg-muted px-1">
+                        <p>
+                          {t("settings.linuxCompat.protonConfirm.description")}{" "}
+                          <code className="rounded bg-muted px-1 text-xs">
                             ~/.ascendara/runners/
                           </code>
                         </p>
-                      </div>
-                      <div className="flex justify-end gap-3 pt-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setShowProtonConfirm(false);
-                            setProtonGEInfo(null);
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={async () => {
-                            setShowProtonConfirm(false);
-                            setProtonUpdateStatus(null);
-                            setIsDownloadingProton(true);
-                            try {
-                              const result = await window.electron.downloadProtonGE();
-                              if (result.success) {
-                                const updated = await window.electron.getRunners();
-                                setRunners(updated);
-                                if (result.path) {
-                                  setSelectedRunner(result.path);
-                                }
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel
+                        onClick={() => {
+                          setShowProtonConfirm(false);
+                          setProtonGEInfo(null);
+                        }}
+                      >
+                        {t("settings.linuxCompat.protonConfirm.cancel")}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={async () => {
+                          setShowProtonConfirm(false);
+                          setProtonUpdateStatus(null);
+                          setIsDownloadingProton(true);
+                          try {
+                            const result = await window.electron.downloadProtonGE();
+                            if (result.success) {
+                              const updated = await window.electron.getRunners();
+                              setRunners(updated);
+                              if (result.path) {
+                                setSelectedRunner(result.path);
                               }
-                            } catch (e) {
-                              console.error("Failed to download Proton-GE:", e);
                             }
-                            setIsDownloadingProton(false);
-                            setProtonGEInfo(null);
-                          }}
-                          className="gap-2"
-                        >
-                          <Download className="h-4 w-4" />
-                          {protonGEInfo.updateAvailable
-                            ? `Update (${protonGEInfo.sizeFormatted})`
-                            : `Download (${protonGEInfo.sizeFormatted})`}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                          } catch (e) {
+                            console.error("Failed to download Proton-GE:", e);
+                          }
+                          setIsDownloadingProton(false);
+                          setProtonGEInfo(null);
+                        }}
+                        className="gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        {protonGEInfo?.updateAvailable
+                          ? t("settings.linuxCompat.protonConfirm.updateBtn", { size: protonGEInfo?.sizeFormatted })
+                          : t("settings.linuxCompat.protonConfirm.downloadBtn", { size: protonGEInfo?.sizeFormatted })}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </>
             )}
 
@@ -3578,14 +3574,14 @@ function Settings() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              No Branch Available
+              {t("settings.noBranchDialog.title")}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-muted-foreground">
               <p>{noBranchMessage}</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">Close</AlertDialogCancel>
+            <AlertDialogCancel className="text-primary">{t("settings.noBranchDialog.close")}</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -3596,43 +3592,44 @@ function Settings() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
               <Star className="h-6 w-6 text-yellow-500" />
-              Ascend Required
+              {t("settings.ascendPromoDialog.title")}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4 text-muted-foreground">
               <p>
-                The <strong className="text-red-400">Experimental Branch</strong> is an
-                exclusive feature for Ascend subscribers.
+                {t("settings.ascendPromoDialog.experimentalBranchExclusivePrefix")}{" "}
+                <strong className="text-red-400">{t("settings.ascendPromoDialog.experimentalBranch")}</strong>
+                {" "}{t("settings.ascendPromoDialog.experimentalBranchExclusiveSuffix")}
               </p>
               <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
                 <h3 className="mb-2 font-semibold text-foreground">
-                  Why subscribe to Ascend?
+                  {t("settings.ascendPromoDialog.whySubscribe")}
                 </h3>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
                     <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <span>Get early access to experimental features and updates</span>
+                    <span>{t("settings.ascendPromoDialog.benefit1")}</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Star className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <span>Support the development of Ascendara</span>
+                    <span>{t("settings.ascendPromoDialog.benefit2")}</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Star className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <span>Unlock exclusive features and perks</span>
+                    <span>{t("settings.ascendPromoDialog.benefit3")}</span>
                   </li>
                 </ul>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">Maybe Later</AlertDialogCancel>
+            <AlertDialogCancel className="text-primary">{t("settings.ascendPromoDialog.maybeLater")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 window.electron?.openURL("https://ascendara.app/ascend");
                 setShowAscendPromoDialog(false);
               }}
             >
-              Learn More About Ascend
+              {t("settings.ascendPromoDialog.learnMore")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
