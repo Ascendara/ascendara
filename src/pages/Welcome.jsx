@@ -2197,9 +2197,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                               r.name.toLowerCase().includes("proton")
                           ) && (
                             <p className="mt-2 text-sm font-medium text-yellow-500/90">
-                              Wine works, but <strong>Proton-GE is recommended</strong>{" "}
-                              for better performance and compatibility. You can install it
-                              below or skip.
+                              {t("welcome.wineRecommendation")}
                             </p>
                           )}
                         </div>
@@ -2227,14 +2225,14 @@ const Welcome = ({ welcomeData, onComplete }) => {
                           <div className="mb-2 flex items-center gap-2">
                             <Rocket className="h-5 w-5 text-primary" />
                             <span className="font-bold text-primary">
-                              Proton-GE (Recommended)
+                              {t("welcome.protonGERecommended")}
                             </span>
                           </div>
                           <p className="mb-4 text-sm text-muted-foreground">
-                            Best for gaming. Includes DXVK, VKD3D, FSR & patches.
+                            {t("welcome.protonGEDesc")}
                             {protonGEInfo && (
                               <span className="mt-1 block font-mono text-xs opacity-75">
-                                Size: {protonGEInfo.sizeFormatted}
+                                {t("welcome.protonGESize")} {protonGEInfo.sizeFormatted}
                               </span>
                             )}
                           </p>
@@ -2269,7 +2267,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
                           ) : (
                             <Download className="mr-2 h-4 w-4" />
                           )}
-                          {isDownloadingProton ? "Checking..." : "Install Proton-GE"}
+                          {isDownloadingProton
+                            ? t("welcome.protonGEChecking")
+                            : t("welcome.protonGEInstall")}
                         </Button>
                       </div>
 
@@ -2278,10 +2278,12 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         <div>
                           <div className="mb-2 flex items-center gap-2">
                             <Wine className="h-5 w-5 text-foreground" />
-                            <span className="font-bold text-foreground">System Wine</span>
+                            <span className="font-bold text-foreground">
+                              {t("welcome.systemWine")}
+                            </span>
                           </div>
                           <p className="mb-4 text-sm text-muted-foreground">
-                            Basic compatibility using your system package manager.
+                            {t("welcome.systemWineDesc")}
                           </p>
                         </div>
                         <Button
@@ -2297,7 +2299,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                           className="w-full"
                         >
                           <FolderDownIcon className="mr-2 h-4 w-4" />
-                          Install Wine
+                          {t("welcome.installWine")}
                         </Button>
                       </div>
                     </div>
@@ -2566,41 +2568,46 @@ const Welcome = ({ welcomeData, onComplete }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
             <h3 className="text-lg font-semibold">
-              {protonGEInfo.updateAvailable ? "Update Proton-GE" : "Download Proton-GE"}
+              {protonGEInfo.updateAvailable
+                ? t("welcome.protonGEDialog.updateTitle")
+                : t("welcome.protonGEDialog.downloadTitle")}
             </h3>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
                 {protonGEInfo.updateAvailable ? (
                   <>
-                    A new version of Proton-GE is available:{" "}
+                    {t("welcome.protonGEDialog.updateAvailable")}{" "}
                     <strong className="text-foreground">{protonGEInfo.name}</strong>
                     {protonGEInfo.installedVersions.length > 0 && (
                       <span>
                         {" "}
-                        (replacing {protonGEInfo.installedVersions.join(", ")})
+                        ({t("welcome.protonGEDialog.replacing")}{" "}
+                        {protonGEInfo.installedVersions.join(", ")})
                       </span>
                     )}
                   </>
                 ) : (
                   <>
-                    You are about to download{" "}
+                    {t("welcome.protonGEDialog.aboutToDownload")}{" "}
                     <strong className="text-foreground">{protonGEInfo.name}</strong>.
                   </>
                 )}
               </p>
               <p>
-                File:{" "}
+                {t("welcome.protonGEDialog.file")}{" "}
                 <code className="rounded bg-muted px-1">{protonGEInfo.fileName}</code>
               </p>
               <p>
-                Size:{" "}
+                {t("welcome.protonGEDialog.size")}{" "}
                 <strong className="text-foreground">{protonGEInfo.sizeFormatted}</strong>{" "}
-                (approximately {(protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1)} GB
-                after extraction)
+                (
+                {t("welcome.protonGEDialog.sizeAfterExtraction", {
+                  size: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1),
+                })}
+                )
               </p>
               <p className="text-muted-foreground">
-                Proton-GE is a custom build of Proton with additional patches for better
-                game compatibility. It will be installed to{" "}
+                {t("welcome.protonGEDialog.description")}{" "}
                 <code className="rounded bg-muted px-1">~/.ascendara/runners/</code>
               </p>
             </div>
@@ -2612,7 +2619,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   setProtonGEInfo(null);
                 }}
               >
-                Cancel
+                {t("welcome.protonGEDialog.cancel")}
               </Button>
               <Button
                 onClick={async () => {
@@ -2635,7 +2642,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                Download ({protonGEInfo.sizeFormatted})
+                {t("welcome.protonGEDialog.download")} ({protonGEInfo.sizeFormatted})
               </Button>
             </div>
           </div>
