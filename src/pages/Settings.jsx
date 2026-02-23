@@ -2401,16 +2401,18 @@ function Settings() {
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold text-primary">
-                      Wine &amp; Proton
+                      {t("settings.wineProton.title")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Configure how Windows games are run on Linux
+                      {t("settings.wineProton.description")}
                     </p>
                   </div>
                   {!isOnLinux && (
                     <div className="ml-auto flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1">
                       <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Linux only</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t("settings.wineProton.linuxOnly")}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -2420,20 +2422,26 @@ function Settings() {
                   <div className="space-y-4 rounded-lg border border-border/60 p-4">
                     <div className="flex items-center gap-2">
                       <Terminal className="h-4 w-4 text-primary" />
-                      <h4 className="font-medium text-foreground">Wine</h4>
+                      <h4 className="font-medium text-foreground">
+                        {t("settings.wineProton.wineSection")}
+                      </h4>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="wine-bin">Wine Binary</Label>
+                      <Label htmlFor="wine-bin">
+                        {t("settings.wineProton.wineBinary")}
+                      </Label>
                       <p className="text-sm text-muted-foreground">
-                        Path to the Wine executable. Defaults to{" "}
-                        <code className="rounded bg-muted px-1 text-xs">wine</code> on
-                        your PATH.
+                        {t("settings.wineProton.wineBinaryDescription")}{" "}
+                        <code className="rounded bg-muted px-1 text-xs">
+                          {t("settings.wineProton.wineBinaryPlaceholder")}
+                        </code>{" "}
+                        on your PATH.
                       </p>
                       <div className="flex gap-2">
                         <Input
                           id="wine-bin"
-                          placeholder="wine"
+                          placeholder={t("settings.wineProton.wineBinaryPlaceholder")}
                           value={settings.wine?.wineBin || ""}
                           onChange={e =>
                             setSettingsLocal(prev => ({
@@ -2485,15 +2493,20 @@ function Settings() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="wine-prefix">Wine Prefix (WINEPREFIX)</Label>
+                      <Label htmlFor="wine-prefix">
+                        {t("settings.wineProton.winePrefix")}
+                      </Label>
                       <p className="text-sm text-muted-foreground">
-                        Directory used as the Wine prefix. Leave empty to use{" "}
-                        <code className="rounded bg-muted px-1 text-xs">~/.wine</code>.
+                        {t("settings.wineProton.winePrefixDescription")}{" "}
+                        <code className="rounded bg-muted px-1 text-xs">
+                          {t("settings.wineProton.winePrefixPlaceholder")}
+                        </code>
+                        .
                       </p>
                       <div className="flex gap-2">
                         <Input
                           id="wine-prefix"
-                          placeholder="~/.wine"
+                          placeholder={t("settings.wineProton.winePrefixPlaceholder")}
                           value={settings.wine?.winePrefix || ""}
                           onChange={e =>
                             setSettingsLocal(prev => ({
@@ -2550,10 +2563,12 @@ function Settings() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Terminal className="h-4 w-4 text-primary" />
-                        <h4 className="font-medium text-foreground">Proton</h4>
+                        <h4 className="font-medium text-foreground">
+                          {t("settings.wineProton.protonSection")}
+                        </h4>
                         <Badge variant="secondary" className="text-xs">
                           <FlaskConical className="mr-1 h-3 w-3" />
-                          Experimental
+                          {t("settings.wineProton.protonExperimental")}
                         </Badge>
                       </div>
                       <Switch
@@ -2577,17 +2592,18 @@ function Settings() {
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Use Proton instead of Wine to run games. When enabled, Proton takes
-                      priority over Wine. Falls back to Wine if Proton fails.
+                      {t("settings.wineProton.protonDescription")}
                     </p>
 
                     <div
                       className={`space-y-4 ${!settings.proton?.enabled ? "pointer-events-none opacity-50" : ""}`}
                     >
                       <div className="space-y-2">
-                        <Label htmlFor="proton-bin">Proton Binary</Label>
+                        <Label htmlFor="proton-bin">
+                          {t("settings.wineProton.protonBinary")}
+                        </Label>
                         <p className="text-sm text-muted-foreground">
-                          Path to the Proton executable (e.g.{" "}
+                          {t("settings.wineProton.protonBinaryDescription")} (e.g.{" "}
                           <code className="rounded bg-muted px-1 text-xs">
                             ~/.steam/steam/steamapps/common/Proton 9.0/proton
                           </code>
@@ -2596,7 +2612,7 @@ function Settings() {
                         <div className="flex gap-2">
                           <Input
                             id="proton-bin"
-                            placeholder="/path/to/proton"
+                            placeholder={t("settings.wineProton.protonBinaryPlaceholder")}
                             value={settings.proton?.protonBin || ""}
                             onChange={e =>
                               setSettingsLocal(prev => ({
@@ -3262,19 +3278,20 @@ function Settings() {
               <div className="border-b border-border px-6 py-4">
                 <div className="flex items-center gap-2">
                   <FlaskConical className="h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-semibold text-primary">App Branch</h2>
+                  <h2 className="text-lg font-semibold text-primary">
+                    {t("settings.appBranch.title")}
+                  </h2>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose your release channel. Switching will download and run the
-                  appropriate installer — the app will restart automatically.
+                  {t("settings.appBranch.description")}
                 </p>
               </div>
               <div className="divide-y divide-border">
                 {[
                   {
                     id: "live",
-                    label: "Live",
-                    description: "The stable release. Recommended for all users.",
+                    label: t("settings.appBranch.live.label"),
+                    description: t("settings.appBranch.live.description"),
                     color: "text-emerald-500",
                     dotColor: "bg-emerald-500",
                     ringColor: "ring-emerald-500/30",
@@ -3283,9 +3300,8 @@ function Settings() {
                   },
                   {
                     id: "public-testing",
-                    label: "Public Testing",
-                    description:
-                      "Get early access to upcoming features before they ship to Live.",
+                    label: t("settings.appBranch.publicTesting.label"),
+                    description: t("settings.appBranch.publicTesting.description"),
                     color: "text-yellow-500",
                     dotColor: "bg-yellow-500",
                     ringColor: "ring-yellow-500/30",
@@ -3294,9 +3310,8 @@ function Settings() {
                   },
                   {
                     id: "experimental",
-                    label: "Experimental",
-                    description:
-                      "Cutting-edge builds with the latest changes. May be unstable.",
+                    label: t("settings.appBranch.experimental.label"),
+                    description: t("settings.appBranch.experimental.description"),
                     color: "text-red-400",
                     dotColor: "bg-red-400",
                     ringColor: "ring-red-400/30",
@@ -3425,27 +3440,28 @@ function Settings() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              Switch to {pendingBranch?.label}?
+              {t("settings.appBranch.switchDialog.title", {
+                branch: pendingBranch?.label,
+              })}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-muted-foreground">
               <p>
-                Ascendara will download the <strong>{pendingBranch?.label}</strong>{" "}
-                installer and launch it. The app will close automatically to complete the
-                switch.
+                {t("settings.appBranch.switchDialog.description")}{" "}
+                <strong>{pendingBranch?.label}</strong>{" "}
+                {t("settings.appBranch.switchDialog.installer")}
               </p>
               {pendingBranch?.id === "experimental" && (
                 <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
                   <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                  <span>
-                    Experimental builds may be unstable and contain bugs. Use at your own
-                    risk.
-                  </span>
+                  <span>{t("settings.appBranch.switchDialog.experimentalWarning")}</span>
                 </div>
               )}
               {isSwitchingBranch && (
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span>Downloading installer...</span>
+                    <span>
+                      {t("settings.appBranch.switchDialog.downloadingInstaller")}
+                    </span>
                     <span>{branchSwitchProgress}%</span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -3460,7 +3476,7 @@ function Settings() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-primary" disabled={isSwitchingBranch}>
-              Cancel
+              {t("settings.appBranch.switchDialog.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={isSwitchingBranch}
@@ -3486,10 +3502,10 @@ function Settings() {
               {isSwitchingBranch ? (
                 <div className="flex items-center gap-2">
                   <Loader className="h-4 w-4 animate-spin" />
-                  Downloading...
+                  {t("settings.appBranch.switchDialog.downloading")}
                 </div>
               ) : (
-                "Switch & Reinstall"
+                t("settings.appBranch.switchDialog.switchAndReinstall")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

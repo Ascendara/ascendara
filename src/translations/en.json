@@ -966,6 +966,11 @@
       "steps": "[{'description': 'The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don\\'t have it, close the guide and click the \"Don\\'t have the extension? Get it for Chrome or Firefox\" button to download it.', 'title': 'The Ascendara Download Handler'}, {'description': 'After installing the extension, click the extension icon to enable the handler.', 'title': 'Step 1: Enable the Handler'}, {'description': 'The extension can stay on as it will only send known providers to Ascendara.', 'title': 'The Download Handler'}, {'description': 'Complete the CAPTCHA, and start the download.', 'title': 'Step 2: Start the download'}, {'description': 'Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.', 'title': 'Step 3: Using the Extension'}, {'description': 'Click the button to Open Ascendara.', 'title': 'Step 4: Downloading'}, {'description': \"Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.\", 'title': \"That's it!\"}]",
       "title": "Downloading with Ascendara"
     },
+    "noDownloadPath": {
+      "desc": "You haven't set a download directory yet. Please go to Settings to choose where your games will be saved.",
+      "goToSettings": "Go to Settings",
+      "title": "No Download Directory Set"
+    },
     "noGameInfoAvailable": "Setup Ascendara Xtra in Preferences to see more information about this game",
     "noReviewsExplanation": "This game doesn't have any professional critic reviews available on OpenCritic. This could be because it's a new release, an indie title, or simply hasn't been reviewed yet.",
     "notExactMatch": "Game name didn't match exactly. Report the game if needed.",
@@ -1066,11 +1071,6 @@
       "torboxOffline": "This provider is offline on Torbox at the moment. Try another provider.",
       "torboxProcessingError": "Error processing Torbox link",
       "torrentSent": "Torrent sent to qBittorrent"
-    },
-    "noDownloadPath": {
-      "title": "No Download Directory Set",
-      "desc": "You haven't set a download directory yet. Please go to Settings to choose where your games will be saved.",
-      "goToSettings": "Go to Settings"
     },
     "topCriticScore": "Top Critic Score",
     "trainer": "Trainer Menu",
@@ -1906,6 +1906,34 @@
     "addLocation": "Add Download Directory",
     "additionalLocations": "Additional Locations",
     "apiKeySaved": "API Key Saved",
+    "appBranch": {
+      "description": "Choose your release channel. Switching will download and run the appropriate installer — the app will restart automatically.",
+      "experimental": {
+        "description": "Cutting-edge builds with the latest changes. May be unstable.",
+        "label": "Experimental",
+        "requiresSubscription": "Requires Ascend subscription"
+      },
+      "live": {
+        "description": "The stable release. Recommended for all users.",
+        "label": "Live"
+      },
+      "publicTesting": {
+        "description": "Get early access to upcoming features before they ship to Live.",
+        "label": "Public Testing"
+      },
+      "switchDialog": {
+        "cancel": "Cancel",
+        "confirm": "Switch Branch",
+        "description": "Ascendara will download the",
+        "downloading": "Downloading...",
+        "downloadingInstaller": "Downloading installer...",
+        "experimentalWarning": "Experimental builds may be unstable and contain bugs. Use at your own risk.",
+        "installer": "installer and launch it. The app will close automatically to complete the switch.",
+        "switchAndReinstall": "Switch & Reinstall",
+        "title": "Switch to {{branch}}?"
+      },
+      "title": "App Branch"
+    },
     "appearance": "Appearance",
     "application": "Application",
     "applyCustomColors": "Apply Colors",
@@ -2165,7 +2193,26 @@
     "warningDescription": "Ascendara is designed as a testing platform for video games, allowing users to evaluate gameplay, performance, and compatibility before making a purchase decision. Ascendara strongly encourages users to support game developers by purchasing games they enjoy.",
     "warningSupportDevelopers": "Game developers invest significant time, resources, and creativity into creating the experiences we all enjoy. Your purchase directly supports their ability to continue making great games and sustains the gaming industry.",
     "warningSupportDevelopersCallToAction": "Please support the developers by purchasing games you enjoy.",
-    "warningTitle": "Hey there, please read this!"
+    "warningTitle": "Hey there, please read this!",
+    "wineProton": {
+      "browse": "Browse",
+      "description": "Configure how Windows games are run on Linux",
+      "linuxOnly": "Linux only",
+      "protonBinary": "Proton Binary",
+      "protonBinaryDescription": "Path to the Proton executable. Defaults to",
+      "protonBinaryPlaceholder": "proton",
+      "protonDescription": "Use Proton compatibility layer instead of Wine. Proton is Valve's fork of Wine optimized for gaming.",
+      "protonExperimental": "Experimental",
+      "protonSection": "Proton",
+      "title": "Wine & Proton",
+      "wineBinary": "Wine Binary",
+      "wineBinaryDescription": "Path to the Wine executable. Defaults to",
+      "wineBinaryPlaceholder": "wine",
+      "winePrefix": "Wine Prefix (WINEPREFIX)",
+      "winePrefixDescription": "Directory used as the Wine prefix. Leave empty to use",
+      "winePrefixPlaceholder": "~/.wine",
+      "wineSection": "Wine"
+    }
   },
   "torbox": {
     "account": "TorBox Account",
