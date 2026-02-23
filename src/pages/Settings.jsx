@@ -3470,7 +3470,6 @@ function Settings() {
                 setIsSwitchingBranch(true);
                 setBranchSwitchProgress(0);
                 try {
-                  handleSettingChange("appBranch", pendingBranch.id);
                   const result = await window.electron.switchBranch(pendingBranch.id);
                   if (!result?.success) {
                     toast.error(result?.error || "Failed to switch branch");

@@ -98,29 +98,25 @@ function registerMiscHandlers() {
   });
 
   // Is experiment / branch
-  let branch = "live";
   let testingVersion = "";
 
-  // Initialize branch from saved settings
-  try {
-    const settingsPath = path.join(app.getPath("userData"), "ascendarasettings.json");
-    if (fs.existsSync(settingsPath)) {
-      const saved = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-      if (saved.appBranch) branch = saved.appBranch;
+  // Helper to get current branch from settings
+  const getCurrentBranch = () => {
+    try {
+      const settingsPath = path.join(app.getPath("userData"), "ascendarasettings.json");
+      if (fs.existsSync(settingsPath)) {
+        const saved = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+        return saved.appBranch || "live";
+      }
+    } catch (e) {
+      console.error("Failed to read appBranch from settings:", e);
     }
-  } catch (e) {
-    console.error("Failed to read appBranch from settings:", e);
-  }
+    return "live";
+  };
 
-  ipcMain.handle("is-experiment", () => branch === "experimental");
+  ipcMain.handle("is-experiment", () => getCurrentBranch() === "experimental");
   ipcMain.handle("get-testing-version", () => testingVersion);
-  ipcMain.handle("get-branch", () => branch);
-
-  // Switch build
-  ipcMain.handle("switch-build", async (_, buildType) => {
-    branch = buildType;
-    return true;
-  });
+  ipcMain.handle("get-branch", () => getCurrentBranch());
 
   // Has admin
   let hasAdmin = false;

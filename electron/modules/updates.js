@@ -495,6 +495,13 @@ function registerUpdateHandlers() {
       });
 
       installerProcess.unref();
+
+      const settingsManager = getSettingsManager();
+      if (settingsManager) {
+        const currentSettings = settingsManager.getSettings();
+        settingsManager.saveSettings({ ...currentSettings, appBranch: branch });
+      }
+
       app.quit();
 
       return { success: true };
