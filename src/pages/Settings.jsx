@@ -260,6 +260,11 @@ const ColorPickerInput = ({ colorKey, label, value, onColorChange }) => {
 };
 
 function Settings() {
+  const [currentBranch, setCurrentBranch] = useState("main");
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+  const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
+  const [showBranchDialog, setShowBranchDialog] = useState(false);
+  const [pendingBranch, setPendingBranch] = useState("");
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
   const { settings, setSettings, setSettingsLocal } = useSettings();
