@@ -362,12 +362,17 @@ contextBridge.exposeInMainWorld("electron", {
   isBrokenVersion: () => ipcRenderer.invoke("is-broken-version"),
   deleteInstaller: () => ipcRenderer.invoke("delete-installer"),
   uninstallAscendara: () => ipcRenderer.invoke("uninstall-ascendara"),
+  switchBranch: branch => ipcRenderer.invoke("switch-branch", branch),
   onUpdateAvailable: callback => ipcRenderer.on("update-available", callback),
   onUpdateReady: callback => ipcRenderer.on("update-ready", callback),
   removeUpdateAvailableListener: callback =>
     ipcRenderer.removeListener("update-available", callback),
   removeUpdateReadyListener: callback =>
     ipcRenderer.removeListener("update-ready", callback),
+  onBranchSwitchProgress: callback =>
+    ipcRenderer.on("branch-switch-progress", (_, progress) => callback(progress)),
+  removeBranchSwitchProgressListener: callback =>
+    ipcRenderer.removeListener("branch-switch-progress", callback),
 
   //===========================================================================
   // THEMES & UI
@@ -391,6 +396,7 @@ contextBridge.exposeInMainWorld("electron", {
   isExperiment: () => ipcRenderer.invoke("is-experiment"),
   getTestingVersion: () => ipcRenderer.invoke("get-testing-version"),
   switchBuild: buildType => ipcRenderer.invoke("switch-build", buildType),
+  getBranch: () => ipcRenderer.invoke("get-branch"),
   showTestNotification: () => ipcRenderer.invoke("show-test-notification"),
 
   //===========================================================================

@@ -97,19 +97,28 @@ function registerMiscHandlers() {
     }
   });
 
-  // Is experiment
-  let experiment = false;
+  // Is experiment / branch
+  let branch = "live";
   let testingVersion = "";
-  ipcMain.handle("is-experiment", () => experiment);
+
+  // Initialize branch from saved settings
+  try {
+    const settingsPath = path.join(app.getPath("userData"), "ascendarasettings.json");
+    if (fs.existsSync(settingsPath)) {
+      const saved = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+      if (saved.appBranch) branch = saved.appBranch;
+    }
+  } catch (e) {
+    console.error("Failed to read appBranch from settings:", e);
+  }
+
+  ipcMain.handle("is-experiment", () => branch === "experimental");
   ipcMain.handle("get-testing-version", () => testingVersion);
+  ipcMain.handle("get-branch", () => branch);
 
   // Switch build
   ipcMain.handle("switch-build", async (_, buildType) => {
-    if (buildType === "stable") {
-      experiment = false;
-    } else if (buildType === "experimental") {
-      experiment = true;
-    }
+    branch = buildType;
     return true;
   });
 
