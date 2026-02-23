@@ -11,6 +11,7 @@ let rpc = null;
 let rpcIsConnected = false;
 let rpcConnectionAttempts = 0;
 const MAX_RPC_ATTEMPTS = 3;
+let currentlyPlayingGame = null;
 
 /**
  * Destroy the Discord RPC connection
@@ -29,6 +30,7 @@ function destroyDiscordRPC() {
       rpc = null;
       rpcIsConnected = false;
       rpcConnectionAttempts = 0;
+      currentlyPlayingGame = null;
     }
     console.log("Discord RPC has been destroyed");
   }
@@ -63,19 +65,23 @@ function initializeDiscordRPC() {
   rpc.on("ready", () => {
     // Reset connection attempts on successful connection
     rpcConnectionAttempts = 0;
-    // Start with library state
-    rpc
-      .setActivity({
-        state: "Searching for games...",
-        largeImageKey: "ascendara",
-        largeImageText: "Ascendara",
-      })
-      .catch(() => {
-        // Ignore activity setting errors
-      });
-
-    console.log("Discord RPC is ready");
     rpcIsConnected = true;
+    console.log("Discord RPC is ready");
+
+    // Restore playing state if a game is running, otherwise show library state
+    if (currentlyPlayingGame) {
+      setPlayingActivity(currentlyPlayingGame);
+    } else {
+      rpc
+        .setActivity({
+          state: "Searching for games...",
+          largeImageKey: "ascendara",
+          largeImageText: "Ascendara",
+        })
+        .catch(() => {
+          // Ignore activity setting errors
+        });
+    }
   });
 
   rpc.on("error", error => {
@@ -114,6 +120,7 @@ function initializeDiscordRPC() {
  * Update Discord RPC to library state
  */
 function updateDiscordRPCToLibrary() {
+  currentlyPlayingGame = null;
   if (!rpc || !rpcIsConnected) return;
 
   // First disconnect any existing activity
@@ -144,6 +151,7 @@ function updateDiscordRPCToLibrary() {
  * @param {string} gameName - Name of the game being played
  */
 function setPlayingActivity(gameName) {
+  currentlyPlayingGame = gameName;
   if (!rpc || !rpcIsConnected) return;
 
   rpc
