@@ -29,7 +29,8 @@ import ctypes
 import atexit
 from pypresence import Presence
 import psutil
-
+import shutil
+import re
 
 if sys.platform == 'darwin':
     ascendara_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
@@ -53,6 +54,136 @@ logging.basicConfig(
 )
 
 CLIENT_ID = '1277379302945718356'
+
+def parse_linux_runner_args(args):
+    """
+    Parse --linux-* arguments passed by games.js on Linux.
+    Returns a dict with runner config, or None if not present.
+    """
+    config = {
+        "runner_type": None,
+        "runner_path": None,
+        "compat_data": None,
+        "steam_path": None,
+    }
+
+    i = 0
+    while i < len(args):
+        if args[i] == "--linux-runner-type" and i + 1 < len(args):
+            config["runner_type"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-runner-path" and i + 1 < len(args):
+            config["runner_path"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-compat-data" and i + 1 < len(args):
+            config["compat_data"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-steam-path" and i + 1 < len(args):
+            config["steam_path"] = args[i + 1]
+            i += 2
+        else:
+            i += 1
+
+    if config["runner_type"]:
+        return config
+    return None
+
+
+def sanitize_game_slug(name):
+    """Sanitize game name for use as a folder name."""
+    return re.sub(r'[^\w\s\-().]', '', name).replace(' ', '_')[:100]
+
+
+def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
+    """
+    Launch a Windows executable using Proton.
+    Sets up environment variables and calls: proton run game.exe
+    """
+    proton_dir = linux_config["runner_path"]
+    proton_script = os.path.join(proton_dir, "proton")
+
+    if not os.path.exists(proton_script):
+        logging.error(f"Proton script not found at: {proton_script}")
+        return None
+
+    os.chmod(proton_script, 0o755)
+
+    env = os.environ.copy()
+    env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
+
+    if linux_config.get("steam_path"):
+        env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = linux_config["steam_path"]
+
+    env.setdefault("SteamAppId", "0")
+    env.setdefault("SteamGameId", "0")
+
+    cmd = [proton_script, "run", exe_path]
+    if game_launch_cmd:
+        cmd.extend(game_launch_cmd.split())
+
+    game_dir = os.path.dirname(exe_path)
+
+    logging.info(f"[Proton] Command: {' '.join(cmd)}")
+    logging.info(f"[Proton] STEAM_COMPAT_DATA_PATH={linux_config['compat_data']}")
+    logging.info(f"[Proton] Working dir: {game_dir}")
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            env=env,
+            cwd=game_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logging.info(f"[Proton] Process started, PID: {process.pid}")
+        return process
+    except Exception as e:
+        logging.error(f"[Proton] Failed to launch: {e}", exc_info=True)
+        return None
+
+
+def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
+    """
+    Launch a Windows executable using system Wine with an isolated prefix.
+    """
+    wine_path = linux_config["runner_path"]
+
+    if not os.path.exists(wine_path) and not shutil.which(wine_path):
+        logging.error(f"Wine not found at: {wine_path}")
+        return None
+
+    prefix_path = os.path.join(linux_config["compat_data"], "pfx")
+    os.makedirs(prefix_path, exist_ok=True)
+
+    env = os.environ.copy()
+    env["WINEPREFIX"] = prefix_path
+    env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
+
+    if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
+        env["DISPLAY"] = ":0"
+
+    cmd = [wine_path, exe_path]
+    if game_launch_cmd:
+        cmd.extend(game_launch_cmd.split())
+
+    game_dir = os.path.dirname(exe_path)
+
+    logging.info(f"[Wine] Command: {' '.join(cmd)}")
+    logging.info(f"[Wine] WINEPREFIX={prefix_path}")
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            env=env,
+            cwd=game_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logging.info(f"[Wine] Process started, PID: {process.pid}")
+        return process
+    except Exception as e:
+        logging.error(f"[Wine] Failed to launch: {e}", exc_info=True)
+        return None
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
     logging.info(f"[ENTRY] _launch_crash_reporter_on_exit(error_code={error_code}, error_message={error_message})")
@@ -438,80 +569,74 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         logging.error(f"Error updating settings.json: {e}", exc_info=True)
 
     try:
-        # Determine if we need to use Wine
+        # Platform-aware launch logic
         is_windows_exe = exe_path.lower().endswith('.exe')
         current_platform = platform.system().lower()
-        use_wine = is_windows_exe and current_platform in ('darwin', 'linux')
-        logging.debug(f"Executable type: {'Windows' if is_windows_exe else 'Other'}, platform: {current_platform}, use_wine: {use_wine}")
-        
+
         if os.path.dirname(exe_path):
             os.chdir(os.path.dirname(exe_path))
             logging.debug(f"Changed working directory to {os.path.dirname(exe_path)}")
-        
-        def launch_with_wine_dxvk(exe_path, wine_prefix=None, wine_bin="wine", extra_args=None):
-            env = os.environ.copy()
-            if wine_prefix:
-                env["WINEPREFIX"] = wine_prefix
-            env["DXVK_LOG_LEVEL"] = "info"
-            # On Linux, try to use the system DISPLAY/WAYLAND_DISPLAY if not set
-            if platform.system().lower() == 'linux':
-                if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
-                    env["DISPLAY"] = ":0"
-            cmd = [wine_bin, exe_path]
-            if extra_args:
-                cmd += shlex.split(extra_args)
-            logging.info(f"Launching with Wine binary: {wine_bin}, WINEPREFIX: {env.get('WINEPREFIX', 'default')}, cmd: {cmd}")
-            return subprocess.Popen(cmd, env=env)
 
-        def launch_with_proton(exe_path, proton_bin, steam_compat_data_path, extra_args=None):
-            env = os.environ.copy()
-            env["STEAM_COMPAT_DATA_PATH"] = steam_compat_data_path
-            env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = os.path.expanduser("~/.steam/steam")
-            env["DXVK_LOG_LEVEL"] = "info"
-            if platform.system().lower() == 'linux':
-                if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
-                    env["DISPLAY"] = ":0"
-            cmd = [proton_bin, "run", exe_path]
-            if extra_args:
-                cmd += shlex.split(extra_args)
-            logging.info(f"Launching with Proton binary: {proton_bin}, STEAM_COMPAT_DATA_PATH: {steam_compat_data_path}, cmd: {cmd}")
-            return subprocess.Popen(cmd, env=env)
+        # Parse Linux runner arguments (passed by Electron's games.js)
+        linux_runner_config = parse_linux_runner_args(sys.argv)
 
-        # Read Wine/Proton config from settings
-        default_wine_prefix = os.path.expanduser("~/.wine")
-        wine_bin = "wine"
-        use_proton = False
-        proton_bin = None
-        proton_data_path = None
-
-        try:
-            with open(settings_file, "r", encoding="utf-8") as f:
-                _settings = json.load(f)
-            wine_cfg = _settings.get("wine", {})
-            wine_bin = wine_cfg.get("wineBin", "wine") or "wine"
-            default_wine_prefix = wine_cfg.get("winePrefix", os.path.expanduser("~/.wine")) or os.path.expanduser("~/.wine")
-            proton_cfg = _settings.get("proton", {})
-            if proton_cfg.get("enabled") and proton_cfg.get("protonBin"):
-                use_proton = True
-                proton_bin = proton_cfg["protonBin"]
-                proton_data_path = proton_cfg.get("steamCompatDataPath", os.path.expanduser("~/.proton"))
-            logging.info(f"Wine config: bin={wine_bin}, prefix={default_wine_prefix}, use_proton={use_proton}")
-        except Exception as cfg_err:
-            logging.warning(f"Could not read Wine/Proton config from settings, using defaults: {cfg_err}")
-
-        if use_wine:
-            if use_proton and current_platform == 'linux':
-                logging.info(f"Using Proton to launch Windows executable: {exe_path}")
-                try:
-                    process = launch_with_proton(exe_path, proton_bin, proton_data_path, extra_args=game_launch_cmd)
-                except Exception as proton_err:
-                    logging.error(f"Proton launch failed, falling back to Wine: {proton_err}", exc_info=True)
-                    process = launch_with_wine_dxvk(exe_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin, extra_args=game_launch_cmd)
+        if current_platform == 'linux' and is_windows_exe and linux_runner_config:
+            # Linux with Proton or Wine (from Electron config)
+            if linux_runner_config["runner_type"] == "proton":
+                logging.info(f"[Launch] Using Proton: {linux_runner_config['runner_path']}")
+                process = launch_with_proton(exe_path, linux_runner_config, game_launch_cmd)
+            elif linux_runner_config["runner_type"] == "wine":
+                logging.info(f"[Launch] Using Wine (isolated): {linux_runner_config['runner_path']}")
+                process = launch_with_wine_isolated(exe_path, linux_runner_config, game_launch_cmd)
             else:
-                logging.info(f"Using Wine + DXVK to launch Windows executable: {exe_path}")
-                process = launch_with_wine_dxvk(exe_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin, extra_args=game_launch_cmd)
-        else:
-            # Regular game execution (no wrapping)
+                logging.error(f"[Launch] Unknown runner type: {linux_runner_config['runner_type']}")
+                process = None
+
+            if process is None:
+                error_msg = f"Failed to launch with {linux_runner_config['runner_type']}"
+                logging.error(error_msg)
+                if not is_custom_game and json_file_path:
+                    with open(json_file_path, "r", encoding='utf-8') as f:
+                        data = json.load(f)
+                    data["runError"] = error_msg
+                    with open(json_file_path, "w", encoding='utf-8') as f:
+                        json.dump(data, f, indent=4)
+                return
+
+        elif current_platform in ('linux', 'darwin') and is_windows_exe and not linux_runner_config:
+            # Fallback: basic Wine (no Proton config from Electron)
+            logging.warning("[Launch] No runner config from Electron, falling back to system Wine")
+            wine_bin = shutil.which("wine")
+            if wine_bin:
+                fallback_compat = os.path.join(
+                    os.path.expanduser("~/.ascendara/compatdata"),
+                    sanitize_game_slug(game_name or "unknown")
+                )
+                os.makedirs(fallback_compat, exist_ok=True)
+                fallback_config = {
+                    "runner_type": "wine",
+                    "runner_path": wine_bin,
+                    "compat_data": fallback_compat,
+                }
+                process = launch_with_wine_isolated(exe_path, fallback_config, game_launch_cmd)
+            else:
+                logging.error("[Launch] No Wine found on system!")
+                process = None
+                return
+
+        elif current_platform in ('linux', 'darwin') and not is_windows_exe:
+            # Native Linux/macOS executable
+            logging.info(f"[Launch] Native executable: {exe_path}")
+            os.chmod(exe_path, 0o755)
+            cmd = exe_path
+            if game_launch_cmd:
+                cmd = f'"{exe_path}" {game_launch_cmd}'
+            process = subprocess.Popen(
+                cmd, shell=True if game_launch_cmd else False,
+                cwd=os.path.dirname(exe_path)
+            )
+
+        elif current_platform == 'windows':
             logging.info(f"Launching executable directly: {exe_path}")
             
             launch_cmd = None
@@ -521,8 +646,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 launch_cmd = f'"{exe_path}" {game_launch_cmd}'
                 logging.info(f"Resolved launch command: {launch_cmd}")
             
-            # Check if admin launch is requested and we're on Windows
-            if admin and platform.system().lower() == 'windows':
+            # Check if admin launch is requested
+            if admin:
                 logging.info(f"Launching with admin privileges: {exe_path}")
                 try:
                     # Use ShellExecute with 'runas' verb to prompt for admin
@@ -586,6 +711,9 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                             raise
                     else:
                         raise
+        else:
+            logging.error(f"Unsupported platform: {current_platform}")
+            return
 
         start_time = time.time()
         last_update = start_time

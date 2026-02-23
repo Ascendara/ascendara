@@ -2321,6 +2321,7 @@
     "chooseWhenToUpdateAscendaraYourself": "自行选择何时更新 Ascendara。当有可用更新时您会收到通知，但它们不会自动安装。",
     "chooseYourTheme": "选择您的主题",
     "clickTheExtensionIcon": "单击扩展图标并在安装时启用下载处理程序",
+    "compatibilityLayer": "兼容层",
     "continue": "继续",
     "continueWithoutSharing": "继续而不共享",
     "darkThemes": "黑暗主题",
@@ -2376,6 +2377,8 @@
     "manualUpdates": "手动更新",
     "neverAutomaticallyUpdate": "从不自动更新",
     "next": "下一个",
+    "noRunnersDesc": "你将无法启动 Windows 游戏。请在下方安装 Proton-GE（推荐）或 Wine。",
+    "noRunnersTitle": "未检测到兼容工具",
     "notEnoughSpaceWarning": "哇哦！您所选驱动器上的可用空间少于 40 GB。考虑清理一些空间或选择不同的驱动器。",
     "noticeAppIsFree": {
       "point1": "Ascendara 上与游戏相关的下载和所有内容将始终免费",
@@ -2391,6 +2394,7 @@
     "personalizeYourExperience": "使用适合您风格的主题来个性化您的体验",
     "pleaseWaitAndRespondToAdminPrompts": "请等待并响应出现的任何管理员提示。不要关闭应用程序。",
     "privacyPolicy": "隐私政策",
+    "protonDetected": "检测到 Proton - 可以开始游戏！",
     "pythonIsRequired": "需要Python",
     "pythonMustBeInstalled": "您的计算机上必须安装 Python 才能在此操作系统上运行 Ascendara 的核心工具",
     "referral": {
@@ -2439,6 +2443,7 @@
     "welcomeTo": "欢迎来到",
     "welcomeToAscendaraDescription": "您即将准备好开始使用 Ascendara。我们将一起完成入职流程，然后设置您的游戏索引，但首先请阅读服务条款和隐私政策。",
     "whenYouClickADownloadLink": "当您开始从已知提供商处下载时，扩展程序将自动停止浏览器中的下载并在 Ascendara 中为您启动下载",
+    "wineDetected": "检测到 Wine",
     "wineIsRequired": "玩酒",
     "wineMustBeInstalled": "需要在计算机上安装和设置 Wine、DXVK 和其他工具才能运行 Window 游戏。不过不用担心，Ascendara 可以为您安装和设置一切",
     "youCanAddMoreLater": "您可以稍后在首选项中添加更多目录",

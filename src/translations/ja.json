@@ -2334,6 +2334,7 @@
     "chooseWhenToUpdateAscendaraYourself": "Ascendara をいつ更新するかを自分で選択してください。アップデートが利用可能になると通知が届きますが、自動的にはインストールされません。",
     "chooseYourTheme": "テーマを選択してください",
     "clickTheExtensionIcon": "拡張機能アイコンをクリックして、インストール時にダウンロード ハンドラーを有効にします。",
+    "compatibilityLayer": "互換レイヤー",
     "continue": "続く",
     "continueWithoutSharing": "共有せずに続行する",
     "darkThemes": "ダークテーマ",
@@ -2389,6 +2390,8 @@
     "manualUpdates": "手動アップデート",
     "neverAutomaticallyUpdate": "決して自動更新しない",
     "next": "次",
+    "noRunnersDesc": "Windows ゲームを起動できません。以下から Proton-GE（推奨）または Wine をインストールしてください。",
+    "noRunnersTitle": "互換ツールが検出されません",
     "notEnoughSpaceWarning": "うわー！選択したドライブの空き容量が 40 GB 未満です。スペースを空けるか、別のドライブを選択することを検討してください。",
     "noticeAppIsFree": {
       "point1": "Ascendara のダウンロードとゲームに関連するすべては常に無料です",
@@ -2404,6 +2407,7 @@
     "personalizeYourExperience": "自分のスタイルに合ったテーマで体験をパーソナライズ",
     "pleaseWaitAndRespondToAdminPrompts": "待ってから、表示される管理者のプロンプトに応答してください。アプリケーションを閉じないでください。",
     "privacyPolicy": "プライバシーポリシー",
+    "protonDetected": "Proton が検出されました - プレイ可能です！",
     "pythonIsRequired": "Pythonは必須です",
     "pythonMustBeInstalled": "このオペレーティング システムで Ascendara のコア ツールを実行するには、Python をコンピュータにインストールする必要があります",
     "referral": {
@@ -2452,6 +2456,7 @@
     "welcomeTo": "へようこそ",
     "welcomeToAscendaraDescription": "Ascendara を使い始める準備がほぼ整いました。オンボーディング プロセスを一緒に進めてから、ゲーム インデックスを設定しますが、その前に利用規約とプライバシー ポリシーをお読みください。",
     "whenYouClickADownloadLink": "既知のプロバイダーからダウンロードを開始すると、拡張機能はブラウザーでのダウンロードを自動的に停止し、Ascendara でダウンロードを開始します。",
+    "wineDetected": "Wine が検出されました",
     "wineIsRequired": "ワインと遊ぶ",
     "wineMustBeInstalled": "Windows ゲームを実行するには、Wine、DXVK、およびその他のツールをコンピューターにインストールしてセットアップする必要があります。ただし、心配しないでください。Ascendara がすべてをインストールして設定できます。",
     "youCanAddMoreLater": "後で環境設定でさらにディレクトリを追加できます",

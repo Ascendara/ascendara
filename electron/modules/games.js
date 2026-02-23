@@ -9,7 +9,7 @@ const os = require("os");
 const axios = require("axios");
 const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, app, BrowserWindow } = require("electron");
-const { isDev, isWindows, appDirectory } = require("./config");
+const { isDev, isWindows, isLinux, appDirectory, getPythonPath } = require("./config");
 const { sanitizeText, getExtensionFromMimeType, shouldLogError } = require("./utils");
 const { getSettingsManager } = require("./settings");
 const {
@@ -20,6 +20,9 @@ const {
 const { hideWindow, showWindow } = require("./window");
 
 const steamgrid = require("./steamgrid");
+
+// Load proton module only on linux
+const proton = isLinux ? require("./proton") : null;
 
 const runGameProcesses = new Map();
 
@@ -357,6 +360,7 @@ function registerGameHandlers() {
           throw new Error("Game is already running");
         }
 
+        // Resolve Handler Path
         let executablePath;
         let handlerScript;
 
@@ -373,6 +377,7 @@ function registerGameHandlers() {
           throw new Error("Game handler not found");
         }
 
+        // Build Handler Arguments
         const gameHandlerArgs = [
           executable,
           isCustom.toString(),
@@ -381,6 +386,61 @@ function registerGameHandlers() {
           ...(launchWithTrainer ? ["--trainer"] : []),
           ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
         ];
+
+        // Linux Proton/Wine: inject runner args
+        if (isLinux && proton && proton.isWindowsExecutable(executable)) {
+          // Read per-game runner override from game config if available
+          let gameRunnerOverride = null;
+          try {
+            if (!isCustom) {
+              const gameInfoPath = path.join(
+                gameDirectory,
+                `${sanitizeText(game)}.ascendara.json`
+              );
+              if (fs.existsSync(gameInfoPath)) {
+                const gi = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
+                gameRunnerOverride = gi.linuxRunner || null;
+              }
+            }
+          } catch (e) {
+            console.warn("[Games] Could not read per-game runner override:", e.message);
+          }
+
+          const launchConfig = await proton.buildLaunchConfig(
+            game,
+            executable,
+            gameRunnerOverride
+          );
+
+          if (launchConfig.error) {
+            console.error("[Games] No runner available:", launchConfig.error);
+            event.sender.send("game-launch-error", {
+              game,
+              error: launchConfig.error,
+            });
+            return false;
+          }
+
+          // Append Linux-specific arguments for the GameHandler
+          gameHandlerArgs.push(
+            "--linux-runner-type",
+            launchConfig.runner.type,
+            "--linux-runner-path",
+            launchConfig.runner.type === "proton"
+              ? launchConfig.runner.path
+              : launchConfig.runner.path,
+            "--linux-compat-data",
+            launchConfig.compatDataPath,
+            "--linux-steam-path",
+            proton.findSteamInstallPath()
+          );
+
+          console.log(
+            `[Games] Linux launch: ${launchConfig.runner.type} (${launchConfig.runner.name})`
+          );
+        }
+
+        // Build final spawn arguments
         const spawnArgs = isWindows
           ? gameHandlerArgs
           : handlerScript
@@ -874,10 +934,16 @@ function registerGameHandlers() {
   // Is Steam running
   ipcMain.handle("is-steam-running", () => {
     try {
-      const processes = execSync('tasklist /fi "imagename eq steam.exe" /fo csv /nh', {
-        encoding: "utf8",
-      });
-      return processes.toLowerCase().includes("steam.exe");
+      if (isWindows) {
+        const processes = execSync('tasklist /fi "imagename eq steam.exe" /fo csv /nh', {
+          encoding: "utf8",
+        });
+        return processes.toLowerCase().includes("steam.exe");
+      } else {
+        // Linux/macOS: check with pgrep
+        const result = execSync("pgrep -x steam", { encoding: "utf8" });
+        return result.trim().length > 0;
+      }
     } catch (error) {
       return false;
     }

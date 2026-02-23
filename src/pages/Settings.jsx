@@ -54,6 +54,8 @@ import {
   SquareTerminal,
   Package,
   AlertTriangle,
+  FolderSync,
+  FileCheck2,
   CpuIcon,
   CornerDownRight,
   Database,
@@ -258,6 +260,11 @@ const ColorPickerInput = ({ colorKey, label, value, onColorChange }) => {
 };
 
 function Settings() {
+  const [currentBranch, setCurrentBranch] = useState("main");
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+  const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
+  const [showBranchDialog, setShowBranchDialog] = useState(false);
+  const [pendingBranch, setPendingBranch] = useState("");
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
   const { settings, setSettings, setSettingsLocal } = useSettings();
@@ -290,12 +297,12 @@ function Settings() {
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
   const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
   const [controllerConnected, setControllerConnected] = useState(false);
-  const [showBranchDialog, setShowBranchDialog] = useState(false);
-  const [pendingBranch, setPendingBranch] = useState(null);
-  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
-  const [branchSwitchProgress, setBranchSwitchProgress] = useState(0);
-  const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
-  const [currentBranch, setCurrentBranch] = useState("live");
+  const [runners, setRunners] = useState([]);
+  const [selectedRunner, setSelectedRunner] = useState("auto");
+  const [isDownloadingProton, setIsDownloadingProton] = useState(false);
+  const [protonGEInfo, setProtonGEInfo] = useState(null);
+  const [showProtonConfirm, setShowProtonConfirm] = useState(false);
+  const [protonUpdateStatus, setProtonUpdateStatus] = useState(null); // null | "checking" | "up-to-date" | "update-available"
   // Default custom colors for merging with saved themes (handles missing new properties)
   const defaultCustomColors = {
     background: "255 255 255",
@@ -480,7 +487,20 @@ function Settings() {
       const isWindows = await window.electron.isOnWindows();
       console.log("Is on Windows:", isWindows);
       setIsOnWindows(isWindows);
-      setIsOnLinux(!isWindows && navigator.userAgent.toLowerCase().includes("linux"));
+      const linux = !isWindows && navigator.userAgent.toLowerCase().includes("linux");
+      setIsOnLinux(linux);
+
+      // Load Linux runners if on Linux
+      if (linux) {
+        try {
+          const detectedRunners = await window.electron.getRunners();
+          setRunners(detectedRunners);
+          const currentSettings = await window.electron.getSettings();
+          setSelectedRunner(currentSettings.linuxRunner || "auto");
+        } catch (e) {
+          console.error("Failed to load runners:", e);
+        }
+      }
     };
     checkPlatform();
   }, []);
@@ -2389,355 +2409,340 @@ function Settings() {
               </div>
             </Card>
 
-            {/* Wine / Proton Card */}
-            <Card
-              id="wine-proton"
-              className={`border-border ${!isOnLinux ? "opacity-60" : ""}`}
-            >
-              <div className="p-6">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-primary/10 p-2">
-                    <Wine className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-primary">
-                      {t("settings.wineProton.title")}
+            {/* ── Linux Compatibility Layer ── */}
+            {isOnLinux && (
+              <>
+                <Card className="border-border p-6">
+                  <div className="space-y-6">
+                    <h3 className="mb-2 text-xl font-semibold text-primary">
+                      {t("welcome.compatibilityLayer")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      {t("settings.wineProton.description")}
+                      Configure how Windows games are launched on Linux using Proton or
+                      Wine.
                     </p>
-                  </div>
-                  {!isOnLinux && (
-                    <div className="ml-auto flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1">
-                      <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">
-                        {t("settings.wineProton.linuxOnly")}
-                      </span>
-                    </div>
-                  )}
-                </div>
 
-                <fieldset disabled={!isOnLinux} className="space-y-6">
-                  {/* Wine section */}
-                  <div className="space-y-4 rounded-lg border border-border/60 p-4">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="h-4 w-4 text-primary" />
-                      <h4 className="font-medium text-foreground">
-                        {t("settings.wineProton.wineSection")}
-                      </h4>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="wine-bin">
-                        {t("settings.wineProton.wineBinary")}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.wineProton.wineBinaryDescription")}{" "}
-                        <code className="rounded bg-muted px-1 text-xs">
-                          {t("settings.wineProton.wineBinaryPlaceholder")}
-                        </code>{" "}
-                        on your PATH.
-                      </p>
-                      <div className="flex gap-2">
-                        <Input
-                          id="wine-bin"
-                          placeholder={t("settings.wineProton.wineBinaryPlaceholder")}
-                          value={settings.wine?.wineBin || ""}
-                          onChange={e =>
-                            setSettingsLocal(prev => ({
-                              ...prev,
-                              wine: { ...(prev.wine || {}), wineBin: e.target.value },
-                            }))
-                          }
-                          onBlur={e => {
-                            const updatedWine = {
-                              ...(settings.wine || {}),
-                              wineBin: e.target.value || "wine",
-                            };
-                            window.electron
-                              .updateSetting("wine", updatedWine)
-                              .then(success => {
-                                if (success)
-                                  setSettingsLocal(prev => ({
-                                    ...prev,
-                                    wine: updatedWine,
-                                  }));
-                              });
-                          }}
-                          className="flex-1 font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            const file = await window.electron.openFileDialog?.();
-                            if (file) {
-                              const updatedWine = {
-                                ...(settings.wine || {}),
-                                wineBin: file,
-                              };
-                              window.electron
-                                .updateSetting("wine", updatedWine)
-                                .then(success => {
-                                  if (success)
-                                    setSettingsLocal(prev => ({
-                                      ...prev,
-                                      wine: updatedWine,
-                                    }));
-                                });
-                            }
-                          }}
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="wine-prefix">
-                        {t("settings.wineProton.winePrefix")}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.wineProton.winePrefixDescription")}{" "}
-                        <code className="rounded bg-muted px-1 text-xs">
-                          {t("settings.wineProton.winePrefixPlaceholder")}
-                        </code>
-                        .
-                      </p>
-                      <div className="flex gap-2">
-                        <Input
-                          id="wine-prefix"
-                          placeholder={t("settings.wineProton.winePrefixPlaceholder")}
-                          value={settings.wine?.winePrefix || ""}
-                          onChange={e =>
-                            setSettingsLocal(prev => ({
-                              ...prev,
-                              wine: { ...(prev.wine || {}), winePrefix: e.target.value },
-                            }))
-                          }
-                          onBlur={e => {
-                            const updatedWine = {
-                              ...(settings.wine || {}),
-                              winePrefix: e.target.value,
-                            };
-                            window.electron
-                              .updateSetting("wine", updatedWine)
-                              .then(success => {
-                                if (success)
-                                  setSettingsLocal(prev => ({
-                                    ...prev,
-                                    wine: updatedWine,
-                                  }));
-                              });
-                          }}
-                          className="flex-1 font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            const dir = await window.electron.openDirectoryDialog();
-                            if (dir) {
-                              const updatedWine = {
-                                ...(settings.wine || {}),
-                                winePrefix: dir,
-                              };
-                              window.electron
-                                .updateSetting("wine", updatedWine)
-                                .then(success => {
-                                  if (success)
-                                    setSettingsLocal(prev => ({
-                                      ...prev,
-                                      wine: updatedWine,
-                                    }));
-                                });
-                            }
-                          }}
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Proton section */}
-                  <div className="space-y-4 rounded-lg border border-border/60 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Terminal className="h-4 w-4 text-primary" />
-                        <h4 className="font-medium text-foreground">
-                          {t("settings.wineProton.protonSection")}
-                        </h4>
-                        <Badge variant="secondary" className="text-xs">
-                          <FlaskConical className="mr-1 h-3 w-3" />
-                          {t("settings.wineProton.protonExperimental")}
-                        </Badge>
-                      </div>
-                      <Switch
-                        checked={settings.proton?.enabled || false}
-                        disabled={!isOnLinux}
-                        onCheckedChange={value => {
-                          const updatedProton = {
-                            ...(settings.proton || {}),
-                            enabled: value,
-                          };
-                          window.electron
-                            .updateSetting("proton", updatedProton)
-                            .then(success => {
-                              if (success)
-                                setSettingsLocal(prev => ({
-                                  ...prev,
-                                  proton: updatedProton,
-                                }));
-                            });
+                    {/* Runner Selection */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium">Default Runner</label>
+                      <select
+                        value={selectedRunner}
+                        onChange={async e => {
+                          setSelectedRunner(e.target.value);
+                          await window.electron.updateSetting(
+                            "linuxRunner",
+                            e.target.value
+                          );
                         }}
-                      />
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="auto">Auto-detect (Recommended)</option>
+                        {runners.map(r => (
+                          <option key={r.path} value={r.path}>
+                            {r.name} (
+                            {r.source === "steam"
+                              ? "Steam"
+                              : r.source === "custom"
+                                ? "Custom"
+                                : "System"}
+                            ){r.version ? ` — v${r.version}` : ""}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.wineProton.protonDescription")}
-                    </p>
 
-                    <div
-                      className={`space-y-4 ${!settings.proton?.enabled ? "pointer-events-none opacity-50" : ""}`}
-                    >
-                      <div className="space-y-2">
-                        <Label htmlFor="proton-bin">
-                          {t("settings.wineProton.protonBinary")}
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          {t("settings.wineProton.protonBinaryDescription")} (e.g.{" "}
-                          <code className="rounded bg-muted px-1 text-xs">
-                            ~/.steam/steam/steamapps/common/Proton 9.0/proton
-                          </code>
-                          ).
+                    {/* Detected Runners List */}
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Detected Runners</h4>
+                      {runners.length === 0 ? (
+                        <p className="text-sm text-yellow-500">
+                          No Proton or Wine installation detected. Download Proton-GE
+                          below.
                         </p>
-                        <div className="flex gap-2">
-                          <Input
-                            id="proton-bin"
-                            placeholder={t("settings.wineProton.protonBinaryPlaceholder")}
-                            value={settings.proton?.protonBin || ""}
-                            onChange={e =>
-                              setSettingsLocal(prev => ({
-                                ...prev,
-                                proton: {
-                                  ...(prev.proton || {}),
-                                  protonBin: e.target.value,
-                                },
-                              }))
+                      ) : (
+                        <ul className="space-y-1">
+                          {runners.map(r => (
+                            <li
+                              key={r.path}
+                              className="flex items-center gap-2 text-sm text-muted-foreground"
+                            >
+                              <span
+                                className={`h-2 w-2 rounded-full ${
+                                  r.source === "steam"
+                                    ? "bg-blue-500"
+                                    : r.source === "custom"
+                                      ? "bg-purple-500"
+                                      : "bg-green-500"
+                                }`}
+                              />
+                              <span className="text-foreground">{r.name}</span>
+                              <span>({r.source})</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-3">
+                      {/* Download / Update Proton-GE */}
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const info = await window.electron.getProtonGEInfo();
+                            if (!info.success) {
+                              console.error("Failed to get Proton-GE info:", info.error);
+                              return;
                             }
-                            onBlur={e => {
-                              const updatedProton = {
-                                ...(settings.proton || {}),
-                                protonBin: e.target.value,
-                              };
-                              window.electron
-                                .updateSetting("proton", updatedProton)
-                                .then(success => {
-                                  if (success)
-                                    setSettingsLocal(prev => ({
-                                      ...prev,
-                                      proton: updatedProton,
-                                    }));
-                                });
-                            }}
-                            className="flex-1 font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            onClick={async () => {
-                              const file = await window.electron.openFileDialog?.();
-                              if (file) {
-                                const updatedProton = {
-                                  ...(settings.proton || {}),
-                                  protonBin: file,
-                                };
-                                window.electron
-                                  .updateSetting("proton", updatedProton)
-                                  .then(success => {
-                                    if (success)
-                                      setSettingsLocal(prev => ({
-                                        ...prev,
-                                        proton: updatedProton,
-                                      }));
-                                  });
-                              }
-                            }}
-                          >
-                            <FolderOpen className="h-4 w-4" />
-                          </Button>
-                        </div>
+                            if (info.alreadyInstalled) {
+                              const updated = await window.electron.getRunners();
+                              setRunners(updated);
+                              return;
+                            }
+                            setProtonGEInfo(info);
+                            setShowProtonConfirm(true);
+                          } catch (e) {
+                            console.error("Failed to get Proton-GE info:", e);
+                          }
+                        }}
+                        disabled={isDownloadingProton}
+                        className="gap-2"
+                      >
+                        {isDownloadingProton ? (
+                          <>
+                            <Loader className="h-4 w-4 animate-spin" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4" />
+                            {runners.some(r => r.name.toLowerCase().includes("ge-proton"))
+                              ? "Update Proton-GE"
+                              : "Download Proton-GE"}
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Check for Updates */}
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          setProtonUpdateStatus("checking");
+                          try {
+                            const info = await window.electron.checkProtonGEUpdate();
+                            if (!info.success) {
+                              setProtonUpdateStatus(null);
+                              return;
+                            }
+                            if (info.alreadyInstalled) {
+                              setProtonUpdateStatus("up-to-date");
+                            } else if (info.updateAvailable) {
+                              setProtonUpdateStatus("update-available");
+                              setProtonGEInfo(info);
+                            } else {
+                              setProtonUpdateStatus(null);
+                            }
+                          } catch (e) {
+                            console.error("Failed to check for updates:", e);
+                            setProtonUpdateStatus(null);
+                          }
+                        }}
+                        disabled={protonUpdateStatus === "checking"}
+                        className="gap-2"
+                      >
+                        {protonUpdateStatus === "checking" ? (
+                          <>
+                            <Loader className="h-4 w-4 animate-spin" />
+                            Checking...
+                          </>
+                        ) : (
+                          <>
+                            <FolderSync className="h-4 w-4" />
+                            Check for Updates
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          const result = await window.electron.selectCustomRunner();
+                          if (result.success) {
+                            setSelectedRunner(result.path);
+                            await window.electron.updateSetting(
+                              "linuxRunner",
+                              result.path
+                            );
+                            const updated = await window.electron.getRunners();
+                            setRunners(updated);
+                          } else if (result.error) {
+                            console.error("Custom runner error:", result.error);
+                          }
+                        }}
+                        className="gap-2"
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                        Select Custom Runner
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          const updated = await window.electron.getRunners();
+                          setRunners(updated);
+                        }}
+                        className="gap-2"
+                      >
+                        <FolderSync className="h-4 w-4" />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    {/* Update Status Message */}
+                    {protonUpdateStatus === "up-to-date" && (
+                      <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                        <FileCheck2 className="h-4 w-4 text-green-500" />
+                        <p className="text-sm text-green-500">Proton-GE is up to date!</p>
                       </div>
+                    )}
 
-                      <div className="space-y-2">
-                        <Label htmlFor="proton-compat">Steam Compat Data Path</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Directory for Proton compatibility data (
-                          <code className="rounded bg-muted px-1 text-xs">
-                            STEAM_COMPAT_DATA_PATH
-                          </code>
-                          ). Leave empty to use{" "}
-                          <code className="rounded bg-muted px-1 text-xs">~/.proton</code>
-                          .
-                        </p>
-                        <div className="flex gap-2">
-                          <Input
-                            id="proton-compat"
-                            placeholder="~/.proton"
-                            value={settings.proton?.steamCompatDataPath || ""}
-                            onChange={e =>
-                              setSettingsLocal(prev => ({
-                                ...prev,
-                                proton: {
-                                  ...(prev.proton || {}),
-                                  steamCompatDataPath: e.target.value,
-                                },
-                              }))
-                            }
-                            onBlur={e => {
-                              const updatedProton = {
-                                ...(settings.proton || {}),
-                                steamCompatDataPath: e.target.value,
-                              };
-                              window.electron
-                                .updateSetting("proton", updatedProton)
-                                .then(success => {
-                                  if (success)
-                                    setSettingsLocal(prev => ({
-                                      ...prev,
-                                      proton: updatedProton,
-                                    }));
-                                });
-                            }}
-                            className="flex-1 font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            onClick={async () => {
-                              const dir = await window.electron.openDirectoryDialog();
-                              if (dir) {
-                                const updatedProton = {
-                                  ...(settings.proton || {}),
-                                  steamCompatDataPath: dir,
-                                };
-                                window.electron
-                                  .updateSetting("proton", updatedProton)
-                                  .then(success => {
-                                    if (success)
-                                      setSettingsLocal(prev => ({
-                                        ...prev,
-                                        proton: updatedProton,
-                                      }));
-                                  });
-                              }
-                            }}
-                          >
-                            <FolderOpen className="h-4 w-4" />
-                          </Button>
+                    {protonUpdateStatus === "update-available" && protonGEInfo && (
+                      <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                          <p className="text-sm text-yellow-500">
+                            Update available:{" "}
+                            <strong>{protonGEInfo.latestVersion}</strong>
+                            {protonGEInfo.installedVersions.length > 0 && (
+                              <span className="text-yellow-500/70">
+                                {" "}
+                                (current: {protonGEInfo.installedVersions[0]})
+                              </span>
+                            )}
+                          </p>
                         </div>
+                        <Button
+                          size="sm"
+                          onClick={() => setShowProtonConfirm(true)}
+                          className="gap-1"
+                        >
+                          <Download className="h-3 w-3" />
+                          Update
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Info Box */}
+                    <div className="rounded-lg border border-border bg-muted/50 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Proton</strong> (recommended) provides the best Windows
+                        game compatibility with automatic DXVK, VKD3D-Proton, and FSR
+                        support. <strong>Wine</strong> works but may require manual
+                        configuration for DirectX games.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+                {/* Proton-GE Download Confirmation Dialog */}
+                {showProtonConfirm && protonGEInfo && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
+                      <h3 className="text-lg font-semibold">
+                        {protonGEInfo.updateAvailable
+                          ? "Update Proton-GE"
+                          : "Download Proton-GE"}
+                      </h3>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <p>
+                          {protonGEInfo.updateAvailable ? (
+                            <>
+                              A new version of Proton-GE is available:{" "}
+                              <strong className="text-foreground">
+                                {protonGEInfo.name}
+                              </strong>
+                              {protonGEInfo.installedVersions.length > 0 && (
+                                <span>
+                                  {" "}
+                                  (replacing {protonGEInfo.installedVersions.join(", ")})
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              You are about to download{" "}
+                              <strong className="text-foreground">
+                                {protonGEInfo.name}
+                              </strong>
+                              .
+                            </>
+                          )}
+                        </p>
+                        <p>
+                          File:{" "}
+                          <code className="rounded bg-muted px-1">
+                            {protonGEInfo.fileName}
+                          </code>
+                        </p>
+                        <p>
+                          Size:{" "}
+                          <strong className="text-foreground">
+                            {protonGEInfo.sizeFormatted}
+                          </strong>{" "}
+                          (approximately{" "}
+                          {(protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1)} GB after
+                          extraction)
+                        </p>
+                        <p className="text-muted-foreground">
+                          Proton-GE is a custom build of Proton with additional patches
+                          for better game compatibility. It will be installed to{" "}
+                          <code className="rounded bg-muted px-1">
+                            ~/.ascendara/runners/
+                          </code>
+                        </p>
+                      </div>
+                      <div className="flex justify-end gap-3 pt-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowProtonConfirm(false);
+                            setProtonGEInfo(null);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            setShowProtonConfirm(false);
+                            setProtonUpdateStatus(null);
+                            setIsDownloadingProton(true);
+                            try {
+                              const result = await window.electron.downloadProtonGE();
+                              if (result.success) {
+                                const updated = await window.electron.getRunners();
+                                setRunners(updated);
+                                if (result.path) {
+                                  setSelectedRunner(result.path);
+                                }
+                              }
+                            } catch (e) {
+                              console.error("Failed to download Proton-GE:", e);
+                            }
+                            setIsDownloadingProton(false);
+                            setProtonGEInfo(null);
+                          }}
+                          className="gap-2"
+                        >
+                          <Download className="h-4 w-4" />
+                          {protonGEInfo.updateAvailable
+                            ? `Update (${protonGEInfo.sizeFormatted})`
+                            : `Download (${protonGEInfo.sizeFormatted})`}
+                        </Button>
                       </div>
                     </div>
                   </div>
-                </fieldset>
-              </div>
-            </Card>
+                )}
+              </>
+            )}
 
             {/* Achievement Watcher Directories Card */}
             <Card className="border-border p-6">
