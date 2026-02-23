@@ -2260,7 +2260,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                             }
                           }}
                           disabled={isDownloadingProton}
-                          className="w-full"
+                          className="w-full text-secondary"
                         >
                           {isDownloadingProton ? (
                             <Loader className="mr-2 h-4 w-4 animate-spin" />
@@ -2309,7 +2309,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       <Button
                         onClick={() => handleNext()}
                         size="lg"
-                        className="px-12 py-6 text-lg"
+                        className="px-12 py-6 text-lg text-secondary"
                         variant={runnersList.length > 0 ? "default" : "ghost"}
                       >
                         {runnersList.length > 0
