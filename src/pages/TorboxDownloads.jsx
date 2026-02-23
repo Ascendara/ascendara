@@ -578,9 +578,9 @@ const TorboxDownloads = () => {
                           : userInfo.plan === 1
                             ? t("torbox.plan_essential")
                             : userInfo.plan === 2
-                              ? t("torbox.plan_standard")
+                              ? t("torbox.plan_pro")
                               : userInfo.plan === 3
-                                ? t("torbox.plan_pro")
+                                ? t("torbox.plan_standard")
                                 : "Unknown"}
                       </Badge>
                       {userInfo.premium_expires_at && userInfo.plan > 0 && (
