@@ -1873,6 +1873,78 @@ export const denyFriendRequest = async requestId => {
   }
 };
 
+// ============================================================================
+// USER DATA & STATUS CACHE - Shared across friend/conversation/messaging functions
+// ============================================================================
+
+/**
+ * User data cache to reduce redundant Firestore reads
+ */
+const userDataCache = new Map();
+const userStatusCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const STATUS_CACHE_DURATION = 60 * 1000; // 1 minute for status (changes more often)
+
+/**
+ * Get user data with caching to reduce Firestore reads
+ * @param {string} userId - User ID
+ * @returns {Promise<object>}
+ */
+const getCachedUserData = async userId => {
+  const cached = userDataCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  const userDoc = await getDoc(doc(db, "users", userId));
+  const userData = userDoc.exists()
+    ? userDoc.data()
+    : { displayName: "Unknown User", photoURL: null };
+
+  userDataCache.set(userId, {
+    data: userData,
+    timestamp: Date.now(),
+  });
+
+  return userData;
+};
+
+/**
+ * Get user status with short-lived caching to reduce Firestore reads
+ * @param {string} userId - User ID
+ * @returns {Promise<string>}
+ */
+const getCachedUserStatus = async userId => {
+  const cached = userStatusCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < STATUS_CACHE_DURATION) {
+    return cached.status;
+  }
+
+  const statusDoc = await getDoc(doc(db, "userStatus", userId));
+  const status = statusDoc.exists() ? statusDoc.data().status : "offline";
+
+  userStatusCache.set(userId, {
+    status,
+    timestamp: Date.now(),
+  });
+
+  return status;
+};
+
+/**
+ * Clear user data cache (call when user data is updated)
+ * @param {string} userId - Optional: specific user ID to clear, or clear all if not provided
+ */
+export const clearUserCache = userId => {
+  if (userId) {
+    userDataCache.delete(userId);
+    userStatusCache.delete(userId);
+  } else {
+    userDataCache.clear();
+    userStatusCache.clear();
+  }
+};
+
 /**
  * Get friends list with user data
  * @returns {Promise<{friends: array, error: string|null}>}
@@ -1943,21 +2015,18 @@ export const subscribeToFriendsList = onUpdate => {
       const friendUids = snapshot.data().list;
       const friends = [];
 
-      // Get user data for each friend
+      // Get user data for each friend (cached to avoid N reads per snapshot)
       for (const uid of friendUids) {
-        const userDoc = await getDoc(doc(db, "users", uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          // Also get their status
-          const statusDoc = await getDoc(doc(db, "userStatus", uid));
-          const status = statusDoc.exists() ? statusDoc.data() : { status: "offline" };
+        const userData = await getCachedUserData(uid);
+        if (userData && userData.displayName !== undefined) {
+          const status = await getCachedUserStatus(uid);
 
           friends.push({
             uid,
             displayName: userData.displayName,
             photoURL: userData.photoURL,
-            status: status.status,
-            customMessage: status.customMessage,
+            status,
+            customMessage: userData.customMessage || "",
             owner: userData.owner || false,
             contributor: userData.contributor || false,
             verified: userData.verified || false,
@@ -2699,50 +2768,8 @@ export const deleteBackup = async backupId => {
 };
 
 // ============================================================================
-// OPTIMIZED MESSAGING FUNCTIONS - Real-time listeners & caching
+// OPTIMIZED MESSAGING FUNCTIONS - Real-time listeners
 // ============================================================================
-
-/**
- * User data cache to reduce redundant Firestore reads
- */
-const userDataCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Get user data with caching to reduce Firestore reads
- * @param {string} userId - User ID
- * @returns {Promise<object>}
- */
-const getCachedUserData = async userId => {
-  const cached = userDataCache.get(userId);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
-  }
-
-  const userDoc = await getDoc(doc(db, "users", userId));
-  const userData = userDoc.exists()
-    ? userDoc.data()
-    : { displayName: "Unknown User", photoURL: null };
-
-  userDataCache.set(userId, {
-    data: userData,
-    timestamp: Date.now(),
-  });
-
-  return userData;
-};
-
-/**
- * Clear user data cache (call when user data is updated)
- * @param {string} userId - Optional: specific user ID to clear, or clear all if not provided
- */
-export const clearUserCache = userId => {
-  if (userId) {
-    userDataCache.delete(userId);
-  } else {
-    userDataCache.clear();
-  }
-};
 
 /**
  * Subscribe to real-time messages in a conversation
@@ -2817,9 +2844,8 @@ export const subscribeToConversations = onUpdate => {
         // Use cached user data
         const userData = await getCachedUserData(otherUserId);
 
-        // Get status
-        const statusDoc = await getDoc(doc(db, "userStatus", otherUserId));
-        const status = statusDoc.exists() ? statusDoc.data().status : "offline";
+        // Get status (cached to avoid a read per conversation on every snapshot)
+        const status = await getCachedUserStatus(otherUserId);
 
         // Use unread counter from conversation document
         const unreadCount = data.unreadCount?.[currentUser.uid] || 0;
