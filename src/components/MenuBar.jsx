@@ -45,7 +45,7 @@ const MenuBar = () => {
   const [iconData, setIconData] = useState("");
   const [showTorrentWarning, setShowTorrentWarning] = useState(false);
   const [isLatest, setIsLatest] = useState(true);
-  const [isExperiment, setIsExperiment] = useState(false);
+  const [appBranch, setAppBranch] = useState("live");
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [isDev, setIsDev] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -82,11 +82,11 @@ const MenuBar = () => {
   }, []);
 
   useEffect(() => {
-    const checkExperimentMode = async () => {
-      const isExperiment = await window.electron.isExperiment();
-      setIsExperiment(isExperiment);
+    const checkBranch = async () => {
+      const branch = (await window.electron.getBranch?.()) ?? "live";
+      setAppBranch(branch);
     };
-    checkExperimentMode();
+    checkBranch();
   }, []);
 
   useEffect(() => {
@@ -266,11 +266,9 @@ const MenuBar = () => {
       <div className="mt-2 flex h-full flex-1 items-center px-3">
         <div className="flex items-center">
           <div className="flex items-center">
-              {iconData && (
-                <img src={iconData} alt="Ascendara" className="mr-2 h-6 w-6" />
-              )}
-              <span className="text-sm font-medium">Ascendara</span>
-            </div>
+            {iconData && <img src={iconData} alt="Ascendara" className="mr-2 h-6 w-6" />}
+            <span className="text-sm font-medium">Ascendara</span>
+          </div>
         </div>
 
         <div
@@ -296,8 +294,14 @@ const MenuBar = () => {
           )}
         </div>
 
-        {/* Experiment mode */}
-        {isExperiment && (
+        {/* Branch badges */}
+        {appBranch === "public-testing" && (
+          <span className="ml-2 flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
+            <FlaskConical className="h-3 w-3" />
+            Public Testing
+          </span>
+        )}
+        {appBranch === "experimental" && (
           <span className="ml-2 flex items-center gap-1 rounded border border-amber-500/20 bg-amber-500/10 px-1 py-0.5 text-[14px] text-amber-500">
             <FlaskConical className="h-3 w-3" />
             {t("app.experiment")}
@@ -391,37 +395,37 @@ const MenuBar = () => {
         )}
       </div>
       <div className="window-controls mr-2 flex items-center">
-          <div className="flex items-center space-x-2">
-            <button
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              onClick={() => window.electron.minimizeWindow()}
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-            <button
-              className="relative text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              onClick={handleFullscreenToggle}
-              title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
-            >
-              <Minimize
-                className={`absolute h-4 w-4 transition-opacity ${
-                  isFullscreen ? "bg-background opacity-100" : "opacity-0"
-                }`}
-              />
-              <Maximize
-                className={`h-4 w-4 transition-opacity ${
-                  isFullscreen ? "opacity-0" : "bg-background opacity-100"
-                }`}
-              />
-            </button>
-            <button
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              onClick={() => window.electron.closeWindow()}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+        <div className="flex items-center space-x-2">
+          <button
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            onClick={() => window.electron.minimizeWindow()}
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <button
+            className="relative text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            onClick={handleFullscreenToggle}
+            title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
+          >
+            <Minimize
+              className={`absolute h-4 w-4 transition-opacity ${
+                isFullscreen ? "bg-background opacity-100" : "opacity-0"
+              }`}
+            />
+            <Maximize
+              className={`h-4 w-4 transition-opacity ${
+                isFullscreen ? "opacity-0" : "bg-background opacity-100"
+              }`}
+            />
+          </button>
+          <button
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            onClick={() => window.electron.closeWindow()}
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
+      </div>
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent className="max-w-2xl bg-background">
           <AlertDialogHeader>
