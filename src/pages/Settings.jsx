@@ -265,6 +265,10 @@ function Settings() {
   const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
   const [showBranchDialog, setShowBranchDialog] = useState(false);
   const [pendingBranch, setPendingBranch] = useState("");
+  const [branchVersions, setBranchVersions] = useState(null);
+  const [showNoBranchDialog, setShowNoBranchDialog] = useState(false);
+  const [noBranchMessage, setNoBranchMessage] = useState("");
+  const [showAscendPromoDialog, setShowAscendPromoDialog] = useState(false);
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
   const { settings, setSettings, setSettingsLocal } = useSettings();
@@ -480,6 +484,20 @@ function Settings() {
       window.electron.removeBranchSwitchProgressListener?.(handler);
     };
   }, [isSwitchingBranch]);
+
+  // Fetch branch versions from API
+  useEffect(() => {
+    const fetchBranchVersions = async () => {
+      try {
+        const response = await fetch("https://api.ascendara.app/branch-versions");
+        const data = await response.json();
+        setBranchVersions(data);
+      } catch (error) {
+        console.error("Failed to fetch branch versions:", error);
+      }
+    };
+    fetchBranchVersions();
+  }, []);
 
   // Check if we're on Windows
   useEffect(() => {
@@ -3330,9 +3348,31 @@ function Settings() {
                   return (
                     <button
                       key={branch.id}
-                      disabled={isActive || isLocked}
+                      disabled={isActive}
                       onClick={() => {
-                        if (isLocked || isActive) return;
+                        if (isActive) return;
+
+                        // Show Ascend promo dialog if locked
+                        if (isLocked) {
+                          setShowAscendPromoDialog(true);
+                          return;
+                        }
+
+                        // Check if branch versions are available
+                        if (branchVersions) {
+                          const liveVersion = branchVersions.live;
+                          const targetVersion = branchVersions[branch.id];
+
+                          // If switching to public-testing or experimental, check if version differs from live
+                          if (branch.id !== "live" && liveVersion === targetVersion) {
+                            setNoBranchMessage(
+                              `There is no ${branch.label} version available at the moment. The ${branch.label} branch is currently on the same version as Live (v${liveVersion}).`
+                            );
+                            setShowNoBranchDialog(true);
+                            return;
+                          }
+                        }
+
                         setPendingBranch(branch);
                         setShowBranchDialog(true);
                       }}
@@ -3340,9 +3380,7 @@ function Settings() {
                         "group flex w-full items-center gap-4 border-l-4 px-6 py-4 text-left transition-all duration-150",
                         isActive
                           ? `${branch.activeBorder} ${branch.activeBg} cursor-default`
-                          : isLocked
-                            ? "cursor-not-allowed border-l-transparent opacity-50"
-                            : "cursor-pointer border-l-transparent hover:bg-muted/40",
+                          : "cursor-pointer border-l-transparent hover:bg-muted/40",
                       ].join(" ")}
                     >
                       <div className="relative flex-shrink-0">
@@ -3455,6 +3493,24 @@ function Settings() {
                 <strong>{pendingBranch?.label}</strong>{" "}
                 {t("settings.appBranch.switchDialog.installer")}
               </p>
+              {branchVersions && pendingBranch?.id && (
+                <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Current Version (Live):</span>
+                    <span className="font-semibold text-foreground">
+                      v{branchVersions.live}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      {pendingBranch.label} Version:
+                    </span>
+                    <span className="font-semibold text-primary">
+                      v{branchVersions[pendingBranch.id]}
+                    </span>
+                  </div>
+                </div>
+              )}
               {pendingBranch?.id === "experimental" && (
                 <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
                   <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0" />
@@ -3512,6 +3568,71 @@ function Settings() {
               ) : (
                 t("settings.appBranch.switchDialog.switchAndReinstall")
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* No Branch Available Dialog */}
+      <AlertDialog open={showNoBranchDialog} onOpenChange={setShowNoBranchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              No Branch Available
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-muted-foreground">
+              <p>{noBranchMessage}</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-primary">Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Ascend Promo Dialog */}
+      <AlertDialog open={showAscendPromoDialog} onOpenChange={setShowAscendPromoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <Star className="h-6 w-6 text-yellow-500" />
+              Ascend Required
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4 text-muted-foreground">
+              <p>
+                The <strong className="text-red-400">Experimental Branch</strong> is an
+                exclusive feature for Ascend subscribers.
+              </p>
+              <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
+                <h3 className="mb-2 font-semibold text-foreground">
+                  Why subscribe to Ascend?
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                    <span>Get early access to experimental features and updates</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Star className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                    <span>Support the development of Ascendara</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Star className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                    <span>Unlock exclusive features and perks</span>
+                  </li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-primary">Maybe Later</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                window.electron?.openURL("https://ascendara.app/ascend");
+                setShowAscendPromoDialog(false);
+              }}
+            >
+              Learn More About Ascend
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

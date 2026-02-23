@@ -67,6 +67,35 @@ async function getSettings() {
 }
 
 /**
+ * Compare version strings, handling branch-specific formats
+ * Returns true if v1 < v2, false otherwise
+ */
+function isVersionLower(v1, v2) {
+  // Handle exact match
+  if (v1 === v2) return false;
+
+  // Split versions by dots and dashes to handle formats like "10.0.2-1"
+  const parseVersion = v => {
+    const parts = v.split(/[.-]/).map(p => parseInt(p) || 0);
+    return parts;
+  };
+
+  const parts1 = parseVersion(v1);
+  const parts2 = parseVersion(v2);
+
+  // Compare each part
+  const maxLength = Math.max(parts1.length, parts2.length);
+  for (let i = 0; i < maxLength; i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    if (p1 < p2) return true;
+    if (p1 > p2) return false;
+  }
+
+  return false;
+}
+
+/**
  * Check version and update if needed
  */
 async function checkVersionAndUpdate() {
@@ -93,7 +122,8 @@ async function checkVersionAndUpdate() {
       }
     }
 
-    isLatest = latestVersion === appVersion;
+    // Use version comparison function instead of simple equality
+    isLatest = !isVersionLower(appVersion, latestVersion);
     console.log(
       `Version check [${currentBranch}]: Current=${appVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
@@ -293,7 +323,17 @@ async function downloadUpdateInBackground() {
       "X-Ascendara-Platform": isWindows ? "windows" : "linux",
     };
 
-    const updateUrl = `https://lfs.ascendara.app/download?update`;
+    // Get current branch to download correct update
+    const settings = await getSettings();
+    const currentBranch = settings.appBranch || "live";
+
+    // Determine update URL based on branch
+    let updateUrl;
+    if (currentBranch === "live") {
+      updateUrl = `https://lfs.ascendara.app/download?update`;
+    } else {
+      updateUrl = `https://lfs.ascendara.app/download?branch=${currentBranch}`;
+    }
     const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
     const installerPath = path.join(tempDir, "AscendaraInstaller.exe");
 
