@@ -885,7 +885,7 @@ function registerSystemHandlers() {
       const command =
         process.platform === "darwin"
           ? "brew install python"
-          : "pkexec apt-get install -y python3 python3-pip python3-venv";
+          : "pkexec apt-get install -y python3 python3-pip python3-venv unrar";
 
       await new Promise((resolve, reject) => {
         const proc = exec(command, (error) => {
@@ -916,7 +916,7 @@ function registerSystemHandlers() {
       updateProgress(40);
 
       const venvPath = path.join(os.homedir(), ".ascendara", "venv");
-      const packages = ["requests", "psutil", "pypresence", "patool", "pySmartDL", "cloudscraper", "qbittorrentapi"];
+      const packages = ["requests", "psutil", "pypresence", "patool", "pySmartDL", "cloudscraper", "beautifulsoup4", "rarfile"];
 
       await new Promise((resolveVenv, rejectVenv) => {
         exec(`mkdir -p "${path.join(os.homedir(), ".ascendara")}" && python3 -m venv "${venvPath}"`, (err, _stdout, stderr) => {

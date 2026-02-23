@@ -828,13 +828,16 @@ class RobustDownloader:
                             if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
                                 total_files_to_extract += 1
                 elif ext == '.rar':
-                    from unrar import rarfile
-                    with rarfile.RarFile(arch_path) as rar_ref:
-                        for rar_info in rar_ref.infolist():
-                            # Check if it's a directory by filename ending with / or \
-                            is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
-                            if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename and not is_dir:
-                                total_files_to_extract += 1
+                    import shutil as _shutil
+                    _unrar = _shutil.which('unrar') or _shutil.which('unrar-free')
+                    if _unrar:
+                        _result = subprocess.run([_unrar, 'l', arch_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        for _line in _result.stdout.decode(errors='replace').splitlines():
+                            _parts = _line.split()
+                            if len(_parts) >= 5 and _parts[0] not in ('-', 'Name', '---'):
+                                _fname = _parts[-1]
+                                if not _fname.endswith('.url') and '_CommonRedist' not in _fname and not _fname.endswith('/'):
+                                    total_files_to_extract += 1
             except Exception as e:
                 logging.warning(f"[RobustDownloader] Could not count files in {arch_path}: {e}")
         
@@ -890,12 +893,16 @@ class RobustDownloader:
                                             if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
                                                 nested_file_count += 1
                                 elif ext == '.rar':
-                                    from unrar import rarfile
-                                    with rarfile.RarFile(new_archive) as rar_ref:
-                                        for rar_info in rar_ref.infolist():
-                                            is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
-                                            if not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename and not is_dir:
-                                                nested_file_count += 1
+                                    import shutil as _shutil
+                                    _unrar = _shutil.which('unrar') or _shutil.which('unrar-free')
+                                    if _unrar:
+                                        _result = subprocess.run([_unrar, 'l', new_archive], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                        for _line in _result.stdout.decode(errors='replace').splitlines():
+                                            _parts = _line.split()
+                                            if len(_parts) >= 5 and _parts[0] not in ('-', 'Name', '---'):
+                                                _fname = _parts[-1]
+                                                if not _fname.endswith('.url') and '_CommonRedist' not in _fname and not _fname.endswith('/'):
+                                                    nested_file_count += 1
                                 
                                 if nested_file_count > 0:
                                     self._total_files_to_extract += nested_file_count
@@ -1009,104 +1016,121 @@ class RobustDownloader:
                         self._update_extraction_progress(zip_info.filename, self._files_extracted_count, self._total_files_to_extract)
     
     def _extract_rar(self, archive_path: str, watching_data: Dict):
-        """Extract a RAR file."""
-        try:
-            from unrar import rarfile
-        except ImportError:
-            logging.error("[RobustDownloader] unrar module not installed")
-            raise ImportError("unrar module required for RAR extraction")
-        
+        """Extract a RAR file using the system unrar binary."""
         import threading
-        
-        with rarfile.RarFile(archive_path) as rar_ref:
-            # Filter members to extract (exclude .url and _CommonRedist)
-            rar_files = [info for info in rar_ref.infolist() 
-                        if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename]
-            
-            logging.info(f"[RobustDownloader] Extracting {len(rar_files)} files from RAR (fast mode)")
-            
-            # Count existing files before extraction to track only new files
-            initial_file_count = 0
+        import shutil as _shutil
+
+        unrar_bin = _shutil.which("unrar") or _shutil.which("unrar-free")
+        if not unrar_bin:
+            raise RuntimeError("System 'unrar' binary not found. Install it with: sudo apt-get install unrar")
+
+        logging.info(f"[RobustDownloader] Extracting RAR with system unrar: {archive_path}")
+
+        # Count existing files before extraction for progress tracking
+        initial_file_count = 0
+        try:
+            for root, dirs, files_in_dir in os.walk(self.download_dir):
+                initial_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+        except Exception:
+            pass
+
+        # Run unrar with Popen so we can read filenames line-by-line as they extract
+        extraction_error = []
+        files_extracted_count = [0]
+        last_filename = [""]
+
+        proc = subprocess.Popen(
+            [unrar_bin, "x", "-y", archive_path, self.download_dir + "/"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        def read_stdout():
             try:
-                for root, dirs, files_in_dir in os.walk(self.download_dir):
-                    initial_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+                last_seen = [""]
+                for raw_line in proc.stdout:
+                    # unrar uses \r for in-place progress; split on \r and \n
+                    raw = raw_line.decode(errors='replace')
+                    for segment in re.split(r'[\r\n]', raw):
+                        line = segment.strip()
+                        # Strip ANSI escape sequences
+                        line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', line)
+                        # Strip non-printable characters (box-drawing, etc.)
+                        line = re.sub(r'[^\x20-\x7E]', '', line)
+                        if not (line.startswith('Extracting') or line.startswith('extracting')):
+                            continue
+                        # Remove trailing percentage/OK noise (unrar in-place progress)
+                        rest = line.split(None, 1)[-1] if len(line.split(None, 1)) > 1 else ''
+                        # Strip from first occurrence of padded percentage onward (handles "file   11% 12% 13%")
+                        rest = re.sub(r'\s{2,}\d+\s*%.*$', '', rest)
+                        rest = re.sub(r'\s+OK\s*$', '', rest)
+                        rest = rest.strip()
+                        fname = os.path.basename(rest)
+                        # Only count/update when the filename actually changes
+                        if fname and fname != last_seen[0] and not fname.endswith('.url') and '_CommonRedist' not in fname:
+                            last_seen[0] = fname
+                            files_extracted_count[0] += 1
+                            last_filename[0] = fname
+                            total = self._files_extracted_count + files_extracted_count[0]
+                            self._update_extraction_progress(fname, total, self._total_files_to_extract)
             except Exception:
                 pass
-            
-            # Use extractall() in thread for speed, monitor directory for progress
-            extraction_complete = threading.Event()
-            extraction_error = []
-            
-            def extract_thread():
-                try:
-                    rar_ref.extractall(self.download_dir)
-                except Exception as e:
-                    extraction_error.append(e)
-                finally:
-                    extraction_complete.set()
-            
-            # Start extraction in background
-            thread = threading.Thread(target=extract_thread, daemon=True)
-            thread.start()
-            
-            # Monitor progress by counting extracted files
-            last_count = 0
-            while not extraction_complete.is_set():
-                # Count files in extraction directory (subtract initial count)
-                current_count = 0
-                try:
-                    for root, dirs, files_in_dir in os.walk(self.download_dir):
-                        current_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
-                except Exception:
-                    pass
-                
-                # Calculate newly extracted files
-                newly_extracted = max(0, current_count - initial_file_count)
-                
-                if newly_extracted > last_count:
-                    files_extracted_this_archive = self._files_extracted_count + newly_extracted
-                    self._update_extraction_progress(f"Extracting... ({newly_extracted} files)", files_extracted_this_archive, self._total_files_to_extract, force=True)
-                    last_count = newly_extracted
-                
-                time.sleep(0.5)  # Check every 0.5 seconds
-            
-            # Wait for thread to complete
-            thread.join(timeout=5)
-            
-            if extraction_error:
-                logging.error(f"[RobustDownloader] RAR extraction failed: {extraction_error[0]}")
-                raise extraction_error[0]
-            
-            logging.info(f"[RobustDownloader] RAR extraction complete")
-            
-            # Clean up unwanted files (.url and _CommonRedist)
+
+        stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+        stdout_thread.start()
+
+        returncode = proc.wait()
+        stdout_thread.join(timeout=5)
+
+        if returncode not in (0, 1):
+            stderr_out = proc.stderr.read().decode(errors='replace').strip()
+            extraction_error.append(RuntimeError(
+                f"unrar exited with code {returncode}: {stderr_out}"
+            ))
+
+        if extraction_error:
+            logging.error(f"[RobustDownloader] RAR extraction failed: {extraction_error[0]}")
+            raise extraction_error[0]
+
+        logging.info(f"[RobustDownloader] RAR extraction complete")
+
+        # Update extracted count from newly added files
+        final_file_count = 0
+        try:
             for root, dirs, files_in_dir in os.walk(self.download_dir):
-                if '_CommonRedist' in root:
+                final_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+        except Exception:
+            pass
+        self._files_extracted_count += max(0, final_file_count - initial_file_count)
+
+        # Clean up unwanted files (.url and _CommonRedist)
+        for root, dirs, files_in_dir in os.walk(self.download_dir):
+            if '_CommonRedist' in root:
+                try:
+                    shutil.rmtree(root)
+                    logging.info(f"[RobustDownloader] Removed _CommonRedist: {root}")
+                except Exception as e:
+                    logging.warning(f"[RobustDownloader] Could not remove _CommonRedist: {e}")
+                continue
+
+            for fname in files_in_dir:
+                if fname.endswith('.url'):
                     try:
-                        shutil.rmtree(root)
-                        logging.info(f"[RobustDownloader] Removed _CommonRedist: {root}")
-                    except Exception as e:
-                        logging.warning(f"[RobustDownloader] Could not remove _CommonRedist: {e}")
+                        os.remove(os.path.join(root, fname))
+                    except Exception:
+                        pass
+
+        # Build watching data from extracted files
+        for dirpath, _, filenames in os.walk(self.download_dir):
+            for fname in filenames:
+                if fname.endswith('.url') or fname.endswith('.rar') or fname.endswith('.zip') or '_CommonRedist' in dirpath:
                     continue
-                
-                for fname in files_in_dir:
-                    if fname.endswith('.url'):
-                        try:
-                            os.remove(os.path.join(root, fname))
-                        except Exception:
-                            pass
-            
-            # Build watching data after extraction
-            for rar_info in rar_files:
-                extracted_path = os.path.join(self.download_dir, rar_info.filename)
-                key = os.path.relpath(extracted_path, self.download_dir)
-                watching_data[key] = {"size": rar_info.file_size}
-                
-                is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
-                if not is_dir:
-                    self._files_extracted_count += 1
-            
-            self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
+                full_path = os.path.join(dirpath, fname)
+                key = os.path.relpath(full_path, self.download_dir).replace('\\', '/')
+                if key not in watching_data:
+                    watching_data[key] = {"size": os.path.getsize(full_path)}
+
+        self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
     
     def _flatten_directories(self):
         """Flatten nested directories that should be at root level."""
