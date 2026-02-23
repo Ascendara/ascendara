@@ -122,7 +122,7 @@
   "app": {
     "admin": {
       "warning": {
-        "message": "Por favor reinicie o Ascendara sem privilégios de administrador. A execução no modo de administrador causa problemas de localização de caminhos e outros problemas.",
+        "message": "Reinicie o Ascendara sem privilégios de administrador. A execução no modo de administrador causa problemas de localização de caminhos e outros problemas.",
         "title": "Não é possível executar em modo administrador"
       }
     },
@@ -259,7 +259,7 @@
       "achievements": "Conquistas",
       "cancel": "Cancelar",
       "cloudBackup": "Backup na nuvem",
-      "cloudOnly": "Somente nuvem",
+      "cloudOnly": "Apenas nuvem",
       "custom": "Personalizado",
       "delete": "Excluir",
       "deleteConfirm": "Excluir da nuvem?",
@@ -279,7 +279,7 @@
       "playtimeTracking": "Acompanhamento do tempo de jogo",
       "removeFromCloud": "Remover da nuvem",
       "searchPlaceholder": "Pesquise sua biblioteca na nuvem...",
-      "sortAchievements": "Maioria das conquistas",
+      "sortAchievements": "Mais conquistas",
       "sortName": "Classificar por nome",
       "sortPlaytime": "Classificar por tempo de reprodução",
       "sortRecent": "Jogado recentemente",
@@ -294,7 +294,7 @@
       "syncing": "Sincronizando...",
       "title": "Biblioteca na nuvem",
       "totalLaunches": "Total de Lançamentos",
-      "totalPlaytime": "Tempo total de jogo",
+      "totalPlaytime": "Tempo total de reprodução",
       "tryDifferentSearch": "Experimente um termo de pesquisa diferente ou limpe sua pesquisa"
     },
     "community": {
@@ -435,7 +435,7 @@
         "title": "Comunidades de jogos"
       },
       "downloadQueue": {
-        "description": "Coloque vários downloads na fila e deixe o Ascendara lidar com eles automaticamente. Inicie os downloads e volte quando estiverem todos prontos.",
+        "description": "Coloque vários downloads na fila e deixe o Ascendara cuidar deles automaticamente. Inicie os downloads e volte quando estiverem todos prontos.",
         "title": "Fila de download"
       },
       "flingTrainer": {
@@ -503,9 +503,9 @@
       "syncTitle": "Sincronize seu perfil",
       "synced": "Perfil sincronizado com sucesso!",
       "topGames": "Principais jogos",
-      "totalPlaytime": "Tempo total de jogo",
+      "totalPlaytime": "Tempo total de reprodução",
       "totalXP": "EXP total",
-      "xp": "XP",
+      "xp": "EXP",
       "yourLevel": "Seu nível"
     },
     "report": {
@@ -727,7 +727,7 @@
     "closeAscendara": "FECHAR ASCENDARA",
     "cloudSaves": "Salva na nuvem",
     "confirm": "Confirmar",
-    "confirmKillDownload": "Matar baixar?",
+    "confirmKillDownload": "Matar Baixar?",
     "confirmKillDownloadMessage": "Tem certeza de que deseja parar e excluir {{game}}? Isso removerá todos os arquivos baixados.",
     "controllerDetected": "Controlador detectado",
     "controllerDetectedMessage": "Ascendara detectou um controlador conectado ao seu dispositivo. Você gostaria de mudar para o modo Big Picture para uma melhor experiência de controle?",
@@ -745,7 +745,7 @@
     "enterBigPicture": "Entre no quadro geral",
     "exit": "SAÍDA",
     "exitBigPicture": "SAIR DA IMAGEM GRANDE",
-    "exitBigPictureConfirm": "Sair do panorama geral?",
+    "exitBigPictureConfirm": "Sair do quadro geral?",
     "exitBigPictureMessage": "Tem certeza de que deseja sair do modo Big Picture e retornar à interface normal do Ascendara?",
     "exitToDownload": "Saia do Big Picture para fazer o download",
     "exitToDownloadMessage": "Para baixar jogos, você precisa sair do modo Big Picture e usar a interface normal do Ascendara. Você gostaria de sair agora?",
@@ -964,6 +964,11 @@
       "steps": "[{'description': 'The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don\\'t have it, close the guide and click the \"Don\\'t have the extension? Get it for Chrome or Firefox\" button to download it.', 'title': 'The Ascendara Download Handler'}, {'description': 'After installing the extension, click the extension icon to enable the handler.', 'title': 'Step 1: Enable the Handler'}, {'description': 'The extension can stay on as it will only send known providers to Ascendara.', 'title': 'The Download Handler'}, {'description': 'Complete the CAPTCHA, and start the download.', 'title': 'Step 2: Start the download'}, {'description': 'Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.', 'title': 'Step 3: Using the Extension'}, {'description': 'Click the button to Open Ascendara.', 'title': 'Step 4: Downloading'}, {'description': \"Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.\", 'title': \"That's it!\"}]",
       "title": "Baixando com Ascendara"
     },
+    "noDownloadPath": {
+      "desc": "Você ainda não definiu um diretório de download. Acesse Configurações para escolher onde seus jogos serão salvos.",
+      "goToSettings": "Vá para Configurações",
+      "title": "Nenhum diretório de download definido"
+    },
     "noGameInfoAvailable": "Configure Ascendara Xtra em Preferências para ver mais informações sobre este jogo",
     "noReviewsExplanation": "Este jogo não possui nenhuma crítica profissional disponível no OpenCritic. Isso pode ser porque é um novo lançamento, um título independente ou simplesmente ainda não foi revisado.",
     "notExactMatch": "O nome do jogo não corresponde exatamente. Reporte o jogo se necessário.",
@@ -1054,7 +1059,7 @@
       "downloadReady": "Download pronto para começar",
       "downloadStarted": "Download iniciado com sucesso",
       "invalidLink": "Por favor insira um link de download válido",
-      "invalidProtocolUrl": "O URL enviado é inválido. Por favor, tente novamente",
+      "invalidProtocolUrl": "URL enviado é inválido. Por favor, tente novamente",
       "linkProcessed": "Link processado com sucesso",
       "noDownloadDirectory": "Por favor, defina primeiro um diretório de download em Preferências",
       "noGameData": "Nenhum dado do jogo foi transmitido",
@@ -1074,7 +1079,7 @@
     },
     "viewCriticReviews": "Ver avaliações dos críticos",
     "viewOnOpenCritic": "Ver no OpenCritic",
-    "yourPC": "Seu computador"
+    "yourPC": "Seu PC"
   },
   "downloads": {
     "actions": {
@@ -1125,7 +1130,7 @@
     "limitedTo": "Limitado a",
     "noDownloads": "Bem, isso é relaxante...",
     "noDownloadsMessage": "Você não está baixando nada no momento, inicie um download para acompanhar o progresso aqui.",
-    "noFilesError": "O downloader não encontrou nenhum arquivo para baixar. Provavelmente, isso significa que o arquivo foi removido da fonte.",
+    "noFilesError": "O downloader não encontrou nenhum arquivo para baixar. Isso provavelmente significa que o arquivo foi removido da fonte.",
     "noSpaceLeftError": "Não há mais espaço no dispositivo. Libere espaço em disco para continuar o download.",
     "openFolder": "Abrir pasta",
     "pause": "Pausa",
@@ -1259,7 +1264,7 @@
     "noAchievementsDescription": "Nenhuma conquista encontrada para este jogo. Jogue e o Ascendara irá detectá-los e rastreá-los automaticamente.",
     "noAchievementsFound": "Nenhuma conquista encontrada",
     "noFilesFound": "Nenhum arquivo disponível. Veja em Nexus Mods para mais opções.",
-    "noSoundtrackDescription": "Nenhuma informação da trilha sonora foi encontrada para este jogo.",
+    "noSoundtrackDescription": "Nenhuma informação de trilha sonora foi encontrada para este jogo.",
     "noSoundtrackFound": "Nenhuma trilha sonora encontrada",
     "notInCloudLibrary": "Não está na biblioteca em nuvem",
     "overview": "Visão geral",
@@ -1399,7 +1404,7 @@
       "confirmRestore": "Confirmar restauração",
       "confirmSpecificRestore": "Confirme a restauração de backup específica",
       "createBackupFirst": "Crie um backup primeiro para vê-lo listado aqui.",
-      "creatingBackup": "Criando backup",
+      "creatingBackup": "Criando Backup",
       "gameBackupTitle": "Backups de salvamento de jogos",
       "listBackups": "Escolha Backup para Restaurar",
       "loadBackupsFailed": "Falha ao carregar backups",
@@ -1766,7 +1771,7 @@
     "stats": "Estatísticas do perfil",
     "topGames": "Seus melhores jogos",
     "topN": "Principais {{count}}",
-    "totalPlaytime": "Tempo total de jogo",
+    "totalPlaytime": "Tempo total de reprodução",
     "totalXP": "EXP total: {{xp}}"
   },
   "refreshDialog": {
@@ -1782,7 +1787,7 @@
     "cookieReceivedDesc": "Recebi o cookie da extensão com sucesso!",
     "cookieReceivedTitle": "Biscoito recebido!",
     "cookieRefreshDescription": "Conclua a verificação novamente para obter um cookie novo e continue a atualização.",
-    "copyLink": "Copiar Link",
+    "copyLink": "Copiar link",
     "detectingDesc": "Verificando se a proteção Cloudflare está ativa no SteamRIP",
     "detectingProtection": "Detectando status de proteção...",
     "extStep1": "Preencha o captcha Cloudflare na página SteamRIP",
@@ -1896,6 +1901,34 @@
     "addLocation": "Adicionar diretório de download",
     "additionalLocations": "Locais Adicionais",
     "apiKeySaved": "Chave de API salva",
+    "appBranch": {
+      "description": "Escolha seu canal de lançamento. A troca fará o download e executará o instalador apropriado – o aplicativo será reiniciado automaticamente.",
+      "experimental": {
+        "description": "Construções de ponta com as mudanças mais recentes. Pode ser instável.",
+        "label": "Experimental",
+        "requiresSubscription": "Requer assinatura Ascend"
+      },
+      "live": {
+        "description": "A versão estável. Recomendado para todos os usuários.",
+        "label": "Ao vivo"
+      },
+      "publicTesting": {
+        "description": "Obtenha acesso antecipado aos próximos recursos antes de serem lançados no Live.",
+        "label": "Teste Público"
+      },
+      "switchDialog": {
+        "cancel": "Cancelar",
+        "confirm": "Trocar filial",
+        "description": "Ascendara irá baixar o",
+        "downloading": "Baixando...",
+        "downloadingInstaller": "Baixando o instalador...",
+        "experimentalWarning": "As compilações experimentais podem ser instáveis ​​e conter bugs. Use por sua conta e risco.",
+        "installer": "instalador e inicie-o. O aplicativo será fechado automaticamente para concluir a troca.",
+        "switchAndReinstall": "Trocar e reinstalar",
+        "title": "Mudar para {{branch}}?"
+      },
+      "title": "Filial de aplicativos"
+    },
     "appearance": "Aparência",
     "application": "Aplicativo",
     "applyCustomColors": "Aplicar cores",
@@ -1904,7 +1937,7 @@
     "ascendaraTimechine": "Máquina do Tempo Ascendara",
     "ascendaraToggleAnalytics": "Inscreva-se e ajude a melhorar o Ascendara",
     "ascendaraUpdates": "Atualizações Automáticas",
-    "ascendaraUpdatesDescription": "Baixe automaticamente novas versões do Ascendara e peça para instalá-las quando estiver pronto.",
+    "ascendaraUpdatesDescription": "Baixe automaticamente novas versões do Ascendara e peça para você instalá-las quando estiver pronto.",
     "ascendaraWorkshopDownloader": "Downloader de oficina",
     "ascendaraWorkshopDownloaderDescription": "O Workshop Downloader permite baixar itens do Steam Workshop sem a necessidade de ter uma conta.",
     "ascendaraWorkshopDownloaderEnable": "Mostrar na barra de navegação",
@@ -1940,7 +1973,7 @@
     "defaultDownloadLocation": "Local de download padrão",
     "defaultLandingPage": "Página inicial padrão",
     "defaultLandingPageDescription": "Escolha qual página será aberta quando você iniciar o Ascendara.",
-    "discordRPC": "Presença rica em discórdia",
+    "discordRPC": "Discord rica presença",
     "discordRPCDescription": "Mostre qual jogo você está jogando com Ascendara no Discord.",
     "downloadLimit": "Limite de velocidade de download",
     "downloadLimitDescription": "Defina uma velocidade máxima para downloads. 0 significa ilimitado.",
@@ -1951,7 +1984,7 @@
       "extreme": "Extremo (>48 threads) – Use com cuidado",
       "high": "Alto (25-32 threads) – Downloads rápidos",
       "low": "Baixo (<8 threads) - Uso mínimo da CPU",
-      "normal": "Normal (8 a 24 threads) – Recomendado para a maioria dos usuários",
+      "normal": "Normal (8-24 threads) – Recomendado para a maioria dos usuários",
       "veryHigh": "Muito Alto (33-48 threads) – Para conexões muito rápidas"
     },
     "downloaderRunningWarning": "Você não pode alterar essas configurações enquanto um download estiver em andamento",
@@ -2133,7 +2166,7 @@
       "vpnWarning": "Seu endereço IP ficará visível para outros pares. Use uma VPN para proteger sua privacidade e evitar possíveis problemas legais."
     },
     "torrenting": "Torrent",
-    "torrentingDescription": "Configure downloads de torrent no Ascendara. O torrent requer qBittorrent e uma VPN é altamente recomendada.",
+    "torrentingDescription": "Configure downloads de torrent no Ascendara. Torrent requer qBittorrent e uma VPN é altamente recomendada.",
     "uploadLogs": "Carregar registros",
     "userSettings": {
       "browseDirectory": "Navegar",
@@ -2153,7 +2186,26 @@
     "warningDescription": "O Ascendara foi projetado como uma plataforma de testes para videogames, permitindo aos usuários avaliar a jogabilidade, o desempenho e a compatibilidade antes de tomar uma decisão de compra. A Ascendara incentiva fortemente os usuários a apoiar os desenvolvedores de jogos comprando os jogos de que gostam.",
     "warningSupportDevelopers": "Os desenvolvedores de jogos investem muito tempo, recursos e criatividade na criação das experiências que todos gostamos. Sua compra apoia diretamente a capacidade deles de continuar criando ótimos jogos e sustenta a indústria de jogos.",
     "warningSupportDevelopersCallToAction": "Por favor, apoie os desenvolvedores comprando jogos que você goste.",
-    "warningTitle": "Olá, por favor leia isto!"
+    "warningTitle": "Olá, por favor leia isto!",
+    "wineProton": {
+      "browse": "Navegar",
+      "description": "Configure como os jogos do Windows são executados no Linux",
+      "linuxOnly": "Somente Linux",
+      "protonBinary": "Binário de prótons",
+      "protonBinaryDescription": "Caminho para o executável do Proton. O padrão é",
+      "protonBinaryPlaceholder": "próton",
+      "protonDescription": "Use a camada de compatibilidade Proton em vez do Wine. Proton é o fork do Wine da Valve otimizado para jogos.",
+      "protonExperimental": "Experimental",
+      "protonSection": "Próton",
+      "title": "Vinho e Próton",
+      "wineBinary": "Binário de vinho",
+      "wineBinaryDescription": "Caminho para o executável do Wine. O padrão é",
+      "wineBinaryPlaceholder": "vinho",
+      "winePrefix": "Prefixo de vinho (WINEPREFIX)",
+      "winePrefixDescription": "Diretório usado como prefixo Wine. Deixe vazio para usar",
+      "winePrefixPlaceholder": "~/.vinho",
+      "wineSection": "Vinho"
+    }
   },
   "torbox": {
     "account": "Conta TorBox",
@@ -2289,7 +2341,7 @@
     "continue": "Continuar",
     "continueWithoutSharing": "Continuar sem compartilhar",
     "darkThemes": "Temas escuros",
-    "dependenciesDesc": "Se você está jogando em um PC novo ou instalou recentemente o Windows, Ascendara pode ajudá-lo a instalar esses componentes essenciais para garantir a melhor experiência",
+    "dependenciesDesc": "Se você estiver jogando em um PC novo ou instalou recentemente o Windows, Ascendara pode ajudá-lo a instalar esses componentes essenciais para garantir a melhor experiência",
     "downloadGamesFaster": "Obtenha a extensão Ascendara",
     "enableAutoUpdates": "Habilitar atualizações automáticas",
     "errorInstallingDependencies": "Erro ao instalar dependências",
@@ -2346,7 +2398,7 @@
       "point1": "Downloads e tudo relacionado a jogos no Ascendara serão sempre gratuitos",
       "point2": "Ascendara não pedirá dados pessoais para baixar ou jogar jogos",
       "point3": "Se você optar por ingressar no Ascend, precisará criar uma conta para esses recursos",
-      "point4": "Os dados anônimos só são compartilhados se você aceitar, e você pode alterar isso a qualquer momento em Configurações",
+      "point4": "Os dados anônimos só são compartilhados se você aceitar, e você pode alterar isso a qualquer momento nas Configurações",
       "subtitle": "Se você pagou pelo Ascendara, foi enganado. Entre em contato com seu banco imediatamente.",
       "title": "Ascendara é totalmente gratuito para usar"
     },
@@ -2404,7 +2456,7 @@
     "welcomeTo": "Bem-vindo ao",
     "welcomeToAscendaraDescription": "Você está quase pronto para começar a usar o Ascendara. Passaremos juntos pelo processo de integração e depois configuraremos o índice do jogo, mas primeiro leia os Termos de Serviço e a Política de Privacidade.",
     "whenYouClickADownloadLink": "Quando você inicia um download de um provedor conhecido, a extensão irá interromper automaticamente o download no seu navegador e iniciá-lo para você no Ascendara",
-    "wineIsRequired": "Brinque com Vinho",
+    "wineIsRequired": "Brinque com vinho",
     "wineMustBeInstalled": "Wine, DXVK e outras ferramentas precisam ser instaladas e configuradas em seu computador para executar jogos do Windows. Não se preocupe, o Ascendara pode instalar e configurar tudo só para você",
     "youCanAddMoreLater": "Você pode adicionar mais diretórios nas preferências posteriormente",
     "youCanChangeThisLater": "Você sempre pode atualizar seu idioma posteriormente em Configurações.",

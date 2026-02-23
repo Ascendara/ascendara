@@ -35,7 +35,7 @@
       "accountExistsWithEmail": "تم إنشاء حساب بالفعل على هذا الجهاز ({{email}}). يمكنك الحصول على حساب Ascend واحد فقط لكل جهاز.",
       "cannotCreateAccount": "لا يمكن إنشاء حساب",
       "deletedAccountMessage": "تم حذف هذا الحساب من قبل المسؤول ولا يمكن استعادته. تمت إزالة جميع البيانات المرتبطة نهائيًا.",
-      "displayNameTooShort": "يجب أن يتكون اسم العرض من 4 أحرف على الأقل",
+      "displayNameTooShort": "يجب أن يكون اسم العرض 4 أحرف على الأقل",
       "emailRequired": "الرجاء إدخال عنوان البريد الإلكتروني الخاص بك",
       "getSupport": "احصل على الدعم على Discord",
       "invalidEmail": "يرجى إدخال عنوان بريد إلكتروني صالح",
@@ -110,7 +110,7 @@
       "emailSent": "تم إرسال بريد إلكتروني للتحقق! تحقق من البريد الوارد الخاص بك.",
       "notYet": "لم يتم التحقق من البريد الإلكتروني بعد. يرجى التحقق من البريد الوارد الخاص بك والنقر على رابط التحقق.",
       "resend": "إعادة إرسال البريد الإلكتروني للتحقق",
-      "sentTo": "لقد أرسلنا رسالة التحقق بالبريد الإلكتروني إلى:",
+      "sentTo": "أرسلنا رسالة التحقق بالبريد الإلكتروني إلى:",
       "subtitle": "يرجى التحقق من عنوان بريدك الإلكتروني للمتابعة",
       "title": "التحقق من البريد الإلكتروني الخاص بك",
       "verified": "تم التحقق من البريد الإلكتروني! مرحبا بكم في الصعود!"
@@ -222,7 +222,7 @@
       "reason": "سبب",
       "trial": "أدرك أن لدي نسخة تجريبية مجانية مدتها 7 أيام",
       "trialBlocked": "النسخة التجريبية مستخدمة بالفعل",
-      "trialBlockedMessage": "لقد تم بالفعل استخدام النسخة التجريبية على هذا الجهاز. اشترك للوصول إلى ميزات Ascend.",
+      "trialBlockedMessage": "لقد تم بالفعل استخدام نسخة تجريبية على هذا الجهاز. اشترك للوصول إلى ميزات Ascend.",
       "trialEndingSoon": "تنتهي المحاكمة قريبا",
       "trialEndingSoonAction": "اشترك الآن للحفاظ على بياناتك آمنة ومواصلة الاستمتاع بميزات Ascend.",
       "trialEndingSoonMessage": "تنتهي النسخة التجريبية من Ascend خلال {{days}} يومًا. بعد انتهاء الفترة التجريبية، سيتم حذف مكتبتك السحابية والبيانات المتزامنة في غضون أيام قليلة."
@@ -342,7 +342,7 @@
       "awayOrBusy": "بعيد / مشغول",
       "empty": "لا أصدقاء بعد",
       "emptyHint": "ابحث عن المستخدمين لإضافتهم كأصدقاء",
-      "findFriends": "البحث عن الأصدقاء",
+      "findFriends": "البحث عن أصدقاء",
       "friends": "أصدقاء",
       "hasRequestPending": "لقد أرسل لك هذا المستخدم طلب صداقة",
       "offline": "غير متصل",
@@ -356,7 +356,7 @@
       "requestPending": "قيد الانتظار",
       "requestReceived": "تم استلام الطلب",
       "requestSent": "تم إرسال طلب الصداقة!",
-      "subtitle": "تواصل والعب مع أصدقائك",
+      "subtitle": "تواصل واللعب مع أصدقائك",
       "title": "أصدقاء",
       "totalFriends": "مجموع الأصدقاء"
     },
@@ -374,7 +374,7 @@
       "cleanedUp": "تنظيف الرسائل القديمة",
       "cleanup": "تنظيف",
       "conversations": "المحادثات",
-      "empty": "لا توجد محادثات حتى الآن",
+      "empty": "لا توجد محادثات بعد",
       "emptyHint": "ابدأ محادثة مع صديق",
       "last7Days": "رسائل من آخر 7 أيام",
       "newMessage": "رسالة جديدة من {{name}}",
@@ -561,7 +561,7 @@
       "billingCycle": "دورة الفواتير",
       "bio": "السيرة الذاتية",
       "bioPlaceholder": "أخبرنا عن نفسك...",
-      "bioTooLong": "يجب أن تكون السيرة الذاتية 100 حرف أو أقل",
+      "bioTooLong": "السيرة الذاتية يجب أن تكون 100 حرف أو أقل",
       "cancel": "يلغي",
       "checkoutCanceled": "تم إلغاء الخروج.",
       "checkoutError": "فشل في بدء الخروج. يرجى المحاولة مرة أخرى.",
@@ -843,7 +843,7 @@
       "detailsPlaceholder": "الرجاء تقديم تفاصيل أكثر عن الموضوع...",
       "error": "فشل في تقديم التقرير",
       "missingInfo": "معلومات مفقودة",
-      "missingInfoDesc": "يرجى ملء كافة الحقول المطلوبة.",
+      "missingInfoDesc": "يرجى ملء جميع الحقول المطلوبة.",
       "ratingFailed": "فشل التقييم",
       "ratingFailedDesc": "لم يتم تقديم تقييمك. آسف لذلك!",
       "reasonLabel": "سبب",
@@ -870,7 +870,7 @@
   },
   "download": {
     "aboutGame": "حول هذه اللعبة",
-    "allDlc": "جميع المحتويات القابلة للتنزيل (DLCs).",
+    "allDlc": "جميع المحتوى القابل للتنزيل (ALL-DLC).",
     "allDlcTooltip": "يتضمن كل المحتوى القابل للتنزيل (DLC) المتاح لهذه اللعبة",
     "autoUpdates": "التحديثات التلقائية",
     "betaFeature": "واو... هذا لا يزال في مرحلة تجريبية!",
@@ -898,7 +898,7 @@
         "step2": "أكمل اختبار CAPTCHA وابدأ التنزيل",
         "step3": "سيوقف الامتداد التنزيل تلقائيًا ويبدأه لك في Ascendara"
       },
-      "invalidLink": "الرجاء إدخال رابط التحميل الصحيح ل",
+      "invalidLink": "الرجاء إدخال رابط تحميل صالح ل",
       "manualInstructions": {
         "step1": "انسخ الرابط والصقه في متصفحك",
         "step2": "أكمل اختبار CAPTCHA وابدأ التنزيل",
@@ -917,7 +917,7 @@
       "selectProviderPrompt": "الرجاء تحديد مزود التنزيل لرؤية التعليمات.",
       "startingDownload": "جارٍ بدء التنزيل...",
       "torboxInstructions": {
-        "description": "سيقوم Ascendara تلقائيًا بإلغاء رابط Torbox الخاص بك واسترداد رابط التنزيل المباشر المتميز",
+        "description": "سيقوم Ascendara تلقائيًا بإلغاء رابط Torbox الخاص بك واسترداد رابط التنزيل المباشر المميز",
         "title": "ابدأ التنزيل باستخدام Torbox"
       },
       "torrentInstructions": {
@@ -960,11 +960,16 @@
       "steps": "[{'description': 'The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don\\'t have it, close the guide and click the \"Don\\'t have the extension? Get it for Chrome or Firefox\" button to download it.', 'title': 'The Ascendara Download Handler'}، {'description': 'After installing the extension, click the extension icon to enable the handler.', 'title': 'Step 1: Enable the Handler'}، {'description': 'The extension can stay on as it will only send known providers to Ascendara.', 'title': 'The Download Handler'}، {'description': 'Complete the CAPTCHA, and start the download.', 'title': 'Step 2: Start the download'}، {'description': 'Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.', 'title': 'Step 3: Using the Extension'}، {'description': 'Click the button to Open Ascendara.', 'title': 'Step 4: Downloading'}، {'description': \"Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.\", 'title': \"That's it!\"}]",
       "title": "التحميل مع Ascendara"
     },
+    "noDownloadPath": {
+      "desc": "لم تقم بتعيين دليل التنزيل بعد. يرجى الانتقال إلى الإعدادات لاختيار المكان الذي سيتم حفظ ألعابك فيه.",
+      "goToSettings": "انتقل إلى الإعدادات",
+      "title": "لا توجد مجموعة دليل التنزيل"
+    },
     "noGameInfoAvailable": "قم بإعداد Ascendara Xtra في التفضيلات لرؤية المزيد من المعلومات حول هذه اللعبة",
     "noReviewsExplanation": "لا تحتوي هذه اللعبة على أي تقييمات نقدية احترافية متاحة على OpenCritic. قد يكون هذا بسبب أنه إصدار جديد، أو عنوان مستقل، أو لأنه ببساطة لم تتم مراجعته بعد.",
     "notExactMatch": "اسم اللعبة غير متطابق تمامًا. الإبلاغ عن اللعبة إذا لزم الأمر.",
     "online": "متصل",
-    "onlineFixWarningDescription": "تأتي هذه اللعبة مثبتة على Online-Fix، وعند تشغيلها ستظهر لك رسالة تخبرك بأنها من صنع فريق Online-Fix. وهذا أمر طبيعي ويجب أن يظهر مرة واحدة فقط في كل لعبة به.",
+    "onlineFixWarningDescription": "تأتي هذه اللعبة مثبتة على Online-Fix، وعند تشغيلها ستشاهد رسالة تخبرك بأنها من صنع فريق Online-Fix. وهذا أمر طبيعي ويجب أن يظهر مرة واحدة فقط في كل مباراة به.",
     "onlineFixWarningTitle": "مطالبة الإصلاح عبر الإنترنت عند الإطلاق",
     "onlineTooltip": "تم تمكين إمكانيات اللعب الجماعي عبر الإنترنت من خلال online-fix.me",
     "openCriticBetaWarning": "نقطة نهاية واجهة برمجة التطبيقات هذه في مرحلة تجريبية وقد تكون هناك مشكلات. إذا عرض OpenCritic لعبة مختلفة، فيرجى الإبلاغ عن اللعبة بالنقر فوق \"إبلاغ\" على يمين العنوان.",
@@ -1035,7 +1040,7 @@
       "cancel": "يلغي",
       "description": "حدد إصدارًا سابقًا من {game}",
       "loadError": "فشل تحميل سجل الإصدارات",
-      "loading": "جارٍ تحميل الإصدارات السابقة...",
+      "loading": "جاري تحميل الإصدارات السابقة...",
       "noVersions": "لم يتم العثور على الإصدارات السابقة",
       "title": "آلة الزمن أسندارا",
       "unknownDate": "تاريخ غير معروف",
@@ -1059,13 +1064,13 @@
       "reportSubmitted": "تم إرسال التقرير بنجاح",
       "torboxOffline": "هذا المزود غير متصل بالإنترنت على Torbox في الوقت الحالي. حاول مزود آخر.",
       "torboxProcessingError": "حدث خطأ أثناء معالجة رابط Torbox",
-      "torrentSent": "تم إرسال التورنت إلى qBittorrent"
+      "torrentSent": "تم إرسال السيل إلى qBittorrent"
     },
     "topCriticScore": "أعلى نقاط الناقد",
     "trainer": "قائمة المدرب",
     "understand": "أنا أفهم، تابع",
     "update": {
-      "description": "سيؤدي هذا إلى إعادة تثبيت اللعبة في نفس الدليل. على الرغم من أن معظم الألعاب تحفظ البيانات في مواقع منفصلة، ​​فمن المستحسن عمل نسخة احتياطية من أي ملفات حفظ مهمة أو محتوى مخصص قبل متابعة التحديث.",
+      "description": "سيؤدي هذا إلى إعادة تثبيت اللعبة في نفس الدليل. بينما تقوم معظم الألعاب بحفظ البيانات في مواقع منفصلة، ​​فمن المستحسن عمل نسخة احتياطية لأي ملفات حفظ مهمة أو محتوى مخصص قبل متابعة التحديث.",
       "title": "هل أنت مستعد لتحديث {{game}}؟"
     },
     "viewCriticReviews": "عرض المراجعات النقدية",
@@ -1183,7 +1188,7 @@
     "updateAvailable": "التحديث متاح",
     "verified": {
       "alwaysWorking": "العمل دائما",
-      "alwaysWorkingDesc": "تم التحقق من العمل بشكل صحيح بعد التحديثات ويعمل مع جميع ميزات Ascendara",
+      "alwaysWorkingDesc": "تم التحقق من أنه يعمل بشكل صحيح بعد التحديثات ويعمل مع جميع ميزات Ascendara",
       "badge": "لعبة تم التحقق منها",
       "clickForInfo": "انقر للحصول على معلومات",
       "dialogDescription": "تم التحقق من هذه اللعبة من قبل مجتمع Ascendara وهي تعمل مع جميع ميزات Ascendara.",
@@ -1234,7 +1239,7 @@
     "latestVersion": "أحدث نسخة",
     "launchCommandPlaceholder": "أدخل أمر الإطلاق",
     "launchOptions": "إطلاق الخيارات",
-    "launchOptionsDescription": "أدخل أمر التشغيل لهذه اللعبة. سيتم تمرير هذه الوسائط إلى اللعبة القابلة للتنفيذ.",
+    "launchOptionsDescription": "أدخل أمر الإطلاق لهذه اللعبة. سيتم تمرير هذه الوسائط إلى اللعبة القابلة للتنفيذ.",
     "launchOptionsSaved": "تم حفظ خيارات الإطلاق!",
     "launchWithTrainer": "ابدأ مع المدرب",
     "launchWithTrainerDescription": "قم بتشغيل المدرب تلقائيًا عند لعب هذه اللعبة",
@@ -1468,7 +1473,7 @@
     "executableManager": {
       "addExecutable": "إضافة قابل للتنفيذ",
       "atLeastOne": "مطلوب ملف تنفيذي واحد على الأقل",
-      "bigPictureWarning": "سوف تحتاج إلى استخدام الماوس الخاص بك لإضافة الملفات التنفيذية في وضع الصورة الكبيرة",
+      "bigPictureWarning": "ستحتاج إلى استخدام الماوس لإضافة الملفات التنفيذية في وضع الصورة الكبيرة",
       "change": "تغيير قابل للتنفيذ",
       "description": "إدارة الملفات القابلة للتنفيذ لهذه اللعبة. سيتم تشغيل الملف الأساسي القابل للتنفيذ عند النقر فوق \"تشغيل\".",
       "exeLocationHint": "لا يمكن العثور على الملف القابل للتنفيذ؟ قد يكون موجودًا في مجلد فرعي مثل \"bin\" أو \"x64\" أو \"x86\" أو \"Binaries\".",
@@ -1528,7 +1533,7 @@
     "libraryValue": {
       "ascendPromo": {
         "cta": "تعرف على الصعود",
-        "message": "بسعر 2 دولار شهريًا، سيستغرق Ascend {{months}} شهرًا لمساواة ما قمت بحفظه. هذه هي {{years}} سنة من المزامنة السحابية والأصدقاء والمزيد.",
+        "message": "بسعر 2 دولار شهريًا، سيستغرق Ascend {{months}} شهرًا لمساواة ما قمت بحفظه. هذا يعني {{years}} عامًا من المزامنة السحابية والأصدقاء والمزيد.",
         "title": "لقد أنقذت ثروة!"
       },
       "breakdown": "انهيار الأسعار",
@@ -1544,7 +1549,7 @@
       "totalValue": "إجمالي قيمة المكتبة"
     },
     "loadingLibrary": "جمع الألعاب الخاصة بك",
-    "loadingLibraryMessage": "تقوم Ascendara بتجميع كل ألعابك من أجلك. إذا تمكنت من قراءة هذه الرسالة، فستستغرق وقتًا أطول قليلاً من المتوقع.",
+    "loadingLibraryMessage": "يقوم Ascendara بتجميع كل ألعابك من أجلك. إذا تمكنت من قراءة هذه الرسالة، فستستغرق وقتًا أطول قليلاً من المتوقع.",
     "minute": "دقيقة",
     "minutes": "دقائق",
     "multiselect": "الاختيار المتعدد",
@@ -1633,7 +1638,7 @@
     "versionPlaceholder": "على سبيل المثال، 1.0.0",
     "vrWarning": {
       "confirm": "أنا أفهم، تشغيل على أي حال",
-      "description": "هذه لعبة واقع افتراضي وقد تتطلب منك تشغيل اللعبة من خلال SteamVR أو تطبيق Meta Quest. قد يؤدي تشغيل اللعبة مباشرة إلى عدم اتصال سماعة الرأس الخاصة بك باللعبة.",
+      "description": "هذه لعبة واقع افتراضي وقد تتطلب منك تشغيل اللعبة من خلال SteamVR أو تطبيق Meta Quest. قد يؤدي تشغيل اللعبة مباشرة إلى عدم اتصال سماعة الرأس باللعبة.",
       "learnMore": "تعرف على المزيد حول تشغيل ألعاب الواقع الافتراضي",
       "title": "ألعاب الواقع الافتراضي وأسندارا"
     }
@@ -1668,7 +1673,7 @@
     "initializing": "جارٍ التهيئة...",
     "justNow": "الآن",
     "lastRefresh": "التحديث الأخير",
-    "locationChangeFailed": "فشل تغيير الموقع",
+    "locationChangeFailed": "فشل في تغيير الموقع",
     "locationChanged": "تم تحديث موقع التخزين",
     "minuteAgo": "منذ دقيقة",
     "minutesAgo": "قبل دقائق",
@@ -1823,7 +1828,7 @@
     "filters": "المرشحات",
     "gamesIndexed": "الألعاب مفهرسة",
     "indexedInformation": "المعلومات المفهرسة",
-    "indexedInformationDescription": "يستخدم Ascendara قاعدة بيانات مطورة خصيصًا لتخزين روابط ومعلومات اللعبة. يتم تحديث المعلومات المفهرسة كل يومين أو في حالة تقديم طلب. لا يتم تخزين أي ملفات ألعاب على الإطلاق على خوادم Ascendara.",
+    "indexedInformationDescription": "تستخدم Ascendara قاعدة بيانات مطورة خصيصًا لتخزين روابط ومعلومات اللعبة. يتم تحديث المعلومات المفهرسة كل يومين أو في حالة تقديم طلب. لا يتم تخزين أي ملفات ألعاب على الإطلاق على خوادم Ascendara.",
     "lastUpdated": "آخر تحديث",
     "leastPopular": "الأقل شعبية",
     "localIndexedDescription": "يتم تحميل الألعاب من الفهرس المحلي الخاص بك. وهذا يوفر تحميلًا أسرع ووصولاً إلى معلومات اللعبة في وضع عدم الاتصال.",
@@ -1879,7 +1884,7 @@
     "achievementWatcher": {
       "addDir": "أضف الدليل",
       "defaultDirs": "أدلة المشاهدة الافتراضية",
-      "defaultDirsNote": "تتم مراقبة هذه الدلائل دائمًا لتحقيق الإنجازات. يمكنك إضافة المزيد من الدلائل أدناه.",
+      "defaultDirsNote": "تتم مراقبة هذه الدلائل دائمًا بحثًا عن الإنجازات. يمكنك إضافة المزيد من الدلائل أدناه.",
       "description": "هذه هي المجلدات التي سيتم مراقبتها للإنجازات. ستتم إضافة أي إنجازات يتم العثور عليها إلى مكتبتك. يعتمد The Achievement Watcher على النسخة الأصلية من xan105 وتم تعديلها من أجل Ascendara.",
       "noDirs": "لم يتم تحديد أي أدلة",
       "title": "مراقب الإنجاز"
@@ -1888,6 +1893,34 @@
     "addLocation": "إضافة دليل التحميل",
     "additionalLocations": "مواقع إضافية",
     "apiKeySaved": "تم حفظ مفتاح API",
+    "appBranch": {
+      "description": "اختر قناة الإصدار الخاصة بك. سيؤدي التبديل إلى تنزيل برنامج التثبيت المناسب وتشغيله — وستتم إعادة تشغيل التطبيق تلقائيًا.",
+      "experimental": {
+        "description": "تصميمات متطورة مع أحدث التغييرات. قد تكون غير مستقرة.",
+        "label": "تجريبي",
+        "requiresSubscription": "يتطلب الاشتراك التصاعدي"
+      },
+      "live": {
+        "description": "الإصدار المستقر. الموصى بها لجميع المستخدمين.",
+        "label": "يعيش"
+      },
+      "publicTesting": {
+        "description": "احصل على إمكانية الوصول المبكر إلى الميزات القادمة قبل شحنها إلى Live.",
+        "label": "الاختبار العام"
+      },
+      "switchDialog": {
+        "cancel": "يلغي",
+        "confirm": "فرع التبديل",
+        "description": "سيقوم Ascendara بتنزيل ملف",
+        "downloading": "جارٍ التنزيل...",
+        "downloadingInstaller": "جارٍ تنزيل المثبت...",
+        "experimentalWarning": "قد تكون الإصدارات التجريبية غير مستقرة وتحتوي على أخطاء. استخدم على مسؤوليتك الخاصة.",
+        "installer": "المثبت وتشغيله. سيتم إغلاق التطبيق تلقائيًا لإكمال التبديل.",
+        "switchAndReinstall": "التبديل وإعادة التثبيت",
+        "title": "هل تريد التبديل إلى {{branch}}؟"
+      },
+      "title": "فرع التطبيقات"
+    },
     "appearance": "مظهر",
     "application": "طلب",
     "applyCustomColors": "تطبيق الألوان",
@@ -2109,7 +2142,7 @@
     "themes": "سمات التطبيق",
     "threads": "المواضيع",
     "title": "تفضيلات Ascendara",
-    "torboxApiKey": "مفتاح Torbox API",
+    "torboxApiKey": "مفتاح واجهة برمجة التطبيقات Torbox",
     "torboxApiKeyDescription": "تتيح لك خدمات Debrid تحويل روابط مضيف الملفات إلى روابط تنزيل مباشرة متميزة، وتجاوز حدود السرعة وأوقات الانتظار. أدخل مفتاح Torbox API هنا لتمكين هذه الميزة.",
     "torboxApiKeyLearnHowtoGet": "تعرف على كيفية الحصول على مفتاح API الخاص بك",
     "torboxApiKeyPlaceholder": "الصق مفتاح Torbox API",
@@ -2145,7 +2178,26 @@
     "warningDescription": "تم تصميم Ascendara كمنصة اختبار لألعاب الفيديو، مما يسمح للمستخدمين بتقييم طريقة اللعب والأداء والتوافق قبل اتخاذ قرار الشراء. تشجع Ascendara المستخدمين بشدة على دعم مطوري الألعاب من خلال شراء الألعاب التي يستمتعون بها.",
     "warningSupportDevelopers": "يستثمر مطورو الألعاب وقتًا وموارد وإبداعًا كبيرًا في إنشاء التجارب التي نستمتع بها جميعًا. إن عملية الشراء الخاصة بك تدعم بشكل مباشر قدرتهم على الاستمرار في صنع ألعاب رائعة والحفاظ على صناعة الألعاب.",
     "warningSupportDevelopersCallToAction": "يرجى دعم المطورين عن طريق شراء الألعاب التي تستمتع بها.",
-    "warningTitle": "مرحبًا، من فضلك اقرأ هذا!"
+    "warningTitle": "مرحبًا، من فضلك اقرأ هذا!",
+    "wineProton": {
+      "browse": "تصفح",
+      "description": "تكوين كيفية تشغيل ألعاب Windows على Linux",
+      "linuxOnly": "لينكس فقط",
+      "protonBinary": "بروتون ثنائي",
+      "protonBinaryDescription": "المسار إلى بروتون القابل للتنفيذ. الافتراضات ل",
+      "protonBinaryPlaceholder": "بروتون",
+      "protonDescription": "استخدم طبقة توافق Proton بدلاً من Wine. Proton هو شوكة النبيذ الخاصة بشركة Valve المُحسّنة للألعاب.",
+      "protonExperimental": "تجريبي",
+      "protonSection": "بروتون",
+      "title": "النبيذ والبروتون",
+      "wineBinary": "ثنائي النبيذ",
+      "wineBinaryDescription": "الطريق إلى النبيذ قابل للتنفيذ. الافتراضات ل",
+      "wineBinaryPlaceholder": "خمر",
+      "winePrefix": "بادئة النبيذ (WINEPREFIX)",
+      "winePrefixDescription": "الدليل المستخدم كبادئة النبيذ. اتركها فارغة للاستخدام",
+      "winePrefixPlaceholder": "~/.wine",
+      "wineSection": "خمر"
+    }
   },
   "torbox": {
     "account": "حساب توربوكس",
@@ -2279,7 +2331,7 @@
     "chooseYourTheme": "اختر الموضوع الخاص بك",
     "clickTheExtensionIcon": "انقر فوق رمز الامتداد وقم بتمكين معالج التنزيل عند تثبيته",
     "continue": "يكمل",
-    "continueWithoutSharing": "استمر بدون مشاركة",
+    "continueWithoutSharing": "الاستمرار بدون مشاركة",
     "darkThemes": "المواضيع المظلمة",
     "dependenciesDesc": "إذا كنت تلعب على جهاز كمبيوتر جديد أو قمت بتثبيت Windows مؤخرًا، فيمكن أن يساعدك Ascendara في تثبيت هذه المكونات الأساسية لضمان أفضل تجربة.",
     "downloadGamesFaster": "احصل على ملحق Ascendara",
@@ -2290,7 +2342,7 @@
     "exploreOnMyOwn": "سأستكشف بمفردي",
     "failedToInstallDependencies": "فشل في تثبيت التبعيات. يرجى المحاولة مرة أخرى أو التخطي إذا استمرت المشكلة.",
     "freshNewLookDesc": "تطبيق اختبار الألعاب المفضل لديك، الآن بتصميم حديث وموضوعات قابلة للتخصيص التي كنت تطلبها",
-    "freshNewLookTitle": "نظرة جديدة جديدة",
+    "freshNewLookTitle": "نظرة جديدة طازجة",
     "gameDevelopmentFramework": "إطار تطوير اللعبة",
     "getStarted": "ابدأ",
     "getTheAscendaraDownloadHandlerExtension": "يساعدك ملحق Ascendara على تنزيل الألعاب بشكل أسرع ويوصى بإعداد فهرس الألعاب في الخطوة التالية.",

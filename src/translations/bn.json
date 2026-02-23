@@ -26,7 +26,7 @@
       "title": "অ্যাকাউন্ট মুছে ফেলার অনুরোধ করুন"
     },
     "deletionWarning": "আপনার অনুরোধ কয়েক দিনের মধ্যে প্রক্রিয়া করা হবে",
-    "displayNameHint": "এইভাবে অন্যান্য ব্যবহারকারীরা আপনাকে দেখতে পাবে। ন্যূনতম 4 অক্ষর।",
+    "displayNameHint": "এইভাবে অন্যান্য ব্যবহারকারীরা আপনাকে দেখতে পাবে। সর্বনিম্ন 4 অক্ষর।",
     "errors": {
       "accountDeleted": "অ্যাকাউন্ট মুছে ফেলা হয়েছে",
       "accountDeletedMessage": "এই অ্যাকাউন্টটি একজন প্রশাসক দ্বারা মুছে ফেলা হয়েছে এবং পুনরুদ্ধার করা যাবে না৷ সমস্ত সংশ্লিষ্ট ডেটা স্থায়ীভাবে মুছে ফেলা হয়েছে।",
@@ -41,7 +41,7 @@
       "invalidEmail": "একটি বৈধ ইমেল ঠিকানা লিখুন",
       "passwordMismatch": "পাসওয়ার্ড মেলে না",
       "passwordRequired": "আপনার পাসওয়ার্ড লিখুন",
-      "passwordRequirements": "পাসওয়ার্ডে অবশ্যই বড় হাতের, ছোট হাতের, সংখ্যা এবং বিশেষ অক্ষর সহ 8+ অক্ষর থাকতে হবে",
+      "passwordRequirements": "পাসওয়ার্ডে অবশ্যই বড় হাতের, ছোট হাতের অক্ষর, সংখ্যা এবং বিশেষ অক্ষর সহ 8+ অক্ষর থাকতে হবে",
       "signInInstead": "পরিবর্তে সাইন ইন করুন",
       "termsRequired": "শর্তাবলী এবং গোপনীয়তা নীতিতে সম্মত হন",
       "updateFailed": "প্রোফাইল আপডেট করতে ব্যর্থ হয়েছে"
@@ -116,7 +116,7 @@
       "verified": "ইমেইল যাচাই করা হয়েছে! আরোহণে স্বাগতম!"
     },
     "welcome": "স্বাগতম",
-    "welcomeBack": "স্বাগত ফিরে",
+    "welcomeBack": "ফিরে স্বাগতম",
     "welcomeBackIntro": "আপনার সমস্ত বৈশিষ্ট্য অ্যাক্সেস করতে সাইন ইন করুন:"
   },
   "app": {
@@ -218,7 +218,7 @@
       "expired": "বিচারের মেয়াদ শেষ",
       "expiredMessage": "আপনার 7 দিনের অ্যাসেন্ড ট্রায়াল শেষ হয়েছে৷ বন্ধু, ক্লাউড-সিঙ্ক এবং আরও অনেক কিছুর মতো Ascend বৈশিষ্ট্যগুলি ব্যবহার চালিয়ে যেতে সদস্যতা নিন।",
       "noTrialMessage": "আপনি একটি বিনামূল্যে ট্রায়াল জন্য যোগ্য নন. Ascend বৈশিষ্ট্য অ্যাক্সেস করতে সাবস্ক্রাইব করুন.",
-      "noTrialTitle": "সাবস্ক্রিপশন প্রয়োজন",
+      "noTrialTitle": "সদস্যতা প্রয়োজন",
       "reason": "কারণ",
       "trial": "আমি বুঝি আমার 7 দিনের বিনামূল্যের ট্রায়াল আছে",
       "trialBlocked": "ট্রায়াল ইতিমধ্যে ব্যবহৃত",
@@ -261,7 +261,7 @@
       "cloudBackup": "ক্লাউড ব্যাকআপ",
       "cloudOnly": "শুধু মেঘ",
       "custom": "কাস্টম",
-      "delete": "মুছুন",
+      "delete": "মুছে দিন",
       "deleteConfirm": "ক্লাউড থেকে মুছবেন?",
       "deleteFailed": "খেলা মুছে ফেলতে ব্যর্থ হয়েছে",
       "emptyDescription": "ক্লাউডে আপনার গেম লাইব্রেরি ব্যাক আপ করুন। আপনার সমস্ত ডিভাইস জুড়ে আপনার খেলার সময়, কৃতিত্ব এবং অগ্রগতি ট্র্যাক করুন।",
@@ -300,7 +300,7 @@
     "community": {
       "allCommunities": "সকল সম্প্রদায়",
       "approved": "অনুমোদিত",
-      "back": "ফিরে",
+      "back": "ব্যাক",
       "createRequest": {
         "description": "বর্ণনা",
         "descriptionPlaceholder": "আপনার সম্প্রদায়ের বর্ণনা দিন...",
@@ -323,7 +323,7 @@
         "error": "যোগদানের অনুরোধ পাঠাতে ব্যর্থ হয়েছে৷",
         "pending": "যোগদানের অনুরোধ পাঠানো হয়েছে! সম্প্রদায়ের মালিকের কাছ থেকে অনুমোদনের অপেক্ষায়।",
         "requesting": "অনুরোধ করা হচ্ছে...",
-        "title": "যোগদানের জন্য অনুরোধ"
+        "title": "যোগদানের অনুরোধ"
       },
       "joinRequests": "অনুরোধ যোগদান",
       "members": "সদস্যরা",
@@ -470,7 +470,7 @@
       },
       "upcoming": {
         "description": "পরবর্তী Ascendara আপডেটে যা আসছে তার একচেটিয়া পূর্বরূপ পান। বক্ররেখার আগে থাকুন এবং দিগন্তে কী নতুন বৈশিষ্ট্য রয়েছে তা জানুন।",
-        "title": "আসন্ন আপডেট পিক"
+        "title": "আসন্ন আপডেট উঁকি"
       },
       "webView": {
         "description": "আপনার সক্রিয় ডাউনলোডগুলি সহজেই নিরীক্ষণ এবং পরিচালনা করুন এবং আপনার Ascend বন্ধুরা আপনার মোবাইল ডিভাইসে কী করছে তা দেখুন৷",
@@ -657,7 +657,7 @@
       "trialActive": "ট্রায়াল সক্রিয়",
       "trialDaysRemaining": "আপনার ট্রায়ালে {{days}} দিন বাকি",
       "trialProgress": "বিচারের অগ্রগতি",
-      "verificationRequiresSubscription": "সাবস্ক্রিপশন প্রয়োজন",
+      "verificationRequiresSubscription": "সদস্যতা প্রয়োজন",
       "verificationTrialWarning": "যাচাইকরণ কমান্ড শুধুমাত্র সক্রিয় গ্রাহকদের জন্য কাজ করে। যাচাই করতে এবং এক্সক্লুসিভ ডিসকর্ড চ্যানেল আনলক করতে Ascend-এ সদস্যতা নিন।",
       "verifiedDescription": "সমস্ত Ascend বৈশিষ্ট্যগুলিতে আপনার সম্পূর্ণ অ্যাক্সেস রয়েছে৷",
       "verifiedThankYou": "Ascendara অংশ হওয়ার জন্য আপনাকে ধন্যবাদ!",
@@ -713,7 +713,7 @@
   "bigPicture": {
     "activeDownloads": "সক্রিয় ডাউনলোড",
     "addedToPlayLater": "পরে খেলতে যোগ করা হয়েছে",
-    "ascendPremiumFeatures": "আরোহণ প্রিমিয়াম বৈশিষ্ট্য",
+    "ascendPremiumFeatures": "আরোহন প্রিমিয়াম বৈশিষ্ট্য",
     "autoUpdates": "স্বয়ংক্রিয় আপডেট",
     "available": "পাওয়া যায়",
     "back": "পিছনে",
@@ -804,11 +804,11 @@
   "common": {
     "action_cannot_be_undone": "এই ক্রিয়াটি পূর্বাবস্থায় ফেরানো যাবে না৷",
     "ascend": "আরোহণ",
-    "back": "ফিরে",
+    "back": "ব্যাক",
     "bigpicture": "বড় ছবি",
     "cancel": "বাতিল করুন",
     "close": "বন্ধ",
-    "delete": "মুছুন",
+    "delete": "মুছে দিন",
     "discord": "বিরোধ",
     "downloading": "ডাউনলোড হচ্ছে...",
     "downloads": "ডাউনলোড",
@@ -879,14 +879,14 @@
     "cloudSaving": "ক্লাউড সেভ করে",
     "companies": "কোম্পানিগুলো",
     "compareYourPC": "আপনার পিসি তুলনা করুন",
-    "completionist": "সম্পূর্ণতাবাদী",
+    "completionist": "পূর্ণতাবাদী",
     "criticError": "সমালোচক পর্যালোচনা লোড করতে ব্যর্থ",
     "criticReviews": "সমালোচক পর্যালোচনা",
     "dataProvidedBy": "গেম তথ্য দ্বারা প্রদান করা হয়",
     "developers": "বিকাশকারীরা",
     "downloadOptions": {
       "ascendaraHandler": "Ascendara ডাউনলোড হ্যান্ডলার",
-      "downloadLink": "ডাউনলোড লিংকঃ",
+      "downloadLink": "ডাউনলোড লিংক:",
       "downloadNow": "এখনই ডাউনলোড করুন",
       "downloadOptions": "ডাউনলোড অপশন",
       "downloadSource": "উৎস ডাউনলোড করুন",
@@ -959,6 +959,11 @@
       "startGuide": "গাইড শুরু করুন",
       "steps": "[{'description': 'The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don\\'t have it, close the guide and click the \"Don\\'t have the extension? Get it for Chrome or Firefox\" button to download it.', 'title': 'The Ascendara Download Handler'}, {'description': 'After installing the extension, click the extension icon to enable the handler.', 'title': 'Step 1: Enable the Handler'}, {'description': 'The extension can stay on as it will only send known providers to Ascendara.', 'title': 'The Download Handler'}, {'description': 'Complete the CAPTCHA, and start the download.', 'title': 'Step 2: Start the download'}, {'description': 'Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.', 'title': 'Step 3: Using the Extension'}, {'description': 'Click the button to Open Ascendara.', 'title': 'Step 4: Downloading'}, {'description': \"Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.\", 'title': \"That's it!\"}]",
       "title": "Ascendara দিয়ে ডাউনলোড করা হচ্ছে"
+    },
+    "noDownloadPath": {
+      "desc": "আপনি এখনও একটি ডাউনলোড ডিরেক্টরি সেট করেননি. আপনার গেমগুলি কোথায় সংরক্ষণ করা হবে তা চয়ন করতে দয়া করে সেটিংসে যান৷",
+      "goToSettings": "সেটিংসে যান",
+      "title": "কোনো ডাউনলোড ডিরেক্টরি সেট নেই"
     },
     "noGameInfoAvailable": "এই গেম সম্পর্কে আরও তথ্য দেখতে পছন্দগুলিতে Ascendara Xtra সেটআপ করুন",
     "noReviewsExplanation": "এই গেমটির OpenCritic-এ উপলব্ধ কোনো পেশাদার সমালোচক পর্যালোচনা নেই। এটি হতে পারে কারণ এটি একটি নতুন রিলিজ, একটি ইন্ডি শিরোনাম, বা কেবল এখনও পর্যালোচনা করা হয়নি৷",
@@ -1094,7 +1099,7 @@
     },
     "completed": "ডাউনলোড সম্পূর্ণ",
     "completedDescription": "আপনার গেম ডাউনলোড হয়ে গেছে এবং খেলার জন্য প্রস্তুত",
-    "connectionBrokenError": "ডাউনলোড সংযোগ বিঘ্নিত হয়েছে. আরও স্থিতিশীল ডাউনলোডের জন্য Ascendara পছন্দগুলিতে একক স্ট্রিম ডাউনলোড সক্ষম করার চেষ্টা করুন।",
+    "connectionBrokenError": "ডাউনলোড সংযোগ বিঘ্নিত হয়েছে. আরও স্থিতিশীল ডাউনলোডের জন্য Ascendara পছন্দগুলিতে একক স্ট্রীম ডাউনলোড সক্ষম করার চেষ্টা করুন৷",
     "connectionResetError": "ডাউনলোড শুরু করা যায়নি কারণ সংযোগটি বাতিল করা হয়েছে৷ আপনার ইন্টারনেট পরিষেবা প্রদানকারী এই নির্দিষ্ট ডাউনলোড উত্স ব্লক করতে পারে, একটি VPN ব্যবহার করার কথা বিবেচনা করুন৷",
     "contentTypeError": "ডাউনলোডার একটি বিষয়বস্তুর প্রকার ত্রুটি রিপোর্ট করেছে৷ এটি সম্ভবত ডাউনলোড লিঙ্ক মেয়াদ শেষ হয়ে গেছে মানে.",
     "currentTotalSpeed": "বর্তমান মোট গতি",
@@ -1155,7 +1160,7 @@
     "verifyAgain": "গেম ফাইল যাচাই করুন",
     "verifying": "ফাইল যাচাই করা হচ্ছে...",
     "verifyingDescription": "আসেন্দারা গেমের ফাইলগুলো যাচাই করছে। গেমের আকারের উপর নির্ভর করে এটি কিছুটা সময় নিতে পারে।",
-    "waiting": "সমবয়সীদের জন্য অপেক্ষা করছি",
+    "waiting": "সমবয়সীদের জন্য অপেক্ষা",
     "waitingDescription": "qBittorrent অন্যান্য ব্যবহারকারীদের কাছ থেকে টরেন্ট ফাইলের টুকরো ডাউনলোড করতে এবং পালাক্রমে তাদের আপলোড করার জন্য সহকর্মীদের সন্ধান করছে। অন্যরা আপনি কি ডাউনলোড করছেন তা দেখতে এবং/অথবা আপনার সর্বজনীন IP ঠিকানা নির্ধারণ করতে সক্ষম হতে পারে।",
     "waitingInQueue": "সারিতে অপেক্ষা করছে",
     "windowsDefenderError": "উইন্ডোজ একটি মিথ্যা ইতিবাচক সনাক্ত করেছে এবং ডাউনলোড সম্পূর্ণ হতে বাধা দিয়েছে। অনুগ্রহ করে Ascendara পছন্দগুলিতে সুরক্ষা ডিরেক্টরিগুলি সক্ষম করুন৷"
@@ -1256,7 +1261,7 @@
     "noAchievementsFound": "কোন অর্জন পাওয়া যায়নি",
     "noFilesFound": "কোন ফাইল উপলব্ধ নেই. আরও বিকল্পের জন্য Nexus Mods এ দেখুন।",
     "noSoundtrackDescription": "এই গেমের জন্য কোন সাউন্ডট্র্যাক তথ্য পাওয়া যায়নি.",
-    "noSoundtrackFound": "কোন সাউন্ডট্র্যাক পাওয়া যায়নি",
+    "noSoundtrackFound": "কোন সাউন্ডট্র্যাক পাওয়া গেছে",
     "notInCloudLibrary": "ক্লাউড লাইব্রেরিতে নেই",
     "overview": "ওভারভিউ",
     "playTrack": "ট্র্যাক খেলুন",
@@ -1362,7 +1367,7 @@
       "autoBackupDesc": "গেম বন্ধ হয়ে গেলে স্বয়ংক্রিয়ভাবে ব্যাকআপ ডেটা সংরক্ষণ করুন",
       "autoBackupDisabled": "অটো-ব্যাকআপ নিষ্ক্রিয়",
       "autoBackupDisabledDesc": "{{game}} এর জন্য অটো-ব্যাকআপ অক্ষম করা হয়েছে",
-      "autoBackupEnabled": "অটো-ব্যাকআপ সক্ষম",
+      "autoBackupEnabled": "স্বয়ংক্রিয় ব্যাকআপ সক্ষম",
       "autoBackupEnabledDesc": "{{game}} এর জন্য স্বয়ংক্রিয় ব্যাকআপ সক্ষম করা হয়েছে",
       "autoBackupOnGameClose": "গেম ক্লোজে অটো-ব্যাকআপ",
       "autoCloudBackup": "অটো-ক্লাউড ব্যাকআপ",
@@ -1393,7 +1398,7 @@
       "createBackupFirst": "এটি এখানে তালিকাভুক্ত দেখতে প্রথমে একটি ব্যাকআপ তৈরি করুন৷",
       "creatingBackup": "ব্যাকআপ তৈরি করা হচ্ছে",
       "gameBackupTitle": "খেলা ব্যাকআপ সংরক্ষণ করুন",
-      "listBackups": "পুনরুদ্ধার করতে ব্যাকআপ নির্বাচন করুন",
+      "listBackups": "পুনরুদ্ধার করতে ব্যাকআপ বেছে নিন",
       "loadBackupsFailed": "ব্যাকআপ লোড করতে ব্যর্থ হয়েছে৷",
       "loadingBackups": "ব্যাকআপ লোড হচ্ছে",
       "noBackupsFound": "কোন ব্যাকআপ পাওয়া যায়নি",
@@ -1409,7 +1414,7 @@
       "restoreWarningDesc": "আপনি আপনার সাম্প্রতিক ব্যাকআপ থেকে {{game}} এর জন্য সংরক্ষণ ডেটা পুনরুদ্ধার করতে চলেছেন৷",
       "restoreWarningGameClosed": "এগিয়ে যাওয়ার আগে নিশ্চিত করুন যে গেমটি চলছে না।",
       "restoreWarningOverwrite": "এটি ব্যাকআপ সংস্করণ সহ বর্তমান সংরক্ষণ করা ফাইলগুলিকে ওভাররাইট করবে৷",
-      "restoreWarningTitle": "দাঁড়াও...",
+      "restoreWarningTitle": "থাকো...",
       "restoringBackup": "ব্যাকআপ পুনরুদ্ধার করা হচ্ছে",
       "restoringDescription": "{{game}} এর জন্য সংরক্ষণ ডেটা পুনরুদ্ধার করা হচ্ছে...",
       "settings": "সেটিংস",
@@ -1451,7 +1456,7 @@
     "confirmRemoveFolderTitle": "ফোল্ডার সরাবেন?",
     "coverSearchError": "চিত্র অনুসন্ধানে ত্রুটি৷",
     "createShortcut": "ডেস্কটপ শর্টকাট তৈরি করুন",
-    "delete": "মুছুন",
+    "delete": "মুছে দিন",
     "deleteConfirmMessage": "আপনি কি আপনার লাইব্রেরি থেকে {{game}} মুছে ফেলার বিষয়ে নিশ্চিত? এটি আপনার Ascendara লাইব্রেরি থেকে গেমটি মুছে ফেলবে এবং সমস্ত সংশ্লিষ্ট ফাইল মুছে ফেলবে। এই ক্রিয়াটি পূর্বাবস্থায় ফেরানো যাবে না৷",
     "deleteFolder": "ফোল্ডার সরান",
     "deleteGame": "গেম মুছুন",
@@ -1689,7 +1694,7 @@
     "shareIndexDesc": "অন্য ব্যবহারকারীদের সাহায্য করতে রিফ্রেশ করার পরে স্বয়ংক্রিয়ভাবে আপনার সূচক আপলোড করুন",
     "sharing": "শেয়ার করা হচ্ছে...",
     "sharingEnabled": "শেয়ারিং অন",
-    "startFailed": "রিফ্রেশ শুরু করতে ব্যর্থ হয়েছে৷",
+    "startFailed": "রিফ্রেশ শুরু করতে ব্যর্থ হয়েছে",
     "startScrape": "স্ক্র্যাপ শুরু করুন",
     "statusCompleted": "রিফ্রেশ সম্পূর্ণ",
     "statusError": "রিফ্রেশ ব্যর্থ হয়েছে",
@@ -1888,6 +1893,34 @@
     "addLocation": "ডাউনলোড ডিরেক্টরি যোগ করুন",
     "additionalLocations": "অতিরিক্ত অবস্থান",
     "apiKeySaved": "API কী সংরক্ষিত",
+    "appBranch": {
+      "description": "আপনার রিলিজ চ্যানেল চয়ন করুন. স্যুইচিং উপযুক্ত ইনস্টলার ডাউনলোড করবে এবং চালাবে — অ্যাপটি স্বয়ংক্রিয়ভাবে পুনরায় চালু হবে।",
+      "experimental": {
+        "description": "অত্যাধুনিক পরিবর্তনের সাথে তৈরি করে। অস্থির হতে পারে।",
+        "label": "পরীক্ষামূলক",
+        "requiresSubscription": "Ascend সাবস্ক্রিপশন প্রয়োজন"
+      },
+      "live": {
+        "description": "স্থিতিশীল মুক্তি। সমস্ত ব্যবহারকারীদের জন্য প্রস্তাবিত.",
+        "label": "লাইভ"
+      },
+      "publicTesting": {
+        "description": "লাইভে পাঠানোর আগে আসন্ন বৈশিষ্ট্যগুলিতে প্রাথমিক অ্যাক্সেস পান।",
+        "label": "পাবলিক পরীক্ষা"
+      },
+      "switchDialog": {
+        "cancel": "বাতিল করুন",
+        "confirm": "সুইচ শাখা",
+        "description": "আসেন্দারা ডাউনলোড করবে",
+        "downloading": "ডাউনলোড হচ্ছে...",
+        "downloadingInstaller": "ইনস্টলার ডাউনলোড হচ্ছে...",
+        "experimentalWarning": "পরীক্ষামূলক বিল্ডগুলি অস্থির হতে পারে এবং এতে বাগ থাকতে পারে। আপনার নিজের ঝুঁকিতে ব্যবহার করুন।",
+        "installer": "ইনস্টলার এবং এটি চালু করুন। স্যুইচ সম্পূর্ণ করতে অ্যাপটি স্বয়ংক্রিয়ভাবে বন্ধ হয়ে যাবে।",
+        "switchAndReinstall": "সুইচ এবং পুনরায় ইনস্টল করুন",
+        "title": "{{branch}} এ স্যুইচ করবেন?"
+      },
+      "title": "অ্যাপ শাখা"
+    },
     "appearance": "চেহারা",
     "application": "আবেদন",
     "applyCustomColors": "রং প্রয়োগ করুন",
@@ -2083,7 +2116,7 @@
     "sideScrollBarDescription": "অ্যাপ্লিকেশন উইন্ডোর পাশে একটি স্ক্রোল বার দেখান।",
     "sidecar": {
       "available": "পাওয়া যায়",
-      "builtIn": "আসেন্দারায় নির্মিত",
+      "builtIn": "Ascendara মধ্যে নির্মিত",
       "description": "Sidecars হল Ascendara দ্বারা পরিচালিত অফিসিয়াল ইন্টিগ্রেশন। এই উপাদানগুলি অ্যাপের ক্ষমতা বাড়ানোর জন্য প্লাগইনগুলির মতো কাজ করে৷",
       "hideBuiltIn": "অন্তর্নির্মিত লুকান",
       "installed": "ইনস্টল করা হয়েছে",
@@ -2121,7 +2154,7 @@
       "description": "টরেন্ট কার্যকারিতা সক্ষম করার আগে দয়া করে এটি সাবধানে পড়ুন:",
       "legalWarning": "কপিরাইটযুক্ত সামগ্রী ডাউনলোড করা আপনার অঞ্চলে বেআইনি হতে পারে৷ আপনি আপনার নিজের কর্মের জন্য দায়ী.",
       "qbitWarning": "এই বৈশিষ্ট্যটির জন্য qBittorrent প্রয়োজন। নিশ্চিত করুন যে এটি আপনার VPN এর সাথে সঠিকভাবে কনফিগার করা আছে।",
-      "title": "টরেন্ট সমর্থন সক্ষম করুন",
+      "title": "টরেন্ট সমর্থন সক্রিয় করুন",
       "vpnWarning": "আপনার আইপি ঠিকানা অন্যান্য সহকর্মীদের কাছে দৃশ্যমান হবে। আপনার গোপনীয়তা রক্ষা করতে এবং সম্ভাব্য আইনি সমস্যা এড়াতে একটি VPN ব্যবহার করুন।"
     },
     "torrenting": "টরেন্টিং",
@@ -2145,7 +2178,26 @@
     "warningDescription": "Ascendara ভিডিও গেমের জন্য একটি পরীক্ষামূলক প্ল্যাটফর্ম হিসাবে ডিজাইন করা হয়েছে, যা ব্যবহারকারীদের ক্রয়ের সিদ্ধান্ত নেওয়ার আগে গেমপ্লে, কর্মক্ষমতা এবং সামঞ্জস্যের মূল্যায়ন করতে দেয়। Ascendara দৃঢ়ভাবে ব্যবহারকারীদের গেম ডেভেলপারদের তাদের উপভোগ করা গেম ক্রয় করে সমর্থন করার জন্য উৎসাহিত করে।",
     "warningSupportDevelopers": "গেম ডেভেলপাররা আমরা সকলেই যে অভিজ্ঞতাগুলি উপভোগ করি তা তৈরি করতে উল্লেখযোগ্য সময়, সংস্থান এবং সৃজনশীলতা বিনিয়োগ করে। আপনার কেনাকাটা সরাসরি তাদের দুর্দান্ত গেম তৈরি করা এবং গেমিং শিল্পকে টিকিয়ে রাখার ক্ষমতাকে সমর্থন করে।",
     "warningSupportDevelopersCallToAction": "আপনি যে গেমগুলি উপভোগ করেন তা ক্রয় করে বিকাশকারীদের সমর্থন করুন৷",
-    "warningTitle": "আরে, এই পড়ুন!"
+    "warningTitle": "আরে, এই পড়ুন!",
+    "wineProton": {
+      "browse": "ব্রাউজ করুন",
+      "description": "লিনাক্সে উইন্ডোজ গেমগুলি কীভাবে চালানো হয় তা কনফিগার করুন",
+      "linuxOnly": "শুধুমাত্র লিনাক্স",
+      "protonBinary": "প্রোটন বাইনারি",
+      "protonBinaryDescription": "প্রোটন এক্সিকিউটেবলের পথ। ডিফল্ট থেকে",
+      "protonBinaryPlaceholder": "প্রোটন",
+      "protonDescription": "ওয়াইনের পরিবর্তে প্রোটন সামঞ্জস্যপূর্ণ স্তর ব্যবহার করুন। প্রোটন হল ভালভের ওয়াইনের কাঁটা যা গেমিংয়ের জন্য অপ্টিমাইজ করা হয়েছে।",
+      "protonExperimental": "পরীক্ষামূলক",
+      "protonSection": "প্রোটন",
+      "title": "ওয়াইন এবং প্রোটন",
+      "wineBinary": "ওয়াইন বাইনারি",
+      "wineBinaryDescription": "ওয়াইন নির্বাহযোগ্য পথ. ডিফল্ট থেকে",
+      "wineBinaryPlaceholder": "ওয়াইন",
+      "winePrefix": "ওয়াইন উপসর্গ (WINEPREFIX)",
+      "winePrefixDescription": "ওয়াইন উপসর্গ হিসাবে ব্যবহৃত ডিরেক্টরি. ব্যবহার করার জন্য খালি রাখুন",
+      "winePrefixPlaceholder": "~/.ওয়াইন",
+      "wineSection": "মদ"
+    }
   },
   "torbox": {
     "account": "TorBox অ্যাকাউন্ট",
@@ -2174,7 +2226,7 @@
     "loading_downloads": "ডাউনলোড লোড হচ্ছে...",
     "no_completed_downloads": "কোন সম্পূর্ণ ডাউনলোড",
     "no_completed_downloads_desc": "আপনার TorBox সার্ভারে কোনো সম্পূর্ণ ডাউনলোড নেই",
-    "no_downloading": "কোনো ডাউনলোড প্রগতিতে নেই",
+    "no_downloading": "কোনো ডাউনলোড প্রগতিতে নেই৷",
     "no_downloading_desc": "বর্তমানে কোনো ডাউনলোড চলছে না",
     "no_ready_downloads": "কোন প্রস্তুত ডাউনলোড",
     "no_ready_downloads_desc": "আপনার পিসিতে ডাউনলোড করার জন্য কোন ডাউনলোড প্রস্তুত নেই",

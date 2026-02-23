@@ -788,7 +788,7 @@
     "seeMore": "Voir plus",
     "select": "SÉLECTIONNER",
     "selectProvider": "Sélectionnez le fournisseur de téléchargement",
-    "selectProviderMessage": "Choisissez le fournisseur à partir duquel vous souhaitez télécharger {{game}} :",
+    "selectProviderMessage": "Choisissez le fournisseur depuis lequel vous souhaitez télécharger {{game}} :",
     "settings": "PARAMÈTRES",
     "space": "Espace",
     "startDownload": "COMMENCER LE TÉLÉCHARGEMENT",
@@ -960,8 +960,13 @@
       "steps": "[{'description': 'The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don\\'t have it, close the guide and click the \"Don\\'t have the extension? Get it for Chrome or Firefox\" button to download it.', 'title': 'The Ascendara Download Handler'}, {'description': 'After installing the extension, click the extension icon to enable the handler.', 'title': 'Step 1: Enable the Handler'}, {'description': 'The extension can stay on as it will only send known providers to Ascendara.', 'title': 'The Download Handler'}, {'description': 'Complete the CAPTCHA, and start the download.', 'title': 'Step 2: Start the download'}, {'description': 'Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.', 'title': 'Step 3: Using the Extension'}, {'description': 'Click the button to Open Ascendara.', 'title': 'Step 4: Downloading'}, {'description': \"Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.\", 'title': \"That's it!\"}]",
       "title": "Téléchargement avec Ascendara"
     },
+    "noDownloadPath": {
+      "desc": "Vous n'avez pas encore défini de répertoire de téléchargement. Veuillez accéder aux paramètres pour choisir où vos jeux seront enregistrés.",
+      "goToSettings": "Allez dans Paramètres",
+      "title": "Aucun ensemble de répertoires de téléchargement"
+    },
     "noGameInfoAvailable": "Configurez Ascendara Xtra dans les Préférences pour voir plus d'informations sur ce jeu.",
-    "noReviewsExplanation": "Ce jeu n'a pas de critiques professionnelles disponibles sur OpenCritic. Cela peut être dû au fait qu'il s'agit d'une nouvelle version, d'un titre indépendant ou qu'il n'a tout simplement pas encore été évalué.",
+    "noReviewsExplanation": "Ce jeu ne dispose d'aucune critique professionnelle disponible sur OpenCritic. Cela peut être dû au fait qu'il s'agit d'une nouvelle version, d'un titre indépendant ou qu'il n'a tout simplement pas encore été évalué.",
     "notExactMatch": "Le nom du jeu ne correspondait pas exactement. Signalez le jeu si nécessaire.",
     "online": "EN LIGNE",
     "onlineFixWarningDescription": "Ce jeu est livré avec Online-Fix installé, lorsque vous le lancez, vous verrez une invite vous indiquant qu'il a été créé par l'équipe Online-Fix. Ceci est normal et ne devrait s'afficher qu'une seule fois pour chaque jeu avec.",
@@ -991,7 +996,7 @@
     "reportBroken": "Rapport",
     "reportDescription": "Veuillez fournir plus de détails sur le problème",
     "reportError": "Veuillez fournir une raison et des détails pour votre rapport",
-    "reportReason": "Pourquoi signalez-vous ce jeu ?",
+    "reportReason": "Pourquoi signalez-vous ce jeu ?",
     "reportReasons": {
       "filesNotDownloading": "Fichiers non téléchargés",
       "gameDetails": "Détails du jeu trompeurs",
@@ -1111,7 +1116,7 @@
     "extracting": "Extraction des fichiers du jeu...",
     "extractingDescription": "L'extraction des fichiers du jeu peut prendre jusqu'à 30 minutes selon la taille du fichier.",
     "firstTimeDownload": {
-      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton \"Arrêter le téléchargement\".",
+      "message": "Ascendara continuera à télécharger des jeux en arrière-plan si vous fermez l'application. Vous pouvez arrêter le téléchargement à tout moment en cliquant sur le bouton d'action puis en cliquant sur le bouton « Arrêter le téléchargement ».",
       "title": "Téléchargement sur Ascendara",
       "understand": "Je comprends"
     },
@@ -1892,6 +1897,34 @@
     "addLocation": "Ajouter un répertoire de téléchargement",
     "additionalLocations": "Emplacements supplémentaires",
     "apiKeySaved": "Clé API enregistrée",
+    "appBranch": {
+      "description": "Choisissez votre canal de diffusion. La commutation téléchargera et exécutera le programme d’installation approprié – l’application redémarrera automatiquement.",
+      "experimental": {
+        "description": "Des constructions de pointe avec les dernières modifications. Peut être instable.",
+        "label": "Expérimental",
+        "requiresSubscription": "Nécessite un abonnement Ascend"
+      },
+      "live": {
+        "description": "La version stable. Recommandé pour tous les utilisateurs.",
+        "label": "En direct"
+      },
+      "publicTesting": {
+        "description": "Bénéficiez d’un accès anticipé aux fonctionnalités à venir avant leur livraison sur Live.",
+        "label": "Tests publics"
+      },
+      "switchDialog": {
+        "cancel": "Annuler",
+        "confirm": "Changer de branche",
+        "description": "Ascendara téléchargera le",
+        "downloading": "Téléchargement...",
+        "downloadingInstaller": "Téléchargement du programme d'installation...",
+        "experimentalWarning": "Les versions expérimentales peuvent être instables et contenir des bugs. Utilisez à vos propres risques.",
+        "installer": "installateur et lancez-le. L'application se fermera automatiquement pour terminer le changement.",
+        "switchAndReinstall": "Changer et réinstaller",
+        "title": "Passer à {{branch}} ?"
+      },
+      "title": "Branche d'application"
+    },
     "appearance": "Apparence",
     "application": "Application",
     "applyCustomColors": "Appliquer des couleurs",
@@ -1947,7 +1980,7 @@
       "extreme": "Extrême (> 48 threads) – À utiliser avec prudence",
       "high": "Élevé (25-32 threads) – Téléchargements rapides",
       "low": "Faible (<8 threads) – Utilisation minimale du processeur",
-      "normal": "Normal (8 à 24 threads) – Recommandé pour la plupart des utilisateurs",
+      "normal": "Normal (8-24 threads) - Recommandé pour la plupart des utilisateurs",
       "veryHigh": "Très haut (33-48 fils) - Pour des connexions très rapides"
     },
     "downloaderRunningWarning": "Vous ne pouvez pas modifier ces paramètres pendant qu'un téléchargement est en cours",
@@ -2101,7 +2134,7 @@
     "singleStream": "Téléchargement d'un seul flux",
     "singleStreamDescription": "Utilisez une seule connexion pour les téléchargements. Plus stable pour les fichiers volumineux mais peut être plus lent.",
     "smoothTransitions": "Transitions fluides",
-    "smoothTransitionsDescription": "Le passage d’une page à l’autre dans l’application présente une animation fluide pour le rendre plus naturel.",
+    "smoothTransitionsDescription": "Le basculement entre les pages de l'application présente une animation fluide pour le rendre plus naturel.",
     "supportCodeDesc": "Entrez votre code d'assistance à 6 chiffres ici pour télécharger automatiquement les journaux. Besoin d'aide ?",
     "supportDesc": "Utilisez votre code d'assistance pour vous connecter avec l'équipe d'assistance d'Ascendara. Les journaux sont téléchargés automatiquement.",
     "supportError": "Échec du téléchargement des journaux. Veuillez réessayer.",
@@ -2146,10 +2179,29 @@
       "usernameError": "Échec de l'enregistrement du nom d'utilisateur"
     },
     "viewComponentsPage": "Afficher la page des composants",
-    "warningDescription": "Ascendara est conçu comme une plate-forme de test pour les jeux vidéo, permettant aux utilisateurs d'évaluer le gameplay, les performances et la compatibilité avant de prendre une décision d'achat. Ascendara encourage fortement les utilisateurs à soutenir les développeurs de jeux en achetant les jeux qu'ils apprécient.",
+    "warningDescription": "Ascendara est conçu comme une plateforme de test pour les jeux vidéo, permettant aux utilisateurs d'évaluer le gameplay, les performances et la compatibilité avant de prendre une décision d'achat. Ascendara encourage fortement les utilisateurs à soutenir les développeurs de jeux en achetant les jeux qu'ils apprécient.",
     "warningSupportDevelopers": "Les développeurs de jeux investissent beaucoup de temps, de ressources et de créativité pour créer les expériences que nous apprécions tous. Votre achat soutient directement leur capacité à continuer à créer d’excellents jeux et à soutenir l’industrie du jeu vidéo.",
     "warningSupportDevelopersCallToAction": "Veuillez soutenir les développeurs en achetant des jeux que vous appréciez.",
-    "warningTitle": "Salut, s'il te plaît, lis ceci !"
+    "warningTitle": "Salut, s'il te plaît, lis ceci !",
+    "wineProton": {
+      "browse": "Parcourir",
+      "description": "Configurer la façon dont les jeux Windows sont exécutés sous Linux",
+      "linuxOnly": "Linux uniquement",
+      "protonBinary": "Proton binaire",
+      "protonBinaryDescription": "Chemin d'accès à l'exécutable Proton. La valeur par défaut est",
+      "protonBinaryPlaceholder": "proton",
+      "protonDescription": "Utilisez la couche de compatibilité Proton au lieu de Wine. Proton est le fork de Wine de Valve optimisé pour les jeux.",
+      "protonExperimental": "Expérimental",
+      "protonSection": "Proton",
+      "title": "Vin & Proton",
+      "wineBinary": "Vin binaire",
+      "wineBinaryDescription": "Chemin d’accès à l’exécutable Wine. La valeur par défaut est",
+      "wineBinaryPlaceholder": "vin",
+      "winePrefix": "Préfixe du vin (WINEPREFIX)",
+      "winePrefixDescription": "Répertoire utilisé comme préfixe Wine. Laisser vide pour pouvoir l'utiliser",
+      "winePrefixPlaceholder": "~/.vin",
+      "wineSection": "Vin"
+    }
   },
   "torbox": {
     "account": "Compte TorBox",
@@ -2201,7 +2253,7 @@
   },
   "tour": {
     "ascend": {
-      "content": "Ici Ascend — vous pouvez nous rejoindre dès maintenant, aujourd'hui, après le didacticiel ! Connectez-vous avec vos amis, synchronisez vos données sur tous les appareils et débloquez des fonctionnalités exclusives.",
+      "content": "Ici Ascend — vous pouvez nous rejoindre dès maintenant, aujourd'hui, après le tutoriel ! Connectez-vous avec vos amis, synchronisez vos données sur tous les appareils et débloquez des fonctionnalités exclusives.",
       "title": "Monter"
     },
     "downloads": {
@@ -2303,7 +2355,7 @@
     "havePython": "J'ai Python",
     "haveWine": "J'ai ça, emmène-moi faire le tour",
     "helpIdentifyAndFix": "Aide à identifier et à résoudre les problèmes plus rapidement",
-    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées à Analytics avec un indicateur urgent, les plaçant en haut de la liste",
+    "helpIdentifyAndFixDesc": "Toutes les erreurs seront automatiquement envoyées aux analyses avec un indicateur urgent, les plaçant en haut de la liste",
     "helpImprove": "Aidez à améliorer Ascendara",
     "howItWorks": "Comment ça marche :",
     "iHaveReadAndAgreeTo": "J'ai lu et j'accepte les conditions d'Ascendara",
@@ -2337,7 +2389,7 @@
     "manualUpdates": "Mises à jour manuelles",
     "neverAutomaticallyUpdate": "Ne jamais mettre à jour automatiquement",
     "next": "Suivant",
-    "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d'espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
+    "notEnoughSpaceWarning": "Waouh ! Vous disposez de moins de 40 Go d’espace libre sur le lecteur sélectionné. Pensez à libérer de l'espace ou à sélectionner un autre lecteur.",
     "noticeAppIsFree": {
       "point1": "Les téléchargements et tout ce qui concerne les jeux sur Ascendara seront toujours gratuits",
       "point2": "Ascendara ne demandera aucune information personnelle pour télécharger ou jouer à des jeux",

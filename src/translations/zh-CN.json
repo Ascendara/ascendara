@@ -41,7 +41,7 @@
       "invalidEmail": "请输入有效的电子邮件地址",
       "passwordMismatch": "密码不匹配",
       "passwordRequired": "请输入您的密码",
-      "passwordRequirements": "密码必须有8个以上字符，包含大写、小写、数字和特殊字符",
+      "passwordRequirements": "密码必须有8位以上字符，包含大写、小写、数字、特殊字符",
       "signInInstead": "改为登录",
       "termsRequired": "请同意条款和隐私政策",
       "updateFailed": "更新个人资料失败"
@@ -407,7 +407,7 @@
       "upcoming": "即将更新"
     },
     "notifications": {
-      "empty": "无通知",
+      "empty": "没有通知",
       "emptyDescription": "你们都被抓住了！稍后回来查看新的更新。",
       "loading": "正在加载通知...",
       "subtitle": "随时了解重要公告和更新",
@@ -564,7 +564,7 @@
       "bioTooLong": "简介不得超过 100 个字符",
       "cancel": "取消",
       "checkoutCanceled": "结账被取消。",
-      "checkoutError": "无法开始结账。请再试一次。",
+      "checkoutError": "无法开始结帐。请再试一次。",
       "codeCopied": "代码已复制到剪贴板",
       "codeExpired": "连接代码已过期",
       "codeExpiresIn": "代码过期时间为",
@@ -960,6 +960,11 @@
       "steps": "[{'description': 'The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don\\'t have it, close the guide and click the \"Don\\'t have the extension? Get it for Chrome or Firefox\" button to download it.', 'title': 'The Ascendara Download Handler'}、{'description': 'After installing the extension, click the extension icon to enable the handler.', 'title': 'Step 1: Enable the Handler'}、{'description': 'The extension can stay on as it will only send known providers to Ascendara.', 'title': 'The Download Handler'}、{'description': 'Complete the CAPTCHA, and start the download.', 'title': 'Step 2: Start the download'}、{'description': 'Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.', 'title': 'Step 3: Using the Extension'}、{'description': 'Click the button to Open Ascendara.', 'title': 'Step 4: Downloading'}、{'description': \"Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.\", 'title': \"That's it!\"}]",
       "title": "使用 Ascendara 下载"
     },
+    "noDownloadPath": {
+      "desc": "您还没有设置下载目录。请前往“设置”选择保存游戏的位置。",
+      "goToSettings": "前往“设置”",
+      "title": "没有设置下载目录"
+    },
     "noGameInfoAvailable": "在首选项中设置 Ascendara Xtra 以查看有关此游戏的更多信息",
     "noReviewsExplanation": "该游戏在 OpenCritic 上没有任何专业评论家评论。这可能是因为它是新版本、独立游戏，或者只是尚未经过审核。",
     "notExactMatch": "游戏名称不完全匹配。如果需要，请报告游戏。",
@@ -1089,7 +1094,7 @@
     "ascendRequired": {
       "description": "您已经有一个下载正在进行中。想要一次下载多个游戏？",
       "learnMore": "加入奥升德",
-      "suggestion": "加入 Ascend，解锁无限同时下载并支持 Ascendara 背后的独立开发者。或者先暂停当前的下载以开始此下载。",
+      "suggestion": "加入 Ascend，解锁无限并发下载并支持 Ascendara 背后的独立开发者。或者先暂停当前的下载以开始此下载。",
       "title": "一次下载多个游戏"
     },
     "completed": "下载完成",
@@ -1175,7 +1180,7 @@
     "onlineTooltip": "在线多人游戏",
     "playLater": "稍后玩",
     "ratingTooltip": "这是在 Ascendara 上下载并玩过该游戏的其他人的平均评分。",
-    "showLess": "显示较少",
+    "showLess": "显示更少",
     "update": "更新",
     "updateAvailable": "可用更新",
     "verified": {
@@ -1313,7 +1318,7 @@
     "noResults": "没有找到结果",
     "placeholder": {
       "global": "搜索阿森达拉",
-      "library": "搜索图书馆",
+      "library": "搜索库",
       "settings": "搜索设置"
     },
     "select": "选择",
@@ -1364,7 +1369,7 @@
       "autoBackupOnGameClose": "游戏关闭时自动备份",
       "autoCloudBackup": "自动云备份",
       "autoCloudBackupActive": "积极的",
-      "autoCloudBackupDesc": "备份时自动将数据保存到云端",
+      "autoCloudBackupDesc": "备份时自动将数据保存至云端",
       "autoCloudBackupLearnMore": "了解有关登高的更多信息 →",
       "autoCloudBackupSignInDesc": "登录 Ascend 以解锁云备份并确保跨设备的保存安全",
       "autoCloudBackupUpgrade": "升级到高级版 →",
@@ -1882,6 +1887,31 @@
     "addLocation": "添加下载目录",
     "additionalLocations": "其他地点",
     "apiKeySaved": "API 密钥已保存",
+    "appBranch": {
+      "description": "选择您的发布渠道。切换将下载并运行适当的安装程序 - 该应用程序将自动重新启动。",
+      "experimental": {
+        "description": "尖端的构建与最新的变化。可能不稳定。",
+        "label": "实验性的",
+        "requiresSubscription": "需要订阅 Ascend"
+      },
+      "live": { "description": "稳定版本。推荐给所有用户。", "label": "居住" },
+      "publicTesting": {
+        "description": "在即将推出的功能上线之前，尽早使用它们。",
+        "label": "公开测试"
+      },
+      "switchDialog": {
+        "cancel": "取消",
+        "confirm": "切换分支",
+        "description": "Ascendara 将下载",
+        "downloading": "正在下载...",
+        "downloadingInstaller": "正在下载安装程序...",
+        "experimentalWarning": "实验版本可能不稳定并且包含错​​误。使用风险自负。",
+        "installer": "安装程序并启动它。应用程序将自动关闭以完成切换。",
+        "switchAndReinstall": "切换并重新安装",
+        "title": "切换到{{branch}}？"
+      },
+      "title": "应用分支"
+    },
     "appearance": "外貌",
     "application": "应用",
     "applyCustomColors": "应用颜色",
@@ -1900,7 +1930,7 @@
     "behaviorAfterDownloadDescription": "选择下载完成后您的计算机应发生的情况。",
     "behaviors": {
       "lock": "锁",
-      "none": "什么也不做",
+      "none": "什么都不做",
       "shutdown": "关闭",
       "sleep": "睡觉"
     },
@@ -2139,7 +2169,26 @@
     "warningDescription": "Ascendara 被设计为视频游戏测试平台，允许用户在做出购买决定之前评估游戏玩法、性能和兼容性。 Ascendara 强烈鼓励用户通过购买他们喜欢的游戏来支持游戏开发者。",
     "warningSupportDevelopers": "游戏开发者投入大量时间、资源和创造力来创造我们都喜欢的体验。您的购买将直接支持他们继续制作精彩游戏并维持游戏行业的能力。",
     "warningSupportDevelopersCallToAction": "请购买您喜欢的游戏来支持开发者。",
-    "warningTitle": "嘿，请阅读本文！"
+    "warningTitle": "嘿，请阅读本文！",
+    "wineProton": {
+      "browse": "浏览",
+      "description": "配置 Windows 游戏在 Linux 上运行的方式",
+      "linuxOnly": "仅限Linux",
+      "protonBinary": "质子双星",
+      "protonBinaryDescription": "Proton 可执行文件的路径。默认为",
+      "protonBinaryPlaceholder": "质子",
+      "protonDescription": "使用 Proton 兼容层代替 Wine。 Proton 是 Valve 的 Wine 分支，针对游戏进行了优化。",
+      "protonExperimental": "实验性的",
+      "protonSection": "普腾",
+      "title": "酒与质子",
+      "wineBinary": "葡萄酒二进制",
+      "wineBinaryDescription": "Wine 可执行文件的路径。默认为",
+      "wineBinaryPlaceholder": "葡萄酒",
+      "winePrefix": "葡萄酒前缀 (WINEPREFIX)",
+      "winePrefixDescription": "用作 Wine 前缀的目录。留空即可使用",
+      "winePrefixPlaceholder": "〜/.wine",
+      "wineSection": "葡萄酒"
+    }
   },
   "torbox": {
     "account": "TorBox 帐户",
