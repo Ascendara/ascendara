@@ -2809,19 +2809,67 @@ const Ascend = () => {
     );
   }
 
+  // Check if in development mode (Firebase disabled)
+  const isProduction = import.meta.env.VITE_PRODUCTION === "true";
+
+  if (!isProduction) {
+    return (
+      <div className="container mx-auto flex min-h-[80vh] max-w-2xl items-center px-6 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full space-y-6 rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-background p-8 text-center"
+        >
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20">
+            <Hammer className="h-8 w-8 text-amber-500" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold">{t("account.developmentMode.title")}</h2>
+            <p className="text-muted-foreground">
+              {t("account.developmentMode.description")}
+            </p>
+          </div>
+          <div className="rounded-lg border border-border/50 bg-muted/50 p-4 text-left">
+            <p className="text-sm font-medium text-foreground">
+              {t("account.developmentMode.productionOnly")}
+            </p>
+            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+              <li>• Account creation and authentication</li>
+              <li>• Friends and messaging</li>
+              <li>• Cloud library sync</li>
+              <li>• Leaderboards and achievements</li>
+              <li>• Community features</li>
+            </ul>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() =>
+              window.electron.openExternal(
+                "https://github.com/Ascendara/ascendara#-configure-firebase"
+              )
+            }
+            className="gap-2"
+          >
+            <ExternalLink className="h-4 w-4" />
+            {t("account.developmentMode.learnMore")}
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (authLoading) {
     return (
       <div className="flex min-h-[80vh] items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
+          className="text-center"
         >
-          <div className="relative">
-            <div className="h-16 w-16 rounded-full border-4 border-primary/20" />
-            <div className="absolute inset-0 h-16 w-16 animate-spin rounded-full border-4 border-transparent border-t-primary" />
-          </div>
-          <p className="text-sm text-muted-foreground">{t("account.loading")}</p>
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            {t("account.loading") || "Loading..."}
+          </p>
         </motion.div>
       </div>
     );

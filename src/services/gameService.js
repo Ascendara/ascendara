@@ -39,9 +39,12 @@ const gameService = {
       }
     }
 
-    // Check if using local index
+    // In development mode, always use production API
+    const isDev = import.meta.env.DEV;
+
+    // Check if using local index (skip in dev mode)
     const settings = await window.electron.getSettings();
-    const usingLocalIndex = settings?.usingLocalIndex === true;
+    const usingLocalIndex = !isDev && settings?.usingLocalIndex === true;
 
     // If local index setting changed, invalidate cache
     if (memoryCache.isLocalIndex !== usingLocalIndex) {

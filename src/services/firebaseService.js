@@ -43,6 +43,9 @@ import {
   startAfter,
 } from "firebase/firestore";
 
+// Check if running in production mode
+const isProduction = import.meta.env.VITE_PRODUCTION === "true";
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -53,28 +56,38 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Analytics (only in browser environment where supported)
+// Initialize Firebase only in production mode
+let app = null;
 let analytics = null;
-isSupported().then(supported => {
-  if (supported) {
-    analytics = getAnalytics(app);
-  }
-});
+let auth = null;
+let db = null;
+let googleProvider = null;
 
-// Initialize Auth
-const auth = getAuth(app);
+if (isProduction) {
+  // Initialize Firebase
+  app = initializeApp(firebaseConfig);
 
-// Initialize Firestore
-const db = getFirestore(app);
+  // Initialize Analytics (only in browser environment where supported)
+  isSupported().then(supported => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  });
 
-// Initialize Google Auth Provider
-const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: "select_account",
-});
+  // Initialize Auth
+  auth = getAuth(app);
+
+  // Initialize Firestore
+  db = getFirestore(app);
+
+  // Initialize Google Auth Provider
+  googleProvider = new GoogleAuthProvider();
+  googleProvider.setCustomParameters({
+    prompt: "select_account",
+  });
+} else {
+  console.log("[Firebase] Running in development mode - Firebase disabled");
+}
 
 /**
  * Subscribe to real-time user status updates
