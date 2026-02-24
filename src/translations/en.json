@@ -26,6 +26,12 @@
       "title": "Request Account Deletion"
     },
     "deletionWarning": "Your request will be processed within a few days",
+    "developmentMode": {
+      "description": "Ascend features are disabled in development mode. To enable Ascend, set VITE_PRODUCTION=true in your .env file and configure Firebase credentials.",
+      "learnMore": "Learn More in README",
+      "productionOnly": "Production Only Feature",
+      "title": "Development Mode"
+    },
     "displayNameHint": "This is how other users will see you. Minimum 4 characters.",
     "errors": {
       "accountDeleted": "Account Deleted",
