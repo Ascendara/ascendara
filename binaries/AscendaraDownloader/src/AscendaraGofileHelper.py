@@ -221,7 +221,7 @@ class GofileDownloader:
                 if os.path.exists(candidate):
                     settings_path = candidate
             else:
-                candidate = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
+                candidate = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
                 if os.path.exists(candidate):
                     settings_path = candidate
             if settings_path and os.path.exists(settings_path):
@@ -1231,8 +1231,8 @@ class GofileDownloader:
                             rel_path = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != '.' else fname
                             rel_path = rel_path.replace('\\', '/')
                             watching_data[rel_path] = {"size": os.path.getsize(full_path)}
-                logging.info(f"[AscendaraGofileHelper] Rebuilt filemap after first-word flattening with {len(watching_data)} files")
-                safe_write_json(watching_path, watching_data)
+            logging.info(f"[AscendaraGofileHelper] Rebuilt filemap after first-word flattening with {len(watching_data)} files")
+            safe_write_json(watching_path, watching_data)
         
         # Force final progress update before finishing extraction
         self._update_extraction_progress("Complete", self._files_extracted_count, total_files_to_extract if total_files_to_extract > 0 else self._files_extracted_count, force=True)
@@ -1378,7 +1378,7 @@ class GofileDownloader:
                 if os.path.exists(candidate):
                     settings_path = candidate
             else:
-                candidate = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
+                candidate = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
                 if os.path.exists(candidate):
                     settings_path = candidate
 

@@ -340,7 +340,7 @@ def get_ludusavi_settings():
         if sys.platform == 'darwin':
             settings_path = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara', 'ascendarasettings.json')
         elif sys.platform == 'linux':
-            settings_path = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
+            settings_path = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
         else:
             settings_path = os.path.join(os.environ.get('APPDATA', ''), 'ascendara', 'ascendarasettings.json')
         logging.debug(f"Checking Ludusavi settings at: {settings_path}")
@@ -432,7 +432,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
     if sys.platform == 'darwin':
         settings_file = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara', 'ascendarasettings.json')
     elif sys.platform == 'linux':
-        settings_file = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
+        settings_file = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
     else:
         settings_file = os.path.join(os.environ.get('APPDATA', ''), 'ascendara', 'ascendarasettings.json')
     logging.debug(f"Initial settings_file path: {settings_file}")
@@ -484,7 +484,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         if sys.platform == 'darwin':
             user_data_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
         elif sys.platform == 'linux':
-            user_data_dir = os.path.join(os.path.expanduser('~/.ascendara'))
+            user_data_dir = os.path.join(os.path.expanduser('~/.config/ascendara'))
         else:
             user_data_dir = os.path.join(os.environ.get('APPDATA', ''), 'ascendara')
         settings_file = os.path.join(user_data_dir, 'ascendarasettings.json')

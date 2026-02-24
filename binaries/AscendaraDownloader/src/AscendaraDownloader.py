@@ -163,7 +163,7 @@ def get_settings_path() -> Optional[str]:
         if os.path.exists(candidate):
             return candidate
     else:
-        candidate = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
+        candidate = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
         if os.path.exists(candidate):
             return candidate
     return None

@@ -191,7 +191,7 @@ def get_blacklist_ids():
             if os.path.exists(candidate):
                 settings_path = candidate
         else:
-            candidate = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
+            candidate = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
             if os.path.exists(candidate):
                 settings_path = candidate
 
@@ -227,7 +227,7 @@ def get_notification_settings():
             if os.path.exists(candidate):
                 settings_path = candidate
         else:
-            candidate = os.path.join(os.path.expanduser('~/.ascendara'), 'ascendarasettings.json')
+            candidate = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
             if os.path.exists(candidate):
                 settings_path = candidate
 
