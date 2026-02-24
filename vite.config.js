@@ -6,7 +6,6 @@ import { execSync } from "child_process";
 import pkg from "./package.json";
 
 const plugins = [react()];
-plugins.unshift(MillionLint.vite());
 
 // https://vitejs.dev/config/
 export default defineConfig({

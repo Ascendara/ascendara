@@ -43,9 +43,6 @@ import {
   startAfter,
 } from "firebase/firestore";
 
-// Check if running in production mode
-const isProduction = import.meta.env.VITE_PRODUCTION === "true";
-
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -56,14 +53,22 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase only in production mode
+// Check if Firebase credentials are available
+const hasFirebaseCredentials = !!(
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);
+
+// Initialize Firebase only if credentials are available
 let app = null;
 let analytics = null;
 let auth = null;
 let db = null;
 let googleProvider = null;
 
-if (isProduction) {
+if (hasFirebaseCredentials) {
   // Initialize Firebase
   app = initializeApp(firebaseConfig);
 
@@ -85,8 +90,12 @@ if (isProduction) {
   googleProvider.setCustomParameters({
     prompt: "select_account",
   });
+
+  console.log("[Firebase] Initialized with credentials");
 } else {
-  console.log("[Firebase] Running in development mode - Firebase disabled");
+  console.log(
+    "[Firebase] Running in development mode - Firebase disabled (no credentials)"
+  );
 }
 
 /**
@@ -96,7 +105,7 @@ if (isProduction) {
  * @returns {function} Unsubscribe function
  */
 export const SnapUserStatus = (userId, onChange) => {
-  if (!userId) return () => {};
+  if (!userId || !db) return () => {};
 
   const ref = doc(db, "userStatus", userId);
   const snap = onSnapshot(
@@ -631,6 +640,10 @@ export const updateUserData = async (uid, data) => {
  * @returns {function} Unsubscribe function
  */
 export const subscribeToAuthChanges = callback => {
+  if (!auth) {
+    console.warn("[Firebase] Auth not initialized, returning no-op unsubscribe");
+    return () => {};
+  }
   return onAuthStateChanged(auth, callback);
 };
 
@@ -639,6 +652,7 @@ export const subscribeToAuthChanges = callback => {
  * @returns {object|null} Current user or null
  */
 export const getCurrentUser = () => {
+  if (!auth) return null;
   return auth.currentUser;
 };
 
@@ -1305,6 +1319,19 @@ export const updateAscendSubscription = async subscriptionData => {
  */
 export const verifyAscendAccess = async (hardwareId = null) => {
   try {
+    if (!auth || !db) {
+      return {
+        hasAccess: false,
+        daysRemaining: 0,
+        isSubscribed: false,
+        isVerified: false,
+        trialBlocked: false,
+        noTrial: false,
+        noTrialReason: null,
+        error: "Firebase not initialized",
+      };
+    }
+
     const user = auth.currentUser;
     if (!user) {
       return {
@@ -2472,6 +2499,10 @@ export const markMessagesAsRead = async conversationId => {
  */
 export const getUnreadMessageCount = async () => {
   try {
+    if (!auth || !db) {
+      return { count: 0, newMessages: [], error: "Firebase not initialized" };
+    }
+
     const currentUser = auth.currentUser;
     if (!currentUser) {
       return { count: 0, newMessages: [], error: "No user logged in" };

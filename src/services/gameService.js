@@ -27,11 +27,18 @@ const gameService = {
   },
 
   async getCachedData() {
+    console.log("[GameService] getCachedData called");
+
     // Check memory cache FIRST - no async, instant return
     const now = Date.now();
     if (memoryCache.games && memoryCache.metadata && memoryCache.timestamp) {
       const age = now - memoryCache.timestamp;
       if (age < CACHE_DURATION) {
+        console.log(
+          "[GameService] Returning from memory cache:",
+          memoryCache.games.length,
+          "games"
+        );
         return {
           games: memoryCache.games,
           metadata: memoryCache.metadata,
@@ -39,12 +46,16 @@ const gameService = {
       }
     }
 
-    // In development mode, always use production API
+    // Check if using local index
     const isDev = import.meta.env.DEV;
+    console.log("[GameService] isDev:", isDev);
 
-    // Check if using local index (skip in dev mode)
     const settings = await window.electron.getSettings();
-    const usingLocalIndex = !isDev && settings?.usingLocalIndex === true;
+    console.log("[GameService] Settings loaded:", {
+      usingLocalIndex: settings?.usingLocalIndex,
+      localIndex: settings?.localIndex,
+    });
+    const usingLocalIndex = settings?.usingLocalIndex === true;
 
     // If local index setting changed, invalidate cache
     if (memoryCache.isLocalIndex !== usingLocalIndex) {
@@ -63,26 +74,63 @@ const gameService = {
 
     // If using local index, load from local file
     if (usingLocalIndex && settings?.localIndex) {
+      console.log(
+        "[GameService] Attempting to load local index from:",
+        settings.localIndex
+      );
       try {
         const data = await this.fetchDataFromLocalIndex(settings.localIndex);
+        console.log("[GameService] Local index loaded:", {
+          hasData: !!data,
+          hasGames: !!data?.games,
+          gamesCount: data?.games?.length || 0,
+          metadata: data?.metadata,
+        });
+
         if (data && data.games && data.games.length > 0) {
+          console.log(
+            "[GameService] Successfully loaded",
+            data.games.length,
+            "games from local index"
+          );
           await this.updateCache(data, true, settings.localIndex);
           return data;
         }
         console.warn("[GameService] Local index file empty or not found");
-        // Return empty data to prevent mixing local and API data
-        return {
-          games: [],
-          metadata: { local: true, games: 0, source: "LOCAL", getDate: "Not available" },
-        };
+        // In dev mode, fall back to API if local index is empty
+        if (isDev) {
+          console.log("[GameService] Dev mode: falling back to API");
+          // Continue to API fetch below
+        } else {
+          // In production, return empty data to prevent mixing local and API data
+          return {
+            games: [],
+            metadata: {
+              local: true,
+              games: 0,
+              source: "LOCAL",
+              getDate: "Not available",
+            },
+          };
+        }
       } catch (error) {
         console.error("[GameService] Error loading local index:", error);
-        // Don't fall back to API when local index is enabled - return empty
-        // This prevents mixing local and API data
-        return {
-          games: [],
-          metadata: { local: true, games: 0, source: "LOCAL", getDate: "Not available" },
-        };
+        // In dev mode, fall back to API if local index fails
+        if (isDev) {
+          console.log("[GameService] Dev mode: falling back to API after error");
+          // Continue to API fetch below
+        } else {
+          // In production, don't fall back to API when local index is enabled
+          return {
+            games: [],
+            metadata: {
+              local: true,
+              games: 0,
+              source: "LOCAL",
+              getDate: "Not available",
+            },
+          };
+        }
       }
     }
 

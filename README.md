@@ -308,9 +308,9 @@ Or using yarn:
 yarn
 ```
 
-3. **Configure Firebase**
+3. **Configure Firebase (Optional)**
 
-   Create a `.env` file in the root directory and add your Firebase credentials:
+   Firebase is optional for development. If you have Firebase credentials, create a `.env` file:
 
    ```sh
    cp .env.example .env
@@ -318,7 +318,7 @@ yarn
 
    Then edit `.env` and replace the placeholder values with your actual Firebase project credentials from the [Firebase Console](https://console.firebase.google.com/).
 
-   > **Note:** The `.env` file is gitignored and will not be committed to the repository. Never commit your Firebase credentials.
+   > **Note:** Firebase will automatically initialize if credentials are detected. Leave the Firebase fields empty in `.env` to run in development mode without authentication features. The `.env` file is gitignored and will not be committed to the repository.
 
 4. **Install Python Dependencies**
 

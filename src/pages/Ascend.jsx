@@ -2809,10 +2809,15 @@ const Ascend = () => {
     );
   }
 
-  // Check if in development mode (Firebase disabled)
-  const isProduction = import.meta.env.VITE_PRODUCTION === "true";
+  // Check if Firebase credentials are available
+  const hasFirebaseCredentials = !!(
+    import.meta.env.VITE_FIREBASE_API_KEY &&
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN &&
+    import.meta.env.VITE_FIREBASE_PROJECT_ID &&
+    import.meta.env.VITE_FIREBASE_APP_ID
+  );
 
-  if (!isProduction) {
+  if (!hasFirebaseCredentials) {
     return (
       <div className="container mx-auto flex min-h-[80vh] max-w-2xl items-center px-6 py-8">
         <motion.div

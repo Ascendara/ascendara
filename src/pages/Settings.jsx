@@ -2441,7 +2441,9 @@ function Settings() {
 
                     {/* Runner Selection */}
                     <div className="space-y-3">
-                      <label className="text-sm font-medium">{t("settings.linuxCompat.defaultRunner")}</label>
+                      <label className="text-sm font-medium">
+                        {t("settings.linuxCompat.defaultRunner")}
+                      </label>
                       <select
                         value={selectedRunner}
                         onChange={async e => {
@@ -2453,7 +2455,9 @@ function Settings() {
                         }}
                         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                       >
-                        <option value="auto">{t("settings.linuxCompat.autoDetect")}</option>
+                        <option value="auto">
+                          {t("settings.linuxCompat.autoDetect")}
+                        </option>
                         {runners.map(r => (
                           <option key={r.path} value={r.path}>
                             {r.name} (
@@ -2470,7 +2474,9 @@ function Settings() {
 
                     {/* Detected Runners List */}
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">{t("settings.linuxCompat.detectedRunners")}</h4>
+                      <h4 className="text-sm font-medium">
+                        {t("settings.linuxCompat.detectedRunners")}
+                      </h4>
                       {runners.length === 0 ? (
                         <p className="text-sm text-yellow-500">
                           {t("settings.linuxCompat.noRunnersWarning")}
@@ -2618,7 +2624,9 @@ function Settings() {
                     {protonUpdateStatus === "up-to-date" && (
                       <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
                         <FileCheck2 className="h-4 w-4 text-green-500" />
-                        <p className="text-sm text-green-500">{t("settings.linuxCompat.upToDate")}</p>
+                        <p className="text-sm text-green-500">
+                          {t("settings.linuxCompat.upToDate")}
+                        </p>
                       </div>
                     )}
 
@@ -2627,11 +2635,15 @@ function Settings() {
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="h-4 w-4 text-yellow-500" />
                           <p className="text-sm text-yellow-500">
-                            {t("settings.linuxCompat.updateAvailable", { version: protonGEInfo.latestVersion })}
+                            {t("settings.linuxCompat.updateAvailable", {
+                              version: protonGEInfo.latestVersion,
+                            })}
                             {protonGEInfo.installedVersions.length > 0 && (
                               <span className="text-yellow-500/70">
                                 {" "}
-                                {t("settings.linuxCompat.updateAvailableCurrent", { version: protonGEInfo.installedVersions[0] })}
+                                {t("settings.linuxCompat.updateAvailableCurrent", {
+                                  version: protonGEInfo.installedVersions[0],
+                                })}
                               </span>
                             )}
                           </p>
@@ -2657,12 +2669,15 @@ function Settings() {
                   </div>
                 </Card>
                 {/* Proton-GE Download Confirmation Dialog */}
-                <AlertDialog open={showProtonConfirm && !!protonGEInfo} onOpenChange={(open) => {
-                  if (!open) {
-                    setShowProtonConfirm(false);
-                    setProtonGEInfo(null);
-                  }
-                }}>
+                <AlertDialog
+                  open={showProtonConfirm && !!protonGEInfo}
+                  onOpenChange={open => {
+                    if (!open) {
+                      setShowProtonConfirm(false);
+                      setProtonGEInfo(null);
+                    }
+                  }}
+                >
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>
@@ -2674,20 +2689,26 @@ function Settings() {
                         <p>
                           {protonGEInfo?.updateAvailable ? (
                             <>
-                              {t("settings.linuxCompat.protonConfirm.updateAvailablePrefix")}{" "}
+                              {t(
+                                "settings.linuxCompat.protonConfirm.updateAvailablePrefix"
+                              )}{" "}
                               <strong className="text-foreground">
                                 {protonGEInfo.name}
                               </strong>
                               {protonGEInfo.installedVersions?.length > 0 && (
                                 <span>
                                   {" "}
-                                  {t("settings.linuxCompat.protonConfirm.replacing", { versions: protonGEInfo.installedVersions.join(", ") })}
+                                  {t("settings.linuxCompat.protonConfirm.replacing", {
+                                    versions: protonGEInfo.installedVersions.join(", "),
+                                  })}
                                 </span>
                               )}
                             </>
                           ) : (
                             <>
-                              {t("settings.linuxCompat.protonConfirm.aboutToDownloadPrefix")}{" "}
+                              {t(
+                                "settings.linuxCompat.protonConfirm.aboutToDownloadPrefix"
+                              )}{" "}
                               <strong className="text-foreground">
                                 {protonGEInfo?.name}
                               </strong>
@@ -2706,7 +2727,10 @@ function Settings() {
                           <strong className="text-foreground">
                             {protonGEInfo?.sizeFormatted}
                           </strong>{" "}
-                          {protonGEInfo && t("settings.linuxCompat.protonConfirm.sizeApprox", { gb: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1) })}
+                          {protonGEInfo &&
+                            t("settings.linuxCompat.protonConfirm.sizeApprox", {
+                              gb: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1),
+                            })}
                         </p>
                         <p>
                           {t("settings.linuxCompat.protonConfirm.description")}{" "}
@@ -2749,8 +2773,12 @@ function Settings() {
                       >
                         <Download className="h-4 w-4" />
                         {protonGEInfo?.updateAvailable
-                          ? t("settings.linuxCompat.protonConfirm.updateBtn", { size: protonGEInfo?.sizeFormatted })
-                          : t("settings.linuxCompat.protonConfirm.downloadBtn", { size: protonGEInfo?.sizeFormatted })}
+                          ? t("settings.linuxCompat.protonConfirm.updateBtn", {
+                              size: protonGEInfo?.sizeFormatted,
+                            })
+                          : t("settings.linuxCompat.protonConfirm.downloadBtn", {
+                              size: protonGEInfo?.sizeFormatted,
+                            })}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -3296,7 +3324,7 @@ function Settings() {
             <Card className="overflow-hidden border-border p-0">
               <div className="border-b border-border px-6 py-4">
                 <div className="flex items-center gap-2">
-                  <FlaskConical className="h-5 w-5 text-primary" />
+                  <FlaskConical className="mb-2 h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold text-primary">
                     {t("settings.appBranch.title")}
                   </h2>
@@ -3581,7 +3609,9 @@ function Settings() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">{t("settings.noBranchDialog.close")}</AlertDialogCancel>
+            <AlertDialogCancel className="text-primary">
+              {t("settings.noBranchDialog.close")}
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -3597,8 +3627,10 @@ function Settings() {
             <AlertDialogDescription className="space-y-4 text-muted-foreground">
               <p>
                 {t("settings.ascendPromoDialog.experimentalBranchExclusivePrefix")}{" "}
-                <strong className="text-red-400">{t("settings.ascendPromoDialog.experimentalBranch")}</strong>
-                {" "}{t("settings.ascendPromoDialog.experimentalBranchExclusiveSuffix")}
+                <strong className="text-red-400">
+                  {t("settings.ascendPromoDialog.experimentalBranch")}
+                </strong>{" "}
+                {t("settings.ascendPromoDialog.experimentalBranchExclusiveSuffix")}
               </p>
               <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
                 <h3 className="mb-2 font-semibold text-foreground">
@@ -3622,7 +3654,9 @@ function Settings() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">{t("settings.ascendPromoDialog.maybeLater")}</AlertDialogCancel>
+            <AlertDialogCancel className="text-primary">
+              {t("settings.ascendPromoDialog.maybeLater")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 window.electron?.openURL("https://ascendara.app/ascend");
