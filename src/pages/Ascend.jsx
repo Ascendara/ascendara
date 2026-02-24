@@ -2339,11 +2339,6 @@ const Ascend = () => {
         setIsSubmitting(false);
         return;
       }
-      if (!agreedToTerms) {
-        toast.error(t("account.errors.termsRequired"));
-        setIsSubmitting(false);
-        return;
-      }
 
       // Show email confirmation dialog before proceeding with signup
       setPendingSignupData({ ...formData });
