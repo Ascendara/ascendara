@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ascendara</title>
+    <style>
+      :root {
+        --color-primary: 255, 207, 207;
+        --color-background: 255, 239, 242;
+      }
+      body {
+        background: linear-gradient(
+          135deg,
+          rgb(var(--color-background)) 0%,
+          rgb(var(--color-background)) 100%
+        );
+        margin: 0;
+      }
+      .initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          135deg,
+          rgb(var(--color-primary) / 0.1) 0%,
+          rgb(var(--color-background)) 100%
+        );
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      }
+      .initial-loader img {
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(0.95);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(0.95);
+          opacity: 0.8;
+        }
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-1d7b2463.js"></script>
+    <link rel="stylesheet" href="./assets/index-cb95738b.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <div class="initial-loader" id="initial-loader">
+      <img src="icon.png" alt="Loading" style="width: 128px; height: 128px" />
+    </div>
+  </body>
+</html>
