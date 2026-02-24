@@ -40,6 +40,7 @@ class SettingsManager {
       threadCount: 12,
       singleStream: true,
       downloadLimit: 0,
+      maxConcurrentDownloads: 5,
       sideScrollBar: false,
       excludeFolders: false,
       prioritizeTorboxOverSeamless: false,

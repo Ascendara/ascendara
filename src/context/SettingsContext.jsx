@@ -83,6 +83,16 @@ export function SettingsProvider({ children }) {
     settingsRef.current = settings;
   }, [settings]);
 
+  // Sync maxConcurrentDownloads to localStorage so downloadQueueService can read it
+  useEffect(() => {
+    if (settings.maxConcurrentDownloads != null) {
+      localStorage.setItem(
+        "maxConcurrentDownloads",
+        String(settings.maxConcurrentDownloads)
+      );
+    }
+  }, [settings.maxConcurrentDownloads]);
+
   const setSettings = useCallback(
     async newSettings => {
       // If newSettings is a function, call it with current settings from ref

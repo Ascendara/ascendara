@@ -548,7 +548,13 @@ export default function DownloadPage() {
 
   async function handleDownload(directUrl = null, dir = null, forceStart = false) {
     const sanitizedGameName = sanitizeText(gameData.game);
-    console.log("[DL] handleDownload called", { directUrl, dir, forceStart, selectedProvider, sanitizedGameName });
+    console.log("[DL] handleDownload called", {
+      directUrl,
+      dir,
+      forceStart,
+      selectedProvider,
+      sanitizedGameName,
+    });
     console.log("[DL] settings.downloadDirectory:", settings.downloadDirectory);
     console.log("[DL] showNoDownloadPath:", showNoDownloadPath);
     if (showNoDownloadPath) {
@@ -570,18 +576,12 @@ export default function DownloadPage() {
       return;
     }
 
-    // Check if there's an active download
+    // Check if we have reached the concurrent download limit
     const hasActive = await hasActiveDownloads();
-    console.log("[DL] hasActive:", hasActive, "isAuthenticated:", isAuthenticated);
+    console.log("[DL] hasActive:", hasActive);
 
     if (hasActive && !forceStart) {
-      // Non-Ascend users can only have 1 download at a time - show error toast
-      if (!isAuthenticated) {
-        toast.error(t("download.toast.downloadQueueLimit"));
-        return;
-      }
-
-      // Ascend users get the queue dialog with options
+      // All users get the queue dialog when the concurrent limit is reached
       const isVrGame = gameData.category?.includes("Virtual Reality");
       setPendingDownloadData({
         url: directUrl || gameData.download_links?.[selectedProvider]?.[0] || "",
@@ -666,7 +666,9 @@ export default function DownloadPage() {
       torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings);
     if (
       !directUrl &&
-      (selectedProvider === "gofile" || selectedProvider === "buzzheavier" || selectedProvider === "pixeldrain") &&
+      (selectedProvider === "gofile" ||
+        selectedProvider === "buzzheavier" ||
+        selectedProvider === "pixeldrain") &&
       !shouldUseTorbox()
     ) {
       let providerLinks = gameData.download_links?.[selectedProvider] || [];
@@ -676,7 +678,12 @@ export default function DownloadPage() {
           ? providerLinks
           : null;
 
-      console.log("[DL] seamless provider link:", validProviderLink, "providerLinks:", providerLinks);
+      console.log(
+        "[DL] seamless provider link:",
+        validProviderLink,
+        "providerLinks:",
+        providerLinks
+      );
       if (!validProviderLink) {
         console.log("[DL] EARLY RETURN: no valid seamless provider link");
         toast.error(t("download.toast.invalidLink"));
@@ -859,7 +866,12 @@ export default function DownloadPage() {
         return;
       }
       if (!inputLink || !isValidLink) {
-        console.log("[DL] EARLY RETURN: inputLink:", inputLink, "isValidLink:", isValidLink);
+        console.log(
+          "[DL] EARLY RETURN: inputLink:",
+          inputLink,
+          "isValidLink:",
+          isValidLink
+        );
         return;
       }
     }

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { addToQueue, processNextInQueue } from "@/services/downloadQueueService";
 import {
   Sheet,
   SheetContent,
@@ -29,6 +30,9 @@ import {
   X,
   Calendar,
   Database,
+  Layers,
+  Download,
+  CheckSquare,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import {
@@ -132,6 +136,10 @@ const Search = memo(() => {
   const { t } = useLanguage();
   const isFitGirlSource = settings.gameSource === "fitgirl";
   const navigate = useNavigate();
+
+  // Batch download mode
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedGames, setSelectedGames] = useState(new Set());
 
   // Save recent searches to localStorage
   const saveRecentSearch = useCallback(query => {
@@ -693,6 +701,62 @@ const Search = memo(() => {
     }
   };
 
+  // Batch mode handlers
+  const handleToggleBatchMode = useCallback(() => {
+    setBatchMode(prev => {
+      if (prev) setSelectedGames(new Set());
+      return !prev;
+    });
+  }, []);
+
+  const handleSelectGame = useCallback(game => {
+    const key = game.gameID || game.game;
+    setSelectedGames(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBatchDownload = useCallback(async () => {
+    const gamesToQueue = displayedGames.filter(g =>
+      selectedGames.has(g.gameID || g.game)
+    );
+    if (gamesToQueue.length === 0) return;
+
+    for (const game of gamesToQueue) {
+      const downloadLinks = game.download_links || {};
+      const allHosts = Object.keys(downloadLinks);
+      const url = downloadLinks[allHosts[0]]?.[0] || "";
+      if (!url) continue;
+      addToQueue({
+        url,
+        gameName: game.game,
+        online: game.online || false,
+        dlc: game.dlc || false,
+        isVr: game.category?.includes("Virtual Reality") || false,
+        updateFlow: false,
+        version: game.version || "",
+        imgID: game.imgID || null,
+        size: game.size || "",
+        additionalDirIndex: 0,
+        gameID: game.gameID || "",
+      });
+    }
+
+    toast.success(
+      `${gamesToQueue.length} game${gamesToQueue.length > 1 ? "s" : ""} added to download queue`
+    );
+    setSelectedGames(new Set());
+    setBatchMode(false);
+    await processNextInQueue();
+    navigate("/downloads");
+  }, [displayedGames, selectedGames, navigate]);
+
   const handleSendRefreshRequest = async () => {
     // Close the confirmation dialog
     setIsRefreshRequestDialogOpen(false);
@@ -1035,6 +1099,24 @@ const Search = memo(() => {
                     </div>
                   )}
               </div>
+              <Button
+                variant={batchMode ? "default" : "secondary"}
+                className="flex items-center gap-2 border-0"
+                onClick={handleToggleBatchMode}
+                title="Batch Download Mode: select multiple games to download at once"
+              >
+                {batchMode ? (
+                  <CheckSquare className="h-4 w-4" />
+                ) : (
+                  <Layers className="h-4 w-4" />
+                )}
+                {batchMode ? "Exit Batch" : "Batch"}
+                {batchMode && selectedGames.size > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-xs font-bold text-primary">
+                    {selectedGames.size}
+                  </span>
+                )}
+              </Button>
               <Sheet>
                 <SheetTrigger asChild>
                   <Button
@@ -1204,7 +1286,13 @@ const Search = memo(() => {
                       key={game.imgID || game.id || `${game.game}-${game.version}`}
                       data-game-name={game.game}
                     >
-                      <GameCard game={game} onDownload={() => handleDownload(game)} />
+                      <GameCard
+                        game={game}
+                        onDownload={() => handleDownload(game)}
+                        selectable={batchMode}
+                        selected={selectedGames.has(game.gameID || game.game)}
+                        onSelect={handleSelectGame}
+                      />
                     </div>
                   ))}
                 </div>
@@ -1222,6 +1310,33 @@ const Search = memo(() => {
           </div>
         </div>
       </div>
+      {/* Batch download sticky bottom bar */}
+      {batchMode && selectedGames.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-3 rounded-full border border-border/50 bg-background/95 px-6 py-3 shadow-2xl shadow-primary/20 backdrop-blur-md">
+            <span className="text-sm font-medium text-foreground">
+              {selectedGames.size} game{selectedGames.size !== 1 ? "s" : ""} selected
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-3 text-muted-foreground hover:text-foreground"
+              onClick={() => setSelectedGames(new Set())}
+            >
+              <X className="h-3 w-3" />
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 gap-2 rounded-full px-5 font-semibold text-secondary"
+              onClick={handleBatchDownload}
+            >
+              <Download className="h-4 w-4" />
+              Download All
+            </Button>
+          </div>
+        </div>
+      )}
       {isIndexUpdating && (
         <AlertDialog defaultOpen>
           <AlertDialogContent>

@@ -480,12 +480,13 @@ const Downloads = () => {
             prev => new Set([...prev, ...newlyCompleted.map(g => g.game)])
           );
 
-          // Process next queued download when a game completes
-          // This triggers immediately when the "Download Complete" card shows
-          processNextInQueue().then(nextItem => {
-            if (nextItem) {
+          // Fill available download slots from queue when a game completes
+          processNextInQueue().then(started => {
+            if (Array.isArray(started) && started.length > 0) {
               toast.success(
-                t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+                started.length === 1
+                  ? t("downloads.queuedDownloadStarted", { name: started[0].gameName })
+                  : `${started.length} queued downloads started`
               );
             }
           });
@@ -548,13 +549,14 @@ const Downloads = () => {
           setPeakSpeed(0);
           localStorage.setItem("peakSpeed", "0");
 
-          // Process next queued download when transitioning from active to no active downloads
-          // This handles stopped downloads and other cases where games don't go through "completed" state
+          // Fill available slots when active count drops (stopped/errored downloads)
           if (prevActiveCountRef.current > 0) {
-            processNextInQueue().then(nextItem => {
-              if (nextItem) {
+            processNextInQueue().then(started => {
+              if (Array.isArray(started) && started.length > 0) {
                 toast.success(
-                  t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+                  started.length === 1
+                    ? t("downloads.queuedDownloadStarted", { name: started[0].gameName })
+                    : `${started.length} queued downloads started`
                 );
               }
             });

@@ -1,0 +1,65 @@
+{
+  "asar": true,
+  "appId": "com.tagoworks.ascendara",
+  "files": ["build/**/*", "electron/**/*", "node_modules/**/*", "package.json"],
+  "extraMetadata": {
+    "main": "electron/app.js"
+  },
+  "extraResources": [
+    {
+      "from": "binaries/AscendaraDownloader/src/AscendaraDownloader.py",
+      "to": "AscendaraDownloader.py"
+    },
+    {
+      "from": "binaries/AscendaraDownloader/src/AscendaraGofileHelper.py",
+      "to": "AscendaraGofileHelper.py"
+    },
+    {
+      "from": "binaries/AscendaraGameHandler/src/AscendaraGameHandler.py",
+      "to": "AscendaraGameHandler.py"
+    },
+    {
+      "from": "binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py",
+      "to": "AscendaraCrashReporter.py"
+    },
+    {
+      "from": "binaries/AscendaraNotificationHelper/src/AscendaraNotificationHelper.py",
+      "to": "AscendaraNotificationHelper.py"
+    },
+    {
+      "from": "binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py",
+      "to": "AscendaraLanguageTranslation.py"
+    },
+    {
+      "from": "binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
+      "to": "AscendaraLocalRefresh.py"
+    },
+    {
+      "from": "binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py",
+      "to": "AscendaraTorrentHandler.py"
+    },
+    {
+      "from": "src/public",
+      "to": "public"
+    }
+  ],
+  "productName": "Ascendara",
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "readme/logo/png/ascendara_512x.png",
+    "category": "Utility",
+    "maintainer": "tagoWorks",
+    "vendor": "tagoWorks",
+    "synopsis": "Auto download and install games in parallel for free",
+    "description": "Ascendara is a desktop application that auto downloads and installs up to 5+ games simultaneously for free."
+  },
+  "directories": {
+    "output": "dist",
+    "buildResources": "build"
+  }
+}

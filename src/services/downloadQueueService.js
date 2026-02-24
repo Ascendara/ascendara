@@ -1,7 +1,28 @@
-// Download Queue Service for Ascend users
-// Manages a queue of downloads that start automatically when the previous one finishes
+// Download Queue Service
+// Manages a queue of downloads that auto-start up to maxConcurrentDownloads in parallel
 
 const QUEUE_STORAGE_KEY = "ascendDownloadQueue";
+const MAX_CONCURRENT_KEY = "maxConcurrentDownloads";
+const DEFAULT_MAX_CONCURRENT = 5;
+
+// Get the max concurrent downloads setting
+export const getMaxConcurrentDownloads = () => {
+  try {
+    const val = parseInt(localStorage.getItem(MAX_CONCURRENT_KEY), 10);
+    return isNaN(val) ? DEFAULT_MAX_CONCURRENT : Math.max(1, Math.min(10, val));
+  } catch {
+    return DEFAULT_MAX_CONCURRENT;
+  }
+};
+
+// Save the max concurrent downloads setting
+export const setMaxConcurrentDownloads = n => {
+  try {
+    localStorage.setItem(MAX_CONCURRENT_KEY, String(Math.max(1, Math.min(10, n))));
+  } catch (error) {
+    console.error("Error saving maxConcurrentDownloads:", error);
+  }
+};
 
 // Get the current download queue
 export const getDownloadQueue = () => {
@@ -72,14 +93,12 @@ export const reorderQueue = (fromIndex, toIndex) => {
   return newQueue;
 };
 
-// Check if there are active downloads (excluding completed/verifying ones)
-export const hasActiveDownloads = async () => {
+// Count currently active downloads (downloading or extracting, not verifying)
+export const getActiveDownloadCount = async () => {
   try {
     const games = await window.electron.getGames();
-    const activeDownloads = games.filter(game => {
+    return games.filter(game => {
       const { downloadingData } = game;
-      // Only count as active if actually downloading, extracting, or updating
-      // Don't count verifying as active since that means it's almost done
       return (
         downloadingData &&
         (downloadingData.downloading ||
@@ -87,71 +106,86 @@ export const hasActiveDownloads = async () => {
           downloadingData.updating) &&
         !downloadingData.verifying
       );
-    });
-    return activeDownloads.length > 0;
+    }).length;
   } catch (error) {
-    console.error("Error checking active downloads:", error);
-    return false;
+    console.error("Error counting active downloads:", error);
+    return 0;
   }
 };
 
-// Process the next item in the queue (called when a download completes)
-export const processNextInQueue = async () => {
-  const nextItem = getNextInQueue();
-  if (!nextItem) {
-    return null;
-  }
+// Returns true only when we have reached the concurrent download limit
+export const hasActiveDownloads = async () => {
+  const count = await getActiveDownloadCount();
+  const max = getMaxConcurrentDownloads();
+  return count >= max;
+};
 
-  // Check if there are still active downloads
-  const hasActive = await hasActiveDownloads();
-  if (hasActive) {
-    return null; // Wait for current download to finish
-  }
-
-  // Start the download
+// Start a single queued item and wait for it to appear in the games list
+const startQueuedItem = async item => {
   try {
     await window.electron.downloadFile(
-      nextItem.url,
-      nextItem.gameName,
-      nextItem.online || false,
-      nextItem.dlc || false,
-      nextItem.isVr || false,
-      nextItem.updateFlow || false,
-      nextItem.version || "",
-      nextItem.imgID || null,
-      nextItem.size || "",
-      nextItem.additionalDirIndex || 0,
-      nextItem.gameID || ""
+      item.url,
+      item.gameName,
+      item.online || false,
+      item.dlc || false,
+      item.isVr || false,
+      item.updateFlow || false,
+      item.version || "",
+      item.imgID || null,
+      item.size || "",
+      item.additionalDirIndex || 0,
+      item.gameID || ""
     );
 
-    // Wait for the download to appear in the games list before removing from queue
-    // This prevents the empty page flash
+    // Wait for download to appear then remove from queue
     const waitForDownloadToAppear = async (maxAttempts = 10) => {
       for (let i = 0; i < maxAttempts; i++) {
         await new Promise(resolve => setTimeout(resolve, 500));
         const games = await window.electron.getGames();
         const found = games.some(
           g =>
-            g.game === nextItem.gameName &&
+            g.game === item.gameName &&
             g.downloadingData &&
             (g.downloadingData.downloading || g.downloadingData.extracting)
         );
         if (found) {
-          removeFromQueue(nextItem.id);
+          removeFromQueue(item.id);
           return;
         }
       }
-      // Fallback: remove anyway after max attempts
-      removeFromQueue(nextItem.id);
+      removeFromQueue(item.id);
     };
 
     waitForDownloadToAppear();
-
-    return nextItem;
+    return item;
   } catch (error) {
     console.error("Error starting queued download:", error);
-    // Still remove from queue on error to prevent infinite retry
-    removeFromQueue(nextItem.id);
+    removeFromQueue(item.id);
     return null;
   }
+};
+
+// Fill all available download slots from the queue (supports parallel downloads)
+export const processNextInQueue = async () => {
+  const queue = getDownloadQueue();
+  if (queue.length === 0) return null;
+
+  const activeCount = await getActiveDownloadCount();
+  const maxConcurrent = getMaxConcurrentDownloads();
+  const availableSlots = maxConcurrent - activeCount;
+
+  if (availableSlots <= 0) return null;
+
+  // Take up to availableSlots items from the front of the queue
+  const itemsToStart = queue.slice(0, availableSlots);
+
+  // Mark them as "in-flight" by optimistically removing from queue
+  // (startQueuedItem will also remove after confirmation)
+  for (const item of itemsToStart) {
+    removeFromQueue(item.id);
+  }
+
+  // Start all of them in parallel
+  const started = await Promise.all(itemsToStart.map(item => startQueuedItem(item)));
+  return started.filter(Boolean);
 };

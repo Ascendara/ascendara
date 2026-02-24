@@ -49,7 +49,13 @@ import { analytics } from "@/services/analyticsService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import verifiedGamesService from "@/services/verifiedGamesService";
 
-const GameCard = memo(function GameCard({ game, compact }) {
+const GameCard = memo(function GameCard({
+  game,
+  compact,
+  selectable,
+  selected,
+  onSelect,
+}) {
   const navigate = useNavigate();
   const [showAllTags, setShowAllTags] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -173,8 +179,14 @@ const GameCard = memo(function GameCard({ game, compact }) {
     });
   }, [game?.gameID]);
 
-  // Handle Card Click (Navigation)
+  // Handle Card Click (Navigation or selection in batch mode)
   const handleCardClick = useCallback(() => {
+    // In selectable mode, toggle selection instead of navigating
+    if (selectable) {
+      onSelect?.(game);
+      return;
+    }
+
     // Prevent navigation if dialog was just closed
     if (dialogJustClosed.current) {
       dialogJustClosed.current = false;
@@ -191,7 +203,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
         },
       },
     });
-  }, [navigate, game, needsUpdate]);
+  }, [navigate, game, needsUpdate, selectable, onSelect]);
 
   // Handle Download Button Click
   const handleDownload = useCallback(
@@ -304,12 +316,16 @@ const GameCard = memo(function GameCard({ game, compact }) {
       <Card
         ref={cardRef}
         onClick={e => {
+          if (selectable) {
+            handleCardClick();
+            return;
+          }
           // Double-check dialog wasn't just closed
           if (!dialogJustClosed.current) {
             handleCardClick();
           }
         }}
-        className="group relative flex min-h-[380px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
+        className={`group relative flex min-h-[380px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10 ${selected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
       >
         <CardContent className="flex-1 p-0">
           {/* Image Section */}
@@ -332,6 +348,21 @@ const GameCard = memo(function GameCard({ game, compact }) {
                 </>
               )}
             </AspectRatio>
+            {/* Batch-select checkbox overlay */}
+            {selectable && (
+              <div
+                className="absolute left-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-md border-2 border-white/80 shadow-md transition-all duration-150"
+                style={{
+                  background: selected ? "hsl(var(--primary))" : "rgba(0,0,0,0.55)",
+                }}
+                onClick={e => {
+                  e.stopPropagation();
+                  onSelect?.(game);
+                }}
+              >
+                {selected && <Check className="h-4 w-4 text-white" />}
+              </div>
+            )}
 
             {/* Top Status Bar */}
             <div className="absolute left-0 right-0 top-0 flex items-start justify-between p-3">
