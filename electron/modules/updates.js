@@ -13,6 +13,7 @@ const {
   appVersion,
   isDev,
   isWindows,
+  isLinux,
   TIMESTAMP_FILE,
   LANG_DIR,
   appDirectory,
@@ -335,7 +336,8 @@ async function downloadUpdateInBackground() {
       updateUrl = `https://lfs.ascendara.app/download?branch=${currentBranch}`;
     }
     const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-    const installerPath = path.join(tempDir, "AscendaraInstaller.exe");
+    const installerFileName = isWindows ? "AscendaraInstaller.exe" : "AscendaraInstaller.AppImage";
+    const installerPath = path.join(tempDir, installerFileName);
 
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir);
@@ -442,17 +444,28 @@ function registerUpdateHandlers() {
 
     if (updateDownloaded) {
       const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-      const installerPath = path.join(tempDir, "AscendaraInstaller.exe");
+      const installerFileName = isWindows ? "AscendaraInstaller.exe" : "AscendaraInstaller.AppImage";
+      const installerPath = path.join(tempDir, installerFileName);
 
       if (!fs.existsSync(installerPath)) {
         console.error("Installer not found at:", installerPath);
         return;
       }
 
+      // On Linux, make AppImage executable before running
+      if (isLinux) {
+        try {
+          fs.chmodSync(installerPath, 0o755);
+        } catch (error) {
+          console.error("Failed to make AppImage executable:", error);
+          return;
+        }
+      }
+
       const installerProcess = spawn(installerPath, [], {
         detached: true,
         stdio: "ignore",
-        shell: true,
+        shell: isLinux,
       });
 
       installerProcess.unref();
@@ -486,7 +499,8 @@ function registerUpdateHandlers() {
       };
 
       const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-      const installerPath = path.join(tempDir, "AscendaraBranchInstaller.exe");
+      const installerFileName = isWindows ? "AscendaraBranchInstaller.exe" : "AscendaraBranchInstaller.AppImage";
+      const installerPath = path.join(tempDir, installerFileName);
 
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir);
@@ -528,10 +542,20 @@ function registerUpdateHandlers() {
         writer.on("error", reject);
       });
 
+      // On Linux, make AppImage executable before running
+      if (isLinux) {
+        try {
+          fs.chmodSync(installerPath, 0o755);
+        } catch (error) {
+          console.error("Failed to make AppImage executable:", error);
+          return { success: false, error: "Failed to make installer executable" };
+        }
+      }
+
       const installerProcess = spawn(installerPath, [], {
         detached: true,
         stdio: "ignore",
-        shell: true,
+        shell: isLinux,
       });
 
       installerProcess.unref();
