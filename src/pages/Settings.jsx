@@ -3511,7 +3511,7 @@ function Settings() {
                 branch: pendingBranch?.label,
               })}
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3 text-muted-foreground">
+            <div className="space-y-3 text-muted-foreground">
               <p>
                 {t("settings.appBranch.switchDialog.description")}{" "}
                 <strong>{pendingBranch?.label}</strong>{" "}
@@ -3557,7 +3557,7 @@ function Settings() {
                   </div>
                 </div>
               )}
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-primary" disabled={isSwitchingBranch}>
@@ -3605,7 +3605,7 @@ function Settings() {
               {t("settings.noBranchDialog.title")}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-muted-foreground">
-              <p>{noBranchMessage}</p>
+              {noBranchMessage}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3624,7 +3624,7 @@ function Settings() {
               <Star className="h-6 w-6 text-yellow-500" />
               {t("settings.ascendPromoDialog.title")}
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4 text-muted-foreground">
+            <div className="space-y-4 text-muted-foreground">
               <p>
                 {t("settings.ascendPromoDialog.experimentalBranchExclusivePrefix")}{" "}
                 <strong className="text-red-400">
@@ -3651,7 +3651,7 @@ function Settings() {
                   </li>
                 </ul>
               </div>
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-primary">
@@ -3676,7 +3676,7 @@ function Settings() {
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
               {t("settings.torrentWarningDialog.title")}
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4 text-muted-foreground">
+            <div className="space-y-4 text-muted-foreground">
               <p>{t("settings.torrentWarningDialog.description")}</p>
               <div className="mt-4 space-y-3 rounded-lg bg-muted p-4">
                 <div className="flex items-start gap-2">
@@ -3692,7 +3692,7 @@ function Settings() {
                   <p>{t("settings.torrentWarningDialog.qbitWarning")}</p>
                 </div>
               </div>
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-primary">

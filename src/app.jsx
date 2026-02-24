@@ -1208,20 +1208,22 @@ const AppRoutes = () => {
           zIndex: 9999,
         }}
       >
-        <motion.img
-          src={iconData}
-          alt="Loading"
-          style={{ width: "128px", height: "128px" }}
-          animate={{
-            scale: [0.95, 1, 0.95],
-            opacity: [0.8, 1, 0.8],
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
+        {iconData && (
+          <motion.img
+            src={iconData}
+            alt="Loading"
+            style={{ width: "128px", height: "128px" }}
+            animate={{
+              scale: [0.95, 1, 0.95],
+              opacity: [0.8, 1, 0.8],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+          />
+        )}
       </motion.div>
     );
   }
