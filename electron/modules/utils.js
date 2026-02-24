@@ -157,7 +157,6 @@ function shouldLogError(errorKey) {
  */
 function printDevModeIntro(appVersion, nodeEnv, isDev = true) {
   const os = require("os");
-  const ip = require("ip");
 
   // Clear the console
   console.clear();
@@ -166,7 +165,20 @@ function printDevModeIntro(appVersion, nodeEnv, isDev = true) {
   const platform = os.platform();
   const release = os.release();
   const arch = os.arch();
-  const localIp = ip.address();
+
+  // Get local IP address using native Node.js
+  const getLocalIp = () => {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name]) {
+        if (iface.family === "IPv4" && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+    return "localhost";
+  };
+  const localIp = getLocalIp();
 
   // ANSI color codes for simple coloring
   const colors = {
