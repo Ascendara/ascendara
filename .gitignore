@@ -21,6 +21,10 @@ package-lock.json
 
 # Configuration and environment
 .env
+.env.local
+.env.development
+.env.production
+.env.*.local
 electron/config.prod.js
 build/icon.ico
 
