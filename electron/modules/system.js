@@ -44,7 +44,12 @@ async function getDirectorySize(directoryPath) {
 
     for (const file of files) {
       const filePath = path.join(directoryPath, file);
-      const stats = await fs.stat(filePath);
+      // use lstat instead of stat to NOT follow symlinks
+      const stats = await fs.lstat(filePath);
+
+      if (stats.isSymbolicLink()) {
+        continue; // Ignoring symbolic links (like z:)
+      }
 
       if (stats.isDirectory()) {
         totalSize += await getDirectorySize(filePath);
