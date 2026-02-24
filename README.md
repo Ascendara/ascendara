@@ -308,13 +308,25 @@ Or using yarn:
 yarn
 ```
 
-3. **Install Python Dependencies**
+3. **Configure Firebase**
+
+   Create a `.env` file in the root directory and add your Firebase credentials:
+
+   ```sh
+   cp .env.example .env
+   ```
+
+   Then edit `.env` and replace the placeholder values with your actual Firebase project credentials from the [Firebase Console](https://console.firebase.google.com/).
+
+   > **Note:** The `.env` file is gitignored and will not be committed to the repository. Never commit your Firebase credentials.
+
+4. **Install Python Dependencies**
 
    ```sh
    pip install -r requirements.txt
    ```
 
-4. **Run the Development App**
+5. **Run the Development App**
 
    Using npm:
 
