@@ -420,7 +420,12 @@ def main():
         print("Failed to move files. Exiting.")
         return 1
     
-    # Step 8: Try to build the AppImage, fallback to unpacked if it fails
+    # Step 8: Generate build signature
+    if not generate_build_signature():
+        print("Failed to generate build signature. Exiting.")
+        return 1
+    
+    # Step 9: Try to build the AppImage, fallback to unpacked if it fails
     if not build_appimage():
         print("AppImage build failed, trying unpacked build...")
         if not build_linux_unpacked():
@@ -431,12 +436,12 @@ def main():
         if not create_tar_archive():
             print("Failed to create tar.gz archive, but unpacked version is available.")
     
-    # Step 9: Clean up temporary files after build
+    # Step 10: Clean up temporary files after build
     if not cleanup_after_build():
         print("Failed to clean up after build. Exiting.")
         return 1
     
-    # Step 10: Register build with backend API
+    # Step 11: Register build with backend API
     print("\n" + "="*60)
     print("Registering build with backend API...")
     print("="*60)
