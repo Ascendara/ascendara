@@ -61,13 +61,14 @@ try {
 }
 
 // API Keys
-const APIKEY = process.env.REACT_APP_AUTHORIZATION || config.AUTHORIZATION;
-const analyticsAPI = process.env.REACT_APP_ASCENDARA_API_KEY || config.ASCENDARA_API_KEY;
-const steamWebApiKey =
-  process.env.REACT_APP_STEAM_WEB_API_KEY || config.ASCENDARA_STEAM_WEB_API_KEY;
-const steamGridDbApiKey =
-  process.env.REACT_APP_STEAMGRIDDB_API_KEY || config.ASCENDARA_STEAMGRIDDB_API_KEY;
-const imageKey = process.env.REACT_APP_IMAGE_KEY || config.IMAGE_KEY;
+// NOTE: Sensitive keys have been moved to backend (api.ascendara.app)
+// These are kept for backward compatibility but will be null/undefined
+const APIKEY = process.env.REACT_APP_AUTHORIZATION || config.AUTHORIZATION || null;
+const analyticsAPI =
+  process.env.REACT_APP_ASCENDARA_API_KEY || config.ASCENDARA_API_KEY || null;
+const steamWebApiKey = null; // Now handled by backend proxy
+const steamGridDbApiKey = null; // Now handled by backend proxy
+const imageKey = process.env.REACT_APP_IMAGE_KEY || config.IMAGE_KEY || null;
 const clientId = process.env.REACT_APP_DISCKEY || config.DISCKEY;
 
 // Returns the Python interpreter path: venv if set up, otherwise system python3

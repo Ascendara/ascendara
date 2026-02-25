@@ -81,18 +81,44 @@ function registerMiscHandlers() {
     }
   });
 
-  // Steam API request handler (bypasses CORS)
+  // Steam API request handler (now proxied through backend)
   ipcMain.handle("steam-request", async (_, { url }) => {
     try {
-      const response = await axios.get(url, {
+      // Parse the URL to determine which proxy endpoint to use
+      const urlObj = new URL(url);
+      let proxyUrl;
+
+      if (url.includes("storesearch")) {
+        // Extract search term from URL
+        const term = urlObj.searchParams.get("term");
+        proxyUrl = `https://api.ascendara.app/api/proxy/steam/search?term=${encodeURIComponent(term)}`;
+      } else if (url.includes("appdetails")) {
+        // Extract appids from URL
+        const appids = urlObj.searchParams.get("appids");
+        proxyUrl = `https://api.ascendara.app/api/proxy/steam/appdetails?appids=${appids}`;
+      } else {
+        // Fallback to direct request for unknown endpoints
+        console.warn("Unknown Steam API endpoint, using direct request:", url);
+        const response = await axios.get(url, {
+          headers: {
+            "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
+            Accept: "application/json",
+          },
+        });
+        return { success: true, data: response.data };
+      }
+
+      // Make request to backend proxy
+      const response = await axios.get(proxyUrl, {
         headers: {
           "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
           Accept: "application/json",
         },
       });
+
       return { success: true, data: response.data };
     } catch (error) {
-      console.error("Steam request error:", error.message);
+      console.error("Steam proxy request error:", error.message);
       return { success: false, error: error.message };
     }
   });
@@ -115,6 +141,7 @@ function registerMiscHandlers() {
     console.log("API Key overridden:", apiKeyOverride);
   });
 
+  // Legacy API key handlers (deprecated - use get-auth-headers instead)
   ipcMain.handle("get-api-key", () => apiKeyOverride || APIKEY);
 
   ipcMain.handle("get-analytics-key", () => analyticsAPI);
@@ -122,6 +149,10 @@ function registerMiscHandlers() {
   ipcMain.handle("get-image-key", () => imageKey);
 
   ipcMain.handle("get-steam-api-key", () => steamWebApiKey);
+
+  // Time-based authentication
+  const authHelper = require("./auth-helper");
+  ipcMain.handle("get-auth-headers", () => authHelper.generateAuthHeaders());
 
   // Open URL
   ipcMain.handle("open-url", async (_, url) => {
