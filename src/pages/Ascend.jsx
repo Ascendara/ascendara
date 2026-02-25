@@ -160,6 +160,8 @@ import {
   Laptop,
   Monitor,
   CheckCheck,
+  FlaskRound,
+  FlaskConical,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -8863,9 +8865,9 @@ const Ascend = () => {
                   transition={{ delay: 0.05 }}
                   className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
                 >
-                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-slate-500/10 blur-2xl transition-all group-hover:bg-slate-500/20" />
                   <div className="relative">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500">
                       <Smartphone className="h-6 w-6" />
                     </div>
                     <div className="flex items-center gap-2">
@@ -8953,9 +8955,9 @@ const Ascend = () => {
                   transition={{ delay: 0.25 }}
                   className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
                 >
-                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-amber-500/10 blur-2xl transition-all group-hover:bg-amber-500/20" />
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-yellow-500/10 blur-2xl transition-all group-hover:bg-yellow-500/20" />
                   <div className="relative">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-500">
                       <Trophy className="h-6 w-6" />
                     </div>
                     <h3 className="mt-4 text-lg font-semibold">
@@ -9145,6 +9147,31 @@ const Ascend = () => {
                     <p className="mt-2 text-sm text-muted-foreground">
                       {t("ascend.premium.communities.description") ||
                         "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions."}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Experimental Branch */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-amber-500/30 hover:bg-card hover:shadow-lg hover:shadow-amber-500/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-amber-500/10 blur-2xl transition-all group-hover:bg-amber-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                      <FlaskConical className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="mt-4 text-lg font-semibold">
+                        {t("ascend.premium.experimentalBranch.title") ||
+                          "Experimental Branch"}
+                      </h3>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.experimentalBranch.description") ||
+                        "Easily switch to the experimental branch in Preferences to test cutting-edge features before they're released. Be the first to try new functionality and help shape Ascendara's future."}
                     </p>
                   </div>
                 </motion.div>

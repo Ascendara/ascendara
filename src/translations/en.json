@@ -447,6 +447,10 @@
         "description": "Queue multiple downloads and let Ascendara handle them automatically. Start downloads and come back when they're all ready.",
         "title": "Download Queue"
       },
+      "experimentalBranch": {
+        "description": "Easily switch to the experimental branch in Preferences to test brand new features before they're released. Be the first to try new functionality and help shape Ascendara's future.",
+        "title": "Experimental Branch"
+      },
       "flingTrainer": {
         "description": "Automatically downloads and runs FLiNG trainer for your game, no manual searching or setup required.",
         "title": "FLiNG Trainer"
