@@ -371,6 +371,7 @@ contextBridge.exposeInMainWorld("electron", {
   // UPDATES
   //===========================================================================
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  downloadUpdate: () => ipcRenderer.invoke("download-update"),
   updateAscendara: () => ipcRenderer.invoke("update-ascendara"),
   isUpdateDownloaded: () => ipcRenderer.invoke("is-update-downloaded"),
   isBrokenVersion: () => ipcRenderer.invoke("is-broken-version"),

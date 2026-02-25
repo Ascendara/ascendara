@@ -1168,7 +1168,15 @@ const AppRoutes = () => {
               label: t("app.toasts.updateNow"),
               onClick: async () => {
                 toast.dismiss("update-available");
-                await window.electron.updateAscendara();
+                // Start the download - update-ready event will fire when complete
+                const isDownloaded = await window.electron.isUpdateDownloaded();
+                if (!isDownloaded) {
+                  // Trigger download only - update-ready event will show install prompt
+                  window.electron.downloadUpdate();
+                } else {
+                  // Already downloaded, show install prompt
+                  updateReadyHandler();
+                }
               },
             },
             duration: 10000,

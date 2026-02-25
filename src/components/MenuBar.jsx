@@ -102,18 +102,12 @@ const MenuBar = () => {
 
     // Only set up the update checking if the app is outdated
     if (!isLatest) {
-      // Check timestamp file for downloading status, but only if auto-update is enabled
+      // Check timestamp file for downloading status (for both auto and manual updates)
       const checkDownloadStatus = async () => {
         try {
-          const settings = await window.electron.getSettings();
-          // Only show downloading badge if auto-update is enabled
-          if (settings.autoUpdate) {
-            const timestamp =
-              await window.electron.getTimestampValue("downloadingUpdate");
-            setIsDownloadingUpdate(timestamp || false);
-          } else {
-            setIsDownloadingUpdate(false);
-          }
+          const timestamp =
+            await window.electron.getTimestampValue("downloadingUpdate");
+          setIsDownloadingUpdate(timestamp || false);
         } catch (error) {
           console.error("Failed to read timestamp file:", error);
         }

@@ -441,22 +441,65 @@ function registerUpdateHandlers() {
     }
   });
 
+  ipcMain.handle("download-update", async () => {
+    if (isLatest) return;
+    if (updateDownloaded) return; // Already downloaded
+
+    try {
+      // If download is already in progress, wait for it
+      if (downloadUpdatePromise) {
+        await downloadUpdatePromise;
+      } else if (!updateDownloadInProgress) {
+        // Start download with proper timestamp tracking
+        updateTimestampFile({
+          downloadingUpdate: true,
+        });
+        
+        downloadUpdatePromise = downloadUpdateInBackground();
+        await downloadUpdatePromise;
+      } else {
+        console.log("Update download already in progress, waiting...");
+      }
+    } catch (error) {
+      console.error("Error during update download:", error);
+      updateTimestampFile({
+        downloadingUpdate: false,
+      });
+      throw error;
+    }
+  });
+
   ipcMain.handle("update-ascendara", async () => {
     if (isLatest) return;
 
+    // If not downloaded yet, download first
     if (!updateDownloaded) {
       try {
+        // If download is already in progress, wait for it
         if (downloadUpdatePromise) {
           await downloadUpdatePromise;
+        } else if (!updateDownloadInProgress) {
+          // Start download with proper timestamp tracking
+          updateTimestampFile({
+            downloadingUpdate: true,
+          });
+          
+          downloadUpdatePromise = downloadUpdateInBackground();
+          await downloadUpdatePromise;
         } else {
-          await downloadUpdateInBackground();
+          console.log("Update download already in progress, waiting...");
+          return;
         }
       } catch (error) {
         console.error("Error during update download:", error);
+        updateTimestampFile({
+          downloadingUpdate: false,
+        });
         return;
       }
     }
 
+    // Install the update
     if (updateDownloaded) {
       const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
       const installerFileName = isWindows
