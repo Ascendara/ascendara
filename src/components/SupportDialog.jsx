@@ -13,11 +13,9 @@ const SupportDialog = ({ onClose }) => {
   useEffect(() => {
     const fetchToken = async () => {
       try {
-        const AUTHORIZATION = await window.electron.getAPIKey();
+        const authHeaders = await window.electron.getAuthHeaders();
         const response = await fetch("https://api.ascendara.app/auth/token", {
-          headers: {
-            Authorization: AUTHORIZATION,
-          },
+          headers: authHeaders,
         });
         const data = await response.json();
         if (data.token) {

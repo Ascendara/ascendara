@@ -1612,13 +1612,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         : referralSource;
                     if (sourceToSend) {
                       try {
-                        const AUTHORIZATION = await window.electron.getAPIKey();
+                        const authHeaders = await window.electron.getAuthHeaders();
                         const tokenResponse = await fetch(
                           "https://api.ascendara.app/auth/token",
                           {
-                            headers: {
-                              Authorization: AUTHORIZATION,
-                            },
+                            headers: authHeaders,
                           }
                         );
 

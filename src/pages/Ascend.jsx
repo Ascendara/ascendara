@@ -199,9 +199,9 @@ const GoogleIcon = ({ className }) => (
 
 // Helper function to get auth token for API calls
 const getAuthToken = async () => {
-  const AUTHORIZATION = await window.electron.getAPIKey();
+  const authHeaders = await window.electron.getAuthHeaders();
   const response = await fetch("https://api.ascendara.app/auth/token", {
-    headers: { Authorization: AUTHORIZATION },
+    headers: authHeaders,
   });
   if (!response.ok) throw new Error("Failed to obtain token");
   const { token } = await response.json();
@@ -823,12 +823,12 @@ const Ascend = () => {
   const loadLeaderboard = async () => {
     setLoadingLeaderboard(true);
     try {
-      const AUTHORIZATION = await window.electron.getAPIKey();
+      const authHeaders = await window.electron.getAuthHeaders();
       const userId = user?.uid || "";
       const response = await fetch(
         `https://api.ascendara.app/ascend/leaderboard${userId ? `?userId=${userId}` : ""}`,
         {
-          headers: { Authorization: AUTHORIZATION },
+          headers: authHeaders,
         }
       );
       if (response.ok) {
@@ -1560,11 +1560,9 @@ const Ascend = () => {
 
     setIsReportingUser(true);
     try {
-      const AUTHORIZATION = await window.electron.getAPIKey();
+      const authHeaders = await window.electron.getAuthHeaders();
       const response = await fetch("https://api.ascendara.app/auth/token", {
-        headers: {
-          Authorization: AUTHORIZATION,
-        },
+        headers: authHeaders,
       });
 
       if (!response.ok) {
@@ -1589,10 +1587,9 @@ const Ascend = () => {
 
       if (!reportResponse.ok) {
         if (reportResponse.status === 401) {
+          const newAuthHeaders = await window.electron.getAuthHeaders();
           const newTokenResponse = await fetch("https://api.ascendara.app/auth/token", {
-            headers: {
-              Authorization: AUTHORIZATION,
-            },
+            headers: newAuthHeaders,
           });
 
           if (!newTokenResponse.ok) {

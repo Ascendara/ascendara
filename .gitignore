@@ -26,6 +26,8 @@ package-lock.json
 .env.production
 .env.*.local
 electron/config.prod.js
+electron/build-signature.json
+build.config.json
 build/icon.ico
 
 # OS and editor files
@@ -37,6 +39,7 @@ build/icon.ico
 /src/translations/json
 exports.txt
 /server
+scripts/register_build.py
 
 # Debian-specific files
 /binaries/*/src/debian

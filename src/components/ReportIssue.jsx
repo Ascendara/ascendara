@@ -49,24 +49,9 @@ const ReportIssue = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const getToken = async () => {
-    try {
-      const AUTHORIZATION = await window.electron.getAPIKey();
-      const response = await fetch("https://api.ascendara.app/auth/token", {
-        headers: {
-          Authorization: AUTHORIZATION,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to obtain token");
-      }
-
-      const data = await response.json();
-      return data.token;
-    } catch (error) {
-      console.error("Error getting token:", error);
-      throw error;
-    }
+    // Import at top of file: import { getAuthToken } from "@/utils/authHelper";
+    const { getAuthToken } = await import("@/utils/authHelper");
+    return getAuthToken();
   };
 
   const handleSubmit = async () => {

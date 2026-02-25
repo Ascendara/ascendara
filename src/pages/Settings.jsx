@@ -4730,11 +4730,11 @@ function Settings() {
                   const sessionToken = validateData.session_token;
 
                   // Step 2: Get app token
-                  const AUTHORIZATION = await window.electron.getAPIKey();
+                  const authHeaders = await window.electron.getAuthHeaders();
                   const tokenResponse = await fetch(
                     "https://api.ascendara.app/auth/token",
                     {
-                      headers: { Authorization: AUTHORIZATION },
+                      headers: authHeaders,
                     }
                   );
 

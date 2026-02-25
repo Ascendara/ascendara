@@ -548,7 +548,13 @@ export default function DownloadPage() {
 
   async function handleDownload(directUrl = null, dir = null, forceStart = false) {
     const sanitizedGameName = sanitizeText(gameData.game);
-    console.log("[DL] handleDownload called", { directUrl, dir, forceStart, selectedProvider, sanitizedGameName });
+    console.log("[DL] handleDownload called", {
+      directUrl,
+      dir,
+      forceStart,
+      selectedProvider,
+      sanitizedGameName,
+    });
     console.log("[DL] settings.downloadDirectory:", settings.downloadDirectory);
     console.log("[DL] showNoDownloadPath:", showNoDownloadPath);
     if (showNoDownloadPath) {
@@ -666,7 +672,9 @@ export default function DownloadPage() {
       torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings);
     if (
       !directUrl &&
-      (selectedProvider === "gofile" || selectedProvider === "buzzheavier" || selectedProvider === "pixeldrain") &&
+      (selectedProvider === "gofile" ||
+        selectedProvider === "buzzheavier" ||
+        selectedProvider === "pixeldrain") &&
       !shouldUseTorbox()
     ) {
       let providerLinks = gameData.download_links?.[selectedProvider] || [];
@@ -676,7 +684,12 @@ export default function DownloadPage() {
           ? providerLinks
           : null;
 
-      console.log("[DL] seamless provider link:", validProviderLink, "providerLinks:", providerLinks);
+      console.log(
+        "[DL] seamless provider link:",
+        validProviderLink,
+        "providerLinks:",
+        providerLinks
+      );
       if (!validProviderLink) {
         console.log("[DL] EARLY RETURN: no valid seamless provider link");
         toast.error(t("download.toast.invalidLink"));
@@ -859,7 +872,12 @@ export default function DownloadPage() {
         return;
       }
       if (!inputLink || !isValidLink) {
-        console.log("[DL] EARLY RETURN: inputLink:", inputLink, "isValidLink:", isValidLink);
+        console.log(
+          "[DL] EARLY RETURN: inputLink:",
+          inputLink,
+          "isValidLink:",
+          isValidLink
+        );
         return;
       }
     }
@@ -1409,11 +1427,9 @@ export default function DownloadPage() {
 
     setIsReporting(true);
     try {
-      const AUTHORIZATION = await window.electron.getAPIKey();
+      const authHeaders = await window.electron.getAuthHeaders();
       const response = await fetch("https://api.ascendara.app/auth/token", {
-        headers: {
-          Authorization: AUTHORIZATION,
-        },
+        headers: authHeaders,
       });
 
       if (!response.ok) {
@@ -1454,10 +1470,9 @@ export default function DownloadPage() {
       if (!reportResponse.ok) {
         // If token is expired or invalid, try once more with a new token
         if (reportResponse.status === 401) {
+          const newAuthHeaders = await window.electron.getAuthHeaders();
           const newTokenResponse = await fetch("https://api.ascendara.app/auth/token", {
-            headers: {
-              Authorization: AUTHORIZATION,
-            },
+            headers: newAuthHeaders,
           });
 
           if (!newTokenResponse.ok) {

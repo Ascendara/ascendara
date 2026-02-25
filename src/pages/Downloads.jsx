@@ -1413,9 +1413,9 @@ const DownloadCard = ({
     if (wasReported) return;
     setIsReporting(true);
     try {
-      const AUTHORIZATION = await window.electron.getAPIKey();
+      const authHeaders = await window.electron.getAuthHeaders();
       const response = await fetch("https://api.ascendara.app/auth/token", {
-        headers: { Authorization: AUTHORIZATION },
+        headers: authHeaders,
       });
       if (!response.ok) throw new Error("Failed to obtain token");
       const { token } = await response.json();
