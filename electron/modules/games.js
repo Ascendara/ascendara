@@ -326,9 +326,62 @@ function registerGameHandlers() {
           }
 
           const executableToUse = specificExecutable || gameInfo.executable;
-          executable = path.isAbsolute(executableToUse)
-            ? executableToUse
-            : path.join(gameDirectory, executableToUse);
+          
+          // Try to resolve the executable path
+          if (path.isAbsolute(executableToUse)) {
+            executable = executableToUse;
+          } else {
+            // First try relative to gameDirectory
+            executable = path.join(gameDirectory, executableToUse);
+            
+            // If not found, search in parent directory and subdirectories
+            if (!fs.existsSync(executable)) {
+              console.log(`[Games] Executable not found at expected path: ${executable}`);
+              console.log(`[Games] Searching for executable in parent directory...`);
+              
+              const parentDir = path.dirname(gameDirectory);
+              const executableBasename = path.basename(executableToUse);
+              let foundPath = null;
+              
+              try {
+                // Search in parent directory
+                const parentContents = fs.readdirSync(parentDir, { withFileTypes: true });
+                
+                for (const dirent of parentContents) {
+                  if (dirent.isDirectory()) {
+                    const testPath = path.join(parentDir, dirent.name, executableBasename);
+                    if (fs.existsSync(testPath)) {
+                      foundPath = testPath;
+                      console.log(`[Games] Found executable at: ${foundPath}`);
+                      break;
+                    }
+                    
+                    // Also check if the relative path works from this directory
+                    const testPathWithRelative = path.join(parentDir, dirent.name, executableToUse);
+                    if (fs.existsSync(testPathWithRelative)) {
+                      foundPath = testPathWithRelative;
+                      console.log(`[Games] Found executable at: ${foundPath}`);
+                      break;
+                    }
+                  }
+                }
+              } catch (searchError) {
+                console.error(`[Games] Error searching for executable:`, searchError);
+              }
+              
+              if (foundPath) {
+                executable = foundPath;
+                // Update the game info file with the correct absolute path
+                try {
+                  gameInfo.executable = foundPath;
+                  fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 2));
+                  console.log(`[Games] Updated game info with correct executable path`);
+                } catch (updateError) {
+                  console.warn(`[Games] Could not update game info file:`, updateError);
+                }
+              }
+            }
+          }
         } else {
           const gamesPath = path.join(settings.downloadDirectory, "games.json");
           if (!fs.existsSync(gamesPath)) {
@@ -353,7 +406,9 @@ function registerGameHandlers() {
         }
 
         if (!fs.existsSync(executable)) {
-          throw new Error(`Game executable not found: ${executable}`);
+          const errorMsg = `Game executable not found at: ${executable}\n\nPlease use the Executable Manager to set the correct path.`;
+          console.error(`[Games] ${errorMsg}`);
+          throw new Error(errorMsg);
         }
 
         if (runGameProcesses.has(game)) {
