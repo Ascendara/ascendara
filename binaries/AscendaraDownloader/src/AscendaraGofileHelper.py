@@ -1078,12 +1078,8 @@ class GofileDownloader:
                     except Exception as e:
                         logging.error(f"Error during extraction on non-Windows system: {str(e)}")
                         raise
-                # Delete archive after successful extraction
-                try:
-                    os.remove(archive_path)
-                    logging.info(f"[AscendaraGofileHelper] Deleted archive: {archive_path}")
-                except Exception as del_e:
-                    logging.warning(f"[AscendaraGofileHelper] Could not delete archive {archive_path}: {del_e}")
+                # Archive deletion moved to after verification to prevent data loss on extraction failures
+                logging.info(f"[AscendaraGofileHelper] Extraction complete for {archive_path}, will delete after verification")
             except Exception as e:
                 logging.error(f"[AscendaraGofileHelper] Error extracting {archive_path}: {str(e)}")
                 raise
