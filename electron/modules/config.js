@@ -8,10 +8,6 @@ const os = require("os");
 const fs = require("fs");
 const { app } = require("electron");
 
-// Current app version
-// Do not change this value
-const appVersion = "10.1.1";
-
 // Environment detection
 const isDev = !app.isPackaged;
 const isWindows = os.platform().startsWith("win");
@@ -121,8 +117,31 @@ const DEPENDENCY_REGISTRY_PATHS = {
   },
 };
 
+// ============================================================================
+// APP VERSION IDENTIFIERS - DO NOT MODIFY MANUALLY
+// ============================================================================
+// These values are CRITICAL to app functionality and update system.
+// Modifying these values manually WILL cause:
+//   - Update system failures and broken version detection
+//   - Branch switching to malfunction
+//   - Potential data corruption or app crashes
+//   - Users stuck on wrong branches unable to update
+//
+// These values should ONLY be changed by:
+//   1. Automated build scripts for production releases
+//   2. Branch-specific build processes (experimental/public-testing)
+//
+// In development mode, appBranch MUST remain "live" to prevent conflicts.
+// ============================================================================
+
+const appBranch = "live";
+const appVersion = "10.1.1";
+const testingVersion = "";
+
 module.exports = {
   appVersion,
+  appBranch,
+  testingVersion,
   isDev,
   isWindows,
   TIMESTAMP_FILE,

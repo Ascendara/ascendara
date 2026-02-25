@@ -53,7 +53,6 @@ export function SettingsProvider({ children }) {
     localRefreshWorkers: 8,
     homeSearch: true,
     indexReminder: "7",
-    appBranch: "live",
     bigPictureKeyboardLayout: "qwerty",
     controllerType: "xbox",
     ludusavi: {

@@ -98,25 +98,12 @@ function registerMiscHandlers() {
   });
 
   // Is experiment / branch
-  let testingVersion = "";
+  const { appBranch } = require("./config");
+  const { testingVersion } = require("./config");
 
-  // Helper to get current branch from settings
-  const getCurrentBranch = () => {
-    try {
-      const settingsPath = path.join(app.getPath("userData"), "ascendarasettings.json");
-      if (fs.existsSync(settingsPath)) {
-        const saved = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-        return saved.appBranch || "live";
-      }
-    } catch (e) {
-      console.error("Failed to read appBranch from settings:", e);
-    }
-    return "live";
-  };
-
-  ipcMain.handle("is-experiment", () => getCurrentBranch() === "experimental");
+  ipcMain.handle("is-experiment", () => appBranch === "experimental");
   ipcMain.handle("get-testing-version", () => testingVersion);
-  ipcMain.handle("get-branch", () => getCurrentBranch());
+  ipcMain.handle("get-branch", () => appBranch);
 
   // Has admin
   let hasAdmin = false;

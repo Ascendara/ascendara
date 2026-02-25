@@ -11,6 +11,7 @@ const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow, app } = require("electron");
 const {
   appVersion,
+  appBranch,
   isDev,
   isWindows,
   isLinux,
@@ -102,7 +103,7 @@ function isVersionLower(v1, v2) {
 async function checkVersionAndUpdate() {
   try {
     const settings = await getSettings();
-    const currentBranch = settings.appBranch || "live";
+    const currentBranch = appBranch;
 
     let latestVersion;
 
@@ -325,8 +326,7 @@ async function downloadUpdateInBackground() {
     };
 
     // Get current branch to download correct update
-    const settings = await getSettings();
-    const currentBranch = settings.appBranch || "live";
+    const currentBranch = appBranch;
 
     // Determine update URL based on branch
     let updateUrl;
@@ -336,7 +336,9 @@ async function downloadUpdateInBackground() {
       updateUrl = `https://lfs.ascendara.app/download?branch=${currentBranch}`;
     }
     const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-    const installerFileName = isWindows ? "AscendaraInstaller.exe" : "AscendaraInstaller.AppImage";
+    const installerFileName = isWindows
+      ? "AscendaraInstaller.exe"
+      : "AscendaraInstaller.AppImage";
     const installerPath = path.join(tempDir, installerFileName);
 
     if (!fs.existsSync(tempDir)) {
@@ -444,7 +446,9 @@ function registerUpdateHandlers() {
 
     if (updateDownloaded) {
       const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-      const installerFileName = isWindows ? "AscendaraInstaller.exe" : "AscendaraInstaller.AppImage";
+      const installerFileName = isWindows
+        ? "AscendaraInstaller.exe"
+        : "AscendaraInstaller.AppImage";
       const installerPath = path.join(tempDir, installerFileName);
 
       if (!fs.existsSync(installerPath)) {
@@ -499,7 +503,9 @@ function registerUpdateHandlers() {
       };
 
       const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-      const installerFileName = isWindows ? "AscendaraBranchInstaller.exe" : "AscendaraBranchInstaller.AppImage";
+      const installerFileName = isWindows
+        ? "AscendaraBranchInstaller.exe"
+        : "AscendaraBranchInstaller.AppImage";
       const installerPath = path.join(tempDir, installerFileName);
 
       if (!fs.existsSync(tempDir)) {
@@ -559,12 +565,6 @@ function registerUpdateHandlers() {
       });
 
       installerProcess.unref();
-
-      const settingsManager = getSettingsManager();
-      if (settingsManager) {
-        const currentSettings = settingsManager.getSettings();
-        settingsManager.saveSettings({ ...currentSettings, appBranch: branch });
-      }
 
       app.quit();
 

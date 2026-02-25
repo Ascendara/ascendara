@@ -262,6 +262,7 @@ const ColorPickerInput = ({ colorKey, label, value, onColorChange }) => {
 function Settings() {
   const [currentBranch, setCurrentBranch] = useState("main");
   const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+  const [branchSwitchProgress, setBranchSwitchProgress] = useState(0);
   const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
   const [showBranchDialog, setShowBranchDialog] = useState(false);
   const [pendingBranch, setPendingBranch] = useState("");
@@ -3239,7 +3240,7 @@ function Settings() {
             </Card>
 
             {/* Developer Settings Card - Only shown in development mode */}
-            {(isDev) && (
+            {isDev && (
               <Card className="border-border p-6">
                 <div className="space-y-6">
                   <div>
