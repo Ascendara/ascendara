@@ -188,7 +188,8 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
 def _launch_crash_reporter_on_exit(error_code, error_message):
     logging.info(f"[ENTRY] _launch_crash_reporter_on_exit(error_code={error_code}, error_message={error_message})")
     try:
-        crash_reporter_path = os.path.join('./AscendaraCrashReporter.exe')
+        binary_name = 'AscendaraCrashReporter.exe' if sys.platform == 'win32' else 'AscendaraCrashReporter'
+        crash_reporter_path = os.path.join('.', binary_name)
         logging.info(f"Attempting to launch crash reporter with error code {error_code}")
         if os.path.exists(crash_reporter_path):
             kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}

@@ -272,7 +272,8 @@ def _launch_notification(title, message):
 def _launch_crash_reporter_on_exit(error_code, error_message):
     """Launch crash reporter on exit"""
     try:
-        crash_reporter_path = os.path.join('./AscendaraCrashReporter.exe')
+        binary_name = 'AscendaraCrashReporter.exe' if sys.platform == 'win32' else 'AscendaraCrashReporter'
+        crash_reporter_path = os.path.join('.', binary_name)
         if os.path.exists(crash_reporter_path):
             subprocess.Popen(
                 [crash_reporter_path, "localrefresh", str(error_code), error_message],

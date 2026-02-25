@@ -173,7 +173,7 @@
         "to": "."
       },
       {
-        "from": "binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter.exe",
+        "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe",
         "to": "."
       },
       {
@@ -194,10 +194,6 @@
       },
       {
         "from": "binaries/AscendaraGameHandler/src/debian/AscendaraGameHandler.py",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraCrashReporter/src/debian/AscendaraCrashReporter.py",
         "to": "."
       },
       {
@@ -259,7 +255,7 @@
           "to": "."
         },
         {
-          "from": "binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter",
+          "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter",
           "to": "."
         },
         {
