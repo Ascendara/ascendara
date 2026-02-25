@@ -273,6 +273,16 @@ def move_files():
         print(f"Failed to move files: {e}")
         return False
 
+def generate_build_signature():
+    print("Generating build signature...")
+    try:
+        subprocess.run(['node', 'scripts/generate_build_signature.js'], check=True, cwd=os.getcwd())
+        print("Build signature generated successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Build signature generation failed with error: {e}")
+        return False
+
 def build_appimage():
     """Build the AppImage using electron-builder"""
     print("Building AppImage...")
@@ -427,7 +437,25 @@ def main():
         print("Failed to clean up after build. Exiting.")
         return 1
     
+    # Step 10: Register build with backend API
+    print("\n" + "="*60)
+    print("Registering build with backend API...")
+    print("="*60)
+    try:
+        register_script = os.path.join('scripts', 'register_build.py')
+        subprocess.run(['python3', register_script], check=True, cwd=os.getcwd())
+        print("Build registration completed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Build registration failed with error: {e}")
+        print("You may need to register this build manually.")
+        print("The build is complete but will not work until registered.")
+    except FileNotFoundError:
+        print("Warning: register_build.py not found, skipping automatic registration.")
+        print("You will need to register this build manually.")
+    
+    print("\n" + "="*60)
     print("Linux build process completed successfully!")
+    print("="*60)
     
     # Check what was created
     version = get_app_version() or 'unknown'

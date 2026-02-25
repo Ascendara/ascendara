@@ -16,6 +16,19 @@ def run_yarn_build():
         print(f"Build failed with error: {e}")
         return False
 
+def generate_build_signature():
+    print("Generating build signature...")
+    try:
+        node_cmd = 'node.exe' if os.name == 'nt' else 'node'
+        # Pass environment variables to subprocess
+        env = os.environ.copy()
+        subprocess.run([node_cmd, 'scripts/generate_build_signature.js'], check=True, cwd=os.getcwd(), env=env)
+        print("Build signature generated successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Build signature generation failed with error: {e}")
+        return False
+
 def run_electron_builder():
     print("Running electron-builder...")
     try:
@@ -260,17 +273,41 @@ def main():
         print("Failed to move files. Exiting.")
         return 1
     
-    # Step 5: Package the Electron app
+    # Step 5: Generate build signature
+    if not generate_build_signature():
+        print("Build process failed at signature generation stage")
+        return 1
+    
+    # Step 6: Package the Electron app
     if not package_electron_app():
         print("Failed to package Electron app. Exiting.")
         return 1
     
-    # Step 6: Clean up temporary files after build
+    # Step 7: Clean up temporary files after build
     if not cleanup_after_build():
         print("Failed to clean up after build. Exiting.")
         return 1
     
+    # Step 8: Register build with backend API
+    print("\n" + "="*60)
+    print("Registering build with backend API...")
+    print("="*60)
+    try:
+        python_cmd = 'python' if os.name == 'nt' else 'python3'
+        register_script = os.path.join('scripts', 'register_build.py')
+        subprocess.run([python_cmd, register_script], check=True, cwd=os.getcwd())
+        print("Build registration completed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Build registration failed with error: {e}")
+        print("You may need to register this build manually.")
+        print("The build is complete but will not work until registered.")
+    except FileNotFoundError:
+        print("Warning: register_build.py not found, skipping automatic registration.")
+        print("You will need to register this build manually.")
+    
+    print("\n" + "="*60)
     print("Build process completed successfully!")
+    print("="*60)
     return 0
 
 if __name__ == "__main__":

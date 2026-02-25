@@ -416,7 +416,8 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // API & NETWORKING
   //===========================================================================
-  getAPIKey: () => ipcRenderer.invoke("get-api-key"),
+  getAPIKey: () => ipcRenderer.invoke("get-api-key"), // Deprecated
+  getAuthHeaders: () => ipcRenderer.invoke("get-auth-headers"), // Use this instead
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   getImageKey: () => ipcRenderer.invoke("get-image-key"),
   openURL: url => ipcRenderer.invoke("open-url", url),
