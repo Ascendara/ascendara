@@ -308,6 +308,7 @@ function Settings() {
   const [protonGEInfo, setProtonGEInfo] = useState(null);
   const [showProtonConfirm, setShowProtonConfirm] = useState(false);
   const [protonUpdateStatus, setProtonUpdateStatus] = useState(null); // null | "checking" | "up-to-date" | "update-available"
+  const [latestDevCommit, setLatestDevCommit] = useState(null);
   // Default custom colors for merging with saved themes (handles missing new properties)
   const defaultCustomColors = {
     background: "255 255 255",
@@ -990,11 +991,30 @@ function Settings() {
     );
   };
 
-  // Check if in development mode
+  // Check if in development mode and fetch latest dev commit
   useEffect(() => {
     const checkDevMode = async () => {
       const isDevMode = await window.electron.isDev();
       setIsDev(isDevMode);
+
+      // Fetch latest development commit if in dev mode
+      if (isDevMode) {
+        try {
+          const response = await fetch(
+            "https://api.github.com/repos/Ascendara/ascendara/commits/development"
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setLatestDevCommit({
+              sha: data.sha,
+              message: data.commit.message.split("\n")[0], // First line only
+              url: data.html_url,
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch latest dev commit:", error);
+        }
+      }
     };
     checkDevMode();
   }, []);
@@ -1161,6 +1181,27 @@ function Settings() {
               <div className="px-2 font-medium">
                 <span>Experiment Build {testingVersion}</span>
               </div>
+            </div>
+          ) : isDev ? (
+            <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
+              <div className="cursor-pointer px-2">
+                <span>Latest Development Commit:</span>
+              </div>
+              {latestDevCommit ? (
+                <div
+                  onClick={() => window.electron.openURL(latestDevCommit.url)}
+                  className="cursor-pointer hover:underline"
+                  title={latestDevCommit.message}
+                >
+                  <span className="text-primary-foreground/60">
+                    {latestDevCommit.sha.substring(0, 8)}
+                  </span>
+                </div>
+              ) : (
+                <div className="cursor-pointer">
+                  <span className="text-primary-foreground/60">Loading...</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
