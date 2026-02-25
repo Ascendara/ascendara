@@ -12,6 +12,7 @@ const { ipcMain, BrowserWindow, app } = require("electron");
 const {
   appVersion,
   appBranch,
+  testingVersion,
   isDev,
   isWindows,
   isLinux,
@@ -124,10 +125,16 @@ async function checkVersionAndUpdate() {
       }
     }
 
+    // Use testingVersion for testing branches, appVersion for live
+    const currentVersion =
+      currentBranch === "public-testing" || currentBranch === "experimental"
+        ? testingVersion
+        : appVersion;
+
     // Use version comparison function instead of simple equality
-    isLatest = !isVersionLower(appVersion, latestVersion);
+    isLatest = !isVersionLower(currentVersion, latestVersion);
     console.log(
-      `Version check [${currentBranch}]: Current=${appVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
+      `Version check [${currentBranch}]: Current=${currentVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
       if (settings.autoUpdate && !updateDownloadInProgress) {
@@ -318,15 +325,21 @@ async function downloadUpdateInBackground() {
       downloadingUpdate: true,
     });
 
+    // Get current branch to download correct update
+    const currentBranch = appBranch;
+
+    // Use testingVersion for testing branches, appVersion for live
+    const currentVersion =
+      currentBranch === "public-testing" || currentBranch === "experimental"
+        ? testingVersion
+        : appVersion;
+
     // Custom headers for app identification
     const headers = {
       "X-Ascendara-Client": "app",
-      "X-Ascendara-Version": appVersion,
+      "X-Ascendara-Version": currentVersion,
       "X-Ascendara-Platform": isWindows ? "windows" : "linux",
     };
-
-    // Get current branch to download correct update
-    const currentBranch = appBranch;
 
     // Determine update URL based on branch
     let updateUrl;
@@ -496,9 +509,15 @@ function registerUpdateHandlers() {
     if (!url) return { success: false, error: "Unknown branch" };
 
     try {
+      // Use testingVersion for testing branches, appVersion for live
+      const versionToSend =
+        branch === "public-testing" || branch === "experimental"
+          ? testingVersion
+          : appVersion;
+
       const headers = {
         "X-Ascendara-Client": "app",
-        "X-Ascendara-Version": appVersion,
+        "X-Ascendara-Version": versionToSend,
         "X-Ascendara-Platform": isWindows ? "windows" : "linux",
       };
 
