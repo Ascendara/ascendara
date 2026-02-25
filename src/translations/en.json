@@ -182,6 +182,7 @@
         "understand": "I Understand"
       }
     },
+    "publicTesting": "PUBLIC TESTING",
     "qbittorrent": {
       "active": "qBittorrent WebUI Active ({{version}})",
       "checkWebUI": "Please check if qBittorrent is running with Web UI enabled",
@@ -812,6 +813,27 @@
     "useArrowsToSelect": "Use arrows to select",
     "verifying": "Verifying...",
     "viewDetails": "VIEW DETAILS"
+  },
+  "branchWelcome": {
+    "experimental": {
+      "autoUpdate": "This branch will automatically update when new experimental builds are available, just like the stable version.",
+      "feature1": "Features may be incomplete or unstable",
+      "feature2": "Bugs and crashes are more likely to occur",
+      "feature3": "Some features may change or be removed without notice",
+      "title": "Welcome to Experimental",
+      "welcome": "You're now running the experimental branch of Ascendara. This is where you can test features that aren't fully ready yet.",
+      "whatToExpect": "What to expect:"
+    },
+    "okayUnderstand": "Okay, I Understand",
+    "publicTesting": {
+      "autoUpdate": "This branch will automatically update when new testing builds are available, just like the stable version.",
+      "feature1": "More polished features that are nearly ready for release",
+      "feature2": "Generally stable, but may have minor bugs",
+      "feature3": "Early access to upcoming features before they go live",
+      "title": "Welcome to Public Testing",
+      "welcome": "You're now running the public testing branch of Ascendara. This version includes features that are more polished but not completely ready for the stable release.",
+      "whatToExpect": "What to expect:"
+    }
   },
   "common": {
     "action_cannot_be_undone": "This action cannot be undone.",
@@ -1913,7 +1935,7 @@
     "additionalLocations": "Additional Locations",
     "apiKeySaved": "API Key Saved",
     "appBranch": {
-      "description": "Choose your release channel. Switching will download and run the appropriate installer — the app will restart automatically.",
+      "description": "Choose your release channel. Switching will download and run the appropriate installer.",
       "experimental": {
         "description": "Cutting-edge builds with the latest changes. May be unstable.",
         "label": "Experimental",

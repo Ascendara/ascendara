@@ -8,6 +8,7 @@ import PlatformWarningDialog from "@/components/PlatformWarningDialog";
 import WatcherWarnDialog from "@/components/WatcherWarnDialog";
 import BrokenVersionDialog from "@/components/BrokenVersionDialog";
 import FirstIndexDialog from "@/components/FirstIndexDialog";
+import BranchWelcomeDialog from "@/components/BranchWelcomeDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import ChangelogDialog from "@/components/ChangelogDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -770,6 +771,8 @@ const AppRoutes = () => {
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
   const [showFirstIndexDialog, setShowFirstIndexDialog] = useState(false);
+  const [showBranchWelcome, setShowBranchWelcome] = useState(false);
+  const [appBranch, setAppBranch] = useState(null);
   const location = useLocation();
   const hasChecked = useRef(false);
   const loadStartTime = useRef(Date.now());
@@ -1068,6 +1071,35 @@ const AppRoutes = () => {
     checkFirstIndex();
   }, [isLoading, showWelcome]);
 
+  // Check for branch welcome dialog (public-testing or experimental)
+  useEffect(() => {
+    const checkBranchWelcome = async () => {
+      // Only check after loading is done and welcome is not showing
+      if (isLoading || showWelcome) return;
+
+      try {
+        const branch = await window.electron.getBranch();
+        setAppBranch(branch);
+
+        // Only show for public-testing or experimental branches
+        if (branch === "public-testing" || branch === "experimental") {
+          // Check if we've already shown this dialog for this branch
+          const hasShown = localStorage.getItem(`branch-welcome-${branch}-shown`);
+
+          if (!hasShown) {
+            // Small delay to let other dialogs settle
+            setTimeout(() => {
+              setShowBranchWelcome(true);
+            }, 1500);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking branch welcome status:", error);
+      }
+    };
+    checkBranchWelcome();
+  }, [isLoading, showWelcome]);
+
   const handleInstallAndRestart = async () => {
     setIsInstalling(true);
     // Set isUpdating timestamp first
@@ -1299,6 +1331,11 @@ const AppRoutes = () => {
       {showFirstIndexDialog && (
         <FirstIndexDialog onClose={() => setShowFirstIndexDialog(false)} />
       )}
+      <BranchWelcomeDialog
+        branch={appBranch}
+        open={showBranchWelcome}
+        onOpenChange={setShowBranchWelcome}
+      />
       <WatcherWarnDialog open={showWatcherWarn} onOpenChange={setShowWatcherWarn} />
       <ChangelogDialog
         open={showChangelog}
