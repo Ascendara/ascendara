@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("path");
+const os = require('os')
 const parentFind = require("find-up");
 function omit(obj, keys) {
   const result = {};
@@ -39,83 +40,183 @@ const files = {
 };
 
 module.exports.getFolders = async userDir_file => {
-  if (process.platform !== "win32") {
-    return [];
+  let steamEmu = [];
+
+  // --- WINDOWS PATHS ---
+  if (process.platform === 'win32') {
+    steamEmu = [
+      {
+        dir: path.join(process.env["Public"], "Documents/Steam/CODEX"),
+        options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
+      },
+      {
+        dir: path.join(process.env["APPDATA"], "Steam/CODEX"),
+        options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
+      },
+      {
+        dir: path.join(process.env["APPDATA"], "Goldberg SteamEmu Saves"),
+        options: {
+          recursive: true,
+          filter: /([0-9]+)/,
+          file: [files.achievement[1], files.achievement[0]],
+        }, //keeping "achievements.ini" [0] for backward compatibility with custom goldberg emu build
+      },
+      {
+        dir: path.join(process.env["APPDATA"], "GSE Saves"),
+        options: {
+          recursive: true,
+          filter: /([0-9]+)/,
+          file: [files.achievement[2]],
+        }, //idk js ctrl c + ctrl v and change folder name, pls dont die me
+      },
+      {
+        dir: path.join(process.env["APPDATA"], "EMPRESS"),
+        options: {
+          recursive: true,
+          filter: /([0-9]+)\\remote\\([0-9]+)/,
+          file: [files.achievement[1]],
+        },
+      },
+      {
+        dir: path.join(process.env["Public"], "Documents/EMPRESS"),
+        options: {
+          recursive: true,
+          filter: /([0-9]+)\\remote\\([0-9]+)/,
+          file: [files.achievement[1]],
+        },
+      },
+      {
+        dir: path.join(process.env["Public"], "Documents/Steam/RUNE"),
+        options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
+      },
+      {
+        dir: path.join(process.env["Public"], "Documents/OnlineFix"),
+        options: {
+          recursive: true,
+          filter: /([0-9]+)\\Stats/,
+          file: [files.achievement[0], files.achievement[1]],
+        },
+      },
+      {
+        dir: path.join(process.env["PROGRAMDATA"], "Steam"),
+        options: {
+          disableCheckIfProcessIsRunning: true,
+          disableCheckTimestamp: true,
+          recursive: true,
+          filter: /([0-9]+)\\stats/,
+          file: [files.achievement[0], files.achievement[1]],
+        },
+        //3DM doesn't need override (disableCheckIfProcessIsRunning,disableCheckTimestamp) ...
+      },
+      {
+        dir: path.join(process.env["LOCALAPPDATA"], "SKIDROW"),
+        options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[5]] },
+      },
+      {
+        dir: path.join(process.env["APPDATA"], "SmartSteamEmu"),
+        options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[7]] },
+      },
+    ];
   }
 
-  let steamEmu = [
-    {
-      dir: path.join(process.env["Public"], "Documents/Steam/CODEX"),
-      options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
-    },
-    {
-      dir: path.join(process.env["APPDATA"], "Steam/CODEX"),
-      options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
-    },
-    {
-      dir: path.join(process.env["APPDATA"], "Goldberg SteamEmu Saves"),
-      options: {
-        recursive: true,
-        filter: /([0-9]+)/,
-        file: [files.achievement[1], files.achievement[0]],
-      }, //keeping "achievements.ini" [0] for backward compatibility with custom goldberg emu build
-    },
-    {
-      dir: path.join(process.env["APPDATA"], "GSE Saves"),
-      options: {
-        recursive: true,
-        filter: /([0-9]+)/,
-        file: [files.achievement[2]],
-      }, //idk js ctrl c + ctrl v and change folder name, pls dont die me
-    },
-    {
-      dir: path.join(process.env["APPDATA"], "EMPRESS"),
-      options: {
-        recursive: true,
-        filter: /([0-9]+)\\remote\\([0-9]+)/,
-        file: [files.achievement[1]],
-      },
-    },
-    {
-      dir: path.join(process.env["Public"], "Documents/EMPRESS"),
-      options: {
-        recursive: true,
-        filter: /([0-9]+)\\remote\\([0-9]+)/,
-        file: [files.achievement[1]],
-      },
-    },
-    {
-      dir: path.join(process.env["Public"], "Documents/Steam/RUNE"),
-      options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
-    },
-    {
-      dir: path.join(process.env["Public"], "Documents/OnlineFix"),
-      options: {
-        recursive: true,
-        filter: /([0-9]+)\\Stats/,
-        file: [files.achievement[0], files.achievement[1]],
-      },
-    },
-    {
-      dir: path.join(process.env["PROGRAMDATA"], "Steam"),
-      options: {
-        disableCheckIfProcessIsRunning: true,
-        disableCheckTimestamp: true,
-        recursive: true,
-        filter: /([0-9]+)\\stats/,
-        file: [files.achievement[0], files.achievement[1]],
-      },
-      //3DM doesn't need override (disableCheckIfProcessIsRunning,disableCheckTimestamp) ...
-    },
-    {
-      dir: path.join(process.env["LOCALAPPDATA"], "SKIDROW"),
-      options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[5]] },
-    },
-    {
-      dir: path.join(process.env["APPDATA"], "SmartSteamEmu"),
-      options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[7]] },
-    },
-  ];
+
+  // --- LINUX PATHS (Proton/Wine Prefixes) ---
+  else if (process.platform === "linux") {
+    const compatDataRoot = path.join(os.homedir(), ".ascendara/compatdata");
+    
+    try {
+      if (await fs.stat(compatDataRoot).catch(() => false)) {
+        const gameFolders = await fs.readdir(compatDataRoot);
+        
+        for (const game of gameFolders) {
+          const driveC = path.join(compatDataRoot, game, "pfx/drive_c");
+          if (!(await fs.stat(driveC).catch(() => false))) continue;
+
+          // Note: "steamuser" is default user of Proton/Wine
+          const relativePaths = [
+            // Public/Documents
+            {
+              path: "users/Public/Documents/Steam/CODEX",
+              file: [files.achievement[0]],
+              filter: /.*/
+            },
+            {
+              path: "users/Public/Documents/EMPRESS",
+              file: [files.achievement[1]],
+              filter: /([0-9]+)\\remote\\([0-9]+)/
+            },
+            {
+              path: "users/Public/Documents/Steam/RUNE",
+              file: [files.achievement[0]],
+              filter: /.*/
+            },
+            {
+              path: "users/Public/Documents/OnlineFix",
+              file: [files.achievement[0], files.achievement[1]],
+              filter: /([0-9]+)\\Stats/
+            },
+            // AppData/Roaming
+            {
+              path: "users/steamuser/AppData/Roaming/Steam/CODEX",
+              file: [files.achievement[0]],
+              filter: /.*/
+            },
+            {
+              path: "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves",
+              file: [files.achievement[1], files.achievement[0]],
+              filter: /([0-9]+)/
+            },
+            {
+              path: "users/steamuser/AppData/Roaming/GSE Saves",
+              file: [files.achievement[2]],
+              filter: /([0-9]+)/
+            },
+            {
+              path: "users/steamuser/AppData/Roaming/EMPRESS",
+              file: [files.achievement[1]],
+              filter: /([0-9]+)\\remote\\([0-9]+)/
+            },
+            {
+              path: "users/steamuser/AppData/Roaming/SmartSteamEmu",
+              file: [files.achievement[7]],
+              filter: /([0-9]+)/
+            },
+            // LocalAppData
+            {
+              path: "users/steamuser/AppData/Local/SKIDROW",
+              file: [files.achievement[5]],
+              filter: /([0-9]+)/
+            },
+            // ProgramData
+            {
+              path: "ProgramData/Steam",
+              file: [files.achievement[0], files.achievement[1]],
+              filter: /([0-9]+)\\stats/,
+              options: { disableCheckIfProcessIsRunning: true, disableCheckTimestamp: true }
+            }
+          ];
+
+          for (const rel of relativePaths) {
+            const fullPath = path.join(driveC, rel.path);
+            // Ensure folder exists before adding it
+            if (await fs.stat(fullPath).catch(() => false)) {
+              steamEmu.push({
+                dir: fullPath,
+                options: {
+                  recursive: true,
+                  filter: rel.filter,
+                  file: rel.file,
+                  ...(rel.options || {})
+                }
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error scanning Linux prefixes:", e);
+    }
+  }
 
   try {
     const mydocs = regedit
