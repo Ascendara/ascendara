@@ -6,7 +6,6 @@
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
-const disk = require("diskusage");
 const crypto = require("crypto");
 const { machineIdSync } = require("node-machine-id");
 const { exec, spawn } = require("child_process");
@@ -33,6 +32,24 @@ const gamesSizeCache = {
   lastCalculated: 0,
   directorySizes: [],
 };
+
+/**
+ * Get disk space using Node.js built-in fs.statfs
+ */
+async function getDiskSpace(directory) {
+  return new Promise((resolve, reject) => {
+    fs.statfs(directory, (err, stats) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({
+          available: stats.bavail * stats.bsize,
+          total: stats.blocks * stats.bsize,
+        });
+      }
+    });
+  });
+}
 
 /**
  * Calculate size of directory recursively
@@ -203,7 +220,7 @@ function registerSystemHandlers() {
                 try {
                   for (const directory of directories) {
                     try {
-                      const { available, total } = await disk.check(directory);
+                      const { available, total } = await getDiskSpace(directory);
                       driveSpaceCache.set(directory, {
                         freeSpace: available,
                         totalSpace: total,
@@ -224,7 +241,7 @@ function registerSystemHandlers() {
               };
             } else {
               try {
-                const { available, total } = await disk.check(dir);
+                const { available, total } = await getDiskSpace(dir);
                 driveSpaceCache.set(dir, {
                   freeSpace: available,
                   totalSpace: total,
@@ -893,7 +910,7 @@ function registerSystemHandlers() {
           : "pkexec apt-get install -y python3 python3-pip python3-venv unrar";
 
       await new Promise((resolve, reject) => {
-        const proc = exec(command, (error) => {
+        const proc = exec(command, error => {
           if (error) {
             updateStatus(`Error installing Python: ${error.message}`);
             setTimeout(() => {
@@ -921,17 +938,29 @@ function registerSystemHandlers() {
       updateProgress(40);
 
       const venvPath = path.join(os.homedir(), ".ascendara", "venv");
-      const packages = ["requests", "psutil", "pypresence", "patool", "pySmartDL", "cloudscraper", "beautifulsoup4", "rarfile"];
+      const packages = [
+        "requests",
+        "psutil",
+        "pypresence",
+        "patool",
+        "pySmartDL",
+        "cloudscraper",
+        "beautifulsoup4",
+        "rarfile",
+      ];
 
       await new Promise((resolveVenv, rejectVenv) => {
-        exec(`mkdir -p "${path.join(os.homedir(), ".ascendara")}" && python3 -m venv "${venvPath}"`, (err, _stdout, stderr) => {
-          if (err) {
-            console.error("venv creation failed:", stderr);
-            rejectVenv(err);
-          } else {
-            resolveVenv();
+        exec(
+          `mkdir -p "${path.join(os.homedir(), ".ascendara")}" && python3 -m venv "${venvPath}"`,
+          (err, _stdout, stderr) => {
+            if (err) {
+              console.error("venv creation failed:", stderr);
+              rejectVenv(err);
+            } else {
+              resolveVenv();
+            }
           }
-        });
+        );
       });
 
       updateStatus("Installing required packages...");
@@ -940,14 +969,17 @@ function registerSystemHandlers() {
       const venvPip = path.join(venvPath, "bin", "pip");
 
       await new Promise((resolvePackage, rejectPackage) => {
-        const pipProc = exec(`"${venvPip}" install ${packages.join(" ")}`, (err, _stdout, stderr) => {
-          if (err) {
-            console.error("Error installing packages:", stderr);
-            rejectPackage(err);
-          } else {
-            resolvePackage();
+        const pipProc = exec(
+          `"${venvPip}" install ${packages.join(" ")}`,
+          (err, _stdout, stderr) => {
+            if (err) {
+              console.error("Error installing packages:", stderr);
+              rejectPackage(err);
+            } else {
+              resolvePackage();
+            }
           }
-        });
+        );
 
         pipProc.stdout.on("data", data => {
           updateStatus(data.toString().trim());

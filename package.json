@@ -80,7 +80,6 @@
     "cors": "^2.8.6",
     "crc": "^4.3.2",
     "discord-rpc": "^4.0.1",
-    "diskusage": "^1.2.0",
     "dotenv": "^17.3.1",
     "electron-dl": "^4.0.0",
     "find-up": "^8.0.0",
