@@ -3238,8 +3238,8 @@ function Settings() {
               </div>
             </Card>
 
-            {/* Developer Settings Card - Only shown in development mode or on Linux */}
-            {(isDev || isOnLinux) && (
+            {/* Developer Settings Card - Only shown in development mode */}
+            {(isDev) && (
               <Card className="border-border p-6">
                 <div className="space-y-6">
                   <div>
