@@ -22,6 +22,7 @@ import {
   Minimize,
   ExternalLink,
   Gamepad2,
+  TestTube2,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { checkForUpdates } from "@/services/updateCheckingService";
@@ -297,14 +298,14 @@ const MenuBar = () => {
         {/* Branch badges */}
         {appBranch === "public-testing" && (
           <span className="ml-2 flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
-            <FlaskConical className="h-3 w-3" />
-            Public Testing
+            <TestTube2 className="h-4 w-4" />
+            <span className="font-semibold">{t("app.publicTesting")}</span>
           </span>
         )}
         {appBranch === "experimental" && (
-          <span className="ml-2 flex items-center gap-1 rounded border border-amber-500/20 bg-amber-500/10 px-1 py-0.5 text-[14px] text-amber-500">
-            <FlaskConical className="h-3 w-3" />
-            {t("app.experiment")}
+          <span className="ml-2 flex items-center gap-1 rounded border border-red-400/20 bg-red-400/10 px-1 py-0.5 text-[14px] text-red-400">
+            <FlaskConical className="h-4 w-4" />
+            <span className="font-semibold">{t("app.experiment")}</span>
           </span>
         )}
 
