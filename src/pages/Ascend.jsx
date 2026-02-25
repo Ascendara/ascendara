@@ -7753,29 +7753,24 @@ const Ascend = () => {
                     <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
 
                     <div className="relative">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-xl shadow-violet-500/30">
-                            <Sparkles className="h-8 w-8 text-white" />
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-5 flex-1 min-w-0">
+                          <div className="flex-shrink-0 mt-1">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-xl shadow-violet-500/30">
+                              <Sparkles className="h-8 w-8 text-white" />
+                            </div>
                           </div>
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <h1 className="text-3xl font-bold">
-                                {upcomingEntry.title ||
-                                  t("ascend.upcoming.title") ||
-                                  "Upcoming Update"}
-                              </h1>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 flex-wrap mb-3">
                               {upcomingEntry.major && (
-                                <span className="rounded-full bg-gradient-to-r from-violet-500 to-purple-500 px-3 py-1 text-xs font-semibold text-white shadow-lg shadow-violet-500/30">
-                                  Major Update
+                                <span className="rounded-full bg-gradient-to-r from-violet-500 to-purple-500 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-violet-500/30">
+                                  MAJOR UPDATE
                                 </span>
                               )}
-                            </div>
-                            <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                              <span className="rounded-md bg-violet-500/10 px-2.5 py-1 font-mono text-violet-600 dark:text-violet-400">
+                              <span className="rounded-lg bg-violet-500/10 px-3 py-1.5 font-mono text-sm font-semibold text-violet-600 dark:text-violet-400 border border-violet-500/20">
                                 v{upcomingEntry.version}
                               </span>
-                              <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Calendar className="h-4 w-4" />
                                 {new Date(upcomingEntry.date).toLocaleDateString(
                                   undefined,
@@ -7787,29 +7782,35 @@ const Ascend = () => {
                                 )}
                               </span>
                             </div>
+                            <h1 className="text-3xl font-bold leading-tight mb-3">
+                              {upcomingEntry.title ||
+                                t("ascend.upcoming.title") ||
+                                "Upcoming Update"}
+                            </h1>
+                            {upcomingEntry.description && (
+                              <p className="text-base text-muted-foreground leading-relaxed">
+                                {upcomingEntry.description}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={loadUpcomingChangelog}
-                          disabled={loadingUpcoming}
-                          className="gap-2"
-                        >
-                          {loadingUpcoming ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
-                          {t("ascend.upcoming.refresh") || "Refresh"}
-                        </Button>
+                        <div className="flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={loadUpcomingChangelog}
+                            disabled={loadingUpcoming}
+                            className="gap-2"
+                          >
+                            {loadingUpcoming ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                            {t("ascend.upcoming.refresh") || "Refresh"}
+                          </Button>
+                        </div>
                       </div>
-
-                      {upcomingEntry.description && (
-                        <p className="mt-4 text-muted-foreground">
-                          {upcomingEntry.description}
-                        </p>
-                      )}
                     </div>
                   </motion.div>
 
