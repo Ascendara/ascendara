@@ -72,8 +72,8 @@ function launchCrashReporter(errorType, errorMessage) {
   if (isDev) {
     crashReporterPath =
       process.platform === "win32"
-        ? path.join("./binaries/AscendaraCrashReporter/dist/AscendaraCrashReporter.exe")
-        : path.join("./binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py");
+        ? path.join("./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe")
+        : path.join("./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter");
   } else {
     crashReporterPath =
       process.platform === "win32"

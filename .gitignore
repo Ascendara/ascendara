@@ -17,6 +17,7 @@ package-lock.json
 
 # Build outputs
 /binaries/*/build
+/binaries/*/target
 .build_venv
 
 # Configuration and environment

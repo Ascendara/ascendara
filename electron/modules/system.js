@@ -835,7 +835,7 @@ function registerSystemHandlers() {
 
       await new Promise((resolve, reject) => {
         const chmodCommand = [
-          `chmod +x "${isDev ? "./binaries/AscendaraCrashReporter/src/AscendaraCrashReporter.py" : path.join(resourcePath, "resources/AscendaraCrashReporter")}"`,
+          `chmod +x "${isDev ? "./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter" : path.join(resourcePath, "resources/AscendaraCrashReporter")}"`,
           `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraDownloader.py" : path.join(resourcePath, "resources/AscendaraDownloader")}"`,
           `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py" : path.join(resourcePath, "resources/AscendaraGofileHelper")}"`,
           `chmod +x "${isDev ? "./binaries/AscendaraGameHandler/src/AscendaraGameHandler.py" : path.join(resourcePath, "resources/AscendaraGameHandler")}"`,

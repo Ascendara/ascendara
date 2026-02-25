@@ -138,7 +138,6 @@ def build_python_binaries_linux():
         ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         []),
         ('AscendaraGofileHelper',        'AscendaraDownloader/src/AscendaraGofileHelper.py',        []),
         ('AscendaraGameHandler',         'AscendaraGameHandler/src/AscendaraGameHandler.py',        []),
-        ('AscendaraCrashReporter',       'AscendaraCrashReporter/src/AscendaraCrashReporter.py',    ['--windowed']),
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
         ('AscendaraLocalRefresh',        'AscendaraLocalRefresh/src/AscendaraLocalRefresh.py',      []),
         ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  []),

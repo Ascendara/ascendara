@@ -1,0 +1,17 @@
+[package]
+name = "AscendaraCrashReporter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# GUI Library
+fltk = { version = "1.4", features = ["fltk-bundled"] }
+
+# For modern styling
+fltk-theme = "0.7"
+
+# For date management
+chrono = "0.4"
+
+# To open links (Discord)
+webbrowser = "0.8"
