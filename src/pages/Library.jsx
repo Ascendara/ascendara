@@ -2772,6 +2772,11 @@ const AddGameForm = ({ onSuccess }) => {
     try {
       await window.electron.importSteamGames(steamappsDirectory);
       setImportSuccess(true);
+      await loadGames();
+      setTimeout(() => {
+        setShowImportingDialog(false);
+        setImportSuccess(null);
+      }, 1500);
     } catch (error) {
       setImportSuccess(false);
     }

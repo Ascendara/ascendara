@@ -1252,35 +1252,6 @@ function registerMiscHandlers() {
 
       for (const folder of gameFolders) {
         try {
-          const gameInfo = await getGameDetails(folder.name, {
-            clientId: settings.twitchClientId,
-            clientSecret: settings.twitchSecret,
-          });
-
-          if (gameInfo?.cover?.url) {
-            try {
-              const response = await axios({
-                url: gameInfo.cover.url,
-                method: "GET",
-                responseType: "arraybuffer",
-              });
-
-              const imageBuffer = Buffer.from(response.data);
-              const mimeType = response.headers["content-type"];
-              const extension = getExtensionFromMimeType(mimeType);
-              const imagePath = path.join(
-                gamesDirectory,
-                `${folder.name}.ascendara${extension}`
-              );
-              await fs.promises.writeFile(imagePath, imageBuffer);
-            } catch (imageError) {
-              console.error(
-                `Error downloading image for ${folder.name}:`,
-                imageError.message
-              );
-            }
-          }
-
           if (!gamesData.games.some(g => g.game === folder.name)) {
             const newGame = {
               game: folder.name,
@@ -1291,6 +1262,58 @@ function registerMiscHandlers() {
               isRunning: false,
             };
             gamesData.games.push(newGame);
+            console.log(`Added game: ${folder.name}`);
+
+            // Try to fetch cover image from Steam
+            try {
+              const searchUrl = `https://store.steampowered.com/api/storesearch?term=${encodeURIComponent(folder.name)}&l=en&cc=US`;
+              const searchResponse = await axios.get(searchUrl);
+
+              if (searchResponse.data?.items?.length > 0) {
+                const steamApp = searchResponse.data.items[0];
+                const appId = steamApp.id;
+                console.log(`Found Steam app for ${folder.name}: ${appId}`);
+
+                // Fetch app details to get header image
+                const detailsUrl = `https://store.steampowered.com/api/appdetails?appids=${appId}`;
+                const detailsResponse = await axios.get(detailsUrl);
+
+                if (detailsResponse.data?.[appId]?.success) {
+                  const gameData = detailsResponse.data[appId].data;
+                  const headerImage = gameData.header_image;
+
+                  if (headerImage) {
+                    console.log(`Downloading cover image for ${folder.name}`);
+                    const imageResponse = await axios({
+                      url: headerImage,
+                      method: "GET",
+                      responseType: "arraybuffer",
+                    });
+
+                    const imageBuffer = Buffer.from(imageResponse.data);
+                    const mimeType = imageResponse.headers["content-type"];
+                    const extension = getExtensionFromMimeType(mimeType);
+                    const imagePath = path.join(
+                      gamesDirectory,
+                      `${folder.name}.ascendara${extension}`
+                    );
+                    await fs.promises.writeFile(imagePath, imageBuffer);
+                    console.log(
+                      `Saved cover image: ${folder.name}.ascendara${extension}`
+                    );
+                  }
+                }
+              } else {
+                console.log(`No Steam app found for ${folder.name}`);
+              }
+            } catch (imageError) {
+              console.error(
+                `Error fetching cover for ${folder.name}:`,
+                imageError.message
+              );
+            }
+          } else {
+            console.log(`Game already exists: ${folder.name}`);
           }
         } catch (err) {
           console.error(`Error processing game folder ${folder.name}:`, err.message);
