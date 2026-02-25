@@ -720,6 +720,14 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         last_update = start_time
         last_play_time = 0
 
+        # Determine if Proton was used for game launch (needed for trainer)
+        use_proton = False
+        proton_config = None
+        if current_platform == 'linux' and is_windows_exe and linux_runner_config:
+            if linux_runner_config["runner_type"] == "proton":
+                use_proton = True
+                proton_config = linux_runner_config
+
         # Launch trainer if requested
         trainer_process = None
         if launch_trainer:
@@ -739,16 +747,37 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     # Try to launch trainer normally first
                     try:
                         if trainer_use_wine:
-                            if use_proton and current_platform == 'linux':
+                            if use_proton and current_platform == 'linux' and proton_config:
                                 logging.info("Launching trainer with Proton")
                                 try:
-                                    trainer_process = launch_with_proton(trainer_path, proton_bin, proton_data_path)
+                                    trainer_process = launch_with_proton(trainer_path, proton_config, None)
                                 except Exception as proton_err:
                                     logging.error(f"Proton trainer launch failed, falling back to Wine: {proton_err}", exc_info=True)
-                                    trainer_process = launch_with_wine_dxvk(trainer_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin)
+                                    # Fallback to system Wine
+                                    wine_bin = shutil.which("wine")
+                                    if wine_bin:
+                                        fallback_wine_config = {
+                                            "runner_type": "wine",
+                                            "runner_path": wine_bin,
+                                            "compat_data": proton_config.get("compat_data", os.path.expanduser("~/.wine"))
+                                        }
+                                        trainer_process = launch_with_wine_isolated(trainer_path, fallback_wine_config, None)
+                                    else:
+                                        logging.error("No Wine fallback available for trainer")
+                                        trainer_process = None
                             else:
                                 logging.info("Launching trainer with Wine")
-                                trainer_process = launch_with_wine_dxvk(trainer_path, wine_prefix=default_wine_prefix, wine_bin=wine_bin)
+                                wine_bin = shutil.which("wine")
+                                if wine_bin:
+                                    wine_config = {
+                                        "runner_type": "wine",
+                                        "runner_path": wine_bin,
+                                        "compat_data": os.path.expanduser("~/.wine")
+                                    }
+                                    trainer_process = launch_with_wine_isolated(trainer_path, wine_config, None)
+                                else:
+                                    logging.error("No Wine found for trainer launch")
+                                    trainer_process = None
                         else:
                             trainer_process = subprocess.Popen(trainer_path)
                         logging.info("Trainer launched successfully")
