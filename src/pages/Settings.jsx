@@ -294,6 +294,7 @@ function Settings() {
   const [showNoLudusaviDialog, setShowNoLudusaviDialog] = useState(false);
   const [availableLanguages, setAvailableLanguages] = useState([]);
   const [isExperiment, setIsExperiment] = useState(false);
+  const [isPublicTesting, setIsPublicTesting] = useState(false);
   const [isDev, setIsDev] = useState(false);
   const [testingVersion, setTestingVersion] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
@@ -449,17 +450,34 @@ function Settings() {
   }, []);
 
   useEffect(() => {
-    const checkExperiment = async () => {
+    const checkBranch = async () => {
       const branch = (await window.electron.getBranch?.()) ?? "live";
       setCurrentBranch(branch);
       const isExp = branch === "experimental";
+      const isPubTest = branch === "public-testing";
       setIsExperiment(isExp);
-      if (isExp) {
+      setIsPublicTesting(isPubTest);
+      
+      if (isExp || isPubTest) {
         const version = await window.electron.getTestingVersion();
         setTestingVersion(version);
+      } else {
+        setTestingVersion("");
       }
     };
-    checkExperiment();
+    checkBranch();
+    
+    // Re-check branch when window becomes visible (after branch switch)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkBranch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -1180,6 +1198,12 @@ function Settings() {
             <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
               <div className="px-2 font-medium">
                 <span>Experiment Build {testingVersion}</span>
+              </div>
+            </div>
+          ) : isPublicTesting ? (
+            <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
+              <div className="px-2 font-medium">
+                <span>Public Testing Build {testingVersion}</span>
               </div>
             </div>
           ) : isDev ? (
