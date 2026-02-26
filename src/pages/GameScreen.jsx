@@ -921,12 +921,12 @@ export default function GameScreen() {
         const localStorageKey = `game-cover-vertical-${gameId}`;
         localStorage.removeItem(localStorageKey);
 
-        // Fetch the new grid image
+        // Fetch the new cover_vertical image
         try {
           const gridBase64 = await window.electron.ipcRenderer.invoke(
             "get-game-image",
             gameId,
-            "grid"
+            "cover_vertical"
           );
           if (gridBase64) {
             const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
@@ -1055,12 +1055,12 @@ export default function GameScreen() {
     const localStorageKey = `game-cover-vertical-${gameId}`;
 
     const loadGameImage = async () => {
-      // 1. Try fetching Vertical GRID from backend first (Priority)
+      // 1. Try fetching Vertical Cover from backend first (Priority)
       try {
         const gridBase64 = await window.electron.ipcRenderer.invoke(
           "get-game-image",
           gameId,
-          "grid"
+          "cover_vertical"
         );
 
         if (gridBase64 && isMounted) {
@@ -1657,105 +1657,68 @@ export default function GameScreen() {
 
           {/* Game title and basic info */}
           <div className="mt-4">
-            <div className="flex items-center gap-3">
-              {showLogo && logoData ? (
-                <button
-                  onClick={toggleLogoDisplay}
-                  className="cursor-pointer transition-opacity hover:opacity-80"
-                  title={t("gameScreen.clickToToggleLogo")}
-                >
-                  <img
-                    src={logoData}
-                    alt={game.game}
-                    className="max-h-20 max-w-md object-contain drop-shadow-md"
-                  />
-                </button>
-              ) : (
-                <button
-                  onClick={logoData ? toggleLogoDisplay : undefined}
-                  className={cn(
-                    "text-4xl font-bold text-primary drop-shadow-md",
-                    logoData && "cursor-pointer transition-opacity hover:opacity-80"
-                  )}
-                  title={logoData ? t("gameScreen.clickToToggleLogo") : undefined}
-                  disabled={!logoData}
-                >
-                  <h1>{game.game}</h1>
-                </button>
-              )}
-              {game.online && (
-                <Gamepad2
-                  className="mb-2 h-5 w-5 text-primary"
-                  title={t("library.iconLegend.onlineFix")}
-                />
-              )}
-              {game.dlc && (
-                <Gift
-                  className="mb-2 h-5 w-5 text-primary"
-                  title={t("library.iconLegend.allDlcs")}
-                />
-              )}
-              {game.isVr && (
-                <svg
-                  className="mb-2 p-0.5 text-primary"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  title={t("library.iconLegend.vrGame")}
-                >
-                  <path
-                    d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
-                    stroke="currentColor"
-                    strokeWidth={1.3}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M3.81253 6.7812C4.5544 5.6684 5.80332 5 7.14074 5H16.8593C18.1967 5 19.4456 5.6684 20.1875 6.7812L21 8H3L3.81253 6.7812Z"
-                    stroke="currentColor"
-                    strokeWidth={1.3}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-              {executableExists ? (
-                <Button
-                  variant="icon"
-                  size="sm"
-                  className="mb-2 text-primary transition-all hover:scale-110"
-                  onClick={() => handlePlayGame()}
-                  disabled={isLaunching || isRunning}
-                >
-                  {isLaunching ? (
-                    <>
-                      <Loader className="h-5 w-5 animate-spin" />
-                    </>
-                  ) : isRunning ? (
-                    <>
-                      <StopCircle className="h-5 w-5" />
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-5 w-5 fill-current" />
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <AlertTriangle
-                  className="mb-2 h-6 w-6 text-yellow-500"
-                  title={t("library.executableNotFound")}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                {showLogo && logoData ? (
+                  <button
+                    onClick={toggleLogoDisplay}
+                    className="cursor-pointer transition-opacity hover:opacity-80"
+                    title={t("gameScreen.clickToToggleLogo")}
+                  >
+                    <img
+                      src={logoData}
+                      alt={game.game}
+                      className="max-h-20 max-w-md object-contain drop-shadow-md"
+                    />
+                  </button>
+                ) : (
+                  <button
+                    onClick={logoData ? toggleLogoDisplay : undefined}
+                    className={cn(
+                      "text-4xl font-bold text-primary drop-shadow-md",
+                      logoData && "cursor-pointer transition-opacity hover:opacity-80"
+                    )}
+                    title={logoData ? t("gameScreen.clickToToggleLogo") : undefined}
+                    disabled={!logoData}
+                  >
+                    <h1>{game.game}</h1>
+                  </button>
+                )}
+                {executableExists ? (
+                  <Button
+                    variant="icon"
+                    size="sm"
+                    className="mb-2 text-primary transition-all hover:scale-110"
+                    onClick={() => handlePlayGame()}
+                    disabled={isLaunching || isRunning}
+                  >
+                    {isLaunching ? (
+                      <>
+                        <Loader className="h-5 w-5 animate-spin" />
+                      </>
+                    ) : isRunning ? (
+                      <>
+                        <StopCircle className="h-5 w-5" />
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-5 w-5 fill-current" />
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <AlertTriangle
+                    className="mb-2 h-6 w-6 text-yellow-500"
+                    title={t("library.executableNotFound")}
                 />
               )}
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-4">
+            {/* Version + Tags Row */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               {game.version && game.version !== "-1" && (
-                <div className="flex items-center gap-1 text-sm text-primary/80">
-                  <Tag className="h-4 w-4" />
-                  <span>{game.version}</span>
+                <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
+                  {game.version}
                   {updateInfo?.updateAvailable && (
                     <button
                       onClick={() => setShowUpdateDialog(true)}
@@ -1765,7 +1728,7 @@ export default function GameScreen() {
                       {t("gameScreen.updateBadge")}
                     </button>
                   )}
-                </div>
+                </span>
               )}
               {!game.version && updateInfo?.updateAvailable && (
                 <button
@@ -1776,6 +1739,61 @@ export default function GameScreen() {
                   {t("gameScreen.updateBadge")}
                 </button>
               )}
+              {game.online && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex cursor-help items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-500">
+                        {t("download.online")}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-secondary">
+                        {t("download.onlineTooltip")}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {game.dlc && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex cursor-help items-center gap-1 rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-500">
+                        {t("download.allDlc")}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-secondary">
+                        {t("download.allDlcTooltip")}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {game.isVr && (
+                <span className="flex items-center gap-1 rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-400">
+                  <svg
+                    className="h-3 w-3"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {t("download.gameNeedsVR")}
+                </span>
+              )}
+            </div>
+
+            {/* Game Details Row */}
+            <div className="mt-4 flex flex-wrap items-center gap-4">
               {game.size && (
                 <div className="flex items-center gap-1 text-sm text-primary/80">
                   <PackageOpen className="h-4 w-4" />
@@ -1789,6 +1807,7 @@ export default function GameScreen() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <div className="container mx-auto">
@@ -1837,7 +1856,7 @@ export default function GameScreen() {
                     </Button>
                   )}
                 </div>
-                <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
+                <div className="relative aspect-[2/3] overflow-hidden rounded-lg">
                   <img
                     src={imageData}
                     alt={game.game}

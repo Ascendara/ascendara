@@ -9,16 +9,10 @@ import gameApiCache from "./gameInfoCacheService";
 // Constants for APIs
 const isDev = import.meta.env.DEV;
 
-// Steam API endpoints
-const STEAM_STORE_SEARCH_URL = isDev
-  ? "/api/steam/search"
-  : "https://store.steampowered.com/api/storesearch";
-const STEAM_APP_LIST_URL = isDev
-  ? "/api/steam/applist"
-  : "https://api.steampowered.com/ISteamApps/GetAppList/v2";
-const STEAM_APP_DETAILS_URL = isDev
-  ? "/api/steam/appdetails"
-  : "https://store.steampowered.com/api/appdetails";
+// Steam API proxy endpoints - always use proxy to avoid API key exposure
+const STEAM_PROXY_BASE = "https://api.ascendara.app/api/proxy/steam";
+const STEAM_STORE_SEARCH_URL = `${STEAM_PROXY_BASE}/search`;
+const STEAM_APP_DETAILS_URL = `${STEAM_PROXY_BASE}/appdetails`;
 
 /**
  * Normalize game title for better matching
@@ -101,8 +95,9 @@ const searchGameSteam = async (gameName, apiKey) => {
         `[Attempt ${i + 1}/${searchVariations.length}] Trying: "${searchTerm}"`
       );
 
-      const storeSearchUrl = `https://store.steampowered.com/api/storesearch?term=${encodedSearch}&l=en&cc=US`;
-      const storeResult = await window.electron.steamRequest(storeSearchUrl);
+      const storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${encodedSearch}`;
+      const response = await fetch(storeSearchUrl);
+      const storeResult = { success: response.ok, data: response.ok ? await response.json() : null };
 
       if (storeResult.success) {
         const storeData = storeResult.data;
@@ -207,16 +202,15 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
   try {
     console.log(`Fetching Steam details for app ID: ${appId}`);
 
-    // Get game details from Steam Store API
-    const url = `https://store.steampowered.com/api/appdetails?appids=${appId}`;
+    // Get game details from Steam Store API via proxy
+    const url = `${STEAM_APP_DETAILS_URL}?appids=${appId}`;
 
-    const result = await window.electron.steamRequest(url);
-
-    if (!result.success) {
-      throw new Error(`Steam API error`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Steam API error: ${response.status}`);
     }
 
-    const data = result.data;
+    const data = await response.json();
 
     console.log("Steam detail response:", data);
 
@@ -241,16 +235,9 @@ const getGameDetailsSteam = async (gameName, config) => {
   try {
     console.log(`Fetching Steam data for: ${gameName}`);
 
-    // Get Steam API key from electron config (hardcoded)
-    const apiKey = await window.electron.getSteamApiKey();
-
-    if (!apiKey) {
-      console.log("Steam API key not available from electron config");
-      return null;
-    }
-
+    // No API key needed - using proxy endpoints
     // Search for the game
-    const searchResult = await searchGameSteam(gameName, apiKey);
+    const searchResult = await searchGameSteam(gameName, null);
 
     console.log("Steam search result:", searchResult);
 
@@ -260,7 +247,7 @@ const getGameDetailsSteam = async (gameName, config) => {
     }
 
     // Get detailed game info
-    const gameDetails = await getGameDetailByIdSteam(searchResult.appid, apiKey);
+    const gameDetails = await getGameDetailByIdSteam(searchResult.appid, null);
 
     if (!gameDetails) {
       console.log(
@@ -702,26 +689,8 @@ const removeDuplicatedPhrases = text => {
 const getGameDetails = async (gameName, config = {}) => {
   console.log("getGameDetails for:", gameName);
 
-  // Get Steam API key from electron config (always available)
-  let steamApiKey = "";
-  try {
-    steamApiKey = await window.electron.getSteamApiKey();
-  } catch (error) {
-    console.error("Error getting Steam API key from electron:", error);
-  }
-
-  console.log("Steam API key:", steamApiKey ? "Set" : "Not set");
-
-  // Check if Steam is enabled (has valid API key from electron config)
-  const useSteam = steamApiKey && steamApiKey.trim() !== "";
-
-  console.log("Using Steam:", useSteam);
-
-  // If Steam API is not available, return null
-  if (!useSteam) {
-    console.log("Steam API is not available");
-    return null;
-  }
+  // No API key needed - using proxy endpoints
+  console.log("Using Steam proxy endpoints");
 
   // Check cache first
   let cachedData = gameApiCache.getCachedGame(gameName, "steam");
@@ -730,9 +699,8 @@ const getGameDetails = async (gameName, config = {}) => {
     return cachedData;
   }
 
-  // Get Steam data
+  // Get Steam data via proxy
   const gameData = await getGameDetailsSteam(gameName, {
-    apiKey: steamApiKey,
     enabled: true,
   });
 
