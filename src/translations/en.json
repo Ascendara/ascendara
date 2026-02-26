@@ -1399,6 +1399,7 @@
     "addFavorite": "Add to Favorites",
     "addGame": {
       "duplicateError": "A game with this name already exists in your library. Please choose a different name.",
+      "success": "Game added to library successfully!",
       "title": "Add to Library"
     },
     "addGameDescription1": "Add your own games or import from Steam.",

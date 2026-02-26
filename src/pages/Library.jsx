@@ -3028,7 +3028,7 @@ const AddGameForm = ({ onSuccess }) => {
       console.log("[AddGameForm] Adding game to library...");
       // imgID is used for image file lookups in both local index and API
       const coverImageId = coverSearch.selectedCover?.imgID;
-      await window.electron.addGame(
+      const result = await window.electron.addGame(
         formData.name,
         formData.isOnline,
         formData.hasDLC,
@@ -3037,7 +3037,17 @@ const AddGameForm = ({ onSuccess }) => {
         coverImageId
       );
 
+      console.log("[AddGameForm] Add game result:", result);
+
+      if (result && !result.success) {
+        console.error("[AddGameForm] Failed to add game:", result.error);
+        setIsSubmitting(false);
+        toast.error(result.error || "Failed to add game. Please try again.");
+        return;
+      }
+
       console.log("[AddGameForm] Game added successfully");
+      toast.success(t("library.addGame.success"));
       setIsSubmitting(false);
       onSuccess();
     } catch (error) {

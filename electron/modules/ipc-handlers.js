@@ -828,7 +828,10 @@ function registerMiscHandlers() {
     async (event, game, online, dlc, version, executable, imgID) => {
       const settings = settingsManager.getSettings();
       try {
-        if (!settings.downloadDirectory) return;
+        if (!settings.downloadDirectory) {
+          console.error("Download directory not set");
+          return { success: false, error: "Download directory not set. Please configure it in Settings." };
+        }
 
         const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
         const gamesDirectory = path.join(settings.downloadDirectory, "games");
@@ -896,8 +899,11 @@ function registerMiscHandlers() {
           isRunning: false,
         });
         await fs.promises.writeFile(gamesFilePath, JSON.stringify(gamesData, null, 2));
+        console.log(`Successfully added custom game: ${game}`);
+        return { success: true };
       } catch (error) {
         console.error("Error saving custom game:", error);
+        return { success: false, error: error.message || "Failed to save game" };
       }
     }
   );
