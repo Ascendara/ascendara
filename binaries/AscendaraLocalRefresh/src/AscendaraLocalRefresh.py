@@ -1047,7 +1047,38 @@ def extract_shared_index(zip_path, output_dir):
         if os.path.exists(imgs_dir):
             if os.path.exists(imgs_backup):
                 shutil.rmtree(imgs_backup)
-            shutil.copytree(imgs_dir, imgs_backup)
+            
+            # Count files for progress tracking
+            total_img_files = sum(len(files) for _, _, files in os.walk(imgs_dir))
+            logging.info(f"Backing up {total_img_files} image files...")
+            
+            # Set total for progress calculation (this will trigger UI updates)
+            progress.set_total_posts(total_img_files)
+            progress.set_current_game(f"Backing up images (0/{total_img_files})...")
+            
+            # Copy with progress updates
+            os.makedirs(imgs_backup, exist_ok=True)
+            copied_files = 0
+            for root, dirs, files in os.walk(imgs_dir):
+                # Create directory structure
+                rel_path = os.path.relpath(root, imgs_dir)
+                dest_dir = os.path.join(imgs_backup, rel_path) if rel_path != '.' else imgs_backup
+                os.makedirs(dest_dir, exist_ok=True)
+                
+                # Copy files with progress updates
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    dst_file = os.path.join(dest_dir, file)
+                    shutil.copy2(src_file, dst_file)
+                    copied_files += 1
+                    
+                    # Update progress every 50 files to trigger UI updates
+                    if copied_files % 50 == 0 or copied_files == total_img_files:
+                        progress.processed_posts = copied_files
+                        progress.set_current_game(f"Backing up images ({copied_files}/{total_img_files})...")
+                        if copied_files % 200 == 0:  # Log less frequently
+                            logging.info(f"Backup progress: {copied_files}/{total_img_files} files")
+            
             logging.info("Backed up imgs directory")
         
         # Extract the zip file

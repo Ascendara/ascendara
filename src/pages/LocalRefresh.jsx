@@ -894,9 +894,11 @@ const LocalRefresh = () => {
                       <>
                         <Loader className="h-4 w-4 animate-spin" />
                         {indexDownloadProgress?.phase === "extracting"
-                          ? indexDownloadProgress.progress >= 1
-                            ? `${t("localRefresh.extracting") || "Extracting"} ${Math.floor(indexDownloadProgress.progress)}%`
-                            : t("localRefresh.extracting") || "Extracting..."
+                          ? indexDownloadProgress.currentGame
+                            ? indexDownloadProgress.currentGame
+                            : indexDownloadProgress.progress >= 1
+                              ? `${t("localRefresh.extracting") || "Extracting"} ${Math.floor(indexDownloadProgress.progress)}%`
+                              : t("localRefresh.extracting") || "Extracting..."
                           : indexDownloadProgress?.progress > 0
                             ? `${Math.floor(indexDownloadProgress.progress)}%`
                             : t("localRefresh.downloading") || "Downloading..."}

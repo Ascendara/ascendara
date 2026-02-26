@@ -1063,6 +1063,7 @@ function registerLocalRefreshHandlers() {
                     total: 100,
                     progress: progressPercent,
                     phase: "extracting",
+                    currentGame: progressData.currentGame || "",
                   });
                 }
               } catch (e) {
