@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
+import { subscribeToDownloads, getActiveDownloadCount } from "@/services/khinsiderService";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -52,6 +53,7 @@ const MenuBar = () => {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasController, setHasController] = useState(false);
+  const [audioDownloadCount, setAudioDownloadCount] = useState(0);
   const mainContentRef = useRef(null);
   const checkIntervalRef = useRef(null);
 
@@ -164,6 +166,14 @@ const MenuBar = () => {
       window.removeEventListener("gamepadconnected", checkForController);
       window.removeEventListener("gamepaddisconnected", checkForController);
     };
+  }, []);
+
+  useEffect(() => {
+    setAudioDownloadCount(getActiveDownloadCount());
+    const unsubscribe = subscribeToDownloads(count => {
+      setAudioDownloadCount(count);
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -364,6 +374,40 @@ const MenuBar = () => {
               {t("app.downloading-update")}
             </span>
           </div>
+        )}
+
+        {/* Show audio downloading badge when downloading audio files */}
+        {audioDownloadCount > 0 && (
+          <span className="ml-2 flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500">
+            <div className="relative h-4 w-4 flex-shrink-0">
+              {/* Spinning loader circle */}
+              <svg
+                className="absolute inset-0 h-full w-full animate-spin"
+                viewBox="0 0 16 16"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="5"
+                  fill="none"
+                  strokeWidth="2"
+                  className="stroke-blue-500/20"
+                />
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="5"
+                  fill="none"
+                  strokeWidth="2"
+                  className="stroke-blue-500"
+                  strokeDasharray="15.7"
+                  strokeDashoffset="7.85"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            {t("app.loading-audio", { count: audioDownloadCount })}
+          </span>
         )}
 
         {/* Show outdated badge only when not downloading */}

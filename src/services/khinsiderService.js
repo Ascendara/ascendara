@@ -3,6 +3,36 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+// Global state for tracking active audio downloads
+let activeDownloads = 0;
+const downloadListeners = new Set();
+
+// Subscribe to download count changes
+export function subscribeToDownloads(callback) {
+  downloadListeners.add(callback);
+  return () => downloadListeners.delete(callback);
+}
+
+// Get current download count
+export function getActiveDownloadCount() {
+  return activeDownloads;
+}
+
+// Update download count and notify listeners
+function updateDownloadCount(delta) {
+  activeDownloads = Math.max(0, activeDownloads + delta);
+  console.log(`[KhinsiderService] Audio download count updated: ${activeDownloads} (delta: ${delta})`);
+  downloadListeners.forEach(listener => listener(activeDownloads));
+}
+
+// Track a download
+export function trackDownload(downloadPromise) {
+  updateDownloadCount(1);
+  return downloadPromise.finally(() => {
+    updateDownloadCount(-1);
+  });
+}
+
 // Always use proxy to avoid CORS issues (works in both dev and production)
 const BASE_URL = "/api/khinsider";
 
@@ -38,9 +68,10 @@ export async function searchAlbums(term) {
 /**
  * Fetch all tracks for a given album ID (from /game-soundtracks/album/:id)
  * @param {string} albumId
+ * @param {Function} onConfirmFetch - Optional callback to confirm fetching when >10 tracks
  * @returns {Promise<Array<{title: string, url: string}>>}
  */
-export async function getAlbumTracks(albumId) {
+export async function getAlbumTracks(albumId, onConfirmFetch) {
   const url = `${BASE_URL}/game-soundtracks/album/${albumId}`;
   const res = await axios.get(url);
   const $ = cheerio.load(res.data);
@@ -66,29 +97,47 @@ export async function getAlbumTracks(albumId) {
       tracks.push({ title, page: BASE_URL + pageLink });
     }
   });
-  // For each track, fetch the download URL (mp3)
-  for (let track of tracks) {
-    try {
-      const pageRes = await axios.get(track.page);
-      const $track = cheerio.load(pageRes.data);
-      // The download link is in <a href="...mp3"> in the center tag
-      const mp3Link = $track('a[href$=".mp3"]').attr("href");
-      if (mp3Link) track.url = mp3Link.startsWith("http") ? mp3Link : BASE_URL + mp3Link;
-    } catch (e) {
-      track.url = null;
+
+  // If more than 10 tracks and confirmation callback provided, ask for confirmation
+  if (tracks.length > 10 && onConfirmFetch) {
+    const shouldContinue = await onConfirmFetch(tracks.length);
+    if (!shouldContinue) {
+      return [];
     }
-    delete track.page;
   }
-  return tracks.filter(t => t.url);
+
+  // Track the metadata fetching operation
+  updateDownloadCount(1);
+  
+  try {
+    // For each track, fetch the download URL (mp3)
+    for (let track of tracks) {
+      try {
+        const pageRes = await axios.get(track.page);
+        const $track = cheerio.load(pageRes.data);
+        // The download link is in <a href="...mp3"> in the center tag
+        const mp3Link = $track('a[href$=".mp3"]').attr("href");
+        if (mp3Link) track.url = mp3Link.startsWith("http") ? mp3Link : BASE_URL + mp3Link;
+      } catch (e) {
+        track.url = null;
+      }
+      delete track.page;
+    }
+    return tracks.filter(t => t.url);
+  } finally {
+    // Always decrement the counter when done
+    updateDownloadCount(-1);
+  }
 }
 
 /**
  * High-level: search by keyword and get tracks for the best-matching album.
  * Prefers exact or near-exact matches to the search term.
  * @param {string} term
+ * @param {Function} onConfirmFetch - Optional callback to confirm fetching when >10 tracks
  * @returns {Promise<Array<{title: string, url: string}>>}
  */
-export async function getGameSoundtrack(term) {
+export async function getGameSoundtrack(term, onConfirmFetch) {
   const albums = await searchAlbums(term);
   if (!albums.length) return [];
   // Try to find the best match (case-insensitive)
@@ -101,5 +150,5 @@ export async function getGameSoundtrack(term) {
   if (!best) best = albums.find(a => a.name.trim().toLowerCase().includes(lowerTerm));
   // Fall back to first result
   if (!best) best = albums[0];
-  return getAlbumTracks(best.id);
+  return getAlbumTracks(best.id, onConfirmFetch);
 }

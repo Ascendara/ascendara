@@ -160,6 +160,7 @@
       "title": "Oh no...",
       "troubleshooting": "Try these steps to resolve the issue:"
     },
+    "loading-audio": "Loading Soundtracks",
     "downloading-update": "Downloading Update...",
     "experiment": "EXPERIMENTAL",
     "firstIndexDialog": {
@@ -1247,7 +1248,10 @@
     "achievements": "Achievements",
     "achievementsUnlocked": "Achievements Unlocked",
     "allDownloadsComplete": "All tracks downloaded!",
+    "audioFetchConfirmMessage": "This soundtrack has {{count}} tracks. Loading all track information will make multiple requests to the server. Do you want to continue?",
+    "audioFetchConfirmTitle": "Load Soundtrack Information?",
     "backToLibrary": "Back to Library",
+    "continueFetch": "Continue",
     "backupSaves": "Backup Saves",
     "oldVersions": "Old Versions",
     "archivedFiles": "Archived Files",

@@ -72,7 +72,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getGameSoundtrack } from "@/services/khinsiderService";
+import { getGameSoundtrack, trackDownload } from "@/services/khinsiderService";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -549,6 +549,38 @@ const SteamNotRunningDialog = ({ open, onClose, t }) => {
   );
 };
 
+const AudioDownloadConfirmDialog = ({ open, onClose, onConfirm, onCancel, trackCount, t }) => (
+  <AlertDialog open={open} onOpenChange={onClose}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle className="text-2xl font-bold text-foreground">
+          {t("gameScreen.audioFetchConfirmTitle")}
+        </AlertDialogTitle>
+        <AlertDialogDescription className="space-y-4 text-muted-foreground">
+          {t("gameScreen.audioFetchConfirmMessage", { count: trackCount })}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter className="flex gap-2">
+        <Button variant="outline" className="text-primary" onClick={() => {
+          onCancel();
+          onClose();
+        }}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          className="text-secondary"
+          onClick={() => {
+            onConfirm();
+            onClose();
+          }}
+        >
+          {t("gameScreen.continueFetch")}
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);
+
 export default function GameScreen() {
   const showError = (game, error) => {
     setErrorGame(game);
@@ -679,6 +711,10 @@ export default function GameScreen() {
     const saved = localStorage.getItem(`game-show-logo-${game?.game || game?.name}`);
     return saved !== "false";
   });
+
+  // Audio download confirmation state
+  const [showAudioDownloadDialog, setShowAudioDownloadDialog] = useState(false);
+  const [pendingAudioDownloads, setPendingAudioDownloads] = useState(null);
 
   // GO BACK!
 
@@ -1037,10 +1073,21 @@ export default function GameScreen() {
       setLoadingSoundtrack(false);
     } else {
       setLoadingSoundtrack(true);
-      getGameSoundtrack(gameName)
+      
+      // Create confirmation callback for when >10 tracks need to be fetched
+      const confirmFetch = (trackCount) => {
+        return new Promise((resolve) => {
+          setPendingAudioDownloads({ count: trackCount, resolve });
+          setShowAudioDownloadDialog(true);
+        });
+      };
+      
+      getGameSoundtrack(gameName, confirmFetch)
         .then(tracks => {
           setSoundtrack(tracks);
-          localStorage.setItem(storageKey, JSON.stringify(tracks));
+          if (tracks.length > 0) {
+            localStorage.setItem(storageKey, JSON.stringify(tracks));
+          }
         })
         .finally(() => setLoadingSoundtrack(false));
     }
@@ -2295,7 +2342,9 @@ export default function GameScreen() {
                             toast.success(t("gameScreen.downloadingAllTracks"));
                             const results = await Promise.all(
                               soundtrack.map(track =>
-                                window.electron.downloadSoundtrack(track.url, game.game)
+                                trackDownload(
+                                  window.electron.downloadSoundtrack(track.url, game.game)
+                                )
                               )
                             );
                             if (results.every(res => res?.success)) {
@@ -2396,17 +2445,17 @@ export default function GameScreen() {
                                     className="h-8 w-8 transition-all duration-200 sm:opacity-0 sm:group-hover:opacity-100"
                                     onClick={() => {
                                       toast.success(t("gameScreen.downloadStarted"));
-                                      window.electron
-                                        .downloadSoundtrack(track.url, game.game)
-                                        .then(res => {
-                                          if (res?.success) {
-                                            toast.success(
-                                              t("gameScreen.downloadComplete")
-                                            );
-                                          } else {
-                                            toast.error(t("gameScreen.downloadFailed"));
-                                          }
-                                        });
+                                      trackDownload(
+                                        window.electron.downloadSoundtrack(track.url, game.game)
+                                      ).then(res => {
+                                        if (res?.success) {
+                                          toast.success(
+                                            t("gameScreen.downloadComplete")
+                                          );
+                                        } else {
+                                          toast.error(t("gameScreen.downloadFailed"));
+                                        }
+                                      });
                                     }}
                                     title={t("gameScreen.downloadTrack")}
                                   >
@@ -3722,6 +3771,34 @@ export default function GameScreen() {
       <SteamNotRunningDialog
         open={showSteamNotRunningWarning}
         onClose={() => setShowSteamNotRunningWarning(false)}
+        t={t}
+      />
+
+      {/* Audio Fetch Confirmation Dialog */}
+      <AudioDownloadConfirmDialog
+        open={showAudioDownloadDialog}
+        onClose={() => {
+          if (pendingAudioDownloads?.resolve) {
+            pendingAudioDownloads.resolve(false);
+          }
+          setShowAudioDownloadDialog(false);
+          setPendingAudioDownloads(null);
+        }}
+        onConfirm={() => {
+          if (pendingAudioDownloads?.resolve) {
+            pendingAudioDownloads.resolve(true);
+          }
+          setShowAudioDownloadDialog(false);
+          setPendingAudioDownloads(null);
+        }}
+        onCancel={() => {
+          if (pendingAudioDownloads?.resolve) {
+            pendingAudioDownloads.resolve(false);
+          }
+          setShowAudioDownloadDialog(false);
+          setPendingAudioDownloads(null);
+        }}
+        trackCount={pendingAudioDownloads?.count || 0}
         t={t}
       />
 
