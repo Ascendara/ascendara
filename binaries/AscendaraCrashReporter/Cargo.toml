@@ -15,3 +15,7 @@ chrono = "0.4"
 
 # To open links (Discord)
 webbrowser = "0.8"
+
+[build-dependencies]
+# Library to embed resources (icons, manifests) into Windows executables
+winres = "0.1"
