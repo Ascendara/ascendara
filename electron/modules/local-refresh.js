@@ -7,7 +7,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow, Notification, app } = require("electron");
-const { isDev, isWindows, appDirectory, APIKEY, getPythonPath } = require("./config");
+const { isDev, isWindows, appDirectory, getPythonPath } = require("./config");
 const { getSettingsManager } = require("./settings");
 const archiver = require("archiver");
 const https = require("https");
@@ -70,19 +70,21 @@ async function createIndexZip(indexPath) {
 }
 
 /**
- * Get an auth token from the API
+ * Get an auth token from the API using time-based authentication
  * @returns {Promise<string>} - The auth token
  */
 async function getAuthToken() {
+  const authHelper = require("./auth-helper");
+  
   return new Promise((resolve, reject) => {
+    const authHeaders = authHelper.generateAuthHeaders();
+    
     const options = {
       hostname: "api.ascendara.app",
       port: 443,
       path: "/auth/token",
       method: "GET",
-      headers: {
-        Authorization: APIKEY,
-      },
+      headers: authHeaders,
     };
 
     const req = https.request(options, res => {
