@@ -642,6 +642,17 @@ export default function DownloadPage() {
           console.log("[Download] Download initiated! Calling notifyDownloadStart");
           notifyDownloadStart(sanitizedGameName, gameData.game);
 
+          // Track download statistics
+          try {
+            await fetch('https://api.ascendara.app/stats/download', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ game: gameData.game })
+            });
+          } catch (error) {
+            console.error('Failed to track download:', error);
+          }
+
           // Keep isStarting true until download actually begins
           const removeDownloadListener = window.electron.onDownloadProgress(
             downloadInfo => {
@@ -915,6 +926,17 @@ export default function DownloadPage() {
       // Notify webapp that download started immediately
       console.log("[Download] Download initiated! Calling notifyDownloadStart");
       notifyDownloadStart(sanitizedGameName, gameData.game);
+
+      // Track download statistics
+      try {
+        await fetch('https://api.ascendara.app/stats/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ game: gameData.game })
+        });
+      } catch (error) {
+        console.error('Failed to track download:', error);
+      }
 
       // Listen for binary spawn errors (async, fires after handler returns)
       const removeErrorListener = window.electron.onDownloadError(errData => {

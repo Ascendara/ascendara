@@ -1,10 +1,9 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const config = require("./config");
+const authHelper = require("./auth-helper");
 
-const SGDB_API_KEY = config.steamGridDbApiKey;
-const BASE_URL = "https://www.steamgriddb.com/api/v2";
+const PROXY_BASE_URL = "https://api.ascendara.app/api/proxy/steamgrid";
 
 async function fetchGameAssets(gameName, gameDir) {
   // Check if we already have all the new assets
@@ -39,7 +38,7 @@ async function fetchGameAssets(gameName, gameDir) {
       `[SteamGrid] Found legacy header for "${gameName}", downloading missing assets`
     );
   }
-  const headers = { Authorization: `Bearer ${SGDB_API_KEY}` };
+  const authHeaders = authHelper.generateAuthHeaders();
   let gameId = null;
 
   try {
@@ -50,8 +49,8 @@ async function fetchGameAssets(gameName, gameDir) {
     console.log(`[SteamGrid] Searching for: "${cleanName}"`);
 
     const searchRes = await axios.get(
-      `${BASE_URL}/search/autocomplete/${encodeURIComponent(cleanName)}`,
-      { headers }
+      `${PROXY_BASE_URL}/search/autocomplete/${encodeURIComponent(cleanName)}`,
+      { headers: authHeaders }
     );
 
     if (searchRes.data.success && searchRes.data.data.length > 0) {
@@ -91,12 +90,12 @@ async function fetchGameAssets(gameName, gameDir) {
       if (alreadyExists) continue;
 
       // 2. Craft the request
-      let url = `${BASE_URL}/${item.type}/game/${gameId}?styles=${item.styles}&sort=score`;
+      let url = `${PROXY_BASE_URL}/${item.type}/game/${gameId}?styles=${item.styles}&sort=score`;
       if (item.dimensions) url += `&dimensions=${item.dimensions.join(",")}`;
       if (item.type !== "logos") url += `&mimes=image/jpeg,image/png`;
 
       try {
-        const res = await axios.get(url, { headers });
+        const res = await axios.get(url, { headers: authHeaders });
 
         if (res.data.success && res.data.data.length > 0) {
           const imageUrl = res.data.data[0].url;

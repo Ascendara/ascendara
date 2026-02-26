@@ -937,7 +937,7 @@ export default function GameScreen() {
         );
         // Reload the game image with cache busting
         const gameId = game.game || game.name;
-        window.electron.ipcRenderer.invoke("get-game-image", gameId, "cover_vertical").then(imageBase64 => {
+        window.electron.ipcRenderer.invoke("get-game-image", gameId, "grid").then(imageBase64 => {
           if (imageBase64) {
             const timestamp = new Date().getTime();
             setImageData(`data:image/jpeg;base64,${imageBase64}?t=${timestamp}`);
@@ -954,15 +954,15 @@ export default function GameScreen() {
         );
         // Clear localStorage cache and reload the grid image
         const gameId = game.game || game.name;
-        const localStorageKey = `game-cover-vertical-${gameId}`;
+        const localStorageKey = `game-grid-${gameId}`;
         localStorage.removeItem(localStorageKey);
 
-        // Fetch the new cover_vertical image
+        // Fetch the new grid image
         try {
           const gridBase64 = await window.electron.ipcRenderer.invoke(
             "get-game-image",
             gameId,
-            "cover_vertical"
+            "grid"
           );
           if (gridBase64) {
             const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
@@ -1099,15 +1099,15 @@ export default function GameScreen() {
     const gameId = game.game || game.name;
 
     // Change the cache key to not load the old header
-    const localStorageKey = `game-cover-vertical-${gameId}`;
+    const localStorageKey = `game-grid-${gameId}`;
 
     const loadGameImage = async () => {
-      // 1. Try fetching Vertical Cover from backend first (Priority)
+      // 1. Try fetching Grid image from backend first (Priority)
       try {
         const gridBase64 = await window.electron.ipcRenderer.invoke(
           "get-game-image",
           gameId,
-          "cover_vertical"
+          "grid"
         );
 
         if (gridBase64 && isMounted) {
@@ -1903,11 +1903,11 @@ export default function GameScreen() {
                     </Button>
                   )}
                 </div>
-                <div className="relative aspect-[2/3] overflow-hidden rounded-lg">
+                <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-muted/30">
                   <img
                     src={imageData}
                     alt={game.game}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                   {/* Edit cover button */}
                   <div className="absolute left-2 top-2 z-10">
