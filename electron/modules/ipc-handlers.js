@@ -1243,13 +1243,15 @@ function registerMiscHandlers() {
   });
 
   // Start Steam handler
-  ipcMain.handle("start-steam", () => {
-    const steamExe = path.join("C:\\Program Files (x86)\\Steam\\Steam.exe");
-    if (fs.existsSync(steamExe)) {
-      spawn(steamExe, [], { detached: true, stdio: "ignore" });
+  ipcMain.handle("start-steam", async () => {
+    const { shell } = require('electron');
+    try {
+      await shell.openExternal('steam://open');
       return true;
+    } catch (error) {
+      console.error('Failed to start Steam:', error);
+      return false;
     }
-    return false;
   });
 
   // Import Steam games handler
