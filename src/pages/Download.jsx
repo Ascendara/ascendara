@@ -3329,21 +3329,20 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                   {/* Game Summary - Spans 2 columns */}
                   <div className="md:col-span-2">
-                    {steamData.summary && (
+                    {(steamData.about_the_game || steamData.summary) && (
                       <div className="mb-8">
                         <h2 className="mb-3 text-xl font-bold text-foreground">
                           {t("download.aboutGame")}
                         </h2>
-                        <p className="leading-relaxed text-muted-foreground">
-                          {steamData.summary}
-                        </p>
-
-                        {steamData.storyline && (
-                          <div className="mt-4">
-                            <p className="leading-relaxed text-muted-foreground">
-                              {steamData.storyline}
-                            </p>
-                          </div>
+                        {steamData.about_the_game ? (
+                          <div 
+                            className="steam-description leading-relaxed text-muted-foreground"
+                            dangerouslySetInnerHTML={{ __html: steamData.about_the_game }}
+                          />
+                        ) : (
+                          <p className="leading-relaxed text-muted-foreground">
+                            {steamData.summary}
+                          </p>
                         )}
                       </div>
                     )}

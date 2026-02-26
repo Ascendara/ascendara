@@ -2617,7 +2617,7 @@ export default function GameScreen() {
                 </div>
 
                 {/* Game Summary */}
-                {steamData?.summary && (
+                {(steamData?.about_the_game || steamData?.summary) && (
                   <Card className="border-l-4 border-l-primary">
                     <CardContent className="p-6">
                       <div className="space-y-4">
@@ -2625,11 +2625,18 @@ export default function GameScreen() {
                           <div className="rounded-full bg-primary/10 p-2">
                             <Info className="h-5 w-5 text-primary" />
                           </div>
-                          <h2 className="text-xl font-bold">{t("gameScreen.summary")}</h2>
+                          <h2 className="text-xl font-bold">{t("gameScreen.aboutGame")}</h2>
                         </div>
-                        <p className="text-base leading-relaxed text-foreground/80">
-                          {steamData.summary}
-                        </p>
+                        {steamData.about_the_game ? (
+                          <div 
+                            className="steam-description text-base leading-relaxed text-foreground/80"
+                            dangerouslySetInnerHTML={{ __html: steamData.about_the_game }}
+                          />
+                        ) : (
+                          <p className="text-base leading-relaxed text-foreground/80">
+                            {steamData.summary}
+                          </p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

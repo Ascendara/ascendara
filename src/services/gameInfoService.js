@@ -596,6 +596,9 @@ const formatSteamData = steamData => {
 
     // Store the full description separately
     full_description: fullCleanDescription,
+    
+    // Store the raw HTML about_the_game for rich display
+    about_the_game: steamData.about_the_game || null,
 
     // Steam API fields
     cover: steamData.header_image
