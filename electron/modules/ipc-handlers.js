@@ -23,6 +23,7 @@ const {
 const { getSettingsManager } = require("./settings");
 const { sanitizeText, getExtensionFromMimeType } = require("./utils");
 const { initializeDiscordRPC, destroyDiscordRPC, setRPCState } = require("./discord-rpc");
+const steamgrid = require("./steamgrid");
 
 let apiKeyOverride = null;
 let has_launched = false;
@@ -1297,51 +1298,15 @@ function registerMiscHandlers() {
             gamesData.games.push(newGame);
             console.log(`Added game: ${folder.name}`);
 
-            // Try to fetch cover image from Steam
+            // Fetch game assets (grid, hero, logo) from SteamGridDB
             try {
-              const searchUrl = `https://store.steampowered.com/api/storesearch?term=${encodeURIComponent(folder.name)}&l=en&cc=US`;
-              const searchResponse = await axios.get(searchUrl);
-
-              if (searchResponse.data?.items?.length > 0) {
-                const steamApp = searchResponse.data.items[0];
-                const appId = steamApp.id;
-                console.log(`Found Steam app for ${folder.name}: ${appId}`);
-
-                // Fetch app details to get header image
-                const detailsUrl = `https://store.steampowered.com/api/appdetails?appids=${appId}`;
-                const detailsResponse = await axios.get(detailsUrl);
-
-                if (detailsResponse.data?.[appId]?.success) {
-                  const gameData = detailsResponse.data[appId].data;
-                  const headerImage = gameData.header_image;
-
-                  if (headerImage) {
-                    console.log(`Downloading cover image for ${folder.name}`);
-                    const imageResponse = await axios({
-                      url: headerImage,
-                      method: "GET",
-                      responseType: "arraybuffer",
-                    });
-
-                    const imageBuffer = Buffer.from(imageResponse.data);
-                    const mimeType = imageResponse.headers["content-type"];
-                    const extension = getExtensionFromMimeType(mimeType);
-                    const imagePath = path.join(
-                      gamesDirectory,
-                      `${folder.name}.ascendara${extension}`
-                    );
-                    await fs.promises.writeFile(imagePath, imageBuffer);
-                    console.log(
-                      `Saved cover image: ${folder.name}.ascendara${extension}`
-                    );
-                  }
-                }
-              } else {
-                console.log(`No Steam app found for ${folder.name}`);
-              }
+              const gameDirectory = path.join(directory, folder.name);
+              console.log(`Fetching assets for ${folder.name} from SteamGridDB`);
+              await steamgrid.fetchGameAssets(folder.name, gameDirectory);
+              console.log(`Successfully fetched assets for ${folder.name}`);
             } catch (imageError) {
               console.error(
-                `Error fetching cover for ${folder.name}:`,
+                `Error fetching assets for ${folder.name}:`,
                 imageError.message
               );
             }

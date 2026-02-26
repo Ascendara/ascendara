@@ -901,7 +901,7 @@ export default function GameScreen() {
         );
         // Reload the game image with cache busting
         const gameId = game.game || game.name;
-        window.electron.getGameImage(gameId).then(imageBase64 => {
+        window.electron.ipcRenderer.invoke("get-game-image", gameId, "cover_vertical").then(imageBase64 => {
           if (imageBase64) {
             const timestamp = new Date().getTime();
             setImageData(`data:image/jpeg;base64,${imageBase64}?t=${timestamp}`);
