@@ -1062,9 +1062,9 @@ export default function GameScreen() {
     setShowLogo(prev => !prev);
   };
 
-  // Fetch Khinsider soundtrack on mount
-  useEffect(() => {
-    if (!game) return;
+  // Fetch Khinsider soundtrack when user clicks on soundtrack tab
+  const fetchSoundtrack = () => {
+    if (!game || soundtrack.length > 0) return;
     const gameName = game.game || game.name;
     const storageKey = `khinsider-soundtrack-${gameName}`;
     const cached = localStorage.getItem(storageKey);
@@ -1091,7 +1091,7 @@ export default function GameScreen() {
         })
         .finally(() => setLoadingSoundtrack(false));
     }
-  }, [game]);
+  };
 
   // Load game image with localStorage cache (similar to Library.jsx)
   useEffect(() => {
@@ -2191,7 +2191,10 @@ export default function GameScreen() {
                 {t("gameScreen.overview")}
               </button>
               <button
-                onClick={() => setActiveTab("soundtrack")}
+                onClick={() => {
+                  setActiveTab("soundtrack");
+                  fetchSoundtrack();
+                }}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
                   activeTab === "soundtrack"
