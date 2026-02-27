@@ -3161,18 +3161,27 @@ const Ascend = () => {
               <h1 className="text-2xl font-bold">
                 {isTrialBlocked
                   ? t("ascend.access.trialBlocked")
-                  : t("ascend.access.expired")}
+                  : t("ascend.access.subscriptionExpired")}
               </h1>
               <p className="text-muted-foreground">
                 {isTrialBlocked
                   ? t("ascend.access.trialBlockedMessage")
-                  : t("ascend.access.expiredMessage")}
+                  : userData?.ascendSubscription?.expiresAt
+                    ? t("ascend.access.subscriptionExpiredOn", {
+                        date: new Date(userData.ascendSubscription.expiresAt.toDate()).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+                      })
+                    : t("ascend.access.subscriptionExpiredMessage")}
               </p>
               {!deletedAccountWarning && (
-                <Button onClick={handleSubscribe} className="w-full text-secondary">
-                  <BadgeDollarSign className="mr-2 h-4 w-4" />
-                  {t("ascend.settings.subscribe")}
-                </Button>
+                <div className="space-y-3">
+                  <Button 
+                    onClick={handleSubscribe} 
+                    className="w-full text-secondary"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {t("ascend.access.renewSubscription")}
+                  </Button>
+                </div>
               )}
               {deletedAccountWarning && (
                 <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-sm">
