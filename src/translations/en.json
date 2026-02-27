@@ -1251,6 +1251,7 @@
     "achievementUnlocked": "Achieved on",
     "achievements": "Achievements",
     "achievementsUnlocked": "Achievements Unlocked",
+    "aboutGame": "About This Game",
     "allDownloadsComplete": "All tracks downloaded!",
     "audioFetchConfirmMessage": "This soundtrack has {{count}} tracks. Loading all track information will make multiple requests to the server. Do you want to continue?",
     "audioFetchConfirmTitle": "Load Soundtrack Information?",

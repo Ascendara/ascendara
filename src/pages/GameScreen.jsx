@@ -716,6 +716,10 @@ export default function GameScreen() {
   const [showAudioDownloadDialog, setShowAudioDownloadDialog] = useState(false);
   const [pendingAudioDownloads, setPendingAudioDownloads] = useState(null);
 
+  // Hero image state for header background
+  const [heroImageData, setHeroImageData] = useState(null);
+  const [hasGridImage, setHasGridImage] = useState(true);
+
   // GO BACK!
 
   const BackLibrary = () => {
@@ -1113,6 +1117,7 @@ export default function GameScreen() {
         if (gridBase64 && isMounted) {
           const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
           setImageData(dataUrl);
+          setHasGridImage(true);
           try {
             localStorage.setItem(localStorageKey, dataUrl);
           } catch (e) {}
@@ -1120,10 +1125,16 @@ export default function GameScreen() {
         }
       } catch (e) {}
 
+      // Grid image failed, mark as not available
+      setHasGridImage(false);
+
       // 2. Try localStorage cache as fallback
       const cachedImage = localStorage.getItem(localStorageKey);
       if (cachedImage) {
-        if (isMounted) setImageData(cachedImage);
+        if (isMounted) {
+          setImageData(cachedImage);
+          setHasGridImage(true);
+        }
         return;
       }
 
@@ -1132,6 +1143,7 @@ export default function GameScreen() {
         const coverUrl = steamService.formatImageUrl(steamData.cover.url, "cover_big");
         if (coverUrl && isMounted) {
           setImageData(coverUrl);
+          setHasGridImage(true);
           // Cache the Steam cover URL
           try {
             localStorage.setItem(localStorageKey, coverUrl);
@@ -1148,6 +1160,7 @@ export default function GameScreen() {
         if (imageBase64 && isMounted) {
           const dataUrl = `data:image/jpeg;base64,${imageBase64}`;
           setImageData(dataUrl);
+          setHasGridImage(true);
           try {
             localStorage.setItem(localStorageKey, dataUrl);
           } catch (e) {
@@ -1187,6 +1200,28 @@ export default function GameScreen() {
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
     };
   }, [game.game, game.name, steamData?.cover?.url]); // Add steamData.cover.url as dependency
+
+  // Load hero image when grid image fails
+  useEffect(() => {
+    if (!hasGridImage && game) {
+      const gameId = game.game || game.name;
+      const loadHeroImage = async () => {
+        try {
+          const heroBase64 = await window.electron.ipcRenderer.invoke(
+            "get-game-image",
+            gameId,
+            "hero"
+          );
+          if (heroBase64) {
+            setHeroImageData(`data:image/jpeg;base64,${heroBase64}`);
+          }
+        } catch (e) {
+          console.error("Error loading hero image:", e);
+        }
+      };
+      loadHeroImage();
+    }
+  }, [hasGridImage, game]);
 
   // Log hasRated state changes
   useEffect(() => {
@@ -1690,7 +1725,20 @@ export default function GameScreen() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero section with game banner/header */}
-      <div className="relative w-full">
+      <div className="relative w-full overflow-hidden">
+        {/* Hero background image with zoom effect when grid image fails */}
+        {!hasGridImage && heroImageData && (
+          <div
+            className="absolute inset-0 z-0"
+            style={{
+              backgroundImage: `url(${heroImageData})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              transform: "scale(1.15)",
+              filter: "blur(8px) brightness(0.4)",
+            }}
+          />
+        )}
         <div className="container relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-between p-4 md:p-8">
           {/* Back button */}
           <Button
@@ -1904,11 +1952,23 @@ export default function GameScreen() {
                   )}
                 </div>
                 <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-muted/30">
-                  <img
-                    src={imageData}
-                    alt={game.game}
-                    className="h-full w-full object-contain"
-                  />
+                  {!hasGridImage && heroImageData ? (
+                    <div
+                      className="h-full w-full"
+                      style={{
+                        backgroundImage: `url(${heroImageData})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        transform: "scale(1.15)",
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={imageData}
+                      alt={game.game}
+                      className="h-full w-full object-contain"
+                    />
+                  )}
                   {/* Edit cover button */}
                   <div className="absolute left-2 top-2 z-10">
                     <Button
@@ -2625,7 +2685,7 @@ export default function GameScreen() {
                     <CardContent className="p-6">
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                          <div className="rounded-full bg-primary/10 p-2">
+                          <div className="rounded-full mb-2 bg-primary/10 p-2">
                             <Info className="h-5 w-5 text-primary" />
                           </div>
                           <h2 className="text-xl font-bold">{t("gameScreen.aboutGame")}</h2>
