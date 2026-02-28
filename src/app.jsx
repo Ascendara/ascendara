@@ -964,7 +964,13 @@ const AppRoutes = () => {
             setIsUpdating(false);
             setIsLoading(false);
             await checkAndSetWelcomeStatus();
-            setShowChangelog(true);
+            
+            // Only show changelog on live branch
+            const branch = await window.electron.getBranch();
+            if (branch === "live") {
+              setShowChangelog(true);
+            }
+            
             toast(t("app.toasts.justUpdated"), {
               description: t("app.toasts.justUpdatedDesc", { version: __APP_VERSION__ }),
               duration: 10000,
@@ -1155,6 +1161,7 @@ const AppRoutes = () => {
       try {
         const settings = await window.electron.getSettings();
         const isLatestVersion = await checkForUpdates();
+        const branch = await window.electron.getBranch();
 
         if (
           !isLatestVersion &&
@@ -1162,8 +1169,22 @@ const AppRoutes = () => {
           !settings.autoUpdate
         ) {
           hasShownUpdateNotification.current = true;
-          toast(t("app.toasts.outOfDate"), {
-            description: t("app.toasts.outOfDateDesc"),
+          
+          // Branch-specific messages
+          let title, description;
+          if (branch === "public-testing") {
+            title = t("app.toasts.outOfDatePublicTesting");
+            description = t("app.toasts.outOfDatePublicTestingDesc");
+          } else if (branch === "experimental") {
+            title = t("app.toasts.outOfDateExperimental");
+            description = t("app.toasts.outOfDateExperimentalDesc");
+          } else {
+            title = t("app.toasts.outOfDate");
+            description = t("app.toasts.outOfDateDesc");
+          }
+          
+          toast(title, {
+            description: description,
             action: {
               label: t("app.toasts.updateNow"),
               onClick: async () => {
@@ -1188,12 +1209,28 @@ const AppRoutes = () => {
       }
     };
 
-    const updateReadyHandler = () => {
+    const updateReadyHandler = async () => {
       if (!isSubscribed || hasShownUpdateReadyNotification.current) return;
 
       hasShownUpdateReadyNotification.current = true;
-      toast(t("app.toasts.updateReady"), {
-        description: t("app.toasts.updateReadyDesc"),
+      
+      // Get branch for branch-specific messages
+      const branch = await window.electron.getBranch();
+      
+      let title, description;
+      if (branch === "public-testing") {
+        title = t("app.toasts.updateReadyPublicTesting");
+        description = t("app.toasts.updateReadyPublicTestingDesc");
+      } else if (branch === "experimental") {
+        title = t("app.toasts.updateReadyExperimental");
+        description = t("app.toasts.updateReadyExperimentalDesc");
+      } else {
+        title = t("app.toasts.updateReady");
+        description = t("app.toasts.updateReadyDesc");
+      }
+      
+      toast(title, {
+        description: description,
         action: {
           label: t("app.toasts.installAndRestart"),
           onClick: handleInstallAndRestart,

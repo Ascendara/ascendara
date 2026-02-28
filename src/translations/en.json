@@ -207,10 +207,18 @@
       "justUpdated": "Update Complete",
       "justUpdatedDesc": "You've just updated to {{version}}",
       "outOfDate": "Ascendara is out of date",
-      "outOfDateDesc": "Please download the latest version from the official website",
+      "outOfDateDesc": "A newer version is available. Click to download and install.",
+      "outOfDatePublicTesting": "Public Testing Version Out of Date",
+      "outOfDatePublicTestingDesc": "A newer public testing version is available. Click to download and install.",
+      "outOfDateExperimental": "Experimental Version Out of Date",
+      "outOfDateExperimentalDesc": "A newer experimental version is available. Click to download and install.",
       "updateNow": "Update Now",
       "updateReady": "Ascendara is ready to update",
-      "updateReadyDesc": "Ascendara downloaded the update and is ready to install and restart now"
+      "updateReadyDesc": "Ascendara downloaded the update and is ready to install and restart now",
+      "updateReadyPublicTesting": "Public Testing Update Ready",
+      "updateReadyPublicTestingDesc": "The public testing update has been downloaded and is ready to install.",
+      "updateReadyExperimental": "Experimental Update Ready",
+      "updateReadyExperimentalDesc": "The experimental update has been downloaded and is ready to install."
     },
     "torrentWarning": "TORRENTING IS ENABLED - USE VPN",
     "watchdog": {
