@@ -2174,31 +2174,57 @@ const InstalledGameCard = memo(
         return;
       }
       try {
-        const covers = await gameService.searchGameCovers(query);
-        setCoverSearch(prev => ({ ...prev, isLoading: false, results: covers || [] }));
-
-        // Load local images if using local index
-        if (settings.usingLocalIndex && settings.localIndex) {
+        // Use SteamGridDB API proxy for game search
+        const searchUrl = `https://api.ascendara.app/api/proxy/steamgriddb/search?term=${encodeURIComponent(query)}`;
+        const searchResponse = await fetch(searchUrl);
+        
+        if (!searchResponse.ok) {
+          throw new Error('SteamGridDB search failed');
+        }
+        
+        const searchData = await searchResponse.json();
+        
+        if (searchData.success && searchData.data && searchData.data.length > 0) {
+          // Get grids for the first few results
+          const results = [];
           const imageUrls = {};
-          for (const cover of covers || []) {
-            if (cover.gameID) {
-              try {
-                const localImagePath = `${settings.localIndex}/imgs/${cover.gameID}.jpg`;
-                const localImageUrl =
-                  await window.electron.getLocalImageUrl(localImagePath);
-                if (localImageUrl) {
-                  imageUrls[cover.gameID] = localImageUrl;
+          
+          for (const game of searchData.data.slice(0, 9)) {
+            try {
+              // Fetch grid images for this game
+              const gridsUrl = `https://api.ascendara.app/api/proxy/steamgriddb/grids/${game.id}`;
+              const gridsResponse = await fetch(gridsUrl);
+              
+              if (gridsResponse.ok) {
+                const gridsData = await gridsResponse.json();
+                
+                if (gridsData.success && gridsData.data && gridsData.data.length > 0) {
+                  // Use the first grid image
+                  const firstGrid = gridsData.data[0];
+                  
+                  results.push({
+                    game: game.name,
+                    gameID: game.id.toString(),
+                    imgID: game.id.toString(),
+                    img: firstGrid.url,
+                  });
+                  
+                  imageUrls[game.id.toString()] = firstGrid.url;
                 }
-              } catch (error) {
-                console.warn(`Could not load local image for ${cover.gameID}:`, error);
               }
+            } catch (gridError) {
+              console.warn(`Could not fetch grids for ${game.name}:`, gridError);
             }
           }
+          
+          setCoverSearch(prev => ({ ...prev, isLoading: false, results: results }));
           setCoverImageUrls(imageUrls);
         } else {
+          setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
           setCoverImageUrls({});
         }
       } catch (err) {
+        console.error("Error searching covers:", err);
         setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
         setCoverImageUrls({});
       }
@@ -2829,138 +2855,80 @@ const AddGameForm = ({ onSuccess }) => {
     searchDebounceRef.current = setTimeout(async () => {
       setCoverSearch(prev => ({ ...prev, isLoading: true }));
       try {
-        // If using local index, search in the local JSON file first
-        if (settings.usingLocalIndex && settings.localIndex) {
-          try {
-            // Load the local index JSON file
-            const indexPath = `${settings.localIndex}/ascendara_games.json`;
-            const indexData = await window.electron.ipcRenderer.readFile(
-              indexPath,
-              "utf8"
-            );
-            const indexJson = JSON.parse(indexData);
-
-            // Search for games matching the query (case-insensitive)
-            const queryLower = query.toLowerCase();
-            const matchingGames = indexJson.games
-              .filter(game => game.game.toLowerCase().includes(queryLower))
-              .slice(0, 9);
-
-            if (matchingGames.length > 0) {
-              // Transform results to match the expected format
-              const results = matchingGames.map(game => ({
-                game: game.game,
-                gameID: game.gameID,
-                imgID: game.imgID, // Use the actual imgID from local index (e.g., "mgw2o9lzyy")
-                img: null, // Will be loaded from local file
-                size: game.size,
-                version: game.version,
-                online: game.online,
-                dlc: game.dlc,
-              }));
-
-              const firstResult = results[0];
-              setCoverSearch(prev => ({
-                ...prev,
-                results: results,
-                selectedCover: firstResult, // Auto-select first result
-                isLoading: false,
-              }));
-
-              // Load local images
-              const imageUrls = {};
-              for (const cover of results) {
-                if (cover.imgID) {
-                  try {
-                    const localImagePath = `${settings.localIndex}/imgs/${cover.imgID}.jpg`;
-                    const localImageUrl =
-                      await window.electron.getLocalImageUrl(localImagePath);
-                    if (localImageUrl) {
-                      imageUrls[cover.gameID] = localImageUrl;
-                    }
-                  } catch (error) {
-                    console.warn(`Could not load local image for ${cover.imgID}:`, error);
-                  }
+        // Use SteamGridDB API proxy for game search
+        const searchUrl = `https://api.ascendara.app/api/proxy/steamgriddb/search?term=${encodeURIComponent(query)}`;
+        const searchResponse = await fetch(searchUrl);
+        
+        if (!searchResponse.ok) {
+          throw new Error('SteamGridDB search failed');
+        }
+        
+        const searchData = await searchResponse.json();
+        
+        if (searchData.success && searchData.data && searchData.data.length > 0) {
+          // Get grids for the first few results
+          const results = [];
+          const imageUrls = {};
+          
+          for (const game of searchData.data.slice(0, 9)) {
+            try {
+              // Fetch grid images for this game
+              const gridsUrl = `https://api.ascendara.app/api/proxy/steamgriddb/grids/${game.id}`;
+              const gridsResponse = await fetch(gridsUrl);
+              
+              if (gridsResponse.ok) {
+                const gridsData = await gridsResponse.json();
+                
+                if (gridsData.success && gridsData.data && gridsData.data.length > 0) {
+                  // Use the first grid image
+                  const firstGrid = gridsData.data[0];
+                  
+                  results.push({
+                    game: game.name,
+                    gameID: game.id.toString(),
+                    imgID: game.id.toString(),
+                    img: firstGrid.url,
+                    steamAppId: game.id,
+                  });
+                  
+                  imageUrls[game.id.toString()] = firstGrid.url;
                 }
               }
-              setCoverImageUrls(imageUrls);
-              return;
+            } catch (gridError) {
+              console.warn(`Could not fetch grids for ${game.name}:`, gridError);
             }
-          } catch (localIndexError) {
-            console.log(
-              "Local index search failed, falling back to Steam API:",
-              localIndexError
-            );
           }
-        }
-
-        // Try Steam API for better metadata (only if not using local index or local search failed)
-        let steamData = null;
-        try {
-          steamData = await steamService.getGameDetails(query);
-          if (steamData && steamData.cover) {
-            // If Steam API returns data, use it
-            const steamResult = {
-              game: steamData.name,
-              gameID: steamData.id?.toString(),
-              imgID: steamData.id?.toString(),
-              img: steamData.cover.url || steamData.cover.formatted_url,
-              steamAppId: steamData.id,
-            };
+          
+          if (results.length > 0) {
+            const firstResult = results[0];
             setCoverSearch(prev => ({
               ...prev,
-              results: [steamResult],
-              selectedCover: steamResult, // Auto-select Steam result
+              results: results,
+              selectedCover: firstResult,
               isLoading: false,
             }));
-
-            // Set the image URL directly from Steam
-            if (steamResult.img) {
-              setCoverImageUrls({ [steamResult.gameID]: steamResult.img });
-            }
+            setCoverImageUrls(imageUrls);
             return;
           }
-        } catch (steamError) {
-          console.log(
-            "Steam API search failed, falling back to game service:",
-            steamError
-          );
         }
-
-        // Fallback to original game service search
-        const results = await gameService.searchGameCovers(query);
-        const firstResult = results.length > 0 ? results[0] : null;
+        
+        // If SteamGridDB returns no results, show empty state
         setCoverSearch(prev => ({
           ...prev,
-          results: results.slice(0, 9),
-          selectedCover: firstResult, // Auto-select first result
+          results: [],
+          selectedCover: null,
           isLoading: false,
         }));
-
-        // Load local images if using local index
-        if (settings.usingLocalIndex && settings.localIndex) {
-          const imageUrls = {};
-          for (const cover of results.slice(0, 9)) {
-            if (cover.gameID) {
-              try {
-                const localImagePath = `${settings.localIndex}/imgs/${cover.gameID}.jpg`;
-                const localImageUrl =
-                  await window.electron.getLocalImageUrl(localImagePath);
-                if (localImageUrl) {
-                  imageUrls[cover.gameID] = localImageUrl;
-                }
-              } catch (error) {
-                console.warn(`Could not load local image for ${cover.gameID}:`, error);
-              }
-            }
-          }
-          setCoverImageUrls(imageUrls);
-        } else {
-          setCoverImageUrls({});
-        }
+        setCoverImageUrls({});
       } catch (error) {
         console.error("Error searching covers:", error);
-        setCoverSearch(prev => ({ ...prev, isLoading: false }));
+        setCoverSearch(prev => ({ 
+          ...prev, 
+          results: [],
+          selectedCover: null,
+          isLoading: false 
+        }));
+        setCoverImageUrls({});
         toast.error(t("library.coverSearchError"));
       }
     }, 300); // 300ms debounce
@@ -3275,7 +3243,7 @@ const AddGameForm = ({ onSuccess }) => {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <div className="relative flex-grow">
-              <SearchIcon className="absolute left-2 top-1/2 h-4 w-4 -translate-y-5 transform text-muted-foreground" />
+              <SearchIcon className="absolute left-2 top-1/2 h-4 w-4 -translate-y-2 transform text-muted-foreground" />
               <Input
                 id="coverSearch"
                 value={coverSearch.query}
@@ -3284,9 +3252,6 @@ const AddGameForm = ({ onSuccess }) => {
                 placeholder={t("library.searchGameCover")}
                 minLength={minSearchLength}
               />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {t("library.searchGameCoverNotice")}
-              </p>
             </div>
           </div>
 
