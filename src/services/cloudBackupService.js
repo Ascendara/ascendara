@@ -1,4 +1,4 @@
-import { uploadBackup } from "./firebaseService";
+import { uploadBackup, listBackups as listCloudBackups } from "./firebaseService";
 /**
  * Upload the latest local backup to cloud
  * Centralized logic for cloud backup uploads
@@ -18,30 +18,61 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
     return { success: false, error: "Backup location not configured" };
   }
   try {
+
+    // 1. Get latest LOCAL backup
     const gameBackupFolder = `${backupLocation}/${gameName}`;
     const backupFiles = await window.electron.listBackupFiles(gameBackupFolder);
 
     if (!backupFiles || backupFiles.length === 0) {
       return { success: false, error: "No backup files found" };
     }
+
+    // Filter zip files
     const zipBackups = backupFiles.filter(f => f.endsWith(".zip"));
     if (zipBackups.length === 0) {
       return { success: false, error: "No zip backup files found" };
     }
-    const latestBackup = zipBackups.sort().reverse()[0];
-    const backupPath = `${gameBackupFolder}/${latestBackup}`;
+
+    const latestBackupName = zipBackups.sort().reverse()[0];
+    const backupPath = `${gameBackupFolder}/${latestBackupName}`;
+    
+    // 2. Get file stats (read file for size)
     const backupFile = await window.electron.readBackupFile(backupPath);
     if (!backupFile) {
       return { success: false, error: "Failed to read backup file" };
     }
+    
+    const localSize = backupFile.length;
+
+    // 3. Check CLOUD backups to avoid duplicate upload
+    try {
+      const cloudResult = await listCloudBackups(gameName);
+      if (cloudResult.success && cloudResult.backups && cloudResult.backups.length > 0) {
+        // Find if this exact backup already exists on cloud
+        const existsOnCloud = cloudResult.backups.some(b => 
+          b.backupName === latestBackupName && b.size === localSize
+        );
+
+        if (existsOnCloud) {
+          console.log(`Backup ${latestBackupName} already exists on cloud with same size. Skipping.`);
+          return { success: true, skipped: true, reason: "already_exists" };
+        }
+      }
+    } catch (checkErr) {
+      console.warn("Failed to check existing cloud backups, proceeding with upload:", checkErr);
+    }
+
+    // 4. Upload if new
     const blob = new Blob([backupFile], { type: "application/zip" });
-    const file = new File([blob], latestBackup, { type: "application/zip" });
+    const file = new File([blob], latestBackupName, { type: "application/zip" });
+      
     const uploadResult = await uploadBackup(
       file,
       gameName,
       `Auto backup - ${new Date().toLocaleString()}`
     );
     return uploadResult;
+
   } catch (error) {
     console.error("Upload backup to cloud error:", error);
     return { success: false, error: error.message };
