@@ -1979,6 +1979,11 @@
         "description": "Ascendara will download the",
         "downloading": "Downloading...",
         "downloadingInstaller": "Downloading installer...",
+        "errors": {
+          "connectionFailed": "Unable to connect to the update server. Please check your internet connection.",
+          "notAvailable": "The {{branch}} branch installer is not available for {{platform}} at this time. Please try again later or contact support.",
+          "timeout": "Download timed out. Please check your internet connection and try again."
+        },
         "experimentalWarning": "Experimental builds may be unstable and contain bugs. Use at your own risk.",
         "installer": "installer and launch it. The app will close automatically to complete the switch.",
         "switchAndReinstall": "Switch & Reinstall",

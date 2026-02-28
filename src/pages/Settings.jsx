@@ -3641,7 +3641,22 @@ function Settings() {
                 try {
                   const result = await window.electron.switchBranch(pendingBranch.id);
                   if (!result?.success) {
-                    toast.error(result?.error || "Failed to switch branch");
+                    // Handle translated error messages
+                    let errorMessage;
+                    if (result.errorType === "notAvailable") {
+                      errorMessage = t("settings.appBranch.switchDialog.errors.notAvailable", {
+                        branch: result.errorData.branch,
+                        platform: result.errorData.platform
+                      });
+                    } else if (result.errorType === "connectionFailed") {
+                      errorMessage = t("settings.appBranch.switchDialog.errors.connectionFailed");
+                    } else if (result.errorType === "timeout") {
+                      errorMessage = t("settings.appBranch.switchDialog.errors.timeout");
+                    } else {
+                      errorMessage = result?.error || "Failed to switch branch";
+                    }
+                    
+                    toast.error(errorMessage);
                     setIsSwitchingBranch(false);
                     setShowBranchDialog(false);
                   }

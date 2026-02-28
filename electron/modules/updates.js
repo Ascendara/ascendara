@@ -724,6 +724,28 @@ rm -f "$0"
       return { success: true };
     } catch (error) {
       console.error("Error switching branch:", error);
+      
+      // Return error type and metadata for frontend translation
+      if (error.response?.status === 404) {
+        const platform = isWindows ? "Windows" : "Linux";
+        return { 
+          success: false, 
+          errorType: "notAvailable",
+          errorData: { branch, platform }
+        };
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        return { 
+          success: false, 
+          errorType: "connectionFailed"
+        };
+      } else if (error.code === 'ETIMEDOUT') {
+        return { 
+          success: false, 
+          errorType: "timeout"
+        };
+      }
+      
+      // Fallback to generic error message
       return { success: false, error: error.message };
     }
   });
