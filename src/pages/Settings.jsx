@@ -3586,9 +3586,11 @@ function Settings() {
               {branchVersions && pendingBranch?.id && (
                 <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Current Version (Live):</span>
+                    <span className="text-muted-foreground">
+                      Current Version ({currentBranch === 'live' ? 'Live' : currentBranch === 'public-testing' ? 'Public Testing' : 'Experimental'}):
+                    </span>
                     <span className="font-semibold text-foreground">
-                      v{branchVersions.live}
+                      v{branchVersions[currentBranch] || branchVersions.live}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
