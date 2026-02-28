@@ -72,6 +72,10 @@ function registerLudusaviHandlers() {
             if (game) args.push(game);
             args.push("--force");
 
+            if (backupName) {
+              args.push("--backup", backupName);
+            }
+            
             if (ludusaviSettings.backupLocation) {
               args.push("--path", ludusaviSettings.backupLocation);
             }
