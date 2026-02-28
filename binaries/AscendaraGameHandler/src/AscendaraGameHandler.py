@@ -117,6 +117,13 @@ def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
     env.setdefault("SteamAppId", "0")
     env.setdefault("SteamGameId", "0")
 
+    if "WAYLAND_DISPLAY" in env and not env.get("SDL_VIDEODRIVER"):
+        env["SDL_VIDEODRIVER"] = "wayland"
+        logging.info("[Proton] Setting SDL_VIDEODRIVER=wayland for controller support")
+    elif "DISPLAY" in env and not env.get("SDL_VIDEODRIVER"):
+        env["SDL_VIDEODRIVER"] = "x11"
+        logging.info("[Proton] Setting SDL_VIDEODRIVER=x11 for controller support")
+
     cmd = [proton_script, "run", exe_path]
     if game_launch_cmd:
         cmd.extend(game_launch_cmd.split())
@@ -161,6 +168,13 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
 
     if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
         env["DISPLAY"] = ":0"
+
+    if "WAYLAND_DISPLAY" in env and not env.get("SDL_VIDEODRIVER"):
+        env["SDL_VIDEODRIVER"] = "wayland"
+        logging.info("[Wine] Setting SDL_VIDEODRIVER=wayland for controller support")
+    elif "DISPLAY" in env and not env.get("SDL_VIDEODRIVER"):
+        env["SDL_VIDEODRIVER"] = "x11"
+        logging.info("[Wine] Setting SDL_VIDEODRIVER=x11 for controller support")
 
     cmd = [wine_path, exe_path]
     if game_launch_cmd:
