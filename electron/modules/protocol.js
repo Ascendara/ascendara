@@ -5,6 +5,7 @@
 
 const { BrowserWindow, app } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { isDev } = require("./config");
 const { createWindow, setHandlingProtocolUrl, setMainWindowHidden } = require("./window");
 
@@ -173,12 +174,108 @@ function registerProtocolHandlers() {
  * @returns {boolean} - Whether this is the primary instance
  */
 function setupSingleInstance() {
-  const { appVersion } = require("./config");
-  const lockKey = process.platform === "linux" ? { appVersion } : undefined;
-  const gotTheLock = app.requestSingleInstanceLock(lockKey);
+  // Use file-based lock to work across dev and production instances
+  const lockDir = path.join(app.getPath("userData"), ".lock");
+  const lockFile = path.join(lockDir, "instance.lock");
+  const protocolFile = path.join(lockDir, "protocol.txt");
+  
+  // Ensure lock directory exists
+  if (!fs.existsSync(lockDir)) {
+    fs.mkdirSync(lockDir, { recursive: true });
+  }
+  
+  // Check if lock file exists
+  if (fs.existsSync(lockFile)) {
+    try {
+      const lockData = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+      const existingPid = lockData.pid;
+      
+      // Check if the process is still running
+      let processExists = false;
+      try {
+        process.kill(existingPid, 0); // Signal 0 checks existence without killing
+        processExists = true;
+      } catch (e) {
+        // Process doesn't exist
+        processExists = false;
+      }
+      
+      if (processExists) {
+        console.log("Another instance is running (PID:", existingPid + "), passing protocol URL and exiting");
+        
+        // If we have a protocol URL in argv, write it to the protocol file
+        const protocolUrl = process.argv.find(arg => arg.startsWith("ascendara://"));
+        if (protocolUrl) {
+          fs.writeFileSync(protocolFile, protocolUrl, "utf8");
+          console.log("Wrote protocol URL to file for existing instance");
+        }
+        
+        app.exit(0);
+        return false;
+      } else {
+        // Stale lock file, remove it
+        console.log("Removing stale lock file");
+        fs.unlinkSync(lockFile);
+      }
+    } catch (error) {
+      console.error("Error reading lock file:", error);
+      // If we can't read it, try to remove it
+      try {
+        fs.unlinkSync(lockFile);
+      } catch (e) {
+        // Ignore
+      }
+    }
+  }
+  
+  // Write our PID to the lock file
+  fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, timestamp: Date.now() }), "utf8");
+  
+  // Watch for protocol file changes (other instances passing URLs to us)
+  let protocolFileWatcher = null;
+  try {
+    protocolFileWatcher = fs.watch(lockDir, (eventType, filename) => {
+      if (filename === "protocol.txt" && fs.existsSync(protocolFile)) {
+        try {
+          const protocolUrl = fs.readFileSync(protocolFile, "utf8").trim();
+          if (protocolUrl && protocolUrl.startsWith("ascendara://")) {
+            console.log("Received protocol URL from another instance:", protocolUrl);
+            handleProtocolUrl(protocolUrl);
+            // Delete the file after reading
+            fs.unlinkSync(protocolFile);
+          }
+        } catch (error) {
+          console.error("Error reading protocol file:", error);
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error setting up protocol file watcher:", error);
+  }
+  
+  // Clean up lock file on exit
+  app.on("will-quit", () => {
+    try {
+      if (protocolFileWatcher) {
+        protocolFileWatcher.close();
+      }
+      if (fs.existsSync(lockFile)) {
+        const lockData = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+        // Only remove if it's our lock
+        if (lockData.pid === process.pid) {
+          fs.unlinkSync(lockFile);
+        }
+      }
+    } catch (error) {
+      console.error("Error cleaning up lock file:", error);
+    }
+  });
+  
+  // Request single instance lock (as backup)
+  const gotTheLock = app.requestSingleInstanceLock();
 
   if (!gotTheLock) {
-    console.log("Another instance is running, quitting this instance");
+    console.log("Another instance detected via Electron lock, quitting");
     app.exit(0);
     return false;
   }
@@ -196,8 +293,20 @@ function setupSingleInstance() {
   app.on("second-instance", (event, commandLine, workingDirectory) => {
     console.log("Second instance detected with args:", commandLine);
 
-    const protocolUrl = commandLine.find(arg => arg.startsWith("ascendara://"));
+    // Find protocol URL in command line arguments
+    // On Linux, the URL might be passed differently
+    let protocolUrl = commandLine.find(arg => arg.startsWith("ascendara://"));
+    
+    // If not found in direct args, check if it's in the last argument (common on Linux)
+    if (!protocolUrl && commandLine.length > 0) {
+      const lastArg = commandLine[commandLine.length - 1];
+      if (lastArg && lastArg.startsWith("ascendara://")) {
+        protocolUrl = lastArg;
+      }
+    }
+    
     if (protocolUrl) {
+      console.log("Protocol URL found in second instance:", protocolUrl);
       handleProtocolUrl(protocolUrl);
     }
 
@@ -212,7 +321,12 @@ function setupSingleInstance() {
       mainWindow.focus();
       mainWindow.center();
       setTimeout(() => mainWindow.setAlwaysOnTop(false), 100);
-      mainWindow.webContents.send("second-instance-detected");
+      
+      // Only send second-instance-detected if there's no protocol URL
+      // (protocol URL handling will navigate to the appropriate page)
+      if (!protocolUrl) {
+        mainWindow.webContents.send("second-instance-detected");
+      }
     } else {
       console.log("No windows found, creating new window");
       createWindow();

@@ -681,55 +681,56 @@ export default function DownloadPage() {
     // Determine if this provider should use Torbox (only if API key is configured)
     const shouldUseTorbox = () =>
       torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings);
+    
+    // Handle seamless providers (gofile, buzzheavier, pixeldrain) when not using Torbox
     if (
-      !directUrl &&
       (selectedProvider === "gofile" ||
         selectedProvider === "buzzheavier" ||
         selectedProvider === "pixeldrain") &&
       !shouldUseTorbox()
     ) {
-      let providerLinks = gameData.download_links?.[selectedProvider] || [];
-      const validProviderLink = Array.isArray(providerLinks)
-        ? providerLinks.find(link => link && typeof link === "string")
-        : typeof providerLinks === "string"
-          ? providerLinks
-          : null;
+      // If directUrl is not provided, get it from gameData
+      if (!directUrl) {
+        let providerLinks = gameData.download_links?.[selectedProvider] || [];
+        const validProviderLink = Array.isArray(providerLinks)
+          ? providerLinks.find(link => link && typeof link === "string")
+          : typeof providerLinks === "string"
+            ? providerLinks
+            : null;
 
-      console.log(
-        "[DL] seamless provider link:",
-        validProviderLink,
-        "providerLinks:",
-        providerLinks
-      );
-      if (!validProviderLink) {
-        console.log("[DL] EARLY RETURN: no valid seamless provider link");
-        toast.error(t("download.toast.invalidLink"));
-        return;
+        console.log(
+          "[DL] seamless provider link:",
+          validProviderLink,
+          "providerLinks:",
+          providerLinks
+        );
+        if (!validProviderLink) {
+          console.log("[DL] EARLY RETURN: no valid seamless provider link");
+          toast.error(t("download.toast.invalidLink"));
+          return;
+        }
+
+        // Properly format the link
+        directUrl = validProviderLink.replace(/^(?:https?:)?\/\//, "https://");
+      } else {
+        // directUrl provided (e.g., from extension), ensure it has proper protocol
+        console.log("[DL] Using provided directUrl for seamless provider:", directUrl);
+        directUrl = directUrl.replace(/^(?:https?:)?\/\//, "https://");
       }
-
-      // Properly format the link
-      directUrl = validProviderLink.replace(/^(?:https?:)?\/\//, "https://");
     }
 
     // Handle providers using Torbox service
-    if (!directUrl && shouldUseTorbox()) {
-      // Check Torbox service status first for the selected provider
-      const torboxStatus = await checkTorboxStatus(selectedProvider);
-      if (!torboxStatus || !torboxStatus.isOnline) {
-        toast.error(t("download.toast.torboxOffline"));
-        setIsStartingDownload(false);
-        clearDownloadLock();
-        return;
+    if (shouldUseTorbox()) {
+      // Use directUrl if provided (e.g., from extension), otherwise get from gameData
+      let providerLink = directUrl;
+      
+      if (!providerLink) {
+        // Get the link array and find a valid one
+        const links = gameData.download_links?.[selectedProvider] || [];
+        providerLink = Array.isArray(links)
+          ? links.find(link => link && typeof link === "string")
+          : links;
       }
-
-      // Get the appropriate link based on the selected provider
-      let providerLink;
-
-      // Get the link array and find a valid one
-      const links = gameData.download_links?.[selectedProvider] || [];
-      providerLink = Array.isArray(links)
-        ? links.find(link => link && typeof link === "string")
-        : links;
 
       // Ensure the link has proper protocol
       if (providerLink && !providerLink.startsWith("http")) {
@@ -739,6 +740,15 @@ export default function DownloadPage() {
       if (!providerLink || !isValidLink) {
         console.log("Invalid link:", providerLink, isValidLink);
         toast.error(t("download.toast.invalidLink"));
+        return;
+      }
+
+      // Check Torbox service status first for the selected provider
+      const torboxStatus = await checkTorboxStatus(selectedProvider);
+      if (!torboxStatus || !torboxStatus.isOnline) {
+        toast.error(t("download.toast.torboxOffline"));
+        setIsStartingDownload(false);
+        clearDownloadLock();
         return;
       }
 
