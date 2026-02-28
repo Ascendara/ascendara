@@ -82,10 +82,12 @@ def build_achievement_watcher():
         with open(package_json_path, 'w') as f:
             f.write(package_json_content)
     
-    # Create dist directory
+    # Clean and create dist directory for fresh build
     dist_dir = os.path.join(achievement_watcher_dir, 'dist')
-    if not os.path.exists(dist_dir):
-        os.makedirs(dist_dir)
+    if os.path.exists(dist_dir):
+        print("Cleaning existing AchievementWatcher dist directory...")
+        shutil.rmtree(dist_dir)
+    os.makedirs(dist_dir)
     
     # Install dependencies
     if not run_command(['yarn', 'install'], cwd=achievement_watcher_dir):
@@ -98,6 +100,34 @@ def build_achievement_watcher():
         return False
     
     print("AscendaraAchievementWatcher built successfully")
+    return True
+
+def build_crash_reporter():
+    """Build the AscendaraCrashReporter Rust binary for Linux"""
+    print("Building AscendaraCrashReporter (Rust)...")
+    
+    crash_reporter_dir = os.path.join('binaries', 'AscendaraCrashReporter')
+    if not os.path.exists(crash_reporter_dir):
+        print("Warning: AscendaraCrashReporter directory not found, skipping...")
+        return True
+    
+    # Check if cargo is installed
+    if not shutil.which('cargo'):
+        print("Error: cargo is not installed. Please install Rust toolchain.")
+        return False
+    
+    # Clean target directory for fresh build
+    target_dir = os.path.join(crash_reporter_dir, 'target')
+    if os.path.exists(target_dir):
+        print("Cleaning existing CrashReporter target directory...")
+        shutil.rmtree(target_dir)
+    
+    # Build for Linux using cargo
+    if not run_command(['cargo', 'build', '--release'], cwd=crash_reporter_dir):
+        print("Failed to build AscendaraCrashReporter")
+        return False
+    
+    print("AscendaraCrashReporter built successfully")
     return True
 
 def build_python_binaries_linux():
@@ -151,7 +181,11 @@ def build_python_binaries_linux():
             continue
 
         dist_dir = os.path.join(binaries_dir, rel_script.split('/')[0], 'dist')
-        os.makedirs(dist_dir, exist_ok=True)
+        # Clean dist directory for fresh build
+        if os.path.exists(dist_dir):
+            print(f"Cleaning existing dist directory for {binary_name}...")
+            shutil.rmtree(dist_dir)
+        os.makedirs(dist_dir)
 
         cmd = [
             venv_python, '-m', 'PyInstaller',
@@ -400,32 +434,37 @@ def main():
         print("Failed to build AscendaraAchievementWatcher. Exiting.")
         return 1
 
-    # Step 4: Compile Python binaries to standalone ELF executables
+    # Step 4: Build AscendaraCrashReporter (Rust) for Linux
+    if not build_crash_reporter():
+        print("Failed to build AscendaraCrashReporter. Exiting.")
+        return 1
+
+    # Step 5: Compile Python binaries to standalone ELF executables
     if not build_python_binaries_linux():
         print("Failed to build Python binaries. Exiting.")
         return 1
     
-    # Step 5: Build the React app
+    # Step 6: Build the React app
     if not build_react_app():
         print("Failed to build React app. Exiting.")
         return 1
     
-    # Step 6: Modify index.html to fix asset paths
+    # Step 7: Modify index.html to fix asset paths
     if not modify_index_html():
         print("Failed to modify index.html. Exiting.")
         return 1
     
-    # Step 7: Move necessary files to electron directory
+    # Step 8: Move necessary files to electron directory
     if not move_files():
         print("Failed to move files. Exiting.")
         return 1
     
-    # Step 8: Generate build signature
+    # Step 9: Generate build signature
     if not generate_build_signature():
         print("Failed to generate build signature. Exiting.")
         return 1
     
-    # Step 9: Try to build the AppImage, fallback to unpacked if it fails
+    # Step 10: Try to build the AppImage, fallback to unpacked if it fails
     if not build_appimage():
         print("AppImage build failed, trying unpacked build...")
         if not build_linux_unpacked():
@@ -436,12 +475,12 @@ def main():
         if not create_tar_archive():
             print("Failed to create tar.gz archive, but unpacked version is available.")
     
-    # Step 10: Clean up temporary files after build
+    # Step 11: Clean up temporary files after build
     if not cleanup_after_build():
         print("Failed to clean up after build. Exiting.")
         return 1
     
-    # Step 11: Register build with backend API
+    # Step 12: Register build with backend API
     print("\n" + "="*60)
     print("Registering build with backend API...")
     print("="*60)

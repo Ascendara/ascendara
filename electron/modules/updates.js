@@ -512,24 +512,71 @@ function registerUpdateHandlers() {
         return;
       }
 
-      // On Linux, make AppImage executable before running
+      // On Linux, handle AppImage replacement via update script
       if (isLinux) {
         try {
+          // Make the downloaded AppImage executable
           fs.chmodSync(installerPath, 0o755);
+
+          // Get the current AppImage path (e.g., ~/.local/bin/Ascendara.AppImage)
+          const currentAppImagePath = process.execPath;
+          
+          console.log("Current AppImage location:", currentAppImagePath);
+          console.log("New AppImage location:", installerPath);
+
+          // Create an update script that will run after the app quits
+          // This avoids issues with replacing a mounted AppImage
+          const updateScriptPath = path.join(tempDir, "update.sh");
+          const updateScript = `#!/bin/bash
+# Wait for the current process to fully exit
+sleep 2
+
+# Create backup
+if [ -f "${currentAppImagePath}" ]; then
+  cp "${currentAppImagePath}" "${currentAppImagePath}.backup"
+fi
+
+# Replace the AppImage
+cp "${installerPath}" "${currentAppImagePath}"
+chmod +x "${currentAppImagePath}"
+
+# Clean up
+sleep 3
+rm -f "${currentAppImagePath}.backup"
+rm -f "${installerPath}"
+rm -f "$0"
+
+# Restart the application
+"${currentAppImagePath}" &
+`;
+
+          fs.writeFileSync(updateScriptPath, updateScript);
+          fs.chmodSync(updateScriptPath, 0o755);
+          
+          console.log("Update script created at:", updateScriptPath);
+
+          // Execute the update script in the background
+          spawn("sh", [updateScriptPath], {
+            detached: true,
+            stdio: "ignore",
+          }).unref();
+
+          // Quit the app so the script can replace the AppImage
+          app.quit();
         } catch (error) {
-          console.error("Failed to make AppImage executable:", error);
+          console.error("Failed to create update script:", error);
           return;
         }
+      } else {
+        // Windows: Run the installer executable
+        const installerProcess = spawn(installerPath, [], {
+          detached: true,
+          stdio: "ignore",
+        });
+
+        installerProcess.unref();
+        app.quit();
       }
-
-      const installerProcess = spawn(installerPath, [], {
-        detached: true,
-        stdio: "ignore",
-        shell: isLinux,
-      });
-
-      installerProcess.unref();
-      app.quit();
     }
   });
 
@@ -610,20 +657,64 @@ function registerUpdateHandlers() {
         writer.on("error", reject);
       });
 
-      // On Linux, make AppImage executable before running
+      // On Linux, handle AppImage replacement via update script
       if (isLinux) {
         try {
           fs.chmodSync(installerPath, 0o755);
+
+          const currentAppImagePath = process.execPath;
+          
+          console.log("Branch switch - Current AppImage:", currentAppImagePath);
+          console.log("Branch switch - New AppImage:", installerPath);
+
+          // Create an update script that will run after the app quits
+          const updateScriptPath = path.join(tempDir, "branch_update.sh");
+          const updateScript = `#!/bin/bash
+# Wait for the current process to fully exit
+sleep 2
+
+# Create backup
+if [ -f "${currentAppImagePath}" ]; then
+  cp "${currentAppImagePath}" "${currentAppImagePath}.backup"
+fi
+
+# Replace the AppImage
+cp "${installerPath}" "${currentAppImagePath}"
+chmod +x "${currentAppImagePath}"
+
+# Clean up
+sleep 3
+rm -f "${currentAppImagePath}.backup"
+rm -f "${installerPath}"
+rm -f "$0"
+
+# Restart the application
+"${currentAppImagePath}" &
+`;
+
+          fs.writeFileSync(updateScriptPath, updateScript);
+          fs.chmodSync(updateScriptPath, 0o755);
+          
+          console.log("Branch switch update script created at:", updateScriptPath);
+
+          // Execute the update script in the background
+          spawn("sh", [updateScriptPath], {
+            detached: true,
+            stdio: "ignore",
+          }).unref();
+
+          app.quit();
+          return { success: true };
         } catch (error) {
-          console.error("Failed to make AppImage executable:", error);
-          return { success: false, error: "Failed to make installer executable" };
+          console.error("Failed to create branch switch update script:", error);
+          return { success: false, error: "Failed to create update script" };
         }
       }
 
+      // Windows: Run the installer executable
       const installerProcess = spawn(installerPath, [], {
         detached: true,
         stdio: "ignore",
-        shell: isLinux,
       });
 
       installerProcess.unref();
