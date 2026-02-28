@@ -150,13 +150,14 @@ function ExtraLanguages() {
   const [selectedLangId, setSelectedLangId] = useState(null);
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  useEffect(() => {
-    const loadLanguages = async () => {
-      const languages = await getAvailableLanguages();
-      setAvailableLanguages(languages);
-    };
-    loadLanguages();
+  const loadLanguages = useCallback(async () => {
+    const languages = await getAvailableLanguages();
+    setAvailableLanguages(languages);
   }, []);
+
+  useEffect(() => {
+    loadLanguages();
+  }, [loadLanguages]);
 
   useEffect(() => {
     const getInstalledTools = async () => {
@@ -167,9 +168,16 @@ function ExtraLanguages() {
   }, []);
   // Subscribe to download progress updates
   useEffect(() => {
-    const unsubscribe = onTranslationProgress(setDownloadProgress);
+    const unsubscribe = onTranslationProgress((progress) => {
+      setDownloadProgress(progress);
+      
+      // Refresh available languages when translation completes
+      if (progress?.phase === "completed") {
+        loadLanguages();
+      }
+    });
     return () => unsubscribe();
-  }, []);
+  }, [loadLanguages]);
 
   const handleChangeLanguage = useCallback(
     langId => {
