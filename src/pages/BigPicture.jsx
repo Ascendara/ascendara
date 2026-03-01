@@ -62,7 +62,7 @@ import flingTrainerService from "@/services/flingTrainerService";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
-import { useImageLoader } from "@/hooks/useImageLoader";
+import { useGameImage } from "@/hooks/useGameImage";
 import recentGamesService from "@/services/recentGamesService";
 import { sanitizeText } from "@/lib/utils";
 import * as torboxService from "@/services/torboxService";
@@ -93,6 +93,7 @@ import {
 } from "@/services/downloadQueueService";
 import LaunchOverlay from "@/components/LaunchOverlay";
 import { motion, AnimatePresence } from "framer-motion";
+import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 
 // UTILS
 const formatBytes = (bytes, decimals = 2) => {
@@ -1775,11 +1776,11 @@ const GameDetailsView = ({
   const descriptionRef = useRef(null);
   const screenshotsRef = useRef(null);
 
-  // Use the same image loading hook as GameCard.jsx
-  const { cachedImage, loading: imageLoading } = useImageLoader(game?.imgID, {
+  // Use unified game image hook for consistency with Library
+  const { imageData: cachedImage, loading: imageLoading } = useGameImage(game, {
     quality: "high",
     priority: "high",
-    enabled: !!game?.imgID,
+    checkPlayLater: true,
   });
 
   // Background Image - check Play Later cache first, then use hook result
@@ -2793,7 +2794,7 @@ const ExecutableManagerDialog = ({
 };
 
 // Installed Game Details View Component
-const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
+const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAssets, assetSearchOpen }) => {
   const navigate = useNavigate();
   const { settings } = useSettings();
   const [logoSrc, setLogoSrc] = useState(null);
@@ -3204,8 +3205,11 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         isDeleteDialogOpen ||
         showBrowseExeWarning ||
         showExecutableSelect ||
-        showExecutableManager
+        showExecutableManager ||
+        assetSearchOpen
       ) {
+        // If asset search is open, block all navigation
+        if (assetSearchOpen) return;
         if (action === "LEFT") {
           setDialogButtonIndex(prev => Math.max(0, prev - 1));
         } else if (action === "RIGHT") {
@@ -3414,6 +3418,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         } else if (!showMedia) {
           if (selectedButton === "folder") setSelectedButton("play");
           else if (selectedButton === "manage") setSelectedButton("folder");
+          else if (selectedButton === "assets") setSelectedButton("manage");
         }
       } else if (action === "RIGHT") {
         if (trainerToggleFocused) {
@@ -3421,6 +3426,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
         } else if (!showMedia) {
           if (selectedButton === "play") setSelectedButton("folder");
           else if (selectedButton === "folder") setSelectedButton("manage");
+          else if (selectedButton === "manage") setSelectedButton("assets");
         }
       } else if (action === "BACK" || action === "MENU") {
         if (trainerToggleFocused) {
@@ -3453,6 +3459,8 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
           } else if (selectedButton === "manage") {
             setShowManagementMenu(true);
             setSelectedMenuItem(0);
+          } else if (selectedButton === "assets") {
+            onChangeAssets?.();
           }
         }
       } else if (action === "X") {
@@ -3575,11 +3583,8 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
     steamData?.formatted_screenshots && steamData.formatted_screenshots.length > 0;
   const bgImage = imageSrc;
   const gameDescription = (
-    steamData?.short_description ||
-    steamData?.about_the_game ||
-    steamData?.detailed_description ||
     steamData?.summary ||
-    steamData?.description ||
+    steamData?.short_description ||
     ""
   )?.replace(/<[^>]*>/g, "");
 
@@ -3834,6 +3839,17 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
                 }`}
               >
                 <Settings className="h-6 w-6" />
+              </button>
+
+              <button
+                onClick={() => onChangeAssets?.()}
+                className={`flex items-center gap-3 rounded-2xl border-2 px-8 py-5 text-xl font-bold backdrop-blur-sm transition-all duration-200 ${
+                  selectedButton === "assets"
+                    ? "scale-110 border-primary bg-primary/30 text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                    : "border-white/20 bg-white/10 text-secondary hover:scale-105 hover:border-white/40 hover:bg-white/20"
+                }`}
+              >
+                <ImageIcon className="h-6 w-6" />
               </button>
             </div>
           </div>
@@ -4326,12 +4342,11 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType }) => {
 const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
   const cardRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
-  const { cachedImage, loading } = useImageLoader(game?.imgID, {
+  const { imageData, loading } = useGameImage(game, {
     quality: isVisible ? "high" : "low",
     priority: isVisible ? "high" : "low",
-    enabled: !!game?.imgID && isVisible,
   });
-  const imageUrl = cachedImage || game.cover || game.image || null;
+  const imageUrl = imageData || game.cover || game.image || null;
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -5130,6 +5145,8 @@ export default function BigPicture() {
   const { isAuthenticated, user } = useAuth();
   const controllerType = settings.controllerType || "xbox";
   const buttons = getControllerButtons(controllerType);
+  const [assetSearchOpen, setAssetSearchOpen] = useState(false);
+  const [assetSearchGame, setAssetSearchGame] = useState(null);
   // Enter full-screen on mount, quit on unmount
   useEffect(() => {
     const enterFullScreen = async () => {
@@ -6159,6 +6176,7 @@ export default function BigPicture() {
         showControllerSettings ||
         showKillDialog ||
         showProviderDialog ||
+        assetSearchOpen ||
         providerDialogJustClosed.current ||
         isKeyboardOpen
       ) {
@@ -6223,6 +6241,7 @@ export default function BigPicture() {
     showControllerSettings,
     showKillDialog,
     showProviderDialog,
+    assetSearchOpen,
     isKeyboardOpen,
   ]);
 
@@ -6675,6 +6694,11 @@ export default function BigPicture() {
             onBack={handleCloseInstalledGameDetails}
             t={t}
             controllerType={settings.controllerType || "xbox"}
+            onChangeAssets={() => {
+              setAssetSearchGame(selectedInstalledGame.game || selectedInstalledGame.name);
+              setAssetSearchOpen(true);
+            }}
+            assetSearchOpen={assetSearchOpen}
           />
         )}
       </div>
@@ -6811,6 +6835,14 @@ export default function BigPicture() {
           </div>
         </div>
       )}
+
+      {/* Game Asset Search Dialog */}
+      <GameAssetSearchDialog
+        open={assetSearchOpen}
+        onOpenChange={setAssetSearchOpen}
+        gameName={assetSearchGame}
+        isControllerMode={true}
+      />
     </div>
   );
 }
