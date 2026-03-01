@@ -90,7 +90,7 @@ import imageCacheService from "@/services/imageCacheService";
 import GameMetadata from "@/components/GameMetadata";
 import steamService from "@/services/gameInfoService";
 import GameRate from "@/components/GameRate";
-import EditCoverDialog from "@/components/EditCoverDialog";
+import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import nexusModsService from "@/services/nexusModsService";
 import flingTrainerService from "@/services/flingTrainerService";
 import { useAuth } from "@/context/AuthContext";
@@ -639,7 +639,7 @@ export default function GameScreen() {
   const [steamData, setSteamData] = useState(null);
   const [steamLoading, setSteamLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
+  const [assetSearchOpen, setAssetSearchOpen] = useState(false);
   const [launchOptionsDialogOpen, setLaunchOptionsDialogOpen] = useState(false);
   const [launchCommand, setLaunchCommand] = useState("");
   const { setTrack, play } = useAudioPlayer();
@@ -1980,7 +1980,7 @@ export default function GameScreen() {
                       tabIndex={0}
                       onClick={e => {
                         e.stopPropagation();
-                        setShowEditCoverDialog(true);
+                        setAssetSearchOpen(true);
                       }}
                     >
                       <ImageUp className="h-5 w-5 fill-none text-white" />
@@ -3758,27 +3758,12 @@ export default function GameScreen() {
         t={t}
       />
 
-      {/* Edit Cover Dialog */}
-      <EditCoverDialog
-        open={showEditCoverDialog}
-        onOpenChange={setShowEditCoverDialog}
+      {/* Game Asset Search Dialog */}
+      <GameAssetSearchDialog
+        open={assetSearchOpen}
+        onOpenChange={setAssetSearchOpen}
         gameName={game?.game || game?.name}
-        onImageUpdate={(dataUrl, imgId) => {
-          setImageData(dataUrl);
-          // Update the game's imgID if needed
-          if (game) {
-            // Pass both imgId and dataUrl to the updateGameCover function
-            // The IPC handler will decide which one to use based on what's provided
-            window.electron
-              .updateGameCover(game.game || game.name, imgId, dataUrl)
-              .then(() => {
-                console.log("Game image updated successfully");
-              })
-              .catch(error => {
-                console.error("Failed to update game image:", error);
-              });
-          }
-        }}
+        isControllerMode={false}
       />
 
       {/* Reset Prefix Confirmation Dialog - Linux only */}
