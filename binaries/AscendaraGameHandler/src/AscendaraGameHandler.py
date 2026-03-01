@@ -404,7 +404,12 @@ def run_ludusavi_backup(game_name):
         if ludusavi_settings.get('backupOptions', {}).get('skipManifestCheck', False):
             cmd.append("--no-manifest-update")
         logging.info(f"Running Ludusavi backup for {game_name} with command: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # Define flag to hide the window (Windows only)
+        creationflags = 0
+        if sys.platform == 'win32':
+            creationflags = subprocess.CREATE_NO_WINDOW # 0x08000000
+
+        result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
         if result.returncode == 0:
             logging.info(f"Ludusavi backup completed successfully for {game_name}")
             logging.info("[EXIT] run_ludusavi_backup() - Success")
