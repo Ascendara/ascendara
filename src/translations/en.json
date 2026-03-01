@@ -1592,6 +1592,20 @@
     "launching": "Launching...",
     "lessThanMinute": "Less than a minute on this game",
     "lessThanMinute2": "Less than a minute",
+    "assetSearch": {
+      "assetsDownloaded": "Downloaded {{count}} asset(s)",
+      "description": "Search for and download new grid, logo, and banner images for this game",
+      "download": "Download Assets",
+      "downloadFailed": "Download failed",
+      "downloading": "Downloading...",
+      "noAssetsFound": "No assets found",
+      "noResults": "No results found",
+      "preview": "Preview Assets",
+      "searchFailed": "Search failed",
+      "searchPlaceholder": "Search for game...",
+      "title": "Search Game Assets"
+    },
+    "changeAssets": "Change Game Assets",
     "libraryValue": {
       "ascendPromo": {
         "cta": "Learn about Ascend",
