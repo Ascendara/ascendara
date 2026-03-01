@@ -323,6 +323,7 @@ export const GameAssetSearchDialog = ({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
         className={cn(
+          "max-h-[90vh] overflow-y-auto",
           isControllerMode ? "max-w-4xl" : "max-w-3xl"
         )}
       >
@@ -412,7 +413,7 @@ export const GameAssetSearchDialog = ({
                       src={assetPreviews.grid}
                       alt="Grid"
                       className={cn(
-                        "aspect-[2/3] w-full border object-cover",
+                        "h-32 w-full border object-cover",
                         isControllerMode ? "rounded-xl" : "rounded-lg"
                       )}
                     />
@@ -425,7 +426,7 @@ export const GameAssetSearchDialog = ({
                       src={assetPreviews.logo}
                       alt="Logo"
                       className={cn(
-                        "aspect-[2/3] w-full border bg-muted object-contain p-2",
+                        "h-32 w-full border bg-muted object-contain p-2",
                         isControllerMode ? "rounded-xl" : "rounded-lg"
                       )}
                     />
@@ -438,7 +439,7 @@ export const GameAssetSearchDialog = ({
                       src={assetPreviews.hero}
                       alt="Hero"
                       className={cn(
-                        "aspect-[2/3] w-full border object-cover",
+                        "h-32 w-full border object-cover",
                         isControllerMode ? "rounded-xl" : "rounded-lg"
                       )}
                     />
@@ -494,7 +495,7 @@ export const GameAssetSearchDialog = ({
             <Button
               onClick={handleDownloadAssets}
               disabled={!selectedGame || isDownloading}
-              className="gap-2"
+              className="gap-2 text-secondary"
             >
               {isDownloading ? (
                 <>
