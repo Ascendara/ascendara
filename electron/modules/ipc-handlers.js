@@ -825,7 +825,7 @@ function registerMiscHandlers() {
   // Save custom game
   ipcMain.handle(
     "save-custom-game",
-    async (event, game, online, dlc, version, executable, imgID) => {
+    async (event, game, online, dlc, version, executable, imageUrl) => {
       const settings = settingsManager.getSettings();
       try {
         if (!settings.downloadDirectory) {
@@ -840,28 +840,14 @@ function registerMiscHandlers() {
           fs.mkdirSync(gamesDirectory, { recursive: true });
         }
 
-        if (imgID) {
+        if (imageUrl) {
           let imageBuffer;
           let extension = ".jpg";
 
-          if (settings.usingLocalIndex && settings.localIndex) {
-            const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
-            try {
-              imageBuffer = await fs.promises.readFile(localImagePath);
-            } catch (error) {
-              console.warn(`Could not load local image for ${imgID}, skipping:`, error);
-              imageBuffer = null;
-            }
-          } else {
-            let imageLink;
-            if (settings.gameSource === "fitgirl") {
-              imageLink = `https://api.ascendara.app/v2/fitgirl/image/${imgID}`;
-            } else {
-              imageLink = `https://api.ascendara.app/v2/image/${imgID}`;
-            }
-
+          try {
+            // Download image directly from the provided URL (e.g., SteamGridDB)
             const response = await axios({
-              url: imageLink,
+              url: imageUrl,
               method: "GET",
               responseType: "arraybuffer",
             });
@@ -869,13 +855,16 @@ function registerMiscHandlers() {
             imageBuffer = Buffer.from(response.data);
             const mimeType = response.headers["content-type"];
             extension = getExtensionFromMimeType(mimeType);
-          }
-
-          if (imageBuffer) {
-            await fs.promises.writeFile(
-              path.join(gamesDirectory, `${game}.ascendara${extension}`),
-              imageBuffer
-            );
+            
+            if (imageBuffer) {
+              await fs.promises.writeFile(
+                path.join(gamesDirectory, `${game}.ascendara${extension}`),
+                imageBuffer
+              );
+              console.log(`Successfully saved cover image for: ${game}`);
+            }
+          } catch (error) {
+            console.warn(`Could not download cover image for ${game}:`, error.message);
           }
         }
 

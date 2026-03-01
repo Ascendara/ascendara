@@ -196,8 +196,8 @@ contextBridge.exposeInMainWorld("electron", {
   getCustomGames: () => ipcRenderer.invoke("get-custom-games"),
   getInstalledGames: () => ipcRenderer.invoke("get-installed-games"),
   getInstalledGamesSize: () => ipcRenderer.invoke("get-installed-games-size"),
-  addGame: (game, online, dlc, version, executable, imgID) =>
-    ipcRenderer.invoke("save-custom-game", game, online, dlc, version, executable, imgID),
+  addGame: (game, online, dlc, version, executable, imageUrl) =>
+    ipcRenderer.invoke("save-custom-game", game, online, dlc, version, executable, imageUrl),
   removeCustomGame: game => ipcRenderer.invoke("remove-game", game),
   deleteGame: game => ipcRenderer.invoke("delete-game", game),
   deleteGameDirectory: game => ipcRenderer.invoke("delete-game-directory", game),
