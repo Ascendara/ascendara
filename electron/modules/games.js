@@ -790,6 +790,72 @@ function registerGameHandlers() {
     return null;
   });
 
+  // Save game asset (grid, logo, hero images)
+  ipcMain.handle("save-game-asset", async (_, gameName, filename, dataUrl) => {
+    const settings = settingsManager.getSettings();
+    if (!settings.downloadDirectory) return { success: false, error: "No download directory" };
+
+    try {
+      // Convert data URL to buffer
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+
+      // Find game directory
+      let gameDir = null;
+
+      // 1. Check custom games
+      const gamesPath = path.join(settings.downloadDirectory, "games.json");
+      if (fs.existsSync(gamesPath)) {
+        const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+        const gameInfo = gamesData.games.find(g => g.game === gameName);
+        if (gameInfo && gameInfo.executable) {
+          gameDir = path.dirname(gameInfo.executable);
+        }
+      }
+
+      // 2. Check standard directories
+      if (!gameDir) {
+        const allDirectories = [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ];
+        for (const dir of allDirectories) {
+          const stdDir = path.join(dir, sanitizeGameName(gameName));
+          if (fs.existsSync(stdDir)) {
+            gameDir = stdDir;
+            break;
+          }
+        }
+      }
+
+      if (!gameDir) {
+        return { success: false, error: "Game directory not found" };
+      }
+
+      // Delete old assets with same type (e.g., old grid.ascendara.jpg)
+      const assetType = filename.split(".")[0]; // grid, logo, or hero
+      const oldPatterns = [
+        `${assetType}.ascendara.jpg`,
+        `${assetType}.ascendara.png`,
+      ];
+      for (const pattern of oldPatterns) {
+        const oldPath = path.join(gameDir, pattern);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+
+      // Save new asset
+      const assetPath = path.join(gameDir, filename);
+      fs.writeFileSync(assetPath, buffer);
+
+      return { success: true, path: assetPath };
+    } catch (error) {
+      console.error("Error saving game asset:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Create game shortcut handler
   ipcMain.handle("create-game-shortcut", async (_, game) => {
     if (isWindows) {
