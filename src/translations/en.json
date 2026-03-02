@@ -1916,6 +1916,13 @@
     "mostRecentlyUpdated": "Recently Updated",
     "noResults": "No results found",
     "outdatedIndexWarning": "Your local game index is out of date. Some game versions or links might no longer be accurate.",
+    "partnerCard": {
+      "description": "Showcase your brand to thousands of active gamers",
+      "growing": "Fast Growing",
+      "learnMore": "Learn More",
+      "title": "Partner with Ascendara",
+      "users": "30K+ Users"
+    },
     "placeholder": "Search games...",
     "quickSearchResults": "Quick Search Results",
     "recentSearches": "Recent Searches",

@@ -29,6 +29,9 @@ import {
   X,
   Calendar,
   Database,
+  Sparkles,
+  Users,
+  TrendingUp,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import {
@@ -57,12 +60,66 @@ let gamesCache = {
   expiryTime: 5 * 60 * 1000, // 5 minutes
 };
 
+const PartnerCard = memo(({ t }) => {
+  const handlePartnerClick = () => {
+    window.electron.openURL("https://ascendara.app/partner");
+  };
+
+  return (
+    <Card
+      onClick={handlePartnerClick}
+      className="group relative h-full cursor-pointer overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 transition-all duration-300 hover:scale-[1.02] hover:border-primary/40 hover:shadow-xl hover:shadow-primary/20"
+    >
+      <div className="flex h-full min-h-[300px] flex-col items-center justify-center p-6 text-center">
+        <div className="mb-4 rounded-full bg-primary/10 p-4 transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110">
+          <Sparkles className="h-8 w-8 text-primary" />
+        </div>
+        
+        <h3 className="mb-2 text-xl font-bold text-foreground">
+          {t("search.partnerCard.title")}
+        </h3>
+        
+        <p className="mb-4 text-sm text-muted-foreground">
+          {t("search.partnerCard.description")}
+        </p>
+        
+        <div className="mb-4 flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Users className="h-4 w-4" />
+            <span>{t("search.partnerCard.users")}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <TrendingUp className="h-4 w-4" />
+            <span>{t("search.partnerCard.growing")}</span>
+          </div>
+        </div>
+        
+        <div className="mt-auto flex items-center gap-2 text-sm font-medium text-primary transition-all duration-300 group-hover:gap-3">
+          <span>{t("search.partnerCard.learnMore")}</span>
+          <ExternalLink className="h-4 w-4" />
+        </div>
+      </div>
+    </Card>
+  );
+});
+
 const Search = memo(() => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(() => {
     const saved = window.sessionStorage.getItem("searchQuery");
     return saved || "";
+  });
+  
+  // Generate random partner card positions once per session
+  const [partnerCardPositions] = useState(() => {
+    const randomInRange = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    return [
+      randomInRange(4, 8),      // First card: around 6 (4-8)
+      randomInRange(48, 52),    // Second card: around 50 (48-52)
+      randomInRange(128, 132),  // Third card: around 130 (128-132)
+      randomInRange(238, 242),  // Fourth card: around 240 (238-242)
+    ];
   });
 
   const [showStickySearch, setShowStickySearch] = useState(false);
@@ -1197,14 +1254,34 @@ const Search = memo(() => {
             ) : (
               <div className="relative">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  {displayedGames.map(game => (
-                    <div
-                      key={game.imgID || game.id || `${game.game}-${game.version}`}
-                      data-game-name={game.game}
-                    >
-                      <GameCard game={game} onDownload={() => handleDownload(game)} />
-                    </div>
-                  ))}
+                  {displayedGames.map((game, index) => {
+                    const items = [];
+                    
+                    items.push(
+                      <div
+                        key={game.imgID || game.id || `${game.game}-${game.version}`}
+                        data-game-name={game.game}
+                      >
+                        <GameCard game={game} onDownload={() => handleDownload(game)} />
+                      </div>
+                    );
+                    
+                    // Progressive intervals with randomness: ~6, ~50, ~130, ~240
+                    const shouldShowPartnerCard = () => {
+                      const position = index + 1;
+                      return partnerCardPositions.includes(position);
+                    };
+                    
+                    if (shouldShowPartnerCard() && index !== displayedGames.length - 1) {
+                      items.push(
+                        <div key={`partner-${index}`}>
+                          <PartnerCard t={t} />
+                        </div>
+                      );
+                    }
+                    
+                    return items;
+                  })}
                 </div>
                 {hasMore && (
                   <div ref={loaderRef} className="flex justify-center py-8">
