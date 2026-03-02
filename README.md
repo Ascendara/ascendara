@@ -19,13 +19,15 @@
 
 ## 🎮 About
 
-Ascendara simplifies your game management experience by providing a seamless way to discover, organize, and test pre-installed games. No more hassle with extracting, installing, or moving files. The game library is powered by a custom webscraper, currently featuring titles mainly from [STEAMRIP](https://ascendara.app/sources/steamrip) with plans to expand to more sources.
+Ascendara simplifies your game management experience by providing a seamless way to discover, organize, and test pre-installed games. No more hassle with extracting, installing, or moving files. The game library is powered by a custom webscraper, currently featuring titles mainly from [STEAMRIP](https://ascendara.app/sources/steamrip) with plans to expand to more sources and is available on both Windows and Linux platforms.
 
-### 👥 Community
+### 🔗 Quick Links
 
 - [Join the Discord](https://ascendara.app/discord) for discussions and support
 - [Submit feedback for Ascendara](https://ascendara.app/feedback)
+- [Contribute to Ascendara](https://github.com/tagoWorks/ascendara)
 - [Read the latest changelog](https://ascendara.app/changelog)
+- [Learn about Ascend](https://ascendara.app/ascend)
 - [Check latest releases on Github](https://github.com/tagoWorks/ascendara/releases)
 
 ## ✨ Features
@@ -34,9 +36,9 @@ Ascendara simplifies your game management experience by providing a seamless way
 
   Lightning-fast 2 click download for games that support it. No browser needed at all.
 
-- 🎵 **Crisp Soundtracks**
+- ☁️ **Cloud Backups**
 
-  Listen to and download high quality tracks from the games soundtrack tab.
+  Upload game backup files to a secure Cloudflare storage system for safekeeping.
 
 - 🔌 **Game Information**
 
@@ -52,12 +54,12 @@ Ascendara simplifies your game management experience by providing a seamless way
 
 - 🕑 **Local Indexing**
 
-  Search for games at crazy speeds and refresh whenever you want.
+  Search for games at crazy speeds and always stay up to date.
 
-- 👤 **Your own username**
+- 📱 **Encrypted Remote Access**
 
-  Personalize your username for online game cracks that support it.
-
+  View download progression from anywhere, all data is end-to-end encrypted.
+  
 - 🌍 **105 Languages Support**
 
   Full interface support for 105 different languages, making Ascendara accessible worldwide.
@@ -223,13 +225,23 @@ These languages come with the app by default:
 
 This installer simply downloads the full setup package from GitHub and goes through the installation.
 The latest version of Ascendara will always be installed through the tool, but you can download specific
-versions directly from the [releases page](https://github.com/Ascendara/ascendara/releases). It is [open source](https://github.com/Ascendara/installer),
-and its file size is smaller than the app's NSIS installer for convenience—making it quicker to download
-and easier to distribute.
+versions directly from the [releases page](https://github.com/Ascendara/ascendara/releases). You can view the complete source code of the installer [here on GitHub](https://github.com/Ascendara/installer).
+
+### Windows
 
 | File                                                                             | SHA-256                                                          | VirusTotal Results                                                                                                      |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b | [1/72 Detections](https://www.virustotal.com/gui/file/bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b) |
+| [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b | [3/72 Detections](https://www.virustotal.com/gui/file/bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b) |
+
+### Linux
+
+Run the following command to install Ascendara:
+
+```bash
+curl -fsSL https://ascendara.app/install.sh | bash
+```
+
+You can view the install script [here](https://github.com/Ascendara/installer/blob/main/install.sh).
 
 ## 🤝 Contributing
 

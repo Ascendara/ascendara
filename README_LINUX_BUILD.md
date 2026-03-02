@@ -93,9 +93,9 @@ yarn electron-builder --linux --config.extraMetadata.main=electron/app.js
 
 The build will create one or more of the following:
 
-- `dist/Ascendara-9.6.3.AppImage` - Main AppImage file
+- `dist/Ascendara-x.x.x.AppImage` - Main AppImage file
 - `dist/linux-unpacked/` - Unpacked Linux application (fallback)
-- `dist/Ascendara-9.6.3-linux-x64.tar.gz` - Compressed archive (fallback)
+- `dist/Ascendara-x.x.x-linux-x64.tar.gz` - Compressed archive (fallback)
 
 ## Troubleshooting
 
