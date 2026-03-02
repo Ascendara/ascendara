@@ -1865,10 +1865,10 @@ const Library = () => {
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {t("library.libraryValue.ascendPromo.message", {
-                        months: Math.floor(
+                        months: Math.round(
                           libraryValueData.totalValue / 2
                         ).toLocaleString(),
-                        years: Math.floor(
+                        years: Math.round(
                           libraryValueData.totalValue / 2 / 12
                         ).toLocaleString(),
                       })}
