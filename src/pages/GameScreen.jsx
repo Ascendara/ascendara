@@ -914,25 +914,6 @@ export default function GameScreen() {
   useEffect(() => {
     if (!isInitialized) return; // Don't set up listeners until initialized
 
-    const handleGameClosed = async () => {
-      if (gameData) {
-        // Get fresh game data
-        const freshGames = await window.electron.getGames();
-        const gameData = freshGames.find(
-          g => (g.game || g.name) === (game.game || game.name)
-        );
-
-        if (
-          gameData &&
-          gameData.launchCount === 1 &&
-          settings.usingLocalIndex &&
-          game.gameID
-        ) {
-          setShowRateDialog(true);
-        }
-      }
-    };
-
     // Handle cover image updates from the main process
     const handleCoverImageUpdated = (_, data) => {
       if (data && data.game === (game.game || game.name) && data.success) {
@@ -994,7 +975,6 @@ export default function GameScreen() {
     };
 
     window.electron.ipcRenderer.on("game-launch-error", handleGameLaunchError);
-    window.electron.ipcRenderer.on("game-closed", handleGameClosed);
     window.electron.ipcRenderer.on("cover-image-updated", handleCoverImageUpdated);
     window.electron.ipcRenderer.on("game-assets-updated", handleGameAssetsUpdated);
 
@@ -1003,7 +983,6 @@ export default function GameScreen() {
         "game-launch-error",
         handleGameLaunchError
       );
-      window.electron.ipcRenderer.removeListener("game-closed", handleGameClosed);
       window.electron.ipcRenderer.removeListener(
         "cover-image-updated",
         handleCoverImageUpdated

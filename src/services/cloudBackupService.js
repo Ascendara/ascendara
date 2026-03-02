@@ -69,7 +69,7 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
     const uploadResult = await uploadBackup(
       file,
       gameName,
-      `Auto backup - ${new Date().toLocaleString()}`
+      latestBackupName
     );
     return uploadResult;
 
