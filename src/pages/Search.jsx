@@ -1272,7 +1272,7 @@ const Search = memo(() => {
                       return partnerCardPositions.includes(position);
                     };
                     
-                    if (shouldShowPartnerCard() && index !== displayedGames.length - 1) {
+                    if (shouldShowPartnerCard() && index !== displayedGames.length - 1 && !searchQuery.trim()) {
                       items.push(
                         <div key={`partner-${index}`}>
                           <PartnerCard t={t} />
