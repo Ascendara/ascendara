@@ -42,6 +42,7 @@ import {
 import AscendSidebar from "@/components/AscendSidebar";
 import LevelingCard from "@/components/LevelingCard";
 import CommunityHub from "@/components/CommunityHub";
+import AdStats from "@/components/AdStats";
 import { toast } from "sonner";
 import {
   searchUsers,
@@ -162,6 +163,7 @@ import {
   CheckCheck,
   FlaskRound,
   FlaskConical,
+  Megaphone,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -5401,6 +5403,9 @@ const Ascend = () => {
                           {userData?.verified && (
                             <BadgeCheck className="mt-1 h-4 w-4 shrink-0 text-blue-500" />
                           )}
+                          {userData?.adUser && (
+                            <Megaphone className="mt-1 h-4 w-4 shrink-0 text-purple-500" />
+                          )}
                         </h3>
                         <p className="truncate text-sm text-muted-foreground">
                           {user.email}
@@ -7726,6 +7731,13 @@ const Ascend = () => {
                   </div>
                 </motion.div>
               )}
+            </div>
+          );
+
+        case "adstats":
+          return (
+            <div className="mb-24 space-y-6">
+              <AdStats userId={user?.uid} />
             </div>
           );
 

@@ -28,6 +28,8 @@ import {
   Gamepad2,
   HardDrive,
   UsersRound,
+  Megaphone,
+  BarChart,
 } from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
@@ -187,6 +189,15 @@ const AscendSidebar = ({
     { id: "notifications", icon: Bell, label: t("ascend.nav.notifications"), badge: 0 },
     { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
   ];
+
+  // Conditionally add Ad Stats for adUser
+  if (userData?.adUser) {
+    mainNavItems.splice(mainNavItems.length - 2, 0, {
+      id: "adstats",
+      icon: BarChart,
+      label: t("ascend.nav.adStats") || "Ad Stats",
+    });
+  }
 
   // Quick access icon button
   const QuickAccessButton = ({ item, isActive }) => (
@@ -440,6 +451,9 @@ const AscendSidebar = ({
               )}
               {userData?.verified && (
                 <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+              )}
+              {userData?.adUser && (
+                <Megaphone className="h-3.5 w-3.5 shrink-0 text-purple-500" />
               )}
             </p>
             <p className="truncate text-[10px] text-muted-foreground">

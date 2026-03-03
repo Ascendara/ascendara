@@ -52,6 +52,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import imageCacheService from "@/services/imageCacheService";
 import { formatLatestUpdate } from "@/lib/utils";
 import verifiedGamesService from "@/services/verifiedGamesService";
+import { getAuthToken } from "@/utils/authHelper";
 
 // Module-level cache with timestamp
 let gamesCache = {
@@ -60,67 +61,164 @@ let gamesCache = {
   expiryTime: 5 * 60 * 1000, // 5 minutes
 };
 
-const PartnerCard = memo(({ t }) => {
-  const handlePartnerClick = () => {
-    window.electron.openURL("https://ascendara.app/partner");
+const AdCard = memo(({ ad, onView, onClick }) => {
+  const { t } = useLanguage();
+  const viewTrackedRef = useRef(false);
+
+  useEffect(() => {
+    if (!viewTrackedRef.current && ad) {
+      onView(ad.id);
+      viewTrackedRef.current = true;
+    }
+  }, [ad, onView]);
+
+  const handleAdClick = () => {
+    onClick(ad.id);
+    if (ad.adLink) {
+      window.electron.openURL(ad.adLink);
+    }
   };
+
+  if (!ad) return null;
 
   return (
     <Card
-      onClick={handlePartnerClick}
-      className="group relative h-full cursor-pointer overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 transition-all duration-300 hover:scale-[1.02] hover:border-primary/40 hover:shadow-xl hover:shadow-primary/20"
+      onClick={handleAdClick}
+      className="group relative flex min-h-[380px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/10"
     >
-      <div className="flex h-full min-h-[300px] flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 rounded-full bg-primary/10 p-4 transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110">
-          <Sparkles className="h-8 w-8 text-primary" />
+      {ad.adImage && (
+        <div className="relative flex-1 overflow-hidden rounded-t-lg">
+          <img
+            src={ad.adImage}
+            alt="Advertisement"
+            className="h-full w-full object-cover transition-all duration-500 group-hover:scale-110"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         </div>
-        
-        <h3 className="mb-2 text-xl font-bold text-foreground">
-          {t("search.partnerCard.title")}
-        </h3>
-        
-        <p className="mb-4 text-sm text-muted-foreground">
-          {t("search.partnerCard.description")}
-        </p>
-        
-        <div className="mb-4 flex items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            <span>{t("search.partnerCard.users")}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <TrendingUp className="h-4 w-4" />
-            <span>{t("search.partnerCard.growing")}</span>
-          </div>
+      )}
+      
+      <div className="flex items-center justify-between gap-2 border-t border-border/10 bg-card px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('ads.adPartner')}
+          </span>
         </div>
-        
-        <div className="mt-auto flex items-center gap-2 text-sm font-medium text-primary transition-all duration-300 group-hover:gap-3">
-          <span>{t("search.partnerCard.learnMore")}</span>
-          <ExternalLink className="h-4 w-4" />
+        <div className="flex items-center gap-1 text-xs font-medium text-primary transition-all duration-300 group-hover:gap-2">
+          <span>{t('ads.learnMore')}</span>
+          <ExternalLink className="h-3 w-3" />
         </div>
       </div>
     </Card>
   );
 });
 
+// Debounce hook for search optimization
+const useDebouncedValue = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const Search = memo(() => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [ads, setAds] = useState([]);
+  const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState(() => {
     const saved = window.sessionStorage.getItem("searchQuery");
     return saved || "";
   });
   
-  // Generate random partner card positions once per session
-  const [partnerCardPositions] = useState(() => {
+  // Debounced search query for filtering (prevents input lag)
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 150);
+  
+  // Generate random ad card positions once per session
+  const [adCardPositions] = useState(() => {
     const randomInRange = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
     return [
-      randomInRange(4, 8),      // First card: around 6 (4-8)
-      randomInRange(48, 52),    // Second card: around 50 (48-52)
-      randomInRange(128, 132),  // Third card: around 130 (128-132)
-      randomInRange(238, 242),  // Fourth card: around 240 (238-242)
+      randomInRange(3, 5),      // First card: around 4 (3-5) - more common
+      randomInRange(18, 22),    // Second card: around 20 (18-22) - more common
+      randomInRange(38, 42),    // Third card: around 40 (38-42) - more common
+      randomInRange(68, 72),    // Fourth card: around 70 (68-72) - more common
+      randomInRange(108, 112),  // Fifth card: around 110 (108-112)
+      randomInRange(158, 162),  // Sixth card: around 160 (158-162)
     ];
   });
+
+  // Generate ad positions for search results (less frequent)
+  const [searchAdPositions] = useState(() => {
+    const randomInRange = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    return [
+      randomInRange(8, 12),     // First card: around 10 (8-12)
+      randomInRange(38, 42),    // Second card: around 40 (38-42)
+      randomInRange(88, 92),    // Third card: around 90 (88-92)
+      randomInRange(158, 162),  // Fourth card: around 160 (158-162)
+    ];
+  });
+
+  // Fetch ads from API
+  useEffect(() => {
+    const fetchAds = async () => {
+      try {
+        const token = await getAuthToken();
+        const response = await fetch('https://api.ascendara.app/ads/all', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (data.success && data.ads.length > 0) {
+          setAds(data.ads);
+        }
+      } catch (error) {
+        console.error('Failed to fetch ads:', error);
+      }
+    };
+    fetchAds();
+  }, []);
+
+  // Track ad view (non-blocking, fire-and-forget)
+  const trackAdView = useCallback((adId) => {
+    // Don't await - fire and forget to prevent blocking
+    getAuthToken().then(token => {
+      fetch('https://api.ascendara.app/ads/view', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ adId })
+      }).catch(error => {
+        console.error('Failed to track ad view:', error);
+      });
+    }).catch(error => {
+      console.error('Failed to get auth token for ad view:', error);
+    });
+  }, []);
+
+  // Track ad click (non-blocking, fire-and-forget)
+  const trackAdClick = useCallback((adId) => {
+    // Don't await - fire and forget to prevent blocking
+    getAuthToken().then(token => {
+      fetch('https://api.ascendara.app/ads/click', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ adId })
+      }).catch(error => {
+        console.error('Failed to track ad click:', error);
+      });
+    }).catch(error => {
+      console.error('Failed to get auth token for ad click:', error);
+    });
+  }, []);
 
   const [showStickySearch, setShowStickySearch] = useState(false);
   const showStickySearchRef = useRef(false);
@@ -222,14 +320,19 @@ const Search = memo(() => {
     mainSearchRef.current?.blur();
   }, []);
 
-  // Quick search - search only game titles
+  const handleSearchFocus = useCallback(() => setShowRecentSearches(true), []);
+  const handleSearchBlur = useCallback(() => {
+    setTimeout(() => setShowRecentSearches(false), 200);
+  }, []);
+
+  // Quick search - search only game titles (uses debounced query)
   useEffect(() => {
-    if (!searchQuery || searchQuery.trim().length === 0) {
+    if (!debouncedSearchQuery || debouncedSearchQuery.trim().length === 0) {
       setQuickSearchResults([]);
       return;
     }
 
-    const query = searchQuery.toLowerCase().trim();
+    const query = debouncedSearchQuery.toLowerCase().trim();
     const results = games
       .filter(game => {
         const title = game.game.toLowerCase();
@@ -238,7 +341,7 @@ const Search = memo(() => {
       .slice(0, 5); // Limit to 5 results
 
     setQuickSearchResults(results);
-  }, [searchQuery, games]);
+  }, [debouncedSearchQuery, games]);
 
   // Handle scroll to show/hide sticky search bar with throttling
   useEffect(() => {
@@ -297,17 +400,6 @@ const Search = memo(() => {
       Date.now() - gamesCache.timestamp < gamesCache.expiryTime
     );
   }, []);
-
-  const useDebouncedValue = (value, delay) => {
-    const [debouncedValue, setDebouncedValue] = useState(value);
-
-    useEffect(() => {
-      const timer = setTimeout(() => setDebouncedValue(value), delay);
-      return () => clearTimeout(timer);
-    }, [value, delay]);
-
-    return debouncedValue;
-  };
 
   const fuzzyMatch = useMemo(() => {
     const cache = new Map();
@@ -511,51 +603,21 @@ const Search = memo(() => {
     return () => stopStatusCheck();
   }, [settings?.usingLocalIndex]);
 
-  // Persist searchQuery to sessionStorage
+  // Persist searchQuery to sessionStorage (use debounced to avoid writing on every keystroke)
   useEffect(() => {
-    window.sessionStorage.setItem("searchQuery", searchQuery);
-  }, [searchQuery]);
+    window.sessionStorage.setItem("searchQuery", debouncedSearchQuery);
+  }, [debouncedSearchQuery]);
 
-  // Persist searchQuery
+  // Persist all filter/sort state - single combined effect
   useEffect(() => {
-    window.sessionStorage.setItem("searchQuery", searchQuery);
-  }, [searchQuery]);
-
-  // Persist Filters and Sorting
-  useEffect(() => {
-    window.sessionStorage.setItem(
-      "selectedCategories",
-      JSON.stringify(selectedCategories)
-    );
-  }, [selectedCategories]);
-
-  useEffect(() => {
+    window.sessionStorage.setItem("selectedCategories", JSON.stringify(selectedCategories));
     window.sessionStorage.setItem("selectedSort", selectedSort);
-  }, [selectedSort]);
-
-  useEffect(() => {
     window.sessionStorage.setItem("onlineFilter", onlineFilter);
-  }, [onlineFilter]);
-
-  useEffect(() => {
     window.sessionStorage.setItem("showDLC", showDLC.toString());
-  }, [showDLC]);
-
-  useEffect(() => {
     window.sessionStorage.setItem("showOnline", showOnline.toString());
-  }, [showOnline]);
-
-  // Persist filterSmallestSize to localStorage
-  useEffect(() => {
     window.localStorage.setItem("filterSmallestSize", filterSmallestSize.toString());
-  }, [filterSmallestSize]);
-
-  // Persist filterProvider to localStorage
-  useEffect(() => {
     window.localStorage.setItem("filterProvider", filterProvider);
-  }, [filterProvider]);
-
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+  }, [selectedCategories, selectedSort, onlineFilter, showDLC, showOnline, filterSmallestSize, filterProvider]);
 
   const filteredGames = useMemo(() => {
     if (!games?.length) return [];
@@ -989,11 +1051,8 @@ const Search = memo(() => {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   onClick={e => e.target.select()}
-                  onFocus={() => setShowRecentSearches(true)}
-                  onBlur={() => {
-                    // Delay hiding to allow clicking on recent searches
-                    setTimeout(() => setShowRecentSearches(false), 200);
-                  }}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
                   onKeyDown={e => {
                     if (e.key === "Enter" && searchQuery.trim()) {
                       saveRecentSearch(searchQuery);
@@ -1254,34 +1313,32 @@ const Search = memo(() => {
             ) : (
               <div className="relative">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  {displayedGames.map((game, index) => {
-                    const items = [];
-                    
-                    items.push(
-                      <div
-                        key={game.imgID || game.id || `${game.game}-${game.version}`}
-                        data-game-name={game.game}
-                      >
-                        <GameCard game={game} onDownload={() => handleDownload(game)} />
-                      </div>
-                    );
-                    
-                    // Progressive intervals with randomness: ~6, ~50, ~130, ~240
-                    const shouldShowPartnerCard = () => {
+                  {(() => {
+                    const isSearching = debouncedSearchQuery.trim().length > 0;
+                    const activePositions = isSearching ? searchAdPositions : adCardPositions;
+                    const adPositionSet = new Set(activePositions);
+                    const lastIndex = displayedGames.length - 1;
+                    const hasAds = ads.length > 0;
+
+                    return displayedGames.map((game, index) => {
                       const position = index + 1;
-                      return partnerCardPositions.includes(position);
-                    };
-                    
-                    if (shouldShowPartnerCard() && index !== displayedGames.length - 1 && !searchQuery.trim()) {
-                      items.push(
-                        <div key={`partner-${index}`}>
-                          <PartnerCard t={t} />
-                        </div>
+                      const showAd = hasAds && index !== lastIndex && adPositionSet.has(position);
+                      const ad = showAd ? ads[activePositions.indexOf(position) % ads.length] : null;
+
+                      return (
+                        <React.Fragment key={game.imgID || game.id || `${game.game}-${game.version}`}>
+                          <div data-game-name={game.game}>
+                            <GameCard game={game} onDownload={() => handleDownload(game)} />
+                          </div>
+                          {showAd && (
+                            <div key={`ad-${index}`}>
+                              <AdCard ad={ad} onView={trackAdView} onClick={trackAdClick} />
+                            </div>
+                          )}
+                        </React.Fragment>
                       );
-                    }
-                    
-                    return items;
-                  })}
+                    });
+                  })()}
                 </div>
                 {hasMore && (
                   <div ref={loaderRef} className="flex justify-center py-8">

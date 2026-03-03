@@ -1,4 +1,8 @@
 {
+  "ads": {
+    "adPartner": "Ascendara Ad Program",
+    "learnMore": "Learn More"
+  },
   "account": {
     "actions": "Account Actions",
     "almostThere": "Almost there!",
@@ -247,6 +251,30 @@
       "trialEndingSoonAction": "Subscribe now to keep your data safe and continue enjoying Ascend features.",
       "trialEndingSoonMessage": "Your Ascend trial ends in {{days}} days. After your trial expires, your cloud library and synced data will be deleted within a few days."
     },
+    "adStats": {
+      "activeAdvertisement": "Active Advertisement",
+      "ad": "Ad",
+      "clicks": "Clicks",
+      "clickRate": "CTR",
+      "contactSupport": "Contact Support to Renew",
+      "ctr": "CTR",
+      "error": "Failed to load ad statistics",
+      "expired": "Expired",
+      "expires": "Expires",
+      "expiresOn": "Expires on {{date}}",
+      "expiringSoon": "Expiring Soon",
+      "loading": "Loading ad statistics...",
+      "noAds": "No ads yet",
+      "noAdsDescription": "You don't have any active ads. Contact support to create your first ad campaign.",
+      "refresh": "Refresh",
+      "subtitle": "Track your ad performance and engagement",
+      "title": "Ad Statistics",
+      "totalAds": "Total Ads",
+      "totalClicks": "Total Clicks",
+      "totalViews": "Total Views",
+      "views": "Views",
+      "yourAds": "Your Ads"
+    },
     "checkingVersion": "Checking version...",
     "cloudBackups": {
       "deleteDesc": "This will permanently delete this backup from cloud storage. This action cannot be undone.",
@@ -413,6 +441,7 @@
       "you": "You"
     },
     "nav": {
+      "adStats": "Ad Stats",
       "cloud": "Cloud",
       "cloudBackups": "Cloud Backups",
       "cloudLibrary": "Cloud Library",
