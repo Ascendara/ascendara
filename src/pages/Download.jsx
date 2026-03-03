@@ -383,6 +383,7 @@ export default function DownloadPage() {
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const [isVerified, setIsVerified] = useState(false);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
+  const [torboxDisabledForSession, setTorboxDisabledForSession] = useState(false);
 
   // Fetch rating from new API when using local index
   useEffect(() => {
@@ -694,9 +695,9 @@ export default function DownloadPage() {
         return;
       }
     }
-    // Determine if this provider should use Torbox (only if API key is configured)
+    // Determine if this provider should use Torbox (only if API key is configured and not disabled for session)
     const shouldUseTorbox = () =>
-      torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings);
+      torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings) && !torboxDisabledForSession;
     
     // Handle seamless providers (gofile, buzzheavier, pixeldrain) when not using Torbox
     if (
@@ -2686,15 +2687,43 @@ export default function DownloadPage() {
                   <h2 className="flex items-center gap-2 text-xl font-semibold">
                     {torboxProviders.includes(selectedProvider) &&
                     torboxService.isEnabled(settings) &&
-                    torboxService.getApiKey(settings)
+                    torboxService.getApiKey(settings) &&
+                    !torboxDisabledForSession
                       ? t("download.downloadOptions.torboxInstructions.title")
                       : t("download.downloadOptions.seamlessInstructions.title")}
                   </h2>
 
+                  {/* Disable TorBox button - only show when TorBox is active */}
+                  {torboxProviders.includes(selectedProvider) &&
+                    torboxService.isEnabled(settings) &&
+                    torboxService.getApiKey(settings) &&
+                    !torboxDisabledForSession && (
+                      <button
+                        onClick={() => setTorboxDisabledForSession(true)}
+                        className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+                      >
+                        {t("download.downloadOptions.torboxInstructions.disableForDownload")}
+                      </button>
+                    )}
+
+                  {/* Re-enable TorBox button - only show when disabled */}
+                  {torboxProviders.includes(selectedProvider) &&
+                    torboxService.isEnabled(settings) &&
+                    torboxService.getApiKey(settings) &&
+                    torboxDisabledForSession && (
+                      <button
+                        onClick={() => setTorboxDisabledForSession(false)}
+                        className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+                      >
+                        {t("download.downloadOptions.torboxInstructions.enableForDownload")}
+                      </button>
+                    )}
+
                   <p className="mt-2 text-sm text-muted-foreground">
                     {torboxProviders.includes(selectedProvider) &&
                     torboxService.isEnabled(settings) &&
-                    torboxService.getApiKey(settings)
+                    torboxService.getApiKey(settings) &&
+                    !torboxDisabledForSession
                       ? t("download.downloadOptions.torboxInstructions.description")
                       : t("download.downloadOptions.seamlessInstructions.description")}
                   </p>

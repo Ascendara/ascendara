@@ -969,6 +969,8 @@
       "startingDownload": "Starting download...",
       "torboxInstructions": {
         "description": "Ascendara will automatically debrid your Torbox link and retrieve a premium direct download link",
+        "disableForDownload": "Disable TorBox just for this download",
+        "enableForDownload": "Re-enable TorBox for this download",
         "title": "Start download with Torbox"
       },
       "torrentInstructions": {
