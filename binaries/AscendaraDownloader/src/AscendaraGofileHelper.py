@@ -910,12 +910,13 @@ class GofileDownloader:
                                 finally:
                                     extraction_complete.set()
                             
-                            # Start extraction in background
-                            thread = threading.Thread(target=extract_thread, daemon=True)
+                            # Start extraction in background (non-daemon so it must complete)
+                            thread = threading.Thread(target=extract_thread, daemon=False)
                             thread.start()
                             
                             # Monitor progress by counting extracted files
                             last_count = 0
+                            last_update_time = time.time()
                             while not extraction_complete.is_set():
                                 # Count files in extraction directory (subtract initial count)
                                 current_count = 0
@@ -928,15 +929,20 @@ class GofileDownloader:
                                 # Calculate newly extracted files
                                 newly_extracted = max(0, current_count - initial_file_count)
                                 
-                                if newly_extracted > last_count:
+                                # Update progress if files changed or every 5 seconds
+                                current_time = time.time()
+                                if newly_extracted > last_count or (current_time - last_update_time) >= 5.0:
                                     files_extracted_this_archive = self._files_extracted_count + newly_extracted
                                     self._update_extraction_progress(f"Extracting... ({newly_extracted} files)", files_extracted_this_archive, total_files_to_extract, force=True)
                                     last_count = newly_extracted
+                                    last_update_time = current_time
                                 
                                 time.sleep(0.5)  # Check every 0.5 seconds
                             
-                            # Wait for thread to complete
-                            thread.join(timeout=5)
+                            # Wait for thread to complete fully (no timeout - must finish)
+                            logging.info(f"[AscendaraGofileHelper] Waiting for RAR extraction thread to complete...")
+                            thread.join()
+                            logging.info(f"[AscendaraGofileHelper] RAR extraction thread completed")
                             
                             if extraction_error:
                                 logging.error(f"[AscendaraGofileHelper] RAR extraction failed: {extraction_error[0]}")
@@ -1274,6 +1280,36 @@ class GofileDownloader:
                     except Exception as e:
                         logging.error(f"[AscendaraGofileHelper] Error deleting _CommonRedist directory: {str(e)}")
 
+            # Check for unextracted RAR files in the download directory
+            for root, dirs, files in os.walk(self.download_dir):
+                for file in files:
+                    if file.endswith('.rar') or file.endswith('.zip') or file.endswith('.7z'):
+                        archive_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(archive_path, self.download_dir)
+                        verify_errors.append({
+                            "file": rel_path,
+                            "error": "Found unextracted archive file in directory",
+                            "archive_type": os.path.splitext(file)[1]
+                        })
+                        logging.error(f"[AscendaraGofileHelper] Found unextracted archive: {rel_path}")
+            
+            # If we found unextracted archives, fail immediately
+            if verify_errors:
+                logging.error(f"[AscendaraGofileHelper] Verification failed: Found {len(verify_errors)} unextracted archive(s)")
+                self.game_info["downloadingData"]["verifyError"] = verify_errors
+                error_count = len(verify_errors)
+                _launch_notification(
+                    "dark",
+                    "Extraction Failed",
+                    f"Found {error_count} unextracted archive {'file' if error_count == 1 else 'files'}"
+                )
+                # Set verifying to false and exit
+                self.game_info["downloadingData"]["verifying"] = False
+                self.game_info["downloadingData"]["downloading"] = False
+                self.game_info["downloadingData"]["extracting"] = False
+                safe_write_json(self.game_info_path, self.game_info)
+                return
+            
             filtered_watching_data = {}
             for file_path, file_info in watching_data.items():
                 if "_CommonRedist" not in file_path:
