@@ -107,20 +107,36 @@ const sanitizeGameName = name => {
 // Helper function to check Torbox service status for a specific provider
 const checkTorboxStatus = async provider => {
   try {
-    const response = await fetch("https://api.ascendara.app/app/json/torboxstatus");
+    const response = await fetch("/api/torbox/webdl/hosters");
     if (!response.ok) {
       throw new Error("Failed to fetch Torbox status");
     }
     const data = await response.json();
-    // Check if the specific provider is online
-    // API returns: {"buzzheavier":"online","datanodes":"online","gofile":"online","megadb":"offline","vikingfile":"online"}
-    if (provider && data[provider]) {
+    
+    const providerMap = {
+      "1fichier": "1Fichier",
+      "megadb": "MegaDB",
+      "gofile": "GoFile",
+      "buzzheavier": "Buzzheavier",
+    };
+    
+    const torboxName = providerMap[provider.toLowerCase()];
+    if (!torboxName) {
+      console.log(`No TorBox mapping for provider: ${provider}`);
+      return null;
+    }
+    
+    // Find the hoster in the response array
+    const hoster = data.data?.find(h => h.name === torboxName);
+    if (hoster) {
       return {
         provider: provider,
-        status: data[provider],
-        isOnline: data[provider] === "online",
+        status: hoster.status ? "online" : "offline",
+        isOnline: hoster.status === true,
       };
     }
+    
+    console.log(`Hoster ${torboxName} not found in TorBox API response`);
     return null;
   } catch (error) {
     console.error("Error checking Torbox status:", error);
@@ -743,7 +759,7 @@ export default function DownloadPage() {
         return;
       }
 
-      // Check Torbox service status first for the selected provider
+      // Check TorBox hoster status for the selected provider
       const torboxStatus = await checkTorboxStatus(selectedProvider);
       if (!torboxStatus || !torboxStatus.isOnline) {
         toast.error(t("download.toast.torboxOffline"));
