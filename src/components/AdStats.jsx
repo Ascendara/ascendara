@@ -17,6 +17,8 @@ const AdStats = ({ userId }) => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [referralStats, setReferralStats] = useState(null);
+  const [referralLoading, setReferralLoading] = useState(true);
 
   const fetchStats = async () => {
     if (!userId) return;
@@ -57,8 +59,31 @@ const AdStats = ({ userId }) => {
     }
   };
 
+  const fetchReferralStats = async () => {
+    setReferralLoading(true);
+    
+    try {
+      const token = await getAuthToken();
+      const response = await fetch('https://api.ascendara.app/app/referral-stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        setReferralStats(data.stats);
+      }
+    } catch (err) {
+      console.error('Error fetching referral stats:', err);
+    } finally {
+      setReferralLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
+    fetchReferralStats();
   }, [userId]);
 
   if (loading) {
@@ -98,11 +123,56 @@ const AdStats = ({ userId }) => {
           <h2 className="text-2xl font-bold">{t('ascend.adStats.title')}</h2>
           <p className="text-sm text-muted-foreground">{t('ascend.adStats.subtitle')}</p>
         </div>
-        <Button onClick={fetchStats} variant="outline" size="sm">
+        <Button onClick={() => { fetchStats(); fetchReferralStats(); }} variant="outline" size="sm">
           <RefreshCw className="mr-2 h-4 w-4" />
           {t('ascend.adStats.refresh')}
         </Button>
       </div>
+
+      {!referralLoading && referralStats && referralStats.last24Hours > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold mb-2">{t('ascend.adStats.userActivity') || 'User Activity'}</h3>
+            <p className="text-sm text-muted-foreground">{t('ascend.adStats.userActivitySubtitle') || 'Recent user acquisition metrics'}</p>
+          </div>
+          
+          <Card className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="rounded-full bg-cyan-500/10 p-3">
+                <TrendingUp className="h-6 w-6 text-cyan-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">{t('ascend.adStats.last24Hours') || 'Last 24 Hours'}</p>
+                <p className="text-2xl font-bold">{referralStats.last24Hours}</p>
+                <p className="text-xs text-muted-foreground">{t('ascend.adStats.newUsers') || 'new users'}</p>
+              </div>
+            </div>
+          </Card>
+
+          {referralStats.recentSources && referralStats.recentSources.length > 0 && (
+            <Card className="p-6">
+              <h4 className="mb-4 text-lg font-semibold">{t('ascend.adStats.recentSources') || 'Recent Sources'}</h4>
+              <div className="space-y-3">
+                {referralStats.recentSources.map((sourceData, index) => (
+                  <div key={index} className="flex items-center justify-between border-b pb-3 last:border-b-0">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-sm font-bold text-primary">{sourceData.count}</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">{sourceData.source}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t('ascend.adStats.latestAt') || 'Latest'}: {new Date(sourceData.latestTimestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="p-6">
