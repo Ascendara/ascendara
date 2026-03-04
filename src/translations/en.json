@@ -279,7 +279,13 @@
       "totalClicks": "Total Clicks",
       "totalViews": "Total Views",
       "views": "Views",
-      "yourAds": "Your Ads"
+      "yourAds": "Your Ads",
+      "userActivity": "User Activity",
+      "userActivitySubtitle": "Recent user acquisition metrics",
+      "last24Hours": "Last 24 Hours",
+      "newUsers": "new users",
+      "recentSources": "Recent Sources",
+      "latestAt": "Latest"
     },
     "checkingVersion": "Checking version...",
     "cloudBackups": {
