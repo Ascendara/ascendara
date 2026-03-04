@@ -99,6 +99,12 @@ def build_achievement_watcher():
         print("Failed to build AscendaraAchievementWatcher for Linux")
         return False
     
+    # Make the binary executable
+    binary_path = os.path.join(achievement_watcher_dir, 'dist', 'AscendaraAchievementWatcher')
+    if os.path.exists(binary_path):
+        os.chmod(binary_path, 0o755)
+        print("Made AscendaraAchievementWatcher executable")
+    
     print("AscendaraAchievementWatcher built successfully")
     return True
 
@@ -126,6 +132,12 @@ def build_crash_reporter():
     if not run_command(['cargo', 'build', '--release'], cwd=crash_reporter_dir):
         print("Failed to build AscendaraCrashReporter")
         return False
+    
+    # Make the binary executable
+    binary_path = os.path.join(crash_reporter_dir, 'target', 'release', 'AscendaraCrashReporter')
+    if os.path.exists(binary_path):
+        os.chmod(binary_path, 0o755)
+        print("Made AscendaraCrashReporter executable")
     
     print("AscendaraCrashReporter built successfully")
     return True
@@ -201,6 +213,12 @@ def build_python_binaries_linux():
         if not run_command(cmd):
             print(f"Failed to compile {binary_name}")
             return False
+
+        # Make the binary executable
+        binary_path = os.path.join(dist_dir, binary_name)
+        if os.path.exists(binary_path):
+            os.chmod(binary_path, 0o755)
+            print(f"Made {binary_name} executable")
 
         # Clean up PyInstaller temp dirs
         for tmp in ['build_tmp', 'spec_tmp']:

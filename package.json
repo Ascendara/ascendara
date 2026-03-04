@@ -187,27 +187,7 @@
         "to": "."
       },
       {
-        "from": "binaries/AscendaraDownloader/src/debian/AscendaraDownloader.py",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraGameHandler/src/debian/AscendaraGameHandler.py",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraNotificationHelper/src/debian/AscendaraNotificationHelper.py",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraLanguageTranslation/src/debian/AscendaraLanguageTranslation.py",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraLocalRefresh/src/debian/AscendaraLocalRefresh.py",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraTorrentHandler/src/debian/AscendaraTorrentHandler.py",
+        "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe",
         "to": "."
       }
     ],
