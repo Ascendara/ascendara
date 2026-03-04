@@ -170,6 +170,12 @@ def sanitize_folder_name(name):
     sanitized_name = ''.join(c for c in name if c in valid_chars)
     return sanitized_name
 
+def generate_website_token(user_agent, account_token):
+    """Generate the dynamic X-Website-Token required by GoFile API."""
+    time_slot = int(time.time()) // 14400
+    raw = f"{user_agent}::en-US::{account_token}::{time_slot}::gf2026x"
+    return sha256(raw.encode()).hexdigest()
+
 def handleerror(game_info, game_info_path, e):
     game_info['online'] = ""
     game_info['dlc'] = ""
@@ -279,16 +285,58 @@ class GofileDownloader:
     @staticmethod
     def _getToken():
         user_agent = os.getenv("GF_USERAGENT", "Mozilla/5.0")
-        headers = {
+        wt = generate_website_token(user_agent, "")
+        
+        # Base headers for the session
+        base_headers = {
             "User-Agent": user_agent,
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip",
             "Accept": "*/*",
             "Connection": "keep-alive",
+            "Origin": "https://gofile.io",
+            "Referer": "https://gofile.io/"
         }
-        create_account_response = requests.post("https://api.gofile.io/accounts", headers=headers).json()
-        if create_account_response["status"] != "ok":
-            raise Exception("Account creation failed!")
-        return create_account_response["data"]["token"]
+        
+        # Additional headers for account creation
+        request_headers = base_headers.copy()
+        request_headers.update({
+            "X-Website-Token": wt,
+            "X-BL": "en-US"
+        })
+        
+        max_retries = 3
+        timeout = 15.0
+        
+        for retry in range(max_retries):
+            try:
+                create_account_response = requests.post(
+                    "https://api.gofile.io/accounts",
+                    headers=request_headers,
+                    timeout=timeout
+                ).json()
+                
+                if create_account_response.get("status") == "ok":
+                    return create_account_response["data"]["token"]
+                else:
+                    logging.error(f"[AscendaraGofileHelper] Account creation failed with status: {create_account_response.get('status')}")
+                    if retry < max_retries - 1:
+                        time.sleep(2 ** retry)
+                        continue
+                    raise Exception(f"Account creation failed: {create_account_response.get('status')}")
+            except requests.exceptions.Timeout:
+                logging.warning(f"[AscendaraGofileHelper] Account creation timeout (attempt {retry + 1}/{max_retries})")
+                if retry < max_retries - 1:
+                    time.sleep(2 ** retry)
+                    continue
+                raise Exception("Account creation timed out after multiple retries")
+            except Exception as e:
+                logging.error(f"[AscendaraGofileHelper] Account creation error: {str(e)}")
+                if retry < max_retries - 1:
+                    time.sleep(2 ** retry)
+                    continue
+                raise
+        
+        raise Exception("Account creation failed after all retries")
 
     def download_from_gofile(self, url, password=None, withNotification=None):
         # Fix URL if it starts with //
@@ -383,21 +431,39 @@ class GofileDownloader:
             raise
 
     def _parseLinksRecursively(self, content_id, password, current_path=""):
-        # GoFile API change: wt parameter moved to X-Website-Token header
-        url = f"https://api.gofile.io/contents/{content_id}"
+        user_agent = os.getenv("GF_USERAGENT", "Mozilla/5.0")
+        wt = generate_website_token(user_agent, self._token)
+        
+        url = f"https://api.gofile.io/contents/{content_id}?cache=true&sortField=createTime&sortDirection=1"
         if password:
-            url = f"{url}?password={password}"
+            url = f"{url}&password={password}"
 
-        headers = {
-            "User-Agent": os.getenv("GF_USERAGENT", "Mozilla/5.0"),
-            "Accept-Encoding": "gzip, deflate, br",
+        # Base headers
+        base_headers = {
+            "User-Agent": user_agent,
+            "Accept-Encoding": "gzip",
             "Accept": "*/*",
             "Connection": "keep-alive",
             "Authorization": f"Bearer {self._token}",
-            "X-Website-Token": "4fd6sg89d7s6",
+            "Origin": "https://gofile.io",
+            "Referer": "https://gofile.io/"
+        }
+        
+        # Additional headers for this specific request
+        request_headers = {
+            "X-Website-Token": wt,
+            "X-BL": "en-US"
         }
 
-        response = requests.get(url, headers=headers).json()
+        try:
+            response = requests.get(
+                url,
+                headers={**base_headers, **request_headers},
+                timeout=15.0
+            ).json()
+        except Exception as e:
+            logging.error(f"[AscendaraGofileHelper] Error fetching content info: {str(e)}")
+            return {}
 
         if response["status"] != "ok":
             logging.error(f"[AscendaraGofileHelper] Failed to get a link as response from {url}. Status: {response.get('status')}")
