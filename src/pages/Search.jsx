@@ -64,6 +64,7 @@ let gamesCache = {
 const AdCard = memo(({ ad, onView, onClick }) => {
   const { t } = useLanguage();
   const viewTrackedRef = useRef(false);
+  const [showInfoDialog, setShowInfoDialog] = useState(false);
 
   useEffect(() => {
     if (!viewTrackedRef.current && ad) {
@@ -79,23 +80,35 @@ const AdCard = memo(({ ad, onView, onClick }) => {
     }
   };
 
+  const handleInfoClick = (e) => {
+    e.stopPropagation();
+    setShowInfoDialog(true);
+  };
+
   if (!ad) return null;
 
   return (
-    <Card
-      onClick={handleAdClick}
-      className="group relative flex min-h-[380px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/10"
-    >
-      {ad.adImage && (
-        <div className="relative flex-1 overflow-hidden rounded-t-lg">
-          <img
-            src={ad.adImage}
-            alt="Advertisement"
-            className="h-full w-full object-cover transition-all duration-500 group-hover:scale-110"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        </div>
-      )}
+    <>
+      <Card
+        onClick={handleAdClick}
+        className="group relative flex h-full cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/10"
+      >
+        {ad.adImage && (
+          <div className="relative h-[350px] overflow-hidden rounded-t-lg">
+            <img
+              src={ad.adImage}
+              alt="Advertisement"
+              className="absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-110"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            <button
+              onClick={handleInfoClick}
+              className="absolute right-2 top-2 rounded-full bg-background/80 p-1.5 backdrop-blur-sm transition-all hover:bg-background"
+            >
+              <InfoIcon className="h-4 w-4 text-foreground" />
+            </button>
+          </div>
+        )}
       
       <div className="flex items-center justify-between gap-2 border-t border-border/10 bg-card px-4 py-3">
         <div className="flex items-center gap-2">
@@ -108,7 +121,27 @@ const AdCard = memo(({ ad, onView, onClick }) => {
           <ExternalLink className="h-3 w-3" />
         </div>
       </div>
-    </Card>
+      </Card>
+
+      <AlertDialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>
+        <AlertDialogContent className="border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-foreground">
+              {t('ads.partnerInfo.title')}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>{t('ads.partnerInfo.description')}</p>
+            <p>{t('ads.partnerInfo.reportIssue')}</p>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <AlertDialogCancel className="text-foreground">
+              {t('ads.partnerInfo.close')}
+            </AlertDialogCancel>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 });
 
@@ -161,19 +194,51 @@ const Search = memo(() => {
     ];
   });
 
-  // Fetch ads from API
+  // Fetch ads from API - check if user has hidePartnerAds enabled
   useEffect(() => {
     const fetchAds = async () => {
       try {
         const token = await getAuthToken();
-        const response = await fetch('https://api.ascendara.app/ads/all', {
+        
+        // Check user's subscription status and hidePartnerAds preference
+        const userResponse = await fetch('https://api.ascendara.app/auth/token', {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
-        const data = await response.json();
-        if (data.success && data.ads.length > 0) {
-          setAds(data.ads);
+        
+        if (!userResponse.ok) {
+          // If we can't verify user, show ads by default
+          const response = await fetch('https://api.ascendara.app/ads/all', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await response.json();
+          if (data.success && data.ads.length > 0) {
+            setAds(data.ads);
+          }
+          return;
+        }
+
+        const userData = await userResponse.json();
+        
+        // Only hide ads if user is (subscribed OR verified) AND has hidePartnerAds enabled
+        const isSubscribed = userData.ascendSubscription?.active === true;
+        const isVerified = userData.verified === true || userData.owner === true || userData.contributor === true;
+        const hideAds = userData.hidePartnerAds === true;
+        
+        // Show ads if user is not (subscribed or verified) OR has not enabled hidePartnerAds
+        if ((!isSubscribed && !isVerified) || !hideAds) {
+          const response = await fetch('https://api.ascendara.app/ads/all', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await response.json();
+          if (data.success && data.ads.length > 0) {
+            setAds(data.ads);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch ads:', error);

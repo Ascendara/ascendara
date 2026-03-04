@@ -488,3 +488,33 @@ h2 {
     transform: none !important;
   }
 }
+
+/* Ascend Sidebar Scrollbar */
+.ascend-sidebar-scroll {
+  direction: rtl;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-muted-foreground) / 0.2) transparent;
+}
+
+.ascend-sidebar-scroll > * {
+  direction: ltr;
+}
+
+.ascend-sidebar-scroll::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.ascend-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ascend-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-muted-foreground) / 0.2);
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.ascend-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-muted-foreground) / 0.4);
+}

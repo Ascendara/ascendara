@@ -272,7 +272,7 @@ const AscendSidebar = ({
       <div className="mx-3 h-px bg-border/50" />
 
       {/* Main Navigation List */}
-      <nav className="relative flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="ascend-sidebar-scroll relative flex-1 space-y-1 overflow-y-auto p-3">
         {/* Cloud Section */}
         <div className="mb-2">
           <button

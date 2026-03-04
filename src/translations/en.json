@@ -1,7 +1,13 @@
 {
   "ads": {
-    "adPartner": "Ascendara Ad Program",
-    "learnMore": "Learn More"
+    "adPartner": "Ascendara Partner",
+    "learnMore": "Learn More",
+    "partnerInfo": {
+      "title": "About Ascendara Partner Program",
+      "description": "These are verified projects run by solo developers or communities that align with Ascendara's values. All partners are carefully vetted to ensure quality and trustworthiness.",
+      "reportIssue": "If you have concerns about any partner content, please report it in the Discord community.",
+      "close": "Got it"
+    }
   },
   "account": {
     "actions": "Account Actions",
@@ -202,9 +208,9 @@
     "supportDialog": {
       "donate": "Support Development",
       "feedback": "Give Feedback",
-      "message": "I know I said no ads but is this really an ad? You're starting to use Ascendara and I would love for you to rate it or give me some feedback. You won't ever see this message again.",
+      "message": "You're starting to use Ascendara and I would love for you to rate it or give me some feedback. You won't ever see this message again.",
       "note": "I've spent so much time creating Ascendara as a passion project. Every feature, every line of code is crafted with care. Your support means everything to me and helps me continue making Ascendara even better.",
-      "title": "Let me know how you like it"
+      "title": "Oh you liking Ascendara a bit?"
     },
     "toasts": {
       "installAndRestart": "Install & Restart",
@@ -674,6 +680,9 @@
       "privacyUpdateFailed": "Failed to update privacy setting",
       "privateAccount": "Private Account",
       "privateAccountDescription": "When enabled, other users won't be able to see your profile details, games, or achievements.",
+      "partnerAdsHidden": "Partner ads are now hidden",
+      "partnerAdsVisible": "Partner ads are now visible",
+      "updateFailed": "Failed to update setting",
       "profile": "Profile",
       "profileUpdated": "Profile updated successfully!",
       "save": "Save Changes",
@@ -2058,12 +2067,16 @@
       "title": "Ascend Required",
       "whySubscribe": "Why subscribe to Ascend?"
     },
-    "ascendaraAnalytics": "Usage Analytics",
-    "ascendaraAnalyticsDescription": "Help improve Ascendara by sending usage data. This data is anonymous and cannot be used to identify you.",
-    "ascendaraTimechine": "Ascendara Timemachine",
-    "ascendaraToggleAnalytics": "Opt-in and help improve Ascendara",
-    "ascendaraUpdates": "Automatic Updates",
-    "ascendaraUpdatesDescription": "Automatically download new versions of Ascendara and ask you to install them when ready.",
+    "ascendaraAnalytics": "Ascendara Analytics",
+    "ascendaraAnalyticsDescription": "Help improve Ascendara by sharing anonymous usage data.",
+    "ascendaraToggleAnalytics": "Enable Analytics",
+    "ascendaraUpdates": "Ascendara Updates",
+    "ascendaraUpdatesDescription": "Automatically check for and install Ascendara updates.",
+    "ascendSettings": "Ascend Settings",
+    "ascendSettingsDescription": "Manage your Ascend subscription preferences.",
+    "hidePartnerAds": "Hide Partner Ads",
+    "hidePartnerAdsDescription": "Hide partner advertisements in search results. Available for active Ascend subscribers.",
+    "hidePartnerAdsRequiresSub": "This feature requires an active Ascend subscription (trial not included).",
     "ascendaraWorkshopDownloader": "Workshop Downloader",
     "ascendaraWorkshopDownloaderDescription": "The Workshop Downloader allows you to download items from the Steam Workshop without needing to have an account.",
     "ascendaraWorkshopDownloaderEnable": "Show in Navigation Bar",
