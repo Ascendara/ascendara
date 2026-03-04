@@ -618,6 +618,7 @@ export const updateUserData = async (uid, data) => {
       "cloudLibrary",
       "profileStats",
       "private",
+      "hidePartnerAds",
     ];
 
     for (const field of allowedFields) {

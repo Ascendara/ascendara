@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, memo, useCallback, useRef, useDeferredValue } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import GameCard from "@/components/GameCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import {
@@ -157,18 +158,94 @@ const useDebouncedValue = (value, delay) => {
   return debouncedValue;
 };
 
+// Module-level fuzzy match cache (persists across renders)
+const fuzzyMatchCache = new Map();
+const createFuzzyMatch = () => {
+  return (text, query) => {
+    if (!text || !query) return false;
+
+    const cacheKey = `${text.toLowerCase()}-${query.toLowerCase()}`;
+    if (fuzzyMatchCache.has(cacheKey)) return fuzzyMatchCache.get(cacheKey);
+
+    text = text.toLowerCase();
+    query = query.toLowerCase();
+
+    // Direct substring match for better performance
+    if (text.includes(query)) {
+      fuzzyMatchCache.set(cacheKey, true);
+      return true;
+    }
+
+    const queryWords = query.split(/\s+/).filter(word => word.length > 0);
+    if (queryWords.length === 0) {
+      fuzzyMatchCache.set(cacheKey, false);
+      return false;
+    }
+
+    const result = queryWords.every(queryWord => {
+      if (/\d/.test(queryWord)) return text.includes(queryWord);
+
+      const words = text.split(/\s+/);
+      return words.some(word => {
+        if (/\d/.test(word)) return word.includes(queryWord);
+        if (word.includes(queryWord)) return true;
+
+        // Optimize character matching
+        let matches = 0;
+        let lastIndex = -1;
+
+        for (const char of queryWord) {
+          const index = word.indexOf(char, lastIndex + 1);
+          if (index > lastIndex) {
+            matches++;
+            lastIndex = index;
+          }
+        }
+
+        return matches >= queryWord.length * 0.8;
+      });
+    });
+
+    fuzzyMatchCache.set(cacheKey, result);
+    if (fuzzyMatchCache.size > 1000) {
+      // Clear oldest entries if cache gets too large
+      const keys = Array.from(fuzzyMatchCache.keys());
+      keys.slice(0, 100).forEach(key => fuzzyMatchCache.delete(key));
+    }
+    return result;
+  };
+};
+const fuzzyMatch = createFuzzyMatch();
+
 const Search = memo(() => {
+  const { userData } = useAuth();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState([]);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
+  // Use uncontrolled input to prevent re-renders on every keystroke
+  const searchInputRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState(() => {
     const saved = window.sessionStorage.getItem("searchQuery");
     return saved || "";
   });
+  const searchTimerRef = useRef(null);
   
-  // Debounced search query for filtering (prevents input lag)
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 150);
+  // Debounce the actual search query that triggers filtering
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
+  
+  // Handle input changes without triggering re-renders
+  const handleSearchInput = useCallback((value) => {
+    // Clear existing timer
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    
+    // Update search query after user stops typing (500ms delay)
+    searchTimerRef.current = setTimeout(() => {
+      setSearchQuery(value);
+    }, 500);
+  }, []);
   
   // Generate random ad card positions once per session
   const [adCardPositions] = useState(() => {
@@ -194,42 +271,22 @@ const Search = memo(() => {
     ];
   });
 
+  // Memoize user ad preferences to prevent unnecessary re-fetches
+  const userAdPreferences = useMemo(() => ({
+    isSubscribed: userData?.ascendSubscription?.active === true,
+    isVerified: userData?.verified === true || userData?.owner === true || userData?.contributor === true,
+    hideAds: userData?.hidePartnerAds === true
+  }), [userData?.ascendSubscription?.active, userData?.verified, userData?.owner, userData?.contributor, userData?.hidePartnerAds]);
+
   // Fetch ads from API - check if user has hidePartnerAds enabled
   useEffect(() => {
     const fetchAds = async () => {
       try {
-        const token = await getAuthToken();
+        const { isSubscribed, isVerified, hideAds } = userAdPreferences;
         
-        // Check user's subscription status and hidePartnerAds preference
-        const userResponse = await fetch('https://api.ascendara.app/auth/token', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!userResponse.ok) {
-          // If we can't verify user, show ads by default
-          const response = await fetch('https://api.ascendara.app/ads/all', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          const data = await response.json();
-          if (data.success && data.ads.length > 0) {
-            setAds(data.ads);
-          }
-          return;
-        }
-
-        const userData = await userResponse.json();
-        
-        // Only hide ads if user is (subscribed OR verified) AND has hidePartnerAds enabled
-        const isSubscribed = userData.ascendSubscription?.active === true;
-        const isVerified = userData.verified === true || userData.owner === true || userData.contributor === true;
-        const hideAds = userData.hidePartnerAds === true;
-        
-        // Show ads if user is not (subscribed or verified) OR has not enabled hidePartnerAds
+        // Only fetch ads if user doesn't have hidePartnerAds enabled OR is not subscribed/verified
         if ((!isSubscribed && !isVerified) || !hideAds) {
+          const token = await getAuthToken();
           const response = await fetch('https://api.ascendara.app/ads/all', {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -239,13 +296,16 @@ const Search = memo(() => {
           if (data.success && data.ads.length > 0) {
             setAds(data.ads);
           }
+        } else {
+          // User has hidePartnerAds enabled and is subscribed/verified - don't show ads
+          setAds([]);
         }
       } catch (error) {
         console.error('Failed to fetch ads:', error);
       }
     };
     fetchAds();
-  }, []);
+  }, [userAdPreferences]);
 
   // Track ad view (non-blocking, fire-and-forget)
   const trackAdView = useCallback((adId) => {
@@ -380,6 +440,9 @@ const Search = memo(() => {
 
   // Handle selecting a recent search
   const handleRecentSearchClick = useCallback(query => {
+    if (mainSearchRef.current) {
+      mainSearchRef.current.value = query;
+    }
     setSearchQuery(query);
     setShowRecentSearches(false);
     mainSearchRef.current?.blur();
@@ -392,21 +455,23 @@ const Search = memo(() => {
 
   // Quick search - search only game titles (uses debounced query)
   useEffect(() => {
-    if (!debouncedSearchQuery || debouncedSearchQuery.trim().length === 0) {
+    if (!searchQuery || searchQuery.trim().length === 0) {
       setQuickSearchResults([]);
       return;
     }
 
-    const query = debouncedSearchQuery.toLowerCase().trim();
-    const results = games
-      .filter(game => {
-        const title = game.game.toLowerCase();
-        return title.includes(query);
-      })
-      .slice(0, 5); // Limit to 5 results
+    const query = searchQuery.toLowerCase().trim();
+    // Early exit optimization - stop after finding 5 results
+    const results = [];
+    for (let i = 0; i < games.length && results.length < 5; i++) {
+      const title = games[i].game.toLowerCase();
+      if (title.includes(query)) {
+        results.push(games[i]);
+      }
+    }
 
     setQuickSearchResults(results);
-  }, [debouncedSearchQuery, games]);
+  }, [searchQuery, games]);
 
   // Handle scroll to show/hide sticky search bar with throttling
   useEffect(() => {
@@ -466,63 +531,6 @@ const Search = memo(() => {
     );
   }, []);
 
-  const fuzzyMatch = useMemo(() => {
-    const cache = new Map();
-
-    return (text, query) => {
-      if (!text || !query) return false;
-
-      const cacheKey = `${text.toLowerCase()}-${query.toLowerCase()}`;
-      if (cache.has(cacheKey)) return cache.get(cacheKey);
-
-      text = text.toLowerCase();
-      query = query.toLowerCase();
-
-      // Direct substring match for better performance
-      if (text.includes(query)) {
-        cache.set(cacheKey, true);
-        return true;
-      }
-
-      const queryWords = query.split(/\s+/).filter(word => word.length > 0);
-      if (queryWords.length === 0) {
-        cache.set(cacheKey, false);
-        return false;
-      }
-
-      const result = queryWords.every(queryWord => {
-        if (/\d/.test(queryWord)) return text.includes(queryWord);
-
-        const words = text.split(/\s+/);
-        return words.some(word => {
-          if (/\d/.test(word)) return word.includes(queryWord);
-          if (word.includes(queryWord)) return true;
-
-          // Optimize character matching
-          let matches = 0;
-          let lastIndex = -1;
-
-          for (const char of queryWord) {
-            const index = word.indexOf(char, lastIndex + 1);
-            if (index > lastIndex) {
-              matches++;
-              lastIndex = index;
-            }
-          }
-
-          return matches >= queryWord.length * 0.8;
-        });
-      });
-
-      cache.set(cacheKey, result);
-      if (cache.size > 1000) {
-        // Clear cache if it gets too large
-        const keys = Array.from(cache.keys());
-        keys.slice(0, 100).forEach(key => cache.delete(key));
-      }
-      return result;
-    };
-  }, []);
 
   const refreshGames = useCallback(
     async (forceRefresh = false) => {
@@ -668,100 +676,98 @@ const Search = memo(() => {
     return () => stopStatusCheck();
   }, [settings?.usingLocalIndex]);
 
-  // Persist searchQuery to sessionStorage (use debounced to avoid writing on every keystroke)
+  // Persist all state - single combined effect with debouncing
   useEffect(() => {
-    window.sessionStorage.setItem("searchQuery", debouncedSearchQuery);
-  }, [debouncedSearchQuery]);
-
-  // Persist all filter/sort state - single combined effect
-  useEffect(() => {
-    window.sessionStorage.setItem("selectedCategories", JSON.stringify(selectedCategories));
-    window.sessionStorage.setItem("selectedSort", selectedSort);
-    window.sessionStorage.setItem("onlineFilter", onlineFilter);
-    window.sessionStorage.setItem("showDLC", showDLC.toString());
-    window.sessionStorage.setItem("showOnline", showOnline.toString());
-    window.localStorage.setItem("filterSmallestSize", filterSmallestSize.toString());
-    window.localStorage.setItem("filterProvider", filterProvider);
-  }, [selectedCategories, selectedSort, onlineFilter, showDLC, showOnline, filterSmallestSize, filterProvider]);
+    const timer = setTimeout(() => {
+      window.sessionStorage.setItem("searchQuery", searchQuery);
+      window.sessionStorage.setItem("selectedCategories", JSON.stringify(selectedCategories));
+      window.sessionStorage.setItem("selectedSort", selectedSort);
+      window.sessionStorage.setItem("onlineFilter", onlineFilter);
+      window.sessionStorage.setItem("showDLC", showDLC.toString());
+      window.sessionStorage.setItem("showOnline", showOnline.toString());
+      window.localStorage.setItem("filterSmallestSize", filterSmallestSize.toString());
+      window.localStorage.setItem("filterProvider", filterProvider);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedCategories, selectedSort, onlineFilter, showDLC, showOnline, filterSmallestSize, filterProvider]);
 
   const filteredGames = useMemo(() => {
     if (!games?.length) return [];
 
-    // Create a fast lookup for categories
-    const categorySet = new Set(selectedCategories);
-    const source = settings?.gameSource || "steamrip";
-
-    // Pre-compute filter conditions
-    const hasCategories = categorySet.size > 0;
+    // Early return if no filters applied
+    const hasSearch = debouncedSearchQuery?.trim().length > 0;
+    const hasCategories = selectedCategories.length > 0;
     const hasContentFilters = showDLC || showOnline;
     const hasOnlineFilter = onlineFilter !== "all";
+    const source = settings?.gameSource || "steamrip";
     const isFitGirl = source === "fitgirl";
 
-    // Apply all filters in a single pass
-    let filtered = games.filter(game => {
-      // Search filter
-      if (debouncedSearchQuery) {
-        const gameTitle = game.game;
-        const gameDesc = game.desc || "";
-        if (!fuzzyMatch(gameTitle + " " + gameDesc, debouncedSearchQuery)) {
-          return false;
-        }
-      }
+    // If no filters, just sort and return
+    if (!hasSearch && !hasCategories && !hasContentFilters && !hasOnlineFilter) {
+      if (isFitGirl) return games;
+      
+      const sortFn = getSortFunction(selectedSort);
+      return sortFn ? [...games].sort(sortFn) : games;
+    }
 
-      // Category filter
+    // Create a fast lookup for categories
+    const categorySet = hasCategories ? new Set(selectedCategories) : null;
+    const lowerQuery = hasSearch ? debouncedSearchQuery.toLowerCase().trim() : "";
+
+    // Apply all filters in a single pass
+    const filtered = [];
+    for (let i = 0; i < games.length; i++) {
+      const game = games[i];
+      
+      // Category filter (fast check first)
       if (hasCategories && !game.category?.some(cat => categorySet.has(cat))) {
-        return false;
+        continue;
       }
 
       // Content filters (DLC/Online)
       if (hasContentFilters) {
         if (showDLC && showOnline) {
-          if (!game.dlc && !game.online) return false;
+          if (!game.dlc && !game.online) continue;
         } else if (showDLC && !game.dlc) {
-          return false;
+          continue;
         } else if (showOnline && !game.online) {
-          return false;
+          continue;
         }
       }
 
       // Online filter
       if (hasOnlineFilter) {
-        if (onlineFilter === "online" && !game.online) return false;
-        if (onlineFilter === "offline" && game.online) return false;
+        if (onlineFilter === "online" && !game.online) continue;
+        if (onlineFilter === "offline" && game.online) continue;
       }
 
-      return true;
-    });
+      // Search filter last (most expensive)
+      if (hasSearch) {
+        const gameTitle = game.game.toLowerCase();
+        const gameDesc = (game.desc || "").toLowerCase();
+        
+        // Fast path: direct substring match
+        if (gameTitle.includes(lowerQuery) || gameDesc.includes(lowerQuery)) {
+          filtered.push(game);
+          continue;
+        }
+        
+        // Slow path: fuzzy match
+        const searchText = `${game.game} ${game.desc || ""}`;
+        if (fuzzyMatch(searchText, debouncedSearchQuery)) {
+          filtered.push(game);
+        }
+      } else {
+        filtered.push(game);
+      }
+    }
 
     // Skip sorting for FitGirl source
     if (isFitGirl) return filtered;
 
-    // Optimize sorting
-    const sortFn = (() => {
-      switch (selectedSort) {
-        case "weight":
-          return (a, b) => (b.weight || 0) - (a.weight || 0);
-        case "weight-asc":
-          return (a, b) => (a.weight || 0) - (b.weight || 0);
-        case "name":
-          return (a, b) => a.game.localeCompare(b.game);
-        case "name-desc":
-          return (a, b) => b.game.localeCompare(a.game);
-        case "latest_update-desc":
-          return (a, b) => {
-            // Sort descending by latest_update (most recent first)
-            if (!a.latest_update && !b.latest_update) return 0;
-            if (!a.latest_update) return 1;
-            if (!b.latest_update) return -1;
-            // Compare as dates (YYYY-MM-DD)
-            return new Date(b.latest_update) - new Date(a.latest_update);
-          };
-        default:
-          return null;
-      }
-    })();
-
-    return sortFn ? [...filtered].sort(sortFn) : filtered;
+    const sortFn = getSortFunction(selectedSort);
+    return sortFn ? filtered.sort(sortFn) : filtered;
   }, [
     games,
     debouncedSearchQuery,
@@ -771,8 +777,30 @@ const Search = memo(() => {
     settings?.gameSource,
     showDLC,
     showOnline,
-    fuzzyMatch,
   ]);
+
+  // Extract sort function to avoid recreating it
+  function getSortFunction(sortType) {
+    switch (sortType) {
+      case "weight":
+        return (a, b) => (b.weight || 0) - (a.weight || 0);
+      case "weight-asc":
+        return (a, b) => (a.weight || 0) - (b.weight || 0);
+      case "name":
+        return (a, b) => a.game.localeCompare(b.game);
+      case "name-desc":
+        return (a, b) => b.game.localeCompare(a.game);
+      case "latest_update-desc":
+        return (a, b) => {
+          if (!a.latest_update && !b.latest_update) return 0;
+          if (!a.latest_update) return 1;
+          if (!b.latest_update) return -1;
+          return new Date(b.latest_update) - new Date(a.latest_update);
+        };
+      default:
+        return null;
+    }
+  }
 
   useEffect(() => {
     // Initialize with first batch of games
@@ -814,10 +842,11 @@ const Search = memo(() => {
     return () => observer.disconnect();
   }, [loadMore, isLoadingMore, hasMore]);
 
-  const handleDownload = async game => {
+  const handleDownload = useCallback(async game => {
     // Save the current search query when downloading a game
-    if (searchQuery && searchQuery.trim()) {
-      saveRecentSearch(searchQuery);
+    const currentSearch = mainSearchRef.current?.value || searchQuery;
+    if (currentSearch && currentSearch.trim()) {
+      saveRecentSearch(currentSearch);
     }
 
     try {
@@ -842,18 +871,21 @@ const Search = memo(() => {
         },
       });
     }
-  };
+  }, [searchQuery, saveRecentSearch, navigate, mainSearchRef]);
 
   // Handle clicking on a quick search result
   const handleQuickSearchClick = useCallback(
     game => {
-      saveRecentSearch(searchQuery);
+      const currentSearch = mainSearchRef.current?.value || searchQuery;
+      if (currentSearch) {
+        saveRecentSearch(currentSearch);
+      }
       handleDownload(game);
       setTimeout(() => {
         setShowRecentSearches(false);
       }, 100);
     },
-    [searchQuery, saveRecentSearch, handleDownload]
+    [searchQuery, saveRecentSearch, handleDownload, mainSearchRef]
   );
 
   const handleRefreshIndex = async () => {
@@ -1113,14 +1145,27 @@ const Search = memo(() => {
                 <Input
                   ref={mainSearchRef}
                   placeholder={t("search.placeholder")}
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                  defaultValue={searchQuery}
+                  onChange={e => handleSearchInput(e.target.value)}
                   onClick={e => e.target.select()}
                   onFocus={handleSearchFocus}
-                  onBlur={handleSearchBlur}
+                  onBlur={e => {
+                    handleSearchBlur();
+                    // Clear timer and immediately apply search on blur
+                    if (searchTimerRef.current) {
+                      clearTimeout(searchTimerRef.current);
+                    }
+                    setSearchQuery(e.target.value);
+                  }}
                   onKeyDown={e => {
-                    if (e.key === "Enter" && searchQuery.trim()) {
-                      saveRecentSearch(searchQuery);
+                    if (e.key === "Enter" && e.target.value.trim()) {
+                      // Clear timer and immediately apply search
+                      if (searchTimerRef.current) {
+                        clearTimeout(searchTimerRef.current);
+                      }
+                      const value = e.target.value;
+                      saveRecentSearch(value);
+                      setSearchQuery(value);
                       mainSearchRef.current?.blur();
                     }
                   }}
@@ -1377,34 +1422,16 @@ const Search = memo(() => {
               </div>
             ) : (
               <div className="relative">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  {(() => {
-                    const isSearching = debouncedSearchQuery.trim().length > 0;
-                    const activePositions = isSearching ? searchAdPositions : adCardPositions;
-                    const adPositionSet = new Set(activePositions);
-                    const lastIndex = displayedGames.length - 1;
-                    const hasAds = ads.length > 0;
-
-                    return displayedGames.map((game, index) => {
-                      const position = index + 1;
-                      const showAd = hasAds && index !== lastIndex && adPositionSet.has(position);
-                      const ad = showAd ? ads[activePositions.indexOf(position) % ads.length] : null;
-
-                      return (
-                        <React.Fragment key={game.imgID || game.id || `${game.game}-${game.version}`}>
-                          <div data-game-name={game.game}>
-                            <GameCard game={game} onDownload={() => handleDownload(game)} />
-                          </div>
-                          {showAd && (
-                            <div key={`ad-${index}`}>
-                              <AdCard ad={ad} onView={trackAdView} onClick={trackAdClick} />
-                            </div>
-                          )}
-                        </React.Fragment>
-                      );
-                    });
-                  })()}
-                </div>
+                <GameGrid 
+                  displayedGames={displayedGames}
+                  debouncedSearchQuery={debouncedSearchQuery}
+                  searchAdPositions={searchAdPositions}
+                  adCardPositions={adCardPositions}
+                  ads={ads}
+                  handleDownload={handleDownload}
+                  trackAdView={trackAdView}
+                  trackAdClick={trackAdClick}
+                />
                 {hasMore && (
                   <div ref={loaderRef} className="flex justify-center py-8">
                     <div className="flex items-center space-x-2">
@@ -1466,5 +1493,70 @@ function useWindowSize() {
 
   return gamesPerPage;
 }
+
+// Memoized game card wrapper to prevent re-renders
+const MemoizedGameCard = memo(({ game, onDownload }) => (
+  <div data-game-name={game.game}>
+    <GameCard game={game} onDownload={onDownload} />
+  </div>
+), (prevProps, nextProps) => {
+  // Only re-render if the game object reference changes
+  return prevProps.game === nextProps.game && prevProps.onDownload === nextProps.onDownload;
+});
+
+// Memoized game grid component to prevent re-renders on search input
+const GameGrid = memo(({ 
+  displayedGames, 
+  debouncedSearchQuery, 
+  searchAdPositions, 
+  adCardPositions, 
+  ads, 
+  handleDownload,
+  trackAdView,
+  trackAdClick 
+}) => {
+  // Create stable callback references for each game
+  const downloadCallbacks = useMemo(() => {
+    const callbacks = new Map();
+    displayedGames.forEach(game => {
+      const key = game.imgID || game.id || `${game.game}-${game.version}`;
+      if (!callbacks.has(key)) {
+        callbacks.set(key, () => handleDownload(game));
+      }
+    });
+    return callbacks;
+  }, [displayedGames, handleDownload]);
+
+  const isSearching = debouncedSearchQuery.trim().length > 0;
+  const activePositions = isSearching ? searchAdPositions : adCardPositions;
+  const adPositionSet = useMemo(() => new Set(activePositions), [activePositions]);
+  const lastIndex = displayedGames.length - 1;
+  const hasAds = ads.length > 0;
+
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {displayedGames.map((game, index) => {
+        const key = game.imgID || game.id || `${game.game}-${game.version}`;
+        const position = index + 1;
+        const showAd = hasAds && index !== lastIndex && adPositionSet.has(position);
+        const ad = showAd ? ads[activePositions.indexOf(position) % ads.length] : null;
+
+        return (
+          <React.Fragment key={key}>
+            <MemoizedGameCard 
+              game={game} 
+              onDownload={downloadCallbacks.get(key)} 
+            />
+            {showAd && (
+              <div key={`ad-${index}`}>
+                <AdCard ad={ad} onView={trackAdView} onClick={trackAdClick} />
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+});
 
 export default Search;
