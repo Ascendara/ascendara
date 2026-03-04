@@ -1,19 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
+import { getAuthToken as getAuthTokenHelper } from "@/utils/authHelper";
 import { checkForUpdates } from "@/services/updateCheckingService";
-import {
-  processNextInQueue,
-  getDownloadQueue,
-  removeFromQueue,
-} from "@/services/downloadQueueService";
-import {
-  initializeDownloadSync,
-  stopDownloadSync,
-  checkDownloadCommands,
-  acknowledgeCommand,
-  forceSyncDownloads,
-} from "@/services/downloadSyncService";
 import { getDeviceIcon, getDeviceDescription } from "@/lib/deviceParser";
 import { cn } from "@/lib/utils";
 import {
@@ -203,13 +192,7 @@ const GoogleIcon = ({ className }) => (
 
 // Helper function to get auth token for API calls
 const getAuthToken = async () => {
-  const authHeaders = await window.electron.getAuthHeaders();
-  const response = await fetch("https://api.ascendara.app/auth/token", {
-    headers: authHeaders,
-  });
-  if (!response.ok) throw new Error("Failed to obtain token");
-  const { token } = await response.json();
-  return token;
+  return getAuthTokenHelper();
 };
 
 const Ascend = () => {
@@ -1810,17 +1793,15 @@ const Ascend = () => {
         if (!authToken) {
           toast.error(
             t("account.errors.authenticationFailed") ||
-              "Authentication failed. Please log in again."
+              "Authentication failed. Please try again."
           );
-          await handleLogout();
           return;
         }
       } catch (authError) {
         console.error("Authentication error:", authError);
         toast.error(
-          t("account.errors.accountNotFound") || "Account not found. Please log in again."
+          t("account.errors.authenticationFailed") || "Authentication failed. Please try again."
         );
-        await handleLogout();
         return;
       }
 
@@ -1871,6 +1852,7 @@ const Ascend = () => {
     try {
       setShowPlanDialog(false);
 
+      // Get a fresh token for the request
       const authToken = await getAuthToken();
       const response = await fetch(
         "https://api.ascendara.app/stripe/create-checkout-session",
@@ -1888,9 +1870,37 @@ const Ascend = () => {
           }),
         }
       );
+
       if (response.ok) {
         const { url } = await response.json();
         window.electron?.openURL?.(url);
+      } else if (response.status === 401) {
+        // Token expired or invalid, retry with a fresh token
+        console.log("Token expired, retrying with fresh token...");
+        const newToken = await getAuthToken();
+        const retryResponse = await fetch(
+          "https://api.ascendara.app/stripe/create-checkout-session",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${newToken}`,
+            },
+            body: JSON.stringify({
+              userId: user.uid,
+              priceId: priceId,
+              successUrl: "ascendara://checkout-success?session_id={CHECKOUT_SESSION_ID}",
+              cancelUrl: "ascendara://checkout-canceled",
+            }),
+          }
+        );
+
+        if (retryResponse.ok) {
+          const { url } = await retryResponse.json();
+          window.electron?.openURL?.(url);
+        } else {
+          toast.error(t("ascend.settings.checkoutError"));
+        }
       } else {
         toast.error(t("ascend.settings.checkoutError"));
       }
