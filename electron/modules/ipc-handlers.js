@@ -206,6 +206,8 @@ function registerMiscHandlers() {
   // Write file (for cloud backup restore)
   ipcMain.handle("writeFile", async (_, filePath, buffer) => {
     try {
+      // Ensure parent folder exists (creates it if needed)
+      await fs.ensureDir(path.dirname(filePath)); 
       await fs.promises.writeFile(filePath, Buffer.from(buffer));
       return true;
     } catch (error) {
