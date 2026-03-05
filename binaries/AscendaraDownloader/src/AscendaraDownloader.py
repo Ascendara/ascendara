@@ -1024,8 +1024,8 @@ class RobustDownloader:
                 # Update progress for non-directory entries
                 if not zip_info.is_dir():
                     self._files_extracted_count += 1
-                    # Only update progress every 100 files to reduce I/O overhead
-                    if self._files_extracted_count % 100 == 0 or self._files_extracted_count == self._total_files_to_extract:
+                    # Update progress more frequently: first 10 files (every file), then every 50 files, or at completion
+                    if self._files_extracted_count <= 10 or self._files_extracted_count % 50 == 0 or self._files_extracted_count == self._total_files_to_extract:
                         self._update_extraction_progress(zip_info.filename, self._files_extracted_count, self._total_files_to_extract)
     
     def _extract_rar(self, archive_path: str, watching_data: Dict):

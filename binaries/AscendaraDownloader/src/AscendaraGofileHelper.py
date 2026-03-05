@@ -876,25 +876,38 @@ class GofileDownloader:
                                     if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
                                         total_files_to_extract += 1
                         elif file.endswith('.rar'):
-                            # Count files using subprocess (avoids unrar Python module dependency)
-                            unrar_bin = shutil.which('unrar') or shutil.which('unrar-free')
-                            sevenz_bin = shutil.which('7z') or shutil.which('7za') or shutil.which('7zr')
-                            list_lines = []
-                            if unrar_bin:
-                                result = subprocess.run([unrar_bin, 'l', archive_path], capture_output=True, text=True)
-                                list_lines = result.stdout.splitlines()
-                            elif sevenz_bin:
-                                result = subprocess.run([sevenz_bin, 'l', archive_path], capture_output=True, text=True)
-                                list_lines = result.stdout.splitlines()
-                            for line in list_lines:
-                                # Skip directory entries and unwanted files
-                                if line.strip().endswith('/') or line.strip().endswith('\\'):
-                                    continue
-                                if '.url' in line or '_CommonRedist' in line:
-                                    continue
-                                # unrar 'l' output has filenames after size/date columns; count non-blank lines with content
-                                if line.strip() and not line.startswith('-') and not line.startswith('RAR') and not line.startswith('Archive') and not line.startswith('Details') and not line.startswith('Attr') and not line.startswith('Total'):
-                                    total_files_to_extract += 1
+                            # Count files - use Python library on Windows, command-line tools on other platforms
+                            if sys.platform == "win32":
+                                try:
+                                    from unrar import rarfile
+                                    with rarfile.RarFile(archive_path, 'r') as rar_ref:
+                                        for rar_info in rar_ref.infolist():
+                                            # Skip directories and unwanted files
+                                            is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                                            if not is_dir and not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:
+                                                total_files_to_extract += 1
+                                except Exception as e:
+                                    logging.warning(f"[AscendaraGofileHelper] Could not count RAR files with library: {e}")
+                            else:
+                                # Use command-line tools on non-Windows platforms
+                                unrar_bin = shutil.which('unrar') or shutil.which('unrar-free')
+                                sevenz_bin = shutil.which('7z') or shutil.which('7za') or shutil.which('7zr')
+                                list_lines = []
+                                if unrar_bin:
+                                    result = subprocess.run([unrar_bin, 'l', archive_path], capture_output=True, text=True)
+                                    list_lines = result.stdout.splitlines()
+                                elif sevenz_bin:
+                                    result = subprocess.run([sevenz_bin, 'l', archive_path], capture_output=True, text=True)
+                                    list_lines = result.stdout.splitlines()
+                                for line in list_lines:
+                                    # Skip directory entries and unwanted files
+                                    if line.strip().endswith('/') or line.strip().endswith('\\'):
+                                        continue
+                                    if '.url' in line or '_CommonRedist' in line:
+                                        continue
+                                    # unrar 'l' output has filenames after size/date columns; count non-blank lines with content
+                                    if line.strip() and not line.startswith('-') and not line.startswith('RAR') and not line.startswith('Archive') and not line.startswith('Details') and not line.startswith('Attr') and not line.startswith('Total'):
+                                        total_files_to_extract += 1
                     except Exception as e:
                         logging.warning(f"[AscendaraGofileHelper] Could not count files in {archive_path}: {e}")
         
@@ -920,25 +933,26 @@ class GofileDownloader:
                             
                             logging.info(f"[AscendaraGofileHelper] Extracting {len(members_to_extract)} files from ZIP")
                             
-                            # Use extractall() for dramatically faster extraction (10-100x faster than file-by-file)
-                            try:
-                                zip_ref.extractall(extract_dir, members=members_to_extract)
-                                logging.info(f"[AscendaraGofileHelper] Bulk ZIP extraction complete")
-                            except Exception as e:
-                                logging.error(f"[AscendaraGofileHelper] Bulk ZIP extraction failed: {e}")
-                                raise
-                            
-                            # Build watching data and update progress after extraction
+                            # Extract files one by one for real-time progress reporting
                             for zip_info in members_to_extract:
+                                try:
+                                    zip_ref.extract(zip_info, extract_dir)
+                                except Exception as e:
+                                    logging.warning(f"[AscendaraGofileHelper] Failed to extract {zip_info.filename}: {e}")
+                                    continue
+                                
                                 extracted_path = os.path.join(extract_dir, zip_info.filename)
                                 key = f"{os.path.relpath(extracted_path, self.download_dir)}"
                                 watching_data[key] = {"size": zip_info.file_size}
+                                
                                 # Update progress for non-directory entries
                                 if not zip_info.is_dir():
                                     self._files_extracted_count += 1
-                                    # Only update progress every 100 files to reduce I/O overhead
-                                    if self._files_extracted_count % 100 == 0 or self._files_extracted_count == total_files_to_extract:
+                                    # Update progress more frequently: first 10 files (every file), then every 50 files, or at completion
+                                    if self._files_extracted_count <= 10 or self._files_extracted_count % 50 == 0 or self._files_extracted_count == total_files_to_extract:
                                         self._update_extraction_progress(zip_info.filename, self._files_extracted_count, total_files_to_extract)
+                            
+                            logging.info(f"[AscendaraGofileHelper] ZIP extraction complete")
                     elif file.endswith('.rar'):
                         from unrar import rarfile
                         import threading
@@ -980,26 +994,46 @@ class GofileDownloader:
                             thread = threading.Thread(target=extract_thread, daemon=False)
                             thread.start()
                             
-                            # Monitor progress by counting extracted files
+                            # Monitor progress by counting extracted files and tracking latest file
                             last_count = 0
                             last_update_time = time.time()
+                            last_file_name = "Preparing..."
+                            
                             while not extraction_complete.is_set():
-                                # Count files in extraction directory (subtract initial count)
+                                # Count files in extraction directory and find most recent file
                                 current_count = 0
+                                latest_file = None
+                                latest_mtime = 0
+                                
                                 try:
                                     for root, dirs, files_in_dir in os.walk(extract_dir):
-                                        current_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
+                                        for f in files_in_dir:
+                                            if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip'):
+                                                current_count += 1
+                                                # Track the most recently modified file
+                                                try:
+                                                    full_path = os.path.join(root, f)
+                                                    mtime = os.path.getmtime(full_path)
+                                                    if mtime > latest_mtime:
+                                                        latest_mtime = mtime
+                                                        latest_file = f
+                                                except Exception:
+                                                    pass
                                 except Exception:
                                     pass
                                 
                                 # Calculate newly extracted files
                                 newly_extracted = max(0, current_count - initial_file_count)
                                 
+                                # Update current file name if we found a new one
+                                if latest_file and latest_file != last_file_name:
+                                    last_file_name = latest_file
+                                
                                 # Update progress if files changed or every 5 seconds
                                 current_time = time.time()
                                 if newly_extracted > last_count or (current_time - last_update_time) >= 5.0:
                                     files_extracted_this_archive = self._files_extracted_count + newly_extracted
-                                    self._update_extraction_progress(f"Extracting... ({newly_extracted} files)", files_extracted_this_archive, total_files_to_extract, force=True)
+                                    self._update_extraction_progress(last_file_name, files_extracted_this_archive, total_files_to_extract, force=True)
                                     last_count = newly_extracted
                                     last_update_time = current_time
                                 
