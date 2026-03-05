@@ -262,6 +262,14 @@ async function getNewLangKeys() {
             args = [langCode, "--updateKeys"];
           }
 
+          // Check if translation executable exists before attempting to spawn
+          if (!fs.existsSync(translatorExePath)) {
+            console.warn(
+              `Translation executable not found at ${translatorExePath}, skipping translation update for ${langCode}`
+            );
+            continue;
+          }
+
           // Add each missing key as a separate --newKey argument
           missing.forEach(key => {
             args.push("--newKey", key);
@@ -282,6 +290,11 @@ async function getNewLangKeys() {
           });
 
           await new Promise((resolve, reject) => {
+            translationProcess.on("error", err => {
+              console.error(`Translation process spawn error for ${langCode}:`, err);
+              reject(err);
+            });
+
             translationProcess.on("close", code => {
               if (code === 0) {
                 resolve();
