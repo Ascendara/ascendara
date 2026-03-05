@@ -487,6 +487,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       }
 
       // If not found locally, download from cloud
+      let backupFileNameToRestore = null;
       if (!backupFilePath) {
         // Get download URL from backend
         const result = await getBackupDownloadUrl(cloudBackup.backupId);
@@ -515,24 +516,30 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         const arrayBuffer = await blob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
 
-        // Save to temp location
-        const tempPath = await window.electron.getTempPath();
-        // Sanitize filename to remove invalid characters for Windows file paths
+        const gameBackupFolder = `${settings.ludusavi.backupLocation}/${gameName}`;
         const sanitizedName = cloudBackup.name
           .replace(/[<>:"/\\|?*]/g, "_")
           .replace(/\s+/g, "_");
-        backupFilePath = `${tempPath}/${sanitizedName}.zip`;
+        const finalFileName = sanitizedName.endsWith('.zip') ? sanitizedName : `${sanitizedName}.zip`;
+        
+        backupFilePath = `${gameBackupFolder}/${finalFileName}`;
+        
         await window.electron.writeFile(backupFilePath, uint8Array);
-        needsCleanup = true;
+        
+        backupFileNameToRestore = finalFileName;
+      } else {
+        // If file already exists
+        backupFileNameToRestore = backupFilePath.split('/').pop().split('\\').pop();
       }
 
       // Extract and restore using Ludusavi
       toast.info("Restoring backup...");
 
+      // Giving Ludusavi the exact name of the file to restore
       const restoreResult = await window.electron.ludusavi(
         "restore",
         gameName,
-        backupFilePath
+        backupFileNameToRestore
       );
 
       if (restoreResult.success) {
