@@ -92,7 +92,7 @@ async function existsAndIsYoungerThan(filePath, { timeUnit = "M", time = 6 }) {
   }
 }
 
-module.exports.loadSteamData = async (appID, lang, key) => {
+module.exports.loadSteamData = async (appID, lang, key = null) => {
   if (!steamLang.some(language => language.api === lang)) {
     throw "Unsupported API language code";
   }
@@ -110,9 +110,7 @@ module.exports.loadSteamData = async (appID, lang, key) => {
     if (await existsAndIsYoungerThan(filePath, { timeUnit: "M", time: 6 })) {
       result = JSON.parse(await fs.readFile(filePath));
     } else {
-      if (!key) {
-        throw new Error("Steam Web API key is required to fetch achievement schema.");
-      }
+      // Fetch from backend API (no key needed)
       result = await getSteamData(appID, lang, key);
       // Ensure cache directory exists before writing
       await fs.mkdir(cache, { recursive: true });
@@ -148,8 +146,9 @@ module.exports.fetchIcon = async (url, appID) => {
   }
 };
 
-async function getSteamData(appID, lang, key) {
-  const url = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v0002/?key=${key}&appid=${appID}&l=${lang}&format=json`;
+async function getSteamData(appID, lang, key = null) {
+  // Use backend API proxy instead of direct Steam API call
+  const url = `https://api.ascendara.app/api/proxy/steam/achievements?appid=${appID}&lang=${lang}`;
 
   const data = await fetchJson(url);
 

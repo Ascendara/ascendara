@@ -16,7 +16,6 @@ const { spawn } = require("child_process");
 // Get config from ENV or IPC
 const homeDir = process.env.USERPROFILE || process.env.HOME || require("os").homedir();
 const timestampFilePath = path.join(homeDir, "timestamp.ascendara.json");
-const STEAM_WEB_API_KEY = process.env.ASCENDARA_STEAM_WEB_API_KEY;
 let watchdogRunning = false;
 
 async function updateWatchdogStatus(running) {
@@ -434,7 +433,7 @@ var app = {
         console.log("from memory cache");
       } else {
         const lang = await getSteamApiLang();
-        game = await steam.loadSteamData(appID, lang, STEAM_WEB_API_KEY);
+        game = await steam.loadSteamData(appID, lang);
         self.cache.push(game);
         console.log("from file cache or remote");
       }
