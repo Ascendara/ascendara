@@ -5888,7 +5888,9 @@ export default function BigPicture() {
 
       // Allow GameDetailsView to handle its own navigation
       if (view === "details" && action === "MENU") {
-        setIsMenuOpen(true);
+        console.log("[GAME DETAILS VIEW] Menu pressed");
+        setView("store");
+        setSelectedStoreGame(null);
         return;
       } else if (view === "details") {
         // GameDetailsView handles all other navigation internally
