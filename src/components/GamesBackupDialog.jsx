@@ -514,19 +514,41 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
 
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
 
         const gameBackupFolder = `${settings.ludusavi.backupLocation}/${gameName}`;
-        const sanitizedName = cloudBackup.name
-          .replace(/[<>:"/\\|?*]/g, "_")
-          .replace(/\s+/g, "_");
-        const finalFileName = sanitizedName.endsWith('.zip') ? sanitizedName : `${sanitizedName}.zip`;
         
-        backupFilePath = `${gameBackupFolder}/${finalFileName}`;
+        // Extract the combined archive (contains both .zip and mapping.yaml)
+        toast.info("Extracting backup files...");
         
-        await window.electron.writeFile(backupFilePath, uint8Array);
+        const JSZip = (await import('jszip')).default;
+        const combinedZip = await JSZip.loadAsync(arrayBuffer);
         
-        backupFileNameToRestore = finalFileName;
+        // Extract all files from the combined archive
+        const files = Object.keys(combinedZip.files);
+        let extractedBackupName = null;
+        
+        for (const filename of files) {
+          const file = combinedZip.files[filename];
+          if (!file.dir) {
+            const content = await file.async('uint8array');
+            const filePath = `${gameBackupFolder}/${filename}`;
+            
+            // Write each file (both .zip and mapping.yaml)
+            await window.electron.writeFile(filePath, content);
+            
+            // Track the backup .zip filename (not the _cloud.zip)
+            if (filename.endsWith('.zip') && !filename.endsWith('_cloud.zip')) {
+              extractedBackupName = filename;
+            }
+          }
+        }
+        
+        if (!extractedBackupName) {
+          throw new Error("No backup .zip file found in cloud archive");
+        }
+        
+        backupFileNameToRestore = extractedBackupName;
+        needsCleanup = true;
       } else {
         // If file already exists
         backupFileNameToRestore = backupFilePath.split('/').pop().split('\\').pop();
