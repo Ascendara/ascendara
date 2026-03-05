@@ -1351,6 +1351,12 @@ class GofileDownloader:
                 for file in files:
                     if file.endswith('.rar') or file.endswith('.zip') or file.endswith('.7z'):
                         archive_path = os.path.join(root, file)
+                        
+                        # Skip the archive we specifically downloaded and extracted, 
+                        # because it is scheduled for deletion AT THE END of this successful verification
+                        if hasattr(self, 'archive_paths') and archive_path in self.archive_paths:
+                            continue
+                        
                         rel_path = os.path.relpath(archive_path, self.download_dir)
                         verify_errors.append({
                             "file": rel_path,
