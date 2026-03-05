@@ -20,6 +20,7 @@ import time
 import threading
 
 from steamrip_scraper import SteamRIPScraper
+from goggames_scraper import GOGGamesScraper
 from utils import get_blacklist_ids, send_notification
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -27,6 +28,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 # Available scrapers - add new sources here
 AVAILABLE_SCRAPERS = {
     'steamrip': SteamRIPScraper,
+    'goggames': GOGGamesScraper,
     # Future sources can be added here:
     # 'fitgirl': FitGirlScraper,
     # 'dodi': DodiScraper,
