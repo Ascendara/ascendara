@@ -55,3 +55,5 @@ src/services/firestore.rules
 src/translations/en.json.20251230_222339.backup
 src/pages/webview-api.py
 scripts/upload.py
+binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh_old.py
+/binaries/AscendaraLocalRefresh/src/__pycache__
