@@ -104,6 +104,7 @@ const LocalRefresh = () => {
   const [newBlacklistId, setNewBlacklistId] = useState("");
   const [workerCount, setWorkerCount] = useState(8);
   const [fetchPageCount, setFetchPageCount] = useState(50);
+  const [selectedSource, setSelectedSource] = useState("steamrip");
   const [showCookieRefreshDialog, setShowCookieRefreshDialog] = useState(false);
   const [cookieRefreshCount, setCookieRefreshCount] = useState(0);
   const cookieSubmittedRef = useRef(false);
@@ -130,6 +131,9 @@ const LocalRefresh = () => {
         }
         if (settings?.fetchPageCount !== undefined) {
           setFetchPageCount(settings.fetchPageCount);
+        }
+        if (settings?.localRefreshSource !== undefined) {
+          setSelectedSource(settings.localRefreshSource);
         }
 
         // Check if localIndex is set, if not set it to default
@@ -563,6 +567,7 @@ const LocalRefresh = () => {
           perPage: fetchPageCount,
           workers: workerCount,
           userAgent: refreshData.userAgent,
+          source: selectedSource,
         });
 
         if (!result.success) {
@@ -996,8 +1001,42 @@ const LocalRefresh = () => {
                 )}
               </div>
 
-              {/* Progress Section */}
-              <AnimatePresence>
+              {/* Source Selection */}
+              {!isRefreshing && !isUploading && (
+                <div className="mt-4 flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground">
+                    {t("localRefresh.source") || "Source"}:
+                  </Label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={selectedSource === "steamrip" ? "default" : "outline"}
+                      onClick={() => {
+                        setSelectedSource("steamrip");
+                        window.electron?.updateSetting("localRefreshSource", "steamrip");
+                      }}
+                      className="h-8 text-xs"
+                    >
+                      SteamRIP
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedSource === "goggames" ? "default" : "outline"}
+                      onClick={() => {
+                        setSelectedSource("goggames");
+                        window.electron?.updateSetting("localRefreshSource", "goggames");
+                      }}
+                      className="h-8 text-xs"
+                    >
+                      GOG-Games
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Progress Section */}
+            <AnimatePresence>
                 {(isRefreshing || isUploading || refreshStatus === "completed") && (
                   <motion.div
                     initial={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -1129,7 +1168,6 @@ const LocalRefresh = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </Card>
 
             {/* Action Row */}
             <div className="grid gap-4 sm:grid-cols-2">
