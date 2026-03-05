@@ -286,7 +286,7 @@ function registerLocalRefreshHandlers() {
 
   ipcMain.handle(
     "start-local-refresh",
-    async (event, { outputPath, cfClearance, perPage, workers, userAgent }) => {
+    async (event, { outputPath, cfClearance, perPage, workers, userAgent, source }) => {
       if (localRefreshStarting) {
         return { success: true, message: "Refresh already starting" };
       }
@@ -345,6 +345,7 @@ function registerLocalRefreshHandlers() {
         let args;
         const fetchPerPage = perPage || 50;
         const workerCount = workers || 8;
+        const sourceToUse = source || "steamrip";
 
         if (isWindows) {
           if (isDev) {
@@ -353,6 +354,8 @@ function registerLocalRefreshHandlers() {
               "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
               "--output",
               outputPath,
+              "--source",
+              sourceToUse,
               "--per-page",
               String(fetchPerPage),
               "--workers",
@@ -372,6 +375,8 @@ function registerLocalRefreshHandlers() {
             args = [
               "--output",
               outputPath,
+              "--source",
+              sourceToUse,
               "--per-page",
               String(fetchPerPage),
               "--workers",
@@ -392,6 +397,8 @@ function registerLocalRefreshHandlers() {
               "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py",
               "--output",
               outputPath,
+              "--source",
+              sourceToUse,
               "--per-page",
               String(fetchPerPage),
               "--workers",
@@ -404,6 +411,8 @@ function registerLocalRefreshHandlers() {
             args = [
               "--output",
               outputPath,
+              "--source",
+              sourceToUse,
               "--per-page",
               String(fetchPerPage),
               "--workers",
@@ -499,18 +508,25 @@ function registerLocalRefreshHandlers() {
                 currentSettings.shareLocalIndex
               );
               if (currentSettings.shareLocalIndex) {
-                // Check if user has custom blacklisted games (only allow upload if blacklist is default or empty)
-                const DEFAULT_BLACKLIST_IDS = ["ABSXUc", "AWBgqf", "ATaHuq"];
-                const userBlacklist = currentSettings.blacklistIDs || [];
-                const hasCustomBlacklist = userBlacklist.some(
-                  id => !DEFAULT_BLACKLIST_IDS.includes(id)
-                );
-
-                if (hasCustomBlacklist) {
+                // Don't upload GOG-Games indexes (experimental source)
+                const usedSource = currentSettings.localRefreshSource || "steamrip";
+                if (usedSource !== "steamrip") {
                   console.log(
-                    "User has custom blacklisted games, skipping upload to preserve index completeness"
+                    `Source '${usedSource}' is experimental, skipping upload to shared index`
                   );
                 } else {
+                  // Check if user has custom blacklisted games (only allow upload if blacklist is default or empty)
+                  const DEFAULT_BLACKLIST_IDS = ["ABSXUc", "AWBgqf", "ATaHuq"];
+                  const userBlacklist = currentSettings.blacklistIDs || [];
+                  const hasCustomBlacklist = userBlacklist.some(
+                    id => !DEFAULT_BLACKLIST_IDS.includes(id)
+                  );
+
+                  if (hasCustomBlacklist) {
+                    console.log(
+                      "User has custom blacklisted games, skipping upload to preserve index completeness"
+                    );
+                  } else {
                   console.log(
                     "ShareLocalIndex is enabled, uploading index to:",
                     outputPath
@@ -527,6 +543,7 @@ function registerLocalRefreshHandlers() {
                   } catch (uploadErr) {
                     console.error("Upload function error:", uploadErr);
                     throw uploadErr;
+                  }
                   }
                 }
               } else {
