@@ -830,13 +830,10 @@ const Downloads = () => {
             <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/5 blur-3xl" />
             <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
 
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative flex flex-col p-5 gap-6 lg:flex-row lg:items-center lg:justify-between">
               {/* Title and status */}
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                    <ArrowDownToLine className="h-5 w-5 text-primary" />
-                  </div>
                   <div>
                     <h1 className="text-2xl font-bold tracking-tight text-foreground">
                       {t("downloads.activeDownloads")}
@@ -916,12 +913,12 @@ const Downloads = () => {
             </div>
 
             {/* Speed Chart */}
-            <div className="relative mt-6">
+            <div className="relative -mx-8 mt-6">
               <div className="h-[140px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={speedHistory}
-                    margin={{ top: 10, right: 10, bottom: 0, left: 10 }}
+                    margin={{ top: 10, right: 0, bottom: 0, left: 0 }}
                   >
                     <defs>
                       <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
@@ -941,14 +938,12 @@ const Downloads = () => {
                     <YAxis hide domain={[0, "auto"]} />
                     <Tooltip content={<CustomTooltip />} />
                     <Area
-                      type={activeDownloads === 0 ? "linear" : "monotoneX"}
+                      type="monotoneX"
                       dataKey="speed"
                       stroke="rgb(var(--color-primary))"
                       strokeWidth={2.5}
                       fill="url(#speedGradient)"
-                      isAnimationActive={true}
-                      animationDuration={activeDownloads === 0 ? 1500 : 950}
-                      animationEasing={activeDownloads === 0 ? "ease-out" : "linear"}
+                      isAnimationActive={false}
                       connectNulls
                       dot={false}
                       baseValue={0}
@@ -956,7 +951,7 @@ const Downloads = () => {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-              <p className="mt-2 text-center text-xs text-muted-foreground">
+              <p className="mt-2 px-5 text-center text-xs text-muted-foreground">
                 {t("downloads.speedHistory")}
               </p>
             </div>
@@ -1531,32 +1526,11 @@ const DownloadCard = ({
         </div>
       )}
 
-      <div className="relative p-5">
+      <div className="relative p-8">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-center gap-3">
-              {/* Game icon placeholder */}
-              <div
-                className={cn(
-                  "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors",
-                  isCompleted
-                    ? "bg-green-500/10"
-                    : hasError
-                      ? "bg-red-500/10"
-                      : "bg-primary/10"
-                )}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : hasError ? (
-                  <AlertCircle className="h-5 w-5 text-red-500" />
-                ) : isExtracting ? (
-                  <Loader className="h-5 w-5 animate-spin text-primary" />
-                ) : (
-                  <Download className="h-5 w-5 text-primary" />
-                )}
-              </div>
 
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-lg font-semibold text-foreground">
