@@ -1040,7 +1040,17 @@ def extract_shared_index(zip_path, output_dir):
         games_backup = os.path.join(output_dir, "ascendara_games_backup.json")
         imgs_backup = os.path.join(output_dir, "imgs_backup")
         
+        # Get game count for validation
+        game_count = 0
         if os.path.exists(games_file):
+            try:
+                with open(games_file, 'r', encoding='utf-8') as f:
+                    games_data = json.load(f)
+                    game_count = len(games_data)
+                    logging.info(f"Current game count: {game_count}")
+            except Exception as e:
+                logging.warning(f"Could not read game count: {e}")
+            
             shutil.copy2(games_file, games_backup)
             logging.info("Backed up ascendara_games.json")
         
@@ -1050,36 +1060,46 @@ def extract_shared_index(zip_path, output_dir):
             
             # Count files for progress tracking
             total_img_files = sum(len(files) for _, _, files in os.walk(imgs_dir))
-            logging.info(f"Backing up {total_img_files} image files...")
+            logging.info(f"Found {total_img_files} image files")
             
-            # Set total for progress calculation (this will trigger UI updates)
-            progress.set_total_posts(total_img_files)
-            progress.set_current_game(f"Backing up images (0/{total_img_files})...")
-            
-            # Copy with progress updates
-            os.makedirs(imgs_backup, exist_ok=True)
-            copied_files = 0
-            for root, dirs, files in os.walk(imgs_dir):
-                # Create directory structure
-                rel_path = os.path.relpath(root, imgs_dir)
-                dest_dir = os.path.join(imgs_backup, rel_path) if rel_path != '.' else imgs_backup
-                os.makedirs(dest_dir, exist_ok=True)
+            # Check if there are more images than games - indicates corruption/mismatch
+            if game_count > 0 and total_img_files > game_count:
+                logging.warning(f"Image count ({total_img_files}) exceeds game count ({game_count})")
+                logging.warning("Deleting all images to allow fresh download")
+                progress.set_current_game("Cleaning up excess images...")
+                shutil.rmtree(imgs_dir)
+                logging.info("Deleted imgs directory - will download fresh images")
+            else:
+                logging.info(f"Backing up {total_img_files} image files...")
                 
-                # Copy files with progress updates
-                for file in files:
-                    src_file = os.path.join(root, file)
-                    dst_file = os.path.join(dest_dir, file)
-                    shutil.copy2(src_file, dst_file)
-                    copied_files += 1
+                # Set total for progress calculation (this will trigger UI updates)
+                progress.set_total_posts(total_img_files)
+                progress.set_current_game(f"Backing up images (0/{total_img_files})...")
+                
+                # Copy with progress updates
+                os.makedirs(imgs_backup, exist_ok=True)
+                copied_files = 0
+                for root, dirs, files in os.walk(imgs_dir):
+                    # Create directory structure
+                    rel_path = os.path.relpath(root, imgs_dir)
+                    dest_dir = os.path.join(imgs_backup, rel_path) if rel_path != '.' else imgs_backup
+                    os.makedirs(dest_dir, exist_ok=True)
                     
-                    # Update progress every 50 files to trigger UI updates
-                    if copied_files % 50 == 0 or copied_files == total_img_files:
-                        progress.processed_posts = copied_files
-                        progress.set_current_game(f"Backing up images ({copied_files}/{total_img_files})...")
-                        if copied_files % 200 == 0:  # Log less frequently
-                            logging.info(f"Backup progress: {copied_files}/{total_img_files} files")
-            
-            logging.info("Backed up imgs directory")
+                    # Copy files with progress updates
+                    for file in files:
+                        src_file = os.path.join(root, file)
+                        dst_file = os.path.join(dest_dir, file)
+                        shutil.copy2(src_file, dst_file)
+                        copied_files += 1
+                        
+                        # Update progress every 50 files to trigger UI updates
+                        if copied_files % 50 == 0 or copied_files == total_img_files:
+                            progress.processed_posts = copied_files
+                            progress.set_current_game(f"Backing up images ({copied_files}/{total_img_files})...")
+                            if copied_files % 200 == 0:  # Log less frequently
+                                logging.info(f"Backup progress: {copied_files}/{total_img_files} files")
+                
+                logging.info("Backed up imgs directory")
         
         # Extract the zip file
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
