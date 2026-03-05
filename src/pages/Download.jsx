@@ -699,8 +699,40 @@ export default function DownloadPage() {
     const shouldUseTorbox = () =>
       torboxProviders.includes(selectedProvider) && torboxService.isEnabled(settings) && !torboxDisabledForSession;
     
+    // Handle providers when TorBox is disabled for session
+    // This includes both seamless providers and TorBox providers that have been disabled
+    if (torboxProviders.includes(selectedProvider) && torboxDisabledForSession) {
+      // If directUrl is not provided, get it from gameData
+      if (!directUrl) {
+        let providerLinks = gameData.download_links?.[selectedProvider] || [];
+        const validProviderLink = Array.isArray(providerLinks)
+          ? providerLinks.find(link => link && typeof link === "string")
+          : typeof providerLinks === "string"
+            ? providerLinks
+            : null;
+
+        console.log(
+          "[DL] TorBox disabled - using direct link:",
+          validProviderLink,
+          "providerLinks:",
+          providerLinks
+        );
+        if (!validProviderLink) {
+          console.log("[DL] EARLY RETURN: no valid provider link with TorBox disabled");
+          toast.error(t("download.toast.invalidLink"));
+          return;
+        }
+
+        // Properly format the link
+        directUrl = validProviderLink.replace(/^(?:https?:)?\/\//, "https://");
+      } else {
+        // directUrl provided (e.g., from extension), ensure it has proper protocol
+        console.log("[DL] Using provided directUrl with TorBox disabled:", directUrl);
+        directUrl = directUrl.replace(/^(?:https?:)?\/\//, "https://");
+      }
+    }
     // Handle seamless providers (gofile, buzzheavier, pixeldrain) when not using Torbox
-    if (
+    else if (
       (selectedProvider === "gofile" ||
         selectedProvider === "buzzheavier" ||
         selectedProvider === "pixeldrain") &&
