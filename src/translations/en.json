@@ -1148,7 +1148,7 @@
     },
     "toast": {
       "downloadFailed": "Failed to start download",
-      "downloadQueueLimit": "Only one download at a time. Sign in with Ascend for unlimited downloads.",
+      "downloadQueueLimit": "You can have 1 active download and 1 queued download at a time. Sign in with Ascend for unlimited queueing.",
       "downloadQueued": "Download added to queue - will start when current download finishes",
       "downloadReady": "Download ready to start",
       "downloadStarted": "Download started successfully",
