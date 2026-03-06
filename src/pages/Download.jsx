@@ -35,7 +35,7 @@ import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import imageCacheService from "@/services/imageCacheService";
 import openCriticService from "@/services/openCriticService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
-import { addToQueue, hasActiveDownloads } from "@/services/downloadQueueService";
+import { addToQueue, hasActiveDownloads, getDownloadQueue } from "@/services/downloadQueueService";
 import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
 import {
   BadgeCheckIcon,
@@ -598,15 +598,8 @@ export default function DownloadPage() {
     console.log("[DL] hasActive:", hasActive, "isAuthenticated:", isAuthenticated);
 
     if (hasActive && !forceStart) {
-      // Non-Ascend users can only have 1 download at a time - show error toast
-      if (!isAuthenticated) {
-        toast.error(t("download.toast.downloadQueueLimit"));
-        return;
-      }
-
-      // Ascend users get the queue dialog with options
       const isVrGame = gameData.category?.includes("Virtual Reality");
-      setPendingDownloadData({
+      const downloadData = {
         url: directUrl || gameData.download_links?.[selectedProvider]?.[0] || "",
         gameName: sanitizedGameName,
         online: gameData.online || false,
@@ -620,7 +613,23 @@ export default function DownloadPage() {
         gameID: gameData.gameID || "",
         directUrl: directUrl,
         dir: dir,
-      });
+      };
+
+      // Non-Ascend users can queue 1 download max
+      if (!isAuthenticated) {
+        const currentQueue = getDownloadQueue();
+        if (currentQueue.length >= 1) {
+          toast.error(t("download.toast.downloadQueueLimit"));
+          return;
+        }
+        // Allow queuing 1 download
+        setPendingDownloadData(downloadData);
+        setShowQueuePrompt(true);
+        return;
+      }
+
+      // Ascend users get the queue dialog with unlimited queue
+      setPendingDownloadData(downloadData);
       setShowQueuePrompt(true);
       return;
     }
@@ -3603,10 +3612,15 @@ export default function DownloadPage() {
               {t("download.queue.title", "Download in Progress")}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4 text-muted-foreground">
-              {t(
-                "download.queue.description",
-                "Another download is currently in progress. Would you like to add this game to the queue or start it now?"
-              )}
+              {isAuthenticated
+                ? t(
+                    "download.queue.description",
+                    "Another download is currently in progress. Would you like to add this game to the queue or start it now?"
+                  )
+                : t(
+                    "download.queue.descriptionFree",
+                    "Another download is currently in progress. You can queue 1 download to start automatically when the current one finishes."
+                  )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row">

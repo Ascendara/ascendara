@@ -22,7 +22,6 @@ import {
   FolderOpen,
   Folder,
   Settings2,
-  ToggleRight,
   X,
   Plus,
   Ban,
@@ -64,6 +63,9 @@ const LocalRefresh = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { settings, updateSetting } = useSettings();
+
+  // Hardcoded flag to show/hide extra sources that aren't ready yet
+  const SHOW_EXTRA_SOURCES = false;
 
   // Get welcomeStep, indexRefreshStarted, and indexComplete from navigation state if coming from Welcome page
   const welcomeStep = location.state?.welcomeStep;
@@ -734,20 +736,6 @@ const LocalRefresh = () => {
     return `${diffDays} ${t("localRefresh.daysAgo") || "days ago"}`;
   };
 
-  // Handle enabling local index
-  const handleEnableLocalIndex = async () => {
-    console.log("[LocalRefresh] Clearing caches before switching to local index");
-    imageCacheService.invalidateSettingsCache();
-    await imageCacheService.clearCache(true);
-    gameService.clearMemoryCache();
-    localStorage.removeItem("ascendara_games_cache");
-    localStorage.removeItem("local_ascendara_games_timestamp");
-    localStorage.removeItem("local_ascendara_metadata_cache");
-    localStorage.removeItem("local_ascendara_last_updated");
-    await updateSetting("usingLocalIndex", true);
-    toast.success(t("localRefresh.switchedToLocal"));
-    window.location.reload();
-  };
 
   // Handle back navigation
   const handleBack = () => {
@@ -1019,17 +1007,19 @@ const LocalRefresh = () => {
                     >
                       SteamRIP
                     </Button>
-                    <Button
-                      size="sm"
-                      variant={selectedSource === "goggames" ? "default" : "outline"}
-                      onClick={() => {
-                        setSelectedSource("goggames");
-                        window.electron?.updateSetting("localRefreshSource", "goggames");
-                      }}
-                      className="h-8 text-xs"
-                    >
-                      GOG-Games
-                    </Button>
+                    {SHOW_EXTRA_SOURCES && (
+                      <Button
+                        size="sm"
+                        variant={selectedSource === "goggames" ? "default" : "outline"}
+                        onClick={() => {
+                          setSelectedSource("goggames");
+                          window.electron?.updateSetting("localRefreshSource", "goggames");
+                        }}
+                        className="h-8 text-xs"
+                      >
+                        GOG-Games
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1171,44 +1161,8 @@ const LocalRefresh = () => {
 
             {/* Action Row */}
             <div className="grid gap-4 sm:grid-cols-2">
-              {/* Enable Local Index */}
-              {!settings?.usingLocalIndex && (
-                <Card className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${hasIndexBefore ? "bg-green-500/10" : "bg-muted"}`}
-                      >
-                        <ToggleRight
-                          className={`h-5 w-5 ${hasIndexBefore ? "text-green-500" : "text-muted-foreground"}`}
-                        />
-                      </div>
-                      <div>
-                        <h3 className="font-medium">
-                          {t("localRefresh.switchToLocal") || "Enable Index"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {hasIndexBefore
-                            ? t("localRefresh.switchToLocalReady") || "Ready to use"
-                            : t("localRefresh.switchToLocalNotReady") || "Refresh first"}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={hasIndexBefore ? "default" : "outline"}
-                      className={hasIndexBefore ? "text-secondary" : ""}
-                      disabled={!hasIndexBefore || isRefreshing}
-                      onClick={handleEnableLocalIndex}
-                    >
-                      {t("localRefresh.enableLocalIndex") || "Enable"}
-                    </Button>
-                  </div>
-                </Card>
-              )}
-
               {/* Share Index Toggle */}
-              <Card className={`p-4 ${settings?.usingLocalIndex ? "sm:col-span-2" : ""}`}>
+              <Card className="p-4 sm:col-span-2">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div

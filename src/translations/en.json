@@ -1082,6 +1082,7 @@
     "queue": {
       "addToQueue": "Add to Queue",
       "description": "Another download is currently in progress. Would you like to add this game to the queue or start it now?",
+      "descriptionFree": "Another download is currently in progress. You can queue 1 download to start automatically when the current one finishes.",
       "startNow": "Start Now",
       "title": "Download in Progress"
     },
