@@ -74,6 +74,7 @@ export function SettingsProvider({ children }) {
       protonBin: "",
       steamCompatDataPath: "",
     },
+    promptPurchaseAfter3Hours: true,
   });
   const settingsRef = useRef(settings);
 
@@ -254,6 +255,7 @@ const defaultSettings = {
     protonBin: "",
     steamCompatDataPath: "",
   },
+  promptPurchaseAfter3Hours: true,
 };
 
 export function useSettings() {

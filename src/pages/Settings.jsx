@@ -1671,6 +1671,27 @@ function Settings() {
                     />
                   </div>
                 )}
+
+                <div
+                  id="prompt-game-support"
+                  className="flex items-center justify-between"
+                >
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.promptGameSupport")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.promptGameSupportDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.promptPurchaseAfter3Hours}
+                    onCheckedChange={() =>
+                      handleSettingChange(
+                        "promptPurchaseAfter3Hours",
+                        !settings.promptPurchaseAfter3Hours
+                      )
+                    }
+                  />
+                </div>
               </div>
             </Card>
 

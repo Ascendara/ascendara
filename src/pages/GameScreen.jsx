@@ -581,6 +581,41 @@ const AudioDownloadConfirmDialog = ({ open, onClose, onConfirm, onCancel, trackC
   </AlertDialog>
 );
 
+const PurchasePromptDialog = ({ open, onClose, gameName, appId, t }) => {
+  const handleOpenStore = () => {
+    if (appId) {
+      window.electron.openURL(`https://steamcommunity.com/app/${appId}`);
+    }
+    onClose();
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            {t("gameScreen.purchasePromptTitle")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="space-y-4 text-muted-foreground">
+            {t("gameScreen.purchasePromptMessage", { game: gameName })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex gap-2">
+          <Button variant="outline" className="text-primary" onClick={onClose}>
+            {t("common.dismiss")}
+          </Button>
+          {appId && (
+            <Button className="gap-2 text-secondary" onClick={handleOpenStore}>
+              <ExternalLink className="h-4 w-4" />
+              {t("gameScreen.openSteamStore")}
+            </Button>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
 export default function GameScreen() {
   const showError = (game, error) => {
     setErrorGame(game);
@@ -719,6 +754,13 @@ export default function GameScreen() {
   // Hero image state for header background
   const [heroImageData, setHeroImageData] = useState(null);
   const [hasGridImage, setHasGridImage] = useState(true);
+
+  // 3-hour purchase prompt state
+  const [showPurchasePrompt, setShowPurchasePrompt] = useState(false);
+  const [hasShownPurchasePrompt, setHasShownPurchasePrompt] = useState(() => {
+    const gameName = game?.game || game?.name;
+    return gameName ? localStorage.getItem(`purchase-prompt-shown-${gameName}`) === 'true' : false;
+  });
 
   // GO BACK!
 
@@ -1001,6 +1043,22 @@ export default function GameScreen() {
       setIsFavorite(favorites.includes(gameName));
     }
   }, [game, favorites]);
+
+  // Check playtime and show purchase prompt after 3 hours (10800 seconds)
+  useEffect(() => {
+    if (!game || !settings.promptPurchaseAfter3Hours || hasShownPurchasePrompt) return;
+    
+    const gameName = game.game || game.name;
+    const playTime = game.playTime || 0;
+    
+    // Check if playtime is at least 3 hours (10800 seconds)
+    if (playTime >= 10800) {
+      setShowPurchasePrompt(true);
+      // Mark as shown so it doesn't appear again
+      localStorage.setItem(`purchase-prompt-shown-${gameName}`, 'true');
+      setHasShownPurchasePrompt(true);
+    }
+  }, [game, settings.promptPurchaseAfter3Hours, hasShownPurchasePrompt]);
 
   // Save favorites when they change
   useEffect(() => {
@@ -1661,6 +1719,7 @@ export default function GameScreen() {
             formatted_url: steamService.formatImageUrl(screenshot.url, "screenshot_huge"),
           }));
         }
+        console.log("Steam data fetched, appid:", data.appid);
         setSteamData(data);
       } else {
         console.log("No game data found for:", gameName);
@@ -3833,6 +3892,15 @@ export default function GameScreen() {
           setPendingAudioDownloads(null);
         }}
         trackCount={pendingAudioDownloads?.count || 0}
+        t={t}
+      />
+
+      {/* Purchase Prompt Dialog */}
+      <PurchasePromptDialog
+        open={showPurchasePrompt}
+        onClose={() => setShowPurchasePrompt(false)}
+        gameName={game?.game || game?.name}
+        appId={steamData?.appid}
         t={t}
       />
 

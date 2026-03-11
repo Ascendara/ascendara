@@ -76,6 +76,7 @@ class SettingsManager {
         protonBin: "",
         steamCompatDataPath: "",
       },
+      promptPurchaseAfter3Hours: true,
     };
     this.initializeSettingsFile();
     this.settings = this.loadSettings();

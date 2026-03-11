@@ -589,6 +589,7 @@ const formatSteamData = steamData => {
   // Format the data for the application
   return {
     id: steamData.steam_appid,
+    appid: steamData.steam_appid,
     name: steamData.name,
     summary: shortDescription,
     description: aboutTheGame || shortDescription,
@@ -699,6 +700,10 @@ const getGameDetails = async (gameName, config = {}) => {
   let cachedData = gameApiCache.getCachedGame(gameName, "steam");
   if (cachedData) {
     console.log(`Using cached Steam data for: ${gameName}`);
+    // Ensure appid field exists in cached data (migration for old cache)
+    if (!cachedData.appid && cachedData.id) {
+      cachedData.appid = cachedData.id;
+    }
     return cachedData;
   }
 
