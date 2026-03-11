@@ -1,14 +1,4 @@
 {
-  "ads": {
-    "adPartner": "Ascendara Partner",
-    "learnMore": "Learn More",
-    "partnerInfo": {
-      "title": "About Ascendara Partner Program",
-      "description": "These are verified projects run by solo developers or communities that align with Ascendara's values. All partners are carefully vetted to ensure quality and trustworthiness.",
-      "reportIssue": "If you have concerns about any partner content, please report it in the Discord community.",
-      "close": "Got it"
-    }
-  },
   "account": {
     "actions": "Account Actions",
     "almostThere": "Almost there!",
@@ -135,6 +125,16 @@
     "welcomeBack": "Welcome Back",
     "welcomeBackIntro": "Sign in to access all your features:"
   },
+  "ads": {
+    "adPartner": "Ascendara Partner",
+    "learnMore": "Learn More",
+    "partnerInfo": {
+      "close": "Got it",
+      "description": "These are verified projects run by solo developers or communities that align with Ascendara's values. All partners are carefully vetted to ensure quality and trustworthiness.",
+      "reportIssue": "If you have concerns about any partner content, please report it in the Discord community.",
+      "title": "About Ascendara Partner Program"
+    }
+  },
   "app": {
     "admin": {
       "warning": {
@@ -170,7 +170,6 @@
       "title": "Oh no...",
       "troubleshooting": "Try these steps to resolve the issue:"
     },
-    "loading-audio": "Loading Soundtracks",
     "downloading-update": "Downloading Update...",
     "experiment": "EXPERIMENTAL",
     "firstIndexDialog": {
@@ -183,6 +182,7 @@
       "ascendaraWillRestart": "Ascendara will restart automatically",
       "installingUpdate": "Installing Update"
     },
+    "loading-audio": "Loading Soundtracks",
     "outdated": "OUTDATED",
     "platform": {
       "warning": {
@@ -216,19 +216,22 @@
       "installAndRestart": "Install & Restart",
       "justUpdated": "Update Complete",
       "justUpdatedDesc": "You've just updated to {{version}}",
+      "linuxUpdateMessage": "A new version of Ascendara is available. To update on Linux, please open your terminal and run the following command:",
+      "linuxUpdateNote": "This will download and install the latest version of Ascendara.",
       "outOfDate": "Ascendara is out of date",
       "outOfDateDesc": "A newer version is available. Click to download and install.",
-      "outOfDatePublicTesting": "Public Testing Version Out of Date",
-      "outOfDatePublicTestingDesc": "A newer public testing version is available. Click to download and install.",
       "outOfDateExperimental": "Experimental Version Out of Date",
       "outOfDateExperimentalDesc": "A newer experimental version is available. Click to download and install.",
+      "outOfDatePublicTesting": "Public Testing Version Out of Date",
+      "outOfDatePublicTestingDesc": "A newer public testing version is available. Click to download and install.",
+      "updateAvailable": "Update Available",
       "updateNow": "Update Now",
       "updateReady": "Ascendara is ready to update",
       "updateReadyDesc": "Ascendara downloaded the update and is ready to install and restart now",
-      "updateReadyPublicTesting": "Public Testing Update Ready",
-      "updateReadyPublicTestingDesc": "The public testing update has been downloaded and is ready to install.",
       "updateReadyExperimental": "Experimental Update Ready",
-      "updateReadyExperimentalDesc": "The experimental update has been downloaded and is ready to install."
+      "updateReadyExperimentalDesc": "The experimental update has been downloaded and is ready to install.",
+      "updateReadyPublicTesting": "Public Testing Update Ready",
+      "updateReadyPublicTestingDesc": "The public testing update has been downloaded and is ready to install."
     },
     "torrentWarning": "TORRENTING IS ENABLED - USE VPN",
     "watchdog": {
@@ -260,8 +263,8 @@
     "adStats": {
       "activeAdvertisement": "Active Advertisement",
       "ad": "Ad",
-      "clicks": "Clicks",
       "clickRate": "CTR",
+      "clicks": "Clicks",
       "contactSupport": "Contact Support to Renew",
       "ctr": "CTR",
       "error": "Failed to load ad statistics",
@@ -269,23 +272,23 @@
       "expires": "Expires",
       "expiresOn": "Expires on {{date}}",
       "expiringSoon": "Expiring Soon",
+      "last24Hours": "Last 24 Hours",
+      "latestAt": "Latest",
       "loading": "Loading ad statistics...",
+      "newUsers": "new users",
       "noAds": "No ads yet",
       "noAdsDescription": "You don't have any active ads. Contact support to create your first ad campaign.",
+      "recentSources": "Recent Sources",
       "refresh": "Refresh",
       "subtitle": "Track your ad performance and engagement",
       "title": "Ad Statistics",
       "totalAds": "Total Ads",
       "totalClicks": "Total Clicks",
       "totalViews": "Total Views",
-      "views": "Views",
-      "yourAds": "Your Ads",
       "userActivity": "User Activity",
       "userActivitySubtitle": "Recent user acquisition metrics",
-      "last24Hours": "Last 24 Hours",
-      "newUsers": "new users",
-      "recentSources": "Recent Sources",
-      "latestAt": "Latest"
+      "views": "Views",
+      "yourAds": "Your Ads"
     },
     "checkingVersion": "Checking version...",
     "cloudBackups": {
@@ -677,6 +680,8 @@
       "noProfileInfo": "Add a bio, country, or social links to personalize your profile",
       "notAllowedBio": "Bio contains words that are not allowed",
       "notAllowedDisplayName": "Display name contains words that are not allowed",
+      "partnerAdsHidden": "Partner ads are now hidden",
+      "partnerAdsVisible": "Partner ads are now visible",
       "paymentNotCompleted": "Payment was not completed. Please try again.",
       "photoURL": "Profile Picture URL",
       "photoURLHint": "Enter a URL to an image (e.g., from Imgur, Discord CDN, etc.)",
@@ -686,9 +691,6 @@
       "privacyUpdateFailed": "Failed to update privacy setting",
       "privateAccount": "Private Account",
       "privateAccountDescription": "When enabled, other users won't be able to see your profile details, games, or achievements.",
-      "partnerAdsHidden": "Partner ads are now hidden",
-      "partnerAdsVisible": "Partner ads are now visible",
-      "updateFailed": "Failed to update setting",
       "profile": "Profile",
       "profileUpdated": "Profile updated successfully!",
       "save": "Save Changes",
@@ -727,6 +729,7 @@
       "trialActive": "Trial Active",
       "trialDaysRemaining": "{{days}} days remaining in your trial",
       "trialProgress": "Trial Progress",
+      "updateFailed": "Failed to update setting",
       "verificationRequiresSubscription": "Subscription Required",
       "verificationTrialWarning": "The verification command only works for active subscribers. Subscribe to Ascend to get verified and unlock exclusive Discord channels.",
       "verifiedDescription": "You have full access to all Ascend features",
@@ -1301,24 +1304,23 @@
     "viewDetails": "View Details"
   },
   "gameScreen": {
+    "aboutGame": "About This Game",
     "aboutSoundtracks": "tracks were fetched and are provided by",
     "achievementLocked": "Locked",
     "achievementUnlocked": "Achieved on",
     "achievements": "Achievements",
     "achievementsUnlocked": "Achievements Unlocked",
-    "aboutGame": "About This Game",
     "allDownloadsComplete": "All tracks downloaded!",
+    "archivedFiles": "Archived Files",
     "audioFetchConfirmMessage": "This soundtrack has {{count}} tracks. Loading all track information will make multiple requests to the server. Do you want to continue?",
     "audioFetchConfirmTitle": "Load Soundtrack Information?",
     "backToLibrary": "Back to Library",
-    "continueFetch": "Continue",
     "backupSaves": "Backup Saves",
-    "oldVersions": "Old Versions",
-    "archivedFiles": "Archived Files",
     "browseMods": "Browse Mods",
     "clickToToggleLogo": "Click to toggle between logo and text",
     "cloudLibraryPromo": "Cloud Library",
     "cloudLibraryPromoDesc": "Sync your games across devices with Ascend",
+    "continueFetch": "Continue",
     "copyTrackName": "Copy Track Name",
     "currentVersion": "Current Version",
     "dismiss": "Dismiss",
@@ -1367,6 +1369,7 @@
     "noSoundtrackDescription": "No soundtrack information was found for this game.",
     "noSoundtrackFound": "No Soundtrack Found",
     "notInCloudLibrary": "Not in Cloud Library",
+    "oldVersions": "Old Versions",
     "overview": "Overview",
     "playTrack": "Play Track",
     "popularMods": "Popular Mods",
@@ -1470,6 +1473,19 @@
     "addGameDescription2": "Add a game to your Ascendara library to easily launch it and track play time. No files will be modified when adding a game.",
     "addToFavorites": "Add to Favorites",
     "alreadyRunning": "{{game}} is already running",
+    "assetSearch": {
+      "assetsDownloaded": "Downloaded {{count}} asset(s)",
+      "description": "Search for and download new grid, logo, and banner images for this game",
+      "download": "Download Assets",
+      "downloadFailed": "Download failed",
+      "downloading": "Downloading...",
+      "noAssetsFound": "No assets found",
+      "noResults": "No results found",
+      "preview": "Preview Assets",
+      "searchFailed": "Search failed",
+      "searchPlaceholder": "Search for game...",
+      "title": "Search Game Assets"
+    },
     "availableSpace": "Available Space",
     "backToLibrary": "Back to Library",
     "backups": {
@@ -1536,6 +1552,7 @@
     "calculatingSize": "Calculating...",
     "cannotRunDev": "Cannot run games in developer mode",
     "cannotVerifyFiles": "Cannot verify game files",
+    "changeAssets": "Change Game Assets",
     "changeCoverImage": "Change Cover Image",
     "changeExecutable": "Change or Add Executable",
     "chooseDirectory": "Choose Directory",
@@ -1639,20 +1656,6 @@
     "launching": "Launching...",
     "lessThanMinute": "Less than a minute on this game",
     "lessThanMinute2": "Less than a minute",
-    "assetSearch": {
-      "assetsDownloaded": "Downloaded {{count}} asset(s)",
-      "description": "Search for and download new grid, logo, and banner images for this game",
-      "download": "Download Assets",
-      "downloadFailed": "Download failed",
-      "downloading": "Downloading...",
-      "noAssetsFound": "No assets found",
-      "noResults": "No results found",
-      "preview": "Preview Assets",
-      "searchFailed": "Search failed",
-      "searchPlaceholder": "Search for game...",
-      "title": "Search Game Assets"
-    },
-    "changeAssets": "Change Game Assets",
     "libraryValue": {
       "ascendPromo": {
         "cta": "Learn about Ascend",
@@ -2074,16 +2077,13 @@
       "title": "Ascend Required",
       "whySubscribe": "Why subscribe to Ascend?"
     },
+    "ascendSettings": "Ascend Settings",
+    "ascendSettingsDescription": "Manage your Ascend subscription preferences.",
     "ascendaraAnalytics": "Ascendara Analytics",
     "ascendaraAnalyticsDescription": "Help improve Ascendara by sharing anonymous usage data.",
     "ascendaraToggleAnalytics": "Enable Analytics",
     "ascendaraUpdates": "Ascendara Updates",
     "ascendaraUpdatesDescription": "Automatically check for and install Ascendara updates.",
-    "ascendSettings": "Ascend Settings",
-    "ascendSettingsDescription": "Manage your Ascend subscription preferences.",
-    "hidePartnerAds": "Hide Partner Ads",
-    "hidePartnerAdsDescription": "Hide partner advertisements in search results. Available for active Ascend subscribers.",
-    "hidePartnerAdsRequiresSub": "This feature requires an active Ascend subscription (trial not included).",
     "ascendaraWorkshopDownloader": "Workshop Downloader",
     "ascendaraWorkshopDownloaderDescription": "The Workshop Downloader allows you to download items from the Steam Workshop without needing to have an account.",
     "ascendaraWorkshopDownloaderEnable": "Show in Navigation Bar",
@@ -2183,6 +2183,9 @@
     "getHelp": "Get Help",
     "hideOnGameLaunch": "Hide on Game Launch",
     "hideOnGameLaunchDescription": "Hide Ascendara when a game is launched from it.",
+    "hidePartnerAds": "Hide Partner Ads",
+    "hidePartnerAdsDescription": "Hide partner advertisements in search results. Available for active Ascend subscribers.",
+    "hidePartnerAdsRequiresSub": "This feature requires an active Ascend subscription (trial not included).",
     "highThreadWarning": "Using more than 32 threads is considered extreme and may cause instability, bans, or network issues. Use with caution.",
     "homeSearch": "Home Search Bar",
     "homeSearchDescription": "Show the search bar and quick access buttons on the home page.",
