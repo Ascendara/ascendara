@@ -14,6 +14,7 @@ const unzipper = require("unzipper");
 const {
   isDev,
   isWindows,
+  isLinux,
   TIMESTAMP_FILE,
   appDirectory,
   DEPENDENCY_REGISTRY_PATHS,
@@ -415,6 +416,9 @@ function registerSystemHandlers() {
 
   // Is on Windows
   ipcMain.handle("is-on-windows", () => isWindows);
+
+  // Is on Linux
+  ipcMain.handle("is-on-linux", () => isLinux);
 
   // Get system username
   ipcMain.handle("get-system-username", () => {

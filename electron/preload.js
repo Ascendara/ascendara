@@ -197,7 +197,15 @@ contextBridge.exposeInMainWorld("electron", {
   getInstalledGames: () => ipcRenderer.invoke("get-installed-games"),
   getInstalledGamesSize: () => ipcRenderer.invoke("get-installed-games-size"),
   addGame: (game, online, dlc, version, executable, imageUrl) =>
-    ipcRenderer.invoke("save-custom-game", game, online, dlc, version, executable, imageUrl),
+    ipcRenderer.invoke(
+      "save-custom-game",
+      game,
+      online,
+      dlc,
+      version,
+      executable,
+      imageUrl
+    ),
   removeCustomGame: game => ipcRenderer.invoke("remove-game", game),
   deleteGame: game => ipcRenderer.invoke("delete-game", game),
   deleteGameDirectory: game => ipcRenderer.invoke("delete-game-directory", game),
@@ -408,6 +416,7 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   getPlatform: () => process.platform,
   isOnWindows: () => ipcRenderer.invoke("is-on-windows"),
+  isOnLinux: () => ipcRenderer.invoke("is-on-linux"),
   fetchSystemSpecs: () => ipcRenderer.invoke("fetch-system-specs"),
   isDev: () => ipcRenderer.invoke("is-dev"),
   isExperiment: () => ipcRenderer.invoke("is-experiment"),

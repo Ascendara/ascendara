@@ -457,7 +457,7 @@ function Settings() {
       const isPubTest = branch === "public-testing";
       setIsExperiment(isExp);
       setIsPublicTesting(isPubTest);
-      
+
       if (isExp || isPubTest) {
         const version = await window.electron.getTestingVersion();
         setTestingVersion(version);
@@ -466,17 +466,17 @@ function Settings() {
       }
     };
     checkBranch();
-    
+
     // Re-check branch when window becomes visible (after branch switch)
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         checkBranch();
       }
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -1543,20 +1543,23 @@ function Settings() {
                   </Select>
                 </div>
 
-                <div id="auto-update" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.ascendaraUpdates")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.ascendaraUpdatesDescription")}
-                    </p>
+                {/* Auto-update is not available on Linux - users must update via terminal */}
+                {window.electron.getPlatform() !== "linux" && (
+                  <div id="auto-update" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.ascendaraUpdates")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.ascendaraUpdatesDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.autoUpdate}
+                      onCheckedChange={() =>
+                        handleSettingChange("autoUpdate", !settings.autoUpdate)
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={settings.autoUpdate}
-                    onCheckedChange={() =>
-                      handleSettingChange("autoUpdate", !settings.autoUpdate)
-                    }
-                  />
-                </div>
+                )}
 
                 <div id="notifications" className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -3587,7 +3590,13 @@ function Settings() {
                 <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">
-                      Current Version ({currentBranch === 'live' ? 'Live' : currentBranch === 'public-testing' ? 'Public Testing' : 'Experimental'}):
+                      Current Version (
+                      {currentBranch === "live"
+                        ? "Live"
+                        : currentBranch === "public-testing"
+                          ? "Public Testing"
+                          : "Experimental"}
+                      ):
                     </span>
                     <span className="font-semibold text-foreground">
                       v{branchVersions[currentBranch] || branchVersions.live}
@@ -3644,18 +3653,23 @@ function Settings() {
                     // Handle translated error messages
                     let errorMessage;
                     if (result.errorType === "notAvailable") {
-                      errorMessage = t("settings.appBranch.switchDialog.errors.notAvailable", {
-                        branch: result.errorData.branch,
-                        platform: result.errorData.platform
-                      });
+                      errorMessage = t(
+                        "settings.appBranch.switchDialog.errors.notAvailable",
+                        {
+                          branch: result.errorData.branch,
+                          platform: result.errorData.platform,
+                        }
+                      );
                     } else if (result.errorType === "connectionFailed") {
-                      errorMessage = t("settings.appBranch.switchDialog.errors.connectionFailed");
+                      errorMessage = t(
+                        "settings.appBranch.switchDialog.errors.connectionFailed"
+                      );
                     } else if (result.errorType === "timeout") {
                       errorMessage = t("settings.appBranch.switchDialog.errors.timeout");
                     } else {
                       errorMessage = result?.error || "Failed to switch branch";
                     }
-                    
+
                     toast.error(errorMessage);
                     setIsSwitchingBranch(false);
                     setShowBranchDialog(false);

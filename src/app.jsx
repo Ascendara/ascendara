@@ -77,6 +77,8 @@ import {
   Circle,
   Square,
   Triangle,
+  Terminal,
+  Copy,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -89,6 +91,70 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import BigPicture from "./pages/BigPicture";
+
+const LinuxUpdateDialog = ({ open, onOpenChange }) => {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+  const updateCommand = "curl -fsSL https://ascendara.app/update.sh | bash";
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(updateCommand);
+      setCopied(true);
+      toast.success(t("common.copied") || "Copied to clipboard!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy:", error);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="border-border">
+        <AlertDialogHeader>
+          <div className="flex items-center gap-4">
+            <Terminal className="mb-2 h-10 w-10 text-primary" />
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("app.toasts.updateAvailable") || "Update Available"}
+            </AlertDialogTitle>
+          </div>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4">
+              <div className="text-foreground">
+                {t("app.toasts.linuxUpdateMessage") ||
+                  "A new version of Ascendara is available. To update on Linux, please open your terminal and run the following command:"}
+              </div>
+              <div className="relative rounded-md bg-muted p-4">
+                <code className="break-all font-mono text-sm text-foreground">
+                  {updateCommand}
+                </code>
+                <button
+                  onClick={handleCopy}
+                  className="absolute right-2 top-2 rounded-md p-2 transition-colors hover:bg-background"
+                  title={t("common.copy") || "Copy"}
+                >
+                  <Copy
+                    className={`h-4 w-4 ${copied ? "text-green-500" : "text-muted-foreground"}`}
+                  />
+                </button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {t("app.toasts.linuxUpdateNote") ||
+                  "This will download and install the latest version of Ascendara."}
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={() => onOpenChange(false)}>
+            {t("common.close") || "Close"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
 
 // Check for trial expiration warning and show dialog
 const TrialWarningChecker = () => {
@@ -773,6 +839,7 @@ const AppRoutes = () => {
   const [showFirstIndexDialog, setShowFirstIndexDialog] = useState(false);
   const [showBranchWelcome, setShowBranchWelcome] = useState(false);
   const [appBranch, setAppBranch] = useState(null);
+  const [showLinuxUpdateDialog, setShowLinuxUpdateDialog] = useState(false);
   const location = useLocation();
   const hasChecked = useRef(false);
   const loadStartTime = useRef(Date.now());
@@ -964,13 +1031,13 @@ const AppRoutes = () => {
             setIsUpdating(false);
             setIsLoading(false);
             await checkAndSetWelcomeStatus();
-            
+
             // Only show changelog on live branch
             const branch = await window.electron.getBranch();
             if (branch === "live") {
               setShowChangelog(true);
             }
-            
+
             toast(t("app.toasts.justUpdated"), {
               description: t("app.toasts.justUpdatedDesc", { version: __APP_VERSION__ }),
               duration: 10000,
@@ -1162,6 +1229,7 @@ const AppRoutes = () => {
         const settings = await window.electron.getSettings();
         const isLatestVersion = await checkForUpdates();
         const branch = await window.electron.getBranch();
+        const isLinux = await window.electron.isOnLinux();
 
         if (
           !isLatestVersion &&
@@ -1169,8 +1237,14 @@ const AppRoutes = () => {
           !settings.autoUpdate
         ) {
           hasShownUpdateNotification.current = true;
-          
-          // Branch-specific messages
+
+          // On Linux, show the custom dialog with terminal instructions
+          if (isLinux) {
+            setShowLinuxUpdateDialog(true);
+            return;
+          }
+
+          // Branch-specific messages for Windows
           let title, description;
           if (branch === "public-testing") {
             title = t("app.toasts.outOfDatePublicTesting");
@@ -1182,7 +1256,7 @@ const AppRoutes = () => {
             title = t("app.toasts.outOfDate");
             description = t("app.toasts.outOfDateDesc");
           }
-          
+
           toast(title, {
             description: description,
             action: {
@@ -1213,10 +1287,10 @@ const AppRoutes = () => {
       if (!isSubscribed || hasShownUpdateReadyNotification.current) return;
 
       hasShownUpdateReadyNotification.current = true;
-      
+
       // Get branch for branch-specific messages
       const branch = await window.electron.getBranch();
-      
+
       let title, description;
       if (branch === "public-testing") {
         title = t("app.toasts.updateReadyPublicTesting");
@@ -1228,7 +1302,7 @@ const AppRoutes = () => {
         title = t("app.toasts.updateReady");
         description = t("app.toasts.updateReadyDesc");
       }
-      
+
       toast(title, {
         description: description,
         action: {
@@ -1386,6 +1460,10 @@ const AppRoutes = () => {
         open={showChangelog}
         onOpenChange={setShowChangelog}
         currentVersion={__APP_VERSION__}
+      />
+      <LinuxUpdateDialog
+        open={showLinuxUpdateDialog}
+        onOpenChange={setShowLinuxUpdateDialog}
       />
     </>
   );

@@ -455,6 +455,12 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("download-update", async () => {
+    // On Linux, updates must be done manually via terminal
+    if (isLinux) {
+      console.log("Updates on Linux must be done manually via terminal");
+      return;
+    }
+
     if (isLatest) return;
     if (updateDownloaded) return; // Already downloaded
 
@@ -467,7 +473,7 @@ function registerUpdateHandlers() {
         updateTimestampFile({
           downloadingUpdate: true,
         });
-        
+
         downloadUpdatePromise = downloadUpdateInBackground();
         await downloadUpdatePromise;
       } else {
@@ -483,6 +489,13 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("update-ascendara", async () => {
+    // On Linux, updates must be done manually via terminal
+    // Users should run: curl -fsSL https://ascendara.app/update.sh | bash
+    if (isLinux) {
+      console.log("Updates on Linux must be done manually via terminal");
+      return;
+    }
+
     if (isLatest) return;
 
     // If not downloaded yet, download first
@@ -496,7 +509,7 @@ function registerUpdateHandlers() {
           updateTimestampFile({
             downloadingUpdate: true,
           });
-          
+
           downloadUpdatePromise = downloadUpdateInBackground();
           await downloadUpdatePromise;
         } else {
@@ -512,12 +525,10 @@ function registerUpdateHandlers() {
       }
     }
 
-    // Install the update
+    // Install the update (Windows only)
     if (updateDownloaded) {
       const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-      const installerFileName = isWindows
-        ? "AscendaraInstaller.exe"
-        : "AscendaraInstaller.AppImage";
+      const installerFileName = "AscendaraInstaller.exe";
       const installerPath = path.join(tempDir, installerFileName);
 
       if (!fs.existsSync(installerPath)) {
@@ -525,71 +536,14 @@ function registerUpdateHandlers() {
         return;
       }
 
-      // On Linux, handle AppImage replacement via update script
-      if (isLinux) {
-        try {
-          // Make the downloaded AppImage executable
-          fs.chmodSync(installerPath, 0o755);
+      // Windows: Run the installer executable
+      const installerProcess = spawn(installerPath, [], {
+        detached: true,
+        stdio: "ignore",
+      });
 
-          // Get the current AppImage path (e.g., ~/.local/bin/Ascendara.AppImage)
-          const currentAppImagePath = process.execPath;
-          
-          console.log("Current AppImage location:", currentAppImagePath);
-          console.log("New AppImage location:", installerPath);
-
-          // Create an update script that will run after the app quits
-          // This avoids issues with replacing a mounted AppImage
-          const updateScriptPath = path.join(tempDir, "update.sh");
-          const updateScript = `#!/bin/bash
-# Wait for the current process to fully exit
-sleep 2
-
-# Create backup
-if [ -f "${currentAppImagePath}" ]; then
-  cp "${currentAppImagePath}" "${currentAppImagePath}.backup"
-fi
-
-# Replace the AppImage
-cp "${installerPath}" "${currentAppImagePath}"
-chmod +x "${currentAppImagePath}"
-
-# Clean up
-sleep 3
-rm -f "${currentAppImagePath}.backup"
-rm -f "${installerPath}"
-rm -f "$0"
-
-# Restart the application
-"${currentAppImagePath}" &
-`;
-
-          fs.writeFileSync(updateScriptPath, updateScript);
-          fs.chmodSync(updateScriptPath, 0o755);
-          
-          console.log("Update script created at:", updateScriptPath);
-
-          // Execute the update script in the background
-          spawn("sh", [updateScriptPath], {
-            detached: true,
-            stdio: "ignore",
-          }).unref();
-
-          // Quit the app so the script can replace the AppImage
-          app.quit();
-        } catch (error) {
-          console.error("Failed to create update script:", error);
-          return;
-        }
-      } else {
-        // Windows: Run the installer executable
-        const installerProcess = spawn(installerPath, [], {
-          detached: true,
-          stdio: "ignore",
-        });
-
-        installerProcess.unref();
-        app.quit();
-      }
+      installerProcess.unref();
+      app.quit();
     }
   });
 
@@ -676,7 +630,7 @@ rm -f "$0"
           fs.chmodSync(installerPath, 0o755);
 
           const currentAppImagePath = process.execPath;
-          
+
           console.log("Branch switch - Current AppImage:", currentAppImagePath);
           console.log("Branch switch - New AppImage:", installerPath);
 
@@ -707,7 +661,7 @@ rm -f "$0"
 
           fs.writeFileSync(updateScriptPath, updateScript);
           fs.chmodSync(updateScriptPath, 0o755);
-          
+
           console.log("Branch switch update script created at:", updateScriptPath);
 
           // Execute the update script in the background
@@ -737,27 +691,27 @@ rm -f "$0"
       return { success: true };
     } catch (error) {
       console.error("Error switching branch:", error);
-      
+
       // Return error type and metadata for frontend translation
       if (error.response?.status === 404) {
         const platform = isWindows ? "Windows" : "Linux";
-        return { 
-          success: false, 
+        return {
+          success: false,
           errorType: "notAvailable",
-          errorData: { branch, platform }
+          errorData: { branch, platform },
         };
-      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-        return { 
-          success: false, 
-          errorType: "connectionFailed"
+      } else if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+        return {
+          success: false,
+          errorType: "connectionFailed",
         };
-      } else if (error.code === 'ETIMEDOUT') {
-        return { 
-          success: false, 
-          errorType: "timeout"
+      } else if (error.code === "ETIMEDOUT") {
+        return {
+          success: false,
+          errorType: "timeout",
         };
       }
-      
+
       // Fallback to generic error message
       return { success: false, error: error.message };
     }
