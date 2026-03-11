@@ -41,7 +41,7 @@ const FolderCard = ({ name, onClick, className, refreshKey }) => {
       for (let i = 0; i < Math.min(folder.items.length, 6); i++) {
         const game = folder.items[i];
         const gameId = game.game || game.name;
-        const localStorageKey = `game-image-${gameId}`;
+        const localStorageKey = `game-cover-${gameId}`;
         const cachedImage = localStorage.getItem(localStorageKey);
         if (cachedImage) {
           thumbnails.push({

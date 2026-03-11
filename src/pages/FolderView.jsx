@@ -83,7 +83,7 @@ const FolderView = () => {
       folder.items.forEach(game => {
         const gameId = game.game || game.name;
         if (!imageCache[gameId]) {
-          const localStorageKey = `game-image-${gameId}`;
+          const localStorageKey = `game-cover-${gameId}`;
           const cachedImage = localStorage.getItem(localStorageKey);
           if (cachedImage) {
             imageCache[gameId] = cachedImage;
@@ -337,7 +337,7 @@ const FolderView = () => {
         imageDataRef.current = imageCache[gameId];
       } else {
         // Then check localStorage
-        const localStorageKey = `game-image-${gameId}`;
+        const localStorageKey = `game-cover-${gameId}`;
         const cachedImage = localStorage.getItem(localStorageKey);
         if (cachedImage) {
           imageCache[gameId] = cachedImage; // Store in memory cache
@@ -451,7 +451,7 @@ const FolderView = () => {
     folderGames.forEach(game => {
       const gameId = game.game || game.name;
       if (!imageCache[gameId]) {
-        const localStorageKey = `game-image-${gameId}`;
+        const localStorageKey = `game-cover-${gameId}`;
         const cachedImage = localStorage.getItem(localStorageKey);
         if (cachedImage) {
           imageCache[gameId] = cachedImage;
