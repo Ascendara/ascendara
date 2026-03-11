@@ -584,7 +584,7 @@ const AudioDownloadConfirmDialog = ({ open, onClose, onConfirm, onCancel, trackC
 const PurchasePromptDialog = ({ open, onClose, gameName, appId, t }) => {
   const handleOpenStore = () => {
     if (appId) {
-      window.electron.openURL(`https://steamcommunity.com/app/${appId}`);
+      window.electron.openURL(`https://store.steampowered.com/app/${appId}`);
     }
     onClose();
   };
