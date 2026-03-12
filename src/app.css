@@ -518,3 +518,13 @@ h2 {
 .ascend-sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--color-muted-foreground) / 0.4);
 }
+
+/* Heart Monitor Graph - Smooth Animation */
+.recharts-surface,
+.recharts-area-area,
+.recharts-area-curve,
+.recharts-area path,
+.recharts-line-curve,
+.recharts-line path {
+  transition: none !important;
+}

@@ -364,17 +364,24 @@ const Downloads = () => {
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false);
   const [showAscendWarning, setShowAscendWarning] = useState(false);
   const [gameToResume, setGameToResume] = useState(null);
-  const MAX_HISTORY_POINTS = 20;
+  const MAX_HISTORY_POINTS = 60;
+  const lastSpeedRef = useRef(0);
+  const targetSpeedRef = useRef(0);
+  const animationIndexRef = useRef(0);
+  const [yAxisMax, setYAxisMax] = useState(100);
   const [speedHistory, setSpeedHistory] = useState(() => {
     const savedHistory = localStorage.getItem("speedHistory");
-    return savedHistory
-      ? JSON.parse(savedHistory)
-      : Array(MAX_HISTORY_POINTS)
-          .fill({ index: 0, speed: 0 })
-          .map((_, i) => ({
-            index: i,
-            speed: 0,
-          }));
+    if (savedHistory) {
+      const parsed = JSON.parse(savedHistory);
+      // Ensure indices are 0-49 for smooth animation
+      return parsed.map((item, i) => ({ index: i, speed: item.speed }));
+    }
+    return Array(MAX_HISTORY_POINTS)
+      .fill({ index: 0, speed: 0 })
+      .map((_, i) => ({
+        index: i,
+        speed: 0,
+      }));
   });
   // Track the actual peak speed separately (persists until page refresh or no active downloads)
   const [peakSpeed, setPeakSpeed] = useState(() => {
@@ -562,18 +569,8 @@ const Downloads = () => {
         }
         prevActiveCountRef.current = activeCount;
 
-        // Update speed history
-        setSpeedHistory(prevHistory => {
-          const newHistory = [
-            ...prevHistory.slice(1),
-            {
-              index: prevHistory[prevHistory.length - 1].index + 1,
-              speed: totalSpeedNum,
-            },
-          ];
-          localStorage.setItem("speedHistory", JSON.stringify(newHistory));
-          return newHistory;
-        });
+        // Store target speed for smooth interpolation
+        targetSpeedRef.current = totalSpeedNum;
       } catch (error) {
         console.error("Error fetching downloading games:", error);
       }
@@ -585,6 +582,85 @@ const Downloads = () => {
     // Only run this effect on mount/unmount (not on downloadingGames change)
     return () => clearInterval(intervalId);
   }, []);
+
+  // Smooth animation loop for fluid graph movement
+  useEffect(() => {
+    let animationFrameId;
+    let lastTime = performance.now();
+    
+    const animate = (currentTime) => {
+      const deltaTime = currentTime - lastTime;
+      
+      // Update approximately 30 times per second for smooth animation
+      if (deltaTime >= 33) {
+        lastTime = currentTime;
+        animationIndexRef.current += 1;
+        
+        setSpeedHistory(prevHistory => {
+          // Smoothly interpolate between current and target speed
+          const currentSpeed = lastSpeedRef.current;
+          const targetSpeed = targetSpeedRef.current;
+          const difference = Math.abs(targetSpeed - currentSpeed);
+          
+          // Adaptive interpolation: slower for large changes, faster for small changes
+          // This prevents sudden jumps when speed changes dramatically
+          let interpolationFactor;
+          if (difference > 10) {
+            interpolationFactor = 0.05; // Very smooth for large changes
+          } else if (difference > 5) {
+            interpolationFactor = 0.08; // Smooth for medium changes
+          } else if (difference > 1) {
+            interpolationFactor = 0.12; // Moderate for small changes
+          } else {
+            interpolationFactor = 0.2; // Faster for tiny changes
+          }
+          
+          let newSpeed = currentSpeed + (targetSpeed - currentSpeed) * interpolationFactor;
+          
+          // Clamp to prevent negative values or very small numbers that cause glitches
+          newSpeed = Math.max(0, newSpeed);
+          
+          // If very close to target (within 0.01), snap to target to prevent endless interpolation
+          if (Math.abs(newSpeed - targetSpeed) < 0.01) {
+            newSpeed = targetSpeed;
+          }
+          
+          lastSpeedRef.current = newSpeed;
+          
+          // Shift all values left and add new interpolated value
+          const newHistory = prevHistory.map((item, i) => {
+            if (i < prevHistory.length - 1) {
+              return { index: i, speed: Math.max(0, prevHistory[i + 1].speed) };
+            } else {
+              return { index: i, speed: newSpeed };
+            }
+          });
+          
+          // Smoothly adjust Y-axis max to prevent jumps
+          const maxSpeed = Math.max(...newHistory.map(h => h.speed));
+          setYAxisMax(prevMax => {
+            // Gradually increase max if data exceeds it
+            if (maxSpeed > prevMax * 0.8) {
+              return Math.max(prevMax, Math.ceil(maxSpeed * 1.2 / 10) * 10);
+            }
+            // Gradually decrease max if data is well below it
+            if (maxSpeed < prevMax * 0.5) {
+              return Math.max(Math.ceil(maxSpeed * 1.5 / 10) * 10, 10);
+            }
+            return prevMax;
+          });
+          
+          return newHistory;
+        });
+      }
+      
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
 
   // Poll queued downloads
   useEffect(() => {
@@ -935,10 +1011,10 @@ const Downloads = () => {
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="index" hide />
-                    <YAxis hide domain={[0, "auto"]} />
+                    <YAxis hide domain={[0, yAxisMax]} />
                     <Tooltip content={<CustomTooltip />} />
                     <Area
-                      type="monotoneX"
+                      type="natural"
                       dataKey="speed"
                       stroke="rgb(var(--color-primary))"
                       strokeWidth={2.5}
@@ -948,8 +1024,8 @@ const Downloads = () => {
                       dot={false}
                       baseValue={0}
                     />
-                  </AreaChart>
-                </ResponsiveContainer>
+                    </AreaChart>
+                  </ResponsiveContainer>
               </div>
               <p className="mt-2 px-5 text-center text-xs text-muted-foreground">
                 {t("downloads.speedHistory")}
