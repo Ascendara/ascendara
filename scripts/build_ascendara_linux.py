@@ -186,18 +186,24 @@ def build_python_binaries_linux():
         ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py', ['--windowed']),
     ]
 
+    # 1. Find all the unique folders and clean them up ONCE before compiling
+    unique_dirs = set(rel_script.split('/')[0] for _, rel_script, _ in binaries)
+    for folder_name in unique_dirs:
+        dist_dir = os.path.join(binaries_dir, folder_name, 'dist')
+        if os.path.exists(dist_dir):
+            print(f"Cleaning existing dist directory for {folder_name}...")
+            shutil.rmtree(dist_dir)
+        os.makedirs(dist_dir)
+
+    # 2. Start the compilation of all binaries
     for binary_name, rel_script, extra_args in binaries:
         script_path = os.path.join(binaries_dir, rel_script)
         if not os.path.exists(script_path):
             print(f"Warning: Script not found, skipping: {script_path}")
             continue
 
+        # dist_dir folder is already clean and created at step 1
         dist_dir = os.path.join(binaries_dir, rel_script.split('/')[0], 'dist')
-        # Clean dist directory for fresh build
-        if os.path.exists(dist_dir):
-            print(f"Cleaning existing dist directory for {binary_name}...")
-            shutil.rmtree(dist_dir)
-        os.makedirs(dist_dir)
 
         cmd = [
             venv_python, '-m', 'PyInstaller',
