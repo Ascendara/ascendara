@@ -970,7 +970,12 @@ class RobustDownloader:
         current_time = time.time()
         elapsed = current_time - self._extraction_start_time
         speed = files_extracted / elapsed if elapsed > 0 else 0
+        
+        # Cap files_extracted to never exceed total_files
+        files_extracted = min(files_extracted, total_files)
         percent = (files_extracted / total_files * 100) if total_files > 0 else 0
+        # Ensure percent never exceeds 100
+        percent = min(percent, 100.0)
         
         # Always update in-memory data
         self.game_info["downloadingData"]["extractionProgress"] = {
@@ -1018,12 +1023,18 @@ class RobustDownloader:
             
             # Build watching data and update progress after extraction
             for zip_info in members_to_extract:
-                extracted_path = os.path.join(self.download_dir, zip_info.filename)
-                key = os.path.relpath(extracted_path, self.download_dir)
-                watching_data[key] = {"size": zip_info.file_size}
-                # Update progress for non-directory entries
+                # Only process actual files, not directories
                 if not zip_info.is_dir():
+                    extracted_path = os.path.join(self.download_dir, zip_info.filename)
+                    key = os.path.relpath(extracted_path, self.download_dir)
+                    watching_data[key] = {"size": zip_info.file_size}
+                    
                     self._files_extracted_count += 1
+                    # Cap the count to never exceed total
+                    if self._files_extracted_count > self._total_files_to_extract:
+                        logging.warning(f"[RobustDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
+                        self._files_extracted_count = self._total_files_to_extract
+                    
                     # Update progress more frequently: first 10 files (every file), then every 50 files, or at completion
                     if self._files_extracted_count <= 10 or self._files_extracted_count % 50 == 0 or self._files_extracted_count == self._total_files_to_extract:
                         self._update_extraction_progress(zip_info.filename, self._files_extracted_count, self._total_files_to_extract)
@@ -1127,7 +1138,13 @@ class RobustDownloader:
                 final_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
         except Exception:
             pass
-        self._files_extracted_count += max(0, final_file_count - initial_file_count)
+        newly_extracted = max(0, final_file_count - initial_file_count)
+        self._files_extracted_count += newly_extracted
+        
+        # Cap the count to never exceed total
+        if self._files_extracted_count > self._total_files_to_extract:
+            logging.warning(f"[RobustDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
+            self._files_extracted_count = self._total_files_to_extract
 
         # Clean up unwanted files (.url and _CommonRedist)
         for root, dirs, files_in_dir in os.walk(self.download_dir):
@@ -1274,7 +1291,13 @@ class RobustDownloader:
                     final_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
             except Exception:
                 pass
-            self._files_extracted_count += max(0, final_file_count - initial_file_count)
+            newly_extracted = max(0, final_file_count - initial_file_count)
+            self._files_extracted_count += newly_extracted
+            
+            # Cap the count to never exceed total
+            if self._files_extracted_count > self._total_files_to_extract:
+                logging.warning(f"[RobustDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
+                self._files_extracted_count = self._total_files_to_extract
         
         # Clean up unwanted files (.url and _CommonRedist)
         for root, dirs, files_in_dir in os.walk(self.download_dir):
