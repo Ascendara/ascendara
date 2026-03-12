@@ -942,7 +942,7 @@ const LocalRefresh = () => {
                             ? t("localRefresh.statusCompleted") || "Complete"
                             : refreshStatus === "error" || uploadError
                               ? t("localRefresh.statusError") || "Failed"
-                              : t("localRefresh.scrapeFromSteamRIP") ||
+                              : t("localRefresh.scrapeStart") ||
                                 "Scrape from SteamRIP"}
                     </h3>
                     <p className="text-sm text-muted-foreground">
@@ -991,7 +991,7 @@ const LocalRefresh = () => {
 
               {/* Source Selection */}
               {!isRefreshing && !isUploading && (
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mt-4 flex text-secondary items-center gap-2">
                   <Label className="text-sm text-muted-foreground">
                     {t("localRefresh.source") || "Source"}:
                   </Label>
