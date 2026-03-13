@@ -942,8 +942,7 @@ const LocalRefresh = () => {
                             ? t("localRefresh.statusCompleted") || "Complete"
                             : refreshStatus === "error" || uploadError
                               ? t("localRefresh.statusError") || "Failed"
-                              : t("localRefresh.scrapeStart") ||
-                                "Scrape from SteamRIP"}
+                              : t("localRefresh.scrapeStart")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       {uploadError ||

@@ -274,30 +274,71 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
     // Send email verification
     await sendEmailVerification(user);
 
-    // Create user document in Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid,
-      email: user.email,
-      displayName,
-      photoURL: null,
-      bio: null,
-      country: null,
-      socials: {
-        discord: null,
-        github: null,
-        steam: null,
-      },
-      hardwareId: hardwareId || null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    // Create user document in Firestore with retry logic
+    const maxRetries = 3;
+    let firestoreSuccess = false;
+    let lastError = null;
 
-    // Set initial online status
-    await setDoc(doc(db, "userStatus", user.uid), {
-      status: "online",
-      customMessage: "",
-      updatedAt: serverTimestamp(),
-    });
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[registerUser] Creating Firestore document (attempt ${attempt}/${maxRetries})...`);
+        
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName,
+          photoURL: null,
+          bio: null,
+          country: null,
+          socials: {
+            discord: null,
+            github: null,
+            steam: null,
+          },
+          hardwareId: hardwareId || null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // Verify document was created
+        const verifyDoc = await getDoc(doc(db, "users", user.uid));
+        if (verifyDoc.exists()) {
+          console.log("[registerUser] Firestore document created and verified successfully");
+          firestoreSuccess = true;
+          break;
+        } else {
+          console.warn(`[registerUser] Document creation returned success but verification failed (attempt ${attempt})`);
+          lastError = new Error("Document verification failed");
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
+        }
+      } catch (firestoreError) {
+        console.error(`[registerUser] Firestore error on attempt ${attempt}:`, firestoreError);
+        lastError = firestoreError;
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+
+    if (!firestoreSuccess) {
+      console.error("[registerUser] Failed to create Firestore document after all retries");
+      // Don't fail the entire registration - user can still log in and we'll create the doc later
+      // But log this as a critical issue
+      console.error("[registerUser] CRITICAL: User created in Auth but not in Firestore:", user.uid);
+    }
+
+    // Set initial online status (non-blocking)
+    try {
+      await setDoc(doc(db, "userStatus", user.uid), {
+        status: "online",
+        customMessage: "",
+        updatedAt: serverTimestamp(),
+      });
+    } catch (statusError) {
+      console.warn("Failed to create user status:", statusError);
+    }
 
     // Register hardware ID if provided (non-blocking - don't fail registration if this fails)
     if (hardwareId) {
@@ -317,7 +358,7 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
       }
     }
 
-    return { user, error: null };
+    return { user, error: null, firestoreCreated: firestoreSuccess };
   } catch (error) {
     console.error("Registration error:", error);
     return { user: null, error: getErrorMessage(error.code) };

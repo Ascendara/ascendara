@@ -74,16 +74,58 @@ export const AuthProvider = ({ children }) => {
             const { data, error: fetchError } = await getUserData(firebaseUser.uid);
 
             // If we can't fetch user data, it might be a new account still being created
-            // Don't log them out - just set the user and let the data load later
-            if (fetchError) {
+            // Try to create the missing document as a fallback
+            if (fetchError || !data) {
               console.warn(
                 "[AuthContext] Failed to fetch user data (might be new account):",
                 fetchError
               );
-              setUser(firebaseUser);
-              setUserData(null);
-              setLoading(false);
-              return;
+              
+              // Attempt to create missing Firestore document
+              try {
+                console.log("[AuthContext] Attempting to create missing Firestore document...");
+                const { setDoc, doc, serverTimestamp } = await import("firebase/firestore");
+                const { db } = await import("@/services/firebaseService");
+                
+                await setDoc(doc(db, "users", firebaseUser.uid), {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName || "User",
+                  photoURL: firebaseUser.photoURL || null,
+                  bio: null,
+                  country: null,
+                  socials: {
+                    discord: null,
+                    github: null,
+                    steam: null,
+                  },
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                }, { merge: true });
+                
+                // Also create status document
+                await setDoc(doc(db, "userStatus", firebaseUser.uid), {
+                  status: "online",
+                  customMessage: "",
+                  updatedAt: serverTimestamp(),
+                }, { merge: true });
+                
+                console.log("[AuthContext] Successfully created missing Firestore document");
+                
+                // Fetch the newly created data
+                const { data: newData } = await getUserData(firebaseUser.uid);
+                setUser(firebaseUser);
+                setUserData(newData);
+                setLoading(false);
+                return;
+              } catch (createError) {
+                console.error("[AuthContext] Failed to create missing Firestore document:", createError);
+                // Still set the user but with no data
+                setUser(firebaseUser);
+                setUserData(null);
+                setLoading(false);
+                return;
+              }
             }
 
             // Only check for pending deletion if we successfully fetched user data
