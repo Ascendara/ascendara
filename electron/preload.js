@@ -228,7 +228,7 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("disable-game-auto-backups", game, isCustom),
   isGameAutoBackupsEnabled: (game, isCustom) =>
     ipcRenderer.invoke("is-game-auto-backups-enabled", game, isCustom),
-  ludusavi: (action, game) => ipcRenderer.invoke("ludusavi", action, game, backupName),
+  ludusavi: (action, game, backupName) => ipcRenderer.invoke("ludusavi", action, game, backupName),
   listBackupFiles: dirPath => ipcRenderer.invoke("listBackupFiles", dirPath),
   readBackupFile: filePath => ipcRenderer.invoke("readBackupFile", filePath),
   getTempPath: () => ipcRenderer.invoke("getTempPath"),
