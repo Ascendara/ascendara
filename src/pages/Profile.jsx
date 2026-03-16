@@ -87,6 +87,49 @@ const CompareAchievementEntries = (Left, Right) => {
   return String(Left.gameName).localeCompare(String(Right.gameName));
 };
 
+const UnknownDeviceInfo = Value => !Value || Value === "Unknown";
+
+const FormatGPU = Renderer => {
+  if (!Renderer) {
+    return null;
+  }
+
+  const AngleMatch = Renderer.match(
+    /^ANGLE \([^,]+,\s*(.+),\s*(OpenGL|Vulkan|Metal|Direct3D|D3D11).*\)$/i
+  );
+
+  if (AngleMatch?.[1]) {
+    return AngleMatch[1].trim();
+  }
+
+  return Renderer.trim();
+};
+
+const LinuxSystem = () => {
+  try {
+    const Canvas = document.createElement("canvas");
+    const Context =
+      Canvas.getContext("webgl") || Canvas.getContext("experimental-webgl");
+
+    if (!Context) {
+      return null;
+    }
+
+    const DebugInfo = Context.getExtension("WEBGL_debug_renderer_info");
+
+    if (!DebugInfo) {
+      return null;
+    }
+
+    const Renderer = Context.getParameter(DebugInfo.UNMASKED_RENDERER_WEBGL);
+
+    return FormatGPU(Renderer) || null;
+  } catch (Error) {
+    console.warn(`[Profile] Unfortunately Could NOT Detect Linux GPU.`, Error);
+    return null;
+  }
+};
+
 const Profile = () => {
   const { t: T } = UseLanguage();
   const { user: User } = UseAuth();
@@ -248,6 +291,12 @@ const Profile = () => {
   const [ActiveEmojiCategoryId, SetActiveEmojiCategoryId] = UseState(
     EmojiCategories[0].id
   );
+  const AmILinux = UseMemo(() => {
+    const Platform = String(DeviceInfo.platform || "").toLowerCase();
+    const OS = String(DeviceInfo.os || "").toLowerCase();
+
+    return Platform.includes("linux") || OS.includes("linux");
+  }, [DeviceInfo.os, DeviceInfo.platform]);
 
   UseEffect(() => {
     localStorage.setItem("selectedEmoji", SelectedEmoji);
@@ -662,13 +711,31 @@ const Profile = () => {
         const specs = await window.electron?.fetchSystemSpecs?.();
         if (cancelled) return;
 
+        const AmILinux =
+          String(platform).toLowerCase().includes("linux") ||
+          String(specs?.os || "")
+            .toLowerCase()
+            .includes("linux");
+        const linuxGpuRenderer =
+          AmILinux && UnknownDeviceInfo(specs?.gpu) ? LinuxSystem() : null;
+        const linuxRunner = AmILinux ? await window.electron?.resolveRunner?.("auto") : null;
+
         SetDeviceInfo(Prev => ({
           ...Prev,
           platform,
           ...(specs || {}),
+          gpu: linuxGpuRenderer || specs?.gpu || Prev.gpu,
+          directx: AmILinux
+            ? linuxRunner?.name ||
+              (linuxRunner?.type === "proton"
+                ? "Proton"
+                : linuxRunner?.type === "wine"
+                  ? "Wine"
+                  : "Wine / Proton")
+            : specs?.directx || Prev.directx,
         }));
       } catch (error) {
-        console.error(`[Profile] device info load failed`, error);
+        console.error(`[Profile] Device Loading Failed`, error);
       }
     };
 
@@ -1446,10 +1513,16 @@ const Profile = () => {
                       <div className="flex items-center justify-between">
                         <span className="group flex items-center gap-2 text-muted-foreground">
                           <Sparkles className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
-                          {T("profile.directX") || "DirectX"}
+                          {AmILinux
+                            ? "Renderer"
+                            : T("profile.directX") || "DirectX"}
                         </span>
                         <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
-                          {DeviceInfo.directx || "Unknown"}
+                          {AmILinux
+                            ? UnknownDeviceInfo(DeviceInfo.directx)
+                              ? "Renderer"
+                              : DeviceInfo.directx
+                            : DeviceInfo.directx || "Unknown"}
                         </span>
                       </div>
                     </div>
