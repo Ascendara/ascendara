@@ -238,10 +238,11 @@ const getMods = async (gameDomainName, options = {}) => {
       },
     };
 
-    // Add name search filter if provided
-    if (searchQuery) {
+    const normalizedSearchQuery = searchQuery?.trim();
+
+    if (normalizedSearchQuery) {
       filter.name = {
-        value: `*${searchQuery}*`,
+        value: normalizedSearchQuery,
         op: "WILDCARD",
       };
     }
