@@ -5959,7 +5959,7 @@ const Ascend = () => {
                     </div>
 
                     {/* Hide Partner Ads - Only for active subscribers and verified users */}
-                    {(ascendAccess.isSubscribed || ascendAccess.isVerified) && (
+                    {(false) && (
                       <div className="flex items-center justify-between border-t border-border/50 pt-6">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
