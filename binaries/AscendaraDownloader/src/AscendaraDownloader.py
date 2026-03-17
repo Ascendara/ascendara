@@ -1523,6 +1523,7 @@ class RobustDownloader:
             safe_write_json(self.game_info_path, self.game_info)
             
             if not verify_errors:
+                self._detect_and_set_executable()
                 self._handle_post_download_behavior()
                 if "downloadingData" in self.game_info:
                     del self.game_info["downloadingData"]
@@ -1530,6 +1531,153 @@ class RobustDownloader:
         except Exception as e:
             logging.error(f"[RobustDownloader] Verification error: {e}")
             handleerror(self.game_info, self.game_info_path, e)
+    
+    def _detect_and_set_executable(self):
+        """Intelligently detect and set the correct executable file for the game."""
+        try:
+            logging.info(f"[RobustDownloader] Detecting executable for {self.game}")
+            
+            # Collect all .exe files in the download directory
+            exe_files = []
+            for root, dirs, files in os.walk(self.download_dir):
+                for file in files:
+                    if file.lower().endswith('.exe'):
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, self.download_dir)
+                        exe_files.append({
+                            'path': full_path,
+                            'rel_path': rel_path,
+                            'name': file,
+                            'size': os.path.getsize(full_path)
+                        })
+            
+            if not exe_files:
+                logging.warning(f"[RobustDownloader] No .exe files found in {self.download_dir}")
+                return
+            
+            logging.info(f"[RobustDownloader] Found {len(exe_files)} .exe files")
+            
+            # Try to find executable reference in text files
+            exe_from_text = self._find_exe_in_text_files()
+            
+            # Score each executable based on various criteria
+            best_exe = None
+            best_score = -1
+            
+            for exe in exe_files:
+                score = 0
+                exe_name_lower = exe['name'].lower()
+                game_name_lower = self.game.lower()
+                
+                # Skip common installer/uninstaller/setup files
+                skip_keywords = ['unins', 'uninstall', 'setup', 'installer', 'redist', 'vcredist', 
+                                'directx', 'dotnet', 'prerequisite', 'launcher', 'updater', 
+                                'crash', 'report', 'config', 'settings', 'easyanticheat', 
+                                'battleye', 'steam_api']
+                if any(keyword in exe_name_lower for keyword in skip_keywords):
+                    logging.debug(f"[RobustDownloader] Skipping {exe['name']} (installer/utility)")
+                    continue
+                
+                # Exact match with text file reference
+                if exe_from_text and exe['name'].lower() == exe_from_text.lower():
+                    score += 1000
+                    logging.info(f"[RobustDownloader] Exact match with text file: {exe['name']}")
+                
+                # Partial match with text file reference
+                if exe_from_text and exe_from_text.lower() in exe_name_lower:
+                    score += 500
+                
+                # Match with game name (sanitized)
+                sanitized_game = sanitize_folder_name(self.game).lower()
+                if sanitized_game in exe_name_lower or exe_name_lower.replace('.exe', '') == sanitized_game:
+                    score += 300
+                
+                # Partial game name match
+                game_words = set(re.findall(r'\w+', game_name_lower))
+                exe_words = set(re.findall(r'\w+', exe_name_lower.replace('.exe', '')))
+                common_words = game_words & exe_words
+                if common_words:
+                    score += len(common_words) * 50
+                
+                # Prefer files in root or immediate subdirectories
+                depth = exe['rel_path'].count(os.sep)
+                if depth == 0:
+                    score += 100
+                elif depth == 1:
+                    score += 50
+                
+                # Prefer larger files (likely the main game executable)
+                if exe['size'] > 10 * 1024 * 1024:  # > 10 MB
+                    score += 30
+                elif exe['size'] > 1 * 1024 * 1024:  # > 1 MB
+                    score += 10
+                
+                # Common game executable patterns
+                game_exe_patterns = [r'^game\.exe$', r'^start\.exe$', r'^play\.exe$', 
+                                    r'.*game.*\.exe$', r'^[^_]+\.exe$']
+                for pattern in game_exe_patterns:
+                    if re.match(pattern, exe_name_lower):
+                        score += 20
+                        break
+                
+                logging.debug(f"[RobustDownloader] {exe['name']}: score={score}, size={exe['size']}, depth={depth}")
+                
+                if score > best_score:
+                    best_score = score
+                    best_exe = exe
+            
+            if best_exe:
+                self.game_info['executable'] = best_exe['path']
+                logging.info(f"[RobustDownloader] Set executable to: {best_exe['rel_path']} (score: {best_score})")
+                safe_write_json(self.game_info_path, self.game_info)
+            else:
+                # Fallback to first exe if no good match found
+                if exe_files:
+                    self.game_info['executable'] = exe_files[0]['path']
+                    logging.warning(f"[RobustDownloader] No good match found, using first exe: {exe_files[0]['rel_path']}")
+                    safe_write_json(self.game_info_path, self.game_info)
+                
+        except Exception as e:
+            logging.error(f"[RobustDownloader] Error detecting executable: {e}")
+    
+    def _find_exe_in_text_files(self):
+        """Search text files for executable references."""
+        try:
+            text_extensions = ['.txt', '.nfo', '.md', '.readme', '.diz']
+            exe_pattern = re.compile(r'([a-zA-Z0-9_\-\s]+\.exe)', re.IGNORECASE)
+            
+            for root, dirs, files in os.walk(self.download_dir):
+                for file in files:
+                    file_lower = file.lower()
+                    if any(file_lower.endswith(ext) for ext in text_extensions):
+                        file_path = os.path.join(root, file)
+                        try:
+                            # Try different encodings
+                            for encoding in ['utf-8', 'latin-1', 'cp1252']:
+                                try:
+                                    with open(file_path, 'r', encoding=encoding, errors='ignore') as f:
+                                        content = f.read(50000)  # Read first 50KB
+                                        matches = exe_pattern.findall(content)
+                                        if matches:
+                                            # Filter out common false positives
+                                            filtered = [m for m in matches if not any(
+                                                skip in m.lower() for skip in 
+                                                ['unins', 'setup', 'install', 'redist', 'vcredist', 'directx']
+                                            )]
+                                            if filtered:
+                                                logging.info(f"[RobustDownloader] Found exe reference in {file}: {filtered[0]}")
+                                                return filtered[0].strip()
+                                    break
+                                except (UnicodeDecodeError, LookupError):
+                                    continue
+                        except Exception as e:
+                            logging.debug(f"[RobustDownloader] Error reading {file}: {e}")
+                            continue
+            
+            return None
+        except Exception as e:
+            logging.error(f"[RobustDownloader] Error searching text files: {e}")
+            return None
     
     def _handle_post_download_behavior(self):
         """Handle post-download actions like lock, sleep, shutdown."""

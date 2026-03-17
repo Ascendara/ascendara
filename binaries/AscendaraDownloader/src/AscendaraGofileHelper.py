@@ -192,7 +192,7 @@ class GofileDownloader:
     def __init__(self, game, online, dlc, isVr, updateFlow, version, size, download_dir, gameID="", max_workers=5):
         self._max_retries = 3
         self._download_timeout = 30 
-        self._token = self._getToken()
+        self._token = None  # Will be set after JSON file is created
         self._lock = Lock()
         self._rate_window = []  # Store recent rate measurements
         self._rate_window_size = 20  # Number of measurements to average (10 seconds at 0.5s intervals)
@@ -304,7 +304,7 @@ class GofileDownloader:
             "X-BL": "en-US"
         })
         
-        max_retries = 3
+        max_retries = 1
         timeout = 15.0
         
         for retry in range(max_retries):
@@ -318,11 +318,19 @@ class GofileDownloader:
                 if create_account_response.get("status") == "ok":
                     return create_account_response["data"]["token"]
                 else:
-                    logging.error(f"[AscendaraGofileHelper] Account creation failed with status: {create_account_response.get('status')}")
+                    status = create_account_response.get('status')
+                    logging.error(f"[AscendaraGofileHelper] Account creation failed with status: {status}")
+                    
+                    # Check if it's a rate limit error
+                    if status == "error-rateLimit":
+                        error_msg = "Gofile rate limit reached. Please enable a VPN and try again in a few minutes."
+                        logging.error(f"[AscendaraGofileHelper] {error_msg}")
+                        raise Exception(f"RATE_LIMIT:{error_msg}")
+                    
                     if retry < max_retries - 1:
                         time.sleep(2 ** retry)
                         continue
-                    raise Exception(f"Account creation failed: {create_account_response.get('status')}")
+                    raise Exception(f"Account creation failed: {status}")
             except requests.exceptions.Timeout:
                 logging.warning(f"[AscendaraGofileHelper] Account creation timeout (attempt {retry + 1}/{max_retries})")
                 if retry < max_retries - 1:
@@ -339,6 +347,32 @@ class GofileDownloader:
         raise Exception("Account creation failed after all retries")
 
     def download_from_gofile(self, url, password=None, withNotification=None):
+        # Get token now that JSON file is created
+        try:
+            self._token = self._getToken()
+        except Exception as e:
+            error_str = str(e)
+            # Check if it's a rate limit error
+            if "RATE_LIMIT:" in error_str or "error-rateLimit" in error_str:
+                user_friendly_msg = "Gofile rate limit reached. Please enable a VPN and try again in a few minutes."
+                self.game_info['downloadingData'] = {
+                    "error": True,
+                    "message": user_friendly_msg,
+                    "downloading": False,
+                    "extracting": False,
+                    "verifying": False
+                }
+            else:
+                self.game_info['downloadingData'] = {
+                    "error": True,
+                    "message": error_str,
+                    "downloading": False,
+                    "extracting": False,
+                    "verifying": False
+                }
+            safe_write_json(self.game_info_path, self.game_info)
+            raise
+        
         # Fix URL if it starts with //
         if url.startswith("//"):
             url = "https:" + url
@@ -1467,8 +1501,12 @@ class GofileDownloader:
                 if "verifyError" in self.game_info["downloadingData"]:
                     del self.game_info["downloadingData"]["verifyError"]
                 
+                # Detect and set the correct executable
+                logging.info("[AscendaraGofileHelper] Verification successful, detecting executable")
+                self._detect_and_set_executable()
+                
                 # Execute post-download behavior when verification is successful
-                logging.info("[AscendaraGofileHelper] Verification successful, proceeding with post-download behavior")
+                logging.info("[AscendaraGofileHelper] Proceeding with post-download behavior")
                 self._handle_post_download_behavior()
 
         except Exception as e:
@@ -1501,6 +1539,153 @@ class GofileDownloader:
             del self.game_info["downloadingData"]["verifyError"]
 
         safe_write_json(self.game_info_path, self.game_info)
+
+    def _detect_and_set_executable(self):
+        """Intelligently detect and set the correct executable file for the game."""
+        try:
+            logging.info(f"[AscendaraGofileHelper] Detecting executable for {self.game}")
+            
+            # Collect all .exe files in the download directory
+            exe_files = []
+            for root, dirs, files in os.walk(self.download_dir):
+                for file in files:
+                    if file.lower().endswith('.exe'):
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, self.download_dir)
+                        exe_files.append({
+                            'path': full_path,
+                            'rel_path': rel_path,
+                            'name': file,
+                            'size': os.path.getsize(full_path)
+                        })
+            
+            if not exe_files:
+                logging.warning(f"[AscendaraGofileHelper] No .exe files found in {self.download_dir}")
+                return
+            
+            logging.info(f"[AscendaraGofileHelper] Found {len(exe_files)} .exe files")
+            
+            # Try to find executable reference in text files
+            exe_from_text = self._find_exe_in_text_files()
+            
+            # Score each executable based on various criteria
+            best_exe = None
+            best_score = -1
+            
+            for exe in exe_files:
+                score = 0
+                exe_name_lower = exe['name'].lower()
+                game_name_lower = self.game.lower()
+                
+                # Skip common installer/uninstaller/setup files
+                skip_keywords = ['unins', 'uninstall', 'setup', 'installer', 'redist', 'vcredist', 
+                                'directx', 'dotnet', 'prerequisite', 'launcher', 'updater', 
+                                'crash', 'report', 'config', 'settings', 'easyanticheat', 
+                                'battleye', 'steam_api']
+                if any(keyword in exe_name_lower for keyword in skip_keywords):
+                    logging.debug(f"[AscendaraGofileHelper] Skipping {exe['name']} (installer/utility)")
+                    continue
+                
+                # Exact match with text file reference
+                if exe_from_text and exe['name'].lower() == exe_from_text.lower():
+                    score += 1000
+                    logging.info(f"[AscendaraGofileHelper] Exact match with text file: {exe['name']}")
+                
+                # Partial match with text file reference
+                if exe_from_text and exe_from_text.lower() in exe_name_lower:
+                    score += 500
+                
+                # Match with game name (sanitized)
+                sanitized_game = sanitize_folder_name(self.game).lower()
+                if sanitized_game in exe_name_lower or exe_name_lower.replace('.exe', '') == sanitized_game:
+                    score += 300
+                
+                # Partial game name match
+                game_words = set(re.findall(r'\w+', game_name_lower))
+                exe_words = set(re.findall(r'\w+', exe_name_lower.replace('.exe', '')))
+                common_words = game_words & exe_words
+                if common_words:
+                    score += len(common_words) * 50
+                
+                # Prefer files in root or immediate subdirectories
+                depth = exe['rel_path'].count(os.sep)
+                if depth == 0:
+                    score += 100
+                elif depth == 1:
+                    score += 50
+                
+                # Prefer larger files (likely the main game executable)
+                if exe['size'] > 10 * 1024 * 1024:  # > 10 MB
+                    score += 30
+                elif exe['size'] > 1 * 1024 * 1024:  # > 1 MB
+                    score += 10
+                
+                # Common game executable patterns
+                game_exe_patterns = [r'^game\.exe$', r'^start\.exe$', r'^play\.exe$', 
+                                    r'.*game.*\.exe$', r'^[^_]+\.exe$']
+                for pattern in game_exe_patterns:
+                    if re.match(pattern, exe_name_lower):
+                        score += 20
+                        break
+                
+                logging.debug(f"[AscendaraGofileHelper] {exe['name']}: score={score}, size={exe['size']}, depth={depth}")
+                
+                if score > best_score:
+                    best_score = score
+                    best_exe = exe
+            
+            if best_exe:
+                self.game_info['executable'] = best_exe['path']
+                logging.info(f"[AscendaraGofileHelper] Set executable to: {best_exe['rel_path']} (score: {best_score})")
+                safe_write_json(self.game_info_path, self.game_info)
+            else:
+                # Fallback to first exe if no good match found
+                if exe_files:
+                    self.game_info['executable'] = exe_files[0]['path']
+                    logging.warning(f"[AscendaraGofileHelper] No good match found, using first exe: {exe_files[0]['rel_path']}")
+                    safe_write_json(self.game_info_path, self.game_info)
+                
+        except Exception as e:
+            logging.error(f"[AscendaraGofileHelper] Error detecting executable: {e}")
+    
+    def _find_exe_in_text_files(self):
+        """Search text files for executable references."""
+        try:
+            text_extensions = ['.txt', '.nfo', '.md', '.readme', '.diz']
+            exe_pattern = re.compile(r'([a-zA-Z0-9_\-\s]+\.exe)', re.IGNORECASE)
+            
+            for root, dirs, files in os.walk(self.download_dir):
+                for file in files:
+                    file_lower = file.lower()
+                    if any(file_lower.endswith(ext) for ext in text_extensions):
+                        file_path = os.path.join(root, file)
+                        try:
+                            # Try different encodings
+                            for encoding in ['utf-8', 'latin-1', 'cp1252']:
+                                try:
+                                    with open(file_path, 'r', encoding=encoding, errors='ignore') as f:
+                                        content = f.read(50000)  # Read first 50KB
+                                        matches = exe_pattern.findall(content)
+                                        if matches:
+                                            # Filter out common false positives
+                                            filtered = [m for m in matches if not any(
+                                                skip in m.lower() for skip in 
+                                                ['unins', 'setup', 'install', 'redist', 'vcredist', 'directx']
+                                            )]
+                                            if filtered:
+                                                logging.info(f"[AscendaraGofileHelper] Found exe reference in {file}: {filtered[0]}")
+                                                return filtered[0].strip()
+                                    break
+                                except (UnicodeDecodeError, LookupError):
+                                    continue
+                        except Exception as e:
+                            logging.debug(f"[AscendaraGofileHelper] Error reading {file}: {e}")
+                            continue
+            
+            return None
+        except Exception as e:
+            logging.error(f"[AscendaraGofileHelper] Error searching text files: {e}")
+            return None
 
     def _handle_post_download_behavior(self):
         try:
@@ -1610,9 +1795,55 @@ def main():
         parser.print_help()
         sys.exit(1)
     except Exception as e:
-        print(f"Error: {str(e)}")
-        logging.error(f"Error: {str(e)}")
-        launch_crash_reporter(1, str(e))
+        error_str = str(e)
+        print(f"Error: {error_str}")
+        logging.error(f"Error: {error_str}")
+        
+        # Update game info with error only if not already set
+        try:
+            game_info_path = os.path.join(args.download_dir, sanitize_folder_name(args.game), f"{sanitize_folder_name(args.game)}.ascendara.json")
+            if os.path.exists(game_info_path):
+                with open(game_info_path, 'r') as f:
+                    game_info = json.load(f)
+                
+                # Only update if error is not already set in downloadingData
+                if not game_info.get('downloadingData', {}).get('error'):
+                    # Check if it's a rate limit error and use user-friendly message
+                    if "RATE_LIMIT:" in error_str or "error-rateLimit" in error_str:
+                        user_friendly_msg = "Gofile rate limit reached. Please enable a VPN and try again in a few minutes."
+                        logging.error(f"[AscendaraGofileHelper] Rate limit error detected - advising user to use VPN")
+                        
+                        game_info['downloadingData'] = {
+                            "error": True,
+                            "message": user_friendly_msg,
+                            "downloading": False,
+                            "extracting": False,
+                            "verifying": False
+                        }
+                        
+                        if args.withNotification:
+                            _launch_notification(
+                                args.withNotification,
+                                "Gofile Rate Limit",
+                                user_friendly_msg
+                            )
+                    else:
+                        # Generic error handling
+                        game_info['downloadingData'] = {
+                            "error": True,
+                            "message": error_str,
+                            "downloading": False,
+                            "extracting": False,
+                            "verifying": False
+                        }
+                    
+                    safe_write_json(game_info_path, game_info)
+                else:
+                    logging.info(f"[AscendaraGofileHelper] Error already set in game info, not overwriting")
+        except Exception as update_err:
+            logging.error(f"Failed to update game info with error: {update_err}")
+        
+        launch_crash_reporter(1, error_str)
         sys.exit(1)
 
 if __name__ == "__main__":

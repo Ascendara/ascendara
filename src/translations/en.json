@@ -1165,7 +1165,11 @@
       "reportSubmitted": "Report submitted successfully",
       "torboxOffline": "This provider is offline on Torbox at the moment. Try another provider.",
       "torboxProcessingError": "Error processing Torbox link",
-      "torrentSent": "Torrent sent to qBittorrent"
+      "torrentSent": "Torrent sent to qBittorrent",
+      "gofileRateLimit": "Gofile Rate Limit Reached",
+      "gofileRateLimitDesc": "Gofile has rate limited your connection. Please enable a VPN and try again in a few minutes.",
+      "gofileAccountError": "Gofile Account Creation Failed",
+      "gofileAccountErrorDesc": "Unable to create a temporary Gofile account. Try enabling a VPN or wait a few minutes before retrying."
     },
     "topCriticScore": "Top Critic Score",
     "trainer": "Trainer Menu",
