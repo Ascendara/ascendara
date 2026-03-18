@@ -429,6 +429,248 @@ h2 {
   animation: pop-bounce 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 
+.download-history-item {
+  position: relative;
+  isolation: isolate;
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    transform 220ms ease;
+}
+
+@keyframes download-history-delete-shake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  20% {
+    transform: translateX(-1px) rotate(-8deg);
+  }
+  40% {
+    transform: translateX(1px) rotate(7deg);
+  }
+  60% {
+    transform: translateX(-1px) rotate(-6deg);
+  }
+  80% {
+    transform: translateX(1px) rotate(5deg);
+  }
+}
+
+@keyframes download-history-delete-pulse {
+  0%,
+  100% {
+    color: rgb(185 28 28);
+    filter: drop-shadow(0 0 0 rgb(239 68 68 / 0));
+    transform: scale(1);
+  }
+  50% {
+    color: rgb(220 38 38);
+    filter: drop-shadow(0 0 10px rgb(239 68 68 / 0.35));
+    transform: scale(1.16);
+  }
+}
+
+@keyframes download-history-delete-card-pulse {
+  0%,
+  100% {
+    border-color: rgb(239 68 68 / 0.32);
+    box-shadow:
+      0 14px 30px rgb(127 29 29 / 0.12),
+      0 0 0 1px rgb(239 68 68 / 0.08);
+  }
+  50% {
+    border-color: rgb(239 68 68 / 0.5);
+    box-shadow:
+      0 16px 34px rgb(127 29 29 / 0.16),
+      0 0 0 1px rgb(239 68 68 / 0.18),
+      0 0 18px rgb(239 68 68 / 0.14);
+  }
+}
+
+@keyframes download-history-delete-border-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    filter: saturate(1) brightness(1);
+  }
+  50% {
+    opacity: 0.82;
+    filter: saturate(1.12) brightness(1.08);
+  }
+}
+
+.download-history-item > :not(.download-history-clear-button) {
+  position: relative;
+  z-index: 1;
+}
+
+.download-history-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    90deg,
+    rgb(239 68 68 / 0.22) 0%,
+    rgb(239 68 68 / 0.85) 52%,
+    rgb(239 68 68 / 0.3) 100%
+  );
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease;
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+.download-history-item-delete-active::after {
+  opacity: 1;
+  transform: scaleX(1);
+  animation: download-history-delete-border-pulse 1s ease-in-out infinite;
+}
+
+.download-history-item-delete-active {
+  border-color: rgb(239 68 68 / 0.32);
+  box-shadow:
+    0 14px 30px rgb(127 29 29 / 0.12),
+    0 0 0 1px rgb(239 68 68 / 0.08);
+  animation: download-history-delete-card-pulse 1s ease-in-out infinite;
+  cursor: pointer;
+}
+
+.download-history-item-delete-active .download-history-item-icon-shell {
+  background-color: rgb(239 68 68 / 0.12);
+}
+
+.download-history-item-delete-active .download-history-item-icon {
+  color: rgb(185 28 28);
+}
+
+.download-history-item-delete-active .download-history-item-title {
+  color: rgb(127 29 29);
+}
+
+.download-history-item-delete-active .download-history-item-meta {
+  color: rgb(153 27 27 / 0.88);
+}
+
+.download-history-item-content {
+  transition:
+    filter 180ms ease,
+    opacity 180ms ease;
+}
+
+.download-history-clear-button {
+  --delete-button-size: 2.75rem;
+  --delete-hit-area-width: calc(50% + 0.625rem);
+  top: 50%;
+  right: 0.75rem;
+  width: var(--delete-button-size);
+  height: var(--delete-button-size);
+  color: rgb(var(--color-muted-foreground) / 0.78);
+  opacity: 0.58;
+  pointer-events: auto;
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  overflow: visible;
+  transform: translateY(-50%);
+  transition:
+    color 180ms ease,
+    opacity 180ms ease,
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.download-history-clear-button:hover,
+.download-history-clear-button:focus-visible {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.download-history-clear-button-active {
+  width: var(--delete-hit-area-width);
+  color: rgb(127 29 29);
+  opacity: 1;
+}
+
+.download-history-clear-motion-shell {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--delete-button-size);
+  height: var(--delete-button-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    right 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.download-history-clear-button:hover .download-history-clear-motion-shell,
+.download-history-clear-button:focus-visible .download-history-clear-motion-shell {
+  transform: scale(1.04);
+}
+
+.download-history-clear-button-active .download-history-clear-motion-shell {
+  right: calc(100% - var(--delete-button-size));
+  transform: scale(1);
+}
+
+.download-history-clear-icon-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.download-history-clear-button-active .download-history-clear-icon-shell {
+  animation: download-history-delete-shake 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97) 0ms
+    1;
+}
+
+.download-history-clear-icon {
+  color: inherit;
+  transition: color 180ms ease;
+}
+
+.download-history-clear-button:hover:not(:disabled),
+.download-history-clear-button:focus-visible:not(:disabled) {
+  color: rgb(127 29 29);
+  opacity: 1;
+}
+
+.download-history-clear-button-active .download-history-clear-icon {
+  animation: download-history-delete-pulse 1s ease-in-out 0ms infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .download-history-item::after,
+  .download-history-item-delete-active,
+  .download-history-clear-button,
+  .download-history-clear-motion-shell,
+  .download-history-clear-icon-shell,
+  .download-history-clear-icon {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .download-history-clear-button-active {
+    width: var(--delete-button-size) !important;
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -478,6 +720,11 @@ h2 {
 }
 .profile-small-card:hover .profile-small-title {
   color: rgb(var(--color-primary));
+}
+
+.download-history-item-delete-active.profile-small-card:hover
+  .download-history-item-title.profile-small-title {
+  color: rgb(127 29 29);
 }
 
 @media (prefers-reduced-motion: reduce) {
