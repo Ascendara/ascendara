@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquareText, TriangleAlert } from "lucide-react";
+import { MessageSquareText, TriangleAlert, Sparkles } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import ReportIssue from "./ReportIssue";
 import "./ContextMenu.css";
@@ -23,8 +23,17 @@ const ContextMenu = () => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    const adjustedX = Math.min(x, viewportWidth - menuWidth);
-    const adjustedY = Math.min(y, viewportHeight - menuHeight);
+    let adjustedX = Math.min(x, viewportWidth - menuWidth);
+    let adjustedY = y;
+
+    // Check if menu would go off bottom of screen
+    if (y + menuHeight > viewportHeight) {
+      // Open upward instead
+      adjustedY = Math.max(0, y - menuHeight);
+    }
+
+    // Ensure it doesn't go off top
+    adjustedY = Math.max(0, Math.min(adjustedY, viewportHeight - menuHeight));
 
     setPosition({ x: adjustedX, y: adjustedY });
     setIsVisible(true);
@@ -74,37 +83,88 @@ const ContextMenu = () => {
     <>
       <AnimatePresence>
         {isVisible && (
-          <motion.div
-            ref={menuRef}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.1 }}
-            className="context-menu"
-            style={{
-              position: "fixed",
-              top: position.y,
-              left: position.x,
-              zIndex: 1000,
-            }}
-          >
-            <div className="context-menu-content">
-              <button
-                onClick={handleReport}
-                className="context-menu-item rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <TriangleAlert className="mr-2 h-4 w-4" />
-                {t("common.reportIssue")}
-              </button>
-              <button
-                onClick={handleFeedback}
-                className="context-menu-item rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <MessageSquareText className="mr-2 h-4 w-4" />
-                {t("common.giveFeedback")}
-              </button>
-            </div>
-          </motion.div>
+          <>
+            {/* Backdrop overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="context-menu-backdrop"
+              onClick={() => setIsVisible(false)}
+            />
+            
+            <motion.div
+              ref={menuRef}
+              initial={{ opacity: 0, scale: 0.92, y: -8 }}
+              animate={{ opacity: 1, scale: 1, y: 0, top: position.y, left: position.x }}
+              exit={{ opacity: 0, scale: 0.92, y: -8 }}
+              transition={{ 
+                duration: 0.2,
+                ease: [0.16, 1, 0.3, 1]
+              }}
+              className="context-menu"
+              style={{
+                position: "fixed",
+                top: position.y,
+                left: position.x,
+                zIndex: 1001,
+              }}
+            >
+              {/* Glow effect */}
+              <div className="context-menu-glow" />
+              
+              <div className="context-menu-content">
+                {/* Header */}
+                <div className="context-menu-header">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{t("common.contextMenu.menu")}</span>
+                </div>
+
+                {/* Separator */}
+                <div className="context-menu-separator" />
+
+                {/* Menu Items */}
+                <motion.button
+                  onClick={handleReport}
+                  className="context-menu-item"
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="context-menu-item-icon">
+                    <TriangleAlert className="h-4 w-4" />
+                  </div>
+                  <div className="context-menu-item-content">
+                    <span className="context-menu-item-label">
+                      {t("common.reportIssue")}
+                    </span>
+                    <span className="context-menu-item-description">
+                      {t("common.contextMenu.reportIssueDescription")}
+                    </span>
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  onClick={handleFeedback}
+                  className="context-menu-item"
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="context-menu-item-icon">
+                    <MessageSquareText className="h-4 w-4" />
+                  </div>
+                  <div className="context-menu-item-content">
+                    <span className="context-menu-item-label">
+                      {t("common.giveFeedback")}
+                    </span>
+                    <span className="context-menu-item-description">
+                      {t("common.contextMenu.shareFeedbackDescription")}
+                    </span>
+                  </div>
+                </motion.button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
       <ReportIssue isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} />

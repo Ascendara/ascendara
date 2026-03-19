@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,9 @@ import {
   Clock,
   DollarSign,
   ArrowDown,
+  Play,
+  Trash2,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -2043,10 +2047,16 @@ const InstalledGameCard = memo(
   }) => {
     const { t } = useLanguage();
     const { settings } = useSettings();
+    const navigate = useNavigate();
     const [isRunning, setIsRunning] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [imageData, setImageData] = useState(null);
     const [executableExists, setExecutableExists] = useState(null);
+    const [contextMenuOpen, setContextMenuOpen] = useState(false);
+    const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+    const [logoData, setLogoData] = useState(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isUninstalling, setIsUninstalling] = useState(false);
     const isFavorite = favorites.includes(game.game || game.name);
 
     useEffect(() => {
@@ -2159,6 +2169,129 @@ const InstalledGameCard = memo(
       selectedCover: null,
     });
     const [coverImageUrls, setCoverImageUrls] = useState({});
+
+    // Load game logo
+    useEffect(() => {
+      let isMounted = true;
+      const gameId = game.game || game.name;
+
+      const loadLogo = async () => {
+        try {
+          const logoBase64 = await window.electron.ipcRenderer.invoke(
+            "get-game-image",
+            gameId,
+            "logo"
+          );
+          if (logoBase64 && isMounted) {
+            setLogoData(`data:image/png;base64,${logoBase64}`);
+          } else {
+            setLogoData(null);
+          }
+        } catch (e) {
+          setLogoData(null);
+        }
+      };
+
+      loadLogo();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [game.game, game.name]);
+
+    const handleContextMenu = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const x = e.clientX;
+      const y = e.clientY;
+      const menuWidth = 260; // min-w-[260px] from the menu
+      const menuHeight = 250; // More realistic estimate based on typical menu size
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let adjustedX = x;
+      let adjustedY = y;
+
+      // Check if menu would go off right side
+      if (x + menuWidth > viewportWidth) {
+        adjustedX = Math.max(0, viewportWidth - menuWidth);
+      }
+
+      // Check if menu would go off bottom of screen
+      if (y + menuHeight > viewportHeight) {
+        // Open upward instead
+        adjustedY = y - menuHeight;
+      }
+
+      // Ensure it doesn't go off top
+      if (adjustedY < 0) {
+        adjustedY = Math.max(0, Math.min(y, viewportHeight - menuHeight));
+      }
+      
+      setContextMenuPosition({ x: adjustedX, y: adjustedY });
+      setContextMenuOpen(true);
+    };
+
+    const handlePlayFromContext = async e => {
+      e.stopPropagation();
+      setContextMenuOpen(false);
+      
+      if (!game.executable && !game.isCustom) {
+        toast.error(t("library.noExecutableSet"));
+        return;
+      }
+      
+      navigate("/gamescreen", {
+        state: {
+          gameData: game,
+        },
+      });
+    };
+
+    const handleRemoveGame = e => {
+      e.stopPropagation();
+      setContextMenuOpen(false);
+      setIsDeleteDialogOpen(true);
+    };
+
+    const handleDeleteGame = e => {
+      e.stopPropagation();
+      setContextMenuOpen(false);
+      setIsDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteGame = async () => {
+      try {
+        setIsUninstalling(true);
+        const gameId = game.game || game.name;
+
+        if (game.isCustom) {
+          await window.electron.removeCustomGame(gameId);
+        } else {
+          await window.electron.deleteGame(gameId);
+        }
+
+        setIsUninstalling(false);
+        setIsDeleteDialogOpen(false);
+        window.location.reload();
+      } catch (error) {
+        console.error("Error deleting game:", error);
+        setIsUninstalling(false);
+      }
+    };
+
+    const handleOpenDirectory = async e => {
+      e.stopPropagation();
+      setContextMenuOpen(false);
+      
+      try {
+        await window.electron.openGameDirectory(game.game || game.name);
+      } catch (error) {
+        console.error("Failed to open directory:", error);
+        toast.error(t("library.failedToOpenDirectory"));
+      }
+    };
 
     const handleCoverSearch = async query => {
       setCoverSearch(prev => ({
@@ -2380,6 +2513,35 @@ const InstalledGameCard = memo(
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Delete/Remove Game Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                {t("library.confirmDelete")}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-4 text-muted-foreground">
+                {t("library.deleteConfirmMessage", { game: game.game || game.name })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex gap-2">
+              <Button variant="outline" className="text-primary" onClick={() => setIsDeleteDialogOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button className="text-secondary" onClick={confirmDeleteGame} disabled={isUninstalling}>
+                {isUninstalling ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    {t("library.deleting")}
+                  </>
+                ) : (
+                  t("library.delete", { game: game.game || game.name })
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <Card
           className={cn(
             "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
@@ -2396,6 +2558,7 @@ const InstalledGameCard = memo(
               onPlay();
             }
           }}
+          onContextMenu={handleContextMenu}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
@@ -2410,6 +2573,120 @@ const InstalledGameCard = memo(
               />
             </div>
           )}
+          {/* Context Menu Portal */}
+          {contextMenuOpen && createPortal(
+            <div
+              className="fixed inset-0 z-[9999] flex items-start justify-start"
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenuOpen(false);
+              }}
+              onContextMenu={e => e.preventDefault()}
+            >
+              {/* Backdrop with blur */}
+              <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+              
+              {/* Context Menu */}
+              <div
+                className="absolute animate-in fade-in zoom-in-95 duration-200 transition-all"
+                style={{
+                  top: contextMenuPosition.y,
+                  left: contextMenuPosition.x,
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="min-w-[260px] max-h-[80vh] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
+                  {/* Header with game logo */}
+                  <div className="flex items-center justify-center border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent px-3 py-3">
+                    {logoData ? (
+                      <img 
+                        src={logoData} 
+                        alt={game.game || game.name} 
+                        className="h-8 max-w-[200px] object-contain"
+                      />
+                    ) : (
+                      <span className="text-sm font-semibold text-foreground">
+                        {game.game || game.name}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Menu Items */}
+                  <div className="max-h-[calc(80vh-60px)] overflow-y-auto p-1.5">
+                    {game.executable ? (
+                      <button
+                        onClick={handlePlayFromContext}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20 transition-all group-hover:bg-primary">
+                          <Play className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{t("common.contextMenu.playGame")}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("common.contextMenu.playGameDescription")}
+                          </div>
+                        </div>
+                      </button>
+                    ) : null}
+                    
+                    <button
+                      onClick={handleOpenDirectory}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                        <FolderOpen className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{t("common.contextMenu.openDirectory")}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("common.contextMenu.openDirectoryDescription")}
+                        </div>
+                      </div>
+                    </button>
+                    
+                    {/* Divider before remove/delete option */}
+                    <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                    
+                    {game.isCustom ? (
+                      <button
+                        onClick={handleRemoveGame}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
+                          <Trash2 className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{t("common.contextMenu.removeGame")}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("common.contextMenu.removeGameDescription")}
+                          </div>
+                        </div>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleDeleteGame}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
+                          <Trash2 className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{t("common.contextMenu.deleteGame")}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("common.contextMenu.deleteGameDescription")}
+                          </div>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
           <CardContent className="p-0">
             <div className="relative aspect-[4/3] overflow-hidden">
               <img
