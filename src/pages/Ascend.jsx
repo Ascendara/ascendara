@@ -1865,7 +1865,7 @@ const Ascend = () => {
           body: JSON.stringify({
             userId: user.uid,
             priceId: priceId,
-            successUrl: "ascendara://checkout-success?session_id={CHECKOUT_SESSION_ID}",
+            successUrl: "https://ascendara.app/thank-you?subscription=success",
             cancelUrl: "ascendara://checkout-canceled",
           }),
         }
@@ -1889,7 +1889,7 @@ const Ascend = () => {
             body: JSON.stringify({
               userId: user.uid,
               priceId: priceId,
-              successUrl: "ascendara://checkout-success?session_id={CHECKOUT_SESSION_ID}",
+              successUrl: "https://ascendara.app/thank-you?subscription=success",
               cancelUrl: "ascendara://checkout-canceled",
             }),
           }
