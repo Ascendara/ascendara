@@ -172,8 +172,16 @@ def sanitize_folder_name(name):
 
 def generate_website_token(user_agent, account_token):
     """Generate the dynamic X-Website-Token required by GoFile API."""
+    try:
+        response = requests.get("https://api.ascendara.app/app/json/gofilesecret", timeout=5)
+        response.raise_for_status()
+        secret = response.json().get("secret")
+    except Exception as e:
+        logging.warning(f"Failed to fetch GoFile secret from API, using fallback: {e}")
+        secret = "f4s58gs6"
+    
     time_slot = int(time.time()) // 14400
-    raw = f"{user_agent}::en-US::{account_token}::{time_slot}::gf2026x"
+    raw = f"{user_agent}::en-US::{account_token}::{time_slot}::{secret}"
     return sha256(raw.encode()).hexdigest()
 
 def handleerror(game_info, game_info_path, e):
