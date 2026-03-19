@@ -376,11 +376,12 @@ const LocalRefresh = () => {
           wasFirstIndexRef.current = false;
         }
 
-        // Reload the page after a short delay to ensure all components get fresh data
-        // This is necessary because components may have cached old imgIDs in their state
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
+        // Dispatch custom event to notify other components to refresh their data
+        // This allows seamless updates without requiring a full page reload
+        console.log("[LocalRefresh] Dispatching index-refreshed event");
+        window.dispatchEvent(new CustomEvent("index-refreshed", {
+          detail: { timestamp: Date.now() }
+        }));
       } else if (data.status === "failed" || data.status === "error") {
         setRefreshStatus("error");
         setIsRefreshing(false);
@@ -485,7 +486,22 @@ const LocalRefresh = () => {
       }
       setHasIndexBefore(true);
       setLastRefreshTime(new Date()); // Set last refresh time to now
-      imageCacheService.clearCache();
+      
+      // Clear caches so the app loads fresh data
+      console.log("[LocalRefresh] Public index download complete, clearing caches");
+      imageCacheService.invalidateSettingsCache();
+      await imageCacheService.clearCache(true);
+      gameService.clearMemoryCache();
+      localStorage.removeItem("ascendara_games_cache");
+      localStorage.removeItem("local_ascendara_games_timestamp");
+      localStorage.removeItem("local_ascendara_metadata_cache");
+      localStorage.removeItem("local_ascendara_last_updated");
+      
+      // Dispatch custom event to notify other components to refresh their data
+      console.log("[LocalRefresh] Dispatching index-refreshed event");
+      window.dispatchEvent(new CustomEvent("index-refreshed", {
+        detail: { timestamp: Date.now() }
+      }));
     };
 
     const handlePublicDownloadError = data => {

@@ -388,7 +388,18 @@ const Search = memo(() => {
     verifiedGamesService.loadVerifiedGames().catch(error => {
       console.error("Failed to load verified games:", error);
     });
-  }, []);
+
+    // Listen for index refresh events
+    const handleIndexRefresh = (event) => {
+      console.log("[Search] Index refreshed, reloading games", event.detail);
+      // Force refresh to get new data
+      setLoading(true);
+      refreshGames(true).finally(() => setLoading(false));
+    };
+
+    window.addEventListener("index-refreshed", handleIndexRefresh);
+    return () => window.removeEventListener("index-refreshed", handleIndexRefresh);
+  }, [refreshGames]);
 
   useEffect(() => {
     const handleResize = () => {

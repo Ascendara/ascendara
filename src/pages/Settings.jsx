@@ -1549,7 +1549,7 @@ function Settings() {
                     <div className="space-y-0.5">
                       <Label>{t("settings.ascendaraUpdates")}</Label>
                       <p className="text-sm text-muted-foreground">
-                        {t("settings.ascendaraUpdatesDescription")}
+                        {t("settings.ascendaraUpdatesDescription2")}
                       </p>
                     </div>
                     <Switch

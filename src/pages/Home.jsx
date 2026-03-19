@@ -430,12 +430,12 @@ const Home = memo(() => {
   const [isLongPressing, setIsLongPressing] = useState(false);
 
   useEffect(() => {
-    const loadGames = async () => {
+    const loadGames = async (forceRefresh = false) => {
       try {
         setLoading(true);
 
-        // Use cache if available
-        if (gamesCache && carouselGamesCache) {
+        // Use cache if available and not forcing refresh
+        if (!forceRefresh && gamesCache && carouselGamesCache) {
           setApiGames(gamesCache);
           setCarouselGames(carouselGamesCache);
 
@@ -459,7 +459,8 @@ const Home = memo(() => {
           return;
         }
 
-        // Fetch fresh data if no cache
+        // Fetch fresh data if no cache or forcing refresh
+        console.log("[Home] Loading fresh game data", forceRefresh ? "(forced refresh)" : "");
         const [gamesData, carouselGames] = await Promise.all([
           gameService.getAllGames(),
           gameService.getRandomTopGames(),
@@ -497,6 +498,18 @@ const Home = memo(() => {
     };
 
     loadGames();
+
+    // Listen for index refresh events
+    const handleIndexRefresh = (event) => {
+      console.log("[Home] Index refreshed, reloading games", event.detail);
+      // Clear module-level caches to force fresh data
+      gamesCache = null;
+      carouselGamesCache = null;
+      loadGames(true);
+    };
+
+    window.addEventListener("index-refreshed", handleIndexRefresh);
+    return () => window.removeEventListener("index-refreshed", handleIndexRefresh);
   }, []);
 
   useEffect(() => {
