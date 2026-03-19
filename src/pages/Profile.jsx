@@ -4,14 +4,24 @@ import React, {
   useRef as UseRef,
   useState as UseState,
 } from "react";
-import { useLanguage as UseLanguage } from "@/context/LanguageContext";
-import { useAuth as UseAuth } from "@/context/AuthContext";
+import { useLanguage as UseLanguage } from "@/Context/LanguageContext";
+import { useAuth as UseAuth } from "@/Context/AuthContext";
 import {
   calculateLevelFromXP,
   getLevelConstants,
 } from "@/services/levelCalculationService";
 
 import UsernameDialog from "@/components/UsernameDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -36,17 +46,14 @@ import {
   Music2,
   Smile,
   Sparkles,
+  Trash2,
   Trophy,
   Upload,
 } from "lucide-react";
 
 const VUS = ["online", "away", "busy", "invisible"];
 
-const {
-  LEVEL_XP_BASE: LevelXpBase,
-  MAX_PROFILE_LEVEL: MaxProfileLevel,
-  XP_RULES: XpRules,
-} = getLevelConstants();
+const { XP_RULES: XpRules } = getLevelConstants();
 
 const ReadJsonFromLocalStorage = (StorageKey, FallbackValue) => {
   try {
@@ -57,10 +64,10 @@ const ReadJsonFromLocalStorage = (StorageKey, FallbackValue) => {
     }
 
     return JSON.parse(RawValue);
-  } catch (Error) {
+  } catch (error) {
     console.warn(
-      `[Profile]couldnt read ${StorageKey} in localstorage using defaults`,
-      Error
+      `[Profile] couldn't read ${StorageKey} from localStorage, using defaults`,
+      error
     );
 
     return FallbackValue;
@@ -108,8 +115,7 @@ const FormatGPU = Renderer => {
 const LinuxSystem = () => {
   try {
     const Canvas = document.createElement("canvas");
-    const Context =
-      Canvas.getContext("webgl") || Canvas.getContext("experimental-webgl");
+    const Context = Canvas.getContext("webgl") || Canvas.getContext("experimental-webgl");
 
     if (!Context) {
       return null;
@@ -124,8 +130,8 @@ const LinuxSystem = () => {
     const Renderer = Context.getParameter(DebugInfo.UNMASKED_RENDERER_WEBGL);
 
     return FormatGPU(Renderer) || null;
-  } catch (Error) {
-    console.warn(`[Profile] Unfortunately Could NOT Detect Linux GPU.`, Error);
+  } catch (error) {
+    console.warn(`[Profile] Couldn't detect Linux GPU.`, error);
     return null;
   }
 };
@@ -135,8 +141,6 @@ const Profile = () => {
   const { user: User } = UseAuth();
 
   const [JoinDate, SetJoinDate] = UseState("");
-  const [Username, SetUsername] = UseState("");
-  const [IsUsingGoldbergName, SetIsUsingGoldbergName] = UseState(true);
   const [GeneralUsername, SetGeneralUsername] = UseState("");
   const [PrivateNotes, SetPrivateNotes] = UseState(() => {
     const UserPrefs = ReadJsonFromLocalStorage("userProfile", {});
@@ -160,7 +164,6 @@ const Profile = () => {
   });
   const [ProfileImage, SetProfileImage] = UseState(null);
   const [Games, SetGames] = UseState([]);
-  const [IsLoading, SetIsLoading] = UseState(true);
   const [AchievementsLeaderboard, SetAchievementsLeaderboard] = UseState([]);
   const [IsLoadingAchievementsLeaderboard, SetIsLoadingAchievementsLeaderboard] =
     UseState(false);
@@ -285,6 +288,9 @@ const Profile = () => {
   };
   const [GameImages, SetGameImages] = UseState({});
   const [DownloadHistory, SetDownloadHistory] = UseState([]);
+  const [RemovingDownloadHistoryIndex, SetRemovingDownloadHistoryIndex] = UseState(null);
+  const [ActiveDeleteHistoryIndex, SetActiveDeleteHistoryIndex] = UseState(null);
+  const [PendingDeleteHistoryItem, SetPendingDeleteHistoryItem] = UseState(null);
 
   const [UserStatus, SetUserStatus] = UseState("online");
 
@@ -327,14 +333,14 @@ const Profile = () => {
 
         if (FetchedStatus != null) {
           console.warn(
-            `[Profile] Unexpected user status from backend; defaulting to online.`,
+            `[Profile] Unexpected User status from backend; defaulting to online.`,
             { FetchedStatus }
           );
         }
-      } catch (Error) {
+      } catch (error) {
         console.error(
-          `[Profile] Failed to load user status — check Firestore rules / network.`,
-          Error
+          `[Profile] Failed to load User status — check Firestore rules / network.`,
+          error
         );
       }
     };
@@ -346,9 +352,9 @@ const Profile = () => {
     };
   }, [User?.uid]);
 
-  const handleUserStatusChange = async NextStatus => {
+  const HandleUserStatusChange = async NextStatus => {
     if (!VUS.includes(NextStatus)) {
-      console.warn(`[Profile] Ignore`, {
+      console.warn(`[Profile] Ignoring invalid status change`, {
         NextStatus,
       });
       return;
@@ -366,7 +372,7 @@ const Profile = () => {
       if (!Result?.success) {
         console.error(`[Profile] Failed to update status`, {
           NextStatus,
-          Error: Result?.error,
+          error: Result?.error,
         });
         SetUserStatus(PreviousStatus);
 
@@ -377,20 +383,20 @@ const Profile = () => {
           SetUserStatus(BackendStatus);
         }
       }
-    } catch (Error) {
-      console.error(`[Profile] Failed to update user status check firestore`, Error);
+    } catch (error) {
+      console.error(`[Profile] Failed to update User status`, error);
       SetUserStatus(PreviousStatus);
     }
   };
 
-  const calculateLevelProgressFromXP = TotalXp => {
-    return calculateLevelFromXP(TotalXp);
+  const CalculateLevelProgressFromXP = TotalXP => {
+    return calculateLevelFromXP(TotalXP);
   };
 
-  const buildProfileStatsFromGames = (InstalledGames, CustomGames) => {
+  const BuildProfileStatsFromGames = (InstalledGames, CustomGames) => {
     const AllGames = [...(InstalledGames || []), ...(CustomGames || [])];
 
-    let TotalXp = 0;
+    let TotalXP = 0;
     let TotalPlaytimeSeconds = 0;
     let GamesPlayedCount = 0;
 
@@ -404,31 +410,31 @@ const Profile = () => {
         GamesPlayedCount += 1;
       }
 
-      let XpFromThisGame = XpRules.basePerGame;
+      let XPFromThisGame = XpRules.basePerGame;
 
-      XpFromThisGame += Math.floor(PlaytimeHours * XpRules.perHourPlayed);
+      XPFromThisGame += Math.floor(PlaytimeHours * XpRules.perHourPlayed);
       const LaunchBonus = Math.min(
         LaunchCount * XpRules.perLaunch,
         XpRules.launchBonusCap
       );
-      XpFromThisGame += LaunchBonus;
+      XPFromThisGame += LaunchBonus;
 
       if (IsCompleted) {
-        XpFromThisGame += XpRules.completedBonus;
+        XPFromThisGame += XpRules.completedBonus;
       }
 
-      TotalXp += XpFromThisGame;
+      TotalXP += XPFromThisGame;
       TotalPlaytimeSeconds += PlaytimeSeconds;
     }
 
     const TotalPlaytimeHours = TotalPlaytimeSeconds / 3600;
     for (const Milestone of XpRules.playtimeMilestones) {
       if (TotalPlaytimeHours >= Milestone.hours) {
-        TotalXp += Milestone.bonus;
+        TotalXP += Milestone.bonus;
       }
     }
 
-    const LevelProgress = calculateLevelProgressFromXP(TotalXp);
+    const LevelProgress = CalculateLevelProgressFromXP(TotalXP);
 
     return {
       totalPlaytime: TotalPlaytimeSeconds,
@@ -450,24 +456,24 @@ const Profile = () => {
     LoadProfile();
     LoadProfileImage();
 
-    const handleProfileUpdate = () => {
+    const HandleProfileUpdate = () => {
       LoadProfile();
     };
 
-    window.addEventListener("storage", handleProfileUpdate);
+    window.addEventListener("storage", HandleProfileUpdate);
 
-    window.addEventListener("username-updated", handleProfileUpdate);
+    window.addEventListener("username-updated", HandleProfileUpdate);
 
     return () => {
-      window.removeEventListener("storage", handleProfileUpdate);
-      window.removeEventListener("username-updated", handleProfileUpdate);
+      window.removeEventListener("storage", HandleProfileUpdate);
+      window.removeEventListener("username-updated", HandleProfileUpdate);
     };
   }, []);
 
   UseEffect(() => {
     let DidCancel = false;
 
-    const loadAchievementsLeaderboard = async () => {
+    const LoadAchievementsLeaderboard = async () => {
       try {
         if (!Array.isArray(Games) || Games.length === 0) {
           SetAchievementsLeaderboard([]);
@@ -485,7 +491,8 @@ const Profile = () => {
         SetIsLoadingAchievementsLeaderboard(true);
 
         const EligibleGames = Games.filter(
-          g => !g?.downloadingData?.downloading && !g?.downloadingData?.extracting
+          Game =>
+            !Game?.downloadingData?.downloading && !Game?.downloadingData?.extracting
         ).slice(0, 75);
 
         if (DidCancel) return;
@@ -505,7 +512,7 @@ const Profile = () => {
           return;
         }
 
-        const results = await Promise.all(
+        const Results = await Promise.all(
           EligibleGames.map(async Game => {
             try {
               const GameName = Game.game || Game.name;
@@ -513,18 +520,23 @@ const Profile = () => {
 
               if (!GameName) return null;
 
-              const achievementData = await window.electron.readGameAchievements(
+              const AchievementData = await window.electron.readGameAchievements(
                 GameName,
                 IsCustom
               );
 
-              const AchievementList = achievementData?.achievements;
+              const AchievementList = AchievementData?.achievements;
               if (!Array.isArray(AchievementList) || AchievementList.length === 0) {
                 return null;
               }
 
               const UnlockedCount = AchievementList.filter(
-                a => !!(a?.achieved || a?.unlocked || a?.isUnlocked)
+                Achievement =>
+                  !!(
+                    Achievement?.achieved ||
+                    Achievement?.unlocked ||
+                    Achievement?.isUnlocked
+                  )
               ).length;
               const TotalCount = AchievementList.length;
 
@@ -547,9 +559,11 @@ const Profile = () => {
 
         if (DidCancel) return;
 
-        const Top6 = results.filter(Boolean).sort(CompareAchievementEntries).slice(0, 6);
+        const TopSix = Results.filter(Boolean)
+          .sort(CompareAchievementEntries)
+          .slice(0, 6);
 
-        SetAchievementsLeaderboard(Top6);
+        SetAchievementsLeaderboard(TopSix);
       } catch (e) {
         console.warn(
           `[Profile] Failed to load achievements leaderboard — check IPC or achievements files.`,
@@ -561,7 +575,7 @@ const Profile = () => {
       }
     };
 
-    loadAchievementsLeaderboard();
+    LoadAchievementsLeaderboard();
 
     return () => {
       DidCancel = true;
@@ -570,8 +584,6 @@ const Profile = () => {
 
   const LoadProfile = async () => {
     try {
-      SetIsLoading(true);
-
       if (!window.electron) {
         throw new Error("window.electron is not available (preload/IPC not initialized)");
       }
@@ -579,14 +591,14 @@ const Profile = () => {
       const JoinDateString = await window.electron.timestampTime();
       SetJoinDate(JoinDateString);
 
-      const InstalledAndCustomGames = await LoadGamesData();
-      console.log("[Profile] Loaded games:", InstalledAndCustomGames?.length, "games");
+      const LoadedGames = await LoadGamesData();
+      console.log("[Profile] Loaded Games:", LoadedGames?.length, "Games");
 
-      const DownloadHistory = await window.electron.getDownloadHistory();
-      SetDownloadHistory(DownloadHistory);
+      const LatestDownloadHistory = await window.electron.getDownloadHistory();
+      SetDownloadHistory(LatestDownloadHistory);
 
-      let CalculatedStats = buildProfileStatsFromGames(InstalledAndCustomGames, []);
-      console.log("[Profile] Calculated stats:", {
+      let CalculatedStats = BuildProfileStatsFromGames(LoadedGames, []);
+      console.log("[Profile] Calculated Stats:", {
         totalGames: CalculatedStats.totalGames,
         gamesPlayed: CalculatedStats.gamesPlayed,
         xp: CalculatedStats.xp,
@@ -594,34 +606,34 @@ const Profile = () => {
         totalPlaytime: CalculatedStats.totalPlaytime,
       });
 
-      let persistedProfileStats = null;
+      let PersistedProfileStats = null;
       try {
-        persistedProfileStats =
+        PersistedProfileStats =
           await window.electron?.getTimestampValue?.("profileStats");
       } catch (e) {
-        persistedProfileStats = null;
+        PersistedProfileStats = null;
       }
 
-      if (!InstalledAndCustomGames || InstalledAndCustomGames.length === 0) {
-        const PersistedXp = persistedProfileStats?.xp;
+      if (!LoadedGames || LoadedGames.length === 0) {
+        const PersistedXP = PersistedProfileStats?.xp;
 
-        if (typeof PersistedXp === "number") {
-          const Progress = calculateLevelProgressFromXP(PersistedXp);
+        if (typeof PersistedXP === "number") {
+          const Progress = CalculateLevelProgressFromXP(PersistedXP);
 
           CalculatedStats = {
             ...CalculatedStats,
             ...Progress,
             totalPlaytime:
-              typeof persistedProfileStats?.totalPlaytime === "number"
-                ? persistedProfileStats.totalPlaytime
+              typeof PersistedProfileStats?.totalPlaytime === "number"
+                ? PersistedProfileStats.totalPlaytime
                 : CalculatedStats.totalPlaytime,
             gamesPlayed:
-              typeof persistedProfileStats?.gamesPlayed === "number"
-                ? persistedProfileStats.gamesPlayed
+              typeof PersistedProfileStats?.gamesPlayed === "number"
+                ? PersistedProfileStats.gamesPlayed
                 : CalculatedStats.gamesPlayed,
             totalGames:
-              typeof persistedProfileStats?.totalGames === "number"
-                ? persistedProfileStats.totalGames
+              typeof PersistedProfileStats?.totalGames === "number"
+                ? PersistedProfileStats.totalGames
                 : CalculatedStats.totalGames,
           };
         }
@@ -638,7 +650,7 @@ const Profile = () => {
         totalGames: CalculatedStats.totalGames || 0,
       });
 
-      SetGames(InstalledAndCustomGames);
+      SetGames(LoadedGames);
       if (window.electron?.setTimestampValue) {
         const Payload = {
           level: CalculatedStats.level || 1,
@@ -646,7 +658,7 @@ const Profile = () => {
           totalPlaytime: CalculatedStats.totalPlaytime || 0,
           gamesPlayed: CalculatedStats.gamesPlayed || 0,
           totalGames: CalculatedStats.totalGames || 0,
-          joinDate: JoinDateString || null,
+          JoinDate: JoinDateString || null,
         };
 
         const Fingerprint = JSON.stringify(Payload);
@@ -682,67 +694,64 @@ const Profile = () => {
         }
       }
 
-      SetUsername(UserPrefs.username || "");
       SetGeneralUsername(UserPrefs.profileName || "");
-      SetIsUsingGoldbergName(UserPrefs.useForGoldberg ?? true);
       SetPrivateNotes(UserPrefs.privateNotes || UserPrefs.bio || "");
-
-      SetIsLoading(false);
     } catch (error) {
       console.error(
         `[Profile] Error loading profile — if this is a fresh install, double-check preload/IPC wiring.`,
         error
       );
-      SetIsLoading(false);
     }
   };
 
   UseEffect(() => {
-    let cancelled = false;
+    let Cancelled = false;
 
-    const loadDeviceInfo = async () => {
+    const LoadDeviceInfo = async () => {
       try {
-        const platform =
+        const Platform =
           window.electron?.getPlatform?.() ||
           navigator.userAgentData?.platform ||
           navigator.platform ||
           "Unknown";
 
-        const specs = await window.electron?.fetchSystemSpecs?.();
-        if (cancelled) return;
+        const Specs = await window.electron?.fetchSystemSpecs?.();
+        if (Cancelled) return;
 
         const AmILinux =
-          String(platform).toLowerCase().includes("linux") ||
-          String(specs?.os || "")
+          String(Platform).toLowerCase().includes("linux") ||
+          String(Specs?.os || "")
             .toLowerCase()
             .includes("linux");
-        const linuxGpuRenderer =
-          AmILinux && UnknownDeviceInfo(specs?.gpu) ? LinuxSystem() : null;
-        const linuxRunner = AmILinux ? await window.electron?.resolveRunner?.("auto") : null;
+        const LinuxGPURenderer =
+          AmILinux && UnknownDeviceInfo(Specs?.gpu) ? LinuxSystem() : null;
+        const LinuxRunner = AmILinux
+          ? await window.electron?.resolveRunner?.("auto")
+          : null;
 
         SetDeviceInfo(Prev => ({
           ...Prev,
-          platform,
-          ...(specs || {}),
-          gpu: linuxGpuRenderer || specs?.gpu || Prev.gpu,
+          platform: Platform,
+          ...(Specs || {}),
+          gpu: LinuxGPURenderer || Specs?.gpu || Prev.gpu,
           directx: AmILinux
-            ? linuxRunner?.name ||
-              (linuxRunner?.type === "proton"
+            ? LinuxRunner?.name ||
+              (LinuxRunner?.type === "proton"
                 ? "Proton"
-                : linuxRunner?.type === "wine"
+                : LinuxRunner?.type === "wine"
                   ? "Wine"
                   : "Wine / Proton")
-            : specs?.directx || Prev.directx,
+            : Specs?.directx || Prev.directx,
         }));
       } catch (error) {
         console.error(`[Profile] Device Loading Failed`, error);
       }
     };
 
-    loadDeviceInfo();
+    LoadDeviceInfo();
 
     return () => {
-      cancelled = true;
+      Cancelled = true;
     };
   }, []);
 
@@ -755,19 +764,19 @@ const Profile = () => {
       }
 
       const InstalledGames = await window.electron.getGames();
-      let customGames = [];
+      let CustomGames = [];
       try {
-        customGames = await window.electron.getCustomGames();
+        CustomGames = await window.electron.getCustomGames();
       } catch (error) {
         console.error(
-          `[Profile] Failed to load custom games — continuing with installed games only.`,
+          `[Profile] Failed to load custom Games — continuing with installed Games only.`,
           error
         );
       }
-      return [...InstalledGames, ...customGames];
+      return [...InstalledGames, ...CustomGames];
     } catch (error) {
       console.error(
-        `[Profile] Error loading games data — check permissions / download folder path.`,
+        `[Profile] Error loading Games data — check permissions / download folder path.`,
         error
       );
       return [];
@@ -811,7 +820,7 @@ const Profile = () => {
       const { gameName: GameName, dataUrl: DataUrl } = Event.detail;
 
       if (!GameName || !DataUrl) return;
-      if (!Games.some(g => (g.game || g.name) === GameName)) return;
+      if (!Games.some(Game => (Game.game || Game.name) === GameName)) return;
 
       console.log(`[Profile] got cover update for ${GameName}`);
       SetGameImages(PrevImages => {
@@ -839,8 +848,8 @@ const Profile = () => {
     };
   }, [Games]);
 
-  const HandleImageUpload = async E => {
-    const File = E.target.files[0];
+  const HandleImageUpload = async Event => {
+    const File = Event.target.files[0];
     if (File) {
       try {
         const Reader = new FileReader();
@@ -891,12 +900,12 @@ const Profile = () => {
     }
   };
 
-  const renderProfileSection = () => {
+  const RenderProfileSection = () => {
     const IsUsingEmoji = !ProfileImage;
 
     return (
       <div className="relative">
-        <div className="flex items-center justify-start gap-4 p-4 text-left">
+        <div className="text-Left flex items-center justify-start gap-4 p-4">
           <Popover>
             <PopoverTrigger asChild>
               <div
@@ -918,7 +927,7 @@ const Profile = () => {
                 }
               >
                 {!ProfileImage && SelectedEmoji}
-                <div className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-full bg-primary/90 p-1 shadow-sm transition-transform duration-300 ease-out group-hover/avatar:scale-110">
+                <div className="-Right-1 absolute -bottom-1 flex items-center justify-center rounded-full bg-primary/90 p-1 shadow-sm transition-transform duration-300 ease-out group-hover/avatar:scale-110">
                   <Smile className="spin-bounce h-6 w-6 text-secondary" />
                 </div>
               </div>
@@ -1053,23 +1062,23 @@ const Profile = () => {
                           color: "text-yellow-400",
                         },
                         { id: "busy", label: "Busy", icon: "🔴", color: "text-red-500" },
-                      ].map(status => (
+                      ].map(Status => (
                         <button
-                          key={status.id}
+                          key={Status.id}
                           className={Cn(
                             "flex w-full items-center gap-2 rounded-lg",
                             "border border-transparent px-3 py-2 text-xs font-semibold",
                             "transition-all duration-200",
                             "hover:scale-[1.02] hover:border-primary/20 hover:bg-accent/20 active:scale-95",
-                            UserStatus === status.id
+                            UserStatus === Status.id
                               ? "border-primary/30 bg-accent/25 text-primary"
                               : "text-foreground"
                           )}
-                          onClick={() => handleUserStatusChange(status.id)}
+                          onClick={() => HandleUserStatusChange(Status.id)}
                           type="button"
                         >
-                          <span className={status.color}>{status.icon}</span>
-                          <span className="capitalize">{status.label}</span>
+                          <span className={Status.color}>{Status.icon}</span>
+                          <span className="capitalize">{Status.label}</span>
                         </button>
                       ))}
                     </PopoverContent>
@@ -1111,20 +1120,20 @@ const Profile = () => {
               <div className="animate-fade-in space-y-4">
                 {/* Icon Tabs */}
                 <div className="mb-2 flex items-center justify-center gap-2">
-                  {EmojiCategories.map(category => (
+                  {EmojiCategories.map(Category => (
                     <button
-                      key={category.id}
+                      key={Category.id}
                       className={Cn(
                         "group grid h-8 min-h-8 w-8 min-w-8 place-items-center rounded-full bg-transparent shadow-sm transition-all duration-300 ease-out focus:outline-none",
-                        ActiveEmojiCategoryId === category.id
+                        ActiveEmojiCategoryId === Category.id
                           ? "animate-pop-bounce scale-110 ring-2 ring-primary"
                           : "hover:scale-105 hover:bg-accent/20"
                       )}
-                      onClick={() => SetActiveEmojiCategoryId(category.id)}
+                      onClick={() => SetActiveEmojiCategoryId(Category.id)}
                       type="button"
-                      aria-label={category.title}
+                      aria-label={Category.title}
                     >
-                      {EmojiTabIcons[category.id]}
+                      {EmojiTabIcons[Category.id]}
                     </button>
                   ))}
                 </div>
@@ -1132,28 +1141,28 @@ const Profile = () => {
                 {/* Emoji Grid */}
                 <div className="animate-fade-in">
                   {EmojiCategories.filter(
-                    category => category.id === ActiveEmojiCategoryId
-                  ).map(category => (
-                    <div key={category.id} className="space-y-2">
+                    Category => Category.id === ActiveEmojiCategoryId
+                  ).map(Category => (
+                    <div key={Category.id} className="space-y-2">
                       <div className="grid grid-cols-6 gap-2">
-                        {category.emojis.map((emoji, index) => (
+                        {Category.emojis.map((Emoji, Index) => (
                           <Button
-                            key={`${category.id}-${emoji}-${index}`}
+                            key={`${Category.id}-${Emoji}-${Index}`}
                             variant={
-                              SelectedEmoji === emoji && !ProfileImage
+                              SelectedEmoji === Emoji && !ProfileImage
                                 ? "secondary"
                                 : "ghost"
                             }
                             className={Cn(
                               "h-10 w-10 rounded-lg text-2xl shadow-sm transition-all duration-300 ease-out",
                               "hover:scale-110 hover:bg-accent/80 active:scale-95",
-                              SelectedEmoji === emoji &&
+                              SelectedEmoji === Emoji &&
                                 !ProfileImage &&
                                 "animate-pop-bounce ring-2 ring-primary"
                             )}
-                            onClick={() => SwitchToEmoji(emoji)}
+                            onClick={() => SwitchToEmoji(Emoji)}
                           >
-                            {emoji}
+                            {Emoji}
                           </Button>
                         ))}
                       </div>
@@ -1181,60 +1190,72 @@ const Profile = () => {
     );
   };
 
-  const FormatPlayTime = seconds => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+  const FormatPlayTime = Seconds => {
+    const Hours = Math.floor(Seconds / 3600);
+    const Minutes = Math.floor((Seconds % 3600) / 60);
 
-    if (hours === 0) {
-      return `${minutes}m`;
+    if (Hours === 0) {
+      return `${Minutes}m`;
     }
-    return `${hours}h ${minutes}m`;
+    return `${Hours}h ${Minutes}m`;
   };
 
   const SortedGames = UseMemo(() => {
     return [...Games]
-      .filter(game => game.playTime && game.playTime >= 60)
-      .sort((a, b) => (b.playTime || 0) - (a.playTime || 0));
+      .filter(Game => Game.playTime && Game.playTime >= 60)
+      .sort(
+        (LeftGame, RightGame) => (RightGame.playTime || 0) - (LeftGame.playTime || 0)
+      );
   }, [Games]);
 
   const PlaytimeStats = UseMemo(() => {
     if (!SortedGames.length) return null;
 
-    const totalPlaytime = SortedGames.reduce(
-      (sum, game) => sum + (game.playTime || 0),
+    const TotalPlaytime = SortedGames.reduce(
+      (Sum, Game) => Sum + (Game.playTime || 0),
       0
     );
-    const avgPlaytime = totalPlaytime / SortedGames.length;
-    const mostPlayed = SortedGames[0];
-    const recentGames = SortedGames.slice(0, 5).map(game => ({
-      name: game.game || game.name,
-      playTime: game.playTime || 0,
-      percentage: ((game.playTime || 0) / totalPlaytime) * 100,
+    const AvgPlaytime = TotalPlaytime / SortedGames.length;
+    const MostPlayed = SortedGames[0];
+    const RecentGames = SortedGames.slice(0, 5).map(Game => ({
+      name: Game.game || Game.name,
+      playTime: Game.playTime || 0,
+      percentage: ((Game.playTime || 0) / TotalPlaytime) * 100,
     }));
 
     return {
-      totalPlaytime,
-      avgPlaytime,
-      mostPlayed,
-      recentGames,
+      totalPlaytime: TotalPlaytime,
+      avgPlaytime: AvgPlaytime,
+      mostPlayed: MostPlayed,
+      recentGames: RecentGames,
     };
   }, [SortedGames]);
 
   const LevelProgressPercent = UseMemo(() => {
-    const denom = Stats.nextLevelXp || 0;
-    if (!denom) return 0;
-    const raw = (Stats.currentXP / denom) * 100;
-    return Math.max(0, Math.min(100, raw));
+    const Denominator = Stats.nextLevelXp || 0;
+    if (!Denominator) return 0;
+    const RawPercent = (Stats.currentXP / Denominator) * 100;
+    return Math.max(0, Math.min(100, RawPercent));
   }, [Stats.currentXP, Stats.nextLevelXp]);
 
-  const SaveUserPreferences = data => {
+  const SortedDownloadHistory = UseMemo(() => {
+    return DownloadHistory.map((Item, HistoryIndex) => ({
+      ...Item,
+      historyIndex: HistoryIndex,
+    })).sort(
+      (LeftItem, RightItem) =>
+        new Date(RightItem.timestamp) - new Date(LeftItem.timestamp)
+    );
+  }, [DownloadHistory]);
+
+  const SaveUserPreferences = Data => {
     try {
-      const currentPrefs = JSON.parse(localStorage.getItem("userProfile") || "{}");
-      const updatedPrefs = { ...currentPrefs, ...data };
-      localStorage.setItem("userProfile", JSON.stringify(updatedPrefs));
+      const CurrentPrefs = JSON.parse(localStorage.getItem("userProfile") || "{}");
+      const UpdatedPrefs = { ...CurrentPrefs, ...Data };
+      localStorage.setItem("userProfile", JSON.stringify(UpdatedPrefs));
       return true;
     } catch (error) {
-      console.error("Error saving user preferences:", error);
+      console.error("Error saving User preferences:", error);
       return false;
     }
   };
@@ -1251,9 +1272,9 @@ const Profile = () => {
     };
   }, []);
 
-  const formatDate = dateString => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
+  const FormatDate = DateString => {
+    const DateValue = new Date(DateString);
+    return DateValue.toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -1262,8 +1283,151 @@ const Profile = () => {
     });
   };
 
+  const HandleConfirmRemoveDownloadHistoryItem = async () => {
+    if (!PendingDeleteHistoryItem) {
+      return;
+    }
+
+    const { historyIndex: HistoryIndex, game: GameName } = PendingDeleteHistoryItem;
+    const NextHistory = DownloadHistory.filter(
+      (_, CurrentIndex) => CurrentIndex !== HistoryIndex
+    );
+
+    SetActiveDeleteHistoryIndex(null);
+
+    if (RemovingDownloadHistoryIndex !== null) {
+      return;
+    }
+
+    try {
+      SetRemovingDownloadHistoryIndex(HistoryIndex);
+      SetPendingDeleteHistoryItem(null);
+      let Result = null;
+
+      if (window.electron?.removeDownloadHistoryItem) {
+        try {
+          Result = await window.electron.removeDownloadHistoryItem(HistoryIndex);
+        } catch (Error) {
+          const Message = String(Error?.message || Error || "");
+
+          if (!Message.includes("No handler registered")) {
+            throw Error;
+          }
+
+          console.warn(
+            `[Profile] remove-download-history-item IPC missing; falling back to timestamp update.`,
+            Error
+          );
+        }
+      } else {
+        console.warn(
+          `[Profile] removeDownloadHistoryItem bridge missing; falling back to timestamp update.`
+        );
+      }
+
+      if (!Result) {
+        if (window.electron?.setTimestampValue) {
+          await window.electron.setTimestampValue("downloadedHistory", NextHistory);
+        }
+
+        Result = {
+          success: true,
+          history: NextHistory,
+        };
+      }
+
+      if (Result?.success === false) {
+        throw new Error(Result.error || "Failed to remove download history item");
+      }
+
+      if (Array.isArray(Result?.history)) {
+        SetDownloadHistory(Result.history);
+      } else {
+        SetDownloadHistory(PrevHistory =>
+          PrevHistory.filter((_, CurrentIndex) => CurrentIndex !== HistoryIndex)
+        );
+      }
+    } catch (Error) {
+      console.error(`[Profile] Failed to remove download history item.`, Error);
+    } finally {
+      SetRemovingDownloadHistoryIndex(null);
+    }
+  };
+
+  const HandleRequestRemoveDownloadHistoryItem = (HistoryIndex, GameName) => {
+    if (RemovingDownloadHistoryIndex !== null) {
+      return;
+    }
+
+    SetPendingDeleteHistoryItem({
+      historyIndex: HistoryIndex,
+      game: GameName || "this game",
+    });
+  };
+
+  const HandleActivateDeleteHistoryItem = HistoryIndex => {
+    if (RemovingDownloadHistoryIndex === HistoryIndex) {
+      return;
+    }
+
+    SetActiveDeleteHistoryIndex(HistoryIndex);
+  };
+
+  const HandleDeactivateDeleteHistoryItem = HistoryIndex => {
+    SetActiveDeleteHistoryIndex(CurrentIndex =>
+      CurrentIndex === HistoryIndex ? null : CurrentIndex
+    );
+  };
+
+  const HandleClickActiveDeleteHistoryItemCard = (Event, HistoryIndex, GameName) => {
+    if (RemovingDownloadHistoryIndex !== null) {
+      return;
+    }
+
+    if (ActiveDeleteHistoryIndex !== HistoryIndex) {
+      return;
+    }
+
+    if (Event.target.closest("button")) {
+      return;
+    }
+
+    HandleRequestRemoveDownloadHistoryItem(HistoryIndex, GameName);
+  };
+
   return (
     <div className="container mx-auto space-y-6 p-4">
+      <AlertDialog
+        open={!!PendingDeleteHistoryItem}
+        onOpenChange={Open => {
+          if (!Open) {
+            SetPendingDeleteHistoryItem(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="border-border bg-background">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-semibold text-foreground">
+              Remove download history item?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {`Remove ${
+                PendingDeleteHistoryItem?.game || "this game"
+              } from your download history?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-foreground">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={HandleConfirmRemoveDownloadHistoryItem}
+            >
+              Yes, delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Profile Header */}
       <div
         className={Cn(
@@ -1274,10 +1438,10 @@ const Profile = () => {
           "hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
         )}
       >
-        <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl transition-all group-hover:bg-primary/30" />
+        <div className="-Right-8 absolute -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl transition-all group-hover:bg-primary/30" />
         <div className="relative min-h-[13rem]">
           <div className="absolute inset-0 flex items-center justify-start">
-            {renderProfileSection()}
+            {RenderProfileSection()}
           </div>
         </div>
       </div>
@@ -1299,10 +1463,10 @@ const Profile = () => {
           )}
         >
           <CardHeader className="relative pb-3">
-            <CardTitle className="group flex w-full items-center justify-start gap-2 text-left">
+            <CardTitle className="text-Left group flex w-full items-center justify-start gap-2">
               <Sparkles className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
               <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                {T("profile.stats") || "Stats"}
+                {T("profile.Stats") || "Stats"}
               </span>
             </CardTitle>
           </CardHeader>
@@ -1342,7 +1506,7 @@ const Profile = () => {
 
                   <Separator />
 
-                  <div className="grid gap-2 text-left text-xs">
+                  <div className="text-Left grid gap-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="group flex items-center gap-2 text-muted-foreground">
                         <Clock className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
@@ -1369,7 +1533,7 @@ const Profile = () => {
                       <span className="text-muted-foreground">
                         {T("profile.mostPlayed")}
                       </span>
-                      <span className="max-w-[160px] truncate text-left font-semibold text-foreground">
+                      <span className="text-Left max-w-[160px] truncate font-semibold text-foreground">
                         {PlaytimeStats?.mostPlayed
                           ? PlaytimeStats.mostPlayed.game || PlaytimeStats.mostPlayed.name
                           : "-"}
@@ -1395,7 +1559,7 @@ const Profile = () => {
                 )}
               >
                 <div className="space-y-2">
-                  <div className="flex items-center justify-start gap-2 text-left text-sm font-semibold">
+                  <div className="text-Left flex items-center justify-start gap-2 text-sm font-semibold">
                     <Smile className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
                     <span>{T("profile.privateNotes") || "Private Notes"}</span>
                   </div>
@@ -1420,9 +1584,9 @@ const Profile = () => {
 
                     <Textarea
                       value={PrivateNotes}
-                      onChange={e => {
-                        const nextValue = e.target.value;
-                        SetPrivateNotes(nextValue);
+                      onChange={Event => {
+                        const NextValue = Event.target.value;
+                        SetPrivateNotes(NextValue);
 
                         SetIsTypingNotes(true);
                         if (TypingNotesTTTPtr.current) {
@@ -1452,20 +1616,20 @@ const Profile = () => {
                   <Separator />
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-start gap-2 text-left text-sm font-semibold">
+                    <div className="text-Left flex items-center justify-start gap-2 text-sm font-semibold">
                       <Monitor className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
                       <span className="transition-colors duration-300 ease-out group-hover:text-primary">
                         {T("profile.device") || "Device"}
                       </span>
                     </div>
 
-                    <div className="grid gap-2 text-left text-xs">
+                    <div className="text-Left grid gap-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="group flex items-center gap-2 text-muted-foreground">
                           <Monitor className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
                           {T("profile.platform") || "Platform"}
                         </span>
-                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
                           {DeviceInfo.platform || "Unknown"}
                         </span>
                       </div>
@@ -1475,7 +1639,7 @@ const Profile = () => {
                           <HardDrive className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
                           {T("profile.os") || "OS"}
                         </span>
-                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
                           {DeviceInfo.os || "Unknown"}
                         </span>
                       </div>
@@ -1485,7 +1649,7 @@ const Profile = () => {
                           <Cpu className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
                           {T("profile.cpu") || "CPU"}
                         </span>
-                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
                           {DeviceInfo.cpu || "Unknown"}
                         </span>
                       </div>
@@ -1495,7 +1659,7 @@ const Profile = () => {
                           <HardDrive className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
                           {T("profile.ram") || "RAM"}
                         </span>
-                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
                           {DeviceInfo.ram || "Unknown"}
                         </span>
                       </div>
@@ -1505,7 +1669,7 @@ const Profile = () => {
                           <Monitor className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
                           {T("profile.gpu") || "GPU"}
                         </span>
-                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
                           {DeviceInfo.gpu || "Unknown"}
                         </span>
                       </div>
@@ -1513,11 +1677,9 @@ const Profile = () => {
                       <div className="flex items-center justify-between">
                         <span className="group flex items-center gap-2 text-muted-foreground">
                           <Sparkles className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
-                          {AmILinux
-                            ? "Renderer"
-                            : T("profile.directX") || "DirectX"}
+                          {AmILinux ? "Renderer" : T("profile.directX") || "DirectX"}
                         </span>
-                        <span className="max-w-[180px] truncate text-right font-semibold text-foreground">
+                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
                           {AmILinux
                             ? UnknownDeviceInfo(DeviceInfo.directx)
                               ? "Renderer"
@@ -1558,22 +1720,22 @@ const Profile = () => {
 
                   <div className="mt-3 grid grid-cols-3 items-end gap-3">
                     {(() => {
-                      const second = AchievementsLeaderboard[1] || null;
-                      const first = AchievementsLeaderboard[0] || null;
-                      const third = AchievementsLeaderboard[2] || null;
+                      const Second = AchievementsLeaderboard[1] || null;
+                      const First = AchievementsLeaderboard[0] || null;
+                      const Third = AchievementsLeaderboard[2] || null;
 
-                      const runner4 = AchievementsLeaderboard[3] || null;
-                      const runner5 = AchievementsLeaderboard[4] || null;
-                      const runner6 = AchievementsLeaderboard[5] || null;
+                      const Runner4 = AchievementsLeaderboard[3] || null;
+                      const Runner5 = AchievementsLeaderboard[4] || null;
+                      const Runner6 = AchievementsLeaderboard[5] || null;
 
                       const Column = ({
                         FirstPlace,
-                        topEntry,
-                        runnerRank,
-                        runnerEntry,
-                        emphasize,
+                        TopEntry,
+                        RunnerRank,
+                        RunnerEntry,
+                        Emphasize,
                       }) => {
-                        const showRunner = true;
+                        const ShowRunner = true;
 
                         return (
                           <div
@@ -1587,13 +1749,13 @@ const Profile = () => {
                             <div
                               className={Cn(
                                 "flex flex-col items-center justify-end px-2 py-2 text-center",
-                                emphasize ? "h-[92px]" : "h-[76px]"
+                                Emphasize ? "h-[92px]" : "h-[76px]"
                               )}
                             >
                               <div
                                 className={Cn(
                                   "text-xs font-semibold text-muted-foreground",
-                                  emphasize && "text-sm"
+                                  Emphasize && "text-sm"
                                 )}
                               >
                                 #{FirstPlace}
@@ -1601,38 +1763,38 @@ const Profile = () => {
                               <div
                                 className={Cn(
                                   "mt-1 w-full truncate font-semibold text-foreground",
-                                  emphasize ? "text-sm" : "text-xs"
+                                  Emphasize ? "text-sm" : "text-xs"
                                 )}
-                                title={topEntry?.gameName || ""}
+                                title={TopEntry?.gameName || ""}
                               >
-                                {topEntry?.gameName || "—"}
+                                {TopEntry?.gameName || "—"}
                               </div>
                               <div
                                 className={Cn(
                                   "mt-1 text-xs text-muted-foreground",
-                                  emphasize && "text-[0.7rem]"
+                                  Emphasize && "text-[0.7rem]"
                                 )}
                               >
-                                {topEntry
-                                  ? `${topEntry.unlocked}/${topEntry.total}`
+                                {TopEntry
+                                  ? `${TopEntry.unlocked}/${TopEntry.total}`
                                   : " "}
                               </div>
                             </div>
 
-                            {showRunner ? (
-                              <div className="border-t border-dashed border-border/70 px-2 py-2">
+                            {ShowRunner ? (
+                              <div className="border-T border-dashed border-border/70 px-2 py-2">
                                 <div className="text-[0.7rem] font-semibold text-muted-foreground">
-                                  #{runnerRank}
+                                  #{RunnerRank}
                                 </div>
                                 <div
                                   className="mt-1 truncate text-xs font-semibold text-foreground"
-                                  title={runnerEntry?.gameName || ""}
+                                  title={RunnerEntry?.gameName || ""}
                                 >
-                                  {runnerEntry?.gameName || "—"}
+                                  {RunnerEntry?.gameName || "—"}
                                 </div>
                                 <div className="mt-1 text-[0.7rem] text-muted-foreground">
-                                  {runnerEntry
-                                    ? `${runnerEntry.unlocked}/${runnerEntry.total}`
+                                  {RunnerEntry
+                                    ? `${RunnerEntry.unlocked}/${RunnerEntry.total}`
                                     : " "}
                                 </div>
                               </div>
@@ -1645,24 +1807,24 @@ const Profile = () => {
                         <>
                           <Column
                             FirstPlace={2}
-                            topEntry={second}
-                            runnerRank={4}
-                            runnerEntry={runner4}
-                            emphasize={false}
+                            TopEntry={Second}
+                            RunnerRank={4}
+                            RunnerEntry={Runner4}
+                            Emphasize={false}
                           />
                           <Column
                             FirstPlace={1}
-                            topEntry={first}
-                            runnerRank={5}
-                            runnerEntry={runner5}
-                            emphasize={true}
+                            TopEntry={First}
+                            RunnerRank={5}
+                            RunnerEntry={Runner5}
+                            Emphasize={true}
                           />
                           <Column
                             FirstPlace={3}
-                            topEntry={third}
-                            runnerRank={6}
-                            runnerEntry={runner6}
-                            emphasize={false}
+                            TopEntry={Third}
+                            RunnerRank={6}
+                            RunnerEntry={Runner6}
+                            Emphasize={false}
                           />
                         </>
                       );
@@ -1690,7 +1852,7 @@ const Profile = () => {
           >
             <CardHeader className="relative pb-3">
               <div className="flex items-center justify-between gap-3">
-                <CardTitle className="group flex items-center justify-start gap-2 text-left">
+                <CardTitle className="text-Left group flex items-center justify-start gap-2">
                   <Gamepad2 className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
                   <span className="transition-colors duration-300 ease-out group-hover:text-primary">
                     {T("profile.games")}
@@ -1705,11 +1867,11 @@ const Profile = () => {
               <ScrollArea className="h-[360px] pr-4">
                 {SortedGames.length > 0 ? (
                   <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {SortedGames.map(game => {
-                      const gameId = game.game || game.name;
+                    {SortedGames.map(Game => {
+                      const GameId = Game.game || Game.name;
                       return (
                         <div
-                          key={gameId}
+                          key={GameId}
                           className={Cn(
                             "profile-small-card flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
                             "backdrop-blur",
@@ -1722,29 +1884,29 @@ const Profile = () => {
                           )}
                         >
                           <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted/30">
-                            {GameImages[gameId] ? (
+                            {GameImages[GameId] ? (
                               <img
-                                src={GameImages[gameId]}
-                                alt={gameId}
+                                src={GameImages[GameId]}
+                                alt={GameId}
                                 className="profile-small-img h-full w-full object-cover transition-transform duration-300"
                               />
                             ) : null}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h3 className="profile-small-title truncate text-left font-medium text-foreground transition-colors duration-300 ease-out">
-                              {gameId}
+                            <h3 className="profile-small-title text-Left truncate font-medium text-foreground transition-colors duration-300 ease-out">
+                              {GameId}
                             </h3>
                             <div className="flex items-center justify-start gap-2 text-xs text-muted-foreground">
                               <Clock className="profile-small-icon h-3 w-3 transition-transform duration-300 ease-out" />
                               <span>
-                                {game.playTime !== undefined
-                                  ? game.playTime < 120
+                                {Game.playTime !== undefined
+                                  ? Game.playTime < 120
                                     ? `1 ${T("library.minute")}`
-                                    : game.playTime < 3600
-                                      ? `${Math.floor(game.playTime / 60)} ${T("library.minutes")}`
-                                      : game.playTime < 7200
+                                    : Game.playTime < 3600
+                                      ? `${Math.floor(Game.playTime / 60)} ${T("library.minutes")}`
+                                      : Game.playTime < 7200
                                         ? `1 ${T("library.hour")}`
-                                        : `${Math.floor(game.playTime / 3600)} ${T("library.hours")}`
+                                        : `${Math.floor(Game.playTime / 3600)} ${T("library.hours")}`
                                   : T("library.neverPlayed")}
                               </span>
                             </div>
@@ -1791,7 +1953,7 @@ const Profile = () => {
           >
             <CardHeader className="relative pb-3">
               <div className="flex items-center justify-between gap-3">
-                <CardTitle className="group flex items-center justify-start gap-2 text-left">
+                <CardTitle className="text-Left group flex items-center justify-start gap-2">
                   <FileDown className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
                   <span className="transition-colors duration-300 ease-out group-hover:text-primary">
                     {T("profile.downloadHistory") || "Download History"}
@@ -1806,32 +1968,83 @@ const Profile = () => {
               <ScrollArea className="h-[360px] pr-4">
                 <div className="mx-auto w-full max-w-6xl space-y-3">
                   {DownloadHistory.length > 0 ? (
-                    [...DownloadHistory]
-                      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                      .map((item, index) => (
+                    SortedDownloadHistory.map(Item => (
                       <div
-                        key={`${item.game}-${index}`}
+                        key={`${Item.game}-${Item.timestamp}-${Item.historyIndex}`}
                         className={Cn(
-                          "profile-small-card flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
+                          "download-history-item profile-small-card flex items-center gap-3 overflow-hidden rounded-lg border border-border bg-card/50 p-3",
+                          ActiveDeleteHistoryIndex === Item.historyIndex &&
+                            "download-history-item-delete-active",
                           "backdrop-blur",
                           "transition-all duration-300 ease-out",
-                          "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm",
+                          "hover:shadow-sm",
                           "hover:[&_.profile-small-icon]:rotate-6",
-                          "hover:[&_.profile-small-icon]:scale-110",
-                          "hover:[&_.profile-small-title]:text-primary"
+                          "hover:[&_.profile-small-icon]:scale-110"
                         )}
+                        onMouseLeave={() =>
+                          HandleDeactivateDeleteHistoryItem(Item.historyIndex)
+                        }
+                        onClick={Event =>
+                          HandleClickActiveDeleteHistoryItemCard(
+                            Event,
+                            Item.historyIndex,
+                            Item.game
+                          )
+                        }
                       >
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                          <FileDown className="profile-small-icon h-5 w-5 text-primary transition-transform duration-300 ease-out" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="profile-small-title truncate text-left font-medium text-foreground transition-colors duration-300 ease-out">
-                            {item.game}
-                          </h3>
-                          <div className="text-left text-xs text-muted-foreground">
-                            {formatDate(item.timestamp)}
+                        <div className="download-history-item-content flex min-w-0 flex-1 items-center gap-3 pr-12">
+                          <div className="download-history-item-icon-shell flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+                            <FileDown className="download-history-item-icon profile-small-icon h-5 w-5 text-primary transition-transform duration-300 ease-out" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="download-history-item-title profile-small-title text-Left truncate font-medium text-foreground transition-colors duration-300 ease-out">
+                              {Item.game}
+                            </h3>
+                            <div className="download-history-item-meta text-Left text-xs text-muted-foreground">
+                              {FormatDate(Item.timestamp)}
+                            </div>
                           </div>
                         </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={Event => {
+                            Event.stopPropagation();
+                            HandleRequestRemoveDownloadHistoryItem(
+                              Item.historyIndex,
+                              Item.game
+                            );
+                          }}
+                          onMouseEnter={() =>
+                            HandleActivateDeleteHistoryItem(Item.historyIndex)
+                          }
+                          onFocus={() =>
+                            HandleActivateDeleteHistoryItem(Item.historyIndex)
+                          }
+                          onBlur={() =>
+                            HandleDeactivateDeleteHistoryItem(Item.historyIndex)
+                          }
+                          disabled={RemovingDownloadHistoryIndex === Item.historyIndex}
+                          className={Cn(
+                            "download-history-clear-button Right-3 absolute z-20 rounded-full border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-transparent focus-visible:bg-transparent",
+                            ActiveDeleteHistoryIndex === Item.historyIndex &&
+                              "download-history-clear-button-active",
+                            RemovingDownloadHistoryIndex === Item.historyIndex &&
+                              "cursor-wait opacity-60"
+                          )}
+                          title={`Clear ${Item.game} from history`}
+                          aria-label={`Clear ${Item.game} from history`}
+                        >
+                          <span
+                            className="download-history-clear-motion-shell"
+                            aria-hidden="true"
+                          >
+                            <span className="download-history-clear-icon-shell">
+                              <Trash2 className="download-history-clear-icon h-4 w-4" />
+                            </span>
+                          </span>
+                        </Button>
                       </div>
                     ))
                   ) : (
