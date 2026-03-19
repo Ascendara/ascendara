@@ -636,20 +636,6 @@ const Downloads = () => {
             }
           });
           
-          // Smoothly adjust Y-axis max to prevent jumps
-          const maxSpeed = Math.max(...newHistory.map(h => h.speed));
-          setYAxisMax(prevMax => {
-            // Gradually increase max if data exceeds it
-            if (maxSpeed > prevMax * 0.8) {
-              return Math.max(prevMax, Math.ceil(maxSpeed * 1.2 / 10) * 10);
-            }
-            // Gradually decrease max if data is well below it
-            if (maxSpeed < prevMax * 0.5) {
-              return Math.max(Math.ceil(maxSpeed * 1.5 / 10) * 10, 10);
-            }
-            return prevMax;
-          });
-          
           return newHistory;
         });
       }
