@@ -12,16 +12,6 @@ import {
 } from "@/services/levelCalculationService";
 
 import UsernameDialog from "@/components/UsernameDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -289,8 +279,6 @@ const Profile = () => {
   const [GameImages, SetGameImages] = UseState({});
   const [DownloadHistory, SetDownloadHistory] = UseState([]);
   const [RemovingDownloadHistoryIndex, SetRemovingDownloadHistoryIndex] = UseState(null);
-  const [ActiveDeleteHistoryIndex, SetActiveDeleteHistoryIndex] = UseState(null);
-  const [PendingDeleteHistoryItem, SetPendingDeleteHistoryItem] = UseState(null);
 
   const [UserStatus, SetUserStatus] = UseState("online");
 
@@ -1283,25 +1271,17 @@ const Profile = () => {
     });
   };
 
-  const HandleConfirmRemoveDownloadHistoryItem = async () => {
-    if (!PendingDeleteHistoryItem) {
-      return;
-    }
-
-    const { historyIndex: HistoryIndex, game: GameName } = PendingDeleteHistoryItem;
-    const NextHistory = DownloadHistory.filter(
-      (_, CurrentIndex) => CurrentIndex !== HistoryIndex
-    );
-
-    SetActiveDeleteHistoryIndex(null);
-
+  const HandleRemoveDownloadHistoryItem = async (HistoryIndex) => {
     if (RemovingDownloadHistoryIndex !== null) {
       return;
     }
 
+    const NextHistory = DownloadHistory.filter(
+      (_, CurrentIndex) => CurrentIndex !== HistoryIndex
+    );
+
     try {
       SetRemovingDownloadHistoryIndex(HistoryIndex);
-      SetPendingDeleteHistoryItem(null);
       let Result = null;
 
       if (window.electron?.removeDownloadHistoryItem) {
@@ -1354,79 +1334,9 @@ const Profile = () => {
     }
   };
 
-  const HandleRequestRemoveDownloadHistoryItem = (HistoryIndex, GameName) => {
-    if (RemovingDownloadHistoryIndex !== null) {
-      return;
-    }
-
-    SetPendingDeleteHistoryItem({
-      historyIndex: HistoryIndex,
-      game: GameName || "this game",
-    });
-  };
-
-  const HandleActivateDeleteHistoryItem = HistoryIndex => {
-    if (RemovingDownloadHistoryIndex === HistoryIndex) {
-      return;
-    }
-
-    SetActiveDeleteHistoryIndex(HistoryIndex);
-  };
-
-  const HandleDeactivateDeleteHistoryItem = HistoryIndex => {
-    SetActiveDeleteHistoryIndex(CurrentIndex =>
-      CurrentIndex === HistoryIndex ? null : CurrentIndex
-    );
-  };
-
-  const HandleClickActiveDeleteHistoryItemCard = (Event, HistoryIndex, GameName) => {
-    if (RemovingDownloadHistoryIndex !== null) {
-      return;
-    }
-
-    if (ActiveDeleteHistoryIndex !== HistoryIndex) {
-      return;
-    }
-
-    if (Event.target.closest("button")) {
-      return;
-    }
-
-    HandleRequestRemoveDownloadHistoryItem(HistoryIndex, GameName);
-  };
 
   return (
     <div className="container mx-auto space-y-6 p-4">
-      <AlertDialog
-        open={!!PendingDeleteHistoryItem}
-        onOpenChange={Open => {
-          if (!Open) {
-            SetPendingDeleteHistoryItem(null);
-          }
-        }}
-      >
-        <AlertDialogContent className="border-border bg-background">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg font-semibold text-foreground">
-              Remove download history item?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              {`Remove ${
-                PendingDeleteHistoryItem?.game || "this game"
-              } from your download history?`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-foreground">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={HandleConfirmRemoveDownloadHistoryItem}
-            >
-              Yes, delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Profile Header */}
       <div
@@ -1971,36 +1881,17 @@ const Profile = () => {
                     SortedDownloadHistory.map(Item => (
                       <div
                         key={`${Item.game}-${Item.timestamp}-${Item.historyIndex}`}
-                        className={Cn(
-                          "download-history-item profile-small-card flex items-center gap-3 overflow-hidden rounded-lg border border-border bg-card/50 p-3",
-                          ActiveDeleteHistoryIndex === Item.historyIndex &&
-                            "download-history-item-delete-active",
-                          "backdrop-blur",
-                          "transition-all duration-300 ease-out",
-                          "hover:shadow-sm",
-                          "hover:[&_.profile-small-icon]:rotate-6",
-                          "hover:[&_.profile-small-icon]:scale-110"
-                        )}
-                        onMouseLeave={() =>
-                          HandleDeactivateDeleteHistoryItem(Item.historyIndex)
-                        }
-                        onClick={Event =>
-                          HandleClickActiveDeleteHistoryItemCard(
-                            Event,
-                            Item.historyIndex,
-                            Item.game
-                          )
-                        }
+                        className="download-history-item profile-small-card relative flex items-center gap-3 overflow-hidden rounded-lg border border-border bg-card/50 p-3 backdrop-blur"
                       >
-                        <div className="download-history-item-content flex min-w-0 flex-1 items-center gap-3 pr-12">
-                          <div className="download-history-item-icon-shell flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                            <FileDown className="download-history-item-icon profile-small-icon h-5 w-5 text-primary transition-transform duration-300 ease-out" />
+                        <div className="flex min-w-0 flex-1 items-center gap-3 pr-12">
+                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+                            <FileDown className="h-5 w-5 text-primary" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h3 className="download-history-item-title profile-small-title text-Left truncate font-medium text-foreground transition-colors duration-300 ease-out">
+                            <h3 className="text-Left truncate font-medium text-foreground">
                               {Item.game}
                             </h3>
-                            <div className="download-history-item-meta text-Left text-xs text-muted-foreground">
+                            <div className="text-Left text-xs text-muted-foreground">
                               {FormatDate(Item.timestamp)}
                             </div>
                           </div>
@@ -2011,39 +1902,18 @@ const Profile = () => {
                           size="sm"
                           onClick={Event => {
                             Event.stopPropagation();
-                            HandleRequestRemoveDownloadHistoryItem(
-                              Item.historyIndex,
-                              Item.game
-                            );
+                            HandleRemoveDownloadHistoryItem(Item.historyIndex);
                           }}
-                          onMouseEnter={() =>
-                            HandleActivateDeleteHistoryItem(Item.historyIndex)
-                          }
-                          onFocus={() =>
-                            HandleActivateDeleteHistoryItem(Item.historyIndex)
-                          }
-                          onBlur={() =>
-                            HandleDeactivateDeleteHistoryItem(Item.historyIndex)
-                          }
                           disabled={RemovingDownloadHistoryIndex === Item.historyIndex}
                           className={Cn(
-                            "download-history-clear-button Right-3 absolute z-20 rounded-full border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-transparent focus-visible:bg-transparent",
-                            ActiveDeleteHistoryIndex === Item.historyIndex &&
-                              "download-history-clear-button-active",
+                            "absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center mt-8 justify-center rounded-full p-0 text-muted-foreground transition-colors hover:text-red-700",
                             RemovingDownloadHistoryIndex === Item.historyIndex &&
                               "cursor-wait opacity-60"
                           )}
                           title={`Clear ${Item.game} from history`}
                           aria-label={`Clear ${Item.game} from history`}
                         >
-                          <span
-                            className="download-history-clear-motion-shell"
-                            aria-hidden="true"
-                          >
-                            <span className="download-history-clear-icon-shell">
-                              <Trash2 className="download-history-clear-icon h-4 w-4" />
-                            </span>
-                          </span>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ))

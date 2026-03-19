@@ -614,19 +614,11 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    right 320ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.download-history-clear-button:hover .download-history-clear-motion-shell,
-.download-history-clear-button:focus-visible .download-history-clear-motion-shell {
-  transform: scale(1.04);
+  transition: right 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .download-history-clear-button-active .download-history-clear-motion-shell {
   right: calc(100% - var(--delete-button-size));
-  transform: scale(1);
 }
 
 .download-history-clear-icon-shell {
