@@ -2283,6 +2283,8 @@
     "noTorrentToolDesc": "The torrent sidecar is required to use the torrent feature on Ascendara. Clicking continue will install the Torrent Sidecar automatically.",
     "notifications": "Desktop Notifications",
     "notificationsDescription": "Send desktop notifications for downloads and index refreshing.",
+    "openOnStartup": "Open Ascendara on Startup",
+    "openOnStartupDescription": "Automatically launch Ascendara when you start your computer.",
     "onlyWindowsSupported": "Only Windows is supported for now",
     "onlyWindowsSupported2": "This feature is only on Windows",
     "preview": {

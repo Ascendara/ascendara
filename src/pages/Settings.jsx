@@ -1576,6 +1576,21 @@ function Settings() {
                   />
                 </div>
 
+                <div id="open-on-startup" className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.openOnStartup")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.openOnStartupDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.openOnStartup}
+                    onCheckedChange={() =>
+                      handleSettingChange("openOnStartup", !settings.openOnStartup)
+                    }
+                  />
+                </div>
+
                 <div id="quick-launch" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label>{t("settings.quickLaunch")}</Label>

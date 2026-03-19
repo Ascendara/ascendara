@@ -75,6 +75,7 @@ export function SettingsProvider({ children }) {
       steamCompatDataPath: "",
     },
     promptPurchaseAfter3Hours: true,
+    openOnStartup: false,
   });
   const settingsRef = useRef(settings);
 
@@ -256,6 +257,7 @@ const defaultSettings = {
     steamCompatDataPath: "",
   },
   promptPurchaseAfter3Hours: true,
+  openOnStartup: false,
 };
 
 export function useSettings() {

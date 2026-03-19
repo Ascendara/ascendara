@@ -77,6 +77,7 @@ class SettingsManager {
         steamCompatDataPath: "",
       },
       promptPurchaseAfter3Hours: true,
+      openOnStartup: false,
     };
     this.initializeSettingsFile();
     this.settings = this.loadSettings();
@@ -278,6 +279,13 @@ function registerSettingsHandlers() {
         } else {
           destroyDiscordRPC();
         }
+      }
+      // Handle startup toggle immediately
+      if (key === "openOnStartup") {
+        app.setLoginItemSettings({
+          openAtLogin: value,
+          openAsHidden: false,
+        });
       }
     }
     return success;
