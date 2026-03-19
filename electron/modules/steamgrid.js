@@ -74,7 +74,7 @@ async function fetchGameAssets(gameName, gameDir) {
         baseName: "hero.ascendara",
         styles: "alternate",
       },
-      { type: "logos", baseName: "logo.ascendara", styles: "official" },
+      { type: "logos", baseName: "logo.ascendara", styles: "white" },
     ];
 
     for (const item of downloads) {
@@ -95,7 +95,14 @@ async function fetchGameAssets(gameName, gameDir) {
       if (item.type !== "logos") url += `&mimes=image/jpeg,image/png`;
 
       try {
-        const res = await axios.get(url, { headers: authHeaders });
+        let res = await axios.get(url, { headers: authHeaders });
+
+        // For logos, if white style returns no results, try official as fallback
+        if (item.type === "logos" && (!res.data.success || res.data.data.length === 0)) {
+          console.log(`[SteamGrid] No white logos found, trying official...`);
+          url = `${PROXY_BASE_URL}/${item.type}/game/${gameId}?styles=official&sort=score`;
+          res = await axios.get(url, { headers: authHeaders });
+        }
 
         if (res.data.success && res.data.data.length > 0) {
           const imageUrl = res.data.data[0].url;
