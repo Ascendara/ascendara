@@ -915,7 +915,7 @@ const Profile = () => {
                 }
               >
                 {!ProfileImage && SelectedEmoji}
-                <div className="-Right-1 absolute -bottom-1 flex items-center justify-center rounded-full bg-primary/90 p-1 shadow-sm transition-transform duration-300 ease-out group-hover/avatar:scale-110">
+                <div className="absolute -bottom-1 right-1 flex items-center justify-center rounded-full bg-primary/90 p-1 shadow-sm transition-transform duration-300 ease-out group-hover/avatar:scale-110">
                   <Smile className="spin-bounce h-6 w-6 text-secondary" />
                 </div>
               </div>
