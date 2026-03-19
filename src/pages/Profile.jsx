@@ -4,8 +4,8 @@ import React, {
   useRef as UseRef,
   useState as UseState,
 } from "react";
-import { useLanguage as UseLanguage } from "@/Context/LanguageContext";
-import { useAuth as UseAuth } from "@/Context/AuthContext";
+import { useLanguage as UseLanguage } from "@/context/LanguageContext";
+import { useAuth as UseAuth } from "@/context/AuthContext";
 import {
   calculateLevelFromXP,
   getLevelConstants,
