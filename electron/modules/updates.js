@@ -30,6 +30,8 @@ let notificationShown = false;
 let updateDownloadInProgress = false;
 let downloadUpdatePromise = null;
 let isBrokenVersion = false;
+let languageCheckInProgress = false;
+let translationUpdateInProgress = false;
 
 /**
  * Check if current version is broken
@@ -159,6 +161,12 @@ async function checkVersionAndUpdate() {
  * Check reference language version
  */
 async function checkReferenceLanguage() {
+  if (languageCheckInProgress) {
+    console.log("Language check already in progress, skipping...");
+    return;
+  }
+  
+  languageCheckInProgress = true;
   try {
     let timestamp = {};
     if (fs.existsSync(TIMESTAMP_FILE)) {
@@ -182,6 +190,8 @@ async function checkReferenceLanguage() {
     }
   } catch (error) {
     console.error("Error checking reference language:", error);
+  } finally {
+    languageCheckInProgress = false;
   }
 }
 
@@ -189,10 +199,17 @@ async function checkReferenceLanguage() {
  * Get new language keys and translate
  */
 async function getNewLangKeys() {
+  if (translationUpdateInProgress) {
+    console.log("Translation update already in progress, skipping...");
+    return;
+  }
+  
+  translationUpdateInProgress = true;
   try {
     // Ensure the languages directory exists in AppData Local
     if (!fs.existsSync(LANG_DIR)) {
       fs.mkdirSync(LANG_DIR, { recursive: true });
+      translationUpdateInProgress = false;
       return;
     }
 
@@ -322,6 +339,8 @@ async function getNewLangKeys() {
   } catch (error) {
     console.error("Error in getNewLangKeys:", error);
     throw error;
+  } finally {
+    translationUpdateInProgress = false;
   }
 }
 
