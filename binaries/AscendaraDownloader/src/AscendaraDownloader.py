@@ -180,6 +180,73 @@ def load_settings() -> Dict[str, Any]:
             logging.error(f"Could not read settings: {e}")
     return {}
 
+def get_directory_size(path: str) -> int:
+    """Calculate total size of a directory in bytes."""
+    total_size = 0
+    try:
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                try:
+                    total_size += os.path.getsize(filepath)
+                except (OSError, FileNotFoundError):
+                    pass
+    except Exception as e:
+        logging.warning(f"Error calculating directory size for {path}: {e}")
+    return total_size
+
+def get_free_disk_space(path: str) -> int:
+    """Get free disk space in bytes for the drive containing the path."""
+    try:
+        if sys.platform == 'win32':
+            import ctypes
+            free_bytes = ctypes.c_ulonglong(0)
+            ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+                ctypes.c_wchar_p(path), None, None, ctypes.pointer(free_bytes)
+            )
+            return free_bytes.value
+        else:
+            stat = os.statvfs(path)
+            return stat.f_bavail * stat.f_frsize
+    except Exception as e:
+        logging.error(f"Error getting free disk space: {e}")
+        return 0
+
+def check_disk_space(path: str, required_bytes: int, operation: str = "operation") -> bool:
+    """Check if there's enough disk space for an operation.
+    
+    Args:
+        path: Directory path to check
+        required_bytes: Required space in bytes
+        operation: Description of the operation for logging
+    
+    Returns:
+        True if sufficient space, False otherwise
+    """
+    try:
+        free_space = get_free_disk_space(path)
+        # Add 10% buffer for safety
+        required_with_buffer = int(required_bytes * 1.1)
+        
+        if free_space < required_with_buffer:
+            logging.error(
+                f"Insufficient disk space for {operation}: "
+                f"Required: {read_size(required_with_buffer)}, "
+                f"Available: {read_size(free_space)}"
+            )
+            return False
+        
+        logging.info(
+            f"Disk space check passed for {operation}: "
+            f"Required: {read_size(required_with_buffer)}, "
+            f"Available: {read_size(free_space)}"
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Error checking disk space: {e}")
+        # Return True to avoid blocking operations if check fails
+        return True
+
 def handleerror(game_info: Dict, game_info_path: str, error: Any):
     """Handle download errors by updating game info."""
     game_info['online'] = ""
@@ -636,6 +703,31 @@ class RobustDownloader:
                 self._download_buzzheavier(url)
                 return
             
+            # Check disk space before starting download
+            # Estimate: download size + extraction (typically 2-3x compressed size)
+            # Use size from game_info if available
+            if self.size:
+                try:
+                    # Parse size string (e.g., "5.2 GB") to bytes
+                    size_parts = self.size.split()
+                    if len(size_parts) == 2:
+                        size_value = float(size_parts[0])
+                        size_unit = size_parts[1].upper()
+                        multipliers = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4}
+                        estimated_download_size = int(size_value * multipliers.get(size_unit, 1024**3))
+                        # Estimate total needed: download + extraction (3x) + backup if update
+                        total_needed = estimated_download_size * 4 if self.updateFlow else estimated_download_size * 3
+                        
+                        if not check_disk_space(self.download_dir, total_needed, "download and extraction"):
+                            error_msg = f"Insufficient disk space. Need ~{read_size(total_needed)}"
+                            logging.error(f"[RobustDownloader] {error_msg}")
+                            handleerror(self.game_info, self.game_info_path, error_msg)
+                            if withNotification:
+                                _launch_notification(withNotification, "Download Failed", error_msg)
+                            return
+                except Exception as e:
+                    logging.warning(f"[RobustDownloader] Could not parse size for disk check: {e}")
+            
             # Update state
             self.game_info["downloadingData"]["downloading"] = True
             safe_write_json(self.game_info_path, self.game_info)
@@ -688,6 +780,135 @@ class RobustDownloader:
             
             if withNotification:
                 _launch_notification(withNotification, "Download Error", f"Error downloading {self.game}: {e}")
+    
+    def _create_update_backup(self) -> Optional[str]:
+        """Create a backup of existing game files before updating.
+        Returns the backup directory path if successful, None otherwise.
+        """
+        if not self.updateFlow:
+            return None
+        
+        backup_dir = os.path.join(self.download_dir, ".ascendara_backup")
+        
+        try:
+            # Calculate size of existing game files
+            existing_size = get_directory_size(self.download_dir)
+            logging.info(f"[RobustDownloader] Existing game size: {read_size(existing_size)}")
+            
+            # Check if we have enough space for backup (need space for copy)
+            if not check_disk_space(self.download_dir, existing_size, "backup creation"):
+                logging.error(f"[RobustDownloader] Insufficient disk space to create backup")
+                if self.withNotification:
+                    _launch_notification(
+                        self.withNotification,
+                        "Update Failed",
+                        "Insufficient disk space to create backup"
+                    )
+                return None
+            
+            # Remove old backup if it exists
+            if os.path.exists(backup_dir):
+                logging.info(f"[RobustDownloader] Removing old backup: {backup_dir}")
+                shutil.rmtree(backup_dir, ignore_errors=True)
+            
+            # Create new backup directory
+            os.makedirs(backup_dir, exist_ok=True)
+            logging.info(f"[RobustDownloader] Creating backup for update: {backup_dir}")
+            
+            # Backup all files except archives, temp files, and the JSON file
+            backup_count = 0
+            skip_extensions = {'.rar', '.zip', '.7z', '.tmp', '.part', '.download'}
+            skip_names = {'.ascendara_backup', 'filemap.ascendara.json'}
+            
+            for item in os.listdir(self.download_dir):
+                item_path = os.path.join(self.download_dir, item)
+                
+                # Skip backup directory itself and JSON file
+                if item in skip_names or item.endswith('.ascendara.json'):
+                    continue
+                
+                # Skip archive files and temp files
+                if os.path.isfile(item_path):
+                    ext = os.path.splitext(item)[1].lower()
+                    if ext in skip_extensions:
+                        continue
+                
+                # Backup the item
+                backup_item_path = os.path.join(backup_dir, item)
+                try:
+                    if os.path.isdir(item_path):
+                        shutil.copytree(item_path, backup_item_path, dirs_exist_ok=True)
+                        logging.info(f"[RobustDownloader] Backed up directory: {item}")
+                    else:
+                        shutil.copy2(item_path, backup_item_path)
+                        logging.info(f"[RobustDownloader] Backed up file: {item}")
+                    backup_count += 1
+                except Exception as e:
+                    logging.warning(f"[RobustDownloader] Could not backup {item}: {e}")
+            
+            logging.info(f"[RobustDownloader] Backup complete: {backup_count} items backed up")
+            return backup_dir
+            
+        except Exception as e:
+            logging.error(f"[RobustDownloader] Failed to create backup: {e}")
+            return None
+    
+    def _restore_from_backup(self, backup_dir: str) -> bool:
+        """Restore game files from backup.
+        Returns True if successful, False otherwise.
+        """
+        if not backup_dir or not os.path.exists(backup_dir):
+            logging.error(f"[RobustDownloader] Backup directory not found: {backup_dir}")
+            return False
+        
+        try:
+            logging.info(f"[RobustDownloader] Restoring from backup: {backup_dir}")
+            
+            # Remove failed update files (except JSON and backup)
+            for item in os.listdir(self.download_dir):
+                if item == '.ascendara_backup' or item.endswith('.ascendara.json'):
+                    continue
+                
+                item_path = os.path.join(self.download_dir, item)
+                try:
+                    if os.path.isdir(item_path):
+                        shutil.rmtree(item_path, ignore_errors=True)
+                    else:
+                        os.remove(item_path)
+                except Exception as e:
+                    logging.warning(f"[RobustDownloader] Could not remove {item}: {e}")
+            
+            # Restore backed up files
+            restore_count = 0
+            for item in os.listdir(backup_dir):
+                backup_item_path = os.path.join(backup_dir, item)
+                restore_item_path = os.path.join(self.download_dir, item)
+                
+                try:
+                    if os.path.isdir(backup_item_path):
+                        shutil.copytree(backup_item_path, restore_item_path, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(backup_item_path, restore_item_path)
+                    restore_count += 1
+                except Exception as e:
+                    logging.error(f"[RobustDownloader] Could not restore {item}: {e}")
+                    return False
+            
+            logging.info(f"[RobustDownloader] Restore complete: {restore_count} items restored")
+            return True
+            
+        except Exception as e:
+            logging.error(f"[RobustDownloader] Failed to restore from backup: {e}")
+            return False
+    
+    def _cleanup_backup(self, backup_dir: str):
+        """Remove backup directory after successful update."""
+        if backup_dir and os.path.exists(backup_dir):
+            try:
+                shutil.rmtree(backup_dir, ignore_errors=True)
+                logging.info(f"[RobustDownloader] Cleaned up backup: {backup_dir}")
+            except Exception as e:
+                logging.warning(f"[RobustDownloader] Could not cleanup backup: {e}")
     
     def _fix_file_extension(self, dest: str) -> str:
         """Fix file extension based on detected file type."""
@@ -785,6 +1006,9 @@ class RobustDownloader:
     
     def _extract_files(self, archive_path: Optional[str] = None):
         """Extract archive files and flatten nested directories."""
+        # Create backup before extraction if this is an update
+        backup_dir = self._create_update_backup()
+        
         self.game_info["downloadingData"]["extracting"] = True
         # Initialize extraction progress tracking
         self.game_info["downloadingData"]["extractionProgress"] = {
@@ -956,7 +1180,7 @@ class RobustDownloader:
             _launch_notification(self.withNotification, "Extraction Complete", f"Extraction complete for {self.game}")
         
         # Verify
-        self._verify_extracted_files(watching_path)
+        self._verify_extracted_files(watching_path, backup_dir)
     
     def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int, force: bool = False):
         """Update extraction progress in the game info JSON.
@@ -1456,8 +1680,13 @@ class RobustDownloader:
                     except Exception:
                         pass
     
-    def _verify_extracted_files(self, watching_path: str):
-        """Verify extracted files match expected sizes."""
+    def _verify_extracted_files(self, watching_path: str, backup_dir: Optional[str] = None):
+        """Verify extracted files match expected sizes.
+        
+        Args:
+            watching_path: Path to the filemap JSON
+            backup_dir: Path to backup directory (for updates)
+        """
         logging.info(f"[RobustDownloader] Starting verification of extracted files")
         verify_start_time = time.time()
         try:
@@ -1483,10 +1712,32 @@ class RobustDownloader:
             # If we found unextracted archives, fail immediately
             if verify_errors:
                 logging.error(f"[RobustDownloader] Verification failed: Found {len(verify_errors)} unextracted archive(s)")
+                
+                # Restore from backup if this is an update
+                if backup_dir:
+                    logging.warning(f"[RobustDownloader] Update failed, restoring from backup")
+                    if self._restore_from_backup(backup_dir):
+                        logging.info(f"[RobustDownloader] Successfully restored original files")
+                        if self.withNotification:
+                            _launch_notification(
+                                self.withNotification,
+                                "Update Failed - Restored",
+                                f"Update failed but original files were restored"
+                            )
+                    else:
+                        logging.error(f"[RobustDownloader] Failed to restore from backup")
+                        if self.withNotification:
+                            _launch_notification(
+                                self.withNotification,
+                                "Update Failed",
+                                f"Update failed and restore failed - backup at {backup_dir}"
+                            )
+                
                 self.game_info["downloadingData"]["verifying"] = False
                 self.game_info["downloadingData"]["verifyError"] = verify_errors
                 safe_write_json(self.game_info_path, self.game_info)
-                if self.withNotification:
+                
+                if not backup_dir and self.withNotification:
                     error_count = len(verify_errors)
                     _launch_notification(
                         self.withNotification,
@@ -1520,16 +1771,58 @@ class RobustDownloader:
             self.game_info["downloadingData"]["verifying"] = False
             if verify_errors:
                 self.game_info["downloadingData"]["verifyError"] = verify_errors
+                
+                # Restore from backup if this is an update
+                if backup_dir:
+                    logging.warning(f"[RobustDownloader] Update verification failed, restoring from backup")
+                    if self._restore_from_backup(backup_dir):
+                        logging.info(f"[RobustDownloader] Successfully restored original files")
+                        if self.withNotification:
+                            _launch_notification(
+                                self.withNotification,
+                                "Update Failed - Restored",
+                                f"Update failed but original files were restored"
+                            )
+                    else:
+                        logging.error(f"[RobustDownloader] Failed to restore from backup")
+                        if self.withNotification:
+                            _launch_notification(
+                                self.withNotification,
+                                "Update Failed",
+                                f"Update failed and restore failed - backup at {backup_dir}"
+                            )
+            
             safe_write_json(self.game_info_path, self.game_info)
             
             if not verify_errors:
                 self._detect_and_set_executable()
                 self._handle_post_download_behavior()
+                
+                # Cleanup backup after successful update
+                if backup_dir:
+                    self._cleanup_backup(backup_dir)
+                    logging.info(f"[RobustDownloader] Update completed successfully, backup cleaned up")
+                
                 if "downloadingData" in self.game_info:
                     del self.game_info["downloadingData"]
                     safe_write_json(self.game_info_path, self.game_info)
         except Exception as e:
             logging.error(f"[RobustDownloader] Verification error: {e}")
+            
+            # Restore from backup if this is an update
+            if backup_dir:
+                logging.warning(f"[RobustDownloader] Update error, restoring from backup")
+                if self._restore_from_backup(backup_dir):
+                    logging.info(f"[RobustDownloader] Successfully restored original files after error")
+                    if self.withNotification:
+                        _launch_notification(
+                            self.withNotification,
+                            "Update Failed - Restored",
+                            f"Update failed but original files were restored"
+                        )
+                else:
+                    logging.error(f"[RobustDownloader] Failed to restore from backup after error")
+            
             handleerror(self.game_info, self.game_info_path, e)
     
     def _detect_and_set_executable(self):
