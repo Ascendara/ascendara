@@ -505,6 +505,8 @@ const Home = memo(() => {
       // Clear module-level caches to force fresh data
       gamesCache = null;
       carouselGamesCache = null;
+      // Clear gameService memory cache
+      gameService.clearMemoryCache();
       loadGames(true);
     };
 

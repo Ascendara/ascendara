@@ -392,6 +392,14 @@ const Search = memo(() => {
     // Listen for index refresh events
     const handleIndexRefresh = (event) => {
       console.log("[Search] Index refreshed, reloading games", event.detail);
+      // Clear module-level cache to force fresh data fetch
+      gamesCache = {
+        data: null,
+        timestamp: null,
+        expiryTime: 5 * 60 * 1000,
+      };
+      // Clear gameService memory cache
+      gameService.clearMemoryCache();
       // Force refresh to get new data
       setLoading(true);
       refreshGames(true).finally(() => setLoading(false));
