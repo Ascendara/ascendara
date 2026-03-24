@@ -53,6 +53,8 @@ import {
   Save,
   RotateCcw,
   Plus,
+  Trophy,
+  Award,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import gameService from "@/services/gameService";
@@ -2812,6 +2814,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
   const [selectedButton, setSelectedButton] = useState("play"); // 'play' or 'folder' or 'manage'
   const [selectedMenuItem, setSelectedMenuItem] = useState(0);
   const [trainerToggleFocused, setTrainerToggleFocused] = useState(false);
+  const [achievementsToggleFocused, setAchievementsToggleFocused] = useState(false);
   const lastInputTime = useRef(0);
   const buttons = getControllerButtons(controllerType);
   const gameName = game.game || game.name;
@@ -2840,6 +2843,24 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
   const [showBrowseExeWarning, setShowBrowseExeWarning] = useState(false);
   const [dialogButtonIndex, setDialogButtonIndex] = useState(0);
 
+  // Achievements state
+  const [achievements, setAchievements] = useState(null);
+  const [achievementsLoading, setAchievementsLoading] = useState(true);
+  const [achievementsPage, setAchievementsPage] = useState(0);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const achievementsPerPage = 12;
+  const totalAchievementsPages =
+    achievements && achievements.achievements
+      ? Math.ceil(achievements.achievements.length / achievementsPerPage)
+      : 1;
+  const paginatedAchievements =
+    achievements && achievements.achievements
+      ? achievements.achievements.slice(
+          achievementsPage * achievementsPerPage,
+          (achievementsPage + 1) * achievementsPerPage
+        )
+      : [];
+
   useEffect(() => {
     console.log("[InstalledGameDetailsView] Mounted with game:", gameName);
     console.log("[InstalledGameDetailsView] Game object:", game);
@@ -2866,7 +2887,23 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
       }
     };
     checkTrainer();
-  }, [gameName, game.executable]);
+
+    // Fetch achievements
+    const fetchAchievements = async () => {
+      setAchievementsLoading(true);
+      try {
+        const result = await window.electron.readGameAchievements(
+          gameName,
+          game.isCustom
+        );
+        setAchievements(result);
+      } catch (e) {
+        setAchievements(null);
+      }
+      setAchievementsLoading(false);
+    };
+    fetchAchievements();
+  }, [gameName, game.executable, game.isCustom]);
 
   // Load game hero image for background
   useEffect(() => {
@@ -3197,6 +3234,19 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
     action => {
       if (!canInput) return;
 
+      // Handle achievements view navigation
+      if (showAchievements) {
+        if (action === "LEFT") {
+          setAchievementsPage(prev => Math.max(0, prev - 1));
+        } else if (action === "RIGHT") {
+          setAchievementsPage(prev => Math.min(totalAchievementsPages - 1, prev + 1));
+        } else if (action === "BACK") {
+          setShowAchievements(false);
+          setAchievementsPage(0);
+        }
+        return;
+      }
+
       // Handle dialog navigation
       if (
         showVrWarning ||
@@ -3399,21 +3449,40 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
 
       // Normal navigation
       if (action === "DOWN") {
-        if (trainerToggleFocused) {
+        const hasAchievements = achievements && achievements.achievements && achievements.achievements.length > 0;
+        if (achievementsToggleFocused) {
+          setAchievementsToggleFocused(false);
+          if (trainerExists) {
+            setTrainerToggleFocused(true);
+          } else {
+            setSelectedButton("play");
+          }
+        } else if (trainerToggleFocused) {
           setTrainerToggleFocused(false);
           setSelectedButton("play"); // Restore button selection
-        } else if (!showMedia) {
+        } else if (!showMedia && selectedButton) {
+          // Only go to media if we're on a button (not focused on toggles)
           setShowMedia(true);
         }
       } else if (action === "UP") {
+        const hasAchievements = achievements && achievements.achievements && achievements.achievements.length > 0;
         if (showMedia) {
           setShowMedia(false);
-        } else if (!trainerToggleFocused && trainerExists) {
+        } else if (trainerToggleFocused && hasAchievements) {
+          setTrainerToggleFocused(false);
+          setAchievementsToggleFocused(true);
+          setSelectedButton("");
+        } else if (!trainerToggleFocused && !achievementsToggleFocused && trainerExists) {
           setTrainerToggleFocused(true);
           setSelectedButton(""); // Clear button selection when focusing trainer
+        } else if (!trainerToggleFocused && !achievementsToggleFocused && !trainerExists && hasAchievements) {
+          setAchievementsToggleFocused(true);
+          setSelectedButton("");
         }
       } else if (action === "LEFT") {
-        if (trainerToggleFocused) {
+        if (achievementsToggleFocused) {
+          // Do nothing on achievements toggle
+        } else if (trainerToggleFocused) {
           // Do nothing on trainer toggle
         } else if (!showMedia) {
           if (selectedButton === "folder") setSelectedButton("play");
@@ -3421,7 +3490,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
           else if (selectedButton === "assets") setSelectedButton("manage");
         }
       } else if (action === "RIGHT") {
-        if (trainerToggleFocused) {
+        if (achievementsToggleFocused) {
+          // Do nothing on achievements toggle
+        } else if (trainerToggleFocused) {
           // Do nothing on trainer toggle
         } else if (!showMedia) {
           if (selectedButton === "play") setSelectedButton("folder");
@@ -3429,7 +3500,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
           else if (selectedButton === "manage") setSelectedButton("assets");
         }
       } else if (action === "BACK" || action === "MENU") {
-        if (trainerToggleFocused) {
+        if (achievementsToggleFocused) {
+          setAchievementsToggleFocused(false);
+        } else if (trainerToggleFocused) {
           setTrainerToggleFocused(false);
         } else if (showMedia) {
           setShowMedia(false);
@@ -3438,7 +3511,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
           onBack();
         }
       } else if (action === "CONFIRM") {
-        if (trainerToggleFocused) {
+        if (achievementsToggleFocused) {
+          setShowAchievements(true);
+        } else if (trainerToggleFocused) {
           const newValue = !launchWithTrainerEnabled;
           setLaunchWithTrainerEnabled(newValue);
           localStorage.setItem(`launch-with-trainer-${gameName}`, newValue.toString());
@@ -3464,9 +3539,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
           }
         }
       } else if (action === "X") {
-        if (!showMedia && !trainerToggleFocused) handleOpenDirectory();
+        if (!showMedia && !trainerToggleFocused && !achievementsToggleFocused) handleOpenDirectory();
       } else if (action === "Y") {
-        if (!showMedia && !showManagementMenu && !trainerToggleFocused) {
+        if (!showMedia && !showManagementMenu && !trainerToggleFocused && !achievementsToggleFocused) {
           setShowManagementMenu(true);
           setSelectedMenuItem(0);
         }
@@ -3487,6 +3562,13 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
       game,
       settings,
       t,
+      showAchievements,
+      achievementsPage,
+      totalAchievementsPages,
+      achievements,
+      achievementsToggleFocused,
+      trainerToggleFocused,
+      trainerExists,
     ]
   );
 
@@ -3734,6 +3816,45 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
                     <span>{t("bigPicture.onlineFix")}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {achievements && achievements.achievements && achievements.achievements.length > 0 && (
+              <div
+                onClick={() => setShowAchievements(true)}
+                className={`mb-6 cursor-pointer rounded-xl border-2 p-4 backdrop-blur-sm transition-all duration-200 ${
+                  achievementsToggleFocused
+                    ? "scale-105 border-primary bg-primary/30 shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                    : "border-white/20 bg-white/10 hover:scale-[1.02] hover:border-primary/40 hover:bg-white/15"
+                }`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-semibold text-white">
+                      {t("gameScreen.achievements")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold text-primary">
+                      {achievements.achievements.filter(a => a.achieved).length}
+                    </span>
+                    <span className="text-sm font-medium text-white/70">
+                      / {achievements.achievements.length}
+                    </span>
+                  </div>
+                </div>
+                <div className="relative h-2.5 overflow-hidden rounded-full bg-black/30">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary via-primary to-primary/90 shadow-lg shadow-primary/20 transition-all duration-500"
+                    style={{
+                      width: `${(achievements.achievements.filter(a => a.achieved).length / achievements.achievements.length) * 100}%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-2 text-center text-xs font-medium text-white/60">
+                  {Math.round((achievements.achievements.filter(a => a.achieved).length / achievements.achievements.length) * 100)}% {t("gameScreen.achievementsUnlocked") || "Complete"}
+                </div>
               </div>
             )}
 
@@ -4002,6 +4123,133 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
                 </span>
               </button>
             </div>
+            <div className="mt-6 text-center text-sm text-muted-foreground">
+              {t("bigPicture.pressBackToClose") || "Press B to close"}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Achievements View Overlay */}
+      {showAchievements && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+          <div className="flex h-[90vh] w-[90vw] flex-col rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Trophy className="h-8 w-8 text-primary" />
+                <h2 className="text-4xl font-bold text-primary">
+                  {t("gameScreen.achievements")}
+                </h2>
+              </div>
+              {achievements && achievements.achievements && (
+                <div className="text-2xl">
+                  <span className="mr-2 font-bold text-primary">
+                    {achievements.achievements.filter(a => a.achieved).length}
+                  </span>
+                  <span className="text-muted-foreground">
+                    / {achievements.achievements.length} {t("gameScreen.achievementsUnlocked")}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="no-scrollbar flex-1 overflow-y-auto">
+              {achievementsLoading ? (
+                <div className="flex h-full flex-col items-center justify-center gap-6">
+                  <Award className="h-16 w-16 animate-pulse text-primary/70" />
+                  <p className="text-2xl font-semibold text-primary/80">
+                    {t("gameScreen.loadingAchievements")}
+                  </p>
+                </div>
+              ) : paginatedAchievements.length > 0 ? (
+                <div className="grid grid-cols-2 gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                  {paginatedAchievements.map((ach, idx) => {
+                    const unlocked = ach.achieved;
+                    return (
+                      <div
+                        key={ach.achID || idx + achievementsPage * achievementsPerPage}
+                        className={`relative flex flex-col items-center rounded-xl border p-6 shadow-lg transition-all duration-200 ${
+                          unlocked
+                            ? "border-primary/50 bg-gradient-to-br from-yellow-50/10 via-green-50/10 to-green-100/10"
+                            : "border-border bg-muted/50"
+                        } min-h-[240px]`}
+                      >
+                        <div className="mb-4 flex h-24 w-24 items-center justify-center">
+                          {ach.icon ? (
+                            <img
+                              src={ach.icon}
+                              alt={ach.message}
+                              className={`h-full w-full rounded-lg object-cover ${
+                                unlocked ? "" : "grayscale opacity-40"
+                              }`}
+                            />
+                          ) : (
+                            <Award
+                              className={`h-16 w-16 ${
+                                unlocked ? "text-primary" : "text-muted-foreground"
+                              }`}
+                            />
+                          )}
+                        </div>
+                        <h3
+                          className={`mb-2 text-center text-lg font-bold ${
+                            unlocked ? "text-primary" : "text-muted-foreground"
+                          }`}
+                        >
+                          {ach.message || "Achievement"}
+                        </h3>
+                        {ach.description && (
+                          <p
+                            className={`text-center text-sm ${
+                              unlocked ? "text-foreground/80" : "text-muted-foreground/60"
+                            }`}
+                          >
+                            {ach.description}
+                          </p>
+                        )}
+                        {unlocked && (
+                          <div className="absolute right-3 top-3">
+                            <Check className="h-6 w-6 text-primary" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-4">
+                  <Trophy className="h-16 w-16 text-muted-foreground" />
+                  <p className="text-xl font-medium text-muted-foreground">
+                    {t("gameScreen.noAchievementsFound")}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {totalAchievementsPages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-6">
+                <button
+                  onClick={() => setAchievementsPage(prev => Math.max(0, prev - 1))}
+                  disabled={achievementsPage === 0}
+                  className="rounded-xl border-2 border-primary px-8 py-3 text-xl font-bold text-primary transition-all hover:bg-primary hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  {t("common.prev")}
+                </button>
+                <span className="text-xl text-muted-foreground">
+                  {t("common.page")} {achievementsPage + 1} / {totalAchievementsPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setAchievementsPage(prev => Math.min(totalAchievementsPages - 1, prev + 1))
+                  }
+                  disabled={achievementsPage === totalAchievementsPages - 1}
+                  className="rounded-xl border-2 border-primary px-8 py-3 text-xl font-bold text-primary transition-all hover:bg-primary hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  {t("common.next")}
+                </button>
+              </div>
+            )}
+
             <div className="mt-6 text-center text-sm text-muted-foreground">
               {t("bigPicture.pressBackToClose") || "Press B to close"}
             </div>
