@@ -55,6 +55,8 @@ import {
   Plus,
   Trophy,
   Award,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import gameService from "@/services/gameService";
@@ -2433,12 +2435,6 @@ const GameDetailsView = ({
                   <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
                     {t("bigPicture.ascendPremiumFeatures")}
                   </span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8)]" />
-                    <span className="text-xs font-bold text-white">
-                      {t("bigPicture.available")}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -4132,67 +4128,87 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
 
       {/* Achievements View Overlay */}
       {showAchievements && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
-          <div className="flex h-[90vh] w-[90vw] flex-col rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
+          <div className="flex h-[92vh] w-[95vw] flex-col rounded-3xl border-2 border-white/10 bg-gradient-to-br from-background via-background to-background/90 p-10 shadow-2xl">
+            <div className="mb-8 flex items-center justify-between border-b border-white/10 pb-6">
               <div className="flex items-center gap-4">
-                <Trophy className="h-8 w-8 text-primary" />
-                <h2 className="text-4xl font-bold text-primary">
-                  {t("gameScreen.achievements")}
-                </h2>
+                <div className="rounded-2xl border-2 border-primary/30 bg-primary/10 p-3">
+                  <Trophy className="h-10 w-10 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-5xl font-black text-primary">
+                    {t("gameScreen.achievements")}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{gameName}</p>
+                </div>
               </div>
               {achievements && achievements.achievements && (
-                <div className="text-2xl">
-                  <span className="mr-2 font-bold text-primary">
-                    {achievements.achievements.filter(a => a.achieved).length}
-                  </span>
-                  <span className="text-muted-foreground">
-                    / {achievements.achievements.length} {t("gameScreen.achievementsUnlocked")}
-                  </span>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="text-3xl">
+                    <span className="font-black text-primary">
+                      {achievements.achievements.filter(a => a.achieved).length}
+                    </span>
+                    <span className="mx-2 text-muted-foreground/50">/</span>
+                    <span className="font-bold text-muted-foreground">
+                      {achievements.achievements.length}
+                    </span>
+                  </div>
+                  <div className="relative h-2 w-48 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/30 transition-all duration-500"
+                      style={{
+                        width: `${(achievements.achievements.filter(a => a.achieved).length / achievements.achievements.length) * 100}%`,
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="no-scrollbar flex-1 overflow-y-auto">
+            <div className="no-scrollbar flex-1 overflow-y-auto px-2">
               {achievementsLoading ? (
                 <div className="flex h-full flex-col items-center justify-center gap-6">
-                  <Award className="h-16 w-16 animate-pulse text-primary/70" />
-                  <p className="text-2xl font-semibold text-primary/80">
+                  <div className="rounded-full border-4 border-primary/20 border-t-primary p-4">
+                    <Award className="h-20 w-20 animate-pulse text-primary" />
+                  </div>
+                  <p className="text-2xl font-bold text-primary">
                     {t("gameScreen.loadingAchievements")}
                   </p>
                 </div>
               ) : paginatedAchievements.length > 0 ? (
-                <div className="grid grid-cols-2 gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-5 lg:grid-cols-3 xl:grid-cols-4">
                   {paginatedAchievements.map((ach, idx) => {
                     const unlocked = ach.achieved;
                     return (
                       <div
                         key={ach.achID || idx + achievementsPage * achievementsPerPage}
-                        className={`relative flex flex-col items-center rounded-xl border p-6 shadow-lg transition-all duration-200 ${
+                        className={`group relative flex flex-col items-center rounded-2xl border-2 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] ${
                           unlocked
-                            ? "border-primary/50 bg-gradient-to-br from-yellow-50/10 via-green-50/10 to-green-100/10"
-                            : "border-border bg-muted/50"
-                        } min-h-[240px]`}
+                            ? "border-primary/40 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent shadow-primary/20"
+                            : "border-white/10 bg-white/5 hover:border-white/20"
+                        } min-h-[260px]`}
                       >
-                        <div className="mb-4 flex h-24 w-24 items-center justify-center">
+                        <div className={`mb-5 flex h-28 w-28 items-center justify-center rounded-xl border-2 p-2 ${
+                          unlocked ? "border-primary/30 bg-primary/10" : "border-white/10 bg-white/5"
+                        }`}>
                           {ach.icon ? (
                             <img
                               src={ach.icon}
                               alt={ach.message}
-                              className={`h-full w-full rounded-lg object-cover ${
-                                unlocked ? "" : "grayscale opacity-40"
+                              className={`h-full w-full rounded-lg object-cover transition-all duration-300 ${
+                                unlocked ? "" : "grayscale opacity-30 group-hover:opacity-50"
                               }`}
                             />
                           ) : (
                             <Award
                               className={`h-16 w-16 ${
-                                unlocked ? "text-primary" : "text-muted-foreground"
+                                unlocked ? "text-primary" : "text-white/30"
                               }`}
                             />
                           )}
                         </div>
                         <h3
-                          className={`mb-2 text-center text-lg font-bold ${
+                          className={`mb-2 text-center text-base font-bold leading-tight ${
                             unlocked ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
@@ -4200,16 +4216,16 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
                         </h3>
                         {ach.description && (
                           <p
-                            className={`text-center text-sm ${
-                              unlocked ? "text-foreground/80" : "text-muted-foreground/60"
+                            className={`text-center text-xs leading-relaxed ${
+                              unlocked ? "text-foreground/80" : "text-muted-foreground/70"
                             }`}
                           >
                             {ach.description}
                           </p>
                         )}
                         {unlocked && (
-                          <div className="absolute right-3 top-3">
-                            <Check className="h-6 w-6 text-primary" />
+                          <div className="absolute right-4 top-4 rounded-full bg-primary p-1.5 shadow-lg shadow-primary/50">
+                            <Check className="h-5 w-5 text-secondary" />
                           </div>
                         )}
                       </div>
@@ -4217,9 +4233,11 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
                   })}
                 </div>
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-4">
-                  <Trophy className="h-16 w-16 text-muted-foreground" />
-                  <p className="text-xl font-medium text-muted-foreground">
+                <div className="flex h-full flex-col items-center justify-center gap-6">
+                  <div className="rounded-full border-2 border-white/10 bg-white/5 p-8">
+                    <Trophy className="h-20 w-20 text-white/30" />
+                  </div>
+                  <p className="text-2xl font-bold text-muted-foreground">
                     {t("gameScreen.noAchievementsFound")}
                   </p>
                 </div>
@@ -4227,30 +4245,37 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
             </div>
 
             {totalAchievementsPages > 1 && (
-              <div className="mt-6 flex items-center justify-center gap-6">
+              <div className="mt-8 flex items-center justify-center gap-8 border-t border-white/10 pt-6">
                 <button
                   onClick={() => setAchievementsPage(prev => Math.max(0, prev - 1))}
                   disabled={achievementsPage === 0}
-                  className="rounded-xl border-2 border-primary px-8 py-3 text-xl font-bold text-primary transition-all hover:bg-primary hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30"
+                  className="flex h-14 w-14 items-center justify-center rounded-xl border-2 border-primary bg-primary/10 text-primary transition-all hover:scale-110 hover:bg-primary hover:text-secondary hover:shadow-lg hover:shadow-primary/30 disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:scale-100"
                 >
-                  {t("common.prev")}
+                  <ChevronLeft className="h-7 w-7" />
                 </button>
-                <span className="text-xl text-muted-foreground">
-                  {t("common.page")} {achievementsPage + 1} / {totalAchievementsPages}
-                </span>
+                <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-white/10 bg-white/5 px-8 py-3">
+                  <span className="text-3xl font-black text-primary">
+                    {achievementsPage + 1}
+                    <span className="mx-2 text-muted-foreground/50">/</span>
+                    {totalAchievementsPages}
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("common.page")}
+                  </span>
+                </div>
                 <button
                   onClick={() =>
                     setAchievementsPage(prev => Math.min(totalAchievementsPages - 1, prev + 1))
                   }
                   disabled={achievementsPage === totalAchievementsPages - 1}
-                  className="rounded-xl border-2 border-primary px-8 py-3 text-xl font-bold text-primary transition-all hover:bg-primary hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30"
+                  className="flex h-14 w-14 items-center justify-center rounded-xl border-2 border-primary bg-primary/10 text-primary transition-all hover:scale-110 hover:bg-primary hover:text-secondary hover:shadow-lg hover:shadow-primary/30 disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:scale-100"
                 >
-                  {t("common.next")}
+                  <ChevronRight className="h-7 w-7" />
                 </button>
               </div>
             )}
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
+            <div className="mt-6 text-center text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {t("bigPicture.pressBackToClose") || "Press B to close"}
             </div>
           </div>
