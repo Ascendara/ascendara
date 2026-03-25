@@ -877,7 +877,15 @@
     "update": "UPDATE",
     "useArrowsToSelect": "Use arrows to select",
     "verifying": "Verifying...",
-    "viewDetails": "VIEW DETAILS"
+    "viewDetails": "VIEW DETAILS",
+    "contextMenu": {
+      "about": "About",
+      "dlcIncluded": "DLC Included",
+      "onlineMultiplayer": "Online Multiplayer",
+      "pressToDownload": "Press to Download",
+      "rating": "Rating",
+      "size": "Size"
+    }
   },
   "branchWelcome": {
     "experimental": {
