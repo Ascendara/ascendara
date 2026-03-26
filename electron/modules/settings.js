@@ -55,6 +55,9 @@ class SettingsManager {
       localRefreshWorkers: 8,
       homeSearch: true,
       indexReminder: "7",
+      autoRefreshEnabled: false,
+      autoRefreshInterval: "7",
+      autoRefreshMethod: "shared",
       bigPictureKeyboardLayout: "qwerty",
       controllerType: "xbox",
       ludusavi: {

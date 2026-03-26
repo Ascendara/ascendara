@@ -23,6 +23,8 @@ import {
   FolderOpen,
   Folder,
   Settings2,
+  Star,
+  Info,
   X,
   Plus,
   Ban,
@@ -37,6 +39,7 @@ import {
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Accordion,
   AccordionContent,
@@ -56,14 +59,23 @@ import {
 import RefreshIndexDialog from "@/components/RefreshIndexDialog";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import imageCacheService from "@/services/imageCacheService";
 import gameService from "@/services/gameService";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const LocalRefresh = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const { settings, updateSetting } = useSettings();
+  const { user, isAuthenticated } = useAuth();
 
   // Hardcoded flag to show/hide extra sources that aren't ready yet
   const SHOW_EXTRA_SOURCES = false;
@@ -121,6 +133,9 @@ const LocalRefresh = () => {
   const [indexDownloadProgress, setIndexDownloadProgress] = useState(null); // { progress, phase, downloaded, total }
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState("7");
+  const [autoRefreshMethod, setAutoRefreshMethod] = useState("shared"); // "shared" or "manual"
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -137,6 +152,15 @@ const LocalRefresh = () => {
         }
         if (settings?.localRefreshSource !== undefined) {
           setSelectedSource(settings.localRefreshSource);
+        }
+        if (settings?.autoRefreshEnabled !== undefined) {
+          setAutoRefreshEnabled(settings.autoRefreshEnabled);
+        }
+        if (settings?.autoRefreshInterval !== undefined) {
+          setAutoRefreshInterval(settings.autoRefreshInterval);
+        }
+        if (settings?.autoRefreshMethod !== undefined) {
+          setAutoRefreshMethod(settings.autoRefreshMethod);
         }
 
         // Check if localIndex is set, if not set it to default
@@ -1076,6 +1100,167 @@ const LocalRefresh = () => {
                       </Button>
                     )}
                   </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Automatic Index Refreshing Card - Ascend Feature */}
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500/10 to-blue-500/10">
+                    <RefreshCw className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">
+                        {t("localRefresh.autoRefresh") || "Automatic Index Refreshing"}
+                      </h3>
+                      <Badge className="gap-1 bg-gradient-to-r from-purple-500/10 to-blue-500/10 text-purple-600 dark:text-purple-400">
+                        <Star className="h-3 w-3" />
+                        {t("common.ascend") || "Ascend"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {t("localRefresh.autoRefreshCardDesc") ||
+                        "Keep your index up to date automatically"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={autoRefreshEnabled && isAuthenticated}
+                  onCheckedChange={async (checked) => {
+                    if (!isAuthenticated) {
+                      toast.info(
+                        t("localRefresh.autoRefreshRequiresAscend") ||
+                          "Sign in to Ascend to enable automatic refreshing"
+                      );
+                      navigate("/ascend");
+                      return;
+                    }
+                    setAutoRefreshEnabled(checked);
+                    await updateSetting("autoRefreshEnabled", checked);
+                    toast.success(
+                      checked
+                        ? t("localRefresh.autoRefreshEnabled") || "Automatic refresh enabled"
+                        : t("localRefresh.autoRefreshDisabled") || "Automatic refresh disabled"
+                    );
+                  }}
+                  disabled={!isAuthenticated}
+                />
+              </div>
+
+              {/* Settings when enabled */}
+              <AnimatePresence>
+                {autoRefreshEnabled && isAuthenticated && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                    animate={{ opacity: 1, height: "auto", marginTop: 16 }}
+                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                    className="space-y-4 border-t border-border/50 pt-4"
+                  >
+                    {/* Method Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">
+                        {t("localRefresh.autoRefreshMethod") || "Refresh Method"}
+                      </Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={async () => {
+                            setAutoRefreshMethod("shared");
+                            await updateSetting("autoRefreshMethod", "shared");
+                          }}
+                          className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
+                            autoRefreshMethod === "shared"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-accent/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Cloud className="h-4 w-4" />
+                            <span className="text-sm font-medium">
+                              {t("localRefresh.sharedIndex") || "Shared Index"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {t("localRefresh.sharedIndexDesc") ||
+                              "Download pre-built index from community"}
+                          </p>
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setAutoRefreshMethod("manual");
+                            await updateSetting("autoRefreshMethod", "manual");
+                          }}
+                          className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
+                            autoRefreshMethod === "manual"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-accent/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Settings2 className="h-4 w-4" />
+                            <span className="text-sm font-medium">
+                              {t("localRefresh.manualScrape") || "Manual Scrape"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {t("localRefresh.manualScrapeDesc") ||
+                              "Build your own index by scraping"}
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Interval Selector */}
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">
+                        {t("localRefresh.refreshInterval") || "Refresh Every"}
+                      </Label>
+                      <Select
+                        value={autoRefreshInterval}
+                        onValueChange={async (value) => {
+                          setAutoRefreshInterval(value);
+                          await updateSetting("autoRefreshInterval", value);
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px] bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2">
+                            {t("localRefresh.intervalOptions.twoDays") || "2 Days"}
+                          </SelectItem>
+                          <SelectItem value="3">
+                            {t("localRefresh.intervalOptions.threeDays") || "3 Days"}
+                          </SelectItem>
+                          <SelectItem value="5">
+                            {t("localRefresh.intervalOptions.fiveDays") || "5 Days"}
+                          </SelectItem>
+                          <SelectItem value="7">
+                            {t("localRefresh.intervalOptions.oneWeek") || "1 Week"}
+                          </SelectItem>
+                          <SelectItem value="10">
+                            {t("localRefresh.intervalOptions.tenDays") || "10 Days"}
+                          </SelectItem>
+                          <SelectItem value="14">
+                            {t("localRefresh.intervalOptions.twoWeeks") || "2 Weeks"}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Not signed in message */}
+              {!isAuthenticated && (
+                <div className="mt-4 flex items-start gap-2 rounded-lg bg-purple-500/5 p-3 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4 shrink-0 text-purple-500" />
+                  <span>
+                    {t("localRefresh.autoRefreshAscendInfo") ||
+                      "Sign in to Ascend to enable automatic index refreshing and keep your game library up to date effortlessly."}
+                  </span>
                 </div>
               )}
             </Card>

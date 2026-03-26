@@ -336,6 +336,233 @@ const GiantBombMigrationWarning = () => {
   );
 };
 
+// Automatic Index Refresher - runs in background when enabled
+const AutomaticIndexRefresher = () => {
+  const { t } = useTranslation();
+  const { settings } = useSettings();
+  const { user, isAuthenticated } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState(0);
+  const [refreshPhase, setRefreshPhase] = useState("");
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const hasStartedRef = useRef(false);
+  const refreshCheckIntervalRef = useRef(null);
+
+  // Expose refresh state globally for MenuBar
+  useEffect(() => {
+    window.autoRefreshState = {
+      isRefreshing,
+      progress: refreshProgress,
+      phase: refreshPhase,
+    };
+  }, [isRefreshing, refreshProgress, refreshPhase]);
+
+  // Check if automatic refresh should run
+  useEffect(() => {
+    const checkAndStartAutoRefresh = async () => {
+      // Don't run if already started, not enabled, or user not authenticated
+      if (hasStartedRef.current || !settings?.autoRefreshEnabled || !isAuthenticated || !user?.uid) {
+        return;
+      }
+
+      // Verify Ascend access (prevent settings.json manipulation)
+      try {
+        const accessStatus = await verifyAscendAccess();
+        if (!accessStatus.hasAccess) {
+          console.log("[AutoRefresh] User doesn't have Ascend access, disabling auto refresh");
+          return;
+        }
+      } catch (error) {
+        console.error("[AutoRefresh] Failed to verify Ascend access:", error);
+        return;
+      }
+
+      // Check if refresh is needed based on interval
+      try {
+        const localIndexPath = settings.localIndex || await window.electron.getDefaultLocalIndexPath();
+        const progress = await window.electron.getLocalRefreshProgress(localIndexPath);
+        
+        if (!progress?.lastSuccessfulTimestamp) {
+          console.log("[AutoRefresh] No previous refresh found, skipping auto refresh");
+          return;
+        }
+
+        const lastRefreshDate = new Date(progress.lastSuccessfulTimestamp * 1000);
+        const now = new Date();
+        const daysSinceRefresh = Math.floor((now - lastRefreshDate) / (1000 * 60 * 60 * 24));
+        const intervalDays = parseInt(settings.autoRefreshInterval || "7");
+
+        console.log(`[AutoRefresh] Days since last refresh: ${daysSinceRefresh}, interval: ${intervalDays}`);
+
+        if (daysSinceRefresh >= intervalDays) {
+          console.log("[AutoRefresh] Starting automatic index refresh");
+          hasStartedRef.current = true;
+          await startAutoRefresh(localIndexPath);
+        }
+      } catch (error) {
+        console.error("[AutoRefresh] Error checking refresh status:", error);
+      }
+    };
+
+    // Delay initial check to let app initialize
+    const timeout = setTimeout(checkAndStartAutoRefresh, 10000);
+    return () => clearTimeout(timeout);
+  }, [settings?.autoRefreshEnabled, settings?.autoRefreshInterval, settings?.localIndex, isAuthenticated, user?.uid]);
+
+  const startAutoRefresh = async (localIndexPath) => {
+    setIsRefreshing(true);
+    setRefreshProgress(0);
+    setRefreshPhase("initializing");
+
+    try {
+      // Get refresh settings
+      const refreshSettings = await window.electron.getSettings();
+      const method = refreshSettings.autoRefreshMethod || "shared";
+
+      if (method === "shared") {
+        // Download shared index from community
+        console.log("[AutoRefresh] Starting shared index download");
+        await window.electron.downloadSharedIndex(localIndexPath);
+      } else {
+        // Manual scrape
+        console.log("[AutoRefresh] Starting manual scrape");
+        const result = await window.electron.startLocalRefresh({
+          outputPath: localIndexPath,
+          cfClearance: "", // Will prompt if needed
+          perPage: refreshSettings.fetchPageCount || 50,
+          workers: refreshSettings.localRefreshWorkers || 8,
+          userAgent: "",
+          source: refreshSettings.localRefreshSource || "steamrip",
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to start automatic refresh");
+        }
+      }
+    } catch (error) {
+      console.error("[AutoRefresh] Failed to start refresh:", error);
+      setIsRefreshing(false);
+      setRefreshPhase("");
+    }
+  };
+
+  // Listen for refresh progress updates (both manual scrape and shared index)
+  useEffect(() => {
+    const handleProgressUpdate = (data) => {
+      if (data.progress !== undefined) {
+        setRefreshProgress(Math.min(Math.round(data.progress * 100), 100));
+      }
+      if (data.phase) {
+        setRefreshPhase(data.phase);
+      }
+      if (data.status === "completed") {
+        setIsRefreshing(false);
+        setRefreshPhase("");
+        setShowCompleteDialog(true);
+      } else if (data.status === "failed" || data.status === "error") {
+        setIsRefreshing(false);
+        setRefreshPhase("");
+      }
+    };
+
+    const handleComplete = () => {
+      setIsRefreshing(false);
+      setRefreshPhase("");
+      setShowCompleteDialog(true);
+    };
+
+    const handleError = () => {
+      setIsRefreshing(false);
+      setRefreshPhase("");
+    };
+
+    // Shared index download progress
+    const handleSharedIndexProgress = (data) => {
+      if (data.progress !== undefined) {
+        setRefreshProgress(Math.min(Math.round(data.progress), 100));
+      }
+      if (data.phase) {
+        setRefreshPhase(data.phase);
+      }
+    };
+
+    const handleSharedIndexComplete = () => {
+      setIsRefreshing(false);
+      setRefreshPhase("");
+      setShowCompleteDialog(true);
+    };
+
+    const handleSharedIndexError = () => {
+      setIsRefreshing(false);
+      setRefreshPhase("");
+    };
+
+    if (window.electron?.onLocalRefreshProgress) {
+      // Manual scrape listeners
+      window.electron.onLocalRefreshProgress(handleProgressUpdate);
+      window.electron.onLocalRefreshComplete(handleComplete);
+      window.electron.onLocalRefreshError(handleError);
+
+      // Shared index download listeners
+      window.electron.onPublicIndexDownloadProgress(handleSharedIndexProgress);
+      window.electron.onPublicIndexDownloadComplete(handleSharedIndexComplete);
+      window.electron.onPublicIndexDownloadError(handleSharedIndexError);
+
+      return () => {
+        window.electron.offLocalRefreshProgress?.();
+        window.electron.offLocalRefreshComplete?.();
+        window.electron.offLocalRefreshError?.();
+        window.electron.offPublicIndexDownloadProgress?.();
+        window.electron.offPublicIndexDownloadComplete?.();
+        window.electron.offPublicIndexDownloadError?.();
+      };
+    }
+  }, []);
+
+  const handleRefreshApp = () => {
+    setShowCompleteDialog(false);
+    // Dispatch the same event that LocalRefresh sends
+    window.dispatchEvent(new CustomEvent("index-refreshed", {
+      detail: { timestamp: Date.now() }
+    }));
+    toast.success(t("localRefresh.refreshComplete") || "Index refreshed! Reloading data...");
+  };
+
+  return (
+    <>
+      <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+        <AlertDialogContent className="border-border">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-4">
+              <RefreshCwIcon className="mb-2 h-10 w-10 text-green-500" />
+              <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                {t("localRefresh.autoRefreshComplete") || "Automatic Index Refresh Complete"}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <div className="text-foreground">
+                  {t("localRefresh.autoRefreshCompleteMessage") ||
+                    "Your game index has been automatically refreshed in the background. Reload to see the latest games."}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="gap-3 sm:justify-end">
+            <AlertDialogCancel className="text-foreground">
+              {t("common.later") || "Later"}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleRefreshApp}>
+              {t("localRefresh.reloadNow") || "Reload Now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
 // PlayStation button component
 const PSButton = ({ type, className = "" }) => {
   const buttonStyles = "inline-flex items-center justify-center";
@@ -1717,6 +1944,7 @@ function App() {
                     <MessageNotificationChecker />
                     <TrialWarningChecker />
                     <GiantBombMigrationWarning />
+                    <AutomaticIndexRefresher />
                     <ControllerDetectionPrompt />
                     <SearchInitializer />
                     <GlobalSearch />

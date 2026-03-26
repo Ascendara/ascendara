@@ -1213,6 +1213,12 @@ function registerLocalRefreshHandlers() {
         publicIndexDownloading = false;
         if (mainWindow) {
           mainWindow.webContents.send("public-index-download-complete");
+          // Dispatch index-refreshed event to reload UI
+          mainWindow.webContents.executeJavaScript(`
+            window.dispatchEvent(new CustomEvent("index-refreshed", {
+              detail: { timestamp: Date.now() }
+            }));
+          `);
         }
       } catch (error) {
         console.error("Failed to download shared index:", error);

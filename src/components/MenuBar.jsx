@@ -54,6 +54,7 @@ const MenuBar = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasController, setHasController] = useState(false);
   const [audioDownloadCount, setAudioDownloadCount] = useState(0);
+  const [autoRefreshState, setAutoRefreshState] = useState(null);
   const mainContentRef = useRef(null);
   const checkIntervalRef = useRef(null);
 
@@ -64,6 +65,19 @@ const MenuBar = () => {
       setIsDev(isDevMode);
     };
     checkDevMode();
+  }, []);
+
+  // Monitor automatic refresh state
+  useEffect(() => {
+    const checkAutoRefreshState = () => {
+      if (window.autoRefreshState) {
+        setAutoRefreshState(window.autoRefreshState);
+      }
+    };
+
+    // Check every second for auto refresh state updates
+    const interval = setInterval(checkAutoRefreshState, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // Check if isOnWindows
@@ -374,6 +388,44 @@ const MenuBar = () => {
               {t("app.downloading-update")}
             </span>
           </div>
+        )}
+
+        {/* Show automatic index refresh badge when refreshing */}
+        {autoRefreshState?.isRefreshing && (
+          <span className="ml-2 flex items-center gap-1 rounded border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[14px] text-purple-500">
+            <div className="relative h-5 w-5 flex-shrink-0">
+              {/* Track circle */}
+              <svg
+                className="absolute inset-0 h-full w-full -rotate-90"
+                viewBox="0 0 16 16"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="5"
+                  fill="none"
+                  strokeWidth="2"
+                  className="stroke-purple-500/20"
+                />
+                {/* Progress circle */}
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="5"
+                  fill="none"
+                  strokeWidth="2"
+                  className="stroke-purple-500"
+                  strokeDasharray="31.4"
+                  strokeDashoffset={31.4 - ((autoRefreshState.progress || 0) / 100) * 31.4}
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <span className="font-medium">
+              {t("localRefresh.autoRefreshing") || "Auto Refreshing"}
+              {autoRefreshState.progress > 0 && ` ${autoRefreshState.progress}%`}
+            </span>
+          </span>
         )}
 
         {/* Show audio downloading badge when downloading audio files */}
