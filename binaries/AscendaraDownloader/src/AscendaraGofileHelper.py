@@ -21,6 +21,7 @@ import time
 import shutil
 import string
 from tempfile import NamedTemporaryFile, gettempdir
+from typing import Optional
 import requests
 import atexit
 from threading import Lock
