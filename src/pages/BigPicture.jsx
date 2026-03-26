@@ -2813,6 +2813,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
   const [trainerToggleFocused, setTrainerToggleFocused] = useState(false);
   const [achievementsToggleFocused, setAchievementsToggleFocused] = useState(false);
   const lastInputTime = useRef(0);
+  const lastButtonState = useRef({});
   const buttons = getControllerButtons(controllerType);
   const gameName = game.game || game.name;
 
@@ -2861,6 +2862,22 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
   useEffect(() => {
     console.log("[InstalledGameDetailsView] Mounted with game:", gameName);
     console.log("[InstalledGameDetailsView] Game object:", game);
+    
+    // Initialize button states with current gamepad state to prevent held buttons from triggering
+    const gp = getGamepadInput();
+    if (gp) {
+      lastButtonState.current = {
+        up: gp.up,
+        down: gp.down,
+        left: gp.left,
+        right: gp.right,
+        a: gp.a,
+        b: gp.b,
+        x: gp.x,
+        menu: gp.menu
+      };
+    }
+    
     if (gameName) {
       window.electron.ipcRenderer.invoke("ensure-game-assets", gameName);
     }
@@ -3617,33 +3634,27 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
       const gp = getGamepadInput();
       if (gp && canInput) {
         const now = Date.now();
-        if (now - lastInputTime.current > 150) {
-          if (gp.down) {
-            handleInput("DOWN");
-            lastInputTime.current = now;
-          } else if (gp.up) {
-            handleInput("UP");
-            lastInputTime.current = now;
-          } else if (gp.left) {
-            handleInput("LEFT");
-            lastInputTime.current = now;
-          } else if (gp.right) {
-            handleInput("RIGHT");
-            lastInputTime.current = now;
-          } else if (gp.b) {
-            handleInput("BACK");
-            lastInputTime.current = now;
-          } else if (gp.a) {
-            handleInput("CONFIRM");
-            lastInputTime.current = now;
-          } else if (gp.x) {
-            handleInput("X");
-            lastInputTime.current = now;
-          } else if (gp.menu) {
-            handleInput("MENU");
-            lastInputTime.current = now;
+        
+        // Track button state changes - only trigger on new press (not hold)
+        const checkButton = (buttonName, action) => {
+          if (gp[buttonName] && !lastButtonState.current[buttonName]) {
+            // Button just pressed (wasn't pressed before)
+            if (now - lastInputTime.current > 150) {
+              handleInput(action);
+              lastInputTime.current = now;
+            }
           }
-        }
+          lastButtonState.current[buttonName] = gp[buttonName];
+        };
+
+        checkButton('down', 'DOWN');
+        checkButton('up', 'UP');
+        checkButton('left', 'LEFT');
+        checkButton('right', 'RIGHT');
+        checkButton('b', 'BACK');
+        checkButton('a', 'CONFIRM');
+        checkButton('x', 'X');
+        checkButton('menu', 'MENU');
       }
       rAF = requestAnimationFrame(loop);
     };
@@ -5692,6 +5703,7 @@ export default function BigPicture() {
   const navigate = useNavigate();
   const lastNavTime = useRef(0);
   const lastActionTime = useRef(0);
+  const lastButtonState = useRef({});
   const GRID_COLS = 6;
 
   // --- DOWNLOAD POLLING ---
@@ -6680,65 +6692,73 @@ export default function BigPicture() {
     let animationFrameId;
 
     const loop = () => {
-      // Block navigation when any dialog is open or just closed
-      if (
-        showExitDialog ||
-        showExitBigPictureDialog ||
-        showControllerSettings ||
-        showKillDialog ||
-        showProviderDialog ||
-        assetSearchOpen ||
-        providerDialogJustClosed.current ||
-        isKeyboardOpen
-      ) {
-        animationFrameId = requestAnimationFrame(loop);
-        return;
-      }
-
       const gp = getGamepadInput();
+      
+      // Always update button states to prevent held buttons from triggering when view changes
       if (gp) {
-        const now = Date.now();
-        const timeSinceLastNav = now - lastNavTime.current;
-
-        if (timeSinceLastNav > 170) {
-          let handledNav = false;
-
-          if (gp.up) {
-            handleNavigation("UP");
-            handledNav = true;
-          } else if (gp.down) {
-            handleNavigation("DOWN");
-            handledNav = true;
-          } else if (gp.left) {
-            handleNavigation("LEFT");
-            handledNav = true;
-          } else if (gp.right) {
-            handleNavigation("RIGHT");
-            handledNav = true;
-          }
-
-          if (handledNav) {
-            lastNavTime.current = now;
-          }
+        const updateButtonState = (buttonName) => {
+          lastButtonState.current[buttonName] = gp[buttonName];
+        };
+        
+        // Block navigation when any dialog is open or just closed
+        if (
+          showExitDialog ||
+          showExitBigPictureDialog ||
+          showControllerSettings ||
+          showKillDialog ||
+          showProviderDialog ||
+          assetSearchOpen ||
+          providerDialogJustClosed.current ||
+          isKeyboardOpen
+        ) {
+          // Update button states even when blocked
+          updateButtonState('up');
+          updateButtonState('down');
+          updateButtonState('left');
+          updateButtonState('right');
+          updateButtonState('a');
+          updateButtonState('b');
+          updateButtonState('menu');
+          animationFrameId = requestAnimationFrame(loop);
+          return;
         }
+
+        const now = Date.now();
+        
+        // Track button state changes - only trigger on new press (not hold)
+        const checkNavButton = (buttonName, action) => {
+          if (gp[buttonName] && !lastButtonState.current[buttonName]) {
+            // Button just pressed (wasn't pressed before)
+            const timeSinceLastNav = now - lastNavTime.current;
+            if (timeSinceLastNav > 170) {
+              handleNavigation(action);
+              lastNavTime.current = now;
+            }
+          }
+          lastButtonState.current[buttonName] = gp[buttonName];
+        };
+
+        const checkActionButton = (buttonName, action) => {
+          if (gp[buttonName] && !lastButtonState.current[buttonName]) {
+            // Button just pressed (wasn't pressed before)
+            if (now - lastActionTime.current > 250) {
+              handleNavigation(action);
+              lastActionTime.current = now;
+            }
+          }
+          lastButtonState.current[buttonName] = gp[buttonName];
+        };
+
+        // 1. NAVIGATION
+        checkNavButton('up', 'UP');
+        checkNavButton('down', 'DOWN');
+        checkNavButton('left', 'LEFT');
+        checkNavButton('right', 'RIGHT');
 
         // 2. ACTIONS
-        if (now - lastActionTime.current > 250) {
-          let handledAction = false;
-
-          if (gp.a) {
-            handleNavigation("CONFIRM");
-            handledAction = true;
-          } else if (gp.b) {
-            handleNavigation("BACK");
-            handledAction = true;
-          } else if (gp.menu) {
-            handleNavigation("MENU");
-            handledAction = true;
-          }
-
-          if (handledAction) lastActionTime.current = now;
-        }
+        checkActionButton('a', 'CONFIRM');
+        checkActionButton('b', 'BACK');
+        checkActionButton('menu', 'MENU');
       }
       animationFrameId = requestAnimationFrame(loop);
     };
