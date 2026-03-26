@@ -736,13 +736,19 @@ export const reloadCurrentUser = async () => {
   }
 };
 
+// Debounce timer for status updates
+let statusUpdateTimer = null;
+let pendingStatusUpdate = null;
+
 /**
  * Update user status (online, away, busy, offline)
+ * Debounced to prevent excessive writes
  * @param {string} status - Status type
  * @param {string} customMessage - Optional custom status message
+ * @param {boolean} immediate - Skip debouncing and update immediately
  * @returns {Promise<{success: boolean, error: string|null}>}
  */
-export const updateUserStatus = async (status, customMessage = "") => {
+export const updateUserStatus = async (status, customMessage = "", immediate = false) => {
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -761,7 +767,31 @@ export const updateUserStatus = async (status, customMessage = "") => {
       updateData.preferredStatus = status;
     }
 
+    // Debounce status updates (except for immediate updates like offline on close)
+    if (!immediate) {
+      pendingStatusUpdate = { user, updateData };
+      
+      if (statusUpdateTimer) {
+        clearTimeout(statusUpdateTimer);
+      }
+
+      statusUpdateTimer = setTimeout(async () => {
+        if (pendingStatusUpdate) {
+          await setDoc(doc(db, "userStatus", pendingStatusUpdate.user.uid), pendingStatusUpdate.updateData, { merge: true });
+          // Clear cache for this user's status
+          clearUserCache(pendingStatusUpdate.user.uid);
+          pendingStatusUpdate = null;
+        }
+      }, 2000); // 2 second debounce
+
+      return { success: true, error: null };
+    }
+
+    // Immediate update
     await setDoc(doc(db, "userStatus", user.uid), updateData, { merge: true });
+    
+    // Clear cache for this user's status
+    clearUserCache(user.uid);
 
     return { success: true, error: null };
   } catch (error) {
@@ -1596,19 +1626,12 @@ export const searchUsers = async searchQuery => {
       }
     });
 
-    // Fetch status for each matching user (profile stats are already in user data)
-    for (const { uid, data } of matchingUsers) {
-      // Get user status
-      let status = "offline";
-      try {
-        const statusDoc = await getDoc(doc(db, "userStatus", uid));
-        if (statusDoc.exists()) {
-          status = statusDoc.data().status || "offline";
-        }
-      } catch (e) {
-        console.warn("Failed to get status for user:", uid);
-      }
+    // Batch fetch status for all matching users
+    const matchingUserIds = matchingUsers.map(u => u.uid);
+    const statusMap = await batchGetUserStatus(matchingUserIds);
 
+    // Build user results
+    for (const { uid, data } of matchingUsers) {
       // Calculate stats from cloudLibrary games
       const games = data.cloudLibrary?.games || [];
       let totalPlaytime = 0;
@@ -1629,7 +1652,7 @@ export const searchUsers = async searchQuery => {
         owner: data.owner || false,
         contributor: data.contributor || false,
         private: isPrivate,
-        status,
+        status: statusMap.get(uid) || "offline",
         level: isPrivate ? 0 : 1,
         totalPlaytime: isPrivate ? 0 : totalPlaytime,
         gamesPlayed: isPrivate ? 0 : games.length,
@@ -1662,16 +1685,8 @@ export const getUserPublicProfile = async userId => {
     }
     const userData = userDoc.data();
 
-    // Get user status
-    let status = "offline";
-    try {
-      const statusDoc = await getDoc(doc(db, "userStatus", userId));
-      if (statusDoc.exists()) {
-        status = statusDoc.data().status || "offline";
-      }
-    } catch (e) {
-      console.warn("Failed to get status for user:", userId);
-    }
+    // Get user status (cached)
+    const status = await getCachedUserStatus(userId);
 
     // Cloud library is stored inside the users document
     const cloudLibrary = userData.cloudLibrary || null;
@@ -1961,20 +1976,22 @@ export const denyFriendRequest = async requestId => {
 
 /**
  * User data cache to reduce redundant Firestore reads
+ * Optimized cache durations to reduce Firebase read costs
  */
 const userDataCache = new Map();
 const userStatusCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const STATUS_CACHE_DURATION = 60 * 1000; // 1 minute for status (changes more often)
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (increased from 5)
+const STATUS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes (increased from 1)
 
 /**
  * Get user data with caching to reduce Firestore reads
  * @param {string} userId - User ID
+ * @param {boolean} forceRefresh - Force cache refresh
  * @returns {Promise<object>}
  */
-const getCachedUserData = async userId => {
+const getCachedUserData = async (userId, forceRefresh = false) => {
   const cached = userDataCache.get(userId);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return cached.data;
   }
 
@@ -1994,11 +2011,12 @@ const getCachedUserData = async userId => {
 /**
  * Get user status with short-lived caching to reduce Firestore reads
  * @param {string} userId - User ID
+ * @param {boolean} forceRefresh - Force cache refresh
  * @returns {Promise<string>}
  */
-const getCachedUserStatus = async userId => {
+const getCachedUserStatus = async (userId, forceRefresh = false) => {
   const cached = userStatusCache.get(userId);
-  if (cached && Date.now() - cached.timestamp < STATUS_CACHE_DURATION) {
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < STATUS_CACHE_DURATION) {
     return cached.status;
   }
 
@@ -2011,6 +2029,92 @@ const getCachedUserStatus = async userId => {
   });
 
   return status;
+};
+
+/**
+ * Batch fetch user data for multiple users (reduces reads vs individual fetches)
+ * @param {Array<string>} userIds - Array of user IDs
+ * @returns {Promise<Map<string, object>>}
+ */
+const batchGetUserData = async userIds => {
+  const results = new Map();
+  const uncachedIds = [];
+
+  // Check cache first
+  for (const userId of userIds) {
+    const cached = userDataCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      results.set(userId, cached.data);
+    } else {
+      uncachedIds.push(userId);
+    }
+  }
+
+  // Fetch uncached users
+  if (uncachedIds.length > 0) {
+    const fetchPromises = uncachedIds.map(async userId => {
+      const userDoc = await getDoc(doc(db, "users", userId));
+      const userData = userDoc.exists()
+        ? userDoc.data()
+        : { displayName: "Unknown User", photoURL: null };
+      
+      userDataCache.set(userId, {
+        data: userData,
+        timestamp: Date.now(),
+      });
+      
+      return [userId, userData];
+    });
+
+    const fetchedData = await Promise.all(fetchPromises);
+    fetchedData.forEach(([userId, userData]) => {
+      results.set(userId, userData);
+    });
+  }
+
+  return results;
+};
+
+/**
+ * Batch fetch user status for multiple users
+ * @param {Array<string>} userIds - Array of user IDs
+ * @returns {Promise<Map<string, string>>}
+ */
+const batchGetUserStatus = async userIds => {
+  const results = new Map();
+  const uncachedIds = [];
+
+  // Check cache first
+  for (const userId of userIds) {
+    const cached = userStatusCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < STATUS_CACHE_DURATION) {
+      results.set(userId, cached.status);
+    } else {
+      uncachedIds.push(userId);
+    }
+  }
+
+  // Fetch uncached statuses
+  if (uncachedIds.length > 0) {
+    const fetchPromises = uncachedIds.map(async userId => {
+      const statusDoc = await getDoc(doc(db, "userStatus", userId));
+      const status = statusDoc.exists() ? statusDoc.data().status : "offline";
+      
+      userStatusCache.set(userId, {
+        status,
+        timestamp: Date.now(),
+      });
+      
+      return [userId, status];
+    });
+
+    const fetchedStatuses = await Promise.all(fetchPromises);
+    fetchedStatuses.forEach(([userId, status]) => {
+      results.set(userId, status);
+    });
+  }
+
+  return results;
 };
 
 /**
@@ -2044,29 +2148,30 @@ export const getFriendsList = async () => {
     }
 
     const friendUids = friendsDoc.data().list;
-    const friends = [];
 
-    // Get user data for each friend
-    for (const uid of friendUids) {
-      const userDoc = await getDoc(doc(db, "users", uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        // Also get their status
-        const statusDoc = await getDoc(doc(db, "userStatus", uid));
-        const status = statusDoc.exists() ? statusDoc.data() : { status: "offline" };
+    // Batch fetch user data and status to reduce reads
+    const [userDataMap, statusMap] = await Promise.all([
+      batchGetUserData(friendUids),
+      batchGetUserStatus(friendUids),
+    ]);
 
-        friends.push({
+    const friends = friendUids
+      .map(uid => {
+        const userData = userDataMap.get(uid);
+        if (!userData || userData.displayName === undefined) return null;
+
+        return {
           uid,
           displayName: userData.displayName,
           photoURL: userData.photoURL,
-          status: status.status,
-          customMessage: status.customMessage,
+          status: statusMap.get(uid) || "offline",
+          customMessage: userData.customMessage || "",
           owner: userData.owner || false,
           contributor: userData.contributor || false,
           verified: userData.verified || false,
-        });
-      }
-    }
+        };
+      })
+      .filter(Boolean);
 
     return { friends, error: null };
   } catch (error) {
@@ -2095,26 +2200,30 @@ export const subscribeToFriendsList = onUpdate => {
       }
 
       const friendUids = snapshot.data().list;
-      const friends = [];
 
-      // Get user data for each friend (cached to avoid N reads per snapshot)
-      for (const uid of friendUids) {
-        const userData = await getCachedUserData(uid);
-        if (userData && userData.displayName !== undefined) {
-          const status = await getCachedUserStatus(uid);
+      // Batch fetch user data and status to reduce reads
+      const [userDataMap, statusMap] = await Promise.all([
+        batchGetUserData(friendUids),
+        batchGetUserStatus(friendUids),
+      ]);
 
-          friends.push({
+      const friends = friendUids
+        .map(uid => {
+          const userData = userDataMap.get(uid);
+          if (!userData || userData.displayName === undefined) return null;
+
+          return {
             uid,
             displayName: userData.displayName,
             photoURL: userData.photoURL,
-            status,
+            status: statusMap.get(uid) || "offline",
             customMessage: userData.customMessage || "",
             owner: userData.owner || false,
             contributor: userData.contributor || false,
             verified: userData.verified || false,
-          });
-        }
-      }
+          };
+        })
+        .filter(Boolean);
 
       onUpdate(friends);
     },
@@ -2919,22 +3028,28 @@ export const subscribeToConversations = onUpdate => {
   return onSnapshot(
     q,
     async snapshot => {
-      const conversations = [];
-
-      for (const docSnap of snapshot.docs) {
+      // Extract all other user IDs first
+      const conversationData = snapshot.docs.map(docSnap => {
         const data = docSnap.data();
         const otherUserId = data.participants.find(id => id !== currentUser.uid);
+        return { docSnap, data, otherUserId };
+      });
 
-        // Use cached user data
-        const userData = await getCachedUserData(otherUserId);
+      const otherUserIds = conversationData.map(c => c.otherUserId);
 
-        // Get status (cached to avoid a read per conversation on every snapshot)
-        const status = await getCachedUserStatus(otherUserId);
+      // Batch fetch all user data and statuses at once
+      const [userDataMap, statusMap] = await Promise.all([
+        batchGetUserData(otherUserIds),
+        batchGetUserStatus(otherUserIds),
+      ]);
 
-        // Use unread counter from conversation document
+      // Build conversations array
+      const conversations = conversationData.map(({ docSnap, data, otherUserId }) => {
+        const userData = userDataMap.get(otherUserId) || { displayName: "Unknown User", photoURL: null };
+        const status = statusMap.get(otherUserId) || "offline";
         const unreadCount = data.unreadCount?.[currentUser.uid] || 0;
 
-        conversations.push({
+        return {
           id: docSnap.id,
           otherUser: {
             uid: otherUserId,
@@ -2949,8 +3064,8 @@ export const subscribeToConversations = onUpdate => {
           lastMessageSenderId: data.lastMessageSenderId,
           lastMessageAt: data.lastMessageAt?.toDate(),
           unreadCount,
-        });
-      }
+        };
+      });
 
       onUpdate(conversations);
     },
