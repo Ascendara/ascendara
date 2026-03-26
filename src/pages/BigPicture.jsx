@@ -680,7 +680,7 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
             onClick={onConfirm}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 0
-                ? "scale-105 bg-primary text-foreground shadow-lg shadow-primary/30"
+                ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30"
                 : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -691,7 +691,7 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
             onClick={onClose}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 1
-                ? "scale-105 bg-slate-600 text-foreground shadow-lg"
+                ? "scale-105 bg-slate-600 text-secondary shadow-lg"
                 : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -5138,7 +5138,7 @@ const HomeSidebar = ({
         >
           {buttons.up || "↑"}
         </span>
-        <span className="text-xs font-semibold text-white/90">
+        <span className="text-xs font-semibold text-primary">
           {t("bigPicture.navigate")}
         </span>
         <span
@@ -5633,12 +5633,24 @@ export default function BigPicture() {
       }
     };
   }, []);
+
+  // Welcome animation effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowWelcomeAnimation(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
   const [allGames, setAllGames] = useState([]);
   const [carouselGames, setCarouselGames] = useState([]);
   const [storeGames, setStoreGames] = useState([]);
   const [storeLoading, setStoreLoading] = useState(false);
   const [selectedStoreGame, setSelectedStoreGame] = useState(null);
   const [view, setView] = useState("carousel");
+  const [previousView, setPreviousView] = useState("carousel");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(true);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showExitBigPictureDialog, setShowExitBigPictureDialog] = useState(false);
   const [showControllerSettings, setShowControllerSettings] = useState(false);
@@ -6036,31 +6048,51 @@ export default function BigPicture() {
 
   // --- INSTALLED GAME DETAILS HANDLERS ---
   const handleShowInstalledGameDetails = game => {
-    setSelectedInstalledGame(game);
-    setInstalledGameView(true);
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    
+    setTimeout(() => {
+      setSelectedInstalledGame(game);
+      setInstalledGameView(true);
+      
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 200);
   };
 
   const handleCloseInstalledGameDetails = useCallback(() => {
     console.log("[CLOSE GAME DETAILS] Resetting view");
+    
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
 
-    // Use functional updates to ensure we're working with latest state
-    setInstalledGameView(prev => {
-      console.log(
-        "[CLOSE GAME DETAILS] Setting installedGameView from",
-        prev,
-        "to false"
-      );
-      return false;
-    });
-    setSelectedInstalledGame(null);
+    setTimeout(() => {
+      // Use functional updates to ensure we're working with latest state
+      setInstalledGameView(prev => {
+        console.log(
+          "[CLOSE GAME DETAILS] Setting installedGameView from",
+          prev,
+          "to false"
+        );
+        return false;
+      });
+      setSelectedInstalledGame(null);
 
-    // Reset any active sidebar state
-    setIsHomeSidebarActive(false);
-    setHomeSidebarIndex(-1);
+      // Reset any active sidebar state
+      setIsHomeSidebarActive(false);
+      setHomeSidebarIndex(-1);
 
-    // Trigger games refresh to update library after potential deletion
-    setRefreshTrigger(prev => prev + 1);
-  }, []);
+      // Trigger games refresh to update library after potential deletion
+      setRefreshTrigger(prev => prev + 1);
+      
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 200);
+  }, [isTransitioning]);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -6141,16 +6173,27 @@ export default function BigPicture() {
   }, [filteredStoreGames, storeSearchQuery]);
 
   const changeView = useCallback(newView => {
-    setCarouselIndex(0);
-    setLibraryIndex(0);
-    setStoreIndex(0);
-
-    setIsSearchBarSelected(false);
-
-    setStoreSearchQuery("");
-    setView(newView);
-    setDisplayedCount(30);
-  }, []);
+    if (newView === view || isTransitioning) return;
+    
+    setPreviousView(view);
+    setIsTransitioning(true);
+    
+    // Start transition out
+    setTimeout(() => {
+      setCarouselIndex(0);
+      setLibraryIndex(0);
+      setStoreIndex(0);
+      setIsSearchBarSelected(false);
+      setStoreSearchQuery("");
+      setView(newView);
+      setDisplayedCount(30);
+      
+      // Transition in
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 200);
+  }, [view, isTransitioning]);
 
   useEffect(() => {
     if (view !== "store") return;
@@ -6352,11 +6395,21 @@ export default function BigPicture() {
   }, [filteredStoreGames.length]);
 
   const handleSelectStoreGame = useCallback((game, index) => {
-    setIsSearchBarSelected(false);
-    setStoreIndex(index);
-    setSelectedStoreGame(game);
-    setView("details");
-  }, []);
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    
+    setTimeout(() => {
+      setIsSearchBarSelected(false);
+      setStoreIndex(index);
+      setSelectedStoreGame(game);
+      setView("details");
+      
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 200);
+  }, [isTransitioning]);
 
   // --- MAIN NAVIGATION LOGIC (SHARED BETWEEN KEYBOARD & GAMEPAD) ---
   const handleNavigation = useCallback(
@@ -6910,7 +6963,7 @@ export default function BigPicture() {
         }}
       />
 
-      {view !== "details" && (
+      {view !== "details" && !installedGameView && (
         <div
           className={`absolute left-24 top-16 z-20 transition-all duration-200 ${isMenuOpen || isKeyboardOpen ? "opacity-50 blur-sm" : ""}`}
         >
@@ -6931,7 +6984,13 @@ export default function BigPicture() {
         className={`relative flex w-full flex-1 items-center pb-16 transition-all duration-200 ${isMenuOpen ? "scale-95 opacity-50 blur-sm" : ""}`}
       >
         {view === "carousel" && (
-          <>
+          <div 
+            className={`absolute inset-0 flex w-full flex-1 items-center pb-16 transition-all duration-300 ease-out ${
+              isTransitioning 
+                ? 'opacity-0 translate-x-[-50px]' 
+                : 'opacity-100 translate-x-0'
+            }`}
+          >
             {/* Home screen sidebar navigation */}
             <HomeSidebar
               selectedIndex={isHomeSidebarActive ? homeSidebarIndex : -1}
@@ -6978,11 +7037,17 @@ export default function BigPicture() {
             </div>
             {/* Show active downloads in carousel view */}
             <ActiveDownloadsBar downloads={downloadingGames} t={t} />
-          </>
+          </div>
         )}
 
         {view === "library" && (
-          <div className="no-scrollbar h-full w-full overflow-y-auto scroll-smooth px-24 pb-8 pt-32">
+          <div 
+            className={`absolute inset-0 no-scrollbar h-full w-full overflow-y-auto scroll-smooth px-24 pb-8 pt-32 transition-all duration-300 ease-out ${
+              isTransitioning 
+                ? 'opacity-0 translate-x-[50px]' 
+                : 'opacity-100 translate-x-0'
+            }`}
+          >
             <div className="grid grid-cols-6 gap-6">
               {allGames.map((game, index) => (
                 <GameCard
@@ -7000,7 +7065,13 @@ export default function BigPicture() {
         )}
 
         {view === "store" && (
-          <div className="no-scrollbar flex h-full w-full flex-col overflow-y-auto scroll-smooth px-24 pt-28">
+          <div 
+            className={`absolute inset-0 no-scrollbar flex h-full w-full flex-col overflow-y-auto scroll-smooth px-24 pt-28 transition-all duration-300 ease-out ${
+              isTransitioning 
+                ? 'opacity-0 translate-x-[50px]' 
+                : 'opacity-100 translate-x-0'
+            }`}
+          >
             <div className="mb-4 flex-shrink-0">
               <StoreSearchBar
                 isSelected={isSearchBarSelected && !isMenuOpen && !isKeyboardOpen}
@@ -7074,9 +7145,15 @@ export default function BigPicture() {
         )}
 
         {view === "downloads" && (
-          <div className="no-scrollbar flex h-full w-full flex-col overflow-y-auto scroll-smooth px-24 pt-28">
+          <div 
+            className={`absolute inset-0 no-scrollbar h-full w-full overflow-y-auto scroll-smooth px-24 pb-8 pt-32 transition-all duration-300 ease-out ${
+              isTransitioning 
+                ? 'opacity-0 translate-x-[50px]' 
+                : 'opacity-100 translate-x-0'
+            } ${downloadingGames.length === 0 ? 'flex items-center justify-center' : ''}`}
+          >
             {downloadingGames.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center">
+              <div className="relative">
                 <div className="relative">
                   {/* Glowing background effect */}
                   <div className="absolute inset-0 -z-10 animate-pulse">
@@ -7202,12 +7279,26 @@ export default function BigPicture() {
         )}
 
         {view === "details" && selectedStoreGame && (
-          <GameDetailsView
-            game={selectedStoreGame}
-            onBack={() => {
-              setView("store");
-              setSelectedStoreGame(null);
-            }}
+          <div 
+            className={`absolute inset-0 transition-all duration-300 ease-out ${
+              isTransitioning 
+                ? 'opacity-0 scale-95' 
+                : 'opacity-100 scale-100'
+            }`}
+          >
+            <GameDetailsView
+              game={selectedStoreGame}
+              onBack={() => {
+                if (isTransitioning) return;
+                setIsTransitioning(true);
+                setTimeout(() => {
+                  setView("store");
+                  setSelectedStoreGame(null);
+                  setTimeout(() => {
+                    setIsTransitioning(false);
+                  }, 50);
+                }, 200);
+              }}
             onDownload={handleStartDownload}
             onShowProviderDialog={(game, providers) => {
               setProviderDialogGame(game);
@@ -7216,27 +7307,36 @@ export default function BigPicture() {
             }}
             t={t}
             controllerType={settings.controllerType || "xbox"}
-            dialogOpen={
-              showExitDialog ||
-              showProviderDialog ||
-              showKillDialog ||
-              providerDialogJustClosed.current
-            }
-          />
+              dialogOpen={
+                showExitDialog ||
+                showProviderDialog ||
+                showKillDialog ||
+                providerDialogJustClosed.current
+              }
+            />
+          </div>
         )}
 
         {installedGameView && selectedInstalledGame && (
-          <InstalledGameDetailsView
-            game={selectedInstalledGame}
-            onBack={handleCloseInstalledGameDetails}
+          <div 
+            className={`absolute inset-0 transition-all duration-300 ease-out ${
+              isTransitioning 
+                ? 'opacity-0 scale-95' 
+                : 'opacity-100 scale-100'
+            }`}
+          >
+            <InstalledGameDetailsView
+              game={selectedInstalledGame}
+              onBack={handleCloseInstalledGameDetails}
             t={t}
             controllerType={settings.controllerType || "xbox"}
             onChangeAssets={() => {
               setAssetSearchGame(selectedInstalledGame.game || selectedInstalledGame.name);
               setAssetSearchOpen(true);
             }}
-            assetSearchOpen={assetSearchOpen}
-          />
+              assetSearchOpen={assetSearchOpen}
+            />
+          </div>
         )}
       </div>
 
@@ -7380,6 +7480,111 @@ export default function BigPicture() {
         gameName={assetSearchGame}
         isControllerMode={true}
       />
+
+      {/* Welcome Animation Overlay */}
+      {showWelcomeAnimation && (
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-background"
+          style={{
+            animation: 'fadeOut 0.5s ease-out 1.5s forwards'
+          }}
+        >
+          <style>{`
+            @keyframes fadeOut {
+              to {
+                opacity: 0;
+                pointer-events: none;
+              }
+            }
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translateY(30px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+            @keyframes scaleIn {
+              from {
+                opacity: 0;
+                transform: scale(0.8);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+            @keyframes glow {
+              0%, 100% {
+                box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+              }
+              50% {
+                box-shadow: 0 0 40px rgba(59, 130, 246, 0.8);
+              }
+            }
+          `}</style>
+          
+          <div className="flex flex-col items-center gap-8">
+            {/* Logo/Icon with scale animation */}
+            <div 
+              className="flex h-32 w-32 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-primary/30"
+              style={{
+                animation: 'scaleIn 0.6s ease-out, glow 2s ease-in-out infinite'
+              }}
+            >
+              <Gamepad2 className="h-16 w-16 text-primary" />
+            </div>
+
+            {/* Welcome text with slide up animation */}
+            <div 
+              className="flex flex-col items-center gap-4"
+              style={{
+                animation: 'slideUp 0.6s ease-out 0.2s both'
+              }}
+            >
+              <h1 className="text-6xl font-light uppercase tracking-[0.3em] text-primary">
+                {t("bigPicture.welcome") || "Welcome"}
+              </h1>
+              <div className="flex items-center gap-3">
+                <div className="h-px w-24 bg-gradient-to-r from-transparent to-primary/50" />
+                <p className="text-xl text-muted-foreground uppercase tracking-widest">
+                  {t("bigPicture.bigPictureMode") || "Big Picture Mode"}
+                </p>
+                <div className="h-px w-24 bg-gradient-to-l from-transparent to-primary/50" />
+              </div>
+            </div>
+
+            {/* Loading indicator */}
+            <div 
+              className="flex gap-2"
+              style={{
+                animation: 'slideUp 0.6s ease-out 0.4s both'
+              }}
+            >
+              <span 
+                className="h-2 w-2 rounded-full bg-primary/70"
+                style={{
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}
+              />
+              <span 
+                className="h-2 w-2 rounded-full bg-primary/70"
+                style={{
+                  animation: 'pulse 1.5s ease-in-out 0.2s infinite'
+                }}
+              />
+              <span 
+                className="h-2 w-2 rounded-full bg-primary/70"
+                style={{
+                  animation: 'pulse 1.5s ease-in-out 0.4s infinite'
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
