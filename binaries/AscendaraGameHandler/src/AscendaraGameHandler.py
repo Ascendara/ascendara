@@ -31,6 +31,7 @@ from pypresence import Presence
 import psutil
 import shutil
 import re
+import tempfile
 
 if sys.platform == 'darwin':
     ascendara_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
@@ -92,6 +93,58 @@ def parse_linux_runner_args(args):
 def sanitize_game_slug(name):
     """Sanitize game name for use as a folder name."""
     return re.sub(r'[^\w\s\-().]', '', name).replace(' ', '_')[:100]
+
+
+def atomic_write_json(file_path, data, indent=4):
+    try:
+        # Get directory and create temp file in same directory (for atomic rename)
+        file_dir = os.path.dirname(file_path) or '.'
+        
+        # Create temp file in same directory as target (required for atomic rename)
+        fd, temp_path = tempfile.mkstemp(dir=file_dir, prefix='.tmp_', suffix='.json')
+        
+        try:
+            # Write JSON to temp file
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=indent)
+                f.flush()
+                # Force write to disk (critical for power loss protection)
+                os.fsync(f.fileno())
+            
+            # Atomic rename (replaces old file)
+            # On Windows, need to remove target first if it exists
+            if sys.platform == 'win32' and os.path.exists(file_path):
+                # Create backup in case rename fails
+                backup_path = file_path + '.bak'
+                if os.path.exists(backup_path):
+                    os.remove(backup_path)
+                os.rename(file_path, backup_path)
+                try:
+                    os.rename(temp_path, file_path)
+                    # Remove backup after successful rename
+                    if os.path.exists(backup_path):
+                        os.remove(backup_path)
+                except Exception:
+                    # Restore backup if rename failed
+                    if os.path.exists(backup_path):
+                        os.rename(backup_path, file_path)
+                    raise
+            else:
+                # On Unix, rename is atomic even if target exists
+                os.rename(temp_path, file_path)
+                
+        except Exception:
+            # Clean up temp file if something went wrong
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+            raise
+            
+    except Exception as e:
+        logging.error(f"Failed to atomically write JSON to {file_path}: {e}", exc_info=True)
+        raise
 
 
 def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
@@ -338,9 +391,8 @@ def update_play_time(file_path, is_custom_game, game_entry=None, seconds_to_add=
             actual_name = data.get('game') or data.get('name') or "Regular Game"
             logging.info(f"Updated play time for game {actual_name}: {data['playTime']} seconds")
 
-        # 4. Write file
-        with open(file_path, "w", encoding='utf-8') as f:
-            json.dump(data, f, indent=4)
+        # 4. Write file atomically
+        atomic_write_json(file_path, data, indent=4)
         
         logging.debug("Play time update saved successfully")
         logging.info(f"[EXIT] update_play_time() - Success (+{seconds_to_add} seconds)")
@@ -534,8 +586,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             data["runError"] = error
-            with open(json_file_path, "w", encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
+            atomic_write_json(json_file_path, data, indent=4)
         else:
             logging.error(error)
         return
@@ -549,8 +600,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 data["launchCount"] = 0
             data["launchCount"] += 1 if increment else -1
             data["launchCount"] = max(0, data["launchCount"])
-            with open(file_path, "w", encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
+            atomic_write_json(file_path, data, indent=4)
         except Exception as e:
             logging.error(f"Error updating launch count for {file_path}: {e}", exc_info=True)
 
@@ -560,8 +610,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         with open(json_file_path, "r", encoding='utf-8') as f:
             game_data = json.load(f)
         game_data["isRunning"] = True
-        with open(json_file_path, "w", encoding='utf-8') as f:
-            json.dump(game_data, f, indent=4)
+        atomic_write_json(json_file_path, game_data, indent=4)
     else:
         with open(games_json_path, "r", encoding='utf-8') as f:
             games_data = json.load(f)
@@ -573,8 +622,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 game["isRunning"] = True
                 logging.info(f"Incremented launch count and set isRunning for custom game: {exe_path}")
                 break
-        with open(games_json_path, "w", encoding='utf-8') as f:
-            json.dump(games_data, f, indent=4)
+        atomic_write_json(games_json_path, games_data, indent=4)
 
     try:
         with open(settings_file, "r") as f:
@@ -582,8 +630,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         if "runningGames" not in settings_data:
             settings_data["runningGames"] = {}
         settings_data["runningGames"][game_name] = exe_path
-        with open(settings_file, "w") as f:
-            json.dump(settings_data, f, indent=4)
+        atomic_write_json(settings_file, settings_data, indent=4)
         logging.info(f"Updated runningGames in {settings_file} for {game_name}")
     except Exception as e:
         logging.error(f"Error updating settings.json: {e}", exc_info=True)
@@ -619,8 +666,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     with open(json_file_path, "r", encoding='utf-8') as f:
                         data = json.load(f)
                     data["runError"] = error_msg
-                    with open(json_file_path, "w", encoding='utf-8') as f:
-                        json.dump(data, f, indent=4)
+                    atomic_write_json(json_file_path, data, indent=4)
                 return
 
         elif current_platform in ('linux', 'darwin') and is_windows_exe and not linux_runner_config:
@@ -871,8 +917,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 if game_name in settings_data['runningGames']:
                     del settings_data['runningGames'][game_name]
                     logging.info(f"Removed {game_name} from runningGames in {settings_file}")
-            with open(settings_file, 'w', encoding='utf-8') as f:
-                json.dump(settings_data, f, indent=4)
+            atomic_write_json(settings_file, settings_data, indent=4)
         except Exception as e:
             logging.error(f"Error updating settings.json on exit: {e}", exc_info=True)
 
@@ -893,15 +938,13 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     game["isRunning"] = False
                     logging.info(f"Set isRunning=False for custom game {game_name}")
                     break
-            with open(games_json_path, "w", encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
+            atomic_write_json(games_json_path, data, indent=4)
         elif json_file_path:
             with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             data["isRunning"] = False
             logging.info(f"Set isRunning=False for game {game_name}")
-            with open(json_file_path, "w", encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
+            atomic_write_json(json_file_path, data, indent=4)
 
         if is_shortcut and rpc:
             logging.info("Clearing Discord Rich Presence after game exit")
@@ -919,16 +962,14 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     game["isRunning"] = False
                     logging.info(f"Set isRunning=False for custom game {exe_path} due to exception")
                     break
-            with open(games_json_path, "w", encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
+            atomic_write_json(games_json_path, data, indent=4)
         elif json_file_path:
             update_launch_count(json_file_path, False)
             with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             data["isRunning"] = False
             logging.info(f"Set isRunning=False for game {exe_path} due to exception")
-            with open(json_file_path, "w", encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
+            atomic_write_json(json_file_path, data, indent=4)
         atexit.register(launch_crash_reporter, 1, str(e))
         logging.info(f"[EXIT] execute due to exception for game: {exe_path}")
 
