@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import GameContextMenu from "@/components/GameContextMenu";
 import {
   Sheet,
   SheetContent,
@@ -226,6 +227,21 @@ const Search = memo(() => {
   const { t } = useLanguage();
   const isFitGirlSource = settings.gameSource === "fitgirl";
   const navigate = useNavigate();
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuGame, setContextMenuGame] = useState(null);
+  const [playLaterGames, setPlayLaterGames] = useState([]);
+
+  // Load Play Later games
+  useEffect(() => {
+    const loadPlayLaterGames = () => {
+      const savedGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+      setPlayLaterGames(savedGames);
+    };
+    loadPlayLaterGames();
+    window.addEventListener("play-later-updated", loadPlayLaterGames);
+    return () => window.removeEventListener("play-later-updated", loadPlayLaterGames);
+  }, []);
 
   // Save recent searches to localStorage
   const saveRecentSearch = useCallback(query => {
@@ -741,8 +757,82 @@ const Search = memo(() => {
     }
   };
 
+  const handleStartDownload = useCallback((game) => {
+    navigate("/download", {
+      state: { 
+        gameData: game,
+        autoStart: true
+      },
+    });
+  }, [navigate]);
+
+  const handleContextMenu = useCallback((e, game) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const x = e.clientX;
+    const y = e.clientY;
+    const menuWidth = 260;
+    const menuHeight = 250;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    let adjustedX = Math.min(x, viewportWidth - menuWidth);
+    let adjustedY = y;
+    if (y + menuHeight > viewportHeight) {
+      adjustedY = Math.max(0, y - menuHeight);
+    }
+    adjustedY = Math.max(0, Math.min(adjustedY, viewportHeight - menuHeight));
+    setContextMenuPosition({ x: adjustedX, y: adjustedY });
+    setContextMenuGame(game);
+    setContextMenuOpen(true);
+  }, []);
+
+  const handleReadMore = useCallback((game) => {
+    navigate("/download", {
+      state: { gameData: game },
+    });
+  }, [navigate]);
+
+  const handlePlayLaterFromContext = useCallback((game) => {
+    const playLaterList = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+    const isInList = playLaterList.some(g => g.game === game.game);
+    
+    if (isInList) {
+      const updatedList = playLaterList.filter(g => g.game !== game.game);
+      localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+      localStorage.removeItem(`play-later-image-${game.game}`);
+    } else {
+      const gameToSave = {
+        game: game.game,
+        gameID: game.gameID,
+        imgID: game.imgID,
+        version: game.version,
+        size: game.size,
+        category: game.category,
+        dlc: game.dlc,
+        online: game.online,
+        download_links: game.download_links,
+        desc: game.desc,
+        addedAt: Date.now(),
+      };
+      playLaterList.push(gameToSave);
+      localStorage.setItem("play-later-games", JSON.stringify(playLaterList));
+    }
+    window.dispatchEvent(new CustomEvent("play-later-updated"));
+  }, []);
+
   return (
     <div className="flex flex-col bg-background">
+      <GameContextMenu
+        isOpen={contextMenuOpen}
+        onClose={() => setContextMenuOpen(false)}
+        position={contextMenuPosition}
+        game={contextMenuGame}
+        onDownload={handleDownload}
+        onStartDownload={handleStartDownload}
+        onReadMore={handleReadMore}
+        onPlayLater={handlePlayLaterFromContext}
+        isPlayLater={contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)}
+      />
       {/* Sticky Search Bar */}
       <div
         onClick={handleStickySearchClick}
@@ -1176,6 +1266,7 @@ const Search = memo(() => {
                   displayedGames={displayedGames}
                   debouncedSearchQuery={debouncedSearchQuery}
                   handleDownload={handleDownload}
+                  handleContextMenu={handleContextMenu}
                 />
                 {hasMore && (
                   <div ref={loaderRef} className="flex justify-center py-8">
@@ -1240,20 +1331,24 @@ function useWindowSize() {
 }
 
 // Memoized game card wrapper to prevent re-renders
-const MemoizedGameCard = memo(({ game, onDownload }) => (
-  <div data-game-name={game.game}>
+const MemoizedGameCard = memo(({ game, onDownload, onContextMenu }) => (
+  <div 
+    data-game-name={game.game}
+    onContextMenu={(e) => onContextMenu?.(e, game)}
+  >
     <GameCard game={game} onDownload={onDownload} />
   </div>
 ), (prevProps, nextProps) => {
   // Only re-render if the game object reference changes
-  return prevProps.game === nextProps.game && prevProps.onDownload === nextProps.onDownload;
+  return prevProps.game === nextProps.game && prevProps.onDownload === nextProps.onDownload && prevProps.onContextMenu === nextProps.onContextMenu;
 });
 
 // Memoized game grid component to prevent re-renders on search input
 const GameGrid = memo(({ 
   displayedGames, 
   debouncedSearchQuery, 
-  handleDownload
+  handleDownload,
+  handleContextMenu
 }) => {
   // Create stable callback references for each game
   const downloadCallbacks = useMemo(() => {
@@ -1276,7 +1371,8 @@ const GameGrid = memo(({
         return (
           <MemoizedGameCard 
             key={key}
-            game={game} 
+            game={game}
+            onContextMenu={handleContextMenu} 
             onDownload={downloadCallbacks.get(key)} 
           />
         );

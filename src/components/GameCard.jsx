@@ -376,7 +376,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{t("gameCard.ratingTooltip")}</p>
+                        <p className='text-secondary'>{t("gameCard.ratingTooltip")}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

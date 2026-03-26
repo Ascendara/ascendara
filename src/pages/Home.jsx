@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import RecentGameCard from "@/components/RecentGameCard";
+import GameContextMenu from "@/components/GameContextMenu";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import {
@@ -55,7 +56,7 @@ let gamesCache = null;
 let carouselGamesCache = null;
 
 // Compact Game Card for horizontal scrolling sections
-const CompactGameCard = memo(({ game, onClick }) => {
+const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
   const [imageUrl, setImageUrl] = useState(null);
   const { t } = useLanguage();
   const imageLoadedRef = useRef(false);
@@ -79,6 +80,11 @@ const CompactGameCard = memo(({ game, onClick }) => {
       className="group relative flex-shrink-0 cursor-pointer"
       style={{ width: "280px" }}
       onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onContextMenu?.(e, game);
+      }}
     >
       <div className="relative overflow-hidden rounded-xl border border-border/30 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5">
         <AspectRatio ratio={16 / 9}>
@@ -119,7 +125,7 @@ const CompactGameCard = memo(({ game, onClick }) => {
 });
 
 // Mini Game Card for category grids
-const MiniGameCard = memo(({ game, onClick }) => {
+const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
   const [imageUrl, setImageUrl] = useState(null);
   const imageLoadedRef = useRef(false);
 
@@ -141,6 +147,11 @@ const MiniGameCard = memo(({ game, onClick }) => {
     <div
       className="group/mini relative cursor-pointer overflow-hidden rounded-lg"
       onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onContextMenu?.(e, game);
+      }}
     >
       <AspectRatio ratio={16 / 9}>
         {imageUrl ? (
@@ -262,6 +273,7 @@ const HorizontalSection = ({
   icon: Icon,
   games,
   onGameClick,
+  onContextMenu,
   accentColor = "primary",
 }) => {
   const scrollRef = useRef(null);
@@ -390,6 +402,7 @@ const HorizontalSection = ({
             key={game.game}
             game={game}
             onClick={() => onGameClick(game)}
+            onContextMenu={onContextMenu}
           />
         ))}
       </div>
@@ -428,6 +441,90 @@ const Home = memo(() => {
   });
   const longPressTimer = useRef(null);
   const [isLongPressing, setIsLongPressing] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuGame, setContextMenuGame] = useState(null);
+  const [playLaterGames, setPlayLaterGames] = useState([]);
+
+  // Load Play Later games
+  useEffect(() => {
+    const loadPlayLaterGames = () => {
+      const savedGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+      setPlayLaterGames(savedGames);
+    };
+    loadPlayLaterGames();
+    window.addEventListener("play-later-updated", loadPlayLaterGames);
+    return () => window.removeEventListener("play-later-updated", loadPlayLaterGames);
+  }, []);
+
+  const handleContextMenu = useCallback((e, game) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const x = e.clientX;
+    const y = e.clientY;
+    const menuWidth = 260;
+    const menuHeight = 250;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    let adjustedX = Math.min(x, viewportWidth - menuWidth);
+    let adjustedY = y;
+    if (y + menuHeight > viewportHeight) {
+      adjustedY = Math.max(0, y - menuHeight);
+    }
+    adjustedY = Math.max(0, Math.min(adjustedY, viewportHeight - menuHeight));
+    setContextMenuPosition({ x: adjustedX, y: adjustedY });
+    setContextMenuGame(game);
+    setContextMenuOpen(true);
+  }, []);
+
+  const handleDownloadFromContext = useCallback((game) => {
+    navigate("/download", {
+      state: { gameData: game },
+    });
+  }, [navigate]);
+
+  const handleStartDownload = useCallback((game) => {
+    navigate("/download", {
+      state: { 
+        gameData: game,
+        autoStart: true
+      },
+    });
+  }, [navigate]);
+
+  const handleReadMore = useCallback((game) => {
+    navigate("/download", {
+      state: { gameData: game },
+    });
+  }, [navigate]);
+
+  const handlePlayLaterFromContext = useCallback((game) => {
+    const playLaterList = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+    const isInList = playLaterList.some(g => g.game === game.game);
+    
+    if (isInList) {
+      const updatedList = playLaterList.filter(g => g.game !== game.game);
+      localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+      localStorage.removeItem(`play-later-image-${game.game}`);
+    } else {
+      const gameToSave = {
+        game: game.game,
+        gameID: game.gameID,
+        imgID: game.imgID,
+        version: game.version,
+        size: game.size,
+        category: game.category,
+        dlc: game.dlc,
+        online: game.online,
+        download_links: game.download_links,
+        desc: game.desc,
+        addedAt: Date.now(),
+      };
+      playLaterList.push(gameToSave);
+      localStorage.setItem("play-later-games", JSON.stringify(playLaterList));
+    }
+    window.dispatchEvent(new CustomEvent("play-later-updated"));
+  }, []);
 
   useEffect(() => {
     const loadGames = async (forceRefresh = false) => {
@@ -959,6 +1056,17 @@ const Home = memo(() => {
   return (
     <div className="min-h-screen bg-background">
       {showTour && <Tour onClose={handleCloseTour} />}
+      <GameContextMenu
+        isOpen={contextMenuOpen}
+        onClose={() => setContextMenuOpen(false)}
+        position={contextMenuPosition}
+        game={contextMenuGame}
+        onDownload={handleDownloadFromContext}
+        onStartDownload={handleStartDownload}
+        onReadMore={handleReadMore}
+        onPlayLater={handlePlayLaterFromContext}
+        isPlayLater={contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)}
+      />
 
       <div className="px-6 py-6">
         {/* Hero Section - Split Layout */}
@@ -1395,6 +1503,7 @@ const Home = memo(() => {
             icon={TrendingUp}
             games={topGames}
             onGameClick={handleCarouselGameClick}
+            onContextMenu={handleContextMenu}
           />
         )}
 
@@ -1406,6 +1515,7 @@ const Home = memo(() => {
               icon={RefreshCw}
               games={recentlyUpdatedGames}
               onGameClick={handleCarouselGameClick}
+              onContextMenu={handleContextMenu}
             />
           </div>
         )}
@@ -1418,6 +1528,7 @@ const Home = memo(() => {
               icon={Globe}
               games={onlineGames}
               onGameClick={handleCarouselGameClick}
+              onContextMenu={handleContextMenu}
             />
           </div>
         )}
@@ -1430,6 +1541,7 @@ const Home = memo(() => {
               icon={Zap}
               games={actionGames}
               onGameClick={handleCarouselGameClick}
+              onContextMenu={handleContextMenu}
             />
           </div>
         )}
@@ -1472,6 +1584,7 @@ const Home = memo(() => {
                           key={game.game}
                           game={game}
                           onClick={() => handleCarouselGameClick(game)}
+                          onContextMenu={handleContextMenu}
                         />
                       ))}
                     </div>

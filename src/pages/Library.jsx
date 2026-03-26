@@ -49,6 +49,8 @@ import {
   Play,
   Trash2,
   Sparkles,
+  MessageSquareText,
+  TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -2646,9 +2648,6 @@ const InstalledGameCard = memo(
                       </div>
                     </button>
                     
-                    {/* Divider before remove/delete option */}
-                    <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-                    
                     {game.isCustom ? (
                       <button
                         onClick={handleRemoveGame}
@@ -2680,6 +2679,49 @@ const InstalledGameCard = memo(
                         </div>
                       </button>
                     )}
+                    
+                    {/* Divider between game actions and default options */}
+                    <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                    
+                    {/* Report Issue */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsReportOpen(true);
+                        setContextMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                        <TriangleAlert className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{t("common.reportIssue")}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("common.contextMenu.reportIssueDescription")}
+                        </div>
+                      </div>
+                    </button>
+                    
+                    {/* Give Feedback */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.electron.openURL("https://ascendara.app/feedback");
+                        setContextMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                        <MessageSquareText className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{t("common.giveFeedback")}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("common.contextMenu.shareFeedbackDescription")}
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 </div>
               </div>

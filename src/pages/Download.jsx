@@ -496,6 +496,42 @@ export default function DownloadPage() {
     setIsPlayLater(isInList);
   }, [gameData?.game]);
 
+  // Track if autoStart has been processed
+  const autoStartProcessed = useRef(false);
+
+  // Handle autoStart for seamless downloads
+  useEffect(() => {
+    const startSeamlessDownload = async () => {
+      if (state?.autoStart && gameData?.download_links && !isStartingDownload && !autoStartProcessed.current) {
+        const seamlessHosts = ["gofile", "buzzheavier", "pixeldrain"];
+        const availableHosts = Object.keys(gameData.download_links);
+        const seamlessHost = availableHosts.find(host => seamlessHosts.includes(host));
+        
+        if (seamlessHost) {
+          console.log("[AutoStart] Starting download with seamless host:", seamlessHost);
+          autoStartProcessed.current = true;
+          
+          // Set the provider in state for UI display
+          setSelectedProvider(seamlessHost);
+          
+          // Get the download link for this provider
+          const downloadLink = gameData.download_links[seamlessHost]?.[0];
+          if (downloadLink) {
+            console.log("[AutoStart] Provider set, waiting for state update before calling whereToDownload");
+            // Wait a bit for the state to update before calling whereToDownload
+            // This ensures handleDownload will see the correct selectedProvider
+            await new Promise(resolve => setTimeout(resolve, 200));
+            console.log("[AutoStart] Calling whereToDownload with link:", downloadLink);
+            // Call whereToDownload which will handle the download flow
+            await whereToDownload(downloadLink);
+          }
+        }
+      }
+    };
+    
+    startSeamlessDownload();
+  }, [state?.autoStart, gameData?.download_links, isStartingDownload]);
+
   // Handle Play Later Click
   const handlePlayLater = () => {
     const playLaterGames = JSON.parse(localStorage.getItem("play-later-games") || "[]");
