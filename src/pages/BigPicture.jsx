@@ -4773,7 +4773,7 @@ const FloatingContextMenu = ({ game, position, t }) => {
 
   return (
     <div 
-      className="pointer-events-none fixed z-50 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="pointer-events-none absolute z-50 animate-in fade-in slide-in-from-bottom-4 duration-300"
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -6245,6 +6245,11 @@ export default function BigPicture() {
         const selectedCard = cardElements[storeIndex];
         if (selectedCard) {
           const rect = selectedCard.getBoundingClientRect();
+          
+          // Get the scrollable container to account for scroll offset
+          const scrollContainer = selectedCard.closest('.overflow-y-auto');
+          const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+          
           // Position to the right of the card, or left if too close to right edge
           const spaceOnRight = window.innerWidth - rect.right;
           const menuWidth = 420;
@@ -6259,11 +6264,11 @@ export default function BigPicture() {
             x = rect.left - menuWidth - 20;
           }
           
-          // Center vertically on the card
-          y = rect.top + (rect.height / 2) - (menuHeight / 2);
+          // Center vertically on the card, accounting for scroll position
+          y = rect.top + scrollTop + (rect.height / 2) - (menuHeight / 2);
           
-          // Keep within viewport bounds
-          y = Math.max(20, Math.min(y, window.innerHeight - menuHeight - 20));
+          // Keep within reasonable bounds (relative to document, not viewport)
+          y = Math.max(scrollTop + 20, y);
           x = Math.max(20, Math.min(x, window.innerWidth - menuWidth - 20));
           
           setContextMenuPosition({ x, y });
