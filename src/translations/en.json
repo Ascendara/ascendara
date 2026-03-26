@@ -1892,7 +1892,11 @@
     "waitingForCookieShort": "Waiting for cookie...",
     "whatThisDoes": "What does this do?",
     "whatThisDoesDescription": "The local index stores game data on your device for faster browsing and offline access. Refreshing updates the index with the latest games from SteamRIP.",
-    "workerCount": "Worker Threads"
+    "workerCount": "Worker Threads",
+    "firstTimeSetup": "First-Time Setup: Build Your Game Index",
+    "setupCompleteMessage": "Index ready! Click Continue to proceed with setup.",
+    "setupInProgressMessage": "Download or build your game index to continue setup.",
+    "continueSetup": "Continue Setup"
   },
   "miniPlayer": {
     "close": "Close",

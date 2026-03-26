@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
+  ArrowRight,
   FolderOpen,
   Folder,
   Settings2,
@@ -773,6 +774,45 @@ const LocalRefresh = () => {
   return (
     <div className={`${welcomeStep ? "mt-0 pt-10" : "mt-6"} min-h-screen bg-background`}>
       <div className="container mx-auto max-w-5xl px-4 py-8">
+        {/* First-time Setup Banner */}
+        {welcomeStep && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 overflow-hidden rounded-lg border-2 border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5"
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+                    <Database className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">
+                      {t("localRefresh.firstTimeSetup") || "First-Time Setup: Build Your Game Index"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {refreshStatus === "completed" || hasIndexBefore
+                        ? t("localRefresh.setupCompleteMessage") || "Index ready! Click Continue to proceed with setup."
+                        : t("localRefresh.setupInProgressMessage") || "Download or build your game index to continue setup."}
+                    </p>
+                  </div>
+                </div>
+                {(refreshStatus === "completed" || hasIndexBefore) && (
+                  <Button
+                    size="lg"
+                    onClick={handleBack}
+                    className="shrink-0 gap-2 text-secondary"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    {t("localRefresh.continueSetup") || "Continue Setup"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Header */}
         <div className="mb-8">
           <Button
