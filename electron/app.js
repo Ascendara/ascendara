@@ -323,6 +323,9 @@ async function initializeApp() {
 
   // App ready handler
   app.whenReady().then(async () => {
+    // Reset quitting flag on app start
+    app.isQuitting = false;
+
     // Start local HTTP server in production to serve app from localhost
     // This allows Firebase auth to work since 'localhost' can be added to authorized domains
     if (!isDev) {
