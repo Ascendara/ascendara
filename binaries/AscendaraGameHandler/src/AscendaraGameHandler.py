@@ -450,14 +450,59 @@ def run_ludusavi_backup(game_name):
             logging.error(f"Ludusavi executable not found at: {ludusavi_path}")
             logging.info("[EXIT] run_ludusavi_backup() - No executable")
             return False
+
+        # Use ludusavi redirects
+
+        # 1. Find AppData folder
+        if sys.platform == 'darwin':
+            app_data_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
+        elif sys.platform == 'linux':
+            app_data_dir = os.path.join(os.path.expanduser('~/.config/ascendara'))
+        else:
+            appdata = os.environ.get('APPDATA', '')
+            prod_dir = os.path.join(appdata, 'ascendara')
+            dev_dir = os.path.join(appdata, 'Electron')
+            app_data_dir = prod_dir if os.path.exists(prod_dir) else dev_dir
+
+        ludusavi_config_dir = os.path.join(app_data_dir, 'ludusavi-cloud-config')
+        config_file_path = os.path.join(ludusavi_config_dir, "config.yaml")
+
+        # 2. Create config.yaml if it doesn't exist
+        if not os.path.exists(config_file_path):
+            os.makedirs(ludusavi_config_dir, exist_ok=True)
+            local_user_dir = os.path.expanduser('~')
+            cloud_user_dir = "C:\\Users\\ascendara_user" if sys.platform == 'win32' else "/home/ascendara_user"
+            
+            local_user_escaped = local_user_dir.replace('\\', '\\\\')
+            cloud_user_escaped = cloud_user_dir.replace('\\', '\\\\')
+            
+            yaml_content = f"""redirects:
+  - kind: bidirectional
+    source: "{local_user_escaped}"
+    target: "{cloud_user_escaped}"
+"""
+            with open(config_file_path, "w", encoding="utf-8") as f:
+                f.write(yaml_content)
+            logging.info(f"Created new Ludusavi config with redirects at: {config_file_path}")
+
+
         backup_location = ludusavi_settings.get('backupLocation')
         backup_format = ludusavi_settings.get('backupFormat', 'zip')
         backups_to_keep = ludusavi_settings.get('backupOptions', {}).get('backupsToKeep', 5)
         compression_level = ludusavi_settings.get('backupOptions', {}).get('compressionLevel', 'default')
         if compression_level == 'default':
             compression_level = 'deflate'
+            
+        # 3. Build the command with global options before "backup" (ludusavi doc)
         cmd = [
             ludusavi_path,
+            "--config", ludusavi_config_dir
+        ]
+
+        if ludusavi_settings.get('backupOptions', {}).get('skipManifestCheck', False):
+            cmd.append("--no-manifest-update")
+            
+        cmd.extend([
             "backup",
             game_name,
             "--path", backup_location,
@@ -465,10 +510,8 @@ def run_ludusavi_backup(game_name):
             "--full-limit", str(backups_to_keep),
             "--compression", compression_level,
             "--force"
-        ]
+        ])
 
-        if ludusavi_settings.get('backupOptions', {}).get('skipManifestCheck', False):
-            cmd.append("--no-manifest-update")
         logging.info(f"Running Ludusavi backup for {game_name} with command: {' '.join(cmd)}")
         # Define flag to hide the window (Windows only)
         creationflags = 0
