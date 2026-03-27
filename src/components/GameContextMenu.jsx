@@ -96,7 +96,7 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-medium">{t("gameCard.downloadNow") || "Download Now"}</span>
+                        <span className="font-medium text-foreground">{t("gameCard.downloadNow") || "Download Now"}</span>
                         <Zap className="h-3 w-3 fill-primary text-primary" />
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -116,10 +116,10 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
                     whileTap={{ scale: 0.98 }}
                   >
                     <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                      <Info className="h-4 w-4" />
+                      <Info className="h-4 w-4 text-foreground" />
                     </div>
                     <div className="flex-1">
-                      <div className="font-medium">{t("gameCard.readMore") || "Read More"}</div>
+                      <div className="font-medium text-foreground">{t("gameCard.readMore") || "Read More"}</div>
                       <div className="text-xs text-muted-foreground">
                         {t("gameCard.readMoreDescription") || "View game details"}
                       </div>
@@ -141,7 +141,7 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
                     <Info className="h-4 w-4 text-primary" />
                   </div>
                   <div className="flex-1">
-                    <div className="font-medium">{t("gameCard.viewDetails") || "View Details"}</div>
+                    <div className="font-medium text-foreground">{t("gameCard.viewDetails") || "View Details"}</div>
                     <div className="text-xs text-muted-foreground">
                       {t("gameCard.readMoreDescription") || "View game details"}
                     </div>
@@ -165,11 +165,11 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
                   {isPlayLater ? (
                     <Check className="h-4 w-4 text-primary" />
                   ) : (
-                    <Clock className="h-4 w-4" />
+                    <Clock className="h-4 w-4 text-foreground" />
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium">
+                  <div className="font-medium text-foreground">
                     {isPlayLater 
                       ? (t("gameCard.removeFromPlayLater") || "Remove from Play Later")
                       : (t("gameCard.addToPlayLater") || "Add to Play Later")
@@ -199,10 +199,10 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
                 whileTap={{ scale: 0.98 }}
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                  <TriangleAlert className="h-4 w-4" />
+                  <TriangleAlert className="h-4 w-4  text-foreground" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium">{t("common.reportIssue") || "Report Issue"}</div>
+                  <div className="font-medium  text-foreground">{t("common.reportIssue") || "Report Issue"}</div>
                   <div className="text-xs text-muted-foreground">
                     {t("common.contextMenu.reportIssueDescription") || "Report a problem"}
                   </div>
@@ -221,10 +221,10 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
                 whileTap={{ scale: 0.98 }}
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                  <MessageSquareText className="h-4 w-4" />
+                  <MessageSquareText className="h-4 w-4  text-foreground" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium">{t("common.giveFeedback") || "Give Feedback"}</div>
+                  <div className="font-medium  text-foreground">{t("common.giveFeedback") || "Give Feedback"}</div>
                   <div className="text-xs text-muted-foreground">
                     {t("common.contextMenu.shareFeedbackDescription") || "Share your thoughts"}
                   </div>

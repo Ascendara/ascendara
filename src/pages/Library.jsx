@@ -2625,7 +2625,7 @@ const InstalledGameCard = memo(
                           <Play className="h-4 w-4 text-primary" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">{t("common.contextMenu.playGame")}</div>
+                          <div className="font-medium text-foreground">{t("common.contextMenu.playGame")}</div>
                           <div className="text-xs text-muted-foreground">
                             {t("common.contextMenu.playGameDescription")}
                           </div>
@@ -2638,10 +2638,10 @@ const InstalledGameCard = memo(
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
                     >
                       <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                        <FolderOpen className="h-4 w-4" />
+                        <FolderOpen className="h-4 w-4 text-foreground" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-medium">{t("common.contextMenu.openDirectory")}</div>
+                        <div className="font-medium text-foreground">{t("common.contextMenu.openDirectory")}</div>
                         <div className="text-xs text-muted-foreground">
                           {t("common.contextMenu.openDirectoryDescription")}
                         </div>
@@ -2654,10 +2654,10 @@ const InstalledGameCard = memo(
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
                       >
                         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-foreground" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">{t("common.contextMenu.removeGame")}</div>
+                          <div className="font-medium text-foreground">{t("common.contextMenu.removeGame")}</div>
                           <div className="text-xs text-muted-foreground">
                             {t("common.contextMenu.removeGameDescription")}
                           </div>
@@ -2669,10 +2669,10 @@ const InstalledGameCard = memo(
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
                       >
                         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-foreground" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">{t("common.contextMenu.deleteGame")}</div>
+                          <div className="font-medium text-foreground">{t("common.contextMenu.deleteGame")}</div>
                           <div className="text-xs text-muted-foreground">
                             {t("common.contextMenu.deleteGameDescription")}
                           </div>
@@ -2693,10 +2693,10 @@ const InstalledGameCard = memo(
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
                     >
                       <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                        <TriangleAlert className="h-4 w-4" />
+                        <TriangleAlert className="h-4 w-4 text-foreground" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-medium">{t("common.reportIssue")}</div>
+                        <div className="font-medium text-foreground">{t("common.reportIssue")}</div>
                         <div className="text-xs text-muted-foreground">
                           {t("common.contextMenu.reportIssueDescription")}
                         </div>
@@ -2713,10 +2713,10 @@ const InstalledGameCard = memo(
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
                     >
                       <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                        <MessageSquareText className="h-4 w-4" />
+                        <MessageSquareText className="h-4 w-4 text-foreground" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-medium">{t("common.giveFeedback")}</div>
+                        <div className="font-medium text-foreground">{t("common.giveFeedback")}</div>
                         <div className="text-xs text-muted-foreground">
                           {t("common.contextMenu.shareFeedbackDescription")}
                         </div>
