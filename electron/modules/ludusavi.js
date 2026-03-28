@@ -5,6 +5,7 @@
 
 const fs = require("fs-extra");
 const path = require("path");
+const os = require("os");
 const { spawn } = require("child_process");
 const { ipcMain, app } = require("electron");
 const { isDev, isWindows, appDirectory } = require("./config");
@@ -29,8 +30,31 @@ function registerLudusaviHandlers() {
         if (!fs.existsSync(ludusaviPath)) {
           return { success: false, error: "Ludusavi executable not found" };
         }
+        
+        // Using ludusavi redirects
+
+        // 1. Define users
+        const localUserDir = os.homedir();
+        const cloudUserDir = "C:\\Users\\ascendara_user"; // Universal user
+
+        // 2. Create a folder in the AppData folder to put the config file in it
+        const ludusaviConfigDir = path.join(app.getPath("userData"), "ludusavi-cloud-config");
+        fs.ensureDirSync(ludusaviConfigDir);
+
+        // 3. Create config.yaml content
+        const configYamlContent = `
+redirects:
+  - kind: bidirectional
+    source: "${localUserDir.replace(/\\/g, '\\\\')}"
+    target: "${cloudUserDir.replace(/\\/g, '\\\\')}"
+`.trim();
+
+        // 4. Write file
+        const configFilePath = path.join(ludusaviConfigDir, "config.yaml");
+        fs.writeFileSync(configFilePath, configYamlContent, "utf8");
 
         let args = [];
+        args.push("--config", ludusaviConfigDir);
 
         switch (action) {
           case "backup":
@@ -68,7 +92,7 @@ function registerLudusaviHandlers() {
             break;
 
           case "restore":
-            args = ["restore"];
+            args.push("restore");
             if (game) args.push(game);
             args.push("--force");
 
@@ -88,7 +112,7 @@ function registerLudusaviHandlers() {
             break;
 
           case "list-backups":
-            args = ["backups"];
+            args.push("backups");
             if (game) args.push(game);
 
             if (ludusaviSettings.backupLocation) {
@@ -99,7 +123,7 @@ function registerLudusaviHandlers() {
             break;
 
           case "find-game":
-            args = ["find"];
+            args.push("find");
             if (game) args.push(game);
             args.push("--multiple");
             args.push("--api");
