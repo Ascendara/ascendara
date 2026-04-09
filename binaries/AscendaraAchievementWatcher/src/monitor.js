@@ -39,12 +39,46 @@ const files = {
   ],
 };
 
+// Helper function to check if directory exists and has achievement files
+async function dirHasAchievementFiles(dirPath) {
+  try {
+    await fs.access(dirPath);
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    
+    // Check if any achievement files exist in this directory
+    for (const file of files.achievement) {
+      if (entries.some(e => e.isFile() && e.name === file)) {
+        return true;
+      }
+    }
+    
+    // Check subdirectories (but only 1 level deep to avoid excessive scanning)
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        try {
+          const subEntries = await fs.readdir(path.join(dirPath, entry.name));
+          for (const file of files.achievement) {
+            if (subEntries.includes(file)) {
+              return true;
+            }
+          }
+        } catch (e) {
+          // Skip inaccessible subdirectories
+        }
+      }
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 module.exports.getFolders = async userDir_file => {
   let steamEmu = [];
 
   // --- WINDOWS PATHS ---
   if (process.platform === 'win32') {
-    steamEmu = [
+    const potentialDirs = [
       {
         dir: path.join(process.env["Public"], "Documents/Steam/CODEX"),
         options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
@@ -59,7 +93,7 @@ module.exports.getFolders = async userDir_file => {
           recursive: true,
           filter: /([0-9]+)/,
           file: [files.achievement[1], files.achievement[0]],
-        }, //keeping "achievements.ini" [0] for backward compatibility with custom goldberg emu build
+        },
       },
       {
         dir: path.join(process.env["APPDATA"], "GSE Saves"),
@@ -67,7 +101,7 @@ module.exports.getFolders = async userDir_file => {
           recursive: true,
           filter: /([0-9]+)/,
           file: [files.achievement[2]],
-        }, //idk js ctrl c + ctrl v and change folder name, pls dont die me
+        },
       },
       {
         dir: path.join(process.env["APPDATA"], "EMPRESS"),
@@ -106,7 +140,6 @@ module.exports.getFolders = async userDir_file => {
           filter: /([0-9]+)\\stats/,
           file: [files.achievement[0], files.achievement[1]],
         },
-        //3DM doesn't need override (disableCheckIfProcessIsRunning,disableCheckTimestamp) ...
       },
       {
         dir: path.join(process.env["LOCALAPPDATA"], "SKIDROW"),
@@ -117,6 +150,16 @@ module.exports.getFolders = async userDir_file => {
         options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[7]] },
       },
     ];
+    
+    // Filter to only include directories that exist and have achievement files
+    for (const dirConfig of potentialDirs) {
+      try {
+        await fs.access(dirConfig.dir);
+        steamEmu.push(dirConfig);
+      } catch (e) {
+        // Directory doesn't exist, skip it
+      }
+    }
   }
 
 

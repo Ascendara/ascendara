@@ -18,6 +18,27 @@ const homeDir = process.env.USERPROFILE || process.env.HOME || require("os").hom
 const timestampFilePath = path.join(homeDir, "timestamp.ascendara.json");
 let watchdogRunning = false;
 
+// Resource optimization constants
+const MAX_WATCHERS = 50; // Limit total number of file watchers
+const MAX_CACHE_SIZE = 20; // Limit number of cached game schemas
+const FILE_EVENT_DEBOUNCE_MS = 500; // Debounce file events
+const CACHE_CLEANUP_INTERVAL_MS = 300000; // Clean cache every 5 minutes
+
+// Debounce tracking
+const fileEventTimers = new Map();
+
+// Performance monitoring
+function logMemoryUsage() {
+  const usage = process.memoryUsage();
+  const formatMB = (bytes) => (bytes / 1024 / 1024).toFixed(2);
+  console.log(`Memory Usage: RSS=${formatMB(usage.rss)}MB, Heap=${formatMB(usage.heapUsed)}/${formatMB(usage.heapTotal)}MB`);
+  
+  // Warn if memory usage is excessive
+  if (usage.heapUsed > 500 * 1024 * 1024) { // 500MB
+    console.warn(`WARNING: High memory usage detected: ${formatMB(usage.heapUsed)}MB`);
+  }
+}
+
 async function updateWatchdogStatus(running) {
   watchdogRunning = running;
   let payload = {};
@@ -117,25 +138,44 @@ var app = {
       self.cache = [];
       console.log("Achievement Watchdog starting ...");
 
-      // Build game directory list from settings
+      // Build game directory list from settings - only scan for emulator configs
       const settings = await getSettings();
       const downloadDir = settings.downloadDirectory;
       const gameDirList = [];
 
       if (downloadDir) {
         try {
-          // Scan download directory for game folders
+          // Only add game folders that have emulator config files
           const gameFolders = await fs.readdir(downloadDir, { withFileTypes: true });
+          const emuConfigFiles = [
+            "ALI213.ini", "valve.ini", "hlm.ini", "ds.ini",
+            "steam_api.ini", "SteamConfig.ini"
+          ];
+          
           for (const dirent of gameFolders) {
             if (dirent.isDirectory()) {
               const gameFolderPath = path.join(downloadDir, dirent.name);
-              gameDirList.push({
-                path: gameFolderPath,
-                notify: true,
-              });
+              // Check if this folder has any emulator config
+              let hasEmuConfig = false;
+              for (const configFile of emuConfigFiles) {
+                try {
+                  await fs.access(path.join(gameFolderPath, configFile));
+                  hasEmuConfig = true;
+                  break;
+                } catch (e) {
+                  // Config file doesn't exist, continue
+                }
+              }
+              
+              if (hasEmuConfig) {
+                gameDirList.push({
+                  path: gameFolderPath,
+                  notify: true,
+                });
+              }
             }
           }
-          console.log(`Found ${gameDirList.length} game directories to monitor`);
+          console.log(`Found ${gameDirList.length} game directories with emulator configs`);
         } catch (err) {
           console.warn("Failed to scan download directory:", err);
         }
@@ -149,23 +189,36 @@ var app = {
       await fs.writeFile(tempFile, JSON.stringify(gameDirList), "utf8");
 
       const folders = await monitor.getFolders(tempFile);
-      console.log(`monitor.getFolders() returned:`, folders);
-      let i = 1;
-      for (let folder of folders) {
+      console.log(`monitor.getFolders() returned ${folders.length} folders`);
+      
+      // Limit total watchers
+      const foldersToWatch = folders.slice(0, MAX_WATCHERS);
+      if (folders.length > MAX_WATCHERS) {
+        console.warn(`Limiting watchers to ${MAX_WATCHERS} (found ${folders.length} potential folders)`);
+      }
+      
+      let watcherCount = 0;
+      for (let folder of foldersToWatch) {
         try {
-          try {
-            await fs.access(folder.dir);
-            // If no error, folder exists
-            self.watch(i, folder.dir, folder.options);
-            i = i + 1;
-          } catch (err) {
-            // Folder does not exist, skip
-          }
-          i = i + 1;
+          await fs.access(folder.dir);
+          // If no error, folder exists
+          self.watch(watcherCount, folder.dir, folder.options);
+          watcherCount++;
         } catch (err) {
-          console.log(err);
+          // Folder does not exist, skip
         }
       }
+      
+      console.log(`Started ${watcherCount} file watchers`);
+      
+      // Start cache cleanup interval
+      setInterval(() => {
+        if (self.cache.length > MAX_CACHE_SIZE) {
+          console.log(`Cleaning cache (size: ${self.cache.length})`);
+          self.cache = self.cache.slice(-MAX_CACHE_SIZE);
+        }
+      }, CACHE_CLEANUP_INTERVAL_MS);
+      
     } catch (err) {
       console.log(err);
       instance.unlock();
@@ -201,219 +254,389 @@ var app = {
             return;
           }
 
-          const currentTime = Date.now();
-          const fileLastModified = (await fs.stat(name)).mtimeMs || 0;
-          console.log(
-            `File last modified: ${fileLastModified}, current time: ${currentTime}, difference: ${currentTime - fileLastModified}ms`
-          );
-          if (currentTime - fileLastModified > 1000) {
-            console.log(`Skipping event: file modified more than 1s ago.`);
-            return;
+          // Debounce file events to prevent excessive processing
+          const debounceKey = `${dir}:${name}`;
+          if (fileEventTimers.has(debounceKey)) {
+            clearTimeout(fileEventTimers.get(debounceKey));
           }
+          
+          const timerId = setTimeout(async () => {
+            fileEventTimers.delete(debounceKey);
+            await processFileEvent(name, options, self);
+          }, FILE_EVENT_DEBOUNCE_MS);
+          
+          fileEventTimers.set(debounceKey, timerId);
+        } catch (err) {
+          console.warn(err);
+        }
+      }
+    );
+  },
+};
 
-          let filePath = path.parse(name);
-          console.log(`Checking if file is in watch list: ${filePath.base}`);
-          if (!options.file.some(file => file == filePath.base)) {
-            console.log(`File ${filePath.base} not in options.file, skipping.`);
-            return;
-          }
+// Extracted file event processing logic
+async function processFileEvent(name, options, self) {
+  try {
+    const currentTime = Date.now();
+    const fileLastModified = (await fs.stat(name)).mtimeMs || 0;
+    console.log(
+      `File last modified: ${fileLastModified}, current time: ${currentTime}, difference: ${currentTime - fileLastModified}ms`
+    );
+    if (currentTime - fileLastModified > 1000) {
+      console.log(`Skipping event: file modified more than 1s ago.`);
+      return;
+    }
 
-          console.log(`Achievement file change detected: ${name}`);
+    let filePath = path.parse(name);
+    console.log(`Checking if file is in watch list: ${filePath.base}`);
+    if (!options.file.some(file => file == filePath.base)) {
+      console.log(`File ${filePath.base} not in options.file, skipping.`);
+      return;
+    }
 
-          if (
-            moment().diff(moment(self.tick)) <= self.options.notification_advanced.tick
-          ) {
-            console.log(`Spamming protection active, skipping notification.`);
-            throw "Spamming protection is enabled > SKIPPING";
-          }
-          self.tick = moment().valueOf();
+    console.log(`Achievement file change detected: ${name}`);
 
-          let appID;
-          try {
-            if (options.appid) {
-              appID = options.appid;
-            } else {
-              // Try to extract appID for OnlineFix: .../OnlineFix/<AppID>/Stats/Achievements.ini
-              const parts = filePath.dir.split(path.sep);
-              const onlineFixIdx = parts.findIndex(p => p.toLowerCase() === "onlinefix");
-              if (onlineFixIdx !== -1 && parts.length > onlineFixIdx + 1) {
-                appID = parts[onlineFixIdx + 1];
-              } else {
-                // Fallback to original logic for other emus
-                appID = filePath.dir
-                  .replace(/(\\stats$)|(\\SteamEmu$)|(\\SteamEmu\\UserStats$)/gi, "")
-                  .match(/([0-9]+$)/g)[0];
-              }
-            }
-            console.log(`Detected appID: ${appID}`);
-          } catch (err) {
-            console.log(`Failed to extract appID from path: ${filePath.dir}`);
-            throw "Unable to find game's appID";
-          }
+    if (
+      moment().diff(moment(self.tick)) <= self.options.notification_advanced.tick
+    ) {
+      console.log(`Spamming protection active, skipping notification.`);
+      throw "Spamming protection is enabled > SKIPPING";
+    }
+    self.tick = moment().valueOf();
 
-          let game = await self.load(appID);
+    let appID;
+    try {
+      if (options.appid) {
+        appID = options.appid;
+      } else {
+        const parts = filePath.dir.split(path.sep);
+        const onlineFixIdx = parts.findIndex(p => p.toLowerCase() === "onlinefix");
+        if (onlineFixIdx !== -1 && parts.length > onlineFixIdx + 1) {
+          appID = parts[onlineFixIdx + 1];
+        } else {
+          appID = filePath.dir
+            .replace(/(\\stats$)|(\\SteamEmu$)|(\\SteamEmu\\UserStats$)/gi, "")
+            .match(/([0-9]+$)/g)[0];
+        }
+      }
+      console.log(`Detected appID: ${appID}`);
+    } catch (err) {
+      console.log(`Failed to extract appID from path: ${filePath.dir}`);
+      throw "Unable to find game's appID";
+    }
 
-          let isRunning = false;
+    let game = await self.load(appID);
 
-          if (options.disableCheckIfProcessIsRunning === true) {
-            isRunning = true;
-          } else if (self.options.notification_advanced.checkIfProcessIsRunning) {
-            if (await isFullscreenAppRunning()) {
-              isRunning = true;
-              console.log(
-                "Fullscreen application detected on primary display. Assuming process is running"
-              );
-            } else if (game.binary) {
-              isRunning = await tasklist.isProcessRunning(game.binary).catch(err => {
-                console.error(err);
-                console.warn("Assuming process is NOT running");
-                return false;
+    let isRunning = false;
+
+    if (options.disableCheckIfProcessIsRunning === true) {
+      isRunning = true;
+    } else if (self.options.notification_advanced.checkIfProcessIsRunning) {
+      if (await isFullscreenAppRunning()) {
+        isRunning = true;
+        console.log(
+          "Fullscreen application detected on primary display. Assuming process is running"
+        );
+      } else if (game.binary) {
+        isRunning = await tasklist.isProcessRunning(game.binary).catch(err => {
+          console.error(err);
+          console.warn("Assuming process is NOT running");
+          return false;
+        });
+
+        if (!isRunning) {
+          console.log("Trying with '-Win64-Shipping' (Unreal Engine Game) ...");
+          isRunning = await tasklist
+            .isProcessRunning(game.binary.replace(".exe", "-Win64-Shipping.exe"))
+            .catch(err => {
+              console.error(err);
+              console.warn("Assuming process is NOT running");
+              return false;
+            });
+        }
+      } else {
+        console.warn(
+          `Warning! Missing "${game.name}" (${game.appid}) binary name > Overriding user choice to check if process is running`
+        );
+        isRunning = true;
+      }
+    } else {
+      isRunning = true;
+    }
+
+    if (isRunning) {
+      let achievements = await monitor.parse(name);
+
+      if (achievements.length > 0) {
+        let cache = await track.load(appID);
+
+        let j = 0;
+        for (let i in achievements) {
+          if (Object.prototype.hasOwnProperty.call(achievements, i)) {
+            try {
+              let ach = game.achievement.list.find(achievement => {
+                if (achievements[i].crc) {
+                  return achievements[i].crc.includes(
+                    crc32(achievement.name).toString(16)
+                  );
+                } else {
+                  return (
+                    achievement.name == achievements[i].name ||
+                    achievement.name.toUpperCase() ==
+                      achievements[i].name.toUpperCase()
+                  );
+                }
               });
+              if (!ach) throw "ACH_NOT_FOUND_IN_SCHEMA";
 
-              if (!isRunning) {
-                console.log("Trying with '-Win64-Shipping' (Unreal Engine Game) ...");
-                isRunning = await tasklist
-                  .isProcessRunning(game.binary.replace(".exe", "-Win64-Shipping.exe"))
-                  .catch(err => {
-                    console.error(err);
-                    console.warn("Assuming process is NOT running");
-                    return false;
-                  });
+              if (achievements[i].crc) {
+                achievements[i].name = ach.name;
+                delete achievements[i].crc;
               }
-            } else {
-              console.warn(
-                `Warning! Missing "${game.name}" (${game.appid}) binary name > Overriding user choice to check if process is running`
-              );
-              isRunning = true;
-            }
-          } else {
-            isRunning = true;
-          }
 
-          if (isRunning) {
-            let achievements = await monitor.parse(name);
+              let previous = cache.find(
+                achievement => achievement.name === ach.name
+              ) || {
+                Achieved: false,
+                CurProgress: 0,
+                MaxProgress: 0,
+                UnlockTime: 0,
+              };
 
-            if (achievements.length > 0) {
-              let cache = await track.load(appID);
-
-              let j = 0;
-              for (let i in achievements) {
-                if (Object.prototype.hasOwnProperty.call(achievements, i)) {
-                  try {
-                    let ach = game.achievement.list.find(achievement => {
-                      if (achievements[i].crc) {
-                        return achievements[i].crc.includes(
-                          crc32(achievement.name).toString(16)
-                        ); //(SSE) crc module removes leading 0 when dealing with anything below 0x1000 -.-'
-                      } else {
-                        return (
-                          achievement.name == achievements[i].name ||
-                          achievement.name.toUpperCase() ==
-                            achievements[i].name.toUpperCase()
-                        ); //uppercase == uppercase : cdx xcom chimera (apiname doesn't match case with steam schema)
-                      }
+              if (
+                !previous.Achieved &&
+                achievements[i].Achieved &&
+                !previous.Notified
+              ) {
+                if (!achievements[i].UnlockTime || achievements[i].UnlockTime == 0)
+                  achievements[i].UnlockTime = moment().unix();
+                console.log("Unlocked:" + ach.displayName);
+                console.log("Sending notification with payload:", {
+                  title: "Achievement Unlocked!",
+                  message: ach.displayName,
+                  icon: ach.icon || "",
+                  appid: game.appid,
+                  game: game.name,
+                  achievement: ach.name,
+                  description: ach.description || "",
+                  unlockTime: achievements[i].UnlockTime,
+                });
+                try {
+                  await sendNotification({
+                    title: "Achievement Unlocked!",
+                    message: ach.displayName,
+                    icon: ach.icon || "",
+                    appid: game.appid,
+                    game: game.name,
+                    achievement: ach.name,
+                    description: ach.description || "",
+                    unlockTime: achievements[i].UnlockTime,
+                  });
+                  console.log("Notification sent successfully.");
+                  achievements[i].Notified = true;
+                  const cacheIdx = cache.findIndex(a => a.name === ach.name);
+                  if (cacheIdx !== -1) {
+                    cache[cacheIdx].Notified = true;
+                    cache[cacheIdx].Achieved = true;
+                    cache[cacheIdx].UnlockTime = achievements[i].UnlockTime;
+                  } else {
+                    cache.push({
+                      name: ach.name,
+                      Notified: true,
+                      Achieved: true,
+                      UnlockTime: achievements[i].UnlockTime,
                     });
-                    if (!ach) throw "ACH_NOT_FOUND_IN_SCHEMA";
-
-                    if (achievements[i].crc) {
-                      achievements[i].name = ach.name;
-                      delete achievements[i].crc;
-                    }
-
-                    let previous = cache.find(
-                      achievement => achievement.name === ach.name
-                    ) || {
-                      Achieved: false,
-                      CurProgress: 0,
-                      MaxProgress: 0,
-                      UnlockTime: 0,
-                    };
-
-                    if (
-                      !previous.Achieved &&
-                      achievements[i].Achieved &&
-                      !previous.Notified
-                    ) {
-                      if (!achievements[i].UnlockTime || achievements[i].UnlockTime == 0)
-                        achievements[i].UnlockTime = moment().unix();
-                      console.log("Unlocked:" + ach.displayName);
-                      console.log("Sending notification with payload:", {
-                        title: "Achievement Unlocked!",
-                        message: ach.displayName,
-                        icon: ach.icon || "",
-                        appid: game.appid,
-                        game: game.name,
-                        achievement: ach.name,
-                        description: ach.description || "",
-                        unlockTime: achievements[i].UnlockTime,
-                      });
-                      try {
-                        await sendNotification({
-                          title: "Achievement Unlocked!",
-                          message: ach.displayName,
-                          icon: ach.icon || "",
-                          appid: game.appid,
-                          game: game.name,
-                          achievement: ach.name,
-                          description: ach.description || "",
-                          unlockTime: achievements[i].UnlockTime,
-                        });
-                        console.log("Notification sent successfully.");
-                        achievements[i].Notified = true;
-                        // Also update 'Notified' in cache for this achievement
-                        const cacheIdx = cache.findIndex(a => a.name === ach.name);
-                        if (cacheIdx !== -1) {
-                          cache[cacheIdx].Notified = true;
-                          cache[cacheIdx].Achieved = true;
-                          cache[cacheIdx].UnlockTime = achievements[i].UnlockTime;
-                        } else {
-                          cache.push({
-                            name: ach.name,
-                            Notified: true,
-                            Achieved: true,
-                            UnlockTime: achievements[i].UnlockTime,
-                          });
-                        }
-                        await track.save(appID, cache);
-                        // Update achievements.ascendara.json for the running game
-                        try {
-                          await updateAchievementsJsonForRunningGame(game, cache);
-                        } catch (err) {
-                          console.error(
-                            "Failed to update achievements.ascendara.json:",
-                            err
-                          );
-                        }
-                      } catch (err) {
-                        console.error("Failed to send notification:", err);
-                      }
-                    } else if (previous.Achieved && achievements[i].Achieved) {
-                      console.log("Already unlocked:" + ach.displayName);
-                      if (
-                        previous.UnlockTime > 0 &&
-                        previous.UnlockTime != achievements[i].UnlockTime
-                      )
-                        achievements[i].UnlockTime = previous.UnlockTime;
-                    }
-                  } catch (err) {
-                    if (err === "ACH_NOT_FOUND_IN_SCHEMA") {
-                      console.warn(
-                        `${achievements[i].crc ? `${achievements[i].crc} (CRC32)` : `${achievements[i].name}`} not found in game schema data ?! ... Achievement was probably deleted or renamed over time > SKIPPING`
-                      );
-                    } else {
-                      console.error(
-                        `Unexpected Error for achievement "${achievements[i].name}": ${err}`
-                      );
-                    }
                   }
+                  await track.save(appID, cache);
+                  try {
+                    await updateAchievementsJsonForRunningGame(game, cache);
+                  } catch (err) {
+                    console.error(
+                      "Failed to update achievements.ascendara.json:",
+                      err
+                    );
+                  }
+                } catch (err) {
+                  console.error("Failed to send notification:", err);
+                }
+              } else if (previous.Achieved && achievements[i].Achieved) {
+                console.log("Already unlocked:" + ach.displayName);
+                if (
+                  previous.UnlockTime > 0 &&
+                  previous.UnlockTime != achievements[i].UnlockTime
+                )
+                  achievements[i].UnlockTime = previous.UnlockTime;
+              }
+            } catch (err) {
+              if (err === "ACH_NOT_FOUND_IN_SCHEMA") {
+                console.warn(
+                  `${achievements[i].crc ? `${achievements[i].crc} (CRC32)` : `${achievements[i].name}`} not found in game schema data ?! ... Achievement was probably deleted or renamed over time > SKIPPING`
+                );
+              } else {
+                console.error(
+                  `Unexpected Error for achievement "${achievements[i].name}": ${err}`
+                );
+              }
+            }
+          }
+        }
+        await track.save(appID, cache);
+      }
+    } else {
+      console.warn(`game's process "${game.binary}" not running`);
+    }
+  } catch (err) {
+    console.warn(err);
+  }
+}
+
+var app = {
+  isRecording: false,
+  cache: [],
+  options: {
+    notification_advanced: {
+      tick: 2000,
+    },
+  },
+  watcher: [],
+  tick: 0,
+  toastID: "Microsoft.XboxApp_8wekyb3d8bbwe!Microsoft.XboxApp",
+  start: async function () {
+    try {
+      let self = this;
+      self.cache = [];
+      console.log("Achievement Watchdog starting ...");
+
+      const settings = await getSettings();
+      const downloadDir = settings.downloadDirectory;
+      const gameDirList = [];
+
+      if (downloadDir) {
+        try {
+          const gameFolders = await fs.readdir(downloadDir, { withFileTypes: true });
+          const emuConfigFiles = [
+            "ALI213.ini", "valve.ini", "hlm.ini", "ds.ini",
+            "steam_api.ini", "SteamConfig.ini"
+          ];
+          
+          for (const dirent of gameFolders) {
+            if (dirent.isDirectory()) {
+              const gameFolderPath = path.join(downloadDir, dirent.name);
+              let hasEmuConfig = false;
+              for (const configFile of emuConfigFiles) {
+                try {
+                  await fs.access(path.join(gameFolderPath, configFile));
+                  hasEmuConfig = true;
+                  break;
+                } catch (e) {
                 }
               }
-              // Save both the updated achievements and cache for persistence
-              await track.save(appID, cache);
+              
+              if (hasEmuConfig) {
+                gameDirList.push({
+                  path: gameFolderPath,
+                  notify: true,
+                });
+              }
             }
-          } else {
-            console.warn(`game's process "${game.binary}" not running`);
           }
+          console.log(`Found ${gameDirList.length} game directories with emulator configs`);
+        } catch (err) {
+          console.warn("Failed to scan download directory:", err);
+        }
+      }
+
+      const tempFile = path.join(
+        process.env.TEMP || process.env.TMP || "/tmp",
+        "ascendara_game_dirs.json"
+      );
+      await fs.writeFile(tempFile, JSON.stringify(gameDirList), "utf8");
+
+      const folders = await monitor.getFolders(tempFile);
+      console.log(`monitor.getFolders() returned ${folders.length} folders`);
+      
+      const foldersToWatch = folders.slice(0, MAX_WATCHERS);
+      if (folders.length > MAX_WATCHERS) {
+        console.warn(`Limiting watchers to ${MAX_WATCHERS} (found ${folders.length} potential folders)`);
+      }
+      
+      let watcherCount = 0;
+      for (let folder of foldersToWatch) {
+        try {
+          await fs.access(folder.dir);
+          self.watch(watcherCount, folder.dir, folder.options);
+          watcherCount++;
+        } catch (err) {
+        }
+      }
+      
+      console.log(`Started ${watcherCount} file watchers`);
+      
+      // Log initial memory usage
+      logMemoryUsage();
+      
+      // Cache cleanup and memory monitoring interval
+      setInterval(() => {
+        if (self.cache.length > MAX_CACHE_SIZE) {
+          console.log(`Cleaning cache (size: ${self.cache.length})`);
+          self.cache = self.cache.slice(-MAX_CACHE_SIZE);
+        }
+        
+        // Log memory usage periodically
+        logMemoryUsage();
+        
+        // Clean up old debounce timers (shouldn't happen, but just in case)
+        if (fileEventTimers.size > 100) {
+          console.warn(`WARNING: Large number of pending file events: ${fileEventTimers.size}`);
+        }
+      }, CACHE_CLEANUP_INTERVAL_MS);
+      
+    } catch (err) {
+      console.log(err);
+      instance.unlock();
+      await updateWatchdogStatus(false);
+      process.exit();
+    }
+  },
+  watch: function (i, dir, options) {
+    let self = this;
+    console.log(
+      `Monitoring achievement changes in directory: "${dir}" with options:`,
+      options
+    );
+    if (options.file && options.file.length > 0) {
+      console.log(
+        `Watching files in ${dir}: ${JSON.stringify(options.file)} with filter: ${options.filter}`
+      );
+    } else {
+      console.warn(
+        `WARNING: No files specified to watch in ${dir}. options.file is:`,
+        options.file
+      );
+    }
+
+    self.watcher[i] = watch(
+      dir,
+      { recursive: options.recursive, filter: options.filter },
+      async function (evt, name) {
+        console.log(`File event: ${evt} on file: ${name}`);
+        try {
+          if (evt !== "update") {
+            console.log(`Ignoring event: ${evt} (only processing 'update' events)`);
+            return;
+          }
+
+          const debounceKey = `${dir}:${name}`;
+          if (fileEventTimers.has(debounceKey)) {
+            clearTimeout(fileEventTimers.get(debounceKey));
+          }
+          
+          const timerId = setTimeout(async () => {
+            fileEventTimers.delete(debounceKey);
+            await processFileEvent(name, options, self);
+          }, FILE_EVENT_DEBOUNCE_MS);
+          
+          fileEventTimers.set(debounceKey, timerId);
         } catch (err) {
           console.warn(err);
         }

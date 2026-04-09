@@ -548,15 +548,22 @@ const Library = () => {
           // Get local game names for comparison
           const installedGames = await window.electron.getGames();
           const customGames = await window.electron.getCustomGames();
+          
+          // Sanitize game name to match backend directory naming
+          const sanitizeName = (name) => {
+            if (!name) return "";
+            return name.replace(/[<>:"/\\|?*]/g, "").trim().toLowerCase();
+          };
+          
           const localGameNames = new Set([
-            ...(installedGames || []).map(g => (g.game || g.name)?.toLowerCase()),
-            ...(customGames || []).map(g => (g.game || g.name)?.toLowerCase()),
+            ...(installedGames || []).map(g => sanitizeName(g.game || g.name)),
+            ...(customGames || []).map(g => sanitizeName(g.game || g.name)),
           ]);
 
           // Filter to cloud games that are NOT installed locally
           // Include both regular games (with gameID) and custom games
           const cloudOnly = cloudResult.data.games.filter(
-            g => !localGameNames.has(g.name?.toLowerCase()) && (g.gameID || g.isCustom)
+            g => !localGameNames.has(sanitizeName(g.name)) && (g.gameID || g.isCustom)
           );
 
           setCloudOnlyGames(cloudOnly);
@@ -724,11 +731,17 @@ const Library = () => {
       }
     }
 
+    // Sanitize game name to match backend directory naming
+    const sanitizeName = (name) => {
+      if (!name) return "";
+      return name.replace(/[<>:"/\\|?*]/g, "").trim().toLowerCase();
+    };
+
     for (const key of keysToCheck) {
       const gameName = key.replace("cloud-restore-", "");
-      // Check if this game is now installed
+      // Check if this game is now installed using sanitized name comparison
       const isInstalled = installedGames.some(
-        g => (g.game || g.name)?.toLowerCase() === gameName.toLowerCase()
+        g => sanitizeName(g.game || g.name) === sanitizeName(gameName)
       );
 
       if (isInstalled) {
