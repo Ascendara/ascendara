@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
@@ -34,6 +35,7 @@ import {
   Sparkles,
   Users,
   TrendingUp,
+  HardDrive,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import {
@@ -134,6 +136,27 @@ const createFuzzyMatch = () => {
 };
 const fuzzyMatch = createFuzzyMatch();
 
+// Helper function to parse game size to GB
+const parseSizeToGB = (sizeStr) => {
+  if (!sizeStr) return 0;
+  const match = sizeStr.match(/([\d.]+)\s*(GB|MB|TB)/i);
+  if (!match) return 0;
+  
+  const value = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  
+  switch (unit) {
+    case 'TB':
+      return value * 1024;
+    case 'GB':
+      return value;
+    case 'MB':
+      return value / 1024;
+    default:
+      return 0;
+  }
+};
+
 const Search = memo(() => {
   const { userData } = useAuth();
   const [games, setGames] = useState([]);
@@ -190,6 +213,11 @@ const Search = memo(() => {
   const [showOnline, setShowOnline] = useState(() => {
     const saved = window.sessionStorage.getItem("showOnline");
     return saved === "true";
+  });
+
+  const [maxSize, setMaxSize] = useState(() => {
+    const saved = window.sessionStorage.getItem("maxSize");
+    return saved ? parseInt(saved) : 200;
   });
 
   const [recentSearches, setRecentSearches] = useState(() => {
@@ -533,12 +561,13 @@ const Search = memo(() => {
       window.sessionStorage.setItem("onlineFilter", onlineFilter);
       window.sessionStorage.setItem("showDLC", showDLC.toString());
       window.sessionStorage.setItem("showOnline", showOnline.toString());
+      window.sessionStorage.setItem("maxSize", maxSize.toString());
       window.localStorage.setItem("filterSmallestSize", filterSmallestSize.toString());
       window.localStorage.setItem("filterProvider", filterProvider);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedCategories, selectedSort, onlineFilter, showDLC, showOnline, filterSmallestSize, filterProvider]);
+  }, [searchQuery, selectedCategories, selectedSort, onlineFilter, showDLC, showOnline, maxSize, filterSmallestSize, filterProvider]);
 
   const filteredGames = useMemo(() => {
     if (!games?.length) return [];
@@ -548,11 +577,12 @@ const Search = memo(() => {
     const hasCategories = selectedCategories.length > 0;
     const hasContentFilters = showDLC || showOnline;
     const hasOnlineFilter = onlineFilter !== "all";
+    const hasSizeFilter = maxSize < 200;
     const source = settings?.gameSource || "steamrip";
     const isFitGirl = source === "fitgirl";
 
     // If no filters, just sort and return
-    if (!hasSearch && !hasCategories && !hasContentFilters && !hasOnlineFilter) {
+    if (!hasSearch && !hasCategories && !hasContentFilters && !hasOnlineFilter && !hasSizeFilter) {
       if (isFitGirl) return games;
 
       const sortFn = getSortFunction(selectedSort);
@@ -590,6 +620,12 @@ const Search = memo(() => {
         if (onlineFilter === "offline" && game.online) continue;
       }
 
+      // Size filter
+      if (hasSizeFilter && game.size) {
+        const sizeInGB = parseSizeToGB(game.size);
+        if (sizeInGB > maxSize) continue;
+      }
+
       // Search filter last (most expensive)
       if (hasSearch) {
         const gameTitle = game.game.toLowerCase();
@@ -625,6 +661,7 @@ const Search = memo(() => {
     settings?.gameSource,
     showDLC,
     showOnline,
+    maxSize,
   ]);
 
   // Extract sort function to avoid recreating it
@@ -1107,7 +1144,7 @@ const Search = memo(() => {
                   >
                     <SlidersHorizontal className="h-4 w-4" />
                     {t("search.filters")}
-                    {(showDLC || showOnline || selectedCategories.length > 0) && (
+                    {(showDLC || showOnline || selectedCategories.length > 0 || maxSize < 200) && (
                       <span className="h-2 w-2 rounded-full bg-primary" />
                     )}
                   </Button>
@@ -1137,6 +1174,32 @@ const Search = memo(() => {
                         >
                           {t("search.showOnline")}
                         </Label>
+                      </div>
+                    </div>
+                    <Separator className="bg-border/50" />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <HardDrive className="h-4 w-4 text-primary" />
+                          <Label className="text-sm font-medium text-foreground">
+                            {t("search.maxGameSize") || "Max Game Size"}
+                          </Label>
+                        </div>
+                        <span className="text-xs font-medium text-primary">
+                          {maxSize >= 200 ? t("search.anySize") : `≤ ${maxSize} GB`}
+                        </span>
+                      </div>
+                      <Slider
+                        min={5}
+                        max={200}
+                        step={5}
+                        value={[maxSize]}
+                        onValueChange={(value) => setMaxSize(value[0])}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>5 GB</span>
+                        <span>{t("search.any")}</span>
                       </div>
                     </div>
                     <Separator className="bg-border/50" />
