@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Check, X, Download, Zap, Cloud, Users, Puzzle, Shield, ExternalLink, Loader2 } from "lucide-react";
 import {
@@ -16,6 +16,17 @@ const SubscriptionPlanDialog = ({
   t,
 }) => {
   const [showRedirectDialog, setShowRedirectDialog] = useState(false);
+
+  // Auto-close redirect dialog after 10 seconds
+  useEffect(() => {
+    if (showRedirectDialog) {
+      const timer = setTimeout(() => {
+        setShowRedirectDialog(false);
+      }, 10000); // 10 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [showRedirectDialog]);
 
   const handlePlanClick = async (planId) => {
     // Close the main dialog
@@ -191,6 +202,13 @@ const SubscriptionPlanDialog = ({
     {/* Redirect Loading Dialog */}
     <AlertDialog open={showRedirectDialog} onOpenChange={setShowRedirectDialog}>
       <AlertDialogContent className="max-w-md border-border/50 bg-background">
+        <button
+          onClick={() => setShowRedirectDialog(false)}
+          className="absolute right-4 top-4 z-10 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        
         <div className="flex flex-col items-center justify-center space-y-4 py-6">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
