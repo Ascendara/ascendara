@@ -1456,6 +1456,20 @@ export const verifyAscendAccess = async (hardwareId = null) => {
 
     // Check if user has active subscription (bypasses hardware check and noTrial)
     if (userData.ascendSubscription?.active) {
+      // Lifetime subscriptions don't have expiration dates
+      if (userData.ascendSubscription.lifetime === true) {
+        return {
+          hasAccess: true,
+          daysRemaining: -1,
+          isSubscribed: true,
+          isVerified: false,
+          trialBlocked: false,
+          noTrial: false,
+          noTrialReason: null,
+          error: null,
+        };
+      }
+      
       const expiresAt = userData.ascendSubscription.expiresAt?.toDate();
       // If active flag is true, trust it regardless of expiration date
       // This prevents subscribed users from being treated as trial users
