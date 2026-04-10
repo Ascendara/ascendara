@@ -41,6 +41,7 @@ const WorkshopDownloader = () => {
   const [downloadLogs, setDownloadLogs] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(false);
+  const [installLogs, setInstallLogs] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -60,24 +61,35 @@ const WorkshopDownloader = () => {
 
   useEffect(() => {
     // Set up download progress listener
-    const removeListener = window.electron.onDownloadProgress(data => {
+    const removeDownloadListener = window.electron.onDownloadProgress(data => {
       setDownloadLogs(prev => [...prev, data.message]);
     });
 
-    // Cleanup listener on unmount
-    return () => removeListener();
+    // Set up install progress listener
+    const removeInstallListener = window.electron.onInstallProgress(data => {
+      setInstallLogs(prev => [...prev, data.message]);
+    });
+
+    // Cleanup listeners on unmount
+    return () => {
+      removeDownloadListener();
+      removeInstallListener();
+    };
   }, []);
 
   const handleNext = async () => {
     if (step === 2) {
       setIsInstalling(true);
+      setInstallLogs([]);
       try {
         const result = await window.electron.installSteamCMD();
         if (result.success) {
+          setInstallLogs(prev => [...prev, "Installation completed successfully!"]);
           toast.success(t("workshopDownloader.installSuccess"));
           setIsSetup(true);
           setStep(step + 1);
         } else {
+          setInstallLogs(prev => [...prev, `Installation failed: ${result.message || "Unknown error"}`]);
           toast.error(t("workshopDownloader.installError"));
         }
       } finally {
@@ -323,6 +335,35 @@ const WorkshopDownloader = () => {
                 </>
               )}
             </Button>
+
+            {/* Installation Log Display Area */}
+            {isInstalling && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-4 w-full max-w-md"
+              >
+                <div className="max-h-48 overflow-y-auto rounded-lg border bg-background p-4 font-mono text-sm">
+                  <h3 className="mb-2 font-semibold text-primary">
+                    Installation Progress
+                  </h3>
+                  <div className="space-y-1 text-muted-foreground">
+                    {installLogs.length > 0 ? (
+                      installLogs.map((log, index) => (
+                        <div key={index} className="whitespace-pre-wrap">
+                          {log}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center italic">
+                        Initializing installation...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         );
 

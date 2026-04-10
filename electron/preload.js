@@ -372,6 +372,10 @@ contextBridge.exposeInMainWorld("electron", {
   installWine: () => ipcRenderer.invoke("install-wine"),
   isSteamCMDInstalled: () => ipcRenderer.invoke("is-steamcmd-installed"),
   installSteamCMD: () => ipcRenderer.invoke("install-steamcmd"),
+  onInstallProgress: callback => {
+    ipcRenderer.on("install-progress", (_, data) => callback(data));
+    return () => ipcRenderer.removeListener("install-progress", callback);
+  },
   checkGameDependencies: () => ipcRenderer.invoke("check-game-dependencies"),
   openReqPath: game => ipcRenderer.invoke("required-libraries", game),
   folderExclusion: boolean => ipcRenderer.invoke("folder-exclusion", boolean),
