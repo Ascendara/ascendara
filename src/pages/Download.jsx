@@ -33,7 +33,6 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import imageCacheService from "@/services/imageCacheService";
-import openCriticService from "@/services/openCriticService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import { addToQueue, hasActiveDownloads, getDownloadQueue } from "@/services/downloadQueueService";
 import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
@@ -193,12 +192,6 @@ export default function DownloadPage() {
   const [providerPatterns, setProviderPatterns] = useState(null);
   const [gameData, setGameData] = useState(state?.gameData);
   const [isUpdating, setIsUpdating] = useState(state?.gameData?.isUpdating || false);
-  const [openCriticDialog, setOpenCriticDialog] = useState(false);
-  const [showOpenCriticWarning, setShowOpenCriticWarning] = useState(false);
-  const [criticData, setCriticData] = useState(null);
-  const [criticLoading, setCriticLoading] = useState(false);
-  const [criticError, setCriticError] = useState(null);
-  const [criticCache, setCriticCache] = useState({});
   const { t } = useLanguage();
   const { settings, setSettings } = useSettings();
   const { isAuthenticated } = useAuth();
@@ -211,43 +204,6 @@ export default function DownloadPage() {
         setProviderPatterns(null);
       });
   }, []);
-
-  // Handle OpenCritic dialog and API call
-  const handleOpenCriticDialog = async gameName => {
-    // Check if warning has been shown before
-    if (!localStorage.getItem("openCriticBetaWarningShown")) {
-      setShowOpenCriticWarning(true);
-      return;
-    }
-    setOpenCriticDialog(true);
-
-    // Check if we have cached data for this game
-    if (criticCache[gameName]) {
-      console.log("Using cached OpenCritic data for:", gameName);
-      setCriticData(criticCache[gameName]);
-      return;
-    }
-
-    setCriticLoading(true);
-    setCriticError(null);
-    setCriticData(null);
-
-    try {
-      const data = await openCriticService.getGameInfo(gameName);
-      setCriticData(data);
-
-      // Cache the results
-      setCriticCache(prevCache => ({
-        ...prevCache,
-        [gameName]: data,
-      }));
-    } catch (error) {
-      console.error("Error fetching OpenCritic data:", error);
-      setCriticError(error.message || "Failed to fetch critic data");
-    } finally {
-      setCriticLoading(false);
-    }
-  };
 
   // Fetch Steam API data
   const fetchSteamData = async gameName => {
@@ -2089,15 +2045,6 @@ export default function DownloadPage() {
                   {/* Action Buttons Row */}
                   <div className="mt-4 flex items-center gap-3">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => handleOpenCriticDialog(gameData.game)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      {t("download.viewCriticReviews")}
-                    </Button>
-                    <Button
                       variant={isPlayLater ? "default" : "ghost"}
                       size="sm"
                       className={`gap-1.5 ${isPlayLater ? "text-secondary" : "text-muted-foreground hover:text-foreground"}`}
@@ -2310,36 +2257,6 @@ export default function DownloadPage() {
             </div>
           </div>
 
-          {/* OpenCritic Beta Warning Dialog */}
-          <AlertDialog
-            open={showOpenCriticWarning}
-            onOpenChange={setShowOpenCriticWarning}
-          >
-            <AlertDialogContent className="max-h-[85vh] max-w-md overflow-y-auto border-border bg-background/95 p-4 backdrop-blur-sm">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2 text-xl font-bold text-primary">
-                  <AlertTriangle className="text-warning h-5 w-5" />
-                  {t("download.betaFeature")}
-                </AlertDialogTitle>
-                <AlertDialogDescription className="mt-3 text-sm" asChild>
-                  <div className="p-3">{t("download.openCriticBetaWarning")}</div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="mt-4">
-                <Button
-                  className="w-full text-secondary"
-                  onClick={() => {
-                    setShowOpenCriticWarning(false);
-                    localStorage.setItem("openCriticBetaWarningShown", "1");
-                    handleOpenCriticDialog(gameData.game);
-                  }}
-                >
-                  {t("download.understand")}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
           {/* Compare Your PC Dialog */}
           <AlertDialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
             <AlertDialogContent className="max-w-2xl border-border bg-background/95 p-6 backdrop-blur-sm">
@@ -2445,261 +2362,6 @@ export default function DownloadPage() {
               <AlertDialogFooter className="mt-6">
                 <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
               </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {/* OpenCritic Dialog */}
-          <AlertDialog open={openCriticDialog} onOpenChange={setOpenCriticDialog}>
-            <AlertDialogContent className="max-h-[85vh] max-w-md overflow-y-auto border-border bg-background/95 p-4 backdrop-blur-sm">
-              <X
-                className="absolute right-4 top-4 h-5 w-5 cursor-pointer text-primary"
-                onClick={() => setOpenCriticDialog(false)}
-              />
-              <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2 text-xl font-bold text-primary">
-                  <Eye className="h-5 w-5" />
-                  {criticData ? criticData.name : gameData.game} -{" "}
-                  {t("download.criticReviews")}
-                </AlertDialogTitle>
-              </AlertDialogHeader>
-
-              {criticLoading ? (
-                <div className="flex h-40 items-center justify-center">
-                  <Loader className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : criticError ? (
-                <div className="flex flex-col items-center justify-center py-6 text-center">
-                  <AlertTriangle className="mb-2 h-10 w-10 text-yellow-500" />
-                  <p>{t("download.criticError")}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{criticError}</p>
-                </div>
-              ) : criticData && criticData.warning === "game_not_rated" ? (
-                <div className="flex flex-col items-center justify-center space-y-4 py-6 text-center">
-                  <div className="rounded-full border border-yellow-500/30 bg-yellow-500/10 p-4">
-                    <AlertTriangle className="h-10 w-10 text-yellow-500" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold text-primary">
-                      {criticData.name}
-                    </h3>
-                    <p className="text-muted-foreground">{t("download.gameNotRated")}</p>
-                  </div>
-
-                  <div className="mt-2 w-full max-w-xs rounded-md border border-border/30 bg-card/60 p-4 shadow-sm">
-                    <p className="text-center text-sm text-muted-foreground">
-                      {t("download.noReviewsExplanation")}
-                    </p>
-                  </div>
-                </div>
-              ) : criticData ? (
-                <div className="space-y-3 p-1">
-                  {!criticData.exactMatch && (
-                    <div className="rounded-md border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm">
-                      <p className="flex items-center gap-1.5 text-xs font-medium text-yellow-500">
-                        <InfoIcon className="h-3 w-3" />
-                        {t("download.notExactMatch")}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {t("download.showingResultsFor")}:{" "}
-                        <span className="font-medium">{criticData.searchResult}</span>
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Warning for games not rated by critics is now handled in the main conditional render */}
-
-                  {/* Game Description Section */}
-                  {criticData.description && (
-                    <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                      <p className="text-sm text-foreground">{criticData.description}</p>
-                    </div>
-                  )}
-
-                  {/* Genres and Platforms */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {criticData.genres && criticData.genres.length > 0 && (
-                      <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                        <h4 className="mb-1 text-sm font-medium text-primary">
-                          {t("download.genres")}
-                        </h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {criticData.genres.map((genre, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
-                            >
-                              {genre}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {criticData.platforms && criticData.platforms.length > 0 && (
-                      <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                        <h4 className="mb-1 text-sm font-medium text-primary">
-                          {t("download.platforms")}
-                        </h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {criticData.platforms.map((platform, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
-                            >
-                              {platform}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Scores Section */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                      <p className="text-sm text-primary">{t("download.medianScore")}</p>
-                      <p className="text-2xl font-bold tracking-tight text-primary">
-                        {criticData.medianScore !== null ? criticData.medianScore : "-"}
-                      </p>
-                    </div>
-                    <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                      <p className="text-sm text-primary">
-                        {t("download.topCriticScore")}
-                      </p>
-                      <p className="text-2xl font-bold tracking-tight text-primary">
-                        {criticData.topCriticScore !== null
-                          ? criticData.topCriticScore
-                          : "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                      <p className="text-sm text-primary">{t("download.tier")}</p>
-                      <p className="text-xl font-semibold tracking-tight text-primary">
-                        {criticData.tier ? criticData.tier : "-"}
-                      </p>
-                    </div>
-
-                    <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                      <p className="text-sm text-primary">{t("download.reviewCount")}</p>
-                      <p className="text-xl font-semibold tracking-tight text-primary">
-                        {criticData.numReviews ? criticData.numReviews : "0"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Review Snippets Section */}
-                  {criticData.reviews && criticData.reviews.length > 0 && (
-                    <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                      <h4 className="mb-2 text-sm font-medium text-primary">
-                        {t("download.reviewSnippets")}
-                      </h4>
-                      <div className="space-y-2">
-                        {criticData.reviews.map((review, index) => (
-                          <div
-                            key={index}
-                            className="border-b border-border pb-2 last:border-0 last:pb-0"
-                          >
-                            <p className="mb-1 text-sm italic text-primary">
-                              "{review.snippet}"
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs text-primary">
-                                {t("download.by")}{" "}
-                                <span className="font-medium text-primary/80">
-                                  {review.author}
-                                </span>{" "}
-                                ({review.outlet})
-                              </p>
-                              {review.score && (
-                                <span className="text-xs font-bold text-primary">
-                                  {review.score}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Time to Beat Section */}
-                  {criticData.timeToBeat &&
-                    Object.keys(criticData.timeToBeat).length > 0 && (
-                      <div className="rounded-md border border-border/30 bg-card/60 p-3 shadow-sm">
-                        <p className="mb-1 text-sm font-medium text-primary">
-                          {t("download.timeToBeat")}
-                        </p>
-                        <div className="space-y-2">
-                          {criticData.timeToBeat.mainStory > 0 && (
-                            <div className="flex justify-between">
-                              <span className="text-sm text-primary">
-                                {t("download.mainStory")}:
-                              </span>
-                              <span className="text-sm font-medium">
-                                {criticData.timeToBeat.mainStory} {t("download.hours")}
-                              </span>
-                            </div>
-                          )}
-                          {criticData.timeToBeat.mainPlusExtras > 0 && (
-                            <div className="flex justify-between">
-                              <span className="text-sm text-primary">
-                                {t("download.mainPlusExtras")}:
-                              </span>
-                              <span className="text-sm font-medium">
-                                {criticData.timeToBeat.mainPlusExtras}{" "}
-                                {t("download.hours")}
-                              </span>
-                            </div>
-                          )}
-                          {criticData.timeToBeat.completionist > 0 && (
-                            <div className="flex justify-between">
-                              <span className="text-sm text-primary">
-                                {t("download.completionist")}:
-                              </span>
-                              <span className="text-sm font-medium">
-                                {criticData.timeToBeat.completionist}{" "}
-                                {t("download.hours")}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                  <div className="mt-4 flex justify-between border-t border-border/50 pt-2 text-primary">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="inline-flex items-center gap-1.5 transition-colors hover:bg-primary/10"
-                      onClick={() =>
-                        window.electron.openURL(
-                          `${criticData.url}/reviews` || `https://opencritic.com`
-                        )
-                      }
-                    >
-                      {t("download.readReviews")} <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="inline-flex items-center gap-1.5 transition-colors hover:bg-primary/10"
-                      onClick={() =>
-                        window.electron.openURL(
-                          criticData.url || `https://opencritic.com`
-                        )
-                      }
-                    >
-                      {t("download.viewOnOpenCritic")}{" "}
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
             </AlertDialogContent>
           </AlertDialog>
 
