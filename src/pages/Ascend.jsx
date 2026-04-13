@@ -1865,6 +1865,38 @@ const Ascend = () => {
 
       // Get a fresh token for the request
       const authToken = await getAuthToken();
+      
+      // Check if this is a lifetime upgrade and fetch discount info
+      let discountAmount = 0;
+      const isLifetimePlan = priceId === "price_1TKjjMCfu5zjwIKZyrWXZFJ1";
+      
+      if (isLifetimePlan && userData?.ascendSubscription?.active && !userData?.ascendSubscription?.lifetime) {
+        try {
+          const discountResponse = await fetch(
+            "https://api.ascendara.app/stripe/calculate-lifetime-discount",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({ userId: user.uid }),
+            }
+          );
+          
+          if (discountResponse.ok) {
+            const discountData = await discountResponse.json();
+            if (discountData.eligible && discountData.discount > 0) {
+              discountAmount = discountData.discount;
+              console.log(`[Checkout] Applying $${discountAmount} discount for lifetime upgrade`);
+            }
+          }
+        } catch (discountError) {
+          console.error("[Checkout] Error fetching discount:", discountError);
+          // Continue without discount if there's an error
+        }
+      }
+      
       const response = await fetch(
         "https://api.ascendara.app/stripe/create-checkout-session",
         {
@@ -1876,6 +1908,7 @@ const Ascend = () => {
           body: JSON.stringify({
             userId: user.uid,
             priceId: priceId,
+            discountAmount: discountAmount,
             successUrl: "https://ascendara.app/thank-you?subscription=success",
             cancelUrl: "ascendara://checkout-canceled",
           }),
@@ -1900,6 +1933,7 @@ const Ascend = () => {
             body: JSON.stringify({
               userId: user.uid,
               priceId: priceId,
+              discountAmount: discountAmount,
               successUrl: "https://ascendara.app/thank-you?subscription=success",
               cancelUrl: "ascendara://checkout-canceled",
             }),

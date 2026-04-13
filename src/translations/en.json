@@ -747,6 +747,18 @@
         "redirectingToCheckout": "Redirecting to Stripe Checkout",
         "completeCheckoutMessage": "Please complete the checkout process in your browser to activate your subscription."
       },
+      "lifetimeDialog": {
+        "title": "Sounds like there's a deal...",
+        "limitedTime": "Limited Time Offer",
+        "description": "You're currently on a recurring subscription. Upgrade to Lifetime Ascend and pay once, forever!",
+        "descriptionWithDiscount": "You're currently on a {{tier}} subscription. Upgrade to Lifetime Ascend and save ${{amount}}!",
+        "saveAmount": "Save ${{amount}}!",
+        "benefit1": "One-time payment, lifetime access",
+        "benefit2": "Never worry about renewals again",
+        "benefit3": "All future updates included",
+        "disclaimer": "This special offer is available for a limited time only. Don't miss out!",
+        "upgradeToLifetime": "Upgrade to Lifetime"
+      },
       "subscriptionSuccessMessage": "You now have full access to all premium features. Thank you for your support!",
       "subtitle": "Manage your account and profile",
       "supportMessage": "Step Up. Connect. Join Ascend.",
@@ -974,6 +986,7 @@
     "library": "Library",
     "next": "Next",
     "notNow": "Not Now",
+    "maybeLater": "Maybe Later",
     "ok": "OK",
     "page": "You're viewing page",
     "preferences": "Preferences",

@@ -39,6 +39,7 @@ import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AdminWarningScreen from "@/components/AdminWarningScreen";
+import LifetimeSubscriptionDialog from "@/components/LifetimeSubscriptionDialog";
 import {
   Navigate,
   Route,
@@ -1946,6 +1947,7 @@ function App() {
                     <GiantBombMigrationWarning />
                     <AutomaticIndexRefresher />
                     <ControllerDetectionPrompt />
+                    <LifetimeSubscriptionDialog />
                     <SearchInitializer />
                     <GlobalSearch />
                     <AppRoutes />
