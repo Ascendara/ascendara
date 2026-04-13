@@ -371,7 +371,7 @@ export const GameAssetSearchDialog = ({
                   handleSearch(e.target.value);
                 }}
                 placeholder={t("library.assetSearch.searchPlaceholder") || "Search for game..."}
-                className="pl-10"
+                className="pl-10 text-primary"
               />
             </div>
           )}
@@ -392,7 +392,7 @@ export const GameAssetSearchDialog = ({
                   ref={(el) => (resultRefs.current[index] = el)}
                   onClick={() => handleSelectGame(result)}
                   className={cn(
-                    "cursor-pointer border-2 p-3 transition-all",
+                    "cursor-pointer border-2 text-primary p-3 transition-all",
                     isControllerMode ? "rounded-xl" : "rounded-lg",
                     selectedGame?.id === result.id
                       ? "border-primary bg-primary/10"
