@@ -194,7 +194,7 @@ export default function DownloadPage() {
   const [isUpdating, setIsUpdating] = useState(state?.gameData?.isUpdating || false);
   const { t } = useLanguage();
   const { settings, setSettings } = useSettings();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userData } = useAuth();
 
   useEffect(() => {
     fetchProviderPatterns()
