@@ -753,7 +753,10 @@ function registerGameHandlers() {
           const customDir = path.dirname(gameInfo.executable);
           for (const pattern of searchPatterns) {
             const p = path.join(customDir, pattern);
-            if (fs.existsSync(p)) return fs.readFileSync(p).toString("base64");
+            if (fs.existsSync(p)) {
+              const buffer = fs.readFileSync(p);
+              return Buffer.from(buffer).toString("base64");
+            }
           }
         }
       } catch (e) {}
@@ -769,7 +772,10 @@ function registerGameHandlers() {
       if (fs.existsSync(stdDir)) {
         for (const pattern of searchPatterns) {
           const p = path.join(stdDir, pattern);
-          if (fs.existsSync(p)) return fs.readFileSync(p).toString("base64");
+          if (fs.existsSync(p)) {
+            const buffer = fs.readFileSync(p);
+            return Buffer.from(buffer).toString("base64");
+          }
         }
       }
     }
@@ -782,7 +788,8 @@ function registerGameHandlers() {
       for (const ext of exts) {
         const p = path.join(centralGamesDir, baseName + ext);
         if (fs.existsSync(p)) {
-          return fs.readFileSync(p).toString("base64");
+          const buffer = fs.readFileSync(p);
+          return Buffer.from(buffer).toString("base64");
         }
       }
     }
