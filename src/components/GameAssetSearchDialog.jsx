@@ -287,6 +287,23 @@ export const GameAssetSearchDialog = ({
               // Save to game directory via IPC
               await window.electron.saveGameAsset(gameName, filename, dataUrl);
               downloadedCount++;
+
+              // If this is the grid image, also update the library card cover
+              if (key === "grid") {
+                const localStorageKey = `game-cover-${gameName}`;
+                try {
+                  localStorage.setItem(localStorageKey, dataUrl);
+                  
+                  // Dispatch event to update library card images
+                  window.dispatchEvent(
+                    new CustomEvent("game-cover-updated", {
+                      detail: { gameName, dataUrl },
+                    })
+                  );
+                } catch (e) {
+                  console.warn("Could not update library card cover:", e);
+                }
+              }
             }
           }
         } catch (e) {
