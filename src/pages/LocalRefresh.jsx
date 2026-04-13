@@ -37,6 +37,7 @@ import {
   Cloud,
   ExternalLink,
   Calendar,
+  PencilIcon,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -1491,7 +1492,7 @@ const LocalRefresh = () => {
                       onClick={handleChangeLocation}
                       disabled={isRefreshing}
                     >
-                      <FolderOpen className="h-3.5 w-3.5" />
+                      <PencilIcon className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
