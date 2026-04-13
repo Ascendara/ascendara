@@ -267,6 +267,13 @@ function registerCriticalHandlers() {
   if (isLinux) {
     const { registerProtonHandlers } = require("./modules/proton");
     registerProtonHandlers();
+
+    const { registerUmuDatabaseHandlers, refreshUmuDatabase } = require("./modules/umu-database");
+    registerUmuDatabaseHandlers();
+    
+    refreshUmuDatabase().catch(e =>
+      console.warn("[UMU-DB] Background refresh failed:", e.message)
+    );
   }
   ipcHandlers.registerMiscHandlers();
   translations.registerTranslationHandlers();

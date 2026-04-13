@@ -50,6 +50,14 @@ function findSteamInstallPath() {
   return path.join(os.homedir(), ".steam/steam"); // fallback
 }
 
+/**
+ * Detects if umu-run is installed
+ */
+function isUmuInstalled() {
+  const { linuxUmuBin } = require("./config");
+  return fs.existsSync(linuxUmuBin);
+}
+
 // ─── Directory Setup ──────────────────────────────────────
 
 /**
@@ -59,7 +67,8 @@ function findSteamInstallPath() {
 function ensureLinuxDirectories() {
   if (!isLinux) return;
 
-  const dirs = [linuxConfigDir, linuxCompatDataDir, linuxRunnersDir];
+  const { linuxUmuDir } = require("./config");
+  const dirs = [linuxConfigDir, linuxCompatDataDir, linuxRunnersDir, linuxUmuDir];
 
   for (const dir of dirs) {
     if (dir) {
@@ -185,6 +194,415 @@ async function getAllRunners() {
   }
 
   return runners;
+}
+
+// ─── UMU Proton Download ──────────────────────────────────
+/**
+ * Fetch info about the latest UMU-Proton release (Open-Wine-Components)
+ */
+async function getUmuProtonInfo() {
+  try {
+    const releaseRes = await fetch(
+      "https://api.github.com/repos/Open-Wine-Components/umu-proton/releases/latest",
+      { headers: { "User-Agent": "Ascendara-Launcher" } }
+    );
+    if (!releaseRes.ok) throw new Error(`GitHub API error ${releaseRes.status}`);
+
+    const release = await releaseRes.json();
+    const tagName = release.tag_name;
+
+    const tarAsset = release.assets.find(
+      a => a.name.endsWith(".tar.gz") && !a.name.includes("sha512sum")
+    );
+
+    if (!tarAsset) {
+      throw new Error("No tar.gz asset found in the latest UMU-Proton release");
+    }
+
+    // Check if this exact version is already installed
+    const targetDir = path.join(linuxRunnersDir, tagName);
+    const alreadyInstalled = fs.existsSync(path.join(targetDir, "proton"));
+
+    // Check if ANY UMU-Proton is installed (for update detection)
+    let installedUmuVersions = [];
+    if (fs.existsSync(linuxRunnersDir)) {
+      try {
+        const dirs = await fs.readdir(linuxRunnersDir, { withFileTypes: true });
+        for (const d of dirs) {
+          if (d.isDirectory() && d.name.toLowerCase().includes("umu-proton")) {
+            if (fs.existsSync(path.join(linuxRunnersDir, d.name, "proton"))) {
+              installedUmuVersions.push(d.name);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    const hasOlderVersion = installedUmuVersions.length > 0 && !alreadyInstalled;
+
+    return {
+      success: true,
+      name: tagName,
+      fileName: tarAsset.name,
+      size: tarAsset.size,
+      sizeFormatted: `${(tarAsset.size / (1024 * 1024)).toFixed(0)} MB`,
+      downloadUrl: tarAsset.browser_download_url,
+      alreadyInstalled,
+      installPath: targetDir,
+      // Update info
+      updateAvailable: hasOlderVersion,
+      installedVersions: installedUmuVersions,
+      latestVersion: tagName,
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Remove old UMU-Proton versions after a successful update.
+ * Keeps only the specified version.
+ */
+async function removeOldUmuProton(keepVersion) {
+  if (!fs.existsSync(linuxRunnersDir)) return [];
+
+  const removed = [];
+  try {
+    const dirs = await fs.readdir(linuxRunnersDir, { withFileTypes: true });
+    for (const d of dirs) {
+      if (
+        d.isDirectory() &&
+        d.name.toLowerCase().includes("umu-proton") &&
+        d.name !== keepVersion
+      ) {
+        const fullPath = path.join(linuxRunnersDir, d.name);
+        await fs.remove(fullPath);
+        removed.push(d.name);
+        console.log(`[Proton] Removed old UMU-Proton version: ${d.name}`);
+      }
+    }
+  } catch (err) {
+    console.error("[Proton] Error removing old UMU-Proton versions:", err);
+  }
+  return removed;
+}
+
+/**
+ * Download and install UMU-Proton
+ */
+async function downloadUmuProton(parentWindow) {
+  if (!isLinux) {
+    return { success: false, message: "Only available on Linux" };
+  }
+
+  const progressWindow = new BrowserWindow({
+    width: 520,
+    height: 280,
+    parent: parentWindow || undefined,
+    modal: !!parentWindow,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  progressWindow.loadURL(
+    "data:text/html;charset=utf-8," +
+      encodeURIComponent(`<!DOCTYPE html><html><head><style>
+        * { margin: 0; box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: rgba(24, 24, 27, 0.97);
+          color: #e4e4e7;
+          padding: 32px;
+          height: 100vh;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 16px; border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+        .spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #8b5cf6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        h3 { font-size: 16px; font-weight: 600; }
+        .status { font-size: 13px; color: #a1a1aa; text-align: center; min-height: 20px; }
+        .progress-wrap { width: 100%; max-width: 400px; }
+        .progress-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+        .progress { height: 100%; background: linear-gradient(90deg, #8b5cf6, #6d28d9); border-radius: 3px; transition: width 0.3s ease; width: 0%; }
+        .percent { font-size: 12px; color: #71717a; text-align: right; margin-top: 4px; }
+      </style></head><body>
+        <div class="spinner"></div>
+        <h3>Downloading UMU-Proton</h3>
+        <div class="status">Fetching latest release...</div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress" id="prog"></div></div>
+          <div class="percent" id="pct"></div>
+        </div>
+      </body></html>`)
+  );
+
+  const updateStatus = msg =>
+    progressWindow.webContents.executeJavaScript(
+      `document.querySelector('.status').textContent=${JSON.stringify(msg)};`
+    );
+  const updateProgress = pct =>
+    progressWindow.webContents.executeJavaScript(
+      `document.getElementById('prog').style.width='${pct}%';document.getElementById('pct').textContent='${Math.round(pct)}%';`
+    );
+
+  try {
+    // 1. Get release info
+    updateStatus("Fetching latest UMU-Proton release...");
+    updateProgress(5);
+
+    const info = await getUmuProtonInfo();
+    if (!info.success) throw new Error(info.error);
+
+    // Check if already installed
+    if (info.alreadyInstalled) {
+      updateStatus(`${info.name} is already installed!`);
+      updateProgress(100);
+      await new Promise(r => setTimeout(r, 2000));
+      progressWindow.close();
+      return {
+        success: true,
+        message: "Already installed",
+        path: info.installPath,
+        name: info.name,
+      };
+    }
+
+    // 2. Download
+    updateStatus(`Downloading ${info.fileName} (${info.sizeFormatted})...`);
+    updateProgress(10);
+
+    const tempPath = path.join(os.tmpdir(), info.fileName);
+
+    const downloadRes = await fetch(info.downloadUrl);
+    if (!downloadRes.ok) throw new Error(`Download failed: ${downloadRes.status}`);
+
+    const totalSize = parseInt(downloadRes.headers.get("content-length") || info.size);
+    const reader = downloadRes.body.getReader();
+    const chunks = [];
+    let downloaded = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      downloaded += value.length;
+      const pct = 10 + (downloaded / totalSize) * 60;
+      updateProgress(pct);
+      updateStatus(
+        `Downloading... ${(downloaded / 1024 / 1024).toFixed(1)} / ${(totalSize / 1024 / 1024).toFixed(1)} MB`
+      );
+    }
+
+    const buffer = Buffer.concat(chunks);
+    await fs.writeFile(tempPath, buffer);
+
+    // 3. Extract
+    updateStatus("Extracting (this may take a moment)...");
+    updateProgress(75);
+
+    fs.ensureDirSync(linuxRunnersDir);
+
+    await new Promise((resolve, reject) => {
+      const proc = exec(
+        `tar -xzf "${tempPath}" -C "${linuxRunnersDir}"`,
+        { maxBuffer: 10 * 1024 * 1024 },
+        err => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+      proc.stderr.on("data", data => {
+        updateStatus(`Extracting: ${data.toString().trim().substring(0, 60)}`);
+      });
+    });
+
+    updateProgress(90);
+
+    // 4. Cleanup temp file
+    await fs.remove(tempPath);
+
+    // 5. Verify installation
+    let installedPath = info.installPath;
+    let installedName = info.name;
+
+    if (!fs.existsSync(path.join(installedPath, "proton"))) {
+      const extractedDirs = await fs.readdir(linuxRunnersDir, { withFileTypes: true });
+      const found = extractedDirs.find(
+        d => d.isDirectory() && d.name.toLowerCase().includes("umu-proton")
+      );
+      if (found && fs.existsSync(path.join(linuxRunnersDir, found.name, "proton"))) {
+        installedPath = path.join(linuxRunnersDir, found.name);
+        installedName = found.name;
+      } else {
+        throw new Error("Extraction succeeded but proton script not found");
+      }
+    }
+
+    // 6. Auto-select this runner if current setting is "auto"
+    const settingsManager = getSettingsManager();
+    const currentSettings = settingsManager.getSettings();
+    if (!currentSettings.linuxRunner || currentSettings.linuxRunner === "auto") {
+      settingsManager.updateSetting("linuxRunner", installedPath);
+      console.log(`[Proton] Auto-selected ${installedName} as default runner`);
+    }
+
+    // 7. If the current runner was an old UMU-Proton version, update it
+    if (currentSettings.linuxRunner && currentSettings.linuxRunner !== "auto") {
+      const currentRunnerName = path.basename(currentSettings.linuxRunner);
+      if (
+        currentRunnerName.toLowerCase().includes("umu-proton") &&
+        currentRunnerName !== installedName
+      ) {
+        settingsManager.updateSetting("linuxRunner", installedPath);
+        console.log(
+          `[Proton] Updated runner from ${currentRunnerName} to ${installedName}`
+        );
+      }
+    }
+
+    // 8. Remove old UMU-Proton versions
+    const removedVersions = await removeOldUmuProton(installedName);
+    if (removedVersions.length > 0) {
+      console.log(`[Proton] Cleaned up old UMU-Proton versions: ${removedVersions.join(", ")}`);
+    }
+
+    updateStatus(`${installedName} installed successfully!`);
+    updateProgress(100);
+    await new Promise(r => setTimeout(r, 2000));
+    progressWindow.close();
+
+    return {
+      success: true,
+      message: `${installedName} installed`,
+      path: installedPath,
+      name: installedName,
+    };
+  } catch (err) {
+    console.error("[Proton] UMU-Proton download failed:", err);
+    updateStatus(`Error: ${err.message}`);
+    await new Promise(r => setTimeout(r, 3000));
+    progressWindow.close();
+    return { success: false, message: err.message };
+  }
+}
+
+/**
+ * Download and install umu-run binary (UMU Launcher)
+ */
+async function downloadUmuLauncher(parentWindow) {
+  if (!isLinux) return { success: false, message: "Linux only" };
+
+  const { linuxUmuDir, linuxUmuBin } = require("./config");
+
+  const progressWindow = new BrowserWindow({
+    width: 520,
+    height: 280,
+    parent: parentWindow || undefined,
+    modal: !!parentWindow,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  });
+
+  progressWindow.loadURL(
+    "data:text/html;charset=utf-8," +
+      encodeURIComponent(`<!DOCTYPE html><html><head><style>
+        * { margin: 0; box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: rgba(24, 24, 27, 0.97);
+          color: #e4e4e7;
+          padding: 32px;
+          height: 100vh;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 16px; border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+        .spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #8b5cf6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        h3 { font-size: 16px; font-weight: 600; }
+        .status { font-size: 13px; color: #a1a1aa; text-align: center; min-height: 20px; }
+        .progress-wrap { width: 100%; max-width: 400px; }
+        .progress-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+        .progress { height: 100%; background: linear-gradient(90deg, #8b5cf6, #6d28d9); border-radius: 3px; transition: width 0.3s ease; width: 0%; }
+        .percent { font-size: 12px; color: #71717a; text-align: right; margin-top: 4px; }
+      </style></head><body>
+        <div class="spinner"></div>
+        <h3>Downloading UMU Launcher</h3>
+        <div class="status">Fetching latest release...</div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress" id="prog"></div></div>
+          <div class="percent" id="pct"></div>
+        </div>
+      </body></html>`)
+  );
+
+  const updateStatus = m => progressWindow.webContents.executeJavaScript(`document.querySelector('.status').textContent=${JSON.stringify(m)}`);
+  const updateProgress = p => progressWindow.webContents.executeJavaScript(`document.getElementById('prog').style.width='${p}%'`);
+
+  try {
+    updateStatus("Fetching latest UMU release...");
+    const res = await fetch("https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases/latest");
+    const release = await res.json();
+    const asset = release.assets.find(a => a.name.includes("umu-launcher") && a.name.endsWith(".tar.gz"));
+
+    if (!asset) throw new Error("UMU asset not found");
+
+    const tempPath = path.join(os.tmpdir(), asset.name);
+    const downloadRes = await fetch(asset.browser_download_url);
+    const totalSize = parseInt(downloadRes.headers.get("content-length"));
+    
+    const reader = downloadRes.body.getReader();
+    let downloaded = 0;
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      downloaded += value.length;
+      updateProgress((downloaded / totalSize) * 80); // 80% for the download
+      updateStatus(`Downloading UMU: ${Math.round((downloaded / 1024 / 1024))} MB`);
+    }
+
+    await fs.writeFile(tempPath, Buffer.concat(chunks));
+
+    updateStatus("Extracting UMU Launcher...");
+    updateProgress(90);
+    
+    // Extraction
+    await new Promise((resolve, reject) => {
+      exec(`tar -xzf "${tempPath}" -C "${linuxUmuDir}" --strip-components=1`, (err) => {
+        if (err) reject(err); else resolve();
+      });
+    });
+
+    // Make the binary executable
+    if (fs.existsSync(linuxUmuBin)) {
+      await new Promise(r => exec(`chmod +x "${linuxUmuBin}"`, r));
+    }
+
+    updateStatus("Installation complete!");
+    updateProgress(100);
+    await new Promise(r => setTimeout(r, 1500));
+    progressWindow.close();
+    return { success: true };
+  } catch (err) {
+    console.error(err);
+    updateStatus("Error: " + err.message);
+    await new Promise(r => setTimeout(r, 3000));
+    progressWindow.close();
+    return { success: false, error: err.message };
+  }
 }
 
 // ─── Proton GE Download ───────────────────────────────────
@@ -594,52 +1012,71 @@ async function resolveRunner(gameOverride) {
  *
  * Returns: { cmd: string[], env: object, runner: object } or null
  */
-async function buildLaunchConfig(gameName, exePath, gameRunnerOverride) {
-  const runner = await resolveRunner(gameRunnerOverride);
-
-  if (!runner) {
-    return { error: "No compatible runner found. Please install Proton-GE or Wine." };
-  }
-
+async function buildLaunchConfig(gameName, exePath, gameRunnerOverride, umuId, store) {
+  const { linuxUmuBin } = require("./config");
   const compatDataPath = getCompatDataPath(gameName);
-  const steamInstallPath = findSteamInstallPath();
+  const winePrefix = path.join(compatDataPath, "pfx");
+  fs.ensureDirSync(winePrefix);
 
-  if (runner.type === "proton") {
-    const protonScript = path.join(runner.path, "proton");
+  // ─── UMU Mode (prioritized if umu-run is installed) ───────────────────────
+  if (isUmuInstalled()) {
+    const runner = await resolveRunner(gameRunnerOverride);
 
     const env = {
+      WINEPREFIX: winePrefix,
+      GAMEID: umuId || "umu-default",
       STEAM_COMPAT_DATA_PATH: compatDataPath,
-      STEAM_COMPAT_CLIENT_INSTALL_PATH: steamInstallPath,
-      // Proton handles DXVK/VKD3D automatically, but we can override
-      // PROTON_USE_WINED3D: "1",    // Uncomment to disable DXVK
-      // PROTON_NO_D3D11: "1",       // Uncomment to disable D3D11
-      // PROTON_NO_D3D12: "1",       // Uncomment to disable VKD3D
-      // PROTON_ENABLE_NVAPI: "1",   // For NVIDIA DLSS
     };
 
+    // PROTONPATH only if we have an explicit runner
+    // otherwise, umu-run will automatically use UMU-Proton.
+    if (runner && runner.type === "proton") {
+      env.PROTONPATH = runner.path;
+    }
+
+    // STORE (optional) (egs, gog, steam, humble, itchio, none...)
+    if (store && store !== "none") {
+      env.STORE = store;
+    }
+
     return {
-      cmd: [protonScript, "run", exePath],
+      cmd: [linuxUmuBin, exePath],
       env,
+      runner: runner || { name: "UMU-Proton (auto)", type: "proton" },
+      compatDataPath,
+      mode: "umu",
+    };
+  }
+
+  // ─── Fallback : umu-run not installed ───────────────────────────────────
+  const runner = await resolveRunner(gameRunnerOverride);
+  if (!runner) {
+    return { error: "No compatible runner found. Please install UMU-Launcher or Proton-GE." };
+  }
+
+  if (runner.type === "proton") {
+    return {
+      cmd: [path.join(runner.path, "proton"), "run", exePath],
+      env: {
+        STEAM_COMPAT_DATA_PATH: compatDataPath,
+        STEAM_COMPAT_CLIENT_INSTALL_PATH: findSteamInstallPath(),
+      },
       runner,
       compatDataPath,
+      mode: "proton-direct",
     };
   }
 
   if (runner.type === "wine") {
-    // Wine fallback — still use isolated prefix
-    const winePrefix = path.join(compatDataPath, "pfx");
-    fs.ensureDirSync(winePrefix);
-
-    const env = {
-      WINEPREFIX: winePrefix,
-      WINEDLLOVERRIDES: "winemenubuilder.exe=d", // Prevent Wine from creating .desktop files
-    };
-
     return {
       cmd: [runner.path, exePath],
-      env,
+      env: {
+        WINEPREFIX: winePrefix,
+        WINEDLLOVERRIDES: "winemenubuilder.exe=d",
+      },
       runner,
       compatDataPath,
+      mode: "wine",
     };
   }
 
@@ -650,6 +1087,22 @@ async function buildLaunchConfig(gameName, exePath, gameRunnerOverride) {
 
 function registerProtonHandlers() {
   if (!isLinux) return;
+
+  ipcMain.handle("is-umu-installed", () => isUmuInstalled());
+  
+  ipcMain.handle("get-umu-proton-info", async () => {
+    return await getUmuProtonInfo();
+  });
+
+  ipcMain.handle("download-umu-launcher", async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return await downloadUmuLauncher(win);
+  });
+
+  ipcMain.handle("download-umu-proton", async event => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return await downloadUmuProton(win);
+  });
 
   // Ensure directories exist at startup
   ensureLinuxDirectories();
@@ -667,6 +1120,17 @@ function registerProtonHandlers() {
   // Remove old Proton-GE versions manually
   ipcMain.handle("cleanup-old-proton-ge", async (_, keepVersion) => {
     const removed = await removeOldProtonGE(keepVersion);
+    return { success: true, removed };
+  });
+
+  // Check for UMU-Proton updates
+  ipcMain.handle("check-umu-proton-update", async () => {
+    return await getUmuProtonInfo();
+  });
+
+  // Remove old UMU-Proton versions manually
+  ipcMain.handle("cleanup-old-umu-proton", async (_, keepVersion) => {
+    const removed = await removeOldUmuProton(keepVersion);
     return { success: true, removed };
   });
 
@@ -796,4 +1260,5 @@ module.exports = {
   isWindowsExecutable,
   findSteamInstallPath,
   removeOldProtonGE,
+  removeOldUmuProton,
 };

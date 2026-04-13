@@ -66,6 +66,8 @@ def parse_linux_runner_args(args):
         "runner_path": None,
         "compat_data": None,
         "steam_path": None,
+        "umu_id": None,
+        "proton_path": None,
     }
 
     i = 0
@@ -81,6 +83,12 @@ def parse_linux_runner_args(args):
             i += 2
         elif args[i] == "--linux-steam-path" and i + 1 < len(args):
             config["steam_path"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-umu-id" and i + 1 < len(args):
+            config["umu_id"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-proton-path" and i + 1 < len(args):
+            config["proton_path"] = args[i + 1]
             i += 2
         else:
             i += 1
@@ -250,6 +258,58 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
         return process
     except Exception as e:
         logging.error(f"[Wine] Failed to launch: {e}", exc_info=True)
+        return None
+
+def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
+    """
+    Launch a Windows executable using umu-run.
+    Equivalent to: GAMEID=umu-xxxx PROTONPATH=/path/to/proton WINEPREFIX=/path/pfx umu-run game.exe
+    """
+    umu_bin = linux_config["runner_path"]  # absolute path to umu-run
+
+    if not os.path.exists(umu_bin):
+        logging.error(f"[UMU] umu-run not found at: {umu_bin}")
+        return None
+
+    os.chmod(umu_bin, 0o755)
+
+    prefix_path = os.path.join(linux_config["compat_data"], "pfx")
+    os.makedirs(prefix_path, exist_ok=True)
+
+    env = os.environ.copy()
+    env["GAMEID"] = linux_config.get("umu_id") or "umu-default"
+    env["WINEPREFIX"] = prefix_path
+    env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
+
+    # optional PROTONPATH - if empty, umu-run uses UMU-Proton
+    if linux_config.get("proton_path"):
+        env["PROTONPATH"] = linux_config["proton_path"]
+
+    if linux_config.get("steam_path"):
+        env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = linux_config["steam_path"]
+
+    cmd = [umu_bin, exe_path]
+    if game_launch_cmd:
+        cmd.extend(game_launch_cmd.split())
+
+    game_dir = os.path.dirname(exe_path)
+
+    logging.info(f"[UMU] Command: {' '.join(cmd)}")
+    logging.info(f"[UMU] GAMEID={env['GAMEID']}, WINEPREFIX={prefix_path}")
+    logging.info(f"[UMU] PROTONPATH={env.get('PROTONPATH', '(auto)')}")
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            env=env,
+            cwd=game_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logging.info(f"[UMU] Process started, PID: {process.pid}")
+        return process
+    except Exception as e:
+        logging.error(f"[UMU] Failed to launch: {e}", exc_info=True)
         return None
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
@@ -692,7 +752,10 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
 
         if current_platform == 'linux' and is_windows_exe and linux_runner_config:
             # Linux with Proton or Wine (from Electron config)
-            if linux_runner_config["runner_type"] == "proton":
+            if linux_runner_config["runner_type"] == "umu":
+                logging.info(f"[Launch] Using UMU: {linux_runner_config['runner_path']}")
+                process = launch_with_umu(exe_path, linux_runner_config, game_launch_cmd)
+            elif linux_runner_config["runner_type"] == "proton":
                 logging.info(f"[Launch] Using Proton: {linux_runner_config['runner_path']}")
                 process = launch_with_proton(exe_path, linux_runner_config, game_launch_cmd)
             elif linux_runner_config["runner_type"] == "wine":
@@ -855,7 +918,10 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     # Try to launch trainer normally first
                     try:
                         if trainer_use_wine:
-                            if use_proton and current_platform == 'linux' and proton_config:
+                            if linux_runner_config and linux_runner_config.get("runner_type") == "umu":
+                                logging.info("Launching trainer with UMU")
+                                trainer_process = launch_with_umu(trainer_path, linux_runner_config, None)
+                            elif use_proton and current_platform == 'linux' and proton_config:
                                 logging.info("Launching trainer with Proton")
                                 try:
                                     trainer_process = launch_with_proton(trainer_path, proton_config, None)

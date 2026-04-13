@@ -19,6 +19,10 @@ const linuxConfigDir = isLinux ? path.join(os.homedir(), ".ascendara") : null;
 const linuxCompatDataDir = isLinux ? path.join(linuxConfigDir, "compatdata") : null;
 const linuxRunnersDir = isLinux ? path.join(linuxConfigDir, "runners") : null;
 
+const linuxUmuDir = isLinux ? path.join(linuxConfigDir, "tools", "umu") : null;
+const linuxUmuBin = isLinux ? path.join(linuxUmuDir, "umu-run") : null;
+const linuxUmuDbPath = isLinux ? path.join(linuxConfigDir, "umu_database.csv") : null;
+
 // Steam common paths for Proton detection
 const STEAM_COMMON_PATHS = isLinux
   ? [
@@ -163,6 +167,9 @@ module.exports = {
   linuxConfigDir,
   linuxCompatDataDir,
   linuxRunnersDir,
+  linuxUmuDir,
+  linuxUmuBin,
+  linuxUmuDbPath,
   STEAM_COMMON_PATHS,
   STEAM_INSTALL_PATHS,
 };
