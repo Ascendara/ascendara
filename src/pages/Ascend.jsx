@@ -9439,13 +9439,22 @@ const Ascend = () => {
             </motion.div>
           </motion.div>
 
+        </motion.div>
+
+        {/* Right side - Form */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="relative w-full max-w-lg justify-self-end"
+        >
           {/* Pricing notice - only on signup */}
           {!isLogin && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 }}
-              className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5"
+              className="relative overflow-hidden rounded-xl mb-8 border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5"
             >
               <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
               <div className="relative flex items-start gap-4">
@@ -9472,15 +9481,7 @@ const Ascend = () => {
               </div>
             </motion.div>
           )}
-        </motion.div>
 
-        {/* Right side - Form */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="relative w-full max-w-lg justify-self-end"
-        >
           {/* Glassmorphism card container */}
           <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/80 p-6 shadow-2xl backdrop-blur-xl">
             {/* Decorative gradient orbs */}

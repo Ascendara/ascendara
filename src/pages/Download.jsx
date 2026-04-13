@@ -2166,6 +2166,15 @@ export default function DownloadPage() {
                 {/* Animated background gradient */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
+                {/* Small text for non-Ascend users - Top Left */}
+                {!isAuthenticated || !userData?.ascendSubscription?.active ? (
+                  <div className="relative mb-3 flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {t("download.ascendFeaturesLocked", { gameName: gameData?.game || "This game" })}
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="relative flex items-center justify-between gap-2">
                   <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-3">
                     {/* Cloud Saves Feature */}

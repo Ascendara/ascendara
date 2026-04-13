@@ -36,6 +36,7 @@ import {
   Download,
   Cloud,
   ExternalLink,
+  Calendar,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -1109,17 +1110,13 @@ const LocalRefresh = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500/10 to-blue-500/10">
-                    <RefreshCw className="h-5 w-5 text-purple-500" />
+                    <Calendar className="h-5 w-5 text-primary" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium">
                         {t("localRefresh.autoRefresh") || "Automatic Index Refreshing"}
                       </h3>
-                      <Badge className="gap-1 bg-gradient-to-r from-purple-500/10 to-blue-500/10 text-purple-600 dark:text-purple-400">
-                        <Star className="h-3 w-3" />
-                        {t("common.ascend") || "Ascend"}
-                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {t("localRefresh.autoRefreshCardDesc") ||
