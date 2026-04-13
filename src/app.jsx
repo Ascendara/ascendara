@@ -1129,8 +1129,8 @@ const AppRoutes = () => {
       const data = await checkWelcomeStatus();
       setWelcomeData(data);
       // Update launch count since this is the first launch
-      const launchCount = await window.electron.updateLaunchCount();
-      if (launchCount === 5) {
+      const count = await window.electron.updateLaunchCount();
+      if (count === 5) {
         setTimeout(() => {
           setShowSupportDialog(true);
         }, 4000);
@@ -1823,6 +1823,22 @@ function ToasterWithTheme() {
 function App() {
   const { t } = useTranslation();
   const [playerExpanded, setPlayerExpanded] = useState(false);
+  const [launchCount, setLaunchCount] = useState(0);
+
+  useEffect(() => {
+    const initializeLaunchCount = async () => {
+      try {
+        const count = await window.electron.updateLaunchCount();
+        // TEMPORARY: Override for testing - change this value to test different scenarios
+        // Use 0-4 to test before dialog shows, 5+ to test after dialog shows
+        setLaunchCount(5); // Change this number for testing
+      } catch (error) {
+        console.error("[App] Error initializing launch count:", error);
+      }
+    };
+
+    initializeLaunchCount();
+  }, []);
 
   useEffect(() => {
     const checkUpdates = async () => {
@@ -1947,7 +1963,7 @@ function App() {
                     <GiantBombMigrationWarning />
                     <AutomaticIndexRefresher />
                     <ControllerDetectionPrompt />
-                    <LifetimeSubscriptionDialog />
+                    <LifetimeSubscriptionDialog launchCount={launchCount} />
                     <SearchInitializer />
                     <GlobalSearch />
                     <AppRoutes />

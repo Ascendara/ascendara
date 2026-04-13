@@ -15,7 +15,7 @@ import { Crown, Sparkles, Zap, Loader2, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getAuthToken } from "@/utils/authHelper";
 
-const LifetimeSubscriptionDialog = () => {
+const LifetimeSubscriptionDialog = ({ launchCount }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, userData } = useAuth();
@@ -26,39 +26,42 @@ const LifetimeSubscriptionDialog = () => {
   const hasCheckedRef = useRef(false);
 
   useEffect(() => {
-    if (!user?.uid || hasCheckedRef.current) return;
+    if (!user?.uid || hasCheckedRef.current || !launchCount) return;
 
     const checkLifetimeEligibility = async () => {
       try {
-        // Check if user has an active subscription but not lifetime
         const subscription = userData?.ascendSubscription;
         
-        if (
-          subscription?.active === true && 
-          subscription?.lifetime !== true &&
-          !hasCheckedRef.current
-        ) {
+        // Show dialog for both non-subscribers and active subscribers without lifetime
+        const shouldShowDialog = 
+          !subscription?.active || // No active subscription
+          (subscription?.active === true && subscription?.lifetime !== true); // Active but not lifetime
+        
+        // Only show after 5 launches (a couple days of usage)
+        if (shouldShowDialog && !hasCheckedRef.current && launchCount >= 5) {
           hasCheckedRef.current = true;
           
-          // Fetch discount information from API
-          try {
-            const token = await user.getIdToken();
-            const response = await fetch('https://api.ascendara.app/stripe/calculate-lifetime-discount', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({ userId: user.uid })
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              setDiscountInfo(data);
-              console.log('[LifetimeDialog] Discount info:', data);
+          // Fetch discount information from API only if user has active subscription
+          if (subscription?.active === true) {
+            try {
+              const token = await user.getIdToken();
+              const response = await fetch('https://api.ascendara.app/stripe/calculate-lifetime-discount', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ userId: user.uid })
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                setDiscountInfo(data);
+                console.log('[LifetimeDialog] Discount info:', data);
+              }
+            } catch (error) {
+              console.error('[LifetimeDialog] Error fetching discount:', error);
             }
-          } catch (error) {
-            console.error('[LifetimeDialog] Error fetching discount:', error);
           }
           
           setLoading(false);
@@ -66,7 +69,7 @@ const LifetimeSubscriptionDialog = () => {
           // Show dialog after a delay to let app initialize
           setTimeout(() => {
             setShowDialog(true);
-          }, 8000); // 8 second delay
+          }, 4000); // 4 second delay
         } else {
           setLoading(false);
         }
@@ -77,9 +80,9 @@ const LifetimeSubscriptionDialog = () => {
     };
 
     checkLifetimeEligibility();
-  }, [user?.uid, userData]);
+  }, [user?.uid, userData, launchCount]);
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (isLifetime = true) => {
     try {
       setShowDialog(false);
       setShowRedirectDialog(true);
@@ -87,11 +90,13 @@ const LifetimeSubscriptionDialog = () => {
       // Get auth token using the helper function
       const authToken = await getAuthToken();
       
-      // Lifetime price ID
-      const lifetimePriceId = "price_1TKjjMCfu5zjwIKZyrWXZFJ1";
+      // Determine which price ID to use
+      const priceId = isLifetime 
+        ? "price_1TKjjMCfu5zjwIKZyrWXZFJ1" // Lifetime
+        : "price_1QnMnNCfu5zjwIKZFbCRwBHd"; // Monthly $1.50
       
-      // Use the discount amount we already fetched
-      const discountAmount = discountInfo?.discount || 0;
+      // Use the discount amount we already fetched (only for lifetime upgrades)
+      const discountAmount = isLifetime ? (discountInfo?.discount || 0) : 0;
       
       // Create checkout session
       const response = await fetch(
@@ -104,7 +109,7 @@ const LifetimeSubscriptionDialog = () => {
           },
           body: JSON.stringify({
             userId: user.uid,
-            priceId: lifetimePriceId,
+            priceId: priceId,
             discountAmount: discountAmount,
             successUrl: "https://ascendara.app/thank-you?subscription=success",
             cancelUrl: "ascendara://checkout-canceled",
@@ -129,7 +134,7 @@ const LifetimeSubscriptionDialog = () => {
             },
             body: JSON.stringify({
               userId: user.uid,
-              priceId: lifetimePriceId,
+              priceId: priceId,
               discountAmount: discountAmount,
               successUrl: "https://ascendara.app/thank-you?subscription=success",
               cancelUrl: "ascendara://checkout-canceled",
@@ -179,6 +184,9 @@ const LifetimeSubscriptionDialog = () => {
 
   if (!showDialog && !showRedirectDialog) return null;
 
+  const subscription = userData?.ascendSubscription;
+  const hasActiveSubscription = subscription?.active === true;
+
   return (
     <>
     <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
@@ -186,7 +194,9 @@ const LifetimeSubscriptionDialog = () => {
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-yellow-500" />
-            {t("ascend.settings.lifetimeDialog.title", "Limited Time: Upgrade to Lifetime")}
+            {hasActiveSubscription
+              ? t("ascend.settings.lifetimeDialog.title", "Sounds like there's a deal...")
+              : t("ascend.settings.lifetimeDialog.titleNoSub", "Join Ascend Today")}
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
             <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
@@ -194,37 +204,62 @@ const LifetimeSubscriptionDialog = () => {
                 <Sparkles className="h-4 w-4" />
                 {t("ascend.settings.lifetimeDialog.limitedTime", "Limited Time Offer")}
               </div>
-              {discountInfo?.discount > 0 && (
+              {hasActiveSubscription && discountInfo?.discount > 0 && (
                 <div className="mt-2 text-lg font-bold text-yellow-900 dark:text-yellow-100">
                   {t("ascend.settings.lifetimeDialog.saveAmount", { amount: discountInfo.discount })}
                 </div>
               )}
             </div>
             
-            <p className="text-sm">
-              {discountInfo?.discount > 0 
-                ? t("ascend.settings.lifetimeDialog.descriptionWithDiscount", { 
-                    tier: discountInfo.subscriptionTier, 
-                    amount: discountInfo.discount 
-                  })
-                : t("ascend.settings.lifetimeDialog.description", "You're currently on a recurring subscription. Upgrade to Lifetime Ascend and pay once, forever!")
-              }
-            </p>
-            
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Zap className="h-4 w-4 text-green-500" />
-                <span>{t("ascend.settings.lifetimeDialog.benefit1", "One-time payment, lifetime access")}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Zap className="h-4 w-4 text-green-500" />
-                <span>{t("ascend.settings.lifetimeDialog.benefit2", "Never worry about renewals again")}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Zap className="h-4 w-4 text-green-500" />
-                <span>{t("ascend.settings.lifetimeDialog.benefit3", "All future updates included")}</span>
-              </div>
-            </div>
+            {hasActiveSubscription ? (
+              <>
+                <p className="text-sm">
+                  {discountInfo?.discount > 0 
+                    ? t("ascend.settings.lifetimeDialog.descriptionWithDiscount", { 
+                        tier: discountInfo.subscriptionTier, 
+                        amount: discountInfo.discount 
+                      })
+                    : t("ascend.settings.lifetimeDialog.description", "You're currently on a recurring subscription. Upgrade to Lifetime Ascend and pay once, forever!")
+                  }
+                </p>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-green-500" />
+                    <span>{t("ascend.settings.lifetimeDialog.benefit1", "One-time payment, lifetime access")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-green-500" />
+                    <span>{t("ascend.settings.lifetimeDialog.benefit2", "Never worry about renewals again")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-green-500" />
+                    <span>{t("ascend.settings.lifetimeDialog.benefit3", "All future updates included")}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm">
+                  {t("ascend.settings.lifetimeDialog.descriptionNoSub", "Unlock premium features with Ascend! Start with a 7-day free trial, then just $1.50/month.")}
+                </p>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-green-500" />
+                    <span>{t("ascend.settings.lifetimeDialog.benefitTrial", "7-day free trial included")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-green-500" />
+                    <span>{t("ascend.settings.lifetimeDialog.benefitPrice", "Only $1.50/month after trial")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-green-500" />
+                    <span>{t("ascend.settings.lifetimeDialog.benefitLifetimeOption", "Or upgrade to lifetime for a one-time payment")}</span>
+                  </div>
+                </div>
+              </>
+            )}
             
             <p className="text-xs text-muted-foreground italic">
               {t("ascend.settings.lifetimeDialog.disclaimer", "This special offer is available for a limited time only. Don't miss out!")}
@@ -235,9 +270,15 @@ const LifetimeSubscriptionDialog = () => {
           <AlertDialogCancel onClick={handleDismiss}>
             {t("common.maybeLater", "Maybe Later")}
           </AlertDialogCancel>
-          <AlertDialogAction onClick={handleUpgrade} className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 text-secondary hover:to-orange-600">
-            {t("ascend.settings.lifetimeDialog.upgradeToLifetime", "Upgrade to Lifetime")}
-          </AlertDialogAction>
+          {hasActiveSubscription ? (
+            <AlertDialogAction onClick={() => handleUpgrade(true)} className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 text-secondary hover:to-orange-600">
+              {t("ascend.settings.lifetimeDialog.upgradeToLifetime", "Upgrade to Lifetime")}
+            </AlertDialogAction>
+          ) : (
+            <AlertDialogAction onClick={() => navigate('/ascend')} className="bg-primary hover:bg-primary/90">
+              {t("ascend.settings.lifetimeDialog.startTrial", "Start Free Trial")}
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
