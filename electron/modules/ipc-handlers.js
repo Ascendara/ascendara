@@ -161,9 +161,9 @@ function registerMiscHandlers() {
   });
 
   // Read local file
-  ipcMain.handle("read-local-file", async (_, filePath) => {
+  ipcMain.handle("read-local-file", async (_, filePath, encoding = "utf8") => {
     try {
-      return await fs.promises.readFile(filePath, "utf8");
+      return await fs.promises.readFile(filePath, encoding);
     } catch (error) {
       console.error("Error reading local file:", error);
       throw error;

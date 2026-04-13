@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld("electron", {
     off: (channel, func) => ipcRenderer.off(channel, func),
     removeListener: (channel, func) => ipcRenderer.removeListener(channel, func),
     invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-    readFile: path => ipcRenderer.invoke("read-local-file", path),
+    readFile: (path, encoding) => ipcRenderer.invoke("read-local-file", path, encoding),
     writeFile: (path, content) => ipcRenderer.invoke("write-file", path, content),
   },
 
