@@ -9,7 +9,7 @@ const os = require("os");
 const axios = require("axios");
 const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, app, BrowserWindow } = require("electron");
-const { isDev, isWindows, isLinux, appDirectory, getPythonPath } = require("./config");
+const { isDev, isWindows, isLinux, appDirectory, linuxUmuBin, getPythonPath } = require("./config");
 const { sanitizeGameName, getExtensionFromMimeType, shouldLogError } = require("./utils");
 const { getSettingsManager } = require("./settings");
 const {
@@ -448,9 +448,9 @@ function registerGameHandlers() {
           // Auto-detect UMU ID if not already set
           try {
             const { autoDetectAndSaveUmuId, getGameUmuId } = require("./umu-database");
-            const existingId = await getGameUmuId(gameDirectory);
+            const existingId = await getGameUmuId(game);
             if (!existingId) {
-              autoDetectAndSaveUmuId(game, gameDirectory).catch(() => {});
+              autoDetectAndSaveUmuId(game).catch(() => {});
             }
           } catch (e) {}
 
@@ -475,7 +475,7 @@ function registerGameHandlers() {
           let umuId = null;
           try {
             const { getGameUmuId } = require("./umu-database");
-            umuId = await getGameUmuId(gameDirectory);
+            umuId = await getGameUmuId(game);
           } catch (e) {
             console.warn("[Games] Could not read umuId:", e.message);
           }
@@ -501,8 +501,8 @@ function registerGameHandlers() {
             "--linux-runner-type",
             launchConfig.mode === "umu" ? "umu" : launchConfig.runner.type,
             "--linux-runner-path",
-            launchConfig.runner.type === "proton"
-              ? launchConfig.runner.path
+            launchConfig.mode === "umu"
+              ? linuxUmuBin 
               : launchConfig.runner.path,
             "--linux-compat-data",
             launchConfig.compatDataPath,

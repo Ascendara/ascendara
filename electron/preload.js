@@ -98,10 +98,9 @@ contextBridge.exposeInMainWorld("electron", {
   // UMU Database
   umuRefreshDatabase: () => ipcRenderer.invoke("umu-refresh-database"),
   umuFindId: gameName => ipcRenderer.invoke("umu-find-id", gameName),
-  umuGetGameId: gameDir => ipcRenderer.invoke("umu-get-game-id", gameDir),
-  umuSetGameId: (gameDir, umuId) => ipcRenderer.invoke("umu-set-game-id", gameDir, umuId),
-  umuAutoDetect: (gameName, gameDir) =>
-    ipcRenderer.invoke("umu-auto-detect", gameName, gameDir),
+  umuGetGameId: gameName => ipcRenderer.invoke("umu-get-game-id", gameName),
+  umuSetGameId: (gameName, umuId) => ipcRenderer.invoke("umu-set-game-id", gameName, umuId),
+  umuAutoDetect: (gameName) => ipcRenderer.invoke("umu-auto-detect", gameName),
 
   // Crack/Emulator Settings
   getLocalCrackUsername: () => ipcRenderer.invoke("get-local-crack-username"),

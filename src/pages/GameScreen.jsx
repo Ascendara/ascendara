@@ -715,13 +715,13 @@ export default function GameScreen() {
     : null;
   if (!gameDir) return;
 
-  window.electron.umuGetGameId(gameDir).then(id => {
+  window.electron.umuGetGameId(game.game || game.name).then(id => {
     setUmuId(id || "");
     setUmuIdInput(id || "");
   });
 
   // Auto-detect if none set
-  window.electron.umuAutoDetect(game.game || game.name, gameDir).then(found => {
+  window.electron.umuAutoDetect(game.game || game.name).then(found => {
     if (found && !umuId) {
       setUmuId(found);
       setUmuIdInput(found);
@@ -2268,11 +2268,8 @@ export default function GameScreen() {
                           disabled={umuIdSaving || umuIdInput === umuId}
                           onClick={async () => {
                             if (!game.executable) return;
-                            const gameDir = game.executable.substring(
-                              0, game.executable.lastIndexOf("/")
-                            );
                             setUmuIdSaving(true);
-                            const result = await window.electron.umuSetGameId(gameDir, umuIdInput);
+                            const result = await window.electron.umuSetGameId(game.game || game.name, umuIdInput);
                             if (result.success) {
                               setUmuId(umuIdInput);
                               toast.success("UMU ID saved");

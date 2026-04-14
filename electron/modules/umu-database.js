@@ -2,6 +2,8 @@ const fs = require("fs-extra");
 const path = require("path");
 const { ipcMain } = require("electron");
 const { linuxConfigDir, isLinux } = require("./config");
+const { getSettingsManager } = require("./settings");
+const { sanitizeGameName } = require("./utils"); // Ajuste le chemin
 
 const UMU_CSV_URL =
   "https://raw.githubusercontent.com/Open-Wine-Components/umu-database/main/umu-database.csv";
@@ -31,6 +33,37 @@ async function refreshUmuDatabase() {
     console.error("[UMU-DB] Refresh failed:", err.message);
     return { success: false, error: err.message };
   }
+}
+
+async function findGameDataLocation(gameName) {
+    const settingsManager = getSettingsManager();
+    const settings = settingsManager.getSettings();
+    
+    const sanitizedGame = sanitizeGameName(gameName);
+    const allDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+    ];
+
+    if (!settings.downloadDirectory) return null;
+
+    // Search logic
+    for (const directory of allDirectories) {
+        let testPath = path.join(directory, sanitizedGame, `${sanitizedGame}.ascendara.json`);
+        if (fs.existsSync(testPath)) return { type: 'file', path: testPath };
+
+        testPath = path.join(directory, gameName, `${gameName}.ascendara.json`);
+        if (fs.existsSync(testPath)) return { type: 'file', path: testPath };
+    }
+
+    const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+    if (fs.existsSync(gamesFilePath)) {
+        const gamesData = await fs.readJson(gamesFilePath);
+        const index = gamesData.games?.findIndex(g => g.game?.toLowerCase() === gameName.toLowerCase());
+        if (index !== -1) return { type: 'custom', path: gamesFilePath, index, fullData: gamesData };
+    }
+
+    return null;
 }
 
 // ─── Parsing CSV ─────────────────────────────────────────────────────────
@@ -123,37 +156,50 @@ function getGameJsonPath(gameDir) {
   return path.join(gameDir, ".ascendara.json");
 }
 
-async function getGameUmuId(gameDir) {
-  const jsonPath = getGameJsonPath(gameDir);
-  if (!fs.existsSync(jsonPath)) return null;
-  try {
-    const data = await fs.readJson(jsonPath);
-    return data.umuId || null;
-  } catch {
-    return null;
-  }
-}
+async function getGameUmuId(gameName) {
+    const location = await findGameDataLocation(gameName);
+    if (!location) return null;
 
-async function setGameUmuId(gameDir, umuId) {
-  const jsonPath = getGameJsonPath(gameDir);
-  try {
-    const data = fs.existsSync(jsonPath) ? await fs.readJson(jsonPath) : {};
-    if (!umuId || umuId.trim() === "") {
-      delete data.umuId;
-    } else {
-      data.umuId = umuId.trim();
+    try {
+        if (location.type === 'file') {
+            const data = await fs.readJson(location.path);
+            return data.umuId || null;
+        } else {
+            return location.fullData.games[location.index].umuId || null;
+        }
+    } catch {
+        return null;
     }
-    await fs.writeJson(jsonPath, data, { spaces: 2 });
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
 }
 
-async function autoDetectAndSaveUmuId(gameName, gameDir) {
+async function setGameUmuId(gameName, umuId) {
+    const location = await findGameDataLocation(gameName);
+    if (!location) return { success: false, error: "Game configuration not found" };
+
+    try {
+        if (location.type === 'file') {
+            // Update game's json
+            const data = await fs.readJson(location.path);
+            data.umuId = umuId?.trim() || undefined;
+            if (!data.umuId) delete data.umuId;
+            await fs.writeJson(location.path, data, { spaces: 4 });
+        } else {
+            // Or update games.json
+            const gamesData = location.fullData;
+            gamesData.games[location.index].umuId = umuId?.trim() || undefined;
+            if (!gamesData.games[location.index].umuId) delete gamesData.games[location.index].umuId;
+            await fs.writeJson(location.path, gamesData, { spaces: 4 });
+        }
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+}
+
+async function autoDetectAndSaveUmuId(gameName,) {
   const found = await findUmuId(gameName);
   if (found) {
-    await setGameUmuId(gameDir, found);
+    await setGameUmuId(gameName, found);
     console.log(`[UMU-DB] Auto-detected ID for "${gameName}": ${found}`);
   } else {
     console.log(`[UMU-DB] No ID found for "${gameName}"`);
