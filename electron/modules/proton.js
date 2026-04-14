@@ -500,7 +500,12 @@ async function downloadUmuLauncher(parentWindow) {
   if (!isLinux) return { success: false, message: "Linux only" };
 
   const { linuxUmuDir, linuxUmuBin } = require("./config");
+  const fs = require("fs-extra");
+  const path = require("path");
+  const os = require("os");
+  const { exec } = require("child_process");
 
+  // Create progress window
   const progressWindow = new BrowserWindow({
     width: 520,
     height: 280,
@@ -546,61 +551,83 @@ async function downloadUmuLauncher(parentWindow) {
       </body></html>`)
   );
 
-  const updateStatus = m => progressWindow.webContents.executeJavaScript(`document.querySelector('.status').textContent=${JSON.stringify(m)}`);
-  const updateProgress = p => progressWindow.webContents.executeJavaScript(`document.getElementById('prog').style.width='${p}%'`);
+  const updateStatus = m => !progressWindow.isDestroyed() && progressWindow.webContents.executeJavaScript(`document.querySelector('.status').textContent=${JSON.stringify(m)}`);
+  const updateProgress = p => !progressWindow.isDestroyed() && progressWindow.webContents.executeJavaScript(`document.getElementById('prog').style.width='${p}%'`);
 
   try {
     updateStatus("Fetching latest UMU release...");
-    const res = await fetch("https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases/latest");
+    
+    // 1. Get release info
+    const res = await fetch("https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases/latest", {
+      headers: { "User-Agent": "Ascendara-Launcher" }
+    });
     const release = await res.json();
-    const asset = release.assets.find(a => a.name.includes("umu-launcher") && a.name.endsWith(".tar.gz"));
+    const version = release.tag_name;
+    const asset = release.assets.find(a => a.name.endsWith("-zipapp.tar"));
 
-    if (!asset) throw new Error("UMU asset not found");
+    if (!asset) throw new Error("UMU Launcher zipapp asset not found");
 
-    const tempPath = path.join(os.tmpdir(), asset.name);
+   // Verify version
+    const versionFile = path.join(linuxUmuDir, "version");
+    if (fs.existsSync(linuxUmuBin) && fs.existsSync(versionFile)) {
+      if (fs.readFileSync(versionFile, "utf8").trim() === version) {
+        progressWindow.close();
+        return { success: true, alreadyInstalled: true };
+      }
+    }
+
+    // 2. Download
+    updateStatus(`Downloading UMU v${version}...`);
     const downloadRes = await fetch(asset.browser_download_url);
     const totalSize = parseInt(downloadRes.headers.get("content-length"));
-    
-    const reader = downloadRes.body.getReader();
-    let downloaded = 0;
-    const chunks = [];
 
+    const reader = downloadRes.body.getReader();
+    
+    const tmpTar = path.join(os.tmpdir(), "umu-launcher.tar");
+    const writer = fs.createWriteStream(tmpTar);
+
+    let downloaded = 0;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      chunks.push(value);
+      
+      writer.write(value);
       downloaded += value.length;
-      updateProgress((downloaded / totalSize) * 80); // 80% for the download
-      updateStatus(`Downloading UMU: ${Math.round((downloaded / 1024 / 1024))} MB`);
+      updateProgress((downloaded / totalSize) * 80); // 80% max pour le DL
     }
+    writer.end();
 
-    await fs.writeFile(tempPath, Buffer.concat(chunks));
-
-    updateStatus("Extracting UMU Launcher...");
+    // 3. Extract and cleanup
+    updateStatus("Extracting UMU...");
     updateProgress(90);
-    
-    // Extraction
+    fs.ensureDirSync(linuxUmuDir);
+
+    if (fs.existsSync(linuxUmuBin)) fs.removeSync(linuxUmuBin);
+
     await new Promise((resolve, reject) => {
-      exec(`tar -xzf "${tempPath}" -C "${linuxUmuDir}" --strip-components=1`, (err) => {
+      // Structure: tar -> dossier umu/ -> fichier umu-run
+      // --strip-components=1 enlève le dossier "umu/"
+      exec(`tar -xf "${tmpTar}" -C "${linuxUmuDir}" --strip-components=1`, (err) => {
         if (err) reject(err); else resolve();
       });
     });
 
-    // Make the binary executable
-    if (fs.existsSync(linuxUmuBin)) {
-      await new Promise(r => exec(`chmod +x "${linuxUmuBin}"`, r));
-    }
+    // 4. Finalization
+    fs.chmodSync(linuxUmuBin, 0o755);
+    fs.writeFileSync(versionFile, version, "utf8");
+    fs.removeSync(tmpTar);
 
     updateStatus("Installation complete!");
     updateProgress(100);
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1000));
     progressWindow.close();
     return { success: true };
   } catch (err) {
-    console.error(err);
-    updateStatus("Error: " + err.message);
-    await new Promise(r => setTimeout(r, 3000));
-    progressWindow.close();
+    if (!progressWindow.isDestroyed()) {
+      updateStatus("Error: " + err.message);
+      await new Promise(r => setTimeout(r, 3000));
+      progressWindow.close();
+    }
     return { success: false, error: err.message };
   }
 }

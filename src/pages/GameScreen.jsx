@@ -686,14 +686,14 @@ export default function GameScreen() {
   const [umuId, setUmuId] = useState("");
   const [umuIdInput, setUmuIdInput] = useState("");
   const [umuIdSaving, setUmuIdSaving] = useState(false);
-  const gameName = game?.game || game?.name;
-  const [umuInstalled, setUmuInstalled] = useState(true);
+  const [umuInstalled, setUmuInstalled] = useState(true); // true by default for other OS
 
   // Detect Linux platform and load prefix info
   useEffect(() => {
     const platform = window.electron.getPlatform();
     if (platform === "linux") {
       setIsOnLinux(true);
+      const gameName = game?.game || game?.name;
       if (gameName) {
         window.electron
           .getPrefixSize(gameName)
