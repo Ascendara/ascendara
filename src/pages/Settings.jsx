@@ -2813,7 +2813,7 @@ function Settings() {
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
-                            disabled={umuInstalled || isDownloadingUmuLauncher}
+                            disabled={isDownloadingUmuLauncher}
                             className="gap-1 text-secondary"
                             onClick={async () => {
                               setIsDownloadingUmuLauncher(true);
@@ -2834,7 +2834,7 @@ function Settings() {
                             {isDownloadingUmuLauncher ? (
                               <><Loader className="h-3 w-3 animate-spin" /> Installing...</>
                             ) : umuInstalled ? (
-                              <><FileCheck2 className="h-3 w-3" /> Installed</>
+                              <><RefreshCw className="h-3 w-3" /> Reinstall/Update</>
                             ) : (
                               <><Download className="h-3 w-3" /> Install</>
                             )}
