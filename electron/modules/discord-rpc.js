@@ -4,7 +4,6 @@
  */
 
 const { Client } = require("discord-rpc");
-const { getSettingsManager } = require("./settings");
 const { clientId, isDev } = require("./config");
 
 let rpc = null;
@@ -50,6 +49,7 @@ function initializeDiscordRPC() {
     return;
   }
 
+  const { getSettingsManager } = require("./settings");
   const settingsManager = getSettingsManager();
   const settings = settingsManager.getSettings();
   if (settings.rpcEnabled === false) {
