@@ -9,7 +9,7 @@ const os = require("os");
 const axios = require("axios");
 const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, app, BrowserWindow } = require("electron");
-const { isDev, isWindows, isLinux, appDirectory, getPythonPath } = require("./config");
+const { isDev, isWindows, isLinux, appDirectory, linuxUmuBin, getPythonPath } = require("./config");
 const { sanitizeGameName, getExtensionFromMimeType, shouldLogError } = require("./utils");
 const { getSettingsManager } = require("./settings");
 const {
@@ -444,6 +444,16 @@ function registerGameHandlers() {
 
         // Linux Proton/Wine: inject runner args
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
+
+          // Auto-detect UMU ID if not already set
+          try {
+            const { autoDetectAndSaveUmuId, getGameUmuId } = require("./umu-database");
+            const existingId = await getGameUmuId(game);
+            if (!existingId) {
+              autoDetectAndSaveUmuId(game).catch(() => {});
+            }
+          } catch (e) {}
+
           // Read per-game runner override from game config if available
           let gameRunnerOverride = null;
           try {
@@ -461,10 +471,20 @@ function registerGameHandlers() {
             console.warn("[Games] Could not read per-game runner override:", e.message);
           }
 
+          // Read umuId from game's json
+          let umuId = null;
+          try {
+            const { getGameUmuId } = require("./umu-database");
+            umuId = await getGameUmuId(game);
+          } catch (e) {
+            console.warn("[Games] Could not read umuId:", e.message);
+          }
+
           const launchConfig = await proton.buildLaunchConfig(
             game,
             executable,
-            gameRunnerOverride
+            gameRunnerOverride,
+            umuId
           );
 
           if (launchConfig.error) {
@@ -479,10 +499,10 @@ function registerGameHandlers() {
           // Append Linux-specific arguments for the GameHandler
           gameHandlerArgs.push(
             "--linux-runner-type",
-            launchConfig.runner.type,
+            launchConfig.mode === "umu" ? "umu" : launchConfig.runner.type,
             "--linux-runner-path",
-            launchConfig.runner.type === "proton"
-              ? launchConfig.runner.path
+            launchConfig.mode === "umu"
+              ? linuxUmuBin 
               : launchConfig.runner.path,
             "--linux-compat-data",
             launchConfig.compatDataPath,
@@ -490,8 +510,18 @@ function registerGameHandlers() {
             proton.findSteamInstallPath()
           );
 
+          // If UMU mode, append necessary env arguments
+          if (launchConfig.mode === "umu") {
+            gameHandlerArgs.push(
+              "--linux-umu-id",
+              launchConfig.env.GAMEID || "umu-default",
+              "--linux-proton-path",
+              launchConfig.env.PROTONPATH || ""
+            );
+          }
+
           console.log(
-            `[Games] Linux launch: ${launchConfig.runner.type} (${launchConfig.runner.name})`
+            `[Games] Linux launch mode: ${launchConfig.mode} via ${launchConfig.runner?.name || "UMU-Proton auto"}`
           );
         }
 

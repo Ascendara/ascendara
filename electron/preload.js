@@ -86,6 +86,22 @@ contextBridge.exposeInMainWorld("electron", {
     return () => ipcRenderer.removeListener("settings-updated", callback);
   },
 
+  // UMU Launcher
+  isUmuInstalled: () => ipcRenderer.invoke("is-umu-installed"),
+  downloadUmuLauncher: () => ipcRenderer.invoke("download-umu-launcher"),
+  downloadUmuProton: () => ipcRenderer.invoke("download-umu-proton"),
+  getUmuProtonInfo: () => ipcRenderer.invoke("get-umu-proton-info"),
+  checkUmuProtonUpdate: () => ipcRenderer.invoke("check-umu-proton-update"),
+  cleanupOldUmuProton: keepVersion =>
+    ipcRenderer.invoke("cleanup-old-umu-proton", keepVersion),
+
+  // UMU Database
+  umuRefreshDatabase: () => ipcRenderer.invoke("umu-refresh-database"),
+  umuFindId: gameName => ipcRenderer.invoke("umu-find-id", gameName),
+  umuGetGameId: gameName => ipcRenderer.invoke("umu-get-game-id", gameName),
+  umuSetGameId: (gameName, umuId) => ipcRenderer.invoke("umu-set-game-id", gameName, umuId),
+  umuAutoDetect: (gameName) => ipcRenderer.invoke("umu-auto-detect", gameName),
+
   // Crack/Emulator Settings
   getLocalCrackUsername: () => ipcRenderer.invoke("get-local-crack-username"),
   getLocalCrackDirectory: () => ipcRenderer.invoke("get-local-crack-directory"),

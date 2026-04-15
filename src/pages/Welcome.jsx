@@ -222,6 +222,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [protonDetected, setProtonDetected] = useState(false);
   const [protonInstalled, setProtonInstalled] = useState(false);
   const [isDownloadingProton, setIsDownloadingProton] = useState(false);
+  const [umuInstalled, setUmuInstalled] = useState(false);
+  const [umuProtonInfo, setUmuProtonInfo] = useState(null);
+  const [isDownloadingUmuLauncher, setIsDownloadingUmuLauncher] = useState(false);
+  const [isDownloadingUmuProton, setIsDownloadingUmuProton] = useState(false);
   const { t } = useTranslation();
   const { language, changeLanguage } = useLanguage();
   const navigate = useNavigate();
@@ -717,6 +721,16 @@ const Welcome = ({ welcomeData, onComplete }) => {
           }
         } catch (e) {
           console.error("Failed to get Proton-GE info:", e);
+        }
+
+        // Fetch UMU info
+        try {
+          const installed = await window.electron.isUmuInstalled();
+          setUmuInstalled(installed);
+          const umuInfo = await window.electron.getUmuProtonInfo();
+          if (umuInfo?.success) setUmuProtonInfo(umuInfo);
+        } catch (e) {
+          console.error("Failed to get UMU info:", e);
         }
       }
     };
@@ -2140,167 +2154,239 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     variants={itemVariants}
                   >
                     {/* Status Banner */}
-                    {runnersList.length > 0 ? (
-                      // FOUND
-                      <div
-                        className={`flex gap-4 rounded-xl border p-6 text-left ${
-                          runnersList.some(
-                            r =>
-                              r.type === "proton" ||
-                              r.name.toLowerCase().includes("proton")
-                          )
-                            ? "border-green-500/30 bg-green-500/10"
-                            : "border-yellow-500/30 bg-yellow-500/10"
-                        }`}
-                      >
-                        {runnersList.some(
-                          r =>
-                            r.type === "proton" || r.name.toLowerCase().includes("proton")
-                        ) ? (
-                          <CircleCheck className="mt-1 h-8 w-8 shrink-0 text-green-500" />
-                        ) : (
-                          <AlertTriangle className="mt-1 h-8 w-8 shrink-0 text-yellow-500" />
-                        )}
+                    {(() => {
+                      const hasProton = runnersList.some(r => r.type === "proton" || r.name.toLowerCase().includes("proton"));
+                      const bothInstalled = hasProton && umuInstalled;
+                      const noneInstalled = !hasProton && !umuInstalled;
 
-                        <div className="w-full space-y-2">
-                          <h3
-                            className={`text-xl font-bold ${runnersList.some(r => r.type === "proton" || r.name.toLowerCase().includes("proton")) ? "text-green-500" : "text-yellow-500"}`}
-                          >
-                            {runnersList.some(
-                              r =>
-                                r.type === "proton" ||
-                                r.name.toLowerCase().includes("proton")
-                            )
-                              ? t("welcome.protonDetected")
-                              : t("welcome.wineDetected")}
-                          </h3>
+                      return (
+                        <div className={`flex gap-4 rounded-xl border p-5 text-left ${
+                          bothInstalled ? "border-green-500/40 bg-green-500/10"
+                          : noneInstalled ? "border-red-500/30 bg-red-500/10"
+                          : "border-yellow-500/30 bg-yellow-500/10"
+                        }`}>
+                          {bothInstalled
+                            ? <CircleCheck className="mt-1 h-7 w-7 shrink-0 text-green-500" />
+                            : noneInstalled
+                              ? <XCircle className="mt-1 h-7 w-7 shrink-0 text-red-500" />
+                              : <AlertTriangle className="mt-1 h-7 w-7 shrink-0 text-yellow-500" />}
 
-                          <div className="space-y-1 rounded-lg border border-border/50 bg-background/40 p-3 font-mono text-sm">
-                            {runnersList.map(r => (
-                              <div
-                                key={r.path}
-                                className="flex items-center justify-between opacity-90"
-                              >
-                                <span className="font-semibold">{r.name}</span>
-                                <span className="ml-4 truncate text-xs opacity-60">
-                                  {r.path}
-                                </span>
+                          <div className="space-y-1">
+                            <h3 className={`text-lg font-bold ${
+                              bothInstalled ? "text-green-500"
+                              : noneInstalled ? "text-red-500"
+                              : "text-yellow-500"
+                            }`}>
+                              {bothInstalled
+                                ? "✓ Recommended setup detected - you're good to go!"
+                                : noneInstalled
+                                  ? t("welcome.noRunnersTitle")
+                                  : `Partial setup detected${hasProton ? " - Proton found, UMU Launcher missing" : " - UMU Launcher found, Proton missing"}`}
+                            </h3>
+
+                            {runnersList.length > 0 && (
+                              <div className="rounded-lg border border-border/50 bg-background/40 p-2 font-mono text-sm">
+                                {runnersList.map(r => (
+                                  <div key={r.path} className="flex items-center justify-between opacity-90">
+                                    <span className="font-semibold">{r.name}</span>
+                                    <span className="ml-4 truncate text-xs opacity-60">{r.path}</span>
+                                  </div>
+                                ))}
+                                {umuInstalled && (
+                                  <div className="flex items-center gap-2 mt-1 opacity-90">
+                                    <span className="font-semibold text-green-600">UMU Launcher</span>
+                                    <span className="text-xs text-green-600 opacity-80">installed</span>
+                                  </div>
+                                )}
                               </div>
-                            ))}
-                          </div>
-
-                          {!runnersList.some(
-                            r =>
-                              r.type === "proton" ||
-                              r.name.toLowerCase().includes("proton")
-                          ) && (
-                            <p className="mt-2 text-sm font-medium text-yellow-500/90">
-                              {t("welcome.wineRecommendation")}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      // NOT FOUND
-                      <div className="flex gap-4 rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-left">
-                        <XCircle className="mt-1 h-8 w-8 shrink-0 text-red-500" />
-                        <div>
-                          <h3 className="text-xl font-bold text-red-500">
-                            {t("welcome.noRunnersTitle")}
-                          </h3>
-                          <p className="mt-1 text-base text-red-400/90">
-                            {t("welcome.noRunnersDesc")}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Install Options */}
-                    <div className="grid gap-4 text-left md:grid-cols-2">
-                      {/* Proton GE Card */}
-                      <div className="flex flex-col justify-between rounded-xl border-2 border-primary bg-primary/5 p-5 shadow-lg shadow-primary/5 transition-all hover:border-primary/50">
-                        <div>
-                          <div className="mb-2 flex items-center gap-2">
-                            <Rocket className="h-5 w-5 text-primary" />
-                            <span className="font-bold text-primary">
-                              {t("welcome.protonGERecommended")}
-                            </span>
-                          </div>
-                          <p className="mb-4 text-sm text-muted-foreground">
-                            {t("welcome.protonGEDesc")}
-                            {protonGEInfo && (
-                              <span className="mt-1 block font-mono text-xs opacity-75">
-                                {t("welcome.protonGESize")} {protonGEInfo.sizeFormatted}
-                              </span>
                             )}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={async () => {
-                            // 1. If we don't have the information, we fetch it
-                            if (!protonGEInfo) {
-                              setIsDownloadingProton(true);
-                              try {
-                                const info = await window.electron.getProtonGEInfo();
-                                if (info.success) {
-                                  setProtonGEInfo(info);
-                                  setShowProtonConfirm(true); // Open dialogue
-                                }
-                              } catch (e) {
-                                console.error(e);
-                                setErrorMessage(e.message);
-                                setShowErrorDialog(true);
-                              }
-                              setIsDownloadingProton(false);
-                            } else {
-                              // 2. If we already have the information, we open it directly.
-                              setShowProtonConfirm(true);
-                            }
-                          }}
-                          disabled={isDownloadingProton}
-                          className="w-full text-secondary"
-                        >
-                          {isDownloadingProton ? (
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Download className="mr-2 h-4 w-4" />
-                          )}
-                          {isDownloadingProton
-                            ? t("welcome.protonGEChecking")
-                            : t("welcome.protonGEInstall")}
-                        </Button>
-                      </div>
-
-                      {/* Wine Card */}
-                      <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-5 transition-all hover:bg-card">
-                        <div>
-                          <div className="mb-2 flex items-center gap-2">
-                            <Wine className="h-5 w-5 text-foreground" />
-                            <span className="font-bold text-foreground">
-                              {t("welcome.systemWine")}
-                            </span>
                           </div>
-                          <p className="mb-4 text-sm text-muted-foreground">
-                            {t("welcome.systemWineDesc")}
-                          </p>
                         </div>
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            const result = await window.electron.installWine();
-                            if (result.success) {
-                              const updated = await window.electron.getRunners();
-                              setRunnersList(updated);
-                              setProtonInstalled(true);
-                            }
-                          }}
-                          className="w-full"
-                        >
-                          <FolderDownIcon className="mr-2 h-4 w-4" />
-                          {t("welcome.installWine")}
-                        </Button>
+                      );
+                    })()}
+
+                    {/* ── Recommended ── */}
+                    <div className="rounded-xl border-2 border-green-500/50 bg-green-500/5 p-5 space-y-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CircleCheck className="h-5 w-5 text-green-500" />
+                        <span className="font-bold text-green-600 dark:text-green-400 text-lg">
+                          Recommended Setup
+                        </span>
+                        <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
+                          Best compatibility
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Install both tools below for the best experience. UMU Launcher handles the runtime
+                        container and Protonfixes, while Proton GE is the most compatible Wine-based engine.
+                      </p>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {/* UMU Launcher */}
+                        <div className={`flex flex-col justify-between rounded-xl border-2 p-4 ${umuInstalled ? "border-green-500 bg-green-500/10" : "border-green-500/50 bg-card"}`}>
+                          <div>
+                            <div className="mb-1 flex items-center gap-2">
+                              {umuInstalled
+                                ? <CircleCheck className="h-5 w-5 text-green-500" />
+                                : <Download className="h-5 w-5 text-green-500" />}
+                              <span className="font-bold text-foreground">UMU Launcher</span>
+                              {umuInstalled && (
+                                <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-xs font-semibold text-green-600">Installed</span>
+                              )}
+                            </div>
+                            <p className="mb-3 text-xs text-muted-foreground">
+                              Runs games inside Steam's Linux Runtime (like Steam does natively).
+                              Automatically applies game-specific fixes, no manual setup needed.
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={umuInstalled || isDownloadingUmuLauncher}
+                            className="w-full text-secondary"
+                            onClick={async () => {
+                              setIsDownloadingUmuLauncher(true);
+                              try {
+                                const result = await window.electron.downloadUmuLauncher();
+                                if (result.success) setUmuInstalled(true);
+                              } catch (e) { console.error(e); }
+                              setIsDownloadingUmuLauncher(false);
+                            }}
+                          >
+                            {isDownloadingUmuLauncher ? (
+                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> Installing...</>
+                            ) : umuInstalled ? (
+                              <><CircleCheck className="mr-2 h-4 w-4" /> Installed</>
+                            ) : (
+                              <><Download className="mr-2 h-4 w-4" /> Install - Recommended</>
+                            )}
+                          </Button>
+                        </div>
+
+                        {/* Proton GE */}
+                        <div className="flex flex-col justify-between rounded-xl border-2 border-primary bg-primary/5 p-4 shadow-md">
+                          <div>
+                            <div className="mb-1 flex items-center gap-2">
+                              <Rocket className="h-5 w-5 text-primary" />
+                              <span className="font-bold text-primary">Proton GE</span>
+                            </div>
+                            <p className="mb-3 text-xs text-muted-foreground">
+                              {t("welcome.protonGEDesc")}
+                              {protonGEInfo?.sizeFormatted && (
+                                <span className="mt-1 block font-mono text-xs opacity-75">
+                                  {t("welcome.protonGESize")} {protonGEInfo.sizeFormatted}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={isDownloadingProton}
+                            className="w-full text-secondary"
+                            onClick={async () => {
+                              if (!protonGEInfo) {
+                                setIsDownloadingProton(true);
+                                try {
+                                  const info = await window.electron.getProtonGEInfo();
+                                  if (info.success) { setProtonGEInfo(info); setShowProtonConfirm(true); }
+                                } catch (e) { console.error(e); }
+                                setIsDownloadingProton(false);
+                              } else {
+                                setShowProtonConfirm(true);
+                              }
+                            }}
+                          >
+                            {isDownloadingProton ? (
+                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> {t("welcome.protonGEChecking")}</>
+                            ) : (
+                              <><Download className="mr-2 h-4 w-4" /> {t("welcome.protonGEInstall")}</>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
+
+                    {/* ── Alternative (Wine / UMU-Proton) ── */}
+                    <details className="rounded-xl border border-border bg-card/30 p-4">
+                      <summary className="cursor-pointer text-sm font-medium text-muted-foreground select-none">
+                        Advanced / Alternatives (optional)
+                      </summary>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {/* Wine */}
+                        <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
+                          <div>
+                            <div className="mb-1 flex items-center gap-2">
+                              <Wine className="h-5 w-5 text-muted-foreground" />
+                              <span className="font-bold text-muted-foreground">{t("welcome.systemWine")}</span>
+                            </div>
+                            <p className="mb-3 text-xs text-muted-foreground">
+                              {t("welcome.systemWineDesc")} Less compatible than Proton GE - use only if you have a specific reason.
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" className="w-full text-muted-foreground"
+                            onClick={async () => {
+                              const result = await window.electron.installWine();
+                              if (result.success) {
+                                const updated = await window.electron.getRunners();
+                                setRunnersList(updated);
+                              }
+                            }}
+                          >
+                            <FolderDownIcon className="mr-2 h-4 w-4" /> {t("welcome.installWine")}
+                          </Button>
+                        </div>
+
+                        {/* UMU Proton */}
+                        <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4 opacity-80">
+                          <div>
+                            <div className="mb-1 flex items-center gap-2">
+                              <Rocket className="h-5 w-5 text-muted-foreground" />
+                              <span className="font-bold text-muted-foreground">UMU-Proton</span>
+                            </div>
+                            <p className="mb-3 text-xs text-muted-foreground">
+                              Alternative Proton build maintained by the UMU team. More stable than Proton GE but less updated. Only install if you know what you're doing.
+                              {umuProtonInfo?.sizeFormatted && (
+                                <span className="mt-1 block font-mono text-xs opacity-75">
+                                  Latest: {umuProtonInfo.name} · {umuProtonInfo.sizeFormatted}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" disabled={isDownloadingUmuProton} className="w-full text-muted-foreground"
+                            onClick={async () => {
+                              setIsDownloadingUmuProton(true);
+                              try {
+                                const result = await window.electron.downloadUmuProton();
+                                if (result.success) {
+                                  const updated = await window.electron.getRunners();
+                                  setRunnersList(updated);
+                                  await window.electron.updateSetting("linuxRunner", result.path);
+                                  const info = await window.electron.getUmuProtonInfo();
+                                  if (info?.success) setUmuProtonInfo(info);
+                                }
+                              } catch (e) { console.error(e); }
+                              setIsDownloadingUmuProton(false);
+                            }}
+                          >
+                            {isDownloadingUmuProton ? (
+                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> Installing...</>
+                            ) : umuProtonInfo?.alreadyInstalled ? (
+                              <><CircleCheck className="mr-2 h-4 w-4" /> Installed</>
+                            ) : (
+                              <><Download className="mr-2 h-4 w-4" /> Install UMU-Proton</>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </details>
+
+                    {!umuInstalled && runnersList.length > 0 && (
+                      <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-left">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
+                        <p className="text-xs text-yellow-600">
+                          UMU Launcher is recommended, without it, games may crash at startup. You can install it later in Settings.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Navigation Buttons */}
                     <div className="flex justify-center pt-4">

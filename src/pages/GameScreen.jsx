@@ -45,6 +45,7 @@ import {
   Gem,
   Cloud,
   CloudOff,
+  Terminal,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
@@ -682,6 +683,11 @@ export default function GameScreen() {
   const [prefixSize, setPrefixSize] = useState(null);
   const [showResetPrefixDialog, setShowResetPrefixDialog] = useState(false);
   const [isResettingPrefix, setIsResettingPrefix] = useState(false);
+  const [umuId, setUmuId] = useState("");
+  const [umuIdInput, setUmuIdInput] = useState("");
+  const [umuIdSaving, setUmuIdSaving] = useState(false);
+  const [umuInstalled, setUmuInstalled] = useState(true); // true by default for other OS
+
   // Detect Linux platform and load prefix info
   useEffect(() => {
     const platform = window.electron.getPlatform();
@@ -696,8 +702,32 @@ export default function GameScreen() {
           })
           .catch(() => {});
       }
+      window.electron.isUmuInstalled().then(installed => {
+        setUmuInstalled(installed);
+      }).catch(() => {});
     }
   }, [game]);
+
+  useEffect(() => {
+  if (!isOnLinux || !game) return;
+  const gameDir = game.executable
+    ? game.executable.substring(0, game.executable.lastIndexOf("/"))
+    : null;
+  if (!gameDir) return;
+
+  window.electron.umuGetGameId(game.game || game.name).then(id => {
+    setUmuId(id || "");
+    setUmuIdInput(id || "");
+  });
+
+  // Auto-detect if none set
+  window.electron.umuAutoDetect(game.game || game.name).then(found => {
+    if (found && !umuId) {
+      setUmuId(found);
+      setUmuIdInput(found);
+    }
+  });
+}, [isOnLinux, game]);
 
   // Nexus Mods state
   const [supportsModManaging, setSupportsModManaging] = useState(false);
@@ -1788,6 +1818,23 @@ export default function GameScreen() {
             {t("common.back")}
           </Button>
 
+          {isOnLinux && !umuInstalled && (
+            <div className="mt-3 flex items-center gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-500" />
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                UMU Launcher is not installed - this game may crash at launch.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto shrink-0 border-yellow-500/50 text-yellow-600"
+                onClick={() => navigate("/settings")}
+              >
+                Install in Settings
+              </Button>
+            </div>
+          )}
+
           {/* Game title and basic info */}
           <div className="mt-4">
             <div className="flex flex-col gap-3">
@@ -2178,6 +2225,69 @@ export default function GameScreen() {
                         </span>
                       )}
                     </Button>
+                  )}
+
+                  {/* UMU ID field - Linux only */}
+                  {isOnLinux && (
+                    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card/50 p-3">
+                      <div className="flex items-center gap-2">
+                        <Terminal className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">UMU ID</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs">
+                                The UMU ID links this game to Protonfixes, which automatically
+                                installs missing DLLs and redistributables (DirectX, Visual C++…)
+                                on launch. Find IDs at{" "}
+                                <button
+                                  onClick={() => window.electron.openURL("https://umu.openwinecomponents.org")}
+                                  className="underline"
+                                >
+                                  umu.openwinecomponents.org
+                                </button>
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={umuIdInput}
+                          onChange={e => setUmuIdInput(e.target.value)}
+                          placeholder="umu-default"
+                          className="h-8 text-xs"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 shrink-0 text-xs text-primary"
+                          disabled={umuIdSaving || umuIdInput === umuId}
+                          onClick={async () => {
+                            if (!game.executable) return;
+                            setUmuIdSaving(true);
+                            const result = await window.electron.umuSetGameId(game.game || game.name, umuIdInput);
+                            if (result.success) {
+                              setUmuId(umuIdInput);
+                              toast.success("UMU ID saved");
+                            } else {
+                              toast.error("Failed to save UMU ID");
+                            }
+                            setUmuIdSaving(false);
+                          }}
+                        >
+                          {umuIdSaving ? <Loader className="h-3 w-3 animate-spin" /> : "Save"}
+                        </Button>
+                      </div>
+                      {umuId && (
+                        <p className="text-xs text-muted-foreground">
+                          Active: <span className="font-mono text-foreground">{umuId}</span>
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 

@@ -32,6 +32,7 @@ const lazyLoaders = {
   translations: createLazyLoader("./translations"),
   themes: createLazyLoader("./themes"),
   qrcode: createLazyLoader("./qrcode"),
+  umuDatabase: createLazyLoader("./umu-database"),
 };
 
 module.exports = {
@@ -89,5 +90,8 @@ module.exports = {
   },
   get qrcode() {
     return lazyLoaders.qrcode();
+  },
+  get umuDatabase() {
+  return lazyLoaders.umuDatabase();
   },
 };

@@ -309,6 +309,11 @@ function Settings() {
   const [protonGEInfo, setProtonGEInfo] = useState(null);
   const [showProtonConfirm, setShowProtonConfirm] = useState(false);
   const [protonUpdateStatus, setProtonUpdateStatus] = useState(null); // null | "checking" | "up-to-date" | "update-available"
+  const [umuInstalled, setUmuInstalled] = useState(false);
+  const [umuProtonInfo, setUmuProtonInfo] = useState(null);
+  const [isDownloadingUmuLauncher, setIsDownloadingUmuLauncher] = useState(false);
+  const [isDownloadingUmuProton, setIsDownloadingUmuProton] = useState(false);
+  const [umuProtonUpdateStatus, setUmuProtonUpdateStatus] = useState(null);
   const [latestDevCommit, setLatestDevCommit] = useState(null);
   // Default custom colors for merging with saved themes (handles missing new properties)
   const defaultCustomColors = {
@@ -535,6 +540,11 @@ function Settings() {
           setRunners(detectedRunners);
           const currentSettings = await window.electron.getSettings();
           setSelectedRunner(currentSettings.linuxRunner || "auto");
+          // Check UMU status
+          const installed = await window.electron.isUmuInstalled();
+          setUmuInstalled(installed);
+          const umuInfo = await window.electron.getUmuProtonInfo();
+          if (umuInfo?.success) setUmuProtonInfo(umuInfo);
         } catch (e) {
           console.error("Failed to load runners:", e);
         }
@@ -2771,6 +2781,179 @@ function Settings() {
                         <strong>Wine</strong> {t("settings.linuxCompat.infoBoxWine")}
                       </p>
                     </div>
+                  </div>
+                  {/* ── UMU Section ── */}
+                  <div className="border-t border-border pt-6 space-y-4">
+                    <h4 className="text-sm font-medium text-foreground">
+                      UMU Launcher & UMU-Proton
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      UMU-Launcher runs games through Steam's Linux Runtime container and applies
+                      Protonfixes automatically. UMU-Proton is the recommended Proton build.
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {/* UMU Launcher */}
+                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">UMU Launcher</span>
+                          {umuInstalled ? (
+                            <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
+                              <FileCheck2 className="h-3 w-3" /> Installed
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-500">
+                              <AlertTriangle className="h-3 w-3" /> Missing
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Required to launch games without Steam via the Sniper runtime.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            disabled={isDownloadingUmuLauncher}
+                            className="gap-1 text-secondary"
+                            onClick={async () => {
+                              setIsDownloadingUmuLauncher(true);
+                              try {
+                                const result = await window.electron.downloadUmuLauncher();
+                                if (result.success) {
+                                  setUmuInstalled(true);
+                                  toast.success("UMU Launcher installed!");
+                                } else {
+                                  toast.error("Failed: " + (result.error || result.message));
+                                }
+                              } catch (e) {
+                                toast.error("Installation failed");
+                              }
+                              setIsDownloadingUmuLauncher(false);
+                            }}
+                          >
+                            {isDownloadingUmuLauncher ? (
+                              <><Loader className="h-3 w-3 animate-spin" /> Installing...</>
+                            ) : umuInstalled ? (
+                              <><RefreshCw className="h-3 w-3" /> Reinstall/Update</>
+                            ) : (
+                              <><Download className="h-3 w-3" /> Install</>
+                            )}
+                          </Button>
+                          <button
+                            onClick={() => window.electron.openURL("https://github.com/Open-Wine-Components/umu-launcher")}
+                            className="text-xs text-muted-foreground hover:text-primary underline"
+                          >
+                            GitHub
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* UMU Proton */}
+                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">UMU-Proton</span>
+                          {umuProtonInfo?.alreadyInstalled ? (
+                            <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
+                              <FileCheck2 className="h-3 w-3" /> {umuProtonInfo.name}
+                            </span>
+                          ) : umuProtonInfo?.updateAvailable ? (
+                            <span className="flex items-center gap-1 rounded bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-500">
+                              <FolderSync className="h-3 w-3" /> Update available
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                              Not installed
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Recommended Proton build with built-in Protonfixes support.
+                          {umuProtonInfo?.sizeFormatted && ` Latest: ${umuProtonInfo.name} (${umuProtonInfo.sizeFormatted})`}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            disabled={isDownloadingUmuProton}
+                            className="gap-1 text-secondary"
+                            onClick={async () => {
+                              setIsDownloadingUmuProton(true);
+                              setUmuProtonUpdateStatus(null);
+                              try {
+                                const result = await window.electron.downloadUmuProton();
+                                if (result.success) {
+                                  toast.success(`${result.name} installed!`);
+                                  const updated = await window.electron.getRunners();
+                                  setRunners(updated);
+                                  const info = await window.electron.getUmuProtonInfo();
+                                  if (info?.success) setUmuProtonInfo(info);
+                                } else {
+                                  toast.error("Failed: " + (result.message || "Unknown error"));
+                                }
+                              } catch (e) {
+                                toast.error("Installation failed");
+                              }
+                              setIsDownloadingUmuProton(false);
+                            }}
+                          >
+                            {isDownloadingUmuProton ? (
+                              <><Loader className="h-3 w-3 animate-spin" /> Installing...</>
+                            ) : umuProtonInfo?.alreadyInstalled ? (
+                              <><FolderSync className="h-3 w-3" /> Reinstall</>
+                            ) : umuProtonInfo?.updateAvailable ? (
+                              <><Download className="h-3 w-3" /> Update</>
+                            ) : (
+                              <><Download className="h-3 w-3" /> Install</>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            disabled={umuProtonUpdateStatus === "checking"}
+                            onClick={async () => {
+                              setUmuProtonUpdateStatus("checking");
+                              const info = await window.electron.checkUmuProtonUpdate();
+                              if (info?.success) {
+                                setUmuProtonInfo(info);
+                                setUmuProtonUpdateStatus(
+                                  info.alreadyInstalled ? "up-to-date" : info.updateAvailable ? "update-available" : null
+                                );
+                              } else {
+                                setUmuProtonUpdateStatus(null);
+                              }
+                            }}
+                          >
+                            {umuProtonUpdateStatus === "checking" ? (
+                              <Loader className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <FolderSync className="h-3 w-3" />
+                            )}
+                            Check
+                          </Button>
+                        </div>
+
+                        {umuProtonUpdateStatus === "up-to-date" && (
+                          <p className="text-xs text-green-500 flex items-center gap-1">
+                            <FileCheck2 className="h-3 w-3" /> Up to date
+                          </p>
+                        )}
+                        {umuProtonUpdateStatus === "update-available" && (
+                          <p className="text-xs text-blue-500 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> Update available: {umuProtonInfo?.latestVersion}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Warning si UMU pas installé */}
+                    {!umuInstalled && (
+                      <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                        <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                          UMU Launcher is not installed. Games may crash without it. Install it above to enable automatic dependency fixes via Protonfixes.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </Card>
                 {/* Proton-GE Download Confirmation Dialog */}
