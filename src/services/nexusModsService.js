@@ -498,9 +498,12 @@ const getModDownloadUrl = (gameDomainName, modId, fileId = null) => {
  * @returns {string} Formatted size string
  */
 const formatFileSize = bytes => {
-  if (!bytes || bytes === 0) return "Unknown";
+  const numericBytes = parseFloat(bytes);
+
+  if (isNaN(numericBytes) || numericBytes <= 0) return "Unknown";
+  
   const units = ["B", "KB", "MB", "GB"];
-  let size = bytes;
+  let size = numericBytes;
   let unitIndex = 0;
   while (size >= 1024 && unitIndex < units.length - 1) {
     size /= 1024;
