@@ -2367,7 +2367,42 @@
       "update": "Update",
       "updateAvailable": "Update available: <strong>{{version}}</strong>",
       "updateAvailableCurrent": "(current: {{version}})",
-      "updateProtonGE": "Update Proton-GE"
+      "updateProtonGE": "Update Proton-GE",
+      "umu": {
+        "sectionTitle": "UMU Launcher & UMU-Proton",
+        "sectionDescription": "UMU-Launcher runs games through Steam's Linux Runtime container and applies Protonfixes automatically. UMU-Proton is the recommended Proton build.",
+        "launcher": {
+          "title": "UMU Launcher",
+          "installed": "Installed",
+          "missing": "Missing",
+          "description": "Required to launch games without Steam via the Sniper runtime.",
+          "installing": "Installing...",
+          "reinstallUpdate": "Reinstall/Update",
+          "install": "Install",
+          "github": "GitHub",
+          "installSuccess": "UMU Launcher installed!",
+          "installFailed": "Failed",
+          "installError": "Installation failed"
+        },
+        "proton": {
+          "title": "UMU-Proton",
+          "updateAvailable": "Update available",
+          "notInstalled": "Not installed",
+          "description": "Recommended Proton build with built-in Protonfixes support.",
+          "latestInfo": "Latest: {{name}} ({{size}})",
+          "installing": "Installing...",
+          "reinstall": "Reinstall",
+          "update": "Update",
+          "install": "Install",
+          "check": "Check",
+          "upToDate": "Up to date",
+          "updateAvailableVersion": "Update available: {{version}}",
+          "installSuccess": "{{name}} installed!",
+          "installFailed": "Failed: {{message}}",
+          "installError": "Installation failed"
+        },
+        "warning": "UMU Launcher is not installed. Games may crash without it. Install it above to enable automatic dependency fixes via Protonfixes."
+      }
     },
     "loadingSettings": "Loading your settings",
     "localIndex": "Local Game Index",
