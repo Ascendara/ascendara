@@ -1,4 +1,3 @@
-import { getCurrentStatus } from "./serverStatus";
 import { sanitizeText } from "@/lib/utils";
 
 const API_URL = "https://api.ascendara.app";
@@ -46,20 +45,17 @@ const gameService = {
       }
     }
 
-    // Check if using local index
-    const isDev = import.meta.env.DEV;
-    console.log("[GameService] isDev:", isDev);
-
+    // Get settings to check local index path
     const settings = await window.electron.getSettings();
-    console.log("[GameService] Settings loaded:", {
-      usingLocalIndex: settings?.usingLocalIndex,
-      localIndex: settings?.localIndex,
-    });
-    const usingLocalIndex = settings?.usingLocalIndex === true;
+    const localIndexPath = settings?.localIndex;
 
-    // If local index setting changed, invalidate cache
-    if (memoryCache.isLocalIndex !== usingLocalIndex) {
-      console.log("[GameService] Local index setting changed, invalidating cache");
+    console.log("[GameService] Settings loaded:", {
+      localIndex: localIndexPath,
+    });
+
+    // If local index path changed, invalidate cache
+    if (memoryCache.localIndexPath !== localIndexPath) {
+      console.log("[GameService] Local index path changed, invalidating cache");
       memoryCache = {
         games: null,
         metadata: null,
@@ -67,19 +63,19 @@ const gameService = {
         lastUpdated: null,
         imageIdMap: null,
         gameIdMap: null,
-        isLocalIndex: usingLocalIndex,
-        localIndexPath: settings?.localIndex,
+        isLocalIndex: true,
+        localIndexPath: localIndexPath,
       };
     }
 
-    // If using local index, load from local file
-    if (usingLocalIndex && settings?.localIndex) {
+    // Always load from local index
+    if (localIndexPath) {
       console.log(
         "[GameService] Attempting to load local index from:",
-        settings.localIndex
+        localIndexPath
       );
       try {
-        const data = await this.fetchDataFromLocalIndex(settings.localIndex);
+        const data = await this.fetchDataFromLocalIndex(localIndexPath);
         console.log("[GameService] Local index loaded:", {
           hasData: !!data,
           hasGames: !!data?.games,
@@ -93,103 +89,44 @@ const gameService = {
             data.games.length,
             "games from local index"
           );
-          await this.updateCache(data, true, settings.localIndex);
+          await this.updateCache(data, true, localIndexPath);
           return data;
         }
         console.warn("[GameService] Local index file empty or not found");
-        // In dev mode, fall back to API if local index is empty
-        if (isDev) {
-          console.log("[GameService] Dev mode: falling back to API");
-          // Continue to API fetch below
-        } else {
-          // In production, return empty data to prevent mixing local and API data
-          return {
-            games: [],
-            metadata: {
-              local: true,
-              games: 0,
-              source: "LOCAL",
-              getDate: "Not available",
-            },
-          };
-        }
+        return {
+          games: [],
+          metadata: {
+            local: true,
+            games: 0,
+            source: "LOCAL",
+            getDate: "Not available",
+          },
+        };
       } catch (error) {
         console.error("[GameService] Error loading local index:", error);
-        // In dev mode, fall back to API if local index fails
-        if (isDev) {
-          console.log("[GameService] Dev mode: falling back to API after error");
-          // Continue to API fetch below
-        } else {
-          // In production, don't fall back to API when local index is enabled
-          return {
-            games: [],
-            metadata: {
-              local: true,
-              games: 0,
-              source: "LOCAL",
-              getDate: "Not available",
-            },
-          };
-        }
-      }
-    }
-
-    // Check localStorage cache (only when NOT using local index)
-    const cachedGames = localStorage.getItem(CACHE_KEY);
-    const cachedMetadata = localStorage.getItem(METADATA_CACHE_KEY);
-    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
-
-    if (cachedGames && cachedMetadata && timestamp) {
-      const age = now - parseInt(timestamp);
-      if (age < CACHE_DURATION) {
-        const parsedGames = JSON.parse(cachedGames);
-        const parsedMetadata = JSON.parse(cachedMetadata);
-
-        // Ensure local property is set correctly for cached API data
-        if (parsedMetadata.local === undefined) {
-          parsedMetadata.local = false;
-        }
-
-        // Update memory cache
-        memoryCache = {
-          ...memoryCache,
-          games: parsedGames,
-          metadata: parsedMetadata,
-          timestamp: parseInt(timestamp),
-          lastUpdated: parsedMetadata.getDate,
-          isLocalIndex: usingLocalIndex,
-        };
-
         return {
-          games: parsedGames,
-          metadata: parsedMetadata,
+          games: [],
+          metadata: {
+            local: true,
+            games: 0,
+            source: "LOCAL",
+            getDate: "Not available",
+          },
         };
       }
     }
 
-    try {
-      const status = getCurrentStatus();
-      if (!status?.ok) {
-        if (cachedGames && cachedMetadata) {
-          const parsedGames = JSON.parse(cachedGames);
-          const parsedMetadata = JSON.parse(cachedMetadata);
-          return { games: parsedGames, metadata: parsedMetadata };
-        }
-        throw new Error("Server is not available");
-      }
-
-      const data = await this.fetchDataFromAPI();
-      await this.updateCache(data);
-      return data;
-    } catch (error) {
-      if (cachedGames && cachedMetadata) {
-        const parsedGames = JSON.parse(cachedGames);
-        const parsedMetadata = JSON.parse(cachedMetadata);
-        return { games: parsedGames, metadata: parsedMetadata };
-      }
-      console.error("Error fetching data:", error);
-      return { games: [], metadata: null };
-    }
+    // No local index path configured
+    console.warn("[GameService] No local index path configured");
+    return {
+      games: [],
+      metadata: {
+        local: true,
+        games: 0,
+        source: "LOCAL",
+        getDate: "Not available",
+      },
+    };
   },
 
   async fetchDataFromLocalIndex(localIndexPath) {
@@ -223,98 +160,6 @@ const gameService = {
     }
   },
 
-  async fetchDataFromAPI() {
-    // Get settings from electron
-    const settings = await window.electron.getSettings();
-    const source = settings?.gameSource || "steamrip";
-
-    let endpoint = `${API_URL}/json/games`;
-    if (source === "fitgirl") {
-      endpoint = `${API_URL}/json/sources/fitgirl/games`;
-    }
-
-    try {
-      const response = await fetch(endpoint);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-
-      // Sanitize game titles
-      if (data.games) {
-        data.games = data.games.map(game => ({
-          ...game,
-          name: sanitizeText(game.name),
-          game: sanitizeText(game.game),
-        }));
-      }
-
-      return {
-        games: data.games,
-        metadata: {
-          apiversion: data.metadata?.apiversion,
-          games: data.games?.length,
-          getDate: data.metadata?.getDate,
-          source: data.metadata?.source || source,
-          imagesAvailable: true,
-          local: false, // Explicitly mark as not local
-        },
-      };
-    } catch (error) {
-      console.warn("Primary API failed, trying backup CDN:", error);
-      const backupEndpoint = "https://cdn.ascendara.app/files/data.json";
-
-      try {
-        const response = await fetch(backupEndpoint, {
-          mode: "no-cors",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        // When using no-cors, we can't access the response directly
-        // We need to handle it differently
-        if (!response.ok && response.type !== "opaque") {
-          throw new Error(`Backup CDN failed! status: ${response.status}`);
-        }
-
-        // Since no-cors might give us an opaque response,
-        // we'll need to handle potential parsing errors
-        let data;
-        try {
-          data = await response.json();
-        } catch (parseError) {
-          console.error("Failed to parse CDN response:", parseError);
-          throw new Error("Unable to parse backup data source");
-        }
-
-        // Sanitize game titles
-        if (data.games) {
-          data.games = data.games.map(game => ({
-            ...game,
-            name: sanitizeText(game.name),
-            game: sanitizeText(game.game),
-          }));
-        }
-
-        return {
-          games: data.games,
-          metadata: {
-            apiversion: data.metadata?.apiversion,
-            games: data.games?.length,
-            getDate: data.metadata?.getDate,
-            source: data.metadata?.source || source,
-            imagesAvailable: false, // Images won't be available when using CDN
-            local: false, // Explicitly mark as not local
-          },
-        };
-      } catch (cdnError) {
-        console.error("Both API and CDN failed:", cdnError);
-        // Re-throw the error to be handled by the caller
-        throw new Error("Failed to fetch game data from both primary and backup sources");
-      }
-    }
-  },
 
   async updateCache(data, isLocalIndex = false, localIndexPath = null) {
     try {
@@ -488,25 +333,8 @@ const gameService = {
   },
 
   async checkMetadataUpdate() {
-    try {
-      // Skip API check if using local index
-      const settings = await window.electron.getSettings();
-      if (settings?.usingLocalIndex) {
-        return null;
-      }
-
-      const response = await fetch(`${API_URL}/json/games`, {
-        method: "HEAD", // Only get headers to check Last-Modified
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const lastModified = response.headers.get("Last-Modified");
-      return lastModified || null;
-    } catch (error) {
-      console.error("Error checking metadata:", error);
-      return null;
-    }
+    // Metadata updates are no longer relevant since we only use local index
+    return null;
   },
 
   async findGameByImageId(imageId) {

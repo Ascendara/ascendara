@@ -542,15 +542,7 @@ const Search = memo(() => {
     return () => unsubscribe();
   }, []);
 
-  // Start status check interval when component mounts (skip for local index)
-  useEffect(() => {
-    // Skip server status checks if using local index
-    if (settings?.usingLocalIndex) {
-      return;
-    }
-    const stopStatusCheck = startStatusCheck();
-    return () => stopStatusCheck();
-  }, [settings?.usingLocalIndex]);
+  // Server status checks removed - games are only loaded from local index now
 
   // Persist all state - single combined effect with debouncing
   useEffect(() => {
