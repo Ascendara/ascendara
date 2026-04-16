@@ -6,7 +6,7 @@
         <a href="https://discord.gg/ap6W3xMTKW"><img src="https://img.shields.io/discord/939249162887766139?color=7289da&label=discord&logo=discord&logoColor=white" alt="Discord"></a>
         <a href="https://github.com/tagoWorks/ascendara/releases/latest"><img src="https://img.shields.io/github/v/release/tagoWorks/ascendara?include_prereleases&label=latest%20release" alt="Latest Release"></a>
          <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Flfs.ascendara.app%2Fcount%2Fdownloads&query=downloads&style=flat&label=download%20count" alt="Download Count">
-        <a href="./LICENSE"><img src="https://img.shields.io/badge/license-CC%20BY--NC%201.0-green" alt="License"></a>
+        <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
     </p>
     <p>
         <a href="https://github.com/tagoWorks/ascendara/issues"><img src="https://img.shields.io/github/issues-raw/tagoWorks/ascendara" alt="Issues"></a>
