@@ -3973,7 +3973,7 @@ function Settings() {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                window.electron?.openURL("https://ascendara.app/ascend");
+                window.electron?.openURL("https://ascendara.app/ascend?ref=app");
                 setShowAscendPromoDialog(false);
               }}
             >

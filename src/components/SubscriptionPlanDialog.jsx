@@ -172,7 +172,7 @@ const SubscriptionPlanDialog = ({
                 {t("ascend.settings.subscriptionDialogV2.everythingIncluded")}
               </h3>
               <button
-                onClick={() => window.open("https://ascendara.app/ascend", "_blank")}
+                onClick={() => window.open("https://ascendara.app/ascend?ref=app", "_blank")}
                 className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
               >
                 <span className="flex items-center gap-1">{t("ascend.settings.subscriptionDialogV2.learnMore")} <ExternalLink className="h-3 w-3" /></span>
