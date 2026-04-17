@@ -2788,8 +2788,7 @@ function Settings() {
                       UMU Launcher & UMU-Proton
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      UMU-Launcher runs games through Steam's Linux Runtime container and applies
-                      Protonfixes automatically. UMU-Proton is the recommended Proton build.
+                      {t("settings.linuxCompat.infoBoxUmuLauncher")}
                     </p>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2799,16 +2798,16 @@ function Settings() {
                           <span className="text-sm font-medium">UMU Launcher</span>
                           {umuInstalled ? (
                             <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
-                              <FileCheck2 className="h-3 w-3" /> Installed
+                              <FileCheck2 className="h-3 w-3" /> {t("common.installed")}
                             </span>
                           ) : (
                             <span className="flex items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-500">
-                              <AlertTriangle className="h-3 w-3" /> Missing
+                              <AlertTriangle className="h-3 w-3" /> {t("common.missing")}
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Required to launch games without Steam via the Sniper runtime.
+                          {t("settings.linuxCompat.umuRequired")}
                         </p>
                         <div className="flex items-center gap-2">
                           <Button
@@ -2832,11 +2831,11 @@ function Settings() {
                             }}
                           >
                             {isDownloadingUmuLauncher ? (
-                              <><Loader className="h-3 w-3 animate-spin" /> Installing...</>
+                              <><Loader className="h-3 w-3 animate-spin" /> {t("common.installing")}</>
                             ) : umuInstalled ? (
-                              <><RefreshCw className="h-3 w-3" /> Reinstall/Update</>
+                              <><RefreshCw className="h-3 w-3" /> {t("settings.linuxCompat.reinstallUpdate")}</>
                             ) : (
-                              <><Download className="h-3 w-3" /> Install</>
+                              <><Download className="h-3 w-3" /> {t("common.install")}</>
                             )}
                           </Button>
                           <button
@@ -2858,16 +2857,16 @@ function Settings() {
                             </span>
                           ) : umuProtonInfo?.updateAvailable ? (
                             <span className="flex items-center gap-1 rounded bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-500">
-                              <FolderSync className="h-3 w-3" /> Update available
+                              <FolderSync className="h-3 w-3" /> {t("settings.linuxCompat.updateAvailableUmu")}
                             </span>
                           ) : (
                             <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                              Not installed
+                              {t("settings.linuxCompat.notInstalled")}
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Recommended Proton build with built-in Protonfixes support.
+                          {t("settings.linuxCompat.infoBoxUmuProton")}
                           {umuProtonInfo?.sizeFormatted && ` Latest: ${umuProtonInfo.name} (${umuProtonInfo.sizeFormatted})`}
                         </p>
                         <div className="flex items-center gap-2">
@@ -2896,13 +2895,13 @@ function Settings() {
                             }}
                           >
                             {isDownloadingUmuProton ? (
-                              <><Loader className="h-3 w-3 animate-spin" /> Installing...</>
+                              <><Loader className="h-3 w-3 animate-spin" /> {t("common.installing")}</>
                             ) : umuProtonInfo?.alreadyInstalled ? (
-                              <><FolderSync className="h-3 w-3" /> Reinstall</>
+                              <><FolderSync className="h-3 w-3" /> {t("settings.linuxCompat.reinstall")}</>
                             ) : umuProtonInfo?.updateAvailable ? (
-                              <><Download className="h-3 w-3" /> Update</>
+                              <><Download className="h-3 w-3" /> {t("settings.linuxCompat.update")}</>
                             ) : (
-                              <><Download className="h-3 w-3" /> Install</>
+                              <><Download className="h-3 w-3" /> {t("common.install")}</>
                             )}
                           </Button>
                           <Button
@@ -2928,29 +2927,29 @@ function Settings() {
                             ) : (
                               <FolderSync className="h-3 w-3" />
                             )}
-                            Check
+                            {t("settings.linuxCompat.checkForUpdates")}
                           </Button>
                         </div>
 
                         {umuProtonUpdateStatus === "up-to-date" && (
                           <p className="text-xs text-green-500 flex items-center gap-1">
-                            <FileCheck2 className="h-3 w-3" /> Up to date
+                            <FileCheck2 className="h-3 w-3" /> {t("settings.linuxCompat.upToDate")}
                           </p>
                         )}
                         {umuProtonUpdateStatus === "update-available" && (
                           <p className="text-xs text-blue-500 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" /> Update available: {umuProtonInfo?.latestVersion}
+                            <AlertTriangle className="h-3 w-3" /> {t("settings.linuxCompat.updateAvailableUmu")}: {umuProtonInfo?.latestVersion}
                           </p>
                         )}
                       </div>
                     </div>
 
-                    {/* Warning si UMU pas installé */}
+                    {/* Warning if UMU not installed */}
                     {!umuInstalled && (
                       <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
                         <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
                         <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                          UMU Launcher is not installed. Games may crash without it. Install it above to enable automatic dependency fixes via Protonfixes.
+                          {t("gameScreen.umuLauncherNotInstalled")}
                         </p>
                       </div>
                     )}
