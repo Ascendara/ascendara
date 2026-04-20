@@ -9,13 +9,15 @@ export function sanitizeText(text) {
   if (!text) return "";
 
   return text
-    .replace(/ŌĆÖ/g, "'")
-    .replace(/ŌĆō/g, "-")
-    .replace(/├Č/g, "ö")
-    .replace(/ŌĆ£/g, '"')
-    .replace(/ŌĆØ/g, '"')
-    .replace(/ŌĆ"/g, "...")
-    .replace(/ŌĆś/g, "'")
+    // Remove text within parentheses (including the parentheses)
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/ÖÖ/g, "'")
+    .replace(/ÖÖ/g, "-")
+    .replace(/Ö/g, "ö")
+    .replace(/ÖÖ/g, '"')
+    .replace(/ÖÖ/g, '"')
+    .replace(/ÖÖ/g, "...")
+    .replace(/ÖÖ/g, "'")
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\//g, "-")

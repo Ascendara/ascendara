@@ -612,9 +612,12 @@ const gameService = {
 
     // Check if using local index
     const isLocalIndex = metadata?.local === true;
+    // Custom sources (Hydra Library) have no imgID/weight; don't require them
+    const isCustomSource = metadata?.customSource === true;
 
     const validGames = games
       .filter(game => {
+        if (isCustomSource) return true;
         if (!game.imgID) return false;
         if (isLocalIndex) return true;
         return (game.weight || 0) >= 7;

@@ -1295,7 +1295,7 @@ function Settings() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h2 className="text-xl font-semibold text-primary">
-                        {t("settings.localIndex") || "Local Game Index"}
+                        {t("settings.yourLocalIndex") || "Local Game Index"}
                       </h2>
                       {isIndexRefreshing && (
                         <Badge variant="secondary" className="mb-2.5 text-xs">
@@ -1331,7 +1331,7 @@ function Settings() {
                 >
                   {isIndexRefreshing
                     ? t("localRefresh.viewProgress") || "View Progress"
-                    : t("settings.manageIndex") || "Manage Index"}
+                    : t("settings.manageIndex2")}
                 </Button>
               </div>
 

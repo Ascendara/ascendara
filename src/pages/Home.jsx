@@ -47,6 +47,7 @@ import {
 import gameService from "@/services/gameService";
 import Tour from "@/components/Tour";
 import imageCacheService from "@/services/imageCacheService";
+import steamGridImageService from "@/services/steamGridImageService";
 import recentGamesService from "@/services/recentGamesService";
 import { cn } from "@/lib/utils";
 import { sanitizeText } from "@/lib/utils";
@@ -55,25 +56,84 @@ import { sanitizeText } from "@/lib/utils";
 let gamesCache = null;
 let carouselGamesCache = null;
 
+// Unified key for the carousel image map: prefer imgID (official index),
+// fall back to a title-based key for custom sources that have no imgID.
+const carouselCoverKey = g =>
+  g?.imgID ? g.imgID : g?.game ? `sgdb:${g.game}` : null;
+
+// Stable gradient fallback for games without a cover image (custom sources).
+// Deterministic per-title so the same game always gets the same tint.
+const FALLBACK_GRADIENTS = [
+  "from-purple-600 via-pink-600 to-rose-600",
+  "from-blue-600 via-indigo-600 to-purple-600",
+  "from-emerald-600 via-teal-600 to-cyan-600",
+  "from-amber-600 via-orange-600 to-red-600",
+  "from-fuchsia-600 via-purple-600 to-indigo-600",
+  "from-sky-600 via-blue-600 to-indigo-600",
+  "from-rose-600 via-pink-600 to-fuchsia-600",
+  "from-lime-600 via-emerald-600 to-teal-600",
+];
+const hashGradient = (key = "") => {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  return FALLBACK_GRADIENTS[Math.abs(h) % FALLBACK_GRADIENTS.length];
+};
+const GameCoverFallback = memo(({ game, size = "md" }) => {
+  const title = sanitizeText(game?.game || game?.name || "");
+  const gradient = hashGradient(title);
+  const iconSize =
+    size === "xs" ? "h-5 w-5" : size === "sm" ? "h-7 w-7" : "h-10 w-10";
+  return (
+    <div
+      className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${gradient} relative overflow-hidden`}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.2),transparent_60%)]" />
+      <Gamepad2 className={`${iconSize} text-white/70 drop-shadow-lg`} />
+    </div>
+  );
+});
+GameCoverFallback.displayName = "GameCoverFallback";
+
 // Compact Game Card for horizontal scrolling sections
 const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
-  const [imageUrl, setImageUrl] = useState(null);
+  // Synchronous SteamGrid peek for instant render on custom-source games
+  const initialSgdbUrl = (() => {
+    if (game?.imgID || !game?.game) return null;
+    const peeked = steamGridImageService.peek(game.game);
+    return peeked ? steamGridImageService.pickUrl(peeked, "card") : null;
+  })();
+  const [imageUrl, setImageUrl] = useState(initialSgdbUrl);
+  const [resolved, setResolved] = useState(!!initialSgdbUrl);
   const { t } = useLanguage();
-  const imageLoadedRef = useRef(false);
+  const imageLoadedRef = useRef(!!initialSgdbUrl);
 
   useEffect(() => {
     if (imageLoadedRef.current) return;
     const loadImage = async () => {
-      if (game?.imgID) {
-        const url = await imageCacheService.getImage(game.imgID);
-        if (url) {
-          imageLoadedRef.current = true;
-          setImageUrl(url);
+      try {
+        if (game?.imgID) {
+          const url = await imageCacheService.getImage(game.imgID);
+          if (url) {
+            imageLoadedRef.current = true;
+            setImageUrl(url);
+          }
+          return;
         }
+        // Custom sources: resolve a cover by game name via SteamGridDB
+        if (game?.game) {
+          const assets = await steamGridImageService.getAssets(game.game);
+          const url = steamGridImageService.pickUrl(assets, "card");
+          if (url) {
+            imageLoadedRef.current = true;
+            setImageUrl(url);
+          }
+        }
+      } finally {
+        setResolved(true);
       }
     };
     loadImage();
-  }, [game?.imgID]);
+  }, [game?.imgID, game?.game]);
 
   return (
     <div
@@ -94,8 +154,10 @@ const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
               alt={game.game}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
             />
-          ) : (
+          ) : !resolved ? (
             <Skeleton className="h-full w-full" />
+          ) : (
+            <GameCoverFallback game={game} />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-100" />
         </AspectRatio>
@@ -126,22 +188,41 @@ const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
 
 // Mini Game Card for category grids
 const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
-  const [imageUrl, setImageUrl] = useState(null);
-  const imageLoadedRef = useRef(false);
+  const initialSgdbUrl = (() => {
+    if (game?.imgID || !game?.game) return null;
+    const peeked = steamGridImageService.peek(game.game);
+    return peeked ? steamGridImageService.pickUrl(peeked, "card") : null;
+  })();
+  const [imageUrl, setImageUrl] = useState(initialSgdbUrl);
+  const [resolved, setResolved] = useState(!!initialSgdbUrl);
+  const imageLoadedRef = useRef(!!initialSgdbUrl);
 
   useEffect(() => {
     if (imageLoadedRef.current) return;
     const loadImage = async () => {
-      if (game?.imgID) {
-        const url = await imageCacheService.getImage(game.imgID);
-        if (url) {
-          imageLoadedRef.current = true;
-          setImageUrl(url);
+      try {
+        if (game?.imgID) {
+          const url = await imageCacheService.getImage(game.imgID);
+          if (url) {
+            imageLoadedRef.current = true;
+            setImageUrl(url);
+          }
+          return;
         }
+        if (game?.game) {
+          const assets = await steamGridImageService.getAssets(game.game);
+          const url = steamGridImageService.pickUrl(assets, "card");
+          if (url) {
+            imageLoadedRef.current = true;
+            setImageUrl(url);
+          }
+        }
+      } finally {
+        setResolved(true);
       }
     };
     loadImage();
-  }, [game?.imgID]);
+  }, [game?.imgID, game?.game]);
 
   return (
     <div
@@ -160,8 +241,10 @@ const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
             alt={game.game}
             className="h-full w-full object-cover transition-transform duration-300 group-hover/mini:scale-110"
           />
-        ) : (
+        ) : !resolved ? (
           <Skeleton className="h-full w-full" />
+        ) : (
+          <GameCoverFallback game={game} size="sm" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-60 transition-opacity group-hover/mini:opacity-100" />
       </AspectRatio>
@@ -243,8 +326,10 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
           alt={sanitizedGameName}
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
         />
-      ) : (
+      ) : game?.imgID ? (
         <Skeleton className="absolute inset-0 h-full w-full" />
+      ) : (
+        <div className="absolute inset-0"><GameCoverFallback game={game} size="xs" /></div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-70 transition-opacity group-hover:opacity-100" />
       <div className="absolute bottom-0 left-0 right-0 p-2">
@@ -641,15 +726,19 @@ const Home = memo(() => {
 
       for (const slideIndex of slidesToLoad) {
         const game = carouselGames[slideIndex];
-        if (!game?.imgID || carouselImages[game.imgID]) continue;
+        const key = carouselCoverKey(game);
+        if (!key || carouselImages[key]) continue;
 
         try {
-          const imageUrl = await imageCacheService.getImage(game.imgID);
+          let imageUrl = null;
+          if (game?.imgID) {
+            imageUrl = await imageCacheService.getImage(game.imgID);
+          } else if (game?.game) {
+            const assets = await steamGridImageService.getAssets(game.game);
+            imageUrl = steamGridImageService.pickUrl(assets, "hero");
+          }
           if (imageUrl) {
-            setCarouselImages(prev => ({
-              ...prev,
-              [game.imgID]: imageUrl,
-            }));
+            setCarouselImages(prev => ({ ...prev, [key]: imageUrl }));
           }
         } catch (error) {
           console.error(`Error loading carousel image for ${game.game}:`, error);
@@ -666,15 +755,19 @@ const Home = memo(() => {
 
     const preloadAllCarouselImages = async () => {
       for (const game of carouselGames) {
-        if (!game?.imgID || carouselImages[game.imgID]) continue;
+        const key = carouselCoverKey(game);
+        if (!key || carouselImages[key]) continue;
 
         try {
-          const imageUrl = await imageCacheService.getImage(game.imgID);
+          let imageUrl = null;
+          if (game?.imgID) {
+            imageUrl = await imageCacheService.getImage(game.imgID);
+          } else if (game?.game) {
+            const assets = await steamGridImageService.getAssets(game.game);
+            imageUrl = steamGridImageService.pickUrl(assets, "hero");
+          }
           if (imageUrl) {
-            setCarouselImages(prev => ({
-              ...prev,
-              [game.imgID]: imageUrl,
-            }));
+            setCarouselImages(prev => ({ ...prev, [key]: imageUrl }));
           }
         } catch (error) {
           console.error(`Error preloading carousel image for ${game.game}:`, error);
@@ -730,6 +823,33 @@ const Home = memo(() => {
         actionGames: [],
         usedGames: new Set(),
       };
+
+    // Custom sources (Hydra Library) don't provide weight, category, or online
+    // flags. Degrade the section layout so Home stays useful instead of empty.
+    const isCustomSource = games.some(g => g?.customSource);
+    if (isCustomSource) {
+      const usedGames = new Set();
+
+      const recentlyUpdatedSection = games
+        .filter(g => !!g?.latest_update)
+        .sort((a, b) => new Date(b.latest_update) - new Date(a.latest_update))
+        .slice(0, 100);
+      recentlyUpdatedSection.forEach(g => usedGames.add(g.game));
+
+      // "Top" for custom sources = newest entries we haven't shown yet
+      const topSection = games
+        .filter(g => !usedGames.has(g.game))
+        .slice(0, 100);
+      topSection.forEach(g => usedGames.add(g.game));
+
+      return {
+        topGames: topSection,
+        recentlyUpdatedGames: recentlyUpdatedSection,
+        onlineGames: [],
+        actionGames: [],
+        usedGames,
+      };
+    }
 
     // Create a shared Set to track used games across all sections
     const usedGames = new Set();
@@ -1091,16 +1211,29 @@ const Home = memo(() => {
                   }
                 >
                   <AspectRatio ratio={16 / 9}>
-                    {carouselImages[currentGame?.imgID] ? (
-                      <img
-                        src={carouselImages[currentGame?.imgID]}
-                        alt={currentGame?.game}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        draggable="false"
-                      />
-                    ) : (
-                      <Skeleton className="h-full w-full" />
-                    )}
+                    {(() => {
+                      const heroKey = carouselCoverKey(currentGame);
+                      const heroUrl = heroKey ? carouselImages[heroKey] : null;
+                      if (heroUrl) {
+                        return (
+                          <img
+                            src={heroUrl}
+                            alt={currentGame?.game}
+                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            draggable="false"
+                          />
+                        );
+                      }
+                      // Still resolving (either imgID fetch or SteamGrid lookup)
+                      if (
+                        currentGame?.imgID ||
+                        (currentGame?.game &&
+                          !steamGridImageService.peek(currentGame.game))
+                      ) {
+                        return <Skeleton className="h-full w-full" />;
+                      }
+                      return <GameCoverFallback game={currentGame} />;
+                    })()}
                   </AspectRatio>
 
                   {/* Overlays */}
