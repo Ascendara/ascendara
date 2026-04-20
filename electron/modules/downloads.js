@@ -504,6 +504,24 @@ function registerDownloadHandlers() {
           spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
         }
 
+        // For torrent downloads, pass the user's qBittorrent WebUI config
+        if (settings.gameSource === "fitgirl") {
+          const qbHost = settings.torrentHost || "localhost";
+          const qbPort = settings.torrentPort || 8080;
+          const qbUser = settings.torrentUsername || "admin";
+          const qbPass = settings.torrentPassword || "adminadmin";
+          spawnCommand = spawnCommand.concat([
+            "--qbitHost",
+            String(qbHost),
+            "--qbitPort",
+            String(qbPort),
+            "--qbitUsername",
+            String(qbUser),
+            "--qbitPassword",
+            String(qbPass),
+          ]);
+        }
+
         // Cache download data for resume functionality
         const cacheDir = path.join(app.getPath("userData"), "downloadCache");
         await fs.promises.mkdir(cacheDir, { recursive: true });

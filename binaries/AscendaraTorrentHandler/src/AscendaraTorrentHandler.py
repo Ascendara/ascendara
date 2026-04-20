@@ -135,11 +135,15 @@ def _launch_notification(theme, title, message):
         logging.error(f"Failed to launch notification helper: {e}")
 
 class TorrentManager:
-    def __init__(self):
+    def __init__(self, qbit_host='localhost', qbit_port=8080, qbit_username='admin', qbit_password='adminadmin'):
         self.qbt_client = None
         self.connect_thread = None
         self.current_torrent_hash = None
         self.notification_theme = None
+        self.qbit_host = qbit_host
+        self.qbit_port = qbit_port
+        self.qbit_username = qbit_username
+        self.qbit_password = qbit_password
         
     def cleanup(self):
         if self.qbt_client and self.current_torrent_hash:
@@ -153,17 +157,29 @@ class TorrentManager:
                 pass  # Ignore any errors during cleanup
     
     def _connect_qbittorrent(self):
-        # Connect to local qBittorrent Web UI
+        # Connect to the user-configured qBittorrent Web UI
+        logging.info(
+            f"Connecting to qBittorrent WebUI at {self.qbit_host}:{self.qbit_port} "
+            f"as user '{self.qbit_username}'"
+        )
         self.qbt_client = qbittorrentapi.Client(
-            host='localhost',
-            port=8080,
-            username='admin',  # Default credentials
-            password='adminadmin'
+            host=self.qbit_host,
+            port=self.qbit_port,
+            username=self.qbit_username,
+            password=self.qbit_password
         )
         try:
             self.qbt_client.auth_log_in()
         except qbittorrentapi.LoginFailed as e:
-            raise Exception("Failed to connect to qBittorrent. Make sure it's running with Web UI enabled.") from e
+            raise Exception(
+                f"Failed to authenticate with qBittorrent at {self.qbit_host}:{self.qbit_port}. "
+                "Check your credentials in Ascendara settings."
+            ) from e
+        except Exception as e:
+            raise Exception(
+                f"Failed to connect to qBittorrent at {self.qbit_host}:{self.qbit_port}. "
+                "Make sure it's running with Web UI enabled and the host/port are correct."
+            ) from e
     
     def ensure_connected(self):
         if self.qbt_client is None:
@@ -345,6 +361,10 @@ def main():
     parser.add_argument("size", help="Download size")
     parser.add_argument("dir", help="Download directory")
     parser.add_argument("--withNotification", help="Theme name for notifications (e.g. light, dark, blue)", default=None)
+    parser.add_argument("--qbitHost", help="qBittorrent WebUI host", default="localhost")
+    parser.add_argument("--qbitPort", help="qBittorrent WebUI port", type=int, default=8080)
+    parser.add_argument("--qbitUsername", help="qBittorrent WebUI username", default="admin")
+    parser.add_argument("--qbitPassword", help="qBittorrent WebUI password", default="adminadmin")
     
     try:
         if len(sys.argv) == 1:  # No arguments provided
@@ -360,7 +380,12 @@ def main():
                      f"version={args.version}, size={args.size}, dir={args.dir}, "
                      f"withNotification={args.withNotification}")
         
-        torrent_manager = TorrentManager()
+        torrent_manager = TorrentManager(
+            qbit_host=args.qbitHost,
+            qbit_port=args.qbitPort,
+            qbit_username=args.qbitUsername,
+            qbit_password=args.qbitPassword,
+        )
         torrent_manager.download_torrent(
             args.magnet,
             args.game,

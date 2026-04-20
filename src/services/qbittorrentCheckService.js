@@ -2,15 +2,20 @@
  * Check if qBittorrent WebUI is running and get its version
  * @returns {Promise<{active: boolean, version?: string, error?: string}>}
  */
-const checkQbittorrentStatus = async () => {
+const checkQbittorrentStatus = async overrides => {
   console.log("[qbitCheckService] Starting qBittorrent status check...");
   try {
-    // First try to authenticate
-    console.log("[qbitCheckService] Attempting authentication with admin/adminadmin...");
-    const loginResult = await window.qbittorrentApi.login({
-      username: "admin",
-      password: "adminadmin",
-    });
+    // Read credentials/endpoint from settings (or use explicit overrides).
+    // Passing undefined fields lets the main-process handler fall back to
+    // the user's configured values in ascendarasettings.json.
+    const creds = {};
+    if (overrides?.host) creds.host = overrides.host;
+    if (overrides?.port) creds.port = overrides.port;
+    if (overrides?.username) creds.username = overrides.username;
+    if (overrides?.password) creds.password = overrides.password;
+
+    console.log("[qbitCheckService] Attempting authentication...");
+    const loginResult = await window.qbittorrentApi.login(creds);
 
     console.log("[qbitCheckService] Auth response:", loginResult);
     if (!loginResult.success) {

@@ -999,6 +999,7 @@
     "notNow": "Not Now",
     "maybeLater": "Maybe Later",
     "ok": "OK",
+    "disabled": "Disabled",
     "page": "You're viewing page",
     "preferences": "Preferences",
     "prev": "Previous",
@@ -2566,6 +2567,32 @@
     },
     "torrenting": "Torrenting",
     "torrentingDescription": "Configure torrent downloads on Ascendara. Torrenting requires qBittorrent and a VPN is strongly recommended.",
+    "qbitConfig": {
+      "title": "qBittorrent Configuration",
+      "description": "Configure your qBittorrent WebUI connection settings. These settings are used when downloading torrents.",
+      "host": "Host",
+      "port": "Port",
+      "username": "Username",
+      "password": "Password",
+      "save": "Save",
+      "saved": "Configuration saved successfully",
+      "errors": {
+        "host": "Host cannot be empty",
+        "port": "Port must be between 1 and 65535"
+      }
+    },
+    "qbitInstall": {
+      "title": "Need qBittorrent?",
+      "description": "qBittorrent is required for torrent functionality. Download and install it from the official website.",
+      "downloadButton": "Download qBittorrent"
+    },
+    "qbitConfigDialog": {
+      "currentConfig": "Current Configuration:",
+      "host": "Host",
+      "port": "Port", 
+      "username": "Username",
+      "password": "Password"
+    },
     "uploadLogs": "Upload Logs",
     "userSettings": {
       "browseDirectory": "Browse",

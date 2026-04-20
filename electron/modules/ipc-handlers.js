@@ -1137,26 +1137,49 @@ function registerMiscHandlers() {
   });
 
   // qBittorrent handlers
-  const qbittorrentClient = axios.create({
-    baseURL: "http://localhost:8080/api/v2",
-    withCredentials: true,
-  });
-
   let qbittorrentSID = null;
+  let qbittorrentBaseUrl = null;
 
-  ipcMain.handle("qbittorrent:login", async (_, { username, password }) => {
+  const resolveQbitEndpoint = overrides => {
+    const manager = getSettingsManager();
+    const host = (overrides && overrides.host) || manager.getSetting("torrentHost") || "localhost";
+    const portRaw = (overrides && overrides.port) || manager.getSetting("torrentPort") || 8080;
+    const port = parseInt(portRaw, 10) || 8080;
+    const origin = `http://${host}:${port}`;
+    return { host, port, origin, baseURL: `${origin}/api/v2` };
+  };
+
+  ipcMain.handle("qbittorrent:login", async (_, credentials) => {
     try {
-      const response = await qbittorrentClient.post(
-        "/auth/login",
-        `username=${username}&password=${password}`,
+      const manager = getSettingsManager();
+      const username =
+        (credentials && credentials.username) ||
+        manager.getSetting("torrentUsername") ||
+        "admin";
+      const password =
+        (credentials && credentials.password) ||
+        manager.getSetting("torrentPassword") ||
+        "adminadmin";
+      const { origin, baseURL } = resolveQbitEndpoint(credentials);
+      qbittorrentBaseUrl = origin;
+
+      const response = await axios.post(
+        `${baseURL}/auth/login`,
+        `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
         {
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Referer: "http://localhost:8080",
-            Origin: "http://localhost:8080",
+            Referer: origin,
+            Origin: origin,
           },
+          withCredentials: true,
+          timeout: 5000,
         }
       );
+
+      if (typeof response.data === "string" && response.data.trim().toLowerCase() === "fails.") {
+        return { success: false, error: "Authentication failed" };
+      }
 
       const setCookie = response.headers["set-cookie"];
       if (setCookie && setCookie[0]) {
@@ -1177,13 +1200,15 @@ function registerMiscHandlers() {
       if (!qbittorrentSID) {
         throw new Error("No SID available - please login first");
       }
-
-      const response = await qbittorrentClient.get("/app/version", {
+      const origin = qbittorrentBaseUrl || resolveQbitEndpoint().origin;
+      const response = await axios.get(`${origin}/api/v2/app/version`, {
         headers: {
-          Referer: "http://localhost:8080",
-          Origin: "http://localhost:8080",
+          Referer: origin,
+          Origin: origin,
           Cookie: `SID=${qbittorrentSID}`,
         },
+        withCredentials: true,
+        timeout: 5000,
       });
 
       return { success: true, version: response.data.replace(/['"]+/g, "") };
