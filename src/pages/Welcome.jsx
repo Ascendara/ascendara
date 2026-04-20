@@ -1126,7 +1126,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </span>
                     <span className="relative">
                       <span className="inline-block animate-shine bg-[linear-gradient(110deg,var(--shine-from),45%,var(--shine-via),55%,var(--shine-to))] bg-[length:200%_100%] bg-clip-text text-transparent">
-                        {t("welcome.ascendara")}
+                        Ascendara
                       </span>
                     </span>
                   </div>
@@ -2137,7 +2137,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   </motion.div>
                 </>
               ) : (
-                /* ─── STEP 2: PROTON / WINE (NEW LOGIC) ─── */
+                /* PROTON & WINE */
                 <>
                   <motion.div
                     className="mb-8 flex items-center justify-center"
@@ -2178,10 +2178,12 @@ const Welcome = ({ welcomeData, onComplete }) => {
                               : "text-yellow-500"
                             }`}>
                               {bothInstalled
-                                ? "✓ Recommended setup detected - you're good to go!"
+                                ? t("welcome.bothInstalled")
                                 : noneInstalled
                                   ? t("welcome.noRunnersTitle")
-                                  : `Partial setup detected${hasProton ? " - Proton found, UMU Launcher missing" : " - UMU Launcher found, Proton missing"}`}
+                                  : hasProton
+                                    ? t("welcome.partialSetupProton")
+                                    : t("welcome.partialSetupUmu")}
                             </h3>
 
                             {runnersList.length > 0 && (
@@ -2195,7 +2197,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                                 {umuInstalled && (
                                   <div className="flex items-center gap-2 mt-1 opacity-90">
                                     <span className="font-semibold text-green-600">UMU Launcher</span>
-                                    <span className="text-xs text-green-600 opacity-80">installed</span>
+                                    <span className="text-xs text-green-600 opacity-80">{t("welcome.installed")}</span>
                                   </div>
                                 )}
                               </div>
@@ -2210,15 +2212,14 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       <div className="flex items-center gap-2 mb-1">
                         <CircleCheck className="h-5 w-5 text-green-500" />
                         <span className="font-bold text-green-600 dark:text-green-400 text-lg">
-                          Recommended Setup
+                          {t("welcome.recommendedSetup")}
                         </span>
                         <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
-                          Best compatibility
+                          {t("welcome.bestCompatibility")}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Install both tools below for the best experience. UMU Launcher handles the runtime
-                        container and Protonfixes, while Proton GE is the most compatible Wine-based engine.
+                        {t("welcome.recommendedSetupInfo")}
                       </p>
 
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -2235,8 +2236,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                               )}
                             </div>
                             <p className="mb-3 text-xs text-muted-foreground">
-                              Runs games inside Steam's Linux Runtime (like Steam does natively).
-                              Automatically applies game-specific fixes, no manual setup needed.
+                              {t("welcome.umuLauncherDesc")}
                             </p>
                           </div>
                           <Button
@@ -2253,11 +2253,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
                             }}
                           >
                             {isDownloadingUmuLauncher ? (
-                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> Installing...</>
+                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> {t("common.installing")}</>
                             ) : umuInstalled ? (
-                              <><CircleCheck className="mr-2 h-4 w-4" /> Installed</>
+                              <><CircleCheck className="mr-2 h-4 w-4" /> {t("common.installed")}</>
                             ) : (
-                              <><Download className="mr-2 h-4 w-4" /> Install - Recommended</>
+                              <><Download className="mr-2 h-4 w-4" /> {t("welcome.installRecommended")}</>
                             )}
                           </Button>
                         </div>
@@ -2308,7 +2308,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     {/* ── Alternative (Wine / UMU-Proton) ── */}
                     <details className="rounded-xl border border-border bg-card/30 p-4">
                       <summary className="cursor-pointer text-sm font-medium text-muted-foreground select-none">
-                        Advanced / Alternatives (optional)
+                        {t("welcome.alternatives")}
                       </summary>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         {/* Wine */}
@@ -2319,7 +2319,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                               <span className="font-bold text-muted-foreground">{t("welcome.systemWine")}</span>
                             </div>
                             <p className="mb-3 text-xs text-muted-foreground">
-                              {t("welcome.systemWineDesc")} Less compatible than Proton GE - use only if you have a specific reason.
+                              {t("welcome.systemWineDesc")}
                             </p>
                           </div>
                           <Button variant="outline" size="sm" className="w-full text-muted-foreground"
@@ -2343,10 +2343,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
                               <span className="font-bold text-muted-foreground">UMU-Proton</span>
                             </div>
                             <p className="mb-3 text-xs text-muted-foreground">
-                              Alternative Proton build maintained by the UMU team. More stable than Proton GE but less updated. Only install if you know what you're doing.
+                              {t("welcome.umuProtonDesc")}
                               {umuProtonInfo?.sizeFormatted && (
                                 <span className="mt-1 block font-mono text-xs opacity-75">
-                                  Latest: {umuProtonInfo.name} · {umuProtonInfo.sizeFormatted}
+                                  {t("welcome.latest")}: {umuProtonInfo.name} · {umuProtonInfo.sizeFormatted}
                                 </span>
                               )}
                             </p>
@@ -2368,11 +2368,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
                             }}
                           >
                             {isDownloadingUmuProton ? (
-                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> Installing...</>
+                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> {t("common.installing")}</>
                             ) : umuProtonInfo?.alreadyInstalled ? (
-                              <><CircleCheck className="mr-2 h-4 w-4" /> Installed</>
+                              <><CircleCheck className="mr-2 h-4 w-4" /> {t("common.installed")}</>
                             ) : (
-                              <><Download className="mr-2 h-4 w-4" /> Install UMU-Proton</>
+                              <><Download className="mr-2 h-4 w-4" /> {t("common.install")}</>
                             )}
                           </Button>
                         </div>
@@ -2383,7 +2383,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-left">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
                         <p className="text-xs text-yellow-600">
-                          UMU Launcher is recommended, without it, games may crash at startup. You can install it later in Settings.
+                          {t("welcome.umuLauncherNotInstalled")}
                         </p>
                       </div>
                     )}

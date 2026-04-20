@@ -1822,7 +1822,7 @@ export default function GameScreen() {
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
               <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-500" />
               <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                UMU Launcher is not installed - this game may crash at launch.
+                {t("gameScreen.umuLauncherNotInstalled")}
               </p>
               <Button
                 size="sm"
@@ -1830,7 +1830,7 @@ export default function GameScreen() {
                 className="ml-auto shrink-0 border-yellow-500/50 text-yellow-600"
                 onClick={() => navigate("/settings")}
               >
-                Install in Settings
+                {t("gameScreen.installInSettings")}
               </Button>
             </div>
           )}
@@ -2240,9 +2240,7 @@ export default function GameScreen() {
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               <p className="text-xs">
-                                The UMU ID links this game to Protonfixes, which automatically
-                                installs missing DLLs and redistributables (DirectX, Visual C++…)
-                                on launch. Find IDs at{" "}
+                                {t("gameScreen.umuIdDescription")}{" "}
                                 <button
                                   onClick={() => window.electron.openURL("https://umu.openwinecomponents.org")}
                                   className="underline"
