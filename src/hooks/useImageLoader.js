@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import imageCacheService from "@/services/imageCacheService";
+import steamGridImageService from "@/services/steamGridImageService";
 
 // Track which images are currently being loaded to prevent duplicate requests
 const loadingImages = new Map();
@@ -47,6 +48,43 @@ export function useImageLoader(
 
   useEffect(() => {
     mountedRef.current = true;
+
+    // SteamGrid fallback: when there's no imgID but a game name is supplied
+    // (typically for custom Hydra sources), resolve a cover URL by name.
+    if (!imgID && options.enabled && options.fallbackGameName) {
+      const name = options.fallbackGameName;
+      const slot = options.fallbackSlot || "card";
+
+      // Synchronous cache peek for instant render
+      const peeked = steamGridImageService.peek(name);
+      if (peeked) {
+        const url = steamGridImageService.pickUrl(peeked, slot);
+        setState({ cachedImage: url, loading: false, error: null });
+        return;
+      }
+
+      setState(prev => ({ ...prev, loading: true }));
+      steamGridImageService
+        .getAssets(name)
+        .then(assets => {
+          if (!mountedRef.current) return;
+          const url = steamGridImageService.pickUrl(assets, slot);
+          setState({
+            cachedImage: url,
+            loading: false,
+            error: url ? null : "No SteamGrid match",
+          });
+        })
+        .catch(err => {
+          if (!mountedRef.current) return;
+          setState({
+            cachedImage: null,
+            loading: false,
+            error: err?.message || "SteamGrid lookup failed",
+          });
+        });
+      return;
+    }
 
     if (!imgID || !options.enabled) {
       setState({
@@ -147,7 +185,14 @@ export function useImageLoader(
       mountedRef.current = false;
       loadTask.mounted = false;
     };
-  }, [imgID, options.enabled, options.quality, options.priority]);
+  }, [
+    imgID,
+    options.enabled,
+    options.quality,
+    options.priority,
+    options.fallbackGameName,
+    options.fallbackSlot,
+  ]);
 
   return state;
 }

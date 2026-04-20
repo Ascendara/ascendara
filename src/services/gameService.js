@@ -7,6 +7,11 @@ const METADATA_CACHE_KEY = "local_ascendara_metadata_cache";
 const LAST_UPDATED_KEY = "local_ascendara_last_updated";
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
+// Custom (Hydra Library) source cache keys - scoped per source URL
+const CUSTOM_SOURCE_CACHE_PREFIX = "ascendara_custom_source_cache::";
+const CUSTOM_SOURCE_CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours
+const CUSTOM_SOURCE_REQUEST_TIMEOUT = 30000;
+
 // Memory cache to avoid localStorage reads
 let memoryCache = {
   games: null,
@@ -17,7 +22,202 @@ let memoryCache = {
   gameIdMap: null, // Cache for game ID lookups
   isLocalIndex: false, // Track if using local index
   localIndexPath: null, // Path to local index
+  customSourceUrl: null, // Active custom source URL (Hydra Library)
 };
+
+// ---------------------------------------------------------------------------
+// Hydra Library helpers
+// ---------------------------------------------------------------------------
+
+const HYDRA_VERSION_RE = /\(v[^)]+\)|\[v[^\]]+\]|\sv\d[\w.\-]*/i;
+const HYDRA_BUILD_RE = /Build\s*\d+/i;
+const HYDRA_NOISE_RE =
+  /\s*(free\s+download|full\s+version|repack|pc\s+game|\+\s*all\s+dlcs?|\+\s*\d+\s+dlcs?)\s*/gi;
+const HYDRA_BRACKET_RE = /\[[^\]]*\]|\{[^}]*\}/g;
+
+function extractHydraVersion(title) {
+  if (!title) return null;
+  const m = title.match(HYDRA_VERSION_RE);
+  if (m) {
+    let raw = m[0].trim().replace(/^[(\[]|[)\]]$/g, "").trim();
+    if (raw.toLowerCase().startsWith("v")) raw = raw.slice(1);
+    return raw.trim() || null;
+  }
+  const b = title.match(HYDRA_BUILD_RE);
+  return b ? b[0].trim() : null;
+}
+
+function cleanHydraTitle(title) {
+  if (!title) return "";
+  return title
+    .replace(HYDRA_VERSION_RE, "")
+    .replace(HYDRA_BUILD_RE, "")
+    .replace(HYDRA_BRACKET_RE, "")
+    .replace(HYDRA_NOISE_RE, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s\-–—:|]+|[\s\-–—:|]+$/g, "")
+    .trim();
+}
+
+function hydraHostKey(uri) {
+  if (!uri) return null;
+  const low = uri.trim().toLowerCase();
+  if (low.startsWith("magnet:")) return "torrent";
+  try {
+    let host = new URL(uri).hostname.toLowerCase();
+    if (host.startsWith("www.")) host = host.slice(4);
+    if (!host) return null;
+    const parts = host.split(".");
+    if (parts.length >= 2) return parts[parts.length - 2];
+    return host;
+  } catch {
+    return null;
+  }
+}
+
+function parseHydraDate(value) {
+  if (!value) return null;
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
+// Deterministic 6-char id derived from an arbitrary stable string.
+function deriveStableGameId(seed) {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"; // matches Python encode_game_id charset
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  }
+  // Mix for better distribution
+  let n = Math.abs(hash);
+  let out = "";
+  for (let i = 0; i < 6; i++) {
+    out = chars[n % chars.length] + out;
+    n = Math.floor(n / chars.length) + (i + 1) * 2971;
+  }
+  return out;
+}
+
+/**
+ * Map a single Hydra download entry to the Ascendara game schema.
+ * Fields not supplied by Hydra (imgID, category, weight, minReqs) are left null/empty
+ * so GameCard/Search render placeholder states gracefully.
+ */
+function mapHydraDownload(download, sourceLabel) {
+  if (!download || !download.title) return null;
+  const rawTitle = String(download.title);
+  const cleanName = cleanHydraTitle(rawTitle) || rawTitle;
+  const version = extractHydraVersion(rawTitle);
+
+  const uris = Array.isArray(download.uris) ? download.uris.filter(Boolean) : [];
+  const downloadLinks = {};
+  for (const uri of uris) {
+    const key = hydraHostKey(uri);
+    if (!key) continue;
+    if (!downloadLinks[key]) downloadLinks[key] = [];
+    downloadLinks[key].push(uri);
+  }
+
+  const seed = `${sourceLabel}::${rawTitle}::${uris.join("|")}`;
+  const gameID = deriveStableGameId(seed);
+
+  return {
+    game: sanitizeText(cleanName),
+    name: sanitizeText(cleanName),
+    gameID,
+    imgID: null,
+    category: [],
+    version: version || null,
+    size: download.fileSize || null,
+    online: false,
+    dlc: false,
+    dirlink: null,
+    minReqs: null,
+    releasedBy: sourceLabel || null,
+    latest_update: parseHydraDate(download.uploadDate),
+    download_links: downloadLinks,
+    weight: null,
+    customSource: sourceLabel || true,
+  };
+}
+
+async function fetchCustomSourceJson(url) {
+  if (!url) throw new Error("Missing custom source URL");
+  // Use the electron-bridged https helper to bypass CORS restrictions.
+  if (window.electron?.request) {
+    const res = await window.electron.request(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Referer: "https://ascendara.app/",
+      },
+      timeout: CUSTOM_SOURCE_REQUEST_TIMEOUT,
+    });
+    if (!res.ok) {
+      let errorMsg = `Custom source HTTP ${res.status}`;
+      if (res.status === 403) {
+        errorMsg += " - Access forbidden. This source may require authentication or have geographic restrictions.";
+      } else if (res.status === 404) {
+        errorMsg += " - Source not found. The URL may be incorrect or the source may have been removed.";
+      } else if (res.status === 429) {
+        errorMsg += " - Too many requests. Please wait before trying again.";
+      }
+      throw new Error(errorMsg);
+    }
+    return JSON.parse(res.data);
+  }
+  // Browser fallback (dev)
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    },
+  });
+  if (!res.ok) {
+    let errorMsg = `Custom source HTTP ${res.status}`;
+    if (res.status === 403) {
+      errorMsg += " - Access forbidden. This source may require authentication or have geographic restrictions.";
+    } else if (res.status === 404) {
+      errorMsg += " - Source not found. The URL may be incorrect or the source may have been removed.";
+    } else if (res.status === 429) {
+      errorMsg += " - Too many requests. Please wait before trying again.";
+    } else {
+      errorMsg += ` - An error occurred while fetching the custom source. Status code: ${res.status}`;
+    }
+    throw new Error(errorMsg);
+  }
+  return res.json();
+}
+
+function readCustomSourceCache(url) {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SOURCE_CACHE_PREFIX + url);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp || !parsed?.games) return null;
+    if (Date.now() - parsed.timestamp > CUSTOM_SOURCE_CACHE_DURATION) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCustomSourceCache(url, payload) {
+  try {
+    localStorage.setItem(
+      CUSTOM_SOURCE_CACHE_PREFIX + url,
+      JSON.stringify({ ...payload, timestamp: Date.now() })
+    );
+  } catch (e) {
+    console.warn("[GameService] Failed to persist custom source cache:", e);
+  }
+}
 
 const gameService = {
   parseDateString(dateStr) {
@@ -28,9 +228,20 @@ const gameService = {
   async getCachedData() {
     console.log("[GameService] getCachedData called");
 
+    // Get settings first so we can branch on Custom Sources Mode before touching cache
+    const settings = await window.electron.getSettings();
+    const customMode = !!settings?.customSourcesMode;
+    const customSource = settings?.customSource;
+    const activeCustomUrl = customMode && customSource?.url ? customSource.url : null;
+
     // Check memory cache FIRST - no async, instant return
     const now = Date.now();
-    if (memoryCache.games && memoryCache.metadata && memoryCache.timestamp) {
+    if (
+      memoryCache.games &&
+      memoryCache.metadata &&
+      memoryCache.timestamp &&
+      memoryCache.customSourceUrl === activeCustomUrl
+    ) {
       const age = now - memoryCache.timestamp;
       if (age < CACHE_DURATION) {
         console.log(
@@ -45,8 +256,30 @@ const gameService = {
       }
     }
 
-    // Get settings to check local index path
-    const settings = await window.electron.getSettings();
+    // Custom Sources Mode: fetch directly from a Hydra-compatible JSON source.
+    // No local index, no images, no Python scraper - just fetch + map + cache.
+    if (activeCustomUrl) {
+      try {
+        const data = await this._loadCustomSourceData(customSource);
+        await this.updateCache(data, false, null, activeCustomUrl);
+        return data;
+      } catch (error) {
+        console.error("[GameService] Failed to load custom source:", error);
+        return {
+          games: [],
+          metadata: {
+            local: false,
+            games: 0,
+            source: customSource?.name || "CUSTOM",
+            getDate: "Not available",
+            customSource: true,
+            error: error.message || String(error),
+          },
+        };
+      }
+    }
+
+    // Local index path (default, official index mode)
     const localIndexPath = settings?.localIndex;
 
     console.log("[GameService] Settings loaded:", {
@@ -65,6 +298,7 @@ const gameService = {
         gameIdMap: null,
         isLocalIndex: true,
         localIndexPath: localIndexPath,
+        customSourceUrl: null,
       };
     }
 
@@ -160,8 +394,177 @@ const gameService = {
     }
   },
 
+  /**
+   * Load & map a Hydra-compatible custom source.
+   * Uses a 12h localStorage cache keyed by source URL; force=true bypasses the cache.
+   */
+  async _loadCustomSourceData(customSource, { force = false } = {}) {
+    const url = customSource?.url;
+    if (!url) throw new Error("Missing custom source URL");
+    const label =
+      customSource?.name || customSource?.title || customSource?.label || "Custom";
 
-  async updateCache(data, isLocalIndex = false, localIndexPath = null) {
+    if (!force) {
+      const cached = readCustomSourceCache(url);
+      if (cached) {
+        console.log(
+          "[GameService] Using cached custom source:",
+          label,
+          cached.games.length,
+          "games"
+        );
+        return { games: cached.games, metadata: cached.metadata };
+      }
+    }
+
+    console.log("[GameService] Fetching custom source JSON:", url);
+    const raw = await fetchCustomSourceJson(url);
+    return this._mapAndCacheHydraJson(raw, { url, label });
+  },
+
+  /**
+   * Shared mapping + caching step for Hydra JSON payloads. Used by both the
+   * automatic fetch path and the manual-paste fallback (when the upstream host
+   * returns 403/Cloudflare-challenged HTML).
+   */
+  _mapAndCacheHydraJson(raw, { url, label }) {
+    const downloads = Array.isArray(raw?.downloads) ? raw.downloads : [];
+    const sourceLabel = raw?.name || label;
+    const games = [];
+    const seenIds = new Set();
+    for (const entry of downloads) {
+      const mapped = mapHydraDownload(entry, sourceLabel);
+      if (!mapped) continue;
+      // Ensure gameID uniqueness within the source
+      if (seenIds.has(mapped.gameID)) {
+        mapped.gameID = deriveStableGameId(
+          `${mapped.gameID}-${seenIds.size}-${mapped.game}`
+        );
+      }
+      seenIds.add(mapped.gameID);
+      games.push(mapped);
+    }
+
+    const metadata = {
+      local: false,
+      customSource: true,
+      source: String(sourceLabel).toUpperCase(),
+      sourceName: sourceLabel,
+      sourceUrl: url,
+      games: games.length,
+      getDate: new Date().toLocaleString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+      listVersion: "hydra-1.0",
+    };
+
+    if (url) writeCustomSourceCache(url, { games, metadata });
+    console.log(
+      "[GameService] Custom source loaded:",
+      label,
+      games.length,
+      "games"
+    );
+    return { games, metadata };
+  },
+
+  /**
+   * Ingest a manually-pasted Hydra JSON blob (string or object) for the active
+   * custom source. Used as a fallback when upstream returns 403/Cloudflare.
+   */
+  async ingestCustomSourceJson(rawInput) {
+    const settings = await window.electron.getSettings();
+    if (!settings?.customSourcesMode) {
+      throw new Error("Custom Sources Mode is not enabled");
+    }
+    const customSource = settings?.customSource;
+    if (!customSource?.url) {
+      throw new Error("No custom source is selected");
+    }
+    let parsed;
+    if (typeof rawInput === "string") {
+      const trimmed = rawInput.trim();
+      if (!trimmed) throw new Error("Pasted JSON is empty");
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        throw new Error("Invalid JSON: " + (e?.message || String(e)));
+      }
+    } else if (rawInput && typeof rawInput === "object") {
+      parsed = rawInput;
+    } else {
+      throw new Error("Pasted JSON is empty");
+    }
+    if (!Array.isArray(parsed?.downloads)) {
+      throw new Error(
+        "JSON is missing a 'downloads' array - is this a Hydra source?"
+      );
+    }
+    const label =
+      customSource?.name ||
+      customSource?.title ||
+      customSource?.label ||
+      "Custom";
+    const data = this._mapAndCacheHydraJson(parsed, {
+      url: customSource.url,
+      label,
+    });
+    await this.updateCache(data, false, null, customSource.url);
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+    localStorage.removeItem(METADATA_CACHE_KEY);
+    return data;
+  },
+
+  /**
+   * Force a re-fetch of the active custom source, bypassing cache.
+   * Returns the fresh { games, metadata } payload.
+   */
+  async refreshCustomSource() {
+    const settings = await window.electron.getSettings();
+    if (!settings?.customSourcesMode) {
+      throw new Error("Custom Sources Mode is not enabled");
+    }
+    const customSource = settings?.customSource;
+    if (!customSource?.url) {
+      throw new Error("No custom source is selected");
+    }
+    const data = await this._loadCustomSourceData(customSource, { force: true });
+    await this.updateCache(data, false, null, customSource.url);
+    // Clear legacy caches so Search.jsx reloads fresh data
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+    localStorage.removeItem(METADATA_CACHE_KEY);
+    return data;
+  },
+
+  /**
+   * Drop the cached entry for a specific custom source URL (or all of them).
+   */
+  clearCustomSourceCache(url) {
+    try {
+      if (url) {
+        localStorage.removeItem(CUSTOM_SOURCE_CACHE_PREFIX + url);
+        return;
+      }
+      const toRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(CUSTOM_SOURCE_CACHE_PREFIX)) toRemove.push(key);
+      }
+      toRemove.forEach(k => localStorage.removeItem(k));
+    } catch (e) {
+      console.warn("[GameService] Failed to clear custom source cache:", e);
+    }
+  },
+
+
+  async updateCache(data, isLocalIndex = false, localIndexPath = null, customSourceUrl = null) {
     try {
       const now = Date.now();
 
@@ -180,8 +583,10 @@ const gameService = {
         timestamp: now,
         lastUpdated: data.metadata?.getDate,
         imageIdMap, // Store the map in memory cache
+        gameIdMap: null,
         isLocalIndex,
         localIndexPath,
+        customSourceUrl,
       };
 
       // Update localStorage cache
@@ -291,6 +696,7 @@ const gameService = {
       gameIdMap: null,
       isLocalIndex: false,
       localIndexPath: null,
+      customSourceUrl: null,
     };
   },
 

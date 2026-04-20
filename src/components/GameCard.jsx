@@ -58,7 +58,9 @@ const GameCard = memo(function GameCard({ game, compact }) {
   const { cachedImage, loading, error } = useImageLoader(game?.imgID, {
     quality: isVisible ? "high" : "low",
     priority: isVisible ? "high" : "low",
-    enabled: !!game?.imgID,
+    enabled: !!game?.imgID || (!game?.imgID && !!game?.game),
+    fallbackGameName: !game?.imgID ? game?.game : null,
+    fallbackSlot: "card",
   });
   const [isInstalled, setIsInstalled] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);

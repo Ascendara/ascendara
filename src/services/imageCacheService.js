@@ -32,6 +32,11 @@ class ImageCacheService {
     this.recent404Count = 0;
     this.max404BeforeClear = 4;
 
+    // 429 circuit breaker - when the API rate-limits us, short-circuit all
+    // subsequent API calls for a cooldown window instead of hammering it.
+    this.rateLimitUntil = 0; // epoch ms; 0 means not rate-limited
+    this.rateLimitBackoff = 30_000; // 30s cooldown per 429 hit
+
     // Settings cache to avoid repeated IPC calls
     this._settingsCache = null;
     this._settingsCacheTime = 0;
@@ -231,7 +236,10 @@ class ImageCacheService {
 
     // Get settings to determine if local index
     const settings = await this._getSettings();
-    const isLocalIndex = settings?.usingLocalIndex && settings?.localIndex;
+    // App now uses the local index exclusively. Treat any configured localIndex
+    // path as local-mode — the deprecated `usingLocalIndex` flag would otherwise
+    // force every image through the API and trigger 429s.
+    const isLocalIndex = !!settings?.localIndex;
 
     // For local index - load directly from disk (no IndexedDB wait needed)
     // When using local index, NEVER fall back to API
@@ -273,7 +281,9 @@ class ImageCacheService {
 
     try {
       const result = await loadPromise;
-      this._setMemoryCache(imgID, result);
+      // Only cache non-null results. Caching null for rate-limited requests
+      // would make those images permanently empty even after the cooldown.
+      if (result) this._setMemoryCache(imgID, result);
       return result;
     } catch (error) {
       this.activeRequests.delete(imgID);
@@ -335,6 +345,12 @@ class ImageCacheService {
   ) {
     if (!imgID) return null;
 
+    // Circuit breaker: if we recently hit a 429, short-circuit instead of
+    // piling on more requests that will also fail.
+    if (this.rateLimitUntil && Date.now() < this.rateLimitUntil) {
+      return null;
+    }
+
     try {
       const timestamp = Math.floor(Date.now() / 1000);
       const signature = await this.generateSignature(timestamp);
@@ -354,10 +370,24 @@ class ImageCacheService {
       );
 
       if (result.error) {
+        if (result.status === 429) {
+          // Trip the circuit breaker and stop retrying. Don't throw — return
+          // null so the caller just treats this image as missing for now.
+          this.rateLimitUntil = Date.now() + this.rateLimitBackoff;
+          console.warn(
+            `[ImageCache] Rate limited (429). Pausing API image loads for ${this.rateLimitBackoff / 1000}s`
+          );
+          return null;
+        }
         if (result.status === 404) {
           this.recent404Count++;
           if (this.recent404Count >= this.max404BeforeClear) {
-            await this.clearCache();
+            // Clear image caches but DON'T auto-refresh gameService here -
+            // that causes an infinite loop of re-renders -> new image
+            // requests -> more 404s -> another clear.
+            this.memoryCache.clear();
+            this.memoryCacheOrder = [];
+            await this.clearIndexedDB();
             this.recent404Count = 0;
           }
         }

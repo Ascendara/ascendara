@@ -18,6 +18,8 @@ const HomeGameCard = memo(({ game, small }) => {
     quality: isVisible ? "high" : "low",
     priority: isVisible ? "high" : "low",
     enabled: true,
+    fallbackGameName: !game?.imgID ? game?.game : null,
+    fallbackSlot: "card",
   });
   const { t } = useLanguage();
 

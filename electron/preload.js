@@ -461,6 +461,8 @@ contextBridge.exposeInMainWorld("electron", {
   openURL: url => ipcRenderer.invoke("open-url", url),
   fetchApiImage: (endpoint, imgID, timestamp, signature) =>
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
+  getSteamGridUrls: gameName => ipcRenderer.invoke("steamgrid-get-urls", gameName),
+  getSteamGridHeader: gameName => ipcRenderer.invoke("steamgrid-get-header", gameName),
 
   // HTTPS Request Helper
   request: (url, options) => {

@@ -33,6 +33,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import imageCacheService from "@/services/imageCacheService";
+import steamGridImageService from "@/services/steamGridImageService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import { addToQueue, hasActiveDownloads, getDownloadQueue } from "@/services/downloadQueueService";
 import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
@@ -1167,8 +1168,21 @@ export default function DownloadPage() {
   useEffect(() => {
     window.scrollTo(0, 0);
     const loadCachedImage = async () => {
-      const image = await imageCacheService.getImage(gameData.imgID);
-      setCachedImage(image);
+      if (gameData?.imgID) {
+        const image = await imageCacheService.getImage(gameData.imgID);
+        setCachedImage(image);
+        return;
+      }
+      // Fallback: custom-source games (no imgID) -> resolve SteamGrid cover by name
+      if (gameData?.game) {
+        const peeked = steamGridImageService.peek(gameData.game);
+        if (peeked) {
+          setCachedImage(steamGridImageService.pickUrl(peeked, "hero"));
+          return;
+        }
+        const assets = await steamGridImageService.getAssets(gameData.game);
+        setCachedImage(steamGridImageService.pickUrl(assets, "hero"));
+      }
     };
     loadCachedImage();
     checkDownloadPath();

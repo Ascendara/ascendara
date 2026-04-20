@@ -160,6 +160,28 @@ function registerMiscHandlers() {
     shell.openExternal(url);
   });
 
+  // Resolve SteamGrid cover URLs for a game name (used by custom-source UI)
+  ipcMain.handle("steamgrid-get-urls", async (_, gameName) => {
+    try {
+      return await steamgrid.getImageUrls(gameName);
+    } catch (error) {
+      console.error("[SteamGrid] getImageUrls IPC error:", error);
+      return { gameId: null, grid: null, hero: null, logo: null, header: null };
+    }
+  });
+
+  // Lightweight: one-image header lookup for browse/search UI (2 requests
+  // instead of 5). Use this by default; switch to steamgrid-get-urls only
+  // when all four asset variants are actually needed.
+  ipcMain.handle("steamgrid-get-header", async (_, gameName) => {
+    try {
+      return await steamgrid.getHeaderUrl(gameName);
+    } catch (error) {
+      console.error("[SteamGrid] getHeaderUrl IPC error:", error);
+      return { gameId: null, url: null };
+    }
+  });
+
   // Read local file
   ipcMain.handle("read-local-file", async (_, filePath, encoding = "utf8") => {
     try {

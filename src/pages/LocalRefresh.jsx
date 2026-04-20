@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,10 @@ import {
   ExternalLink,
   Calendar,
   PencilIcon,
+  Globe,
+  ShieldCheck,
+  Search as SearchIcon,
+  AlertTriangle,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -59,6 +63,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import RefreshIndexDialog from "@/components/RefreshIndexDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
@@ -128,6 +140,9 @@ const LocalRefresh = () => {
   const lastCookieToastTimeRef = useRef(0);
   const cookieDialogOpenRef = useRef(false);
   const wasFirstIndexRef = useRef(false);
+  // Snapshot of the previous custom source, used to revert the selection if
+  // the user bails out of the manual-paste fallback without ingesting JSON.
+  const previousCustomSourceRef = useRef(null);
   const [checkingApi, setCheckingApi] = useState(false);
   const [apiAvailable, setApiAvailable] = useState(false);
   const [indexInfo, setIndexInfo] = useState(null); // { gameCount, date, size }
@@ -138,6 +153,34 @@ const LocalRefresh = () => {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState("7");
   const [autoRefreshMethod, setAutoRefreshMethod] = useState("shared"); // "shared" or "manual"
+
+  // Custom Sources Mode (Hydra Library)
+  const [customSourcesMode, setCustomSourcesMode] = useState(false);
+  const [customSource, setCustomSource] = useState(null); // { id, name, url, gamesCount, ... }
+  const [customSourceLastSynced, setCustomSourceLastSynced] = useState(null);
+  const [customSourceGameCount, setCustomSourceGameCount] = useState(null);
+  const [hydraBrowserOpen, setHydraBrowserOpen] = useState(false);
+  const [hydraSources, setHydraSources] = useState([]);
+  const [hydraSourcesLoading, setHydraSourcesLoading] = useState(false);
+  const [hydraSourcesError, setHydraSourcesError] = useState(null);
+  const [hydraSearchQuery, setHydraSearchQuery] = useState("");
+  const [isSyncingCustomSource, setIsSyncingCustomSource] = useState(false);
+
+  // Manual paste fallback (triggered on 403 from upstream source)
+  const [manualPasteOpen, setManualPasteOpen] = useState(false);
+  const [manualPasteText, setManualPasteText] = useState("");
+  const [manualPasteError, setManualPasteError] = useState(null);
+  const [isIngestingManual, setIsIngestingManual] = useState(false);
+  const [manualPasteSourceUrl, setManualPasteSourceUrl] = useState(null);
+
+  // Library of sources the user has selected/synced, so they can switch back
+  // and forth without having to re-browse Hydra each time.
+  const [customSourcesLibrary, setCustomSourcesLibrary] = useState([]);
+
+  // Torrent-only source warning (shown when a synced source has no non-torrent
+  // hosts and the user hasn't enabled torrenting in Settings yet)
+  const [torrentWarningOpen, setTorrentWarningOpen] = useState(false);
+  const [torrentWarningSource, setTorrentWarningSource] = useState(null);
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -163,6 +206,21 @@ const LocalRefresh = () => {
         }
         if (settings?.autoRefreshMethod !== undefined) {
           setAutoRefreshMethod(settings.autoRefreshMethod);
+        }
+        if (settings?.customSourcesMode !== undefined) {
+          setCustomSourcesMode(!!settings.customSourcesMode);
+        }
+        if (settings?.customSource && typeof settings.customSource === "object") {
+          setCustomSource(settings.customSource);
+          if (settings.customSource.lastSynced) {
+            setCustomSourceLastSynced(new Date(settings.customSource.lastSynced));
+          }
+          if (typeof settings.customSource.gameCount === "number") {
+            setCustomSourceGameCount(settings.customSource.gameCount);
+          }
+        }
+        if (Array.isArray(settings?.customSourcesLibrary)) {
+          setCustomSourcesLibrary(settings.customSourcesLibrary);
         }
 
         // Check if localIndex is set, if not set it to default
@@ -780,6 +838,394 @@ const LocalRefresh = () => {
   };
 
 
+  // ---------------------------------------------------------------------------
+  // Custom Sources Mode handlers (Hydra Library)
+  // ---------------------------------------------------------------------------
+
+  const handleToggleCustomSourcesMode = async (enabled) => {
+    setCustomSourcesMode(enabled);
+    await updateSetting("customSourcesMode", enabled);
+    // Force full reload of game data on next request
+    gameService.clearMemoryCache();
+    localStorage.removeItem("ascendara_games_cache");
+    localStorage.removeItem("local_ascendara_games_timestamp");
+    localStorage.removeItem("local_ascendara_metadata_cache");
+    if (enabled) {
+      // Ensure usingLocalIndex reflects that we're NOT using the official local index
+      await updateSetting("usingLocalIndex", false);
+      toast.info(
+        t("localRefresh.customModeEnabled") ||
+          "Custom Sources Mode enabled. Select a source to begin."
+      );
+    } else {
+      // Revert to using local index if one is built; app.jsx / Search.jsx will re-read
+      toast.info(
+        t("localRefresh.customModeDisabled") ||
+          "Custom Sources Mode disabled. Reverting to official index."
+      );
+    }
+    // Notify other pages (Search/Library) to re-fetch games
+    window.dispatchEvent(
+      new CustomEvent("index-refreshed", { detail: { timestamp: Date.now() } })
+    );
+  };
+
+  const fetchHydraSources = useCallback(async () => {
+    setHydraSourcesLoading(true);
+    setHydraSourcesError(null);
+    try {
+      const url = "https://api.hydralibrary.com/sources?page=1&limit=100";
+      let parsed;
+      if (window.electron?.request) {
+        const res = await window.electron.request(url, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          timeout: 20000,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        parsed = JSON.parse(res.data);
+      } else {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        parsed = await r.json();
+      }
+      const sources = Array.isArray(parsed?.sources) ? parsed.sources : [];
+      setHydraSources(sources);
+    } catch (err) {
+      console.error("Failed to fetch Hydra sources:", err);
+      setHydraSourcesError(err?.message || "Failed to fetch sources");
+    } finally {
+      setHydraSourcesLoading(false);
+    }
+  }, []);
+
+  const handleOpenHydraBrowser = () => {
+    setHydraBrowserOpen(true);
+    // Fetch fresh list every time the dialog opens (cheap)
+    if (!hydraSourcesLoading) {
+      fetchHydraSources();
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Library / torrent helpers
+  // ---------------------------------------------------------------------------
+
+  // Merge a source entry into the persisted library (dedupe by URL) and save.
+  const upsertLibraryEntry = useCallback(async (entry) => {
+    if (!entry?.url) return [];
+    let next = [];
+    setCustomSourcesLibrary((prev) => {
+      const filtered = (prev || []).filter((s) => s?.url !== entry.url);
+      next = [entry, ...filtered].slice(0, 20); // cap at 20 saved sources
+      return next;
+    });
+    await updateSetting("customSourcesLibrary", next);
+    return next;
+  }, [updateSetting]);
+
+  const removeLibraryEntry = useCallback(async (url) => {
+    if (!url) return;
+    let next = [];
+    setCustomSourcesLibrary((prev) => {
+      next = (prev || []).filter((s) => s?.url !== url);
+      return next;
+    });
+    await updateSetting("customSourcesLibrary", next);
+  }, [updateSetting]);
+
+  // Check Hydra source metadata (topDownloadOption) to see if the upstream
+  // only advertises torrent links. This is the authoritative signal when
+  // browsing sources, because it doesn't require syncing first.
+  const isSourceMetaTorrentOnly = (source) => {
+    const opts = Array.isArray(source?.topDownloadOption)
+      ? source.topDownloadOption
+      : null;
+    if (!opts || opts.length === 0) return false;
+    return opts.every(
+      (o) => String(o?.name || "").toLowerCase() === "torrent"
+    );
+  };
+
+  // Inspect a mapped dataset to determine whether it's torrent-only.
+  // Hydra maps magnet links to download_links.torrent, and most DDL hosts
+  // produce non-torrent keys (gofile, buzzheavier, 1fichier, etc.).
+  const isTorrentOnlyDataset = (games) => {
+    if (!Array.isArray(games) || games.length === 0) return false;
+    let sampled = 0;
+    let nonTorrent = 0;
+    for (const g of games) {
+      const links = g?.download_links;
+      if (!links || typeof links !== "object") continue;
+      sampled++;
+      const keys = Object.keys(links).filter((k) => (links[k] || []).length > 0);
+      if (keys.some((k) => k !== "torrent")) nonTorrent++;
+      if (sampled >= 50) break; // sampling is enough
+    }
+    if (sampled === 0) return false;
+    return nonTorrent === 0;
+  };
+
+  const maybeWarnTorrentOnly = async (source, games) => {
+    try {
+      const torrentOnly =
+        isSourceMetaTorrentOnly(source) || isTorrentOnlyDataset(games);
+      if (!torrentOnly) return;
+      const current = await window.electron.getSettings();
+      if (current?.torrentEnabled) return;
+      setTorrentWarningSource({ ...source, torrentOnly: true });
+      setTorrentWarningOpen(true);
+      // Mark the source so the UI can decorate it later
+      await upsertLibraryEntry({
+        ...source,
+        torrentOnly: true,
+        lastUsed: Date.now(),
+      });
+    } catch (e) {
+      console.warn("[LocalRefresh] torrent-only check failed:", e);
+    }
+  };
+
+  const handleSelectCustomSource = async (source) => {
+    if (!source?.url) return;
+    const payload = {
+      id: source.id,
+      name: source.title || source.name || "Custom Source",
+      url: source.url,
+      gamesCount: source.gamesCount || null,
+      description: source.description || "",
+      status: Array.isArray(source.status) ? source.status : [],
+      rating: source.rating || null,
+      addedDate: source.addedDate || null,
+      topDownloadOption: Array.isArray(source.topDownloadOption)
+        ? source.topDownloadOption
+        : null,
+      torrentOnly: isSourceMetaTorrentOnly(source) || undefined,
+    };
+    payload.lastUsed = Date.now();
+    // Snapshot the previously-active source so we can revert if the user
+    // cancels out of the manual-paste fallback without ingesting anything.
+    previousCustomSourceRef.current = customSource;
+    setCustomSource(payload);
+    setCustomSourceLastSynced(null);
+    setCustomSourceGameCount(null);
+    await updateSetting("customSource", payload);
+    await upsertLibraryEntry(payload);
+    setHydraBrowserOpen(false);
+    toast.success(
+      (t("localRefresh.customSourceSelected") || "Selected custom source") +
+        ": " +
+        payload.name
+    );
+    // If the Hydra metadata already tells us this is a torrent-only source
+    // and the user hasn't enabled torrenting, surface the warning BEFORE we
+    // try to sync. We also short-circuit the sync so the user isn't hit
+    // with the 403 / manual-paste dialog on top of the torrent warning.
+    if (isSourceMetaTorrentOnly(payload)) {
+      try {
+        const current = await window.electron.getSettings();
+        if (!current?.torrentEnabled) {
+          setTorrentWarningSource({ ...payload, torrentOnly: true });
+          setTorrentWarningOpen(true);
+          // Clear the revert snapshot -- the user explicitly picked this
+          // source and we're just waiting on them to decide about torrents.
+          previousCustomSourceRef.current = null;
+          return;
+        }
+      } catch (e) {
+        console.warn("[LocalRefresh] torrent pre-check failed:", e);
+      }
+    }
+    // Immediately sync the source after selection
+    await handleSyncCustomSource(payload);
+  };
+
+  // Switch the active source to a previously-saved library entry. Reuses the
+  // cached mapped data if fresh (<12h), otherwise refetches.
+  const handleSwitchToSavedSource = async (entry) => {
+    if (!entry?.url) return;
+    const now = Date.now();
+    const payload = { ...entry, lastUsed: now };
+    setCustomSource(payload);
+    setCustomSourceLastSynced(
+      entry.lastSynced ? new Date(entry.lastSynced) : null
+    );
+    setCustomSourceGameCount(
+      typeof entry.gameCount === "number" ? entry.gameCount : null
+    );
+    await updateSetting("customSource", payload);
+    await upsertLibraryEntry(payload);
+    // Force other pages to reload with the new source's cache
+    gameService.clearMemoryCache();
+    window.dispatchEvent(
+      new CustomEvent("index-refreshed", { detail: { timestamp: now } })
+    );
+    toast.success(
+      (t("localRefresh.customSourceSwitched") || "Switched source") +
+        ": " +
+        payload.name
+    );
+  };
+
+  const handleSyncCustomSource = async (sourceOverride) => {
+    const source = sourceOverride || customSource;
+    if (!source?.url) {
+      toast.error(
+        t("localRefresh.customSourceNone") || "No custom source selected"
+      );
+      return;
+    }
+    if (isSyncingCustomSource) return;
+    setIsSyncingCustomSource(true);
+    try {
+      const data = await gameService.refreshCustomSource();
+      const count = data?.games?.length || 0;
+      const now = Date.now();
+      setCustomSourceLastSynced(new Date(now));
+      setCustomSourceGameCount(count);
+      const nextPayload = {
+        ...source,
+        lastSynced: now,
+        lastUsed: now,
+        gameCount: count,
+      };
+      setCustomSource(nextPayload);
+      await updateSetting("customSource", nextPayload);
+      // Save to library so the user can swap back to it later
+      await upsertLibraryEntry(nextPayload);
+      // Also flip hasIndexBefore so gating UI treats this as "ready"
+      if (window.electron?.setTimestampValue) {
+        await window.electron.setTimestampValue("hasIndexBefore", true);
+        setHasIndexBefore(true);
+      }
+      toast.success(
+        (t("localRefresh.customSourceSynced") || "Custom source synced") +
+          ` (${count.toLocaleString()} ${t("localRefresh.games") || "games"})`
+      );
+      // Notify other pages
+      window.dispatchEvent(
+        new CustomEvent("index-refreshed", { detail: { timestamp: now } })
+      );
+      // If this source only offers torrent links and the user hasn't enabled
+      // torrenting yet, surface a guided prompt.
+      await maybeWarnTorrentOnly(nextPayload, data?.games);
+    } catch (err) {
+      console.error("Custom source sync failed:", err);
+      const msg = String(err?.message || "");
+      const is403 = /HTTP\s*403/i.test(msg);
+      if (is403) {
+        // Upstream is Cloudflare-challenged or otherwise blocking us.
+        // Open the URL in the user's browser so they can solve the challenge
+        // and paste the resulting JSON back into Ascendara.
+        setManualPasteSourceUrl(source.url);
+        setManualPasteText("");
+        setManualPasteError(null);
+        setManualPasteOpen(true);
+        try {
+          if (window.electron?.openURL) {
+            await window.electron.openURL(source.url);
+          }
+        } catch (openErr) {
+          console.warn("Failed to open source URL:", openErr);
+        }
+      } else {
+        toast.error(
+          (t("localRefresh.customSourceSyncFailed") || "Sync failed") +
+            (err?.message ? `: ${err.message}` : "")
+        );
+        // Sync failed outright (non-403) -- revert the selection so the UI
+        // doesn't show a "set" source that was never actually loaded.
+        await revertPendingCustomSource();
+      }
+    } finally {
+      setIsSyncingCustomSource(false);
+    }
+  };
+
+  // Revert `customSource` to whatever was active before the user picked a new
+  // one, used when they back out of the manual-paste dialog without pasting.
+  const revertPendingCustomSource = async () => {
+    const prev = previousCustomSourceRef.current;
+    previousCustomSourceRef.current = null;
+    setCustomSource(prev || null);
+    setCustomSourceLastSynced(
+      prev?.lastSynced ? new Date(prev.lastSynced) : null
+    );
+    setCustomSourceGameCount(
+      typeof prev?.gameCount === "number" ? prev.gameCount : null
+    );
+    try {
+      await updateSetting("customSource", prev || null);
+    } catch (e) {
+      console.warn("Failed to revert customSource setting:", e);
+    }
+  };
+
+  const handleIngestManualJson = async () => {
+    if (isIngestingManual) return;
+    setManualPasteError(null);
+    setIsIngestingManual(true);
+    try {
+      const data = await gameService.ingestCustomSourceJson(manualPasteText);
+      const count = data?.games?.length || 0;
+      const now = Date.now();
+      setCustomSourceLastSynced(new Date(now));
+      setCustomSourceGameCount(count);
+      const nextPayload = {
+        ...(customSource || {}),
+        lastSynced: now,
+        lastUsed: now,
+        gameCount: count,
+      };
+      setCustomSource(nextPayload);
+      await updateSetting("customSource", nextPayload);
+      await upsertLibraryEntry(nextPayload);
+      if (window.electron?.setTimestampValue) {
+        await window.electron.setTimestampValue("hasIndexBefore", true);
+        setHasIndexBefore(true);
+      }
+      toast.success(
+        (t("localRefresh.customSourceSynced") || "Custom source synced") +
+          ` (${count.toLocaleString()} ${t("localRefresh.games") || "games"})`
+      );
+      window.dispatchEvent(
+        new CustomEvent("index-refreshed", { detail: { timestamp: now } })
+      );
+      await maybeWarnTorrentOnly(nextPayload, data?.games);
+      // Ingest succeeded -- commit the selection by clearing the revert snapshot.
+      previousCustomSourceRef.current = null;
+      setManualPasteOpen(false);
+      setManualPasteText("");
+    } catch (err) {
+      console.error("Manual JSON ingest failed:", err);
+      setManualPasteError(err?.message || String(err));
+    } finally {
+      setIsIngestingManual(false);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setManualPasteText(text);
+        setManualPasteError(null);
+      }
+    } catch (e) {
+      console.warn("Clipboard read failed:", e);
+    }
+  };
+
+  const filteredHydraSources = useMemo(() => {
+    const q = hydraSearchQuery.trim().toLowerCase();
+    if (!q) return hydraSources;
+    return hydraSources.filter((s) => {
+      const title = (s?.title || s?.name || "").toLowerCase();
+      const desc = (s?.description || "").toLowerCase();
+      return title.includes(q) || desc.includes(q);
+    });
+  }, [hydraSources, hydraSearchQuery]);
+
   // Handle back navigation
   const handleBack = () => {
     if (welcomeStep) {
@@ -896,8 +1342,278 @@ const LocalRefresh = () => {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Main Actions */}
           <div className="space-y-4 lg:col-span-2">
+            {/* Custom Sources Mode Card */}
+            <Card className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10">
+                    <Globe className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">
+                        {t("localRefresh.customSourcesMode") || "Custom Sources Mode"}
+                      </h3>
+                      <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                        {t("localRefresh.experimental") || "Experimental"}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {t("localRefresh.customSourcesModeDesc") ||
+                        "Pull games from Hydra Library-compatible sources in addition to Ascendara's official index."}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={customSourcesMode}
+                  onCheckedChange={handleToggleCustomSourcesMode}
+                  disabled={isRefreshing || isUploading || isSyncingCustomSource}
+                />
+              </div>
+
+              <AnimatePresence>
+                {customSourcesMode && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                    animate={{ opacity: 1, height: "auto", marginTop: 16 }}
+                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                    className="space-y-3 border-t border-border/50 pt-4"
+                  >
+                    {/* Trade-offs warning */}
+                    <div className="flex items-start gap-2 rounded-lg bg-orange-500/10 p-3 text-xs text-orange-700 dark:text-orange-300">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        <p className="font-medium">
+                          {t("localRefresh.customSourceTradeoffsTitle") ||
+                            "Reduced metadata"}
+                        </p>
+                        <p className="mt-1 leading-relaxed">
+                          {t("localRefresh.customSourceTradeoffsDesc") ||
+                            "Custom sources don't include cover images, categories, or popularity data. Browsing, filtering by category, and sorting by popularity will be unavailable for games from these sources."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Selected source summary */}
+                    {customSource?.url ? (
+                      <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                              <Database className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="truncate text-sm font-medium">
+                                  {customSource.name}
+                                </p>
+                                {Array.isArray(customSource.status) &&
+                                  customSource.status.includes("Trusted") && (
+                                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                                  )}
+                                {customSource.torrentOnly && (
+                                  <Badge
+                                    variant="outline"
+                                    className="gap-1 border-orange-500/40 bg-orange-500/10 px-1.5 py-0 text-[10px] uppercase text-orange-600 dark:text-orange-400"
+                                  >
+                                    {t("localRefresh.torrentOnly") || "Torrent only"}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {customSource.url}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleOpenHydraBrowser}
+                              disabled={isSyncingCustomSource}
+                              className="gap-1.5"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              {t("localRefresh.changeSource") || "Change"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleSyncCustomSource()}
+                              disabled={isSyncingCustomSource}
+                              className="gap-1.5 text-secondary"
+                            >
+                              {isSyncingCustomSource ? (
+                                <>
+                                  <Loader className="h-3.5 w-3.5 animate-spin" />
+                                  {t("localRefresh.syncing") || "Syncing..."}
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="h-3.5 w-3.5" />
+                                  {t("localRefresh.syncNow") || "Sync Now"}
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Metadata badges */}
+                        <div className="flex flex-wrap gap-1.5 pl-12">
+                          {(customSourceGameCount !== null ||
+                            customSource.gamesCount) && (
+                            <Badge variant="secondary" className="gap-1 text-[11px]">
+                              <Database className="h-3 w-3" />
+                              {(customSourceGameCount !== null
+                                ? customSourceGameCount
+                                : customSource.gamesCount
+                              ).toLocaleString()}{" "}
+                              {t("localRefresh.games") || "games"}
+                            </Badge>
+                          )}
+                          {(() => {
+                            const r = customSource.rating;
+                            const avg =
+                              r && typeof r === "object"
+                                ? r.avg
+                                : typeof r === "number"
+                                  ? r
+                                  : null;
+                            if (avg == null || Number.isNaN(Number(avg))) return null;
+                            const total =
+                              r && typeof r === "object" && r.total ? r.total : null;
+                            return (
+                              <Badge variant="secondary" className="gap-1 text-[11px]">
+                                <Star className="h-3 w-3 fill-current" />
+                                {Number(avg).toFixed(2)}
+                                {total ? (
+                                  <span className="text-muted-foreground/80">
+                                    ({total})
+                                  </span>
+                                ) : null}
+                              </Badge>
+                            );
+                          })()}
+                          {customSourceLastSynced && (
+                            <Badge variant="outline" className="gap-1 text-[11px]">
+                              <RefreshCw className="h-3 w-3" />
+                              {t("localRefresh.lastSynced") || "Last synced"}{" "}
+                              {formatLastRefreshTime(customSourceLastSynced)}
+                            </Badge>
+                          )}
+                          {customSource.lastUsed && (
+                            <Badge variant="outline" className="gap-1 text-[11px]">
+                              <Clock className="h-3 w-3" />
+                              {t("localRefresh.lastUsed") || "Last used"}{" "}
+                              {formatLastRefreshTime(new Date(customSource.lastUsed))}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border/70 bg-muted/20 p-4 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          {t("localRefresh.customSourcePrompt") ||
+                            "No custom source selected yet. Browse Hydra Library to pick one."}
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={handleOpenHydraBrowser}
+                          className="mx-auto gap-2 text-secondary"
+                        >
+                          <Globe className="h-4 w-4" />
+                          {t("localRefresh.browseHydraSources") ||
+                            "Browse Hydra Sources"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Saved sources library - quick-switch between previously-used sources */}
+                    {customSourcesLibrary.filter(
+                      s => s?.url && s.url !== customSource?.url
+                    ).length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {t("localRefresh.savedSources") || "Your sources"}
+                          </p>
+                          <span className="text-[10px] text-muted-foreground/70">
+                            {t("localRefresh.savedSourcesHint") ||
+                              "Click to switch instantly"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {customSourcesLibrary
+                            .filter(s => s?.url && s.url !== customSource?.url)
+                            .slice(0, 6)
+                            .map(entry => (
+                              <div
+                                key={entry.url}
+                                role="button"
+                                tabIndex={isSyncingCustomSource ? -1 : 0}
+                                aria-disabled={isSyncingCustomSource}
+                                onClick={() => {
+                                  if (isSyncingCustomSource) return;
+                                  handleSwitchToSavedSource(entry);
+                                }}
+                                onKeyDown={e => {
+                                  if (isSyncingCustomSource) return;
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    handleSwitchToSavedSource(entry);
+                                  }
+                                }}
+                                className="group flex cursor-pointer items-center gap-2 rounded-md border border-border/50 bg-background/60 p-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                              >
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+                                  <Database className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1">
+                                    <p className="truncate text-xs font-medium">
+                                      {entry.name}
+                                    </p>
+                                    {entry.torrentOnly && (
+                                      <span
+                                        title={t("localRefresh.torrentOnly") || "Torrent only"}
+                                        className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"
+                                      />
+                                    )}
+                                  </div>
+                                  <p className="truncate text-[10px] text-muted-foreground">
+                                    {typeof entry.gameCount === "number"
+                                      ? `${entry.gameCount.toLocaleString()} ${t("localRefresh.games") || "games"}`
+                                      : entry.url}
+                                    {entry.lastUsed && (
+                                      <>
+                                        {" • "}
+                                        {formatLastRefreshTime(new Date(entry.lastUsed))}
+                                      </>
+                                    )}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    removeLibraryEntry(entry.url);
+                                  }}
+                                  className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                  title={t("common.remove") || "Remove"}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </Card>
+
             {/* Download Shared Index Card */}
-            {apiAvailable && (
+            {!customSourcesMode && apiAvailable && (
               <Card className="p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -990,6 +1706,7 @@ const LocalRefresh = () => {
             )}
 
             {/* Scrape from SteamRIP Card */}
+            {!customSourcesMode && (
             <Card className="p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1105,8 +1822,10 @@ const LocalRefresh = () => {
                 </div>
               )}
             </Card>
+            )}
 
             {/* Automatic Index Refreshing Card - Ascend Feature */}
+            {!customSourcesMode && (
             <Card className="p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1262,6 +1981,7 @@ const LocalRefresh = () => {
                 </div>
               )}
             </Card>
+            )}
 
             {/* Progress Section */}
             <AnimatePresence>
@@ -1626,18 +2346,55 @@ const LocalRefresh = () => {
               </div>
             </Card>
 
-            {/* Info Card */}
+            {/* Info Card - adapts copy based on whether Custom Sources Mode is active */}
             <Card className="bg-muted/30 p-4">
               <div className="flex gap-3">
-                <Database className="h-5 w-5 shrink-0 text-primary" />
-                <div>
-                  <h3 className="text-sm font-medium">
-                    {t("localRefresh.whatThisDoes") || "About"}
-                  </h3>
+                {customSourcesMode ? (
+                  <Globe className="h-5 w-5 shrink-0 text-purple-500" />
+                ) : (
+                  <Database className="h-5 w-5 shrink-0 text-primary" />
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium">
+                      {customSourcesMode
+                        ? t("localRefresh.whatThisDoesCustom") || "Custom Sources"
+                        : t("localRefresh.whatThisDoes") || "About"}
+                    </h3>
+                    {customSourcesMode && customSource?.name && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {customSource.name}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {t("localRefresh.whatThisDoesDescription") ||
-                      "Store game data locally for faster browsing and offline access."}
+                    {customSourcesMode
+                      ? customSource?.url
+                        ? (t("localRefresh.whatThisDoesCustomActiveDesc") ||
+                          "Browsing {{name}} ({{count}} games). Data refreshes every 12 hours or when you hit Sync Now. Switch sources anytime from the list above.")
+                          .replace("{{name}}", customSource.name || "your source")
+                          .replace(
+                            "{{count}}",
+                            (customSourceGameCount ??
+                              customSource.gameCount ??
+                              customSource.gamesCount ??
+                              0
+                            ).toLocaleString()
+                          )
+                        : t("localRefresh.whatThisDoesCustomDesc") ||
+                          "Pull games from any Hydra Library-compatible JSON source. Pick one to get started."
+                      : t("localRefresh.whatThisDoesDescription") ||
+                        "Store game data locally for faster browsing and offline access."}
                   </p>
+                  {customSourcesMode && customSource?.torrentOnly && (
+                    <div className="mt-2 flex items-start gap-1.5 rounded-md border border-orange-500/30 bg-orange-500/5 p-2 text-[11px] text-orange-700 dark:text-orange-300">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>
+                        {t("localRefresh.torrentOnlyHint") ||
+                          "This source only offers torrent links. Enable torrenting in Settings to download."}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -1680,6 +2437,298 @@ const LocalRefresh = () => {
           mode="cookie-refresh"
           cookieRefreshCount={cookieRefreshCount}
         />
+
+        {/* Hydra Library Source Browser Dialog */}
+        <Dialog open={hydraBrowserOpen} onOpenChange={setHydraBrowserOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-purple-500" />
+                {t("localRefresh.hydraBrowserTitle") || "Browse Hydra Library Sources"}
+              </DialogTitle>
+              <DialogDescription>
+                {t("localRefresh.hydraBrowserDesc") ||
+                  "Pick a community-maintained source to use as your game index. Sources are fetched live from api.hydralibrary.com."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={
+                    t("localRefresh.hydraSearchPlaceholder") ||
+                    "Search sources..."
+                  }
+                  value={hydraSearchQuery}
+                  onChange={(e) => setHydraSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <div className="max-h-[55vh] min-h-[200px] space-y-2 overflow-y-auto pr-1">
+                {hydraSourcesLoading && (
+                  <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                    <Loader className="h-4 w-4 animate-spin" />
+                    {t("localRefresh.hydraLoading") || "Loading sources..."}
+                  </div>
+                )}
+                {hydraSourcesError && !hydraSourcesLoading && (
+                  <div className="flex flex-col items-center gap-3 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+                    <AlertCircle className="h-5 w-5" />
+                    <span>{hydraSourcesError}</span>
+                    <Button size="sm" variant="outline" onClick={fetchHydraSources}>
+                      {t("common.retry") || "Retry"}
+                    </Button>
+                  </div>
+                )}
+                {!hydraSourcesLoading &&
+                  !hydraSourcesError &&
+                  filteredHydraSources.length === 0 && (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      {t("localRefresh.hydraNoResults") || "No sources match your search."}
+                    </div>
+                  )}
+                {!hydraSourcesLoading &&
+                  !hydraSourcesError &&
+                  filteredHydraSources.map((source) => {
+                    const isSelected = customSource?.id === source.id;
+                    const trusted =
+                      Array.isArray(source.status) && source.status.includes("Trusted");
+                    return (
+                      <button
+                        key={source.id || source.url}
+                        type="button"
+                        onClick={() => handleSelectCustomSource(source)}
+                        disabled={isSyncingCustomSource}
+                        className={`flex w-full flex-col gap-2 rounded-lg border p-3 text-left transition-all disabled:opacity-50 ${
+                          isSelected
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-accent/50"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="truncate text-sm font-semibold">
+                                {source.title || source.name}
+                              </h4>
+                              {trusted && (
+                                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                              )}
+                              {isSelected && (
+                                <CircleCheck className="h-3.5 w-3.5 text-primary" />
+                              )}
+                            </div>
+                            {source.description && (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                {source.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="shrink-0 text-right text-xs text-muted-foreground">
+                            {typeof source.gamesCount === "number" && (
+                              <div className="font-medium text-foreground">
+                                {source.gamesCount.toLocaleString()}{" "}
+                                {t("localRefresh.games") || "games"}
+                              </div>
+                            )}
+                            {source.rating?.avg != null && (
+                              <div className="flex items-center justify-end gap-1">
+                                <Star className="h-3 w-3 text-amber-500" />
+                                <span>{source.rating.avg.toFixed(2)}</span>
+                                {source.rating.total ? (
+                                  <span className="text-muted-foreground/70">
+                                    ({source.rating.total})
+                                  </span>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {Array.isArray(source.topDownloadOption) &&
+                          source.topDownloadOption.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {source.topDownloadOption.slice(0, 4).map((opt, idx) => (
+                                <Badge
+                                  key={`${source.id}-${opt.name}-${idx}`}
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {opt.name}
+                                  {typeof opt.count === "number" &&
+                                    ` · ${opt.count.toLocaleString()}`}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+
+            <DialogFooter className="flex-row items-center justify-between sm:justify-between">
+              <p className="text-xs text-muted-foreground">
+                {t("localRefresh.hydraAttribution") ||
+                  "Sources provided by Hydra Library (hydralibrary.com)"}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHydraBrowserOpen(false)}
+              >
+                {t("common.close") || "Close"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Torrent-only source warning (shown after sync when source has no
+            non-torrent hosts and torrentEnabled=false) */}
+        <AlertDialog open={torrentWarningOpen} onOpenChange={setTorrentWarningOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                {t("localRefresh.torrentOnlyDialogTitle") ||
+                  "This source uses torrents only"}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <span className="block">
+                  {(t("localRefresh.torrentOnlyDialogBody") ||
+                    "{{name}} only publishes magnet links. To download anything from it you'll need to enable torrenting in Settings.")
+                    .replace(
+                      "{{name}}",
+                      torrentWarningSource?.name || "This source"
+                    )}
+                </span>
+                <span className="block rounded-md border border-orange-500/30 bg-orange-500/5 p-2 text-xs text-orange-700 dark:text-orange-300">
+                  {t("localRefresh.torrentOnlyDialogVpn") ||
+                    "Torrenting exposes your IP to peers — using a VPN is strongly recommended."}
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>
+                {t("localRefresh.torrentOnlyDialogLater") || "Not now"}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-orange-500 text-white hover:bg-orange-600"
+                onClick={() => {
+                  setTorrentWarningOpen(false);
+                  navigate("/settings", {
+                    state: { scrollTo: "torrent-downloads", scrollToBottom: true },
+                  });
+                }}
+              >
+                {t("localRefresh.torrentOnlyDialogOpenSettings") ||
+                  "Open Settings"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Manual paste fallback dialog (shown when upstream returns 403) */}
+        <Dialog
+          open={manualPasteOpen}
+          onOpenChange={(open) => {
+            setManualPasteOpen(open);
+            // If the dialog is being closed (via cancel / escape / backdrop)
+            // and the user never successfully ingested anything, revert the
+            // pending source selection so we don't persist an unloaded source.
+            if (!open && previousCustomSourceRef.current !== null) {
+              revertPendingCustomSource();
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-amber-500" />
+                {t("localRefresh.manualPasteTitle") ||
+                  "Couldn't fetch source automatically"}
+              </DialogTitle>
+              <DialogDescription>
+                {t("localRefresh.manualPasteDesc") ||
+                  "The source is protected by a browser challenge (Cloudflare) that Ascendara can't solve on its own. We've opened the source URL in your browser — once the page loads the JSON, copy the entire text and paste it below."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              {manualPasteSourceUrl && (
+                <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs">
+                  <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <code className="flex-1 truncate font-mono text-[11px]">
+                    {manualPasteSourceUrl}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      if (window.electron?.openURL && manualPasteSourceUrl) {
+                        window.electron.openURL(manualPasteSourceUrl);
+                      }
+                    }}
+                  >
+                    {t("localRefresh.openAgain") || "Open again"}
+                  </Button>
+                </div>
+              )}
+
+              <textarea
+                value={manualPasteText}
+                onChange={e => {
+                  setManualPasteText(e.target.value);
+                  if (manualPasteError) setManualPasteError(null);
+                }}
+                placeholder={
+                  t("localRefresh.manualPastePlaceholder") ||
+                  'Paste the full JSON here (should start with { "name": ... "downloads": [...] })'
+                }
+                spellCheck={false}
+                className="h-56 w-full resize-none rounded-md border bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:ring-2 focus:ring-primary/40"
+              />
+
+              {manualPasteError && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {manualPasteError}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePasteFromClipboard}
+                disabled={isIngestingManual}
+              >
+                {t("localRefresh.pasteFromClipboard") || "Paste from clipboard"}
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setManualPasteOpen(false)}
+                  disabled={isIngestingManual}
+                >
+                  {t("common.cancel") || "Cancel"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleIngestManualJson}
+                  disabled={isIngestingManual || !manualPasteText.trim()}
+                >
+                  {isIngestingManual
+                    ? t("localRefresh.importing") || "Importing..."
+                    : t("localRefresh.importJson") || "Import JSON"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -253,7 +253,11 @@ const Search = memo(() => {
   const gamesPerLoad = useWindowSize();
   const [apiMetadata, setApiMetadata] = useState(null);
   const { t } = useLanguage();
-  const isFitGirlSource = settings.gameSource === "fitgirl";
+  const isCustomSource =
+    !!settings?.customSourcesMode || apiMetadata?.customSource === true;
+  // Custom sources (Hydra Library) have no popularity/weight or categories, so
+  // treat them the same as fitgirl for sort/filter UI degradation purposes.
+  const isFitGirlSource = settings.gameSource === "fitgirl" || isCustomSource;
   const navigate = useNavigate();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
@@ -885,7 +889,16 @@ const Search = memo(() => {
               {!apiMetadata.local && (
                 <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{t("search.usingApiWarning")}</span>
+                  <span>{t("search.usinganApiWarning")}</span>                    
+                  <a
+                    className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                    onClick={() =>
+                      window.electron.openURL("https://ascendara.app/docs/features/external-sources")
+                    }
+                  >
+                    {t("common.learnMore")}
+                    <ExternalLink className="ml-1 h-3 w-3" />
+                  </a>
                 </div>
               )}
               {isIndexOutdated && apiMetadata.local && (
@@ -973,7 +986,7 @@ const Search = memo(() => {
                             <Separator className="bg-border/50" />
                             <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-yellow-600 dark:text-yellow-400">
                               <AlertTriangle className="h-4 w-4 shrink-0" />
-                              <span>{t("search.usingApiWarning")}</span>
+                              <span>{t("search.usinganApiWarning")}</span>
                             </div>
                             <Separator className="bg-border/50" />
                             <p>
@@ -981,10 +994,26 @@ const Search = memo(() => {
                               {apiMetadata.games.toLocaleString()}
                             </p>
                             <p>
-                              {t("search.source")}: {apiMetadata.source}
+                              {t("search.source")}:{" "}
+                              {apiMetadata.sourceName || apiMetadata.source}
                             </p>
+                            {apiMetadata.customSource && apiMetadata.sourceUrl && (
+                              <p className="break-all text-xs text-muted-foreground/80">
+                                <a
+                                  onClick={() =>
+                                    window.electron?.openURL?.(apiMetadata.sourceUrl)
+                                  }
+                                  className="cursor-pointer hover:underline"
+                                >
+                                  {apiMetadata.sourceUrl}
+                                </a>
+                              </p>
+                            )}
                             <p>
-                              {t("search.lastUpdated")}: {apiMetadata.getDate}
+                              {apiMetadata.customSource
+                                ? t("search.lastSynced") || "Last synced"
+                                : t("search.lastUpdated")}
+                              : {apiMetadata.getDate}
                             </p>
                             <Separator className="bg-border/50" />
                             <div className="pt-2">

@@ -1124,18 +1124,33 @@ function Settings() {
 
   // Handle scrollTo from navigation state (from global search)
   useEffect(() => {
-    if (location.state?.scrollTo && !isLoading) {
+    if ((location.state?.scrollTo || location.state?.scrollToBottom) && !isLoading) {
       const scrollToId = location.state.scrollTo;
+      const scrollToBottom = !!location.state.scrollToBottom;
 
       // Small delay to ensure DOM is ready
       setTimeout(() => {
-        const element = document.getElementById(scrollToId);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-          element.classList.add("highlight-setting");
-          setTimeout(() => {
-            element.classList.remove("highlight-setting");
-          }, 4000);
+        if (scrollToBottom) {
+          // Scroll to the very bottom of the settings page (torrenting +
+          // experimental sections live there).
+          const scroller =
+            document.scrollingElement || document.documentElement;
+          window.scrollTo({
+            top: scroller.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+        if (scrollToId) {
+          const element = document.getElementById(scrollToId);
+          if (element) {
+            if (!scrollToBottom) {
+              element.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+            element.classList.add("highlight-setting");
+            setTimeout(() => {
+              element.classList.remove("highlight-setting");
+            }, 4000);
+          }
         }
       }, 100);
 
@@ -3235,10 +3250,6 @@ function Settings() {
                           <h3 className="text-lg font-semibold">
                             {t("settings.torrentOnAscendara")}
                           </h3>
-                          <Badge variant="secondary" className="text-xs">
-                            <FlaskConical className="mr-1 h-4 w-4" />
-                            {t("settings.experimental")}
-                          </Badge>
                         </div>
                         <p className="max-w-[600px] text-sm text-muted-foreground">
                           {t("settings.torrentDescription")}
