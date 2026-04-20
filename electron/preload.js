@@ -377,6 +377,12 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("directory-size-status", (_, status) => callback(status));
     return () => ipcRenderer.removeListener("directory-size-status", callback);
   },
+  getCustomSavePaths: (gameName, isCustomGame) => 
+    ipcRenderer.invoke("get-custom-save-paths", gameName, isCustomGame),
+  setCustomSavePaths: (gameName, isCustomGame, paths) => 
+    ipcRenderer.invoke("set-custom-save-paths", gameName, isCustomGame, paths),
+  openFolderDialog: () => 
+    ipcRenderer.invoke("open-folder-dialog"),
 
   //===========================================================================
   // TOOLS & DEPENDENCIES

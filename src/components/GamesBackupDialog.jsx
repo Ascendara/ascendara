@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import {
   AlertCircle,
   AlertTriangle,
@@ -21,9 +22,10 @@ import {
   FolderSync,
   ListOrdered,
   Loader,
-  Loader2,
+  Plus,
   RotateCcw,
   Save,
+  Trash2,
   X,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
@@ -52,7 +54,6 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
   const [restoreDetails, setRestoreDetails] = useState({ error: null });
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [autoCloudBackupEnabled, setAutoCloudBackupEnabled] = useState(() => {
-    // Load saved preference from localStorage
     const saved = localStorage.getItem(`cloudBackup_${game.game || game.name}`);
     return saved === "true";
   });
@@ -63,6 +64,11 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
   const [selectedBackup, setSelectedBackup] = useState(null);
   const [isUploadingToCloud, setIsUploadingToCloud] = useState(false);
   const [restoringCloudBackup, setRestoringCloudBackup] = useState(null);
+
+  // Custom save paths state
+  const [customSavePaths, setCustomSavePaths] = useState([]);
+  const [isSavingPaths, setIsSavingPaths] = useState(false);
+  const [pathsDirty, setPathsDirty] = useState(false);
 
   // BigPicture mode controller navigation
   const [selectedButtonIndex, setSelectedButtonIndex] = useState(0);
@@ -82,6 +88,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       setRestoreSuccess(false);
       setSelectedButtonIndex(0);
       setSelectedBackupIndex(0);
+      setPathsDirty(false);
 
       (async () => {
         try {
@@ -93,9 +100,77 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         } catch (e) {
           setAutoBackupEnabled(false);
         }
+
+        // Load custom save paths
+        try {
+          const result = await window.electron.getCustomSavePaths(
+            game.game || game.name,
+            game.isCustom
+          );
+          if (result?.success) {
+            setCustomSavePaths(result.paths || []);
+          }
+        } catch {
+          setCustomSavePaths([]);
+        }
       })();
     }
   }, [open, game]);
+
+  // Custom save paths handlers
+  const handleAddPath = () => {
+    setCustomSavePaths(prev => [...prev, ""]);
+    setPathsDirty(true);
+  };
+
+  const handleRemovePath = index => {
+    setCustomSavePaths(prev => prev.filter((_, i) => i !== index));
+    setPathsDirty(true);
+  };
+
+  const handlePathChange = (index, value) => {
+    setCustomSavePaths(prev => prev.map((p, i) => (i === index ? value : p)));
+    setPathsDirty(true);
+  };
+
+  const handleBrowsePath = async index => {
+    try {
+      const result = await window.electron.openFolderDialog();
+      if (result?.path) {
+        setCustomSavePaths(prev => prev.map((p, i) => (i === index ? result.path : p)));
+        setPathsDirty(true);
+      }
+    } catch (err) {
+      toast.error("Failed to open folder picker");
+    }
+  };
+
+  const handleSavePaths = async () => {
+    setIsSavingPaths(true);
+    try {
+      const nonEmpty = customSavePaths.filter(p => p.trim());
+      const result = await window.electron.setCustomSavePaths(
+        game.game || game.name,
+        game.isCustom,
+        nonEmpty
+      );
+      if (result?.success) {
+        setCustomSavePaths(result.paths);
+        setPathsDirty(false);
+        toast.success(
+          nonEmpty.length > 0
+            ? "Custom save paths saved"
+            : "Custom save paths cleared — Ludusavi will use its default detection"
+        );
+      } else {
+        throw new Error(result?.error || "Failed to save paths");
+      }
+    } catch (err) {
+      toast.error("Failed to save custom paths: " + err.message);
+    } finally {
+      setIsSavingPaths(false);
+    }
+  };
 
   // Controller input handling for BigPicture mode
   useEffect(() => {
@@ -622,7 +697,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       const data = result.data;
       let gameBackups = [];
 
-      if (data && data.games && data.games[gameName] && data.games[gameName].backups) {
+      if (data?.games?.[gameName]?.backups) {
         gameBackups = data.games[gameName].backups.map(backup => ({
           name: backup.name,
           timestamp: backup.when,
@@ -676,6 +751,95 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
     }
   };
 
+  // Render helpers
+  const renderCustomSavePathsSection = () => (
+    <Card className="border-muted/40 transition-all hover:border-muted/60">
+      <CardContent className="p-5">
+        <div className="space-y-3">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2 text-base font-semibold">
+              <div className="rounded-full bg-primary/10 p-1.5">
+                <FolderOpen className="h-4 w-4 text-primary" />
+              </div>
+              {t("library.backups.customSavePaths")}
+            </Label>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-xs text-primary hover:bg-primary/10"
+              onClick={handleAddPath}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t("library.backups.addPath")}
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {t("library.backups.customPathDesc")}
+          </p>
+
+          {/* Path rows */}
+          {customSavePaths.length > 0 ? (
+            <div className="space-y-2">
+              {customSavePaths.map((p, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    value={p}
+                    onChange={e => handlePathChange(i, e.target.value)}
+                    placeholder="C:\Users\you\AppData\LocalLow\Studio\Game"
+                    className="h-8 flex-1 font-mono text-xs"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    onClick={() => handleBrowsePath(i)}
+                    title="Browse…"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => handleRemovePath(i)}
+                    title="Remove"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-1 text-xs italic text-muted-foreground">
+              {t("library.backups.noCustomPaths")}
+            </p>
+          )}
+
+          {/* Save button — only shown when there are unsaved changes */}
+          {pathsDirty && (
+            <div className="flex justify-end pt-1">
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={handleSavePaths}
+                disabled={isSavingPaths}
+              >
+                {isSavingPaths ? (
+                  <Loader className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                {t("library.backups.savePaths")}
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   const renderOptionsScreen = () => (
     <div className="space-y-6 py-4">
       {/* Main Action - Backup Now */}
@@ -712,7 +876,6 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
               <Button
                 className="flex h-full w-full items-center justify-center gap-3 py-4"
                 variant="outline"
-                onClick={undefined}
                 disabled={!settings.ludusavi.enabled}
               >
                 <RotateCcw className="h-5 w-5 text-primary" />
@@ -730,7 +893,6 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
               <Button
                 className="flex h-full w-full items-center justify-center gap-3 py-4"
                 variant="outline"
-                onClick={undefined}
               >
                 <ListOrdered className="h-5 w-5 text-primary" />
                 <span className="text-base font-medium">
@@ -747,7 +909,6 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
               <Button
                 className="flex h-full w-full items-center justify-center gap-3 py-4"
                 variant="outline"
-                onClick={undefined}
               >
                 <X className="h-5 w-5 text-primary" />
                 <span className="text-base font-medium">{t("common.close")}</span>
@@ -819,6 +980,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
           {t("library.backups.settings")}
         </h3>
 
+        {/* Auto Backup toggle */}
         <Card className="border-muted/40 transition-all hover:border-muted/60">
           <CardContent className="p-5">
             <div className="flex items-center justify-between space-x-4">
@@ -846,6 +1008,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
           </CardContent>
         </Card>
 
+        {/* Auto Cloud Backup toggle */}
         <Card className="border-muted/40 transition-all hover:border-muted/60">
           <CardContent className="p-5">
             <div className="flex items-center justify-between space-x-4">
@@ -932,6 +1095,9 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
             </div>
           </CardContent>
         </Card>
+
+        {/* Custom save paths */}
+        {renderCustomSavePathsSection()}
       </div>
     </div>
   );
