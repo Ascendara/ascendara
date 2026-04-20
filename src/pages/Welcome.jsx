@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +26,8 @@ import {
   Wine,
   Database,
   AlertTriangle,
+  Sparkles,
+  BellRing,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -245,6 +247,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [showDepsAlert, setShowDepsAlert] = useState(false);
   const [showSkipAlert, setShowSkipAlert] = useState(false);
   const [showDepsErrorAlert, setShowDepsErrorAlert] = useState(false);
+  const [showManualUpdateConfirm, setShowManualUpdateConfirm] = useState(false);
   const [downloadDirectory, setDownloadDirectory] = useState("");
   const [dependencyStatus, setDependencyStatus] = useState({
     ".NET Framework": { installed: false, icon: null },
@@ -796,6 +799,139 @@ const Welcome = ({ welcomeData, onComplete }) => {
     }
   }, [indexRefreshStarted]);
 
+  // Signal to other parts of the app (e.g. AutomaticIndexRefresher in app.jsx)
+  // that the welcome/onboarding flow is active, so they can suppress the
+  // global "index refreshed, reload?" dialog while the user is still in setup.
+  useEffect(() => {
+    window.__welcomeActive = true;
+    return () => {
+      window.__welcomeActive = false;
+    };
+  }, []);
+
+  // Auto-start the community (shared) index download on first open.
+  // Runs silently in the background while the user progresses through setup.
+  const autoIndexStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoIndexStartedRef.current) return;
+    let isMounted = true;
+
+    const handleStarted = () => {
+      if (!isMounted) return;
+      setIndexRefreshStarted(true);
+      setIsIndexRefreshing(true);
+    };
+
+    const handleComplete = async () => {
+      if (!isMounted) return;
+      try {
+        if (window.electron?.setTimestampValue) {
+          await window.electron.setTimestampValue("hasIndexBefore", true);
+        }
+        if (window.electron?.updateSetting) {
+          await window.electron.updateSetting("usingLocalIndex", true);
+        }
+      } catch (e) {
+        console.error("[Welcome] Failed to persist index flags:", e);
+      }
+      try {
+        const imageCacheService = (
+          await import("@/services/imageCacheService")
+        ).default;
+        const gameService = (await import("@/services/gameService")).default;
+        imageCacheService.invalidateSettingsCache?.();
+        await imageCacheService.clearCache?.(true);
+        gameService.clearMemoryCache?.();
+      } catch (e) {
+        console.warn("[Welcome] Cache clear after index download failed:", e);
+      }
+      localStorage.removeItem("ascendara_games_cache");
+      localStorage.removeItem("local_ascendara_games_timestamp");
+      localStorage.removeItem("local_ascendara_metadata_cache");
+      localStorage.removeItem("local_ascendara_last_updated");
+      window.dispatchEvent(
+        new CustomEvent("index-refreshed", { detail: { timestamp: Date.now() } })
+      );
+      setIsIndexRefreshing(false);
+      setIndexComplete(true);
+    };
+
+    const handleError = err => {
+      if (!isMounted) return;
+      console.error("[Welcome] Auto index download error:", err);
+      setIsIndexRefreshing(false);
+    };
+
+    (async () => {
+      try {
+        // Skip if the user already has an index from a previous session
+        if (window.electron?.getTimestampValue) {
+          const hasIndexed =
+            await window.electron.getTimestampValue("hasIndexBefore");
+          if (hasIndexed === true) {
+            autoIndexStartedRef.current = true;
+            if (isMounted) {
+              setIndexRefreshStarted(true);
+              setIsIndexRefreshing(false);
+              setIndexComplete(true);
+            }
+            return;
+          }
+        }
+
+        // Register listeners first so we don't miss the started event
+        window.electron?.onPublicIndexDownloadStarted?.(handleStarted);
+        window.electron?.onPublicIndexDownloadComplete?.(handleComplete);
+        window.electron?.onPublicIndexDownloadError?.(handleError);
+
+        // If a download is already in progress (e.g. from app-level
+        // auto-refresh), just reflect that state instead of starting again.
+        if (window.electron?.getPublicIndexDownloadStatus) {
+          const status = await window.electron.getPublicIndexDownloadStatus();
+          if (status?.isDownloading) {
+            autoIndexStartedRef.current = true;
+            if (isMounted) {
+              setIndexRefreshStarted(true);
+              setIsIndexRefreshing(true);
+            }
+            return;
+          }
+        }
+
+        // Resolve output path and kick off the download
+        const currentSettings = await window.electron.getSettings();
+        const outputPath =
+          currentSettings?.localIndex ||
+          (await window.electron.getDefaultLocalIndexPath());
+
+        if (!currentSettings?.localIndex && window.electron?.updateSetting) {
+          try {
+            await window.electron.updateSetting("localIndex", outputPath);
+          } catch (e) {
+            console.warn("[Welcome] Failed to persist default localIndex:", e);
+          }
+        }
+
+        autoIndexStartedRef.current = true;
+        if (isMounted) {
+          setIndexRefreshStarted(true);
+          setIsIndexRefreshing(true);
+        }
+        await window.electron.downloadSharedIndex(outputPath);
+      } catch (e) {
+        console.error("[Welcome] Failed to auto-start community index:", e);
+        if (isMounted) setIsIndexRefreshing(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+      window.electron?.offPublicIndexDownloadStarted?.();
+      window.electron?.offPublicIndexDownloadComplete?.();
+      window.electron?.offPublicIndexDownloadError?.();
+    };
+  }, []);
+
   if (welcomeData.isV7Welcome) {
     if (showAnalyticsStep) {
       return (
@@ -1052,6 +1188,77 @@ const Welcome = ({ welcomeData, onComplete }) => {
               }}
             >
               {t("welcome.continue")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showManualUpdateConfirm}
+        onOpenChange={setShowManualUpdateConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-2 flex items-center gap-3">
+              <div className="rounded-lg bg-yellow-500/15 p-2">
+                <AlertTriangle className="h-6 w-6 text-yellow-500" />
+              </div>
+              <AlertDialogTitle className="text-2xl mt-2 font-bold text-foreground">
+                {t("welcome.manualUpdateConfirm.title")}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-left">
+                <p className="text-foreground">
+                  {t("welcome.manualUpdateConfirm.intro")}
+                </p>
+                <div className="space-y-2 rounded-lg bg-muted/40 p-3">
+                  <div className="flex items-start gap-2">
+                    <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm text-foreground">
+                      {t("welcome.manualUpdateConfirm.securityPoint")}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm text-foreground">
+                      {t("welcome.manualUpdateConfirm.featuresPoint")}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Rocket className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm text-foreground">
+                      {t("welcome.manualUpdateConfirm.ascendPoint")}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm text-foreground">
+                      {t("welcome.manualUpdateConfirm.notifyPoint")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="bg-primary text-secondary hover:bg-primary/90"
+              onClick={() => {
+                setShowManualUpdateConfirm(false);
+                handleUpdateChoice(true);
+              }}
+            >
+              {t("welcome.manualUpdateConfirm.keepAuto")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-transparent text-muted-foreground hover:bg-muted"
+              onClick={() => {
+                setShowManualUpdateConfirm(false);
+                handleUpdateChoice(false);
+              }}
+            >
+              {t("welcome.manualUpdateConfirm.disableAnyway")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1368,7 +1575,26 @@ const Welcome = ({ welcomeData, onComplete }) => {
               exit="exit"
             >
               <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <Database className="mx-auto mb-4 h-16 w-16 text-primary" />
+                <div className="relative mx-auto mb-4 h-20 w-20">
+                  <motion.div
+                    className="absolute inset-0 rounded-full bg-primary/20"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+                    transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+                  />
+                  <motion.div
+                    className="absolute inset-0 rounded-full bg-primary/20"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+                    transition={{
+                      duration: 2.4,
+                      repeat: Infinity,
+                      ease: "easeOut",
+                      delay: 1.2,
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Database className="h-16 w-16 text-primary" />
+                  </div>
+                </div>
                 <h2 className="mb-2 text-3xl font-bold text-primary">
                   {t("welcome.localIndex.title")}
                 </h2>
@@ -1378,67 +1604,83 @@ const Welcome = ({ welcomeData, onComplete }) => {
               </motion.div>
 
               <motion.div
-                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6"
+                className="mb-6 grid w-full max-w-3xl gap-4 md:grid-cols-2"
                 variants={itemVariants}
               >
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                  <p>{t("welcome.localIndex.point1")}</p>
+                <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 text-left">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-primary">
+                      {t("welcome.localIndex.officialTitle")}
+                    </h3>
+                    <span className="ml-auto rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
+                      {t("welcome.localIndex.default")}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {t("welcome.localIndex.officialDesc")}
+                  </p>
                 </div>
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                  <p>{t("welcome.localIndex.point2")}</p>
-                </div>
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                  <p>{t("welcome.localIndex.point3")}</p>
+
+                <div className="rounded-xl border border-border bg-card/30 p-5 text-left">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Globe2 className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold">
+                      {t("welcome.localIndex.externalTitle")}
+                    </h3>
+                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      {t("welcome.localIndex.optional")}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {t("welcome.localIndex.externalDesc")}
+                  </p>
                 </div>
               </motion.div>
 
-              {indexRefreshStarted ? (
-                <motion.div variants={itemVariants} className="space-y-4">
-                  <div className="flex items-center justify-center gap-2 text-primary">
-                    {isIndexRefreshing ? (
-                      <>
-                        <Loader className="h-5 w-5 animate-spin" />
-                        <span>{t("welcome.localIndex.refreshing")}</span>
-                      </>
-                    ) : (
-                      <>
-                        <CircleCheck className="h-5 w-5" />
-                        <span>{t("welcome.localIndex.refreshComplete")}</span>
-                      </>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {t("welcome.localIndex.canContinue")}
-                  </p>
-                  <Button
-                    size="lg"
-                    onClick={handleNext}
-                    className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                  >
-                    {t("welcome.continue")}
-                  </Button>
-                </motion.div>
-              ) : (
-                <motion.div variants={itemVariants}>
-                  <Button
-                    size="lg"
-                    onClick={() =>
-                      navigate("/localrefresh", {
-                        state: {
-                          fromWelcome: true,
-                          welcomeStep: step,
-                        },
-                      })
-                    }
-                    className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                  >
-                    {t("welcome.localIndex.setupIndex")}
-                  </Button>
-                </motion.div>
-              )}
+              <motion.div
+                className="mb-8 max-w-3xl space-y-3 rounded-lg bg-card/30 p-5"
+                variants={itemVariants}
+              >
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="h-5 w-5 flex-shrink-0 text-primary" />
+                  <p className="text-sm">{t("welcome.localIndex.point1")}</p>
+                </div>
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="h-5 w-5 flex-shrink-0 text-primary" />
+                  <p className="text-sm">{t("welcome.localIndex.point2")}</p>
+                </div>
+                <div className="flex items-start space-x-3 text-left">
+                  <CircleCheck className="h-5 w-5 flex-shrink-0 text-primary" />
+                  <p className="text-sm">{t("welcome.localIndex.point3")}</p>
+                </div>
+              </motion.div>
+
+              <motion.div variants={itemVariants} className="space-y-3">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  {indexComplete ? (
+                    <>
+                      <CircleCheck className="h-4 w-4 text-primary" />
+                      <span>{t("welcome.localIndex.refreshComplete")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin text-primary" />
+                      <span>{t("welcome.localIndex.autoSetup")}</span>
+                    </>
+                  )}
+                </div>
+                <Button
+                  size="lg"
+                  onClick={handleNext}
+                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                >
+                  {t("welcome.next")}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {t("welcome.localIndex.changeLaterHint")}
+                </p>
+              </motion.div>
             </motion.div>
           )}
 
@@ -2017,10 +2259,26 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 className="mb-12 grid w-full max-w-4xl grid-cols-1 gap-6 md:grid-cols-2"
                 variants={itemVariants}
               >
-                {/* Auto Update Option */}
-                <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 transition-colors hover:border-primary/30">
+                {/* Auto Update Option - Recommended */}
+                <motion.div
+                  className="relative flex scale-[1.02] flex-col overflow-hidden rounded-xl border-2 border-primary bg-gradient-to-br from-primary/15 via-primary/10 to-transparent p-6 shadow-lg shadow-primary/10 ring-1 ring-primary/30"
+                  whileHover={{ scale: 1.04 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                >
+                  {/* Recommended badge */}
+                  <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wide text-secondary shadow-md">
+                    <Sparkles className="h-3 w-3" />
+                    {t("welcome.recommended")}
+                  </div>
+                  {/* Animated glow */}
+                  <motion.div
+                    className="pointer-events-none absolute -inset-1 -z-10 rounded-xl bg-primary/20 blur-2xl"
+                    animate={{ opacity: [0.3, 0.55, 0.3] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  />
+
                   <div className="mb-4 flex items-center space-x-3">
-                    <div className="rounded-lg bg-primary/20 p-2">
+                    <div className="rounded-lg bg-primary/20 p-2.5">
                       <Download className="h-6 w-6 text-primary" />
                     </div>
                     <h3 className="text-xl font-semibold text-primary">
@@ -2042,12 +2300,12 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   </div>
                   <Button
                     size="lg"
-                    className="w-full bg-primary text-secondary hover:bg-primary/90"
+                    className="mt-auto w-full bg-primary text-secondary shadow-md hover:bg-primary/90"
                     onClick={() => handleUpdateChoice(true)}
                   >
                     {t("welcome.enableAutoUpdates")}
                   </Button>
-                </div>
+                </motion.div>
 
                 {/* Manual Update Option */}
                 <div className="flex flex-col rounded-xl border border-border bg-card/30 p-6">
@@ -2066,7 +2324,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     variant="outline"
                     size="lg"
                     className="mt-auto w-full text-muted-foreground"
-                    onClick={() => handleUpdateChoice(false)}
+                    onClick={() => setShowManualUpdateConfirm(true)}
                   >
                     {t("welcome.neverAutomaticallyUpdate")}
                   </Button>

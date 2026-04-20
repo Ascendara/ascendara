@@ -490,6 +490,10 @@ const AutomaticIndexRefresher = () => {
     const handleSharedIndexComplete = () => {
       setIsRefreshing(false);
       setRefreshPhase("");
+      // Skip the "refresh complete" dialog while the Welcome/onboarding
+      // flow is active - the user hasn't finished setup and doesn't need
+      // to reload data mid-onboarding.
+      if (window.__welcomeActive) return;
       setShowCompleteDialog(true);
     };
 
@@ -1330,13 +1334,22 @@ const AppRoutes = () => {
 
   const handleWelcomeComplete = async (withTour = false) => {
     setWelcomeData({ isNew: false, isV7: true });
-    setShowWelcome(false);
 
+    // Persist tour intent via sessionStorage instead of a query param.
+    // Query params are fragile here because the interim renders between
+    // `setShowWelcome(false)` and `navigate(...)` can trip one of the
+    // redirect guards ("/welcome -> /" or default landing page) and strip
+    // the search string before Home ever reads it.
     if (withTour) {
-      navigate("/?tour=true", { replace: true });
-    } else {
-      navigate("/", { replace: true });
+      try {
+        sessionStorage.setItem("ascendara:startTour", "1");
+      } catch (e) {
+        console.warn("Failed to persist tour intent:", e);
+      }
     }
+
+    navigate("/", { replace: true });
+    setShowWelcome(false);
   };
 
   useEffect(() => {
@@ -1421,10 +1434,17 @@ const AppRoutes = () => {
   }, [isLoading, showWelcome, isNewInstall, welcomeData]);
 
   useEffect(() => {
+    // Don't redirect to the default landing page if the user just finished
+    // the welcome flow and asked for the tour - the tour lives on Home and
+    // is triggered by the `?tour=true` query param, which would otherwise
+    // be stripped by a replace navigation here.
+    const tourActive = location.search?.includes("tour=true");
+
     if (
       !isLoading &&
       location.pathname === "/" &&
       !showWelcome &&
+      !tourActive &&
       settings?.defaultOpenPage &&
       settings.defaultOpenPage !== "home" &&
       !hasInitialRedirect
@@ -1436,6 +1456,7 @@ const AppRoutes = () => {
   }, [
     isLoading,
     location.pathname,
+    location.search,
     showWelcome,
     settings?.defaultOpenPage,
     hasInitialRedirect,
@@ -1617,7 +1638,9 @@ const AppRoutes = () => {
 
   if (location.pathname === "/welcome" && !effectiveShowWelcome) {
     console.log("Redirecting from welcome to home");
-    return <Navigate to="/" replace />;
+    // Preserve the current query string (e.g. ?tour=true) so the post-welcome
+    // tour can still activate on Home after the redirect.
+    return <Navigate to={{ pathname: "/", search: location.search }} replace />;
   }
 
   if (location.pathname === "/" && effectiveShowWelcome) {

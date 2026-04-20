@@ -18,6 +18,17 @@ const Layout = memo(() => {
   useEffect(() => {
     if (searchParams.get("tour") === "true") {
       setShowTour(true);
+      return;
+    }
+    // Post-welcome tour intent is persisted via sessionStorage so it survives
+    // route redirects (e.g. default landing page) that would strip a query.
+    try {
+      if (sessionStorage.getItem("ascendara:startTour") === "1") {
+        sessionStorage.removeItem("ascendara:startTour");
+        setShowTour(true);
+      }
+    } catch (e) {
+      // sessionStorage may be unavailable - ignore
     }
   }, [searchParams]);
 

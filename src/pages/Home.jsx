@@ -45,7 +45,6 @@ import {
   HelpCircle,
 } from "lucide-react";
 import gameService from "@/services/gameService";
-import Tour from "@/components/Tour";
 import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 import recentGamesService from "@/services/recentGamesService";
@@ -511,7 +510,6 @@ const Home = memo(() => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showTour, setShowTour] = useState(false);
   const [carouselImages, setCarouselImages] = useState({});
   const [recentGames, setRecentGames] = useState([]);
   const [touchStart, setTouchStart] = useState(0);
@@ -695,12 +693,6 @@ const Home = memo(() => {
     window.addEventListener("index-refreshed", handleIndexRefresh);
     return () => window.removeEventListener("index-refreshed", handleIndexRefresh);
   }, []);
-
-  useEffect(() => {
-    if (searchParams.get("tour") === "true") {
-      setShowTour(true);
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     if (!autoPlay || !carouselGames.length) return;
@@ -1028,11 +1020,6 @@ const Home = memo(() => {
     setAutoPlay(false);
   }, [carouselGames.length]);
 
-  const handleCloseTour = useCallback(() => {
-    setShowTour(false);
-    setSearchParams({});
-  }, [setSearchParams]);
-
   const handleCarouselGameClick = useCallback(
     game => {
       const container = document.querySelector(".page-container");
@@ -1175,7 +1162,6 @@ const Home = memo(() => {
 
   return (
     <div className="min-h-screen bg-background">
-      {showTour && <Tour onClose={handleCloseTour} />}
       <GameContextMenu
         isOpen={contextMenuOpen}
         onClose={() => setContextMenuOpen(false)}
