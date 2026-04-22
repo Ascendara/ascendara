@@ -54,6 +54,23 @@ import { sanitizeText } from "@/lib/utils";
 // Module-level caches that persist during runtime
 let gamesCache = null;
 let carouselGamesCache = null;
+// Identifier for the active source the cache was built against. Used to
+// invalidate the cache on mount when the user toggled custom/official mode
+// (or switched custom source) while Home was unmounted.
+let gamesCacheSourceKey = null;
+
+const computeSourceKey = settings => {
+  if (!settings) return "none";
+  const customMode = !!settings.customSourcesMode;
+  if (customMode) {
+    const list = settings.activeCustomList;
+    if (list?.id) return `list:${list.id}`;
+    const src = settings.customSource;
+    if (src?.url) return `custom:${src.url}`;
+    return "custom:none";
+  }
+  return `official:${settings.localIndex || "default"}`;
+};
 
 // Unified key for the carousel image map: prefer imgID (official index),
 // fall back to a title-based key for custom sources that have no imgID.
@@ -613,6 +630,29 @@ const Home = memo(() => {
     const loadGames = async (forceRefresh = false) => {
       try {
         setLoading(true);
+
+        // Invalidate the module-level cache if the active source changed
+        // while Home was unmounted (e.g. user toggled custom mode on
+        // LocalRefresh then came back).
+        try {
+          const currentSettings = await window.electron.getSettings();
+          const currentKey = computeSourceKey(currentSettings);
+          if (gamesCacheSourceKey && gamesCacheSourceKey !== currentKey) {
+            console.log(
+              "[Home] Active source changed, invalidating cache",
+              gamesCacheSourceKey,
+              "->",
+              currentKey
+            );
+            gamesCache = null;
+            carouselGamesCache = null;
+            gameService.clearMemoryCache();
+            forceRefresh = true;
+          }
+          gamesCacheSourceKey = currentKey;
+        } catch (e) {
+          console.warn("[Home] Failed to check source key:", e);
+        }
 
         // Use cache if available and not forcing refresh
         if (!forceRefresh && gamesCache && carouselGamesCache) {

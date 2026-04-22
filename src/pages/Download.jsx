@@ -87,6 +87,7 @@ import {
 import nexusModsService from "@/services/nexusModsService";
 import flingTrainerService from "@/services/flingTrainerService";
 import verifiedGamesService from "@/services/verifiedGamesService";
+import gameService from "@/services/gameService";
 
 // Async validation using API patterns
 const isValidURL = async (url, provider, patterns) => {
@@ -341,6 +342,7 @@ export default function DownloadPage() {
   const [isVerified, setIsVerified] = useState(false);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
   const [torboxDisabledForSession, setTorboxDisabledForSession] = useState(false);
+  const [isExternalSourcesMode, setIsExternalSourcesMode] = useState(false);
 
   // Fetch rating from new API when using local index
   useEffect(() => {
@@ -452,6 +454,22 @@ export default function DownloadPage() {
     const isInList = playLaterGames.some(g => g.game === gameData.game);
     setIsPlayLater(isInList);
   }, [gameData?.game]);
+
+  // Check if user is in external sources mode
+  useEffect(() => {
+    const checkExternalSourcesMode = async () => {
+      try {
+        const { metadata } = await gameService.getCachedData();
+        const isCustomSource = metadata?.customSource === true;
+        setIsExternalSourcesMode(isCustomSource);
+      } catch (error) {
+        console.error("Error checking external sources mode:", error);
+        setIsExternalSourcesMode(false);
+      }
+    };
+
+    checkExternalSourcesMode();
+  }, []);
 
   // Track if autoStart has been processed
   const autoStartProcessed = useRef(false);
@@ -624,6 +642,105 @@ export default function DownloadPage() {
       // Ascend users get the queue dialog with unlimited queue
       setPendingDownloadData(downloadData);
       setShowQueuePrompt(true);
+      return;
+    }
+
+    // Handle magnet/torrent links from custom (external) sources. These come
+    // through gameData.download_links.torrent = ["magnet:?xt=..."] from the
+    // Hydra-compatible JSON format. They're not DDL providers, so we skip the
+    // provider UI entirely and hand the magnet URI straight to the downloader.
+    const isMagnet = (s) => typeof s === "string" && s.trim().toLowerCase().startsWith("magnet:");
+    const torrentLinksFromGame = Array.isArray(gameData.download_links?.torrent)
+      ? gameData.download_links.torrent.filter(Boolean)
+      : [];
+    const isTorrentProvider =
+      selectedProvider === "torrent" ||
+      isMagnet(directUrl) ||
+      (!selectedProvider && torrentLinksFromGame.some(isMagnet));
+
+    if (isTorrentProvider) {
+      const magnetLink =
+        (isMagnet(directUrl) ? directUrl : null) ||
+        torrentLinksFromGame.find(isMagnet) ||
+        torrentLinksFromGame[0];
+
+      if (!magnetLink) {
+        console.log("[DL] EARLY RETURN: no magnet link in torrent provider");
+        toast.error(t("download.toast.invalidLink"));
+        return;
+      }
+
+      if (!settings.torrentEnabled) {
+        toast.error(
+          t("download.toast.torrentDisabled") ||
+            "Enable torrenting in Settings to download this game."
+        );
+        return;
+      }
+
+      if (!torrentRunning) {
+        toast.error(
+          t("download.downloadOptions.torrentInstructions.noTorrent") ||
+            "qBittorrent is not running. Start qBittorrent and try again."
+        );
+        return;
+      }
+
+      if (isStartingDownload) {
+        console.log("Download already in progress, skipping");
+        return;
+      }
+      setIsStartingDownload(true);
+      cacheDownloadData(sanitizedGameName, gameData);
+
+      try {
+        const isVrGame = gameData.category?.includes("Virtual Reality");
+        await window.electron.downloadFile(
+          magnetLink,
+          sanitizedGameName,
+          gameData.online || false,
+          gameData.dlc || false,
+          isVrGame || false,
+          gameData.isUpdating || false,
+          gameData.version || "",
+          gameData.imgID,
+          gameData.size || "",
+          dir,
+          gameData.gameID || ""
+        );
+
+        notifyDownloadStart(sanitizedGameName, gameData.game);
+
+        try {
+          await fetch('https://api.ascendara.app/stats/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ game: gameData.game })
+          });
+        } catch (error) {
+          console.error('Failed to track download:', error);
+        }
+
+        const removeDownloadListener = window.electron.onDownloadProgress(
+          downloadInfo => {
+            if (downloadInfo.game === sanitizedGameName) {
+              setIsStartingDownload(false);
+              removeDownloadListener();
+              forceSyncDownloads();
+            }
+          }
+        );
+
+        setTimeout(() => {
+          toast.success(t("download.toast.torrentSent"));
+          navigate("/downloads");
+        }, 2500);
+      } catch (error) {
+        console.error("Torrent download failed:", error);
+        toast.error(t("download.toast.downloadFailed"));
+        setIsStartingDownload(false);
+        clearDownloadLock();
+      }
       return;
     }
 
@@ -2249,7 +2366,7 @@ export default function DownloadPage() {
                     )}
 
                     {/* Auto Updates Feature */}
-                    {providers.some(p => seamlessProviders.includes(p)) && (
+                    {providers.some(p => seamlessProviders.includes(p)) && !isExternalSourcesMode && (
                       <div className="group/item flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
                         <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm ring-1 ring-primary/20 transition-all duration-200 group-hover/item:shadow-md group-hover/item:ring-primary/30">
                           <RefreshCw className="h-4 w-4 text-primary transition-transform duration-200 group-hover/item:scale-110" />
@@ -2412,6 +2529,57 @@ export default function DownloadPage() {
                   <Button
                     onClick={() => whereToDownload()}
                     disabled={isStartingDownload || !gameData || !torrentRunning}
+                    className="mt-6 h-12 w-full max-w-xs text-lg text-secondary"
+                  >
+                    {isStartingDownload ? (
+                      <>
+                        {t("download.sendingTorrent")}
+                        <Loader className="ml-2 h-4 w-4 animate-spin" />
+                      </>
+                    ) : (
+                      t("download.downloadOptions.downloadTorrent")
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : selectedProvider === "torrent" ? (
+            /* Custom Source Torrent Download */
+            <div className="rounded-xl border border-border/30 bg-card p-6">
+              <div className="mx-auto max-w-lg">
+                <div className="flex flex-col items-center text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                    <ArrowDownCircle className="h-7 w-7 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-semibold">
+                    {t("download.downloadOptions.torrentInstructions.title") || "Torrent Download"}
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t("download.downloadOptions.torrentInstructions.description")}
+                  </p>
+
+                  {!settings.torrentEnabled && (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-600">
+                      <AlertTriangle className="h-4 w-4" />
+                      {t("download.toast.torrentDisabled") ||
+                        "Enable torrenting in Settings to download this game."}
+                    </div>
+                  )}
+                  {settings.torrentEnabled && !torrentRunning && (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-600">
+                      <AlertTriangle className="h-4 w-4" />
+                      {t("download.downloadOptions.torrentInstructions.noTorrent")}
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={() => whereToDownload()}
+                    disabled={
+                      isStartingDownload ||
+                      !gameData ||
+                      !settings.torrentEnabled ||
+                      !torrentRunning
+                    }
                     className="mt-6 h-12 w-full max-w-xs text-lg text-secondary"
                   >
                     {isStartingDownload ? (

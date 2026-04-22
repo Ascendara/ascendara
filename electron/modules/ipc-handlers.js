@@ -1600,6 +1600,185 @@ function registerMiscHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // Custom List Storage
+  // Writes each imported list as a standalone JSON file under the user's
+  // Documents/Ascendara/CustomLists folder so it can be inspected, shared, or
+  // opened from the index info dialog.
+  // ---------------------------------------------------------------------------
+  const getCustomListsDir = () => {
+    const dir = path.join(app.getPath("documents"), "Ascendara", "CustomLists");
+    fs.ensureDirSync(dir);
+    return dir;
+  };
+  const safeListFileName = listId => {
+    const safe = String(listId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    return `${safe}.json`;
+  };
+  const getCustomListFilePath = listId =>
+    path.join(getCustomListsDir(), safeListFileName(listId));
+
+  // ---------------------------------------------------------------------------
+  // External Source JSON Storage
+  // Persists user-provided JSON for external-source buckets under the user's
+  // configured local index directory (`<localIndex>/external-sources/`). This
+  // keeps the payload alongside the local game index and survives localStorage
+  // clears so the game service can load the source without hitting the network.
+  // ---------------------------------------------------------------------------
+  const getExternalSourcesDir = () => {
+    const settings = settingsManager.getSettings();
+    const base =
+      settings?.localIndex ||
+      path.join(app.getPath("appData"), "ascendara", "localindex");
+    const dir = path.join(base, "external-sources");
+    fs.ensureDirSync(dir);
+    return dir;
+  };
+  const safeExternalSourceFileName = sourceId => {
+    const safe = String(sourceId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    return `${safe}.json`;
+  };
+  const getExternalSourceFilePath = sourceId =>
+    path.join(getExternalSourcesDir(), safeExternalSourceFileName(sourceId));
+
+  ipcMain.handle("get-external-sources-directory", () => {
+    try {
+      return getExternalSourcesDir();
+    } catch (err) {
+      console.error("get-external-sources-directory failed:", err);
+      return null;
+    }
+  });
+
+  ipcMain.handle("set-external-source-json", async (_, sourceId, data) => {
+    try {
+      if (!sourceId) throw new Error("Missing sourceId");
+      const filePath = getExternalSourceFilePath(sourceId);
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
+      return { success: true, path: filePath };
+    } catch (err) {
+      console.error("set-external-source-json failed:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("get-external-source-json", async (_, sourceId) => {
+    try {
+      if (!sourceId) return null;
+      const filePath = getExternalSourceFilePath(sourceId);
+      if (!(await fs.pathExists(filePath))) return null;
+      const raw = await fs.readFile(filePath, "utf8");
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("get-external-source-json failed:", err);
+      return null;
+    }
+  });
+
+  ipcMain.handle("remove-external-source-json", async (_, sourceId) => {
+    try {
+      if (!sourceId) return { success: false, error: "Missing sourceId" };
+      const filePath = getExternalSourceFilePath(sourceId);
+      if (await fs.pathExists(filePath)) {
+        await fs.remove(filePath);
+      }
+      return { success: true };
+    } catch (err) {
+      console.error("remove-external-source-json failed:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("get-custom-lists-directory", () => {
+    try {
+      return getCustomListsDir();
+    } catch (err) {
+      console.error("get-custom-lists-directory failed:", err);
+      return null;
+    }
+  });
+
+  ipcMain.handle("set-custom-list-data", async (_, listId, data) => {
+    try {
+      if (!listId) throw new Error("Missing listId");
+      const filePath = getCustomListFilePath(listId);
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
+      return { success: true, path: filePath };
+    } catch (err) {
+      console.error("set-custom-list-data failed:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("get-custom-list-data", async (_, listId) => {
+    try {
+      if (!listId) return null;
+      const filePath = getCustomListFilePath(listId);
+      if (!(await fs.pathExists(filePath))) return null;
+      const raw = await fs.readFile(filePath, "utf8");
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("get-custom-list-data failed:", err);
+      return null;
+    }
+  });
+
+  ipcMain.handle("get-custom-list-file-path", (_, listId) => {
+    try {
+      if (!listId) return null;
+      return getCustomListFilePath(listId);
+    } catch (err) {
+      console.error("get-custom-list-file-path failed:", err);
+      return null;
+    }
+  });
+
+  ipcMain.handle("remove-custom-list-data", async (_, listId) => {
+    try {
+      if (!listId) return { success: false, error: "Missing listId" };
+      const filePath = getCustomListFilePath(listId);
+      if (await fs.pathExists(filePath)) {
+        await fs.remove(filePath);
+      }
+      return { success: true };
+    } catch (err) {
+      console.error("remove-custom-list-data failed:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("open-custom-list-file", async (_, listId) => {
+    try {
+      if (!listId) return { success: false, error: "Missing listId" };
+      const filePath = getCustomListFilePath(listId);
+      if (!(await fs.pathExists(filePath))) {
+        return { success: false, error: "File not found" };
+      }
+      await shell.openPath(filePath);
+      return { success: true };
+    } catch (err) {
+      console.error("open-custom-list-file failed:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("show-custom-list-in-folder", async (_, listId) => {
+    try {
+      if (!listId) return { success: false, error: "Missing listId" };
+      const filePath = getCustomListFilePath(listId);
+      if (!(await fs.pathExists(filePath))) {
+        // Fall back to opening the directory itself
+        await shell.openPath(getCustomListsDir());
+        return { success: true };
+      }
+      shell.showItemInFolder(filePath);
+      return { success: true };
+    } catch (err) {
+      console.error("show-custom-list-in-folder failed:", err);
+      return { success: false, error: err.message };
+    }
+  });
 }
 
 module.exports = {

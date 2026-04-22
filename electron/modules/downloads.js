@@ -382,10 +382,17 @@ function registerDownloadHandlers() {
         let executablePath;
         let spawnCommand;
 
+        // A magnet/torrent link always needs the torrent handler, regardless
+        // of which gameSource the user is on. Custom (external) sources may
+        // deliver magnet URIs for any game.
+        const isMagnetLink =
+          typeof link === "string" && link.trim().toLowerCase().startsWith("magnet:");
+        const isTorrentLink = settings.gameSource === "fitgirl" || isMagnetLink;
+
         if (isWindows) {
           executablePath = isDev
             ? path.join(
-                settings.gameSource === "fitgirl"
+                isTorrentLink
                   ? "./binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe"
                   : link.includes("gofile.io")
                     ? "./binaries/AscendaraDownloader/dist/AscendaraGofileHelper.exe"
@@ -393,18 +400,52 @@ function registerDownloadHandlers() {
               )
             : path.join(
                 appDirectory,
-                settings.gameSource === "fitgirl"
+                isTorrentLink
                   ? "/resources/AscendaraTorrentHandler.exe"
                   : link.includes("gofile.io")
                     ? "/resources/AscendaraGofileHelper.exe"
                     : "/resources/AscendaraDownloader.exe"
               );
 
-          spawnCommand =
-            settings.gameSource === "fitgirl"
+          spawnCommand = isTorrentLink
+            ? [
+                link,
+                sanitizedGame,
+                online,
+                dlc,
+                isVr,
+                updateFlow,
+                version || -1,
+                size,
+                settings.downloadDirectory,
+              ]
+            : [
+                link.includes("gofile.io") ? "https://" + link : link,
+                sanitizedGame,
+                online,
+                dlc,
+                isVr,
+                updateFlow,
+                version || -1,
+                size,
+                targetDirectory,
+                gameID || "",
+              ];
+        } else {
+          if (isDev) {
+            executablePath = getPythonPath();
+            const scriptPath = path.join(
+              isTorrentLink
+                ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py"
+                : link.includes("gofile.io")
+                  ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
+                  : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+            );
+            spawnCommand = isTorrentLink
               ? [
+                  scriptPath,
                   link,
-                  sanitizedGame,
+                  game,
                   online,
                   dlc,
                   isVr,
@@ -414,8 +455,9 @@ function registerDownloadHandlers() {
                   settings.downloadDirectory,
                 ]
               : [
+                  scriptPath,
                   link.includes("gofile.io") ? "https://" + link : link,
-                  sanitizedGame,
+                  game,
                   online,
                   dlc,
                   isVr,
@@ -425,66 +467,28 @@ function registerDownloadHandlers() {
                   targetDirectory,
                   gameID || "",
                 ];
-        } else {
-          if (isDev) {
-            executablePath = getPythonPath();
-            const scriptPath = path.join(
-              settings.gameSource === "fitgirl"
-                ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py"
-                : link.includes("gofile.io")
-                  ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
-                  : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
-            );
-            spawnCommand =
-              settings.gameSource === "fitgirl"
-                ? [
-                    scriptPath,
-                    link,
-                    game,
-                    online,
-                    dlc,
-                    isVr,
-                    updateFlow,
-                    version || -1,
-                    size,
-                    settings.downloadDirectory,
-                  ]
-                : [
-                    scriptPath,
-                    link.includes("gofile.io") ? "https://" + link : link,
-                    game,
-                    online,
-                    dlc,
-                    isVr,
-                    updateFlow,
-                    version || -1,
-                    size,
-                    targetDirectory,
-                    gameID || "",
-                  ];
           } else {
             executablePath = path.join(
               process.resourcesPath,
-              settings.gameSource === "fitgirl"
+              isTorrentLink
                 ? "AscendaraTorrentHandler"
                 : link.includes("gofile.io")
                   ? "AscendaraGofileHelper"
                   : "AscendaraDownloader"
             );
-            spawnCommand =
-              settings.gameSource === "fitgirl"
-                ? [
-                    link,
-                    game,
-                    online,
-                    dlc,
-                    isVr,
-                    updateFlow,
-                    version || -1,
-                    size,
-                    settings.downloadDirectory,
-                  ]
-                : [
+            spawnCommand = isTorrentLink
+              ? [
+                  link,
+                  game,
+                  online,
+                  dlc,
+                  isVr,
+                  updateFlow,
+                  version || -1,
+                  size,
+                  settings.downloadDirectory,
+                ]
+              : [
                     link.includes("gofile.io") ? "https://" + link : link,
                     game,
                     online,
@@ -505,7 +509,7 @@ function registerDownloadHandlers() {
         }
 
         // For torrent downloads, pass the user's qBittorrent WebUI config
-        if (settings.gameSource === "fitgirl") {
+        if (isTorrentLink) {
           const qbHost = settings.torrentHost || "localhost";
           const qbPort = settings.torrentPort || 8080;
           const qbUser = settings.torrentUsername || "admin";

@@ -117,6 +117,28 @@ contextBridge.exposeInMainWorld("electron", {
   getTimestampValue: key => ipcRenderer.invoke("get-timestamp-value", key),
   timestampTime: () => ipcRenderer.invoke("timestamp-time"),
 
+  // External Source JSON (user-provided bucket JSON stored in <localIndex>/external-sources)
+  getExternalSourcesDirectory: () =>
+    ipcRenderer.invoke("get-external-sources-directory"),
+  setExternalSourceJson: (sourceId, data) =>
+    ipcRenderer.invoke("set-external-source-json", sourceId, data),
+  getExternalSourceJson: sourceId =>
+    ipcRenderer.invoke("get-external-source-json", sourceId),
+  removeExternalSourceJson: sourceId =>
+    ipcRenderer.invoke("remove-external-source-json", sourceId),
+
+  // Custom Lists (user-imported JSON sources stored in Documents/Ascendara/CustomLists)
+  getCustomListsDirectory: () => ipcRenderer.invoke("get-custom-lists-directory"),
+  setCustomListData: (listId, data) =>
+    ipcRenderer.invoke("set-custom-list-data", listId, data),
+  getCustomListData: listId => ipcRenderer.invoke("get-custom-list-data", listId),
+  getCustomListFilePath: listId =>
+    ipcRenderer.invoke("get-custom-list-file-path", listId),
+  removeCustomListData: listId => ipcRenderer.invoke("remove-custom-list-data", listId),
+  openCustomListFile: listId => ipcRenderer.invoke("open-custom-list-file", listId),
+  showCustomListInFolder: listId =>
+    ipcRenderer.invoke("show-custom-list-in-folder", listId),
+
   //===========================================================================
   // WELCOME FLOW & APP STATE
   //===========================================================================

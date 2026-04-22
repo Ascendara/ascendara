@@ -42,6 +42,9 @@ import {
   ShieldCheck,
   Search as SearchIcon,
   AlertTriangle,
+  ClipboardList,
+  Plug,
+  PlugIcon,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -160,16 +163,22 @@ const LocalRefresh = () => {
   const [autoRefreshInterval, setAutoRefreshInterval] = useState("7");
   const [autoRefreshMethod, setAutoRefreshMethod] = useState("shared"); // "shared" or "manual"
 
-  // Custom Sources Mode (Hydra Library)
+  // External Sources Mode (user-configurable source bucket)
   const [customSourcesMode, setCustomSourcesMode] = useState(false);
   const [customSource, setCustomSource] = useState(null); // { id, name, url, gamesCount, ... }
   const [customSourceLastSynced, setCustomSourceLastSynced] = useState(null);
   const [customSourceGameCount, setCustomSourceGameCount] = useState(null);
-  const [hydraBrowserOpen, setHydraBrowserOpen] = useState(false);
-  const [hydraSources, setHydraSources] = useState([]);
-  const [hydraSourcesLoading, setHydraSourcesLoading] = useState(false);
-  const [hydraSourcesError, setHydraSourcesError] = useState(null);
-  const [hydraSearchQuery, setHydraSearchQuery] = useState("");
+  const [sourceBrowserOpen, setSourceBrowserOpen] = useState(false);
+  const [bucketSources, setBucketSources] = useState([]);
+  const [bucketSourcesLoading, setBucketSourcesLoading] = useState(false);
+  const [bucketSourcesError, setBucketSourcesError] = useState(null);
+  const [bucketSearchQuery, setBucketSearchQuery] = useState("");
+  // URL of the active source bucket. Users enter this manually; the Ascendara
+  // API decides which bucket hosts are allowed (e.g. library.hydra.wiki).
+  // `sourceBucketUrl` is the committed value (persisted, gates Browse);
+  // `sourceBucketUrlDraft` is what's in the input while the user is typing.
+  const [sourceBucketUrl, setSourceBucketUrl] = useState("");
+  const [sourceBucketUrlDraft, setSourceBucketUrlDraft] = useState("");
   const [isSyncingCustomSource, setIsSyncingCustomSource] = useState(false);
 
   // Manual paste fallback (triggered on 403 from upstream source)
@@ -180,13 +189,27 @@ const LocalRefresh = () => {
   const [manualPasteSourceUrl, setManualPasteSourceUrl] = useState(null);
 
   // Library of sources the user has selected/synced, so they can switch back
-  // and forth without having to re-browse Hydra each time.
+  // and forth without having to re-browse the bucket each time.
   const [customSourcesLibrary, setCustomSourcesLibrary] = useState([]);
 
   // Torrent-only source warning (shown when a synced source has no non-torrent
   // hosts and the user hasn't enabled torrenting in Settings yet)
   const [torrentWarningOpen, setTorrentWarningOpen] = useState(false);
   const [torrentWarningSource, setTorrentWarningSource] = useState(null);
+
+  // JSON Import Dialog
+  const [showJsonImportDialog, setShowJsonImportDialog] = useState(false);
+  const [jsonImportText, setJsonImportText] = useState("");
+  const [jsonImportError, setJsonImportError] = useState(null);
+  const [isProcessingJson, setIsProcessingJson] = useState(false);
+  const [showJsonConfirmDialog, setShowJsonConfirmDialog] = useState(false);
+  const [jsonImportData, setJsonImportData] = useState(null); // { type, gameCount, keys, sampleGames }
+  const [jsonListName, setJsonListName] = useState(""); // For naming custom lists
+
+  // Custom Lists Management
+  const [customLists, setCustomLists] = useState([]); // Array of custom lists
+  const [activeCustomList, setActiveCustomList] = useState(null); // Currently active custom list
+  const [showListNameDialog, setShowListNameDialog] = useState(false); // Dialog for naming new lists
 
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
@@ -213,58 +236,84 @@ const LocalRefresh = () => {
         if (settings?.autoRefreshMethod !== undefined) {
           setAutoRefreshMethod(settings.autoRefreshMethod);
         }
-        if (settings?.customSourcesMode !== undefined) {
-          setCustomSourcesMode(!!settings.customSourcesMode);
+
+        // Load custom sources library
+        if (settings?.customSourcesLibrary) {
+          setCustomSourcesLibrary(settings.customSourcesLibrary);
         }
-        if (settings?.customSource && typeof settings.customSource === "object") {
+
+        // Load custom lists
+        if (settings?.customLists) {
+          setCustomLists(settings.customLists);
+        }
+
+        // Load active custom list
+        if (settings?.activeCustomList) {
+          setActiveCustomList(settings.activeCustomList);
+        }
+
+        // Load custom source mode
+        if (settings?.customSourcesMode) {
+          setCustomSourcesMode(settings.customSourcesMode);
+        }
+
+        // Load the user-configured source bucket URL (e.g. library.hydra.wiki)
+        if (typeof settings?.sourceBucketUrl === "string") {
+          setSourceBucketUrl(settings.sourceBucketUrl);
+          setSourceBucketUrlDraft(settings.sourceBucketUrl);
+        }
+
+        // Load custom source
+        if (settings?.customSource) {
           setCustomSource(settings.customSource);
           if (settings.customSource.lastSynced) {
             setCustomSourceLastSynced(new Date(settings.customSource.lastSynced));
           }
-          if (typeof settings.customSource.gameCount === "number") {
+          if (settings.customSource.gameCount) {
             setCustomSourceGameCount(settings.customSource.gameCount);
           }
         }
-        if (Array.isArray(settings?.customSourcesLibrary)) {
-          setCustomSourcesLibrary(settings.customSourcesLibrary);
-        }
 
-        // Check if localIndex is set, if not set it to default
-        let indexPath = settings?.localIndex;
-        if (!indexPath) {
+        // Load local index path
+        if (settings?.localIndexPath) {
+          setLocalIndexPath(settings.localIndexPath);
+        } else if (window.electron?.getDefaultLocalIndexPath) {
           const defaultPath = await window.electron.getDefaultLocalIndexPath();
-          await window.electron.updateSetting("localIndex", defaultPath);
           setLocalIndexPath(defaultPath);
-          indexPath = defaultPath;
-          console.log("Set default localIndex path:", defaultPath);
-        } else {
-          setLocalIndexPath(indexPath);
+          await updateSetting("localIndexPath", defaultPath);
         }
 
-        // Check if user has indexed before from timestamp
-        if (window.electron?.getTimestampValue) {
-          const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
-          setHasIndexBefore(hasIndexed === true);
-          // Track if this is the user's first index for auto-enabling
-          wasFirstIndexRef.current = hasIndexed !== true;
+        // Load last refresh time
+        if (settings?.lastLocalIndexRefresh) {
+          setLastRefreshTime(new Date(settings.lastLocalIndexRefresh));
         }
 
-        // Load last refresh time from progress.json lastSuccessfulTimestamp
-        if (indexPath && window.electron?.getLocalRefreshProgress) {
-          try {
-            const progress = await window.electron.getLocalRefreshProgress(indexPath);
-            // Use lastSuccessfulTimestamp which persists across refresh attempts
-            if (progress?.lastSuccessfulTimestamp) {
-              setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
+        // Resolve the index path once for status queries below
+        const resolvedIndexPath =
+          settings?.localIndexPath ||
+          (window.electron?.getDefaultLocalIndexPath
+            ? await window.electron.getDefaultLocalIndexPath()
+            : null);
+
+        // Check if refresh is running
+        if (window.electron?.isLocalIndexRefreshing) {
+          const refreshing = await window.electron.isLocalIndexRefreshing();
+          if (refreshing) {
+            try {
+              const progress = await window.electron.getLocalRefreshProgress(resolvedIndexPath);
+              // Use lastSuccessfulTimestamp which persists across refresh attempts
+              if (progress?.lastSuccessfulTimestamp) {
+                setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
+              }
+            } catch (e) {
+              console.log("No progress file found for last refresh time");
             }
-          } catch (e) {
-            console.log("No progress file found for last refresh time");
           }
         }
 
         // Check if a refresh is currently running and restore UI state
         if (window.electron?.getLocalRefreshStatus) {
-          const status = await window.electron.getLocalRefreshStatus(indexPath);
+          const status = await window.electron.getLocalRefreshStatus(resolvedIndexPath);
           if (status.isRunning) {
             console.log("Refresh is running, restoring UI state:", status.progress);
             setIsRefreshing(true);
@@ -845,7 +894,7 @@ const LocalRefresh = () => {
 
 
   // ---------------------------------------------------------------------------
-  // Custom Sources Mode handlers (Hydra Library)
+  // External Sources Mode handlers
   // ---------------------------------------------------------------------------
 
   const handleToggleCustomSourcesMode = async (enabled) => {
@@ -861,13 +910,13 @@ const LocalRefresh = () => {
       await updateSetting("usingLocalIndex", false);
       toast.info(
         t("localRefresh.customModeEnabled") ||
-          "Custom Sources Mode enabled. Select a source to begin."
+          "External sources enabled. Set a source bucket URL to begin."
       );
     } else {
       // Revert to using local index if one is built; app.jsx / Search.jsx will re-read
       toast.info(
         t("localRefresh.customModeDisabled") ||
-          "Custom Sources Mode disabled. Reverting to official index."
+          "External sources disabled. Reverting to the official index."
       );
     }
     // Notify other pages (Search/Library) to re-fetch games
@@ -876,40 +925,95 @@ const LocalRefresh = () => {
     );
   };
 
-  const fetchHydraSources = useCallback(async () => {
-    setHydraSourcesLoading(true);
-    setHydraSourcesError(null);
+  // Fetch the list of sources for a given bucket URL.
+  const fetchBucketSources = useCallback(async (bucketUrl) => {
+    setBucketSourcesLoading(true);
+    setBucketSourcesError(null);
     try {
-      const url = "https://api.hydralibrary.com/sources?page=1&limit=100";
+      const targetBucket = String(bucketUrl || sourceBucketUrl || "");
+      if (!targetBucket.trim()) {
+        setBucketSources([]);
+        setBucketSourcesError(
+          t("localRefresh.bucketUrlRequired") ||
+            "Enter a source bucket URL to continue."
+        );
+        return;
+      }
+
+      const url =
+        "https://api.ascendara.app/api/sources/bucket?url=" +
+        encodeURIComponent(targetBucket) +
+        "&page=1&limit=100";
+
       let parsed;
+      let ok;
+      let status;
       if (window.electron?.request) {
         const res = await window.electron.request(url, {
           method: "GET",
           headers: { Accept: "application/json" },
           timeout: 20000,
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        parsed = JSON.parse(res.data);
+        status = res.status;
+        ok = res.ok;
+        try { parsed = JSON.parse(res.data); } catch (_) { parsed = null; }
       } else {
         const r = await fetch(url);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        parsed = await r.json();
+        status = r.status;
+        ok = r.ok;
+        try { parsed = await r.json(); } catch (_) { parsed = null; }
       }
-      const sources = Array.isArray(parsed?.sources) ? parsed.sources : [];
-      setHydraSources(sources);
-    } catch (err) {
-      console.error("Failed to fetch Hydra sources:", err);
-      setHydraSourcesError(err?.message || "Failed to fetch sources");
-    } finally {
-      setHydraSourcesLoading(false);
-    }
-  }, []);
 
-  const handleOpenHydraBrowser = () => {
-    setHydraBrowserOpen(true);
-    // Fetch fresh list every time the dialog opens (cheap)
-    if (!hydraSourcesLoading) {
-      fetchHydraSources();
+      if (!ok) {
+        // 404 = URL is not a recognized bucket. Surface the server message so
+        // the UX can coach the user toward a valid bucket
+        if (status === 404) {
+          setBucketSources([]);
+          setBucketSourcesError(
+            parsed?.message ||
+              t("localRefresh.bucketUrlUnrecognized") ||
+              "This URL is not a recognized source bucket."
+          );
+          return;
+        }
+        throw new Error(parsed?.message || `HTTP ${status}`);
+      }
+
+      const sources = Array.isArray(parsed?.sources) ? parsed.sources : [];
+      setBucketSources(sources);
+    } catch (err) {
+      console.error("Failed to fetch bucket sources:", err);
+      setBucketSourcesError(err?.message || "Failed to fetch sources");
+    } finally {
+      setBucketSourcesLoading(false);
+    }
+  }, [sourceBucketUrl, t]);
+
+  const handleSaveSourceBucketUrl = async (rawUrl) => {
+    const trimmed = (rawUrl || "").trim();
+    setSourceBucketUrl(trimmed);
+    setSourceBucketUrlDraft(trimmed);
+    await updateSetting("sourceBucketUrl", trimmed);
+    if (trimmed) {
+      toast.success(
+        t("localRefresh.sourceBucketSaved") || "Source bucket saved"
+      );
+    }
+  };
+
+  const handleOpenSourceBrowser = () => {
+    // Require the user to have configured a bucket URL first. The API decides
+    // which bucket hosts are accepted; the client just forwards the URL.
+    if (!sourceBucketUrl.trim()) {
+      toast.error(
+        t("localRefresh.bucketUrlRequired") ||
+          "Enter a source bucket URL to continue."
+      );
+      return;
+    }
+    setSourceBrowserOpen(true);
+    if (!bucketSourcesLoading) {
+      fetchBucketSources(sourceBucketUrl);
     }
   };
 
@@ -940,7 +1044,7 @@ const LocalRefresh = () => {
     await updateSetting("customSourcesLibrary", next);
   }, [updateSetting]);
 
-  // Check Hydra source metadata (topDownloadOption) to see if the upstream
+  // Check source metadata (topDownloadOption) to see if the upstream
   // only advertises torrent links. This is the authoritative signal when
   // browsing sources, because it doesn't require syncing first.
   const isSourceMetaTorrentOnly = (source) => {
@@ -954,7 +1058,7 @@ const LocalRefresh = () => {
   };
 
   // Inspect a mapped dataset to determine whether it's torrent-only.
-  // Hydra maps magnet links to download_links.torrent, and most DDL hosts
+  // Bucket sources map magnet links to download_links.torrent, and most DDL hosts
   // produce non-torrent keys (gofile, buzzheavier, 1fichier, etc.).
   const isTorrentOnlyDataset = (games) => {
     if (!Array.isArray(games) || games.length === 0) return false;
@@ -994,6 +1098,7 @@ const LocalRefresh = () => {
 
   const handleSelectCustomSource = async (source) => {
     if (!source?.url) return;
+
     const payload = {
       id: source.id,
       name: source.title || source.name || "Custom Source",
@@ -1009,6 +1114,29 @@ const LocalRefresh = () => {
       torrentOnly: isSourceMetaTorrentOnly(source) || undefined,
     };
     payload.lastUsed = Date.now();
+
+    // Hard-block torrent-only sources when torrenting is disabled. We show
+    // the warning dialog (which links to Settings) but do NOT commit the
+    // selection -- the user has to enable torrenting first.
+    if (isSourceMetaTorrentOnly(payload)) {
+      try {
+        const current = await window.electron.getSettings();
+        if (!current?.torrentEnabled) {
+          setTorrentWarningSource({ ...payload, torrentOnly: true, blocked: true });
+          setTorrentWarningOpen(true);
+          return;
+        }
+      } catch (e) {
+        console.warn("[LocalRefresh] torrent pre-check failed:", e);
+      }
+    }
+
+    // Clear active custom list when picking a regular external source.
+    if (activeCustomList) {
+      setActiveCustomList(null);
+      await updateSetting("activeCustomList", null);
+    }
+
     // Snapshot the previously-active source so we can revert if the user
     // cancels out of the manual-paste fallback without ingesting anything.
     previousCustomSourceRef.current = customSource;
@@ -1017,31 +1145,12 @@ const LocalRefresh = () => {
     setCustomSourceGameCount(null);
     await updateSetting("customSource", payload);
     await upsertLibraryEntry(payload);
-    setHydraBrowserOpen(false);
+    setSourceBrowserOpen(false);
     toast.success(
       (t("localRefresh.customSourceSelected") || "Selected custom source") +
         ": " +
         payload.name
     );
-    // If the Hydra metadata already tells us this is a torrent-only source
-    // and the user hasn't enabled torrenting, surface the warning BEFORE we
-    // try to sync. We also short-circuit the sync so the user isn't hit
-    // with the 403 / manual-paste dialog on top of the torrent warning.
-    if (isSourceMetaTorrentOnly(payload)) {
-      try {
-        const current = await window.electron.getSettings();
-        if (!current?.torrentEnabled) {
-          setTorrentWarningSource({ ...payload, torrentOnly: true });
-          setTorrentWarningOpen(true);
-          // Clear the revert snapshot -- the user explicitly picked this
-          // source and we're just waiting on them to decide about torrents.
-          previousCustomSourceRef.current = null;
-          return;
-        }
-      } catch (e) {
-        console.warn("[LocalRefresh] torrent pre-check failed:", e);
-      }
-    }
     // Immediately sync the source after selection
     await handleSyncCustomSource(payload);
   };
@@ -1052,6 +1161,13 @@ const LocalRefresh = () => {
     if (!entry?.url) return;
     const now = Date.now();
     const payload = { ...entry, lastUsed: now };
+    
+    // Clear active custom list when switching to a regular external source.
+    if (activeCustomList) {
+      setActiveCustomList(null);
+      await updateSetting("activeCustomList", null);
+    }
+    
     setCustomSource(payload);
     setCustomSourceLastSynced(
       entry.lastSynced ? new Date(entry.lastSynced) : null
@@ -1061,8 +1177,14 @@ const LocalRefresh = () => {
     );
     await updateSetting("customSource", payload);
     await upsertLibraryEntry(payload);
-    // Force other pages to reload with the new source's cache
+    
+    // Clear all caches to force reload with new data
     gameService.clearMemoryCache();
+    localStorage.removeItem("ascendara_games_cache");
+    localStorage.removeItem("local_ascendara_games_timestamp");
+    localStorage.removeItem("local_ascendara_metadata_cache");
+    localStorage.removeItem("local_ascendara_last_updated");
+    
     window.dispatchEvent(
       new CustomEvent("index-refreshed", { detail: { timestamp: now } })
     );
@@ -1118,11 +1240,23 @@ const LocalRefresh = () => {
     } catch (err) {
       console.error("Custom source sync failed:", err);
       const msg = String(err?.message || "");
-      const is403 = /HTTP\s*403/i.test(msg);
-      if (is403) {
-        // Upstream is Cloudflare-challenged or otherwise blocking us.
-        // Open the URL in the user's browser so they can solve the challenge
-        // and paste the resulting JSON back into Ascendara.
+      // Any HTTP error (403 Cloudflare, 404, 429, generic network failure, etc.)
+      // means we couldn't refetch automatically. Open the URL in the user's
+      // browser so they can grab the JSON themselves and paste it back in.
+      const isFetchFailure =
+        /Custom source HTTP|HTTP\s*\d+|Failed to fetch|NetworkError|ETIMEDOUT|ENOTFOUND|ECONNRESET/i.test(
+          msg
+        );
+      // If we already have saved JSON for this source, don't revert -- the
+      // user's data is still usable, we just couldn't refresh it.
+      const hasSavedJson = !!source?.lastSynced;
+      if (isFetchFailure) {
+        toast.error(
+          (t("localRefresh.customSourceSyncFailed") || "Sync failed") +
+            " - " +
+            (t("localRefresh.customSourcePasteFallback") ||
+              "paste the JSON manually to update.")
+        );
         setManualPasteSourceUrl(source.url);
         setManualPasteText("");
         setManualPasteError(null);
@@ -1139,9 +1273,11 @@ const LocalRefresh = () => {
           (t("localRefresh.customSourceSyncFailed") || "Sync failed") +
             (err?.message ? `: ${err.message}` : "")
         );
-        // Sync failed outright (non-403) -- revert the selection so the UI
-        // doesn't show a "set" source that was never actually loaded.
-        await revertPendingCustomSource();
+        // Sync failed outright -- only revert if we never had data for this
+        // source to begin with. Otherwise keep the existing saved payload.
+        if (!hasSavedJson) {
+          await revertPendingCustomSource();
+        }
       }
     } finally {
       setIsSyncingCustomSource(false);
@@ -1172,6 +1308,12 @@ const LocalRefresh = () => {
     setManualPasteError(null);
     setIsIngestingManual(true);
     try {
+      // Clear active custom list when ingesting JSON for a regular external source.
+      if (activeCustomList) {
+        setActiveCustomList(null);
+        await updateSetting("activeCustomList", null);
+      }
+      
       const data = await gameService.ingestCustomSourceJson(manualPasteText);
       const count = data?.games?.length || 0;
       const now = Date.now();
@@ -1182,10 +1324,22 @@ const LocalRefresh = () => {
         lastSynced: now,
         lastUsed: now,
         gameCount: count,
+        // Flag this source as user-provided so gameService never tries to
+        // re-fetch it from the upstream URL (the user's pasted JSON is
+        // persisted to disk and will be used on future loads).
+        userProvided: true,
       };
       setCustomSource(nextPayload);
       await updateSetting("customSource", nextPayload);
       await upsertLibraryEntry(nextPayload);
+      
+      // Clear all caches to force reload with new data
+      gameService.clearMemoryCache();
+      localStorage.removeItem("ascendara_games_cache");
+      localStorage.removeItem("local_ascendara_games_timestamp");
+      localStorage.removeItem("local_ascendara_metadata_cache");
+      localStorage.removeItem("local_ascendara_last_updated");
+      
       if (window.electron?.setTimestampValue) {
         await window.electron.setTimestampValue("hasIndexBefore", true);
         setHasIndexBefore(true);
@@ -1222,15 +1376,369 @@ const LocalRefresh = () => {
     }
   };
 
-  const filteredHydraSources = useMemo(() => {
-    const q = hydraSearchQuery.trim().toLowerCase();
-    if (!q) return hydraSources;
-    return hydraSources.filter((s) => {
+  const handlePasteJsonFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setJsonImportText(text);
+        setJsonImportError(null);
+      }
+    } catch (e) {
+      console.warn("Clipboard read failed:", e);
+    }
+  };
+
+  const handleProcessJsonImport = async () => {
+    if (!jsonImportText.trim()) return;
+    
+    setIsProcessingJson(true);
+    setJsonImportError(null);
+    
+    try {
+      const parsedData = JSON.parse(jsonImportText);
+      const validation = validateAndDetectJsonFormat(parsedData);
+      
+      if (!validation.isValid) {
+        setJsonImportError(validation.error);
+        return;
+      }
+      
+      setJsonImportData(validation.data);
+      
+      // Auto-fill list name if there's a name field in the JSON
+      if (parsedData.name && typeof parsedData.name === 'string' && parsedData.name.trim()) {
+        setJsonListName(parsedData.name.trim());
+      } else {
+        setJsonListName("");
+      }
+      
+      setShowJsonConfirmDialog(true);
+      setJsonImportText("");
+      setShowJsonImportDialog(false);
+      
+    } catch (err) {
+      console.error("JSON parsing failed:", err);
+      setJsonImportError(err?.message || "Invalid JSON format");
+    } finally {
+      setIsProcessingJson(false);
+    }
+  };
+
+  const handleConfirmJsonImport = async () => {
+    if (!jsonImportData || !jsonListName.trim()) return;
+    
+    try {
+      // Use the original JSON data as-is without conversion
+      const originalData = jsonImportData.originalData;
+      const count = jsonImportData.gameCount;
+      const now = Date.now();
+      
+      // Create a custom list entry
+      const customListData = {
+        id: `custom_list_${now}`,
+        name: jsonListName.trim(),
+        itemCount: count,
+        format: jsonImportData.type,
+        createdAt: now,
+        lastUsed: now,
+        originalJson: originalData, // Store the original JSON structure
+        keys: jsonImportData.keys,
+        sampleItems: jsonImportData.sampleGames
+      };
+      
+      // Store the JSON data directly in a way that can be accessed by the game service
+      if (window.electron?.setCustomListData) {
+        await window.electron.setCustomListData(customListData.id, originalData);
+      }
+      
+      // Add to custom lists and persist.
+      const updatedLists = [...customLists, customListData];
+      setCustomLists(updatedLists);
+      await updateSetting("customLists", updatedLists);
+
+      // Close dialogs before switching so the UI feels responsive.
+      setShowJsonConfirmDialog(false);
+      setJsonImportData(null);
+      setJsonImportText("");
+      setJsonListName("");
+
+      // Activate the newly-imported list through the same pipeline used by
+      // list switching so the game service actually loads it as the source.
+      await handleSwitchToList(customListData);
+
+      window.dispatchEvent(
+        new CustomEvent("custom-list-imported", { detail: { list: customListData, timestamp: now } })
+      );
+      
+    } catch (err) {
+      console.error("JSON import failed:", err);
+      toast.error(err?.message || "Failed to import JSON data");
+    }
+  };
+
+  // Normalize any supported custom list JSON into bucket-compatible {name, downloads: []}
+  // so the game service pipeline (ingestCustomSourceJson) can consume it uniformly.
+  const normalizeListDataToBucketFormat = (raw, fallbackName) => {
+    if (!raw || typeof raw !== "object") return null;
+    if (Array.isArray(raw.downloads)) {
+      return { name: raw.name || fallbackName, ...raw };
+    }
+    if (Array.isArray(raw.games)) {
+      const downloads = raw.games.map((g) => {
+        // Collect URIs from every common shape used by community JSONs.
+        const uris = [];
+        if (Array.isArray(g.uris)) uris.push(...g.uris);
+        if (g.uri) uris.push(g.uri);
+        if (g.magnet) uris.push(g.magnet);
+        if (g.url) uris.push(g.url);
+        if (g.dirlink) uris.push(g.dirlink);
+        if (g.download_links && typeof g.download_links === "object") {
+          for (const val of Object.values(g.download_links)) {
+            if (Array.isArray(val)) uris.push(...val);
+            else if (typeof val === "string") uris.push(val);
+          }
+        }
+        return {
+          title: g.title || g.name || g.game || "Unknown",
+          uris: uris.filter(Boolean),
+          uploadDate:
+            g.uploadDate || g.date || g.latest_update || new Date().toISOString(),
+          fileSize: g.fileSize || g.size || "N/A",
+        };
+      });
+      return { name: raw.name || fallbackName, downloads };
+    }
+    return null;
+  };
+
+  // Custom Lists Management Functions
+  // A custom list is just a user-imported external source. Reuse the same pipeline.
+  const handleSwitchToList = async (list) => {
+    try {
+      const now = Date.now();
+
+      // If an external (non-custom-list) source is currently active, push it
+      // down to the saved sources library so it can be swapped back later.
+      if (customSource && !customSource.isCustomList) {
+        await upsertLibraryEntry(customSource);
+      }
+
+      // Ensure external sources mode is enabled (custom lists live within it).
+      if (!customSourcesMode) {
+        setCustomSourcesMode(true);
+        await updateSetting("customSourcesMode", true);
+      }
+
+      // Pull stored JSON for this list. Prefer electron-backed storage, but
+      // fall back to the copy embedded in the list object (set at import time)
+      // so lists always work even if disk storage is unavailable.
+      let raw = null;
+      try {
+        if (window.electron?.getCustomListData) {
+          raw = await window.electron.getCustomListData(list.id);
+        }
+      } catch (e) {
+        console.warn("[LocalRefresh] getCustomListData failed:", e);
+      }
+      if (!raw) raw = list.originalJson || null;
+      if (typeof raw === "string") {
+        try { raw = JSON.parse(raw); } catch (_) { /* fall through */ }
+      }
+
+      const normalized = normalizeListDataToBucketFormat(raw, list.name);
+      if (!normalized || !Array.isArray(normalized.downloads) || normalized.downloads.length === 0) {
+        console.error("[LocalRefresh] Custom list normalize failed. raw keys:", raw && typeof raw === "object" ? Object.keys(raw) : typeof raw);
+        toast.error(t("localRefresh.listDataInvalid") || "Custom list data is invalid");
+        return;
+      }
+
+      // Build a customSource payload that looks just like any other external
+      // source. The URL is a stable synthetic key used only as a cache key.
+      const customSourcePayload = {
+        id: list.id,
+        name: list.name,
+        url: `custom_list_${list.id}`,
+        gameCount: normalized.downloads.length,
+        lastSynced: now,
+        lastUsed: now,
+        isCustomList: true,
+      };
+
+      // IMPORTANT: settings.customSource must be set BEFORE ingestCustomSourceJson
+      // since the game service reads customSource from settings internally.
+      await updateSetting("customSource", customSourcePayload);
+      setCustomSource(customSourcePayload);
+      setCustomSourceLastSynced(new Date(now));
+      setCustomSourceGameCount(normalized.downloads.length);
+      setActiveCustomList(list);
+      await updateSetting("activeCustomList", list);
+
+      // Clear legacy caches and memory cache so the new source loads fresh.
+      gameService.clearMemoryCache();
+      gameService.clearCustomSourceCache(customSourcePayload.url);
+      localStorage.removeItem("ascendara_games_cache");
+      localStorage.removeItem("local_ascendara_games_timestamp");
+      localStorage.removeItem("local_ascendara_metadata_cache");
+      localStorage.removeItem("local_ascendara_last_updated");
+
+      // Feed the normalized JSON through the exact same pipeline external
+      // sources use. This populates the URL-keyed cache so future reads return
+      // this data without attempting a network fetch.
+      await gameService.ingestCustomSourceJson(normalized);
+
+      if (window.electron?.setTimestampValue) {
+        await window.electron.setTimestampValue("hasIndexBefore", true);
+        setHasIndexBefore(true);
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("index-refreshed", { detail: { timestamp: now } })
+      );
+
+      toast.success(
+        (t("localRefresh.listSwitched") || "Switched to list") + `: ${list.name}`
+      );
+    } catch (err) {
+      console.error("Failed to switch to list:", err);
+      toast.error(err?.message || "Failed to switch list");
+    }
+  };
+
+  
+  const handleRenameList = async (list) => {
+    const newName = prompt(
+      t("localRefresh.enterNewName") || "Enter new name for this list:",
+      list.name
+    );
+    
+    if (newName && newName.trim() && newName.trim() !== list.name) {
+      try {
+        const updatedLists = customLists.map(l => 
+          l.id === list.id ? { ...l, name: newName.trim() } : l
+        );
+        setCustomLists(updatedLists);
+        await updateSetting("customLists", updatedLists);
+        
+        // Update active list if it's the one being renamed
+        if (activeCustomList?.id === list.id) {
+          const updatedActiveList = { ...activeCustomList, name: newName.trim() };
+          setActiveCustomList(updatedActiveList);
+          await updateSetting("activeCustomList", updatedActiveList);
+        }
+        
+        toast.success(t("localRefresh.listRenamed") || "List renamed successfully");
+      } catch (err) {
+        console.error("Failed to rename list:", err);
+        toast.error(err?.message || "Failed to rename list");
+      }
+    }
+  };
+
+  const handleDeleteList = async (list) => {
+    const confirmed = confirm(
+      (t("localRefresh.confirmDeleteList") || "Are you sure you want to delete this list?") +
+      ` "${list.name}"`
+    );
+    
+    if (confirmed) {
+      try {
+        const updatedLists = customLists.filter(l => l.id !== list.id);
+        setCustomLists(updatedLists);
+        await updateSetting("customLists", updatedLists);
+        
+        // Remove from electron storage
+        if (window.electron?.removeCustomListData) {
+          await window.electron.removeCustomListData(list.id);
+        }
+        
+        // Remove from active list if it was the active one
+        if (activeCustomList?.id === list.id) {
+          setActiveCustomList(null);
+          await updateSetting("activeCustomList", null);
+        }
+        
+        toast.success(t("localRefresh.listDeleted") || "List deleted successfully");
+      } catch (err) {
+        console.error("Failed to delete list:", err);
+        toast.error(err?.message || "Failed to delete list");
+      }
+    }
+  };
+
+  const validateAndDetectJsonFormat = (data) => {
+    if (!data || typeof data !== 'object') {
+      return { isValid: false, error: "Invalid JSON: must be an object" };
+    }
+    
+    // Check for games array format
+    if (data.games && Array.isArray(data.games)) {
+      if (data.games.length === 0) {
+        return { isValid: false, error: "Games array is empty" };
+      }
+      
+      // Extract keys from sample games
+      const sampleGames = data.games.slice(0, 3);
+      const keys = new Set();
+      sampleGames.forEach(game => {
+        if (game && typeof game === 'object') {
+          Object.keys(game).forEach(key => keys.add(key));
+        }
+      });
+      
+      return {
+        isValid: true,
+        data: {
+          type: 'games',
+          gameCount: data.games.length,
+          keys: Array.from(keys),
+          sampleGames,
+          originalData: data
+        }
+      };
+    }
+    
+    // Check for downloads array format
+    if (data.downloads && Array.isArray(data.downloads)) {
+      if (data.downloads.length === 0) {
+        return { isValid: false, error: "Downloads array is empty" };
+      }
+      
+      // Extract keys from sample downloads
+      const sampleGames = data.downloads.slice(0, 3);
+      const keys = new Set();
+      sampleGames.forEach(download => {
+        if (download && typeof download === 'object') {
+          Object.keys(download).forEach(key => keys.add(key));
+        }
+      });
+      
+      return {
+        isValid: true,
+        data: {
+          type: 'downloads',
+          gameCount: data.downloads.length,
+          keys: Array.from(keys),
+          sampleGames,
+          originalData: data
+        }
+      };
+    }
+    
+    return { 
+      isValid: false, 
+      error: "Unsupported format. Expected { \"games\": [...] } or { \"name\": \"...\", \"downloads\": [...] }" 
+    };
+  };
+
+  const filteredBucketSources = useMemo(() => {
+    const q = bucketSearchQuery.trim().toLowerCase();
+    if (!q) return bucketSources;
+    return bucketSources.filter((s) => {
       const title = (s?.title || s?.name || "").toLowerCase();
       const desc = (s?.description || "").toLowerCase();
       return title.includes(q) || desc.includes(q);
     });
-  }, [hydraSources, hydraSearchQuery]);
+  }, [bucketSources, bucketSearchQuery]);
 
   // Handle back navigation
   const handleBack = () => {
@@ -1354,7 +1862,7 @@ const LocalRefresh = () => {
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="truncate text-xl mt-2 font-bold leading-tight">
                         {customSourcesMode
-                          ? customSource?.name ||
+                          ? activeCustomList?.name || customSource?.name ||
                             t("localRefresh.noSourceSelected") ||
                             "No source selected"
                           : t("localRefresh.ascendaraIndex") || "Ascendara Index"}
@@ -1407,11 +1915,13 @@ const LocalRefresh = () => {
                     </div>
                     <p className="mb-4 text-sm text-muted-foreground">
                       {customSourcesMode
-                        ? customSource?.url
-                          ? t("localRefresh.heroDescCustomActive") ||
-                            "Pulling games from this Hydra Library-compatible source."
-                          : t("localRefresh.heroDescCustomEmpty") ||
-                            "Pick a Hydra Library source below to start pulling games."
+                        ? activeCustomList
+                          ? (t("localRefresh.heroDescCustomListActive") || "Browsing custom list") + ` "${activeCustomList.name}" (${activeCustomList.itemCount?.toLocaleString() || 0} ${t("localRefresh.items") || "items"})`
+                          : customSource?.url
+                            ? t("localRefresh.heroDescCustomActive") ||
+                              "Pulling games from your selected external source."
+                            : t("localRefresh.heroDescCustomEmpty") ||
+                              "Set a source bucket URL below to start pulling games."
                         : t("localRefresh.heroDescAscendara") ||
                           "Your offline copy of Ascendara's curated game database."}
                           &nbsp;
@@ -1439,7 +1949,8 @@ const LocalRefresh = () => {
                     <div className="mt-1 text-2xl font-bold leading-none">
                       {(() => {
                         const count = customSourcesMode
-                          ? customSourceGameCount ??
+                          ? activeCustomList?.itemCount ??
+                            customSourceGameCount ??
                             customSource?.gameCount ??
                             customSource?.gamesCount
                           : indexInfo?.gameCount;
@@ -1455,9 +1966,11 @@ const LocalRefresh = () => {
                     </div>
                     <div className="mt-1 truncate text-sm font-semibold">
                       {customSourcesMode
-                        ? customSourceLastSynced
-                          ? formatLastRefreshTime(customSourceLastSynced)
-                          : t("localRefresh.never") || "Never"
+                        ? activeCustomList?.createdAt
+                          ? formatLastRefreshTime(new Date(activeCustomList.createdAt))
+                          : customSourceLastSynced
+                            ? formatLastRefreshTime(customSourceLastSynced)
+                            : t("localRefresh.never") || "Never"
                         : lastRefreshTime
                           ? formatLastRefreshTime(lastRefreshTime)
                           : t("localRefresh.never") || "Never"}
@@ -1471,23 +1984,25 @@ const LocalRefresh = () => {
                     </div>
                     <div className="mt-1 flex items-center gap-1 text-sm font-semibold">
                       {customSourcesMode
-                        ? (() => {
-                            const r = customSource?.rating;
-                            const avg =
-                              r && typeof r === "object"
-                                ? r.avg
-                                : typeof r === "number"
-                                  ? r
-                                  : null;
-                            if (avg == null || Number.isNaN(Number(avg)))
-                              return "—";
-                            return (
-                              <>
-                                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                                {Number(avg).toFixed(1)}
-                              </>
-                            );
-                          })()
+                        ? activeCustomList
+                          ? "Not Available"
+                          : (() => {
+                              const r = customSource?.rating;
+                              const avg =
+                                r && typeof r === "object"
+                                  ? r.avg
+                                  : typeof r === "number"
+                                    ? r
+                                    : null;
+                              if (avg == null || Number.isNaN(Number(avg)))
+                                return "—";
+                              return (
+                                <>
+                                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                                  {Number(avg).toFixed(1)}
+                                </>
+                              );
+                            })()
                         : indexInfo?.date
                           ? new Date(indexInfo.date).toLocaleDateString(
                               undefined,
@@ -1521,7 +2036,7 @@ const LocalRefresh = () => {
                         <Button
                           size="lg"
                           onClick={() => handleSyncCustomSource()}
-                          disabled={isSyncingCustomSource}
+                          disabled={isSyncingCustomSource || !sourceBucketUrl.trim()}
                           className="gap-2 text-secondary sm:flex-1"
                         >
                           {isSyncingCustomSource ? (
@@ -1539,7 +2054,7 @@ const LocalRefresh = () => {
                         <Button
                           size="lg"
                           variant="outline"
-                          onClick={handleOpenHydraBrowser}
+                          onClick={handleOpenSourceBrowser}
                           disabled={isSyncingCustomSource}
                           className="gap-2"
                         >
@@ -1547,16 +2062,17 @@ const LocalRefresh = () => {
                           {t("localRefresh.changeSource") || "Change source"}
                         </Button>
                       </>
-                    ) : (
+                    ) : sourceBucketUrl.trim() ? (
                       <Button
                         size="lg"
-                        onClick={handleOpenHydraBrowser}
+                        onClick={handleOpenSourceBrowser}
                         className="gap-2 text-secondary sm:flex-1"
                       >
                         <Globe className="h-4 w-4" />
-                        {t("localRefresh.browseHydraSources") || "Browse sources"}
+                        {t("localRefresh.browseSources") || "Browse sources"}
                       </Button>
-                    )
+                    ) : null
+                    
                   ) : (
                     <>
                       {apiAvailable ? (
@@ -1647,7 +2163,7 @@ const LocalRefresh = () => {
               </div>
             </Card>
             {!customSourcesMode && (
-              <Card className="overflow-hidden p-0">
+              <Card className="overflow-hidden border-0 p-0">
                 <div className="flex items-start gap-3 p-5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-blue-500/15">
                     <Calendar className="h-5 w-5 text-primary" />
@@ -1811,7 +2327,7 @@ const LocalRefresh = () => {
 
             {/* Share Index compact */}
             {!customSourcesMode && (
-              <Card className="p-5">
+              <Card className="p-5 border-0">
                 <div className="flex items-start gap-3">
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
@@ -1866,10 +2382,10 @@ const LocalRefresh = () => {
             )}
 
             {/* Custom Sources - compact switch card; expands to show source list */}
-            <Card className="overflow-hidden p-0">
+            <Card className="overflow-hidden p-0 border-0">
               <div className="flex items-start gap-3 p-5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500/15 to-pink-500/15">
-                  <Globe className="h-5 w-5 text-purple-500" />
+                  <PlugIcon className="h-5 w-5 text-purple-500" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
@@ -1877,7 +2393,7 @@ const LocalRefresh = () => {
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold">
                           {t("localRefresh.customSourcesMode") ||
-                            "Custom Sources Mode"}
+                            "External Sources"}
                         </h3>
                         <Badge
                           variant="outline"
@@ -1888,7 +2404,7 @@ const LocalRefresh = () => {
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {t("localRefresh.customSourcesModeDesc") ||
-                          "Pull games from Hydra Library-compatible sources instead of Ascendara's official index."}
+                          "Pull games from an external source bucket of your choice instead of Ascendara's official index."}
                       </p>
                     </div>
                     <Switch
@@ -2003,23 +2519,235 @@ const LocalRefresh = () => {
                           </div>
                         </div>
                       )}
+                      <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold text-foreground">
+                            {t("localRefresh.sourceBucketLabel") ||
+                              "Source bucket URL"}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSourceBucketUrlDraft("https://library.hydra.wiki/")
+                            }
+                            className="text-[10px] text-primary hover:underline"
+                          >
+                            {t("localRefresh.sourceBucketUseRecommended") ||
+                              "Use recommended"}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="url"
+                            inputMode="url"
+                            placeholder="Bucket URL..."
+                            value={sourceBucketUrlDraft}
+                            onChange={e => setSourceBucketUrlDraft(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleSaveSourceBucketUrl(sourceBucketUrlDraft);
+                              }
+                            }}
+                            disabled={isSyncingCustomSource}
+                            className="h-9 flex-1 text-xs"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleSaveSourceBucketUrl(sourceBucketUrlDraft)}
+                            disabled={
+                              isSyncingCustomSource ||
+                              !sourceBucketUrlDraft.trim() ||
+                              sourceBucketUrlDraft.trim() === sourceBucketUrl.trim()
+                            }
+                            className="h-9 text-secondary"
+                          >
+                            {t("localRefresh.sourceBucketSet") || "Set"}
+                          </Button>
+                          {sourceBucketUrl.trim() && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSaveSourceBucketUrl("")}
+                              disabled={isSyncingCustomSource}
+                              className="h-9"
+                              title={t("common.clear") || "Clear"}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          {t("localRefresh.sourceBucketHint") ||
+                            "Paste the URL of the source collection you want to pull from. Recommended: "}
+                          <span className="font-mono text-foreground">
+                            https://library.hydra.wiki/
+                          </span>
+                        </p>
+                      </div>
 
                       {!customSource?.url && (
-                        <Button
-                          onClick={handleOpenHydraBrowser}
-                          variant="outline"
-                          className="w-full gap-2"
-                        >
-                          <Globe className="h-4 w-4" />
-                          {t("localRefresh.browseHydraSources") ||
-                            "Browse Hydra Sources"}
-                        </Button>
+                        <div className="space-y-2">
+                          <Button
+                            onClick={handleOpenSourceBrowser}
+                            disabled={!sourceBucketUrl.trim() || isSyncingCustomSource}
+                            variant="outline"
+                            className="w-full gap-2"
+                          >
+                            <Globe className="h-4 w-4" />
+                            {t("localRefresh.browseSources") ||
+                              "Browse sources"}
+                          </Button>
+                          <Button
+                            onClick={() => setShowJsonImportDialog(true)}
+                            variant="outline"
+                            className="w-full gap-2"
+                          >
+                            <Upload className="h-4 w-4" />
+                            {t("localRefresh.importJson") || "Import JSON Data"}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </Card>
+
+            {/* Custom Lists Management */}
+            {customSourcesMode && (
+              <Card className="overflow-hidden p-0 border-0">
+              <div className="flex items-start gap-3 p-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15">
+                  <ClipboardList className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">
+                          {t("localRefresh.customLists") || "Custom Lists"}
+                        </h3>
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {t("localRefresh.customListsDesc") ||
+                          "Create and manage your own game lists from imported JSON data."}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {activeCustomList && (
+                        <Badge variant="default" className="text-xs">
+                          {activeCustomList.name}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-border/60 bg-muted/20 p-5">
+                <div className="space-y-3">
+                  {/* Active Custom List Info */}
+                  {activeCustomList && (
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+                      <CircleCheck className="h-4 w-4 text-blue-500" />
+                      <div className="text-sm">
+                        <p className="font-medium text-blue-700 dark:text-blue-300">
+                          {t("localRefresh.activeList") || "Active List"}: {activeCustomList.name}
+                        </p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400">
+                          {activeCustomList.itemCount?.toLocaleString() || 0} {t("localRefresh.items") || "items"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Lists Grid */}
+                  {customLists.length > 0 && (
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          {t("localRefresh.yourLists") || "Your Lists"}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground/70">
+                          {t("localRefresh.savedSourcesHint") || "Click to switch"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {customLists
+                          .filter((list) => list.id !== activeCustomList?.id)
+                          .slice(0, 6)
+                          .map((list) => (
+                            <div
+                              key={list.id}
+                              role="button"
+                              tabIndex={-1}
+                              onClick={() => handleSwitchToList(list)}
+                              className="group flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 bg-background p-2 text-left transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
+                            >
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+                                <Database className="h-3.5 w-3.5 text-muted-foreground group-hover:text-blue-500" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1">
+                                  <p className="truncate text-xs font-semibold">
+                                    {list.name}
+                                  </p>
+                                  {list.format && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {list.format}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="truncate text-[10px] text-muted-foreground">
+                                  {list.itemCount?.toLocaleString() || 0} {t("localRefresh.items") || "items"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRenameList(list);
+                                  }}
+                                  className="opacity-0 transition-opacity hover:text-blue-500 group-hover:opacity-100"
+                                  title={t("common.rename") || "Rename"}
+                                >
+                                  <PencilIcon className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteList(list);
+                                  }}
+                                  className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                  title={t("common.delete") || "Delete"}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Import New List Button */}
+                  <Button
+                    onClick={() => setShowJsonImportDialog(true)}
+                    variant="outline"
+                    className="w-full gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("localRefresh.importNewList") || "Import New List"}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+            )}
 
             <AnimatePresence>
               {(isRefreshing || isUploading || refreshStatus === "completed") && (
@@ -2326,58 +3054,6 @@ const LocalRefresh = () => {
                 </div>
               </div>
 
-              {/* About - adapts copy based on whether Custom Sources Mode is active */}
-              <Card className="bg-muted/30 p-4">
-              <div className="flex gap-3">
-                {customSourcesMode ? (
-                  <Globe className="h-5 w-5 shrink-0 text-purple-500" />
-                ) : (
-                  <Database className="h-5 w-5 shrink-0 text-primary" />
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-medium">
-                      {customSourcesMode
-                        ? t("localRefresh.whatThisDoesCustom") || "Custom Sources"
-                        : t("localRefresh.whatThisDoes") || "About"}
-                    </h3>
-                    {customSourcesMode && customSource?.name && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        {customSource.name}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {customSourcesMode
-                      ? customSource?.url
-                        ? (t("localRefresh.whatThisDoesCustomActiveDesc") ||
-                          "Browsing {{name}} ({{count}} games). Data refreshes every 12 hours or when you hit Sync Now. Switch sources anytime from the list above.")
-                          .replace("{{name}}", customSource.name || "your source")
-                          .replace(
-                            "{{count}}",
-                            (customSourceGameCount ??
-                              customSource.gameCount ??
-                              customSource.gamesCount ??
-                              0
-                            ).toLocaleString()
-                          )
-                        : t("localRefresh.whatThisDoesCustomDesc") ||
-                          "Pull games from any Hydra Library-compatible JSON source. Pick one to get started."
-                      : t("localRefresh.whatThisDoesDescription") ||
-                        "Store game data locally for faster browsing and offline access."}
-                  </p>
-                  {customSourcesMode && customSource?.torrentOnly && (
-                    <div className="mt-2 flex items-start gap-1.5 rounded-md border border-orange-500/30 bg-orange-500/5 p-2 text-[11px] text-orange-700 dark:text-orange-300">
-                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                      <span>
-                        {t("localRefresh.torrentOnlyHint") ||
-                          "This source only offers torrent links. Enable torrenting in Settings to download."}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -2420,16 +3096,16 @@ const LocalRefresh = () => {
           cookieRefreshCount={cookieRefreshCount}
         />
 
-        {/* Hydra Library Source Browser Dialog */}
-        <Dialog open={hydraBrowserOpen} onOpenChange={setHydraBrowserOpen}>
+        {/* External Source Bucket Browser Dialog */}
+        <Dialog open={sourceBrowserOpen} onOpenChange={setSourceBrowserOpen}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
                 <Globe className="h-5 w-5" />
-                {t("localRefresh.hydraBrowserTitle")}
+                {t("localRefresh.sourceBrowserTitle")}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                {t("localRefresh.hydraBrowserDesc")}
+                {t("localRefresh.sourceBrowserDesc")}
               </DialogDescription>
             </DialogHeader>
 
@@ -2438,40 +3114,40 @@ const LocalRefresh = () => {
                 <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={
-                    t("localRefresh.hydraSearchPlaceholder")
+                    t("localRefresh.sourceBrowserSearchPlaceholder")
                   }
-                  value={hydraSearchQuery}
-                  onChange={(e) => setHydraSearchQuery(e.target.value)}
+                  value={bucketSearchQuery}
+                  onChange={(e) => setBucketSearchQuery(e.target.value)}
                   className="pl-9"
                 />
               </div>
 
               <div className="max-h-[55vh] min-h-[200px] space-y-2 overflow-y-auto pr-1">
-                {hydraSourcesLoading && (
+                {bucketSourcesLoading && (
                   <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader className="h-4 w-4 animate-spin" />
-                    {t("localRefresh.hydraLoading") || "Loading sources..."}
+                    {t("localRefresh.sourcesLoading") || "Loading sources..."}
                   </div>
                 )}
-                {hydraSourcesError && !hydraSourcesLoading && (
-                  <div className="flex flex-col items-center gap-3 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+                {bucketSourcesError && !bucketSourcesLoading && (
+                  <div className="flex flex-col items-center mt-4 gap-2 p-4 text-sm text-primary">
                     <AlertCircle className="h-5 w-5" />
-                    <span>{hydraSourcesError}</span>
-                    <Button size="sm" variant="outline" onClick={fetchHydraSources}>
+                    <span>{bucketSourcesError}</span>
+                    <Button size="sm" className='text-primary' variant="outline" onClick={fetchBucketSources}>
                       {t("common.retry") || "Retry"}
                     </Button>
                   </div>
                 )}
-                {!hydraSourcesLoading &&
-                  !hydraSourcesError &&
-                  filteredHydraSources.length === 0 && (
+                {!bucketSourcesLoading &&
+                  !bucketSourcesError &&
+                  filteredBucketSources.length === 0 && (
                     <div className="py-8 text-center text-sm text-muted-foreground">
-                      {t("localRefresh.hydraNoResults") || "No sources match your search."}
+                      {t("localRefresh.sourcesNoResults") || "No sources match your search."}
                     </div>
                   )}
-                {!hydraSourcesLoading &&
-                  !hydraSourcesError &&
-                  filteredHydraSources.map((source) => {
+                {!bucketSourcesLoading &&
+                  !bucketSourcesError &&
+                  filteredBucketSources.map((source) => {
                     const isSelected = customSource?.id === source.id;
                     const trusted =
                       Array.isArray(source.status) && source.status.includes("Trusted");
@@ -2550,13 +3226,13 @@ const LocalRefresh = () => {
 
             <DialogFooter className="flex-row items-center justify-between sm:justify-between">
               <p className="text-xs text-muted-foreground">
-                {t("localRefresh.hydraAttribution")}
+                {t("localRefresh.sourcesAttribution")}
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 className="text-primary"
-                onClick={() => setHydraBrowserOpen(false)}
+                onClick={() => setSourceBrowserOpen(false)}
               >
                 {t("common.close") || "Close"}
               </Button>
@@ -2573,12 +3249,15 @@ const LocalRefresh = () => {
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-2 text-muted-foreground">
                 <span className="block">
-                  {(t("localRefresh.torrentOnlyDialogBody") ||
-                    "{{name}} only publishes magnet links. To download anything from it you'll need to enable torrenting in Settings.")
-                    .replace(
-                      "{{name}}",
-                      torrentWarningSource?.name || "This source"
-                    )}
+                  {(torrentWarningSource?.blocked
+                    ? t("localRefresh.torrentOnlyDialogBlocked") ||
+                      "{{name}} only publishes magnet links, so you can't select it until torrenting is enabled in Settings."
+                    : t("localRefresh.torrentOnlyDialogBody") ||
+                      "{{name}} only publishes magnet links. To download anything from it you'll need to enable torrenting in Settings."
+                  ).replace(
+                    "{{name}}",
+                    torrentWarningSource?.name || "This source"
+                  )}
                 </span>
                 <span className="block rounded-md border border-orange-500/30 bg-orange-500/5 p-2 text-xs text-orange-700 dark:text-orange-300">
                   {t("localRefresh.torrentOnlyDialogVpn") ||
@@ -2705,6 +3384,283 @@ const LocalRefresh = () => {
                     : t("localRefresh.importJson") || "Import JSON"}
                 </Button>
               </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* JSON Import Dialog */}
+        <Dialog open={showJsonImportDialog} onOpenChange={setShowJsonImportDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                <Upload className="h-5 w-5 text-primary" />
+                {t("localRefresh.jsonImportTitle") || "Import Game JSON Data"}
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                {t("localRefresh.jsonImportDesc") ||
+                  "Paste your game JSON data below. Supports both standard game formats and download list formats."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-md border border-muted bg-muted/30 p-3">
+                <span className="text-sm text-muted-foreground">
+                  {t("localRefresh.jsonLearnMore") || "Learn more about supported formats"}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-xs text-primary"
+                  onClick={() => {  
+                      window.electron.openURL("https://ascendara.app/docs/features/external-sources");
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  {t("common.docs") || "Docs"}
+                </Button>
+              </div>
+
+              <textarea
+                value={jsonImportText}
+                onChange={e => {
+                  setJsonImportText(e.target.value);
+                  if (jsonImportError) setJsonImportError(null);
+                }}
+                placeholder={
+                  t("localRefresh.jsonImportPlaceholder") ||
+                  'Paste your JSON data here (e.g., { "games": [...] } or { "name": "...", "downloads": [...] })'
+                }
+                spellCheck={false}
+                className="h-56 w-full text-foreground resize-none rounded-md border bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:ring-2 focus:ring-primary/40"
+              />
+
+              {jsonImportError && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {jsonImportError}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-primary"
+                onClick={handlePasteJsonFromClipboard}
+                disabled={isProcessingJson}
+              >
+                {t("localRefresh.pasteFromClipboard") || "Paste from clipboard"}
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary"
+                  onClick={() => setShowJsonImportDialog(false)}
+                  disabled={isProcessingJson}
+                >
+                  {t("common.cancel") || "Cancel"}
+                </Button>
+                <Button
+                  size="sm"
+                  className="text-muted"
+                  onClick={handleProcessJsonImport}
+                  disabled={isProcessingJson || !jsonImportText.trim()}
+                >
+                  {isProcessingJson
+                    ? t("localRefresh.processing") || "Processing..."
+                    : t("localRefresh.processJson") || "Process JSON"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* JSON Import Confirmation Dialog */}
+        <Dialog open={showJsonConfirmDialog} onOpenChange={setShowJsonConfirmDialog}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                {t("localRefresh.jsonConfirmTitle") || "Confirm JSON Import"}
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                {t("localRefresh.jsonConfirmDesc") ||
+                  "Review the detected structure and game count before importing."}
+              </DialogDescription>
+            </DialogHeader>
+
+            {jsonImportData && (
+              <div className="space-y-4">
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <PencilIcon className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-semibold">
+                      {t("localRefresh.listName") || "List Name"}
+                    </span>
+                  </div>
+                  <Input
+                    value={jsonListName}
+                    onChange={e => setJsonListName(e.target.value)}
+                    placeholder={
+                      t("localRefresh.listNamePlaceholder") || "Enter a name for this list..."
+                    }
+                    className="w-full"
+                  />
+                </Card>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Database className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold">
+                        {t("localRefresh.jsonDetectedFormat") || "Detected Structure"}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {jsonImportData.type === 'games' 
+                        ? `Array: "games" (${jsonImportData.gameCount} items)`
+                        : jsonImportData.type === 'downloads'
+                        ? `Array: "downloads" (${jsonImportData.gameCount} items)`
+                        : `Object with ${jsonImportData.gameCount} items`
+                      }
+                    </Badge>
+                  </Card>
+
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-4 w-4 text-emerald-500" />
+                      <span className="text-sm font-semibold">
+                        {t("localRefresh.jsonItemCount") || "Total Items"}
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-primary">
+                      {jsonImportData.gameCount.toLocaleString()}
+                    </div>
+                  </Card>
+                </div>
+
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Settings2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-semibold">
+                      {t("localRefresh.jsonDetectedKeys") || "Detected Keys"}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {jsonImportData.keys.map((key, index) => (
+                      <Badge key={index} variant="outline" className="text-[10px]">
+                        {key}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      {t("localRefresh.jsonLearnMore") || "Learn more about supported formats"}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => {
+                        if (window.electron?.openURL) {
+                          window.electron.openURL("https://ascendara.app/docs");
+                        } else {
+                          window.open("https://ascendara.app/docs", "_blank");
+                        }
+                      }}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      {t("common.docs") || "Docs"}
+                    </Button>
+                  </div>
+                </Card>
+
+                {jsonImportData.sampleGames && jsonImportData.sampleGames.length > 0 && (
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Star className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold">
+                        {t("localRefresh.jsonSampleItems") || "Sample Items"}
+                      </span>
+                    </div>
+                    <div className="max-h-32 overflow-y-auto space-y-2">
+                      {jsonImportData.sampleGames.map((item, index) => (
+                        <div key={index} className="text-xs border-l-2 border-muted pl-2">
+                          <div className="font-mono text-primary">
+                            {jsonImportData.type === 'games' 
+                              ? item.game || item.title || `Item ${index + 1}`
+                              : item.title || item.name || `Item ${index + 1}`
+                            }
+                          </div>
+                          <div className="text-muted-foreground mt-1">
+                            {Object.keys(item).slice(0, 3).map(key => {
+                              const value = item[key];
+                              let displayValue = '';
+                              
+                              if (typeof value === 'string') {
+                                displayValue = value.length > 30 ? value.substring(0, 30) + '...' : value;
+                              } else if (typeof value === 'object' && value !== null) {
+                                if (key === 'uris' && Array.isArray(value)) {
+                                  // Special handling for URIs array - check this FIRST
+                                  displayValue = value.slice(0, 2).map(uri => 
+                                    typeof uri === 'string' ? uri.substring(0, 20) + '...' : 'Object'
+                                  ).join(', ') + (value.length > 2 ? '...' : '');
+                                } else if (Array.isArray(value)) {
+                                  displayValue = `Array[${value.length}]`;
+                                } else {
+                                  displayValue = `Object{${Object.keys(value).length}}`;
+                                }
+                              } else {
+                                displayValue = String(value);
+                              }
+                              
+                              return (
+                                <span key={key} className="mr-2">
+                                  {key}: {displayValue}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+                  <div className="flex items-start gap-2">
+                    <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <div>
+                      <p className="font-medium">
+                        {t("localRefresh.jsonDynamicAdapt") || "Dynamic Adaptation"}
+                      </p>
+                      <p className="mt-1 leading-relaxed">
+                        {t("localRefresh.jsonDynamicAdaptDesc") || "Ascendara will automatically adapt to your JSON structure without requiring format conversion. The detected keys and structure will be preserved."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-primary"
+                onClick={() => setShowJsonConfirmDialog(false)}
+              >
+                {t("common.cancel") || "Cancel"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmJsonImport}
+                disabled={!jsonListName.trim()}
+                className="bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {t("localRefresh.importJson") || "Import JSON Data"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

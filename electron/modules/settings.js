@@ -84,6 +84,12 @@ class SettingsManager {
       },
       promptPurchaseAfter3Hours: true,
       openOnStartup: false,
+      // Custom Sources Mode (Hydra Library) + user-imported custom lists
+      customSourcesMode: false,
+      customSource: null,
+      customSourcesLibrary: [],
+      customLists: [],
+      activeCustomList: null,
     };
     this.initializeSettingsFile();
     this.settings = this.loadSettings();

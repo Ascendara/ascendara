@@ -195,15 +195,71 @@ async function fetchCustomSourceJson(url) {
   return res.json();
 }
 
-function readCustomSourceCache(url) {
+function readCustomSourceCache(url, { ignoreTtl = false } = {}) {
   try {
     const raw = localStorage.getItem(CUSTOM_SOURCE_CACHE_PREFIX + url);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.timestamp || !parsed?.games) return null;
-    if (Date.now() - parsed.timestamp > CUSTOM_SOURCE_CACHE_DURATION) return null;
+    if (!ignoreTtl && Date.now() - parsed.timestamp > CUSTOM_SOURCE_CACHE_DURATION) return null;
     return parsed;
   } catch {
+    return null;
+  }
+}
+
+// Derive a stable, filesystem-safe listId for a custom source URL so we can
+// store the user-provided JSON via the electron-backed custom-list storage
+// (see ipc-handlers.js set-custom-list-data). This lets imported / pasted
+// sources survive localStorage clears and lets the service skip the network
+// entirely when a saved JSON is available.
+function deriveCustomSourceListId(url) {
+  if (!url) return null;
+  if (String(url).startsWith("custom_list_")) return String(url);
+  return "custom_source_" + String(url).replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+async function persistUserProvidedJson(url, rawJson) {
+  try {
+    if (!url || !rawJson || typeof window === "undefined") return false;
+    const sourceId = deriveCustomSourceListId(url);
+    if (!sourceId) return false;
+    // Prefer the localIndex-based external-source store so the payload lives
+    // alongside the user's local game index (not in Documents/CustomLists).
+    if (window.electron?.setExternalSourceJson) {
+      const res = await window.electron.setExternalSourceJson(sourceId, rawJson);
+      if (res?.success) return true;
+    }
+    // Legacy fallback for builds without the new IPC.
+    if (window.electron?.setCustomListData) {
+      const res = await window.electron.setCustomListData(sourceId, rawJson);
+      return !!res?.success;
+    }
+    return false;
+  } catch (e) {
+    console.warn("[GameService] Failed to persist user-provided JSON:", e);
+    return false;
+  }
+}
+
+async function readUserProvidedJson(url) {
+  try {
+    if (!url || typeof window === "undefined") return null;
+    const sourceId = deriveCustomSourceListId(url);
+    if (!sourceId) return null;
+    // Try the new external-source store first, then fall back to the legacy
+    // custom-list store (for sources persisted before the storage move).
+    if (window.electron?.getExternalSourceJson) {
+      const data = await window.electron.getExternalSourceJson(sourceId);
+      if (data) return data;
+    }
+    if (window.electron?.getCustomListData) {
+      const data = await window.electron.getCustomListData(sourceId);
+      if (data) return data;
+    }
+    return null;
+  } catch (e) {
+    console.warn("[GameService] Failed to read user-provided JSON:", e);
     return null;
   }
 }
@@ -398,14 +454,30 @@ const gameService = {
    * Load & map a Hydra-compatible custom source.
    * Uses a 12h localStorage cache keyed by source URL; force=true bypasses the cache.
    */
-  async _loadCustomSourceData(customSource, { force = false } = {}) {
+  async _loadCustomSourceData(customSource, { force = false, refetch = false } = {}) {
     const url = customSource?.url;
     if (!url) throw new Error("Missing custom source URL");
     const label =
       customSource?.name || customSource?.title || customSource?.label || "Custom";
+    const userProvided = !!customSource?.userProvided || !!customSource?.isCustomList;
+
+    // Explicit refetch: always hit the network and, on success, overwrite the
+    // user-provided JSON on disk. Used by the "Sync now" button so a source
+    // the user originally had to paste in manually can eventually update
+    // itself automatically once the upstream is reachable again.
+    if (refetch) {
+      console.log("[GameService] Refetching custom source JSON:", url);
+      const raw = await fetchCustomSourceJson(url);
+      // Persist the fresh JSON so future loads skip the network (and so
+      // user-provided sources stay in sync after a successful resync).
+      await persistUserProvidedJson(url, raw);
+      return this._mapAndCacheHydraJson(raw, { url, label });
+    }
 
     if (!force) {
-      const cached = readCustomSourceCache(url);
+      // For user-provided sources we ignore the 12h TTL: the user's pasted
+      // JSON is the authoritative data, not a network snapshot.
+      const cached = readCustomSourceCache(url, { ignoreTtl: userProvided });
       if (cached) {
         console.log(
           "[GameService] Using cached custom source:",
@@ -417,8 +489,24 @@ const gameService = {
       }
     }
 
+    // User-provided JSON: read from electron-backed file storage first; never
+    // fall back to the network since these sources can't be re-fetched
+    // (e.g. the upstream requires a Cloudflare challenge or doesn't exist).
+    const savedJson = await readUserProvidedJson(url);
+    if (savedJson) {
+      console.log("[GameService] Using saved user-provided JSON:", label);
+      return this._mapAndCacheHydraJson(savedJson, { url, label });
+    }
+
+    if (userProvided) {
+      throw new Error(
+        "No saved JSON available for this user-provided source. Re-import the JSON to continue."
+      );
+    }
+
     console.log("[GameService] Fetching custom source JSON:", url);
     const raw = await fetchCustomSourceJson(url);
+    await persistUserProvidedJson(url, raw);
     return this._mapAndCacheHydraJson(raw, { url, label });
   },
 
@@ -514,6 +602,9 @@ const gameService = {
       url: customSource.url,
       label,
     });
+    // Persist the raw JSON to disk so it survives cache clears and future
+    // loads don't attempt a network fetch.
+    await persistUserProvidedJson(customSource.url, parsed);
     await this.updateCache(data, false, null, customSource.url);
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(CACHE_TIMESTAMP_KEY);
@@ -534,7 +625,10 @@ const gameService = {
     if (!customSource?.url) {
       throw new Error("No custom source is selected");
     }
-    const data = await this._loadCustomSourceData(customSource, { force: true });
+    const data = await this._loadCustomSourceData(customSource, {
+      force: true,
+      refetch: true,
+    });
     await this.updateCache(data, false, null, customSource.url);
     // Clear legacy caches so Search.jsx reloads fresh data
     localStorage.removeItem(CACHE_KEY);

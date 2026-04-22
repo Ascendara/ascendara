@@ -76,6 +76,7 @@ import {
   Gamepad2,
   Terminal,
   Wine,
+  ClipboardList,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
@@ -304,6 +305,8 @@ function Settings() {
   const [exclusionLoading, setExclusionLoading] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
+  const [indexRefreshProgress, setIndexRefreshProgress] = useState(null); // { progress, phase, processedPosts, totalPosts }
+  const [indexInfo, setIndexInfo] = useState(null); // { gameCount, date, size }
   const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
   const [controllerConnected, setControllerConnected] = useState(false);
   const [runners, setRunners] = useState([]);
@@ -406,7 +409,15 @@ function Settings() {
           // Check if refresh is currently running
           if (window.electron?.getLocalRefreshStatus) {
             const status = await window.electron.getLocalRefreshStatus(indexPath);
-            setIsIndexRefreshing(status.isRunning);
+            setIsIndexRefreshing(!!status.isRunning);
+            if (status.isRunning && status.progress) {
+              setIndexRefreshProgress({
+                progress: status.progress.progress,
+                phase: status.progress.phase,
+                processedPosts: status.progress.processedPosts,
+                totalPosts: status.progress.totalPosts,
+              });
+            }
             // Use lastSuccessfulTimestamp which persists across refresh attempts
             if (status.progress?.lastSuccessfulTimestamp) {
               setLastRefreshTime(
@@ -420,7 +431,16 @@ function Settings() {
               setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
             }
             // Check status from progress file
-            setIsIndexRefreshing(progress?.status === "running");
+            const running = progress?.status === "running";
+            setIsIndexRefreshing(running);
+            if (running) {
+              setIndexRefreshProgress({
+                progress: progress.progress,
+                phase: progress.phase,
+                processedPosts: progress.processedPosts,
+                totalPosts: progress.totalPosts,
+              });
+            }
           }
         }
       } catch (e) {
@@ -429,20 +449,44 @@ function Settings() {
     };
     loadRefreshStatus();
 
-    // Listen for refresh progress updates
+    // Listen for refresh progress updates using the same handlers as LocalRefresh
     if (window.electron?.onLocalRefreshProgress) {
-      const handleProgress = data => {
-        if (data.status === "running") {
-          setIsIndexRefreshing(true);
-        } else if (data.status === "completed" || data.status === "failed") {
+      const handleProgressUpdate = async data => {
+        // Any progress update while status is not terminal means a refresh is active
+        if (data.status === "completed" || data.status === "failed" || data.status === "error") {
           setIsIndexRefreshing(false);
-          // Use lastSuccessfulTimestamp which only updates on successful completion
-          if (data.lastSuccessfulTimestamp) {
+          setIndexRefreshProgress(null);
+          if (data.status === "completed" && data.lastSuccessfulTimestamp) {
             setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
           }
+          return;
+        }
+        setIsIndexRefreshing(true);
+        setIndexRefreshProgress(prev => ({
+          progress: data.progress ?? prev?.progress,
+          phase: data.phase ?? prev?.phase,
+          processedPosts: data.processedPosts ?? prev?.processedPosts,
+          totalPosts: data.totalPosts ?? prev?.totalPosts,
+        }));
+      };
+
+      const handleComplete = async data => {
+        setIsIndexRefreshing(false);
+        setIndexRefreshProgress(null);
+        if (data.code === 0 && data.lastSuccessfulTimestamp) {
+          setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
         }
       };
-      window.electron.onLocalRefreshProgress(handleProgress);
+
+      const handleError = () => {
+        setIsIndexRefreshing(false);
+        setIndexRefreshProgress(null);
+      };
+
+      // Subscribe to IPC events
+      window.electron.onLocalRefreshProgress(handleProgressUpdate);
+      window.electron.onLocalRefreshComplete(handleComplete);
+      window.electron.onLocalRefreshError(handleError);
 
       // Listen for public index download complete
       const handlePublicDownloadComplete = () => {
@@ -452,6 +496,8 @@ function Settings() {
 
       return () => {
         window.electron.offLocalRefreshProgress?.();
+        window.electron.offLocalRefreshComplete?.();
+        window.electron.offLocalRefreshError?.();
         window.electron.offPublicIndexDownloadComplete?.();
       };
     }
@@ -502,6 +548,26 @@ function Settings() {
       }
     };
     checkSubscription();
+  }, []);
+
+  // Fetch index info from API
+  useEffect(() => {
+    const fetchIndexInfo = async () => {
+      try {
+        const infoResponse = await fetch("https://api.ascendara.app/localindex/info");
+        const infoData = await infoResponse.json();
+        if (infoData.success) {
+          setIndexInfo({
+            gameCount: infoData.gameCount,
+            date: infoData.date,
+            size: infoData.size,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch index info:", error);
+      }
+    };
+    fetchIndexInfo();
   }, []);
 
   useEffect(() => {
@@ -1299,58 +1365,179 @@ function Settings() {
           {/* Left Column - Core Settings */}
           <div className="space-y-6 lg:col-span-8">
             {/* Local Game Index Card */}
-            <Card className="border-border p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-lg bg-primary/10 p-3">
-                    {isIndexRefreshing ? (
-                      <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
-                    ) : (
-                      <Database className="h-6 w-6 text-primary" />
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-semibold text-primary">
-                        {t("settings.yourLocalIndex") || "Local Game Index"}
-                      </h2>
-                      {isIndexRefreshing && (
-                        <Badge variant="secondary" className="mb-2.5 text-xs">
-                          {t("localRefresh.statusRunning") || "Refreshing..."}
-                        </Badge>
-                      )}
+            {(() => {
+              const customMode = !!settings?.customSourcesMode;
+              const activeList = settings?.activeCustomList || null;
+              const cs = settings?.customSource || null;
+              const isCustomList = customMode && (activeList || cs?.isCustomList);
+              const sourceName = isCustomList
+                ? activeList?.name || cs?.name || t("localRefresh.noSourceSelected") || "No source selected"
+                : customMode
+                  ? cs?.name || t("localRefresh.noSourceSelected") || "No source selected"
+                  : t("localRefresh.ascendaraIndex") || "Ascendara Index";
+              const gameCount = isCustomList
+                ? activeList?.itemCount ?? cs?.gameCount ?? null
+                : customMode
+                  ? cs?.gameCount ?? cs?.gamesCount ?? null
+                  : indexInfo?.gameCount ?? null;
+              const lastSyncedMs = isCustomList
+                ? activeList?.createdAt ?? cs?.lastSynced ?? null
+                : customMode
+                  ? cs?.lastSynced ?? null
+                  : lastRefreshTime
+                    ? lastRefreshTime.getTime()
+                    : indexInfo?.date
+                      ? new Date(indexInfo.date).getTime()
+                      : null;
+              const formatLastSync = (ms) => {
+                if (!ms) return t("localRefresh.never") || "Never";
+                const d = new Date(ms);
+                const diff = Date.now() - d.getTime();
+                if (diff < 60 * 1000) return t("localRefresh.justNow") || "Just now";
+                if (diff < 60 * 60 * 1000) {
+                  const m = Math.floor(diff / (60 * 1000));
+                  return `${m} ${t("localRefresh.minutesAgo") || "min ago"}`;
+                }
+                if (diff < 24 * 60 * 60 * 1000) {
+                  const h = Math.floor(diff / (60 * 60 * 1000));
+                  return `${h} ${t("localRefresh.hoursAgo") || "h ago"}`;
+                }
+                return d.toLocaleDateString();
+              };
+              return (
+                <Card className="border-border p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-lg bg-primary/10 p-3">
+                        {isIndexRefreshing ? (
+                          <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
+                        ) : isCustomList ? (
+                          <ClipboardList className="h-6 w-6 text-primary" />
+                        ) : customMode ? (
+                          <Globe className="h-6 w-6 text-primary" />
+                        ) : (
+                          <Database className="h-6 w-6 text-primary" />
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xl font-semibold text-primary">
+                            {t("settings.yourLocalIndex") || "Local Game Index"}
+                          </h2>
+                          {isIndexRefreshing && (
+                            <Badge variant="secondary" className="mb-2.5 text-xs">
+                              {t("localRefresh.statusRunning") || "Refreshing..."}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="max-w-[500px] text-sm text-muted-foreground">
+                          {t("settings.localIndexDescription")}
+                        </p>
+                        <div className="flex items-center gap-2 pt-1 text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            {sourceName}
+                          </span>
+                          <span className="text-muted-foreground/60">/</span>
+                          <span>
+                            {customMode
+                              ? t("localRefresh.lastSynced") || "Last synced"
+                              : t("localRefresh.lastRefresh") || "Last refresh"}
+                            : {formatLastSync(lastSyncedMs)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="max-w-[500px] text-sm text-muted-foreground">
-                      {t("settings.localIndexDescription")}
-                    </p>
-                    <div
-                      className={`flex items-center gap-2 pt-2 text-sm ${lastRefreshTime ? "text-muted-foreground" : "font-bold text-yellow-500"}`}
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="shrink-0 gap-2 text-secondary"
+                      onClick={() => navigate("/localrefresh")}
                     >
-                      {lastRefreshTime ? (
-                        <Clock className="h-4 w-4" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4" />
-                      )}
-                      <span>
-                        {t("settings.lastIndexRefresh") || "Last refresh"}:{" "}
-                        {lastRefreshTime
-                          ? lastRefreshTime.toLocaleDateString()
-                          : t("localRefresh.never") || "Never"}
-                      </span>
+                      {isIndexRefreshing
+                        ? t("localRefresh.viewProgress") || "View Progress"
+                        : t("settings.manageIndex2")}
+                    </Button>
+                  </div>
+
+                  {/* 3-stat strip: Games / Last synced / Source-specific */}
+                  <div className="mt-6 grid grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-border/50 p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("localRefresh.games") || "Games"}
+                      </div>
+                      <div className="mt-1 text-2xl font-bold leading-none">
+                        {isIndexRefreshing && indexRefreshProgress?.processedPosts != null
+                          ? `${Number(indexRefreshProgress.processedPosts).toLocaleString()}${
+                              indexRefreshProgress.totalPosts
+                                ? ` / ${Number(indexRefreshProgress.totalPosts).toLocaleString()}`
+                                : ""
+                            }`
+                          : gameCount != null
+                            ? gameCount.toLocaleString()
+                            : "—"}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-border/50 p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {customMode
+                          ? t("localRefresh.lastSynced") || "Last synced"
+                          : t("localRefresh.lastRefresh") || "Last refresh"}
+                      </div>
+                      <div className="mt-1 truncate text-sm font-semibold">
+                        {formatLastSync(lastSyncedMs)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-border/50 p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {isCustomList
+                          ? t("localRefresh.fileLocation") || "File"
+                          : t("localRefresh.status") || "Status"}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1 text-sm font-semibold">
+                        {isCustomList ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              window.electron?.showCustomListInFolder?.(
+                                activeList?.id || cs?.id
+                              )
+                            }
+                            className="inline-flex cursor-pointer items-center gap-1 text-primary hover:underline"
+                          >
+                            <FolderOpen className="h-3.5 w-3.5" />
+                            {t("localRefresh.showInFolder") || "Show in folder"}
+                          </button>
+                        ) : isIndexRefreshing ? (
+                          <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                            <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
+                            {indexRefreshProgress?.progress != null
+                              ? `${Math.min(Math.round(indexRefreshProgress.progress * 100), 100)}%`
+                              : (t("localRefresh.statusRunning") || "Refreshing...")}
+                          </span>
+                        ) : customMode ? (
+                          cs?.lastSynced ? (
+                            <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
+                              <CheckCircle className="h-3.5 w-3.5" />
+                              {t("localRefresh.statusCompleted") || "Synced"}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {t("localRefresh.statusIdle") || "Not synced"}
+                            </span>
+                          )
+                        ) : settings?.usingLocalIndex ? (
+                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
+                            <Zap className="h-3.5 w-3.5" />
+                            {t("localRefresh.usingLocalIndex") || "Active"}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {t("localRefresh.statusIdle") || "Idle"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="shrink-0 gap-2 text-secondary"
-                  onClick={() => navigate("/localrefresh")}
-                >
-                  {isIndexRefreshing
-                    ? t("localRefresh.viewProgress") || "View Progress"
-                    : t("settings.manageIndex2")}
-                </Button>
-              </div>
 
               {/* Index Reminder Setting */}
               <div
@@ -1398,6 +1585,8 @@ function Settings() {
                 </div>
               </div>
             </Card>
+              );
+            })()}
 
             {/* General Settings Card */}
             <Card className="border-border p-6">
@@ -3262,20 +3451,46 @@ function Settings() {
                         <Switch
                           checked={settings.torrentEnabled}
                           onCheckedChange={handleTorrentToggle}
-                          disabled={!isOnWindows}
+                          disabled={
+                            !isOnWindows ||
+                            (settings.customSourcesMode &&
+                              settings.customSource?.torrentOnly &&
+                              settings.torrentEnabled)
+                          }
                         />
                       </div>
                     </TooltipTrigger>
-                    {!isOnWindows && (
+                    {!isOnWindows ? (
                       <TooltipContent>
                         <p className="text-secondary">
                           {t("settings.onlyWindowsSupported")}
                         </p>
                       </TooltipContent>
-                    )}
+                    ) : settings.customSourcesMode &&
+                      settings.customSource?.torrentOnly &&
+                      settings.torrentEnabled ? (
+                      <TooltipContent>
+                        <p className="text-secondary">
+                          {t("settings.torrentRequiredBySource") ||
+                            "Your selected external source requires torrenting."}
+                        </p>
+                      </TooltipContent>
+                    ) : null}
                   </Tooltip>
                 </TooltipProvider>
               </div>
+              {settings.customSourcesMode &&
+                settings.customSource?.torrentOnly &&
+                settings.torrentEnabled && (
+                  <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
+                    {(t("settings.torrentLockedBySourceNote") ||
+                      "Torrenting can't be disabled while {{name}} is selected — it only publishes magnet links. Change the external source in Local Refresh first."
+                    ).replace(
+                      "{{name}}",
+                      settings.customSource?.name || "this external source"
+                    )}
+                  </div>
+                )}
 
               <div className="space-y-6">
                   {/* qBittorrent Status */}

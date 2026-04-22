@@ -998,16 +998,50 @@ const Search = memo(() => {
                               {apiMetadata.sourceName || apiMetadata.source}
                             </p>
                             {apiMetadata.customSource && apiMetadata.sourceUrl && (
-                              <p className="break-all text-xs text-muted-foreground/80">
-                                <a
-                                  onClick={() =>
-                                    window.electron?.openURL?.(apiMetadata.sourceUrl)
-                                  }
-                                  className="cursor-pointer hover:underline"
-                                >
-                                  {apiMetadata.sourceUrl}
-                                </a>
-                              </p>
+                              (() => {
+                                const isCustomList = String(apiMetadata.sourceUrl).startsWith("custom_list_");
+                                const listId = isCustomList ? apiMetadata.sourceUrl : null;
+                                if (isCustomList) {
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                                      <span className="rounded border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 font-medium text-blue-600 dark:text-blue-300">
+                                        {t("search.customList") || "Custom list"}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          window.electron?.showCustomListInFolder?.(listId)
+                                        }
+                                        className="cursor-pointer text-primary hover:underline"
+                                      >
+                                        {t("search.showInFolder") || "Show in folder"}
+                                      </button>
+                                      <span className="text-muted-foreground/60">/</span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          window.electron?.openCustomListFile?.(listId)
+                                        }
+                                        className="cursor-pointer text-primary hover:underline"
+                                      >
+                                        {t("search.openFile") || "Open file"}
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <p className="break-all text-xs text-muted-foreground/80">
+                                    <a
+                                      onClick={() =>
+                                        window.electron?.openURL?.(apiMetadata.sourceUrl)
+                                      }
+                                      className="cursor-pointer hover:underline"
+                                    >
+                                      {apiMetadata.sourceUrl}
+                                    </a>
+                                  </p>
+                                );
+                              })()
                             )}
                             <p>
                               {apiMetadata.customSource
