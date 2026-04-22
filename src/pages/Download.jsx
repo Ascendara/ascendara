@@ -306,6 +306,7 @@ export default function DownloadPage() {
   const [isDev, setIsDev] = useState(false);
   const [showNoDownloadPath, setShowNoDownloadPath] = useState(false);
   const [cachedImage, setCachedImage] = useState(null);
+  const [coverGridUrl, setCoverGridUrl] = useState(null);
   const [isValidLink, setIsValidLink] = useState(true);
   const [torrentRunning, setIsTorrentRunning] = useState(false);
   const [showCopySuccess, setShowCopySuccess] = useState(false);
@@ -1301,6 +1302,21 @@ export default function DownloadPage() {
         setCachedImage(steamGridImageService.pickUrl(assets, "hero"));
       }
     };
+    // Resolve a portrait SteamGridDB cover (600x900) for the detail-page cover
+    // slot. SGDB is the primary art source; Steam header_image is the fallback
+    // and is applied directly at render time if this comes back null.
+    const loadCoverGrid = async () => {
+      if (!gameData?.game) return;
+      try {
+        const full = await steamGridImageService.getFullAssets(gameData.game);
+        if (full?.grid) {
+          setCoverGridUrl(full.grid);
+        }
+      } catch (e) {
+        // Silent: Steam cover fallback renders automatically
+      }
+    };
+    loadCoverGrid();
     loadCachedImage();
     checkDownloadPath();
   }, [gameData, navigate]);
@@ -3164,16 +3180,32 @@ export default function DownloadPage() {
 
                     <div className="absolute bottom-0 left-0 right-0 flex items-end p-8">
                       <div className="relative z-10 flex w-full flex-col md:flex-row md:items-end">
-                        {/* Game Cover */}
-                        {steamData.cover && (
+                        {/* Game Cover - SteamGridDB portrait primary, Steam header fallback */}
+                        {(coverGridUrl || steamData.cover) && (
                           <div className="mb-4 h-[200px] w-[150px] shrink-0 overflow-hidden rounded-md border border-border shadow-lg md:mb-0 md:mr-6">
                             <img
-                              src={steamService.formatImageUrl(
-                                steamData.cover.url,
-                                "cover_big"
-                              )}
+                              src={
+                                coverGridUrl ||
+                                steamService.formatImageUrl(
+                                  steamData.cover.url,
+                                  "cover_big"
+                                )
+                              }
                               alt={steamData.name}
                               className="h-full w-full object-cover"
+                              onError={e => {
+                                // If SGDB URL fails at load time, swap to Steam cover
+                                if (
+                                  coverGridUrl &&
+                                  steamData.cover &&
+                                  e.currentTarget.src !== steamData.cover.url
+                                ) {
+                                  e.currentTarget.src = steamService.formatImageUrl(
+                                    steamData.cover.url,
+                                    "cover_big"
+                                  );
+                                }
+                              }}
                             />
                           </div>
                         )}
