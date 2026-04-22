@@ -1270,8 +1270,17 @@ const AppRoutes = () => {
               setShowChangelog(true);
             }
 
+            // Use testing version for non-live branches
+            let versionToShow = __APP_VERSION__;
+            if (branch !== "live") {
+              const testingVer = await window.electron.getTestingVersion();
+              if (testingVer) {
+                versionToShow = testingVer;
+              }
+            }
+
             toast(t("app.toasts.justUpdated"), {
-              description: t("app.toasts.justUpdatedDesc", { version: __APP_VERSION__ }),
+              description: t("app.toasts.justUpdatedDesc", { version: versionToShow }),
               duration: 10000,
               id: "update-completed",
             });
