@@ -331,41 +331,31 @@ function registerDownloadHandlers() {
             }
           }
 
-          if (!headerImagePath && imageKey) {
-            const imageLink =
-              settings.gameSource === "fitgirl"
-                ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
-                : `https://api.ascendara.app/v2/image/${imgID}`;
-
-            const timestamp = Math.floor(Date.now() / 1000);
-            const signature = crypto
-              .createHmac("sha256", imageKey)
-              .update(timestamp.toString())
-              .digest("hex");
-
+          // Try SteamGridDB fallback if no local image found
+          if (!headerImagePath) {
             try {
-              const response = await axios({
-                url: imageLink,
-                method: "GET",
-                responseType: "arraybuffer",
-                headers: {
-                  "X-Timestamp": timestamp.toString(),
-                  "X-Signature": signature,
-                  "Cache-Control": "no-store",
-                },
-              });
-
-              imageBuffer = Buffer.from(response.data);
-              const mimeType = response.headers["content-type"];
-              const extension = getExtensionFromMimeType(mimeType);
-              headerImagePath = path.join(gameDirectory, `header.ascendara${extension}`);
-              await fs.promises.writeFile(headerImagePath, imageBuffer);
-            } catch (imgError) {
-              console.error(`Failed to download header image: ${imgError.message}`);
-              // Continue without header image
+              console.log(`No local header image found, trying SteamGridDB fallback for: ${game}`);
+              const steamGridHeader = await steamgrid.fetchGameHeader(game);
+              if (steamGridHeader && steamGridHeader.url) {
+                const response = await axios({
+                  url: steamGridHeader.url,
+                  method: "GET",
+                  responseType: "arraybuffer",
+                  timeout: 10000,
+                });
+                
+                imageBuffer = Buffer.from(response.data);
+                const mimeType = response.headers["content-type"];
+                const extension = getExtensionFromMimeType(mimeType);
+                headerImagePath = path.join(gameDirectory, `header.ascendara${extension}`);
+                await fs.promises.writeFile(headerImagePath, imageBuffer);
+                console.log(`SteamGridDB header image downloaded and saved: ${headerImagePath}`);
+              } else {
+                console.log(`No SteamGridDB header image found for: ${game}`);
+              }
+            } catch (steamGridError) {
+              console.warn(`SteamGridDB fallback failed for ${game}:`, steamGridError.message);
             }
-          } else if (!headerImagePath) {
-            console.log(`Skipping header image download: imageKey not available`);
           }
         } else {
           console.log(`No imgID provided, skipping header image download`);

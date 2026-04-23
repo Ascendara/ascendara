@@ -2980,30 +2980,24 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
         return;
       }
 
-      // Fallback to API if no cached image
-      if (game.imgID) {
+      // Try SteamGridDB fallback if no cached image exists
+      if (game.game && !game.imgID) {
         try {
-          const response = await fetch(
-            `https://api.ascendara.app/v2/image/${game.imgID}`
-          );
-          if (response.ok && isMounted) {
-            const blob = await response.blob();
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              if (isMounted) {
-                setImageData(reader.result);
-                // Cache for future use
-                try {
-                  localStorage.setItem(`play-later-image-${game.game}`, reader.result);
-                } catch (e) {
-                  console.warn("Could not cache play later image:", e);
-                }
-              }
-            };
-            reader.readAsDataURL(blob);
+          const steamGridImageService = await import("@/services/steamGridImageService");
+          const assets = await steamGridImageService.default.getAssets(game.game);
+          const imageUrl = steamGridImageService.default.pickUrl(assets, "card");
+          if (imageUrl && isMounted) {
+            setImageData(imageUrl);
+            // Cache the SteamGridDB image URL for future use
+            try {
+              localStorage.setItem(`play-later-image-${game.game}`, imageUrl);
+            } catch (e) {
+              console.warn("Could not cache SteamGridDB play later image:", e);
+            }
+            return;
           }
         } catch (error) {
-          console.error("Error loading play later game image:", error);
+          console.warn("SteamGridDB fallback failed for play later image:", error);
         }
       }
     };

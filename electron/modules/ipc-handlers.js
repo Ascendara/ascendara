@@ -937,30 +937,43 @@ function registerMiscHandlers() {
       let extension = ".jpg";
 
       if (imgID) {
-        if (settings.usingLocalIndex && settings.localIndex) {
-          const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
-          try {
-            imageBuffer = await fs.promises.readFile(localImagePath);
-          } catch (error) {
-            console.warn(`Could not load local image for ${imgID}:`, error);
+        // App only uses local index now
+      if (!settings.usingLocalIndex || !settings.localIndex) {
+        console.warn(`Cannot update game cover: local index is not enabled`);
+        return false;
+      }
+      
+      const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+      try {
+        imageBuffer = await fs.promises.readFile(localImagePath);
+      } catch (error) {
+        console.warn(`Could not load local image for ${imgID}:`, error);
+        
+        // Try SteamGridDB fallback
+        try {
+          console.log(`Trying SteamGridDB fallback for game cover: ${game}`);
+          const steamGridHeader = await steamgrid.fetchGameHeader(game);
+          if (steamGridHeader && steamGridHeader.url) {
+            const response = await axios({
+              url: steamGridHeader.url,
+              method: "GET",
+              responseType: "arraybuffer",
+              timeout: 10000,
+            });
+            
+            imageBuffer = Buffer.from(response.data);
+            const mimeType = response.headers["content-type"];
+            extension = getExtensionFromMimeType(mimeType);
+            console.log(`SteamGridDB game cover downloaded for: ${game}`);
+          } else {
+            console.log(`No SteamGridDB game cover found for: ${game}`);
             return false;
           }
-        } else {
-          const imageLink =
-            settings.gameSource === "fitgirl"
-              ? `https://api.ascendara.app/v2/fitgirl/image/${imgID}`
-              : `https://api.ascendara.app/v2/image/${imgID}`;
-
-          const response = await axios({
-            url: imageLink,
-            method: "GET",
-            responseType: "arraybuffer",
-          });
-
-          imageBuffer = Buffer.from(response.data);
-          const mimeType = response.headers["content-type"];
-          extension = getExtensionFromMimeType(mimeType);
+        } catch (steamGridError) {
+          console.warn(`SteamGridDB fallback failed for ${game}:`, steamGridError.message);
+          return false;
         }
+      }
       } else if (imageData) {
         const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
         imageBuffer = Buffer.from(base64Data, "base64");
