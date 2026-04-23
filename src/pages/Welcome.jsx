@@ -28,6 +28,9 @@ import {
   AlertTriangle,
   Sparkles,
   BellRing,
+  Gift,
+  Crown,
+  Star,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -1343,7 +1346,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 className="mb-12 max-w-4xl text-xl text-foreground/80"
                 variants={itemVariants}
               >
-                {t("welcome.welcomeToAscendaraDescription")}
+                {t("welcome.welcomeToAscendaraDescription2")}
               </motion.p>
 
               <motion.div className="mb-12 max-w-xl space-y-6" variants={itemVariants}>
@@ -1531,26 +1534,54 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 </p>
               </motion.div>
 
-              <motion.div
-                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6"
+              <motion.div 
+                className="mb-12 max-w-2xl w-full"
                 variants={itemVariants}
               >
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                  <p className="text-md">{t("welcome.noticeAppIsFree.point1")}</p>
+                <div className="rounded-lg bg-card/30 p-6 space-y-4">
+                  <div className="flex items-start space-x-3 text-left">
+                    <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                    <p className="text-md">{t("welcome.noticeAppIsFree.point1")}</p>
+                  </div>
+                  <div className="flex items-start space-x-3 text-left">
+                    <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                    <p>{t("welcome.noticeAppIsFree.point2")}</p>
+                  </div>
+                  <div className="flex items-start space-x-3 text-left">
+                    <Crown className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                    <p>{t("welcome.noticeAppIsFree.point3")}</p>
+                  </div>
+                  <div className="flex items-start space-x-3 text-left">
+                    <Shield className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                    <p className="text-md">{t("welcome.noticeAppIsFree.point4")}</p>
+                  </div>
                 </div>
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                  <p>{t("welcome.noticeAppIsFree.point2")}</p>
-                </div>
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                  <p>{t("welcome.noticeAppIsFree.point3")}</p>
-                </div>
-                <div className="flex items-start space-x-3 text-left">
-                  <Shield className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                  <p className="text-md">{t("welcome.noticeAppIsFree.point4")}</p>
-                </div>
+
+                <motion.div 
+                  className="mt-6 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 p-6"
+                  variants={itemVariants}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-left">
+                      <h4 className="text-lg font-semibold text-purple-500 mb-2">
+                        {t("welcome.noticeAppIsFree.ascendTitle")}
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {t("welcome.noticeAppIsFree.ascendDescription")}
+                      </p>
+                      <a 
+                        href="https://ascendara.app/ascend" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center space-x-2 text-purple-500 hover:text-purple-400 transition-colors"
+                      >
+                        <span className="text-sm font-medium">{t("welcome.noticeAppIsFree.learnMore")}</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                    <Crown className="h-8 w-8 text-purple-500/50" />
+                  </div>
+                </motion.div>
               </motion.div>
 
               <motion.div variants={itemVariants}>
