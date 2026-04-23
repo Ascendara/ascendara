@@ -260,26 +260,12 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
         logging.error(f"[Wine] Failed to launch: {e}", exc_info=True)
         return None
 
-def get_python_executable():
-    python_path = shutil.which("python3")
-    
-    if not python_path:
-        # Fallback
-        python_path = shutil.which("python")
-        
-    if not python_path:
-        logging.error("[UMU] No Python interpreter was found on the system.")
-        return None
-        
-    return python_path
-
 def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     """
     Launch a Windows executable using umu-run.
     Equivalent to: GAMEID=umu-xxxx PROTONPATH=/path/to/proton WINEPREFIX=/path umu-run game.exe
     """
     umu_bin = linux_config["runner_path"]  # absolute path to umu-run
-    python_bin = get_python_executable()
 
     if not os.path.exists(umu_bin):
         logging.error(f"[UMU] umu-run not found at: {umu_bin}")
@@ -291,10 +277,6 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     os.makedirs(prefix_path, exist_ok=True)
 
     env = os.environ.copy()
-    # clean env
-    for var in ["PYTHONPATH", "PYTHONHOME", "LD_LIBRARY_PATH"]:
-        env.pop(var, None)
-
     env["GAMEID"] = linux_config.get("umu_id") or "umu-default"
     env["WINEPREFIX"] = prefix_path
     env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
@@ -306,7 +288,7 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     if linux_config.get("steam_path"):
         env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = linux_config["steam_path"]
 
-    cmd = [python_bin, umu_bin, exe_path]
+    cmd = [umu_bin, exe_path]
     if game_launch_cmd:
         cmd.extend(game_launch_cmd.split())
 
@@ -315,7 +297,6 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     logging.info(f"[UMU] Command: {' '.join(cmd)}")
     logging.info(f"[UMU] GAMEID={env['GAMEID']}, WINEPREFIX={prefix_path}")
     logging.info(f"[UMU] PROTONPATH={env.get('PROTONPATH', '(auto)')}")
-    logging.info(f"[UMU] Using Python: {python_bin}")
 
     try:
         process = subprocess.Popen(
