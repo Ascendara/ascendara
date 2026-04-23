@@ -169,7 +169,7 @@ def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
 
     os.chmod(proton_script, 0o755)
 
-    env = os.environ.copy()
+    env = _clean_pyinstaller_env(os.environ.copy())
     env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
 
     if linux_config.get("steam_path"):
@@ -223,7 +223,7 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
     prefix_path = os.path.join(linux_config["compat_data"], "pfx")
     os.makedirs(prefix_path, exist_ok=True)
 
-    env = os.environ.copy()
+    env = _clean_pyinstaller_env(os.environ.copy())
     env["WINEPREFIX"] = prefix_path
     env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
 
@@ -260,6 +260,16 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
         logging.error(f"[Wine] Failed to launch: {e}", exc_info=True)
         return None
 
+def _clean_pyinstaller_env(env):
+    for var in ('LD_LIBRARY_PATH', 'LD_PRELOAD', 'PYTHONPATH', 'PYTHONHOME'):
+        orig = env.get(var + '_ORIG')
+        if orig is not None:
+            env[var] = orig
+            del env[var + '_ORIG']
+        else:
+            env.pop(var, None)
+    return env
+
 def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     """
     Launch a Windows executable using umu-run.
@@ -276,7 +286,7 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     prefix_path = linux_config["compat_data"]
     os.makedirs(prefix_path, exist_ok=True)
 
-    env = os.environ.copy()
+    env = _clean_pyinstaller_env(os.environ.copy())
     env["GAMEID"] = linux_config.get("umu_id") or "umu-default"
     env["WINEPREFIX"] = prefix_path
     env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
