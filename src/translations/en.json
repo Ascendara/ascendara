@@ -1978,7 +1978,7 @@
     "lastUsed": "Last used",
     "locationChangeFailed": "Failed to change location",
     "locationChanged": "Storage location updated",
-    "manualPasteDesc": "The source is protected by a browser challenge (Cloudflare) that Ascendara can't solve on its own. We've opened the source URL in your browser — once the page loads the JSON, copy the entire text and paste it below.",
+    "manualPasteDesc": "The JSON link is protected by a browser challenge that Ascendara can't solve on its own. Once the page loads the JSON, copy the entire text and paste it below.",
     "manualPastePlaceholder": "Paste the full JSON here (should start with { \"name\": ... \"downloads\": [...] })",
     "manualPasteTitle": "Couldn't fetch source automatically",
     "manualScrape": "Manual Scrape",
