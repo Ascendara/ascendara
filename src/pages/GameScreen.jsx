@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
+import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/context/SettingsContext";
@@ -4156,8 +4157,8 @@ export default function GameScreen() {
                   return;
                 }
 
-                // Try seamless providers: gofile first, then buzzheavier, then pixeldrain
-                const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
+                // Try seamless providers in priority order from central config
+                const seamlessProviders = SEAMLESS_PROVIDERS;
                 const downloadLinks = updateInfo?.downloadLinks || {};
 
                 let downloadUrl = null;

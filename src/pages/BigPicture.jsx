@@ -99,6 +99,7 @@ import {
 import LaunchOverlay from "@/components/LaunchOverlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
+import { SEAMLESS_PROVIDERS } from "@/config/providers";
 
 // UTILS
 const formatBytes = (bytes, decimals = 2) => {
@@ -327,10 +328,9 @@ const checkSeamlessAvailable = game => {
   if (!game || !game.download_links) return false;
   const links = game.download_links;
   if (typeof links !== "object" || links === null) return false;
-  const compatibleHosts = ["gofile", "buzzheavier", "pixeldrain"];
   try {
     const hosts = Object.keys(links);
-    return hosts.some(host => compatibleHosts.includes(host.toLowerCase()));
+    return hosts.some(host => SEAMLESS_PROVIDERS.includes(host.toLowerCase()));
   } catch (e) {
     return false;
   }
@@ -1771,7 +1771,7 @@ const GameDetailsView = ({
 
   // Provider selection for seamless downloads
   const [selectedProviderIndex, setSelectedProviderIndex] = useState(0);
-  const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
+  const seamlessProviders = SEAMLESS_PROVIDERS;
   const availableProviders = isSeamless
     ? seamlessProviders.filter(provider => game.download_links?.[provider])
     : [];
@@ -5828,7 +5828,7 @@ export default function BigPicture() {
     preferredProvider = null,
     forceStart = false
   ) => {
-    const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
+    const seamlessProviders = SEAMLESS_PROVIDERS;
     const links = game.download_links;
 
     // Determine torbox providers based on prioritizeTorboxOverSeamless setting

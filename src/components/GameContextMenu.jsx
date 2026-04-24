@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Download, Info, Clock, Check, Zap, TriangleAlert, MessageSquareText } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import ReportIssue from "./ReportIssue";
+import { SEAMLESS_PROVIDERS } from "@/config/providers";
 
 const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMore, onPlayLater, isPlayLater, onStartDownload }) => {
   const { t } = useLanguage();
@@ -35,9 +36,8 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
   // Check if game has seamless download options
   const hasSeamlessOption = useMemo(() => {
     if (!game?.download_links) return false;
-    const seamlessHosts = ["gofile", "buzzheavier", "pixeldrain"];
     const availableHosts = Object.keys(game.download_links);
-    return availableHosts.some(host => seamlessHosts.includes(host));
+    return availableHosts.some(host => SEAMLESS_PROVIDERS.includes(host));
   }, [game?.download_links]);
 
   if (!isOpen || !game) return null;

@@ -88,6 +88,11 @@ import nexusModsService from "@/services/nexusModsService";
 import flingTrainerService from "@/services/flingTrainerService";
 import verifiedGamesService from "@/services/verifiedGamesService";
 import gameService from "@/services/gameService";
+import {
+  SEAMLESS_PROVIDERS,
+  VERIFIED_PROVIDERS as CENTRAL_VERIFIED_PROVIDERS,
+  TORBOX_PROVIDER_DISPLAY_NAMES,
+} from "@/config/providers";
 
 // Async validation using API patterns
 const isValidURL = async (url, provider, patterns) => {
@@ -114,14 +119,7 @@ const checkTorboxStatus = async provider => {
     }
     const data = await response.json();
     
-    const providerMap = {
-      "1fichier": "1Fichier",
-      "megadb": "MegaDB",
-      "gofile": "GoFile",
-      "buzzheavier": "Buzzheavier",
-    };
-    
-    const torboxName = providerMap[provider.toLowerCase()];
+    const torboxName = TORBOX_PROVIDER_DISPLAY_NAMES[provider.toLowerCase()];
     if (!torboxName) {
       console.log(`No TorBox mapping for provider: ${provider}`);
       return null;
@@ -479,9 +477,8 @@ export default function DownloadPage() {
   useEffect(() => {
     const startSeamlessDownload = async () => {
       if (state?.autoStart && gameData?.download_links && !isStartingDownload && !autoStartProcessed.current) {
-        const seamlessHosts = ["gofile", "buzzheavier", "pixeldrain"];
         const availableHosts = Object.keys(gameData.download_links);
-        const seamlessHost = availableHosts.find(host => seamlessHosts.includes(host));
+        const seamlessHost = availableHosts.find(host => SEAMLESS_PROVIDERS.includes(host));
         
         if (seamlessHost) {
           console.log("[AutoStart] Starting download with seamless host:", seamlessHost);
@@ -553,8 +550,8 @@ export default function DownloadPage() {
   const steamSectionRef = useRef(null);
   const mainContentRef = useRef(null);
   const scrollThreshold = 220;
-  const seamlessProviders = ["gofile", "buzzheavier", "pixeldrain"];
-  const VERIFIED_PROVIDERS = ["megadb", "gofile", "buzzheavier", "pixeldrain"];
+  const seamlessProviders = SEAMLESS_PROVIDERS;
+  const VERIFIED_PROVIDERS = CENTRAL_VERIFIED_PROVIDERS;
 
   async function whereToDownload(directUrl = null) {
     console.log("[DL] whereToDownload called, directUrl:", directUrl);
