@@ -346,7 +346,7 @@ class GOGGamesScraper(BaseScraper):
                 download_links.setdefault('gofile', []).append(href)
             elif 'pixeldrain.com' in href:
                 download_links.setdefault('pixeldrain', []).append(href)
-            elif 'buzzheavier.com' in href:
+            elif 'bzzhr.to' in href:
                 download_links.setdefault('buzzheavier', []).append(href)
             elif '1fichier.com' in href:
                 download_links.setdefault('1fichier', []).append(href)

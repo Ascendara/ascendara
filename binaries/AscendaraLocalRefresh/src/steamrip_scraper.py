@@ -453,7 +453,7 @@ class SteamRIPScraper(BaseScraper):
                 download_links.setdefault("megadb", []).append(href)
             elif "pixeldrain.com" in href:
                 download_links.setdefault("pixeldrain", []).append(href)
-            elif "buzzheavier.com" in href:
+            elif "bzzhr.to" in href:
                 download_links.setdefault("buzzheavier", []).append(href)
             elif "vikingfile.com" in href:
                 download_links.setdefault("vikingfile", []).append(href)

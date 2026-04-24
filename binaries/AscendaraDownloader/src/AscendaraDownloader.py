@@ -598,6 +598,7 @@ class RobustDownloader:
     VALID_BUZZHEAVIER_DOMAINS = [
         'buzzheavier.com',
         'bzzhr.co',
+        'bzzhr.to',
         'fuckingfast.net',
         'fuckingfast.co'
     ]
