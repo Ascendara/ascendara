@@ -71,6 +71,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import gameService from "@/services/gameService";
+import { safeSetItem } from "@/services/gameInfoCacheService";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import steamService from "@/services/gameInfoService";
@@ -190,7 +191,7 @@ const Library = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem("game-favorites", JSON.stringify(favorites));
+    safeSetItem("game-favorites", JSON.stringify(favorites));
   }, [favorites]);
 
   useLibrarySearch();
@@ -293,7 +294,7 @@ const Library = () => {
 
   // Save sortOrder to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("library-sortOrder", sortOrder);
+    safeSetItem("library-sortOrder", sortOrder);
   }, [sortOrder]);
 
   // Pagination logic
@@ -456,7 +457,7 @@ const Library = () => {
   // Handle removing a game from Play Later list
   const handleRemoveFromPlayLater = gameName => {
     const updatedList = playLaterGames.filter(g => g.game !== gameName);
-    localStorage.setItem("play-later-games", JSON.stringify(updatedList));
+    safeSetItem("play-later-games", JSON.stringify(updatedList));
     localStorage.removeItem(`play-later-image-${gameName}`);
     setPlayLaterGames(updatedList);
   };
@@ -663,7 +664,7 @@ const Library = () => {
         favorite: cloudGame.favorite,
         isCustom: true,
       };
-      localStorage.setItem(
+      safeSetItem(
         `cloud-restore-${cloudGame.name}`,
         JSON.stringify(cloudRestoreData)
       );
@@ -697,7 +698,7 @@ const Library = () => {
         lastPlayed: cloudGame.lastPlayed,
         favorite: cloudGame.favorite,
       };
-      localStorage.setItem(
+      safeSetItem(
         `cloud-restore-${cloudGame.name}`,
         JSON.stringify(cloudRestoreData)
       );
@@ -998,8 +999,8 @@ const Library = () => {
       if (allGameTitles.length === 0) {
         const emptyResult = { totalValue: 0, games: [], notFound: [] };
         setLibraryValueData(emptyResult);
-        localStorage.setItem("library-value-cache", JSON.stringify(emptyResult));
-        localStorage.setItem("library-value-game-count", "0");
+        safeSetItem("library-value-cache", JSON.stringify(emptyResult));
+        safeSetItem("library-value-game-count", "0");
         setCachedGameCount(0);
         setIsCalculatingValue(false);
         return;
@@ -1016,8 +1017,8 @@ const Library = () => {
 
       // Cache the result
       setLibraryValueData(result);
-      localStorage.setItem("library-value-cache", JSON.stringify(result));
-      localStorage.setItem("library-value-game-count", String(allGameTitles.length));
+      safeSetItem("library-value-cache", JSON.stringify(result));
+      safeSetItem("library-value-game-count", String(allGameTitles.length));
       setCachedGameCount(allGameTitles.length);
     } catch (error) {
       console.error("Error calculating library value:", error);
