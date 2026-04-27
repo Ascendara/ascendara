@@ -1100,6 +1100,7 @@
         "title": "Start download with Torbox"
       },
       "torrentInstructions": {
+        "title": "Torrent Download",
         "description": "Click the button below to download the torrent file. Make sure you have a torrent client installed and a VPN enabled for safe downloading.",
         "noTorrent": "qBittorrent WebUI cannot be accessed. Check settings for more information."
       },
@@ -1241,6 +1242,7 @@
       "noGameData": "No game data was passed down",
       "processingLink": "Processing download link...",
       "reportFailed": "Failed to submit report",
+      "torrentDisabled": "Enable torrenting in Settings to download this game.",
       "reportSubmitted": "Report submitted successfully",
       "torboxOffline": "This provider is offline on Torbox at the moment. Try another provider.",
       "torboxProcessingError": "Error processing Torbox link",
