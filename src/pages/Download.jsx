@@ -1754,10 +1754,22 @@ export default function DownloadPage() {
 
   const providers = hasProviders
     ? Object.entries(downloadLinks)
-        .filter(([_, links]) => {
+        .filter(([provider, links]) => {
           if (!Array.isArray(links)) return false;
           if (links.length === 0) return false;
-          return links.some(link => typeof link === "string" && link.length > 0);
+          const hasValidLink = links.some(
+            link => typeof link === "string" && link.length > 0
+          );
+          if (!hasValidLink) return false;
+          if (provider === "torrent") {
+            const hasMagnet = links.some(
+              link =>
+                typeof link === "string" &&
+                link.trim().toLowerCase().startsWith("magnet:")
+            );
+            return hasMagnet && !!settings.torrentEnabled;
+          }
+          return true;
         })
         .map(([provider]) => provider)
     : [];
@@ -1772,25 +1784,36 @@ export default function DownloadPage() {
       const availableProviders = Object.keys(gameData.download_links).filter(
         provider => gameData.download_links[provider]?.length > 0
       );
+      const ddlProviders = availableProviders.filter(p => p !== "torrent");
 
-      if (availableProviders.includes("gofile")) {
+      if (ddlProviders.includes("gofile")) {
         setSelectedProvider("gofile");
       } else if (
         torboxService.isEnabled(settings) &&
-        availableProviders.includes("1fichier")
+        ddlProviders.includes("1fichier")
       ) {
         setSelectedProvider("1fichier");
-      } else if (availableProviders.includes("buzzheavier")) {
+      } else if (ddlProviders.includes("buzzheavier")) {
         setSelectedProvider("buzzheavier");
-      } else if (availableProviders.length > 0) {
-        setSelectedProvider(availableProviders[0]);
+      } else if (ddlProviders.length > 0) {
+        setSelectedProvider(ddlProviders[0]);
+      } else if (
+        availableProviders.includes("torrent") &&
+        settings.torrentEnabled
+      ) {
+        setSelectedProvider("torrent");
       } else {
         setSelectedProvider("");
       }
     } else {
       setSelectedProvider("");
     }
-  }, [gameData, settings.prioritizeTorboxOverSeamless, settings.torboxApiKey]);
+  }, [
+    gameData,
+    settings.prioritizeTorboxOverSeamless,
+    settings.torboxApiKey,
+    settings.torrentEnabled,
+  ]);
 
   if (gameData && gameData.game) {
     gameData.game = sanitizeGameName(gameData.game);

@@ -371,13 +371,10 @@ function registerDownloadHandlers() {
           .catch(err => console.error(`[Download] Assets download failed:`, err));
         let executablePath;
         let spawnCommand;
-
-        // A magnet/torrent link always needs the torrent handler, regardless
-        // of which gameSource the user is on. Custom (external) sources may
-        // deliver magnet URIs for any game.
-        const isMagnetLink =
-          typeof link === "string" && link.trim().toLowerCase().startsWith("magnet:");
-        const isTorrentLink = settings.gameSource === "fitgirl" || isMagnetLink;
+        const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
+        const isMagnetLink = linkStr.startsWith("magnet:");
+        const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
+        const isTorrentLink = isMagnetLink || isDotTorrentFile;
 
         if (isWindows) {
           executablePath = isDev
