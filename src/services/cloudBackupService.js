@@ -20,7 +20,15 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
   try {
 
     // 1. Get latest LOCAL backup
-    const gameBackupFolder = `${backupLocation}/${gameName}`;
+    const listResult = await window.electron.ludusavi("list-backups", gameName);
+    const gamesData = listResult?.data?.games;
+    const resolvedKey = gamesData && Object.keys(gamesData).find(k =>
+      k === gameName || k.toLowerCase().startsWith(gameName.toLowerCase())
+    );
+    const gameBackupFolder = resolvedKey
+      ? gamesData[resolvedKey].backupPath
+      : `${backupLocation}/${gameName}`;
+
     const backupFiles = await window.electron.listBackupFiles(gameBackupFolder);
 
     if (!backupFiles || backupFiles.length === 0) {

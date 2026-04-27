@@ -697,13 +697,19 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       const data = result.data;
       let gameBackups = [];
 
-      if (data?.games?.[gameName]?.backups) {
-        gameBackups = data.games[gameName].backups.map(backup => ({
+      const resolvedKey = data?.games
+        ? Object.keys(data.games).find(k =>
+            k === gameName || k.toLowerCase().startsWith(gameName.toLowerCase())
+          )
+        : null;
+
+      if (resolvedKey && data.games[resolvedKey].backups) {
+        gameBackups = data.games[resolvedKey].backups.map(backup => ({
           name: backup.name,
           timestamp: backup.when,
           os: backup.os,
           locked: backup.locked,
-          path: data.games[gameName].backupPath,
+          path: data.games[resolvedKey].backupPath,
           isLocal: true,
         }));
 
