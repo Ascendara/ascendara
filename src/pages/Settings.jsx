@@ -1242,6 +1242,19 @@ function Settings() {
     }
   }, [location.state, isLoading, navigate, location.pathname]);
 
+  // On linux, verify that ludusavi is installed
+  useEffect(() => {
+    if (!isOnLinux || !settings?.ludusavi?.enabled) return;
+    (async () => {
+      const tools = await window.electron.getInstalledTools();
+      if (!tools.includes("ludusavi")) {
+        // Fix if binary missing but toggle activated
+        handleSettingChange("enabled", false, true);
+        console.log("[Ludusavi] Binary not found on Linux, disabling in settings");
+      }
+    })();
+  }, [isOnLinux]);
+
   // Show loading state
   if (isLoading) {
     return (
@@ -2586,7 +2599,7 @@ function Settings() {
                     )}
                     <div className="mt-4 flex items-center justify-between">
                       <div
-                        className={`space-y-2 ${!isOnWindows || !settings.ludusavi.backupLocation ? "pointer-events-none opacity-50" : ""}`}
+                        className={`space-y-2 ${!settings.ludusavi.backupLocation ? "pointer-events-none opacity-50" : ""}`}
                       >
                         <Label>{t("settings.gameBackup.title")}</Label>
                         <p className="max-w-[70%] text-sm text-muted-foreground">
