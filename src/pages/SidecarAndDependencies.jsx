@@ -339,11 +339,14 @@ const SidecarAndDependencies = () => {
               notOnWindows: !isOnWindows,
             };
           }
+          // List of supported tools on Linux
+          const linuxSupported = ["ludusavi", "watchdog", "downloader", "localrefresh",
+                                  "gofilehelper", "crashreporter", "notification", "gamehandler"];
           return {
             ...sc,
             installed: installed.includes(sc.id),
             running: false,
-            notOnWindows: !isOnWindows,
+            notOnWindows: !isOnWindows && !linuxSupported.includes(sc.id),
           };
         });
         setSidecars(sidecarStatuses);
