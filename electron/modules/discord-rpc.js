@@ -28,7 +28,6 @@ function destroyDiscordRPC() {
     } finally {
       rpc = null;
       rpcIsConnected = false;
-      rpcConnectionAttempts = 0;
       currentlyPlayingGame = null;
     }
     console.log("Discord RPC has been destroyed");
