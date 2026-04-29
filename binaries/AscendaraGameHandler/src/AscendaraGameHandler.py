@@ -204,6 +204,7 @@ def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
             stderr=subprocess.PIPE,
         )
         logging.info(f"[Proton] Process started, PID: {process.pid}")
+        _pipe_process_logs(process, "PROTON")
         return process
     except Exception as e:
         logging.error(f"[Proton] Failed to launch: {e}", exc_info=True)
@@ -255,6 +256,7 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
             stderr=subprocess.PIPE,
         )
         logging.info(f"[Wine] Process started, PID: {process.pid}")
+        _pipe_process_logs(process, "WINE")
         return process
     except Exception as e:
         logging.error(f"[Wine] Failed to launch: {e}", exc_info=True)
@@ -317,10 +319,20 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
             stderr=subprocess.PIPE,
         )
         logging.info(f"[UMU] Process started, PID: {process.pid}")
+        _pipe_process_logs(process, "UMU")
         return process
     except Exception as e:
         logging.error(f"[UMU] Failed to launch: {e}", exc_info=True)
         return None
+
+def _pipe_process_logs(process, prefix):
+    """Log stdout/stderr of a subprocess in background threads."""
+    import threading
+    def log_pipe(pipe, tag):
+        for line in iter(pipe.readline, b''):
+            logging.info(f"{tag} {line.decode('utf-8', errors='replace').strip()}")
+    threading.Thread(target=log_pipe, args=(process.stdout, f"[{prefix}-OUT]"), daemon=True).start()
+    threading.Thread(target=log_pipe, args=(process.stderr, f"[{prefix}-ERR]"), daemon=True).start()
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
     logging.info(f"[ENTRY] _launch_crash_reporter_on_exit(error_code={error_code}, error_message={error_message})")
