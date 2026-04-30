@@ -2506,6 +2506,7 @@
       "update": "Update",
       "updateAvailable": "Update available: <strong>{{version}}</strong>",
       "updateAvailableCurrent": "(current: {{version}})",
+      "updateAvailableUmu": "Update available",
       "updateProtonGE": "Update Proton-GE"
     },
     "loadingSettings": "Loading your settings",
