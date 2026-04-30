@@ -139,9 +139,9 @@ const DEPENDENCY_REGISTRY_PATHS = {
 // In development mode, appBranch MUST remain "live" to prevent conflicts.
 // ============================================================================
 
-const appBranch = "live";
+const appBranch = "public-testing";
 const appVersion = "10.4.3";
-const testingVersion = "";
+const testingVersion = "10.4.4.1";
 
 module.exports = {
   appVersion,

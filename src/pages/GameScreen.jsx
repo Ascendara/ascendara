@@ -99,6 +99,7 @@ import flingTrainerService from "@/services/flingTrainerService";
 import { useAuth } from "@/context/AuthContext";
 import { getCloudLibrary, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
+import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
@@ -1649,6 +1650,11 @@ export default function GameScreen() {
       }
 
       console.log("Launching game: ", gameName);
+      // Cloud-first pre-launch merge: pull the authoritative cloud counters
+      // for this game (if any) into the local JSON before the GameHandler
+      // starts incrementing. Silent / best-effort — never blocks launch.
+      await pullCloudGameDataBeforeLaunch(gameName);
+
       // Launch the game
       killAudioAndMiniplayer();
       // Use the tracked shift key state for admin privileges

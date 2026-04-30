@@ -48,6 +48,7 @@ import gameService from "@/services/gameService";
 import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 import recentGamesService from "@/services/recentGamesService";
+import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import { cn } from "@/lib/utils";
 import { sanitizeText } from "@/lib/utils";
 
@@ -1027,7 +1028,10 @@ const Home = memo(() => {
 
   const handlePlayGame = async game => {
     try {
-      await window.electron.playGame(game.game || game.name, game.isCustom);
+      const gameName = game.game || game.name;
+      // Cloud-first pre-launch merge (silent / best-effort).
+      await pullCloudGameDataBeforeLaunch(gameName);
+      await window.electron.playGame(gameName, game.isCustom);
 
       // Get and cache the game image
       const imageBase64 = await window.electron.getGameImage(game.game || game.name);

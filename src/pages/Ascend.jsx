@@ -143,6 +143,7 @@ import {
   UserCheck,
   Inbox,
   Download,
+  CloudDownload,
   ListOrdered,
   Puzzle,
   Infinity,
@@ -320,6 +321,7 @@ const Ascend = () => {
   const [cloudLibrary, setCloudLibrary] = useState(null);
   const [loadingCloudLibrary, setLoadingCloudLibrary] = useState(true);
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
+  const [isRestoringFromCloud, setIsRestoringFromCloud] = useState(false);
   const [localGames, setLocalGames] = useState([]);
   const [cloudLibraryImages, setCloudLibraryImages] = useState({});
   const [librarySearchQuery, setLibrarySearchQuery] = useState("");
@@ -1039,6 +1041,200 @@ const Ascend = () => {
       toast.error(t("ascend.cloudLibrary.syncFailed") || "Failed to sync library");
     }
     setIsSyncingLibrary(false);
+  };
+
+  // Restore profile + per-game data from cloud into local files.
+  // Useful after OS migration / fresh install so that level/XP/playtime
+  // and per-game playTime/launchCount/lastPlayed/favorite are rebuilt locally.
+  const handleRestoreFromCloud = async () => {
+    if (!user) {
+      navigate("/ascend");
+      return;
+    }
+
+    setIsRestoringFromCloud(true);
+    let profileRestored = false;
+    let profileDerivedFromLibrary = false;
+    let gamesRestored = 0;
+    let achievementsRestored = 0;
+
+    try {
+      // 1. Fetch profile stats and library together so we can fall back to
+      //    deriving stats from per-game cloud data when the profile doc is empty
+      //    (e.g. user only ever clicked "Sync Library" and never "Sync Profile",
+      //    which is the common OS-migration scenario).
+      const [statsResult, cloudResult, installedGames, customGames] =
+        await Promise.all([
+          getProfileStats(),
+          getCloudLibrary(),
+          window.electron?.getGames?.() || [],
+          window.electron?.getCustomGames?.() || [],
+        ]);
+
+      const cloudStats = statsResult?.data || null;
+      const cloudGames = cloudResult?.data?.games || [];
+
+      // Decide source of truth for profileStats. If cloud doc has meaningful
+      // data, prefer it. Otherwise derive from cloud library games.
+      const cloudStatsHasData =
+        cloudStats &&
+        ((cloudStats.xp || 0) > 0 ||
+          (cloudStats.totalPlaytime || 0) > 0 ||
+          (cloudStats.level || 1) > 1 ||
+          (cloudStats.gamesPlayed || 0) > 0);
+
+      let resolvedStats = null;
+      if (cloudStatsHasData) {
+        resolvedStats = {
+          level: cloudStats.level || 1,
+          xp: cloudStats.xp || 0,
+          totalPlaytime: cloudStats.totalPlaytime || 0,
+          gamesPlayed: cloudStats.gamesPlayed || 0,
+          totalGames: cloudStats.totalGames || 0,
+          JoinDate: cloudStats.joinDate || null,
+        };
+      } else if (cloudGames.length > 0) {
+        // Derive from cloud library — pass games as the "regular" arg; the
+        // calculator only reads playTime/launchCount/completed which exist on
+        // both regular and custom cloud entries.
+        const derived = calculateProfileStats(cloudGames, []);
+        resolvedStats = {
+          level: derived.level || 1,
+          xp: derived.xp || 0,
+          totalPlaytime: derived.totalPlaytime || 0,
+          gamesPlayed: derived.gamesPlayed || 0,
+          totalGames: derived.totalGames || 0,
+          JoinDate: cloudStats?.joinDate || null,
+        };
+        profileDerivedFromLibrary = true;
+      }
+
+      // Write resolved stats into local timestamp file — max-merge with any
+      // existing local profileStats so a smaller cloud snapshot never clobbers
+      // progress the local machine has already accumulated.
+      if (resolvedStats && window.electron?.setTimestampValue) {
+        try {
+          const localStats =
+            (await window.electron?.getTimestampValue?.("profileStats")) || {};
+          const mergedStats = {
+            level: Math.max(localStats.level || 1, resolvedStats.level || 1),
+            xp: Math.max(localStats.xp || 0, resolvedStats.xp || 0),
+            totalPlaytime: Math.max(
+              localStats.totalPlaytime || 0,
+              resolvedStats.totalPlaytime || 0
+            ),
+            gamesPlayed: Math.max(
+              localStats.gamesPlayed || 0,
+              resolvedStats.gamesPlayed || 0
+            ),
+            totalGames: Math.max(
+              localStats.totalGames || 0,
+              resolvedStats.totalGames || 0
+            ),
+            JoinDate: localStats.JoinDate || resolvedStats.JoinDate || null,
+          };
+          resolvedStats = mergedStats;
+          await window.electron.setTimestampValue("profileStats", mergedStats);
+          profileRestored = true;
+        } catch (e) {
+          console.warn("Failed to persist restored profileStats locally:", e);
+        }
+
+        // If we derived stats from the library (cloud doc was empty/stale),
+        // push them back up so subsequent restores read directly from the
+        // profile doc and so the leaderboard reflects real progress.
+        if (profileDerivedFromLibrary) {
+          try {
+            await syncProfileToAscend({
+              level: resolvedStats.level,
+              xp: resolvedStats.xp,
+              totalPlaytime: resolvedStats.totalPlaytime,
+              gamesPlayed: resolvedStats.gamesPlayed,
+              totalGames: resolvedStats.totalGames,
+              joinDate: resolvedStats.JoinDate,
+            });
+          } catch (e) {
+            console.warn(
+              "Failed to back-fill cloud profileStats from derived library data:",
+              e
+            );
+          }
+        }
+      }
+
+      // 2. Restore per-game data for games already installed locally
+      const allLocal = [
+        ...(installedGames || []).map(g => ({
+          name: g.game || g.name,
+          isCustom: false,
+        })),
+        ...(customGames || []).map(g => ({
+          name: g.game || g.name,
+          isCustom: true,
+        })),
+      ];
+
+      for (const cg of cloudGames) {
+        const match = allLocal.find(
+          lg => lg.name?.toLowerCase() === cg.name?.toLowerCase()
+        );
+        if (!match) continue;
+
+        try {
+          const restoreResult = await window.electron?.restoreCloudGameData?.(
+            match.name,
+            {
+              playTime: cg.playTime || 0,
+              launchCount: cg.launchCount || 0,
+              lastPlayed: cg.lastPlayed || null,
+              favorite: cg.favorite || false,
+            }
+          );
+          if (restoreResult?.success) {
+            gamesRestored += 1;
+          }
+        } catch (e) {
+          console.warn(`Failed to restore game data for ${match.name}:`, e);
+        }
+
+        // Also restore full achievement data for this game if available in cloud
+        try {
+          const achResult = await getGameAchievements(match.name);
+          if (achResult?.data && window.electron?.writeGameAchievements) {
+            await window.electron.writeGameAchievements(match.name, achResult.data);
+            achievementsRestored += 1;
+          }
+        } catch (e) {
+          console.warn(`Failed to restore achievements for ${match.name}:`, e);
+        }
+      }
+
+      if (!profileRestored && gamesRestored === 0) {
+        toast.error(
+          t("ascend.cloudLibrary.restoreNothing") ||
+            "Nothing to restore — no cloud data found"
+        );
+      } else {
+        const baseMsg =
+          t("ascend.cloudLibrary.restored", {
+            games: gamesRestored,
+            achievements: achievementsRestored,
+          }) ||
+          `Restored ${profileRestored ? "profile, " : ""}${gamesRestored} game(s), ${achievementsRestored} achievement set(s) from cloud`;
+        const suffix = profileDerivedFromLibrary
+          ? ` ${t("ascend.cloudLibrary.restoredDerived") || "(profile rebuilt from your cloud library)"}`
+          : "";
+        toast.success(`${baseMsg}${suffix}`);
+        // Refresh visible cloud library panel + profile stats
+        await Promise.all([loadCloudLibrary(), loadProfileStats()]);
+      }
+    } catch (e) {
+      console.error("Failed to restore from cloud:", e);
+      toast.error(
+        t("ascend.cloudLibrary.restoreFailed") || "Failed to restore from cloud"
+      );
+    }
+    setIsRestoringFromCloud(false);
   };
 
   // Check if a cloud game is installed locally
@@ -6704,21 +6900,43 @@ const Ascend = () => {
                       </p>
                     )}
                   </div>
-                  <Button
-                    onClick={handleSyncLibrary}
-                    disabled={isSyncingLibrary}
-                    className="gap-2 text-secondary shadow-lg"
-                    size="lg"
-                  >
-                    {isSyncingLibrary ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CloudUpload className="h-4 w-4" />
-                    )}
-                    {isSyncingLibrary
-                      ? t("ascend.cloudLibrary.syncing")
-                      : t("ascend.cloudLibrary.sync")}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleRestoreFromCloud}
+                      disabled={isRestoringFromCloud || isSyncingLibrary}
+                      variant="outline"
+                      className="gap-2 shadow-lg"
+                      size="lg"
+                      title={
+                        t("ascend.cloudLibrary.restoreTooltip") ||
+                        "Restore profile stats and per-game playtime from cloud into local files (use after OS migration or fresh install)"
+                      }
+                    >
+                      {isRestoringFromCloud ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CloudDownload className="h-4 w-4" />
+                      )}
+                      {isRestoringFromCloud
+                        ? t("ascend.cloudLibrary.restoring") || "Restoring..."
+                        : t("ascend.cloudLibrary.restore") || "Restore from Cloud"}
+                    </Button>
+                    <Button
+                      onClick={handleSyncLibrary}
+                      disabled={isSyncingLibrary || isRestoringFromCloud}
+                      className="gap-2 text-secondary shadow-lg"
+                      size="lg"
+                    >
+                      {isSyncingLibrary ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CloudUpload className="h-4 w-4" />
+                      )}
+                      {isSyncingLibrary
+                        ? t("ascend.cloudLibrary.syncing")
+                        : t("ascend.cloudLibrary.sync")}
+                    </Button>
+                  </div>
                 </div>
               </div>
 

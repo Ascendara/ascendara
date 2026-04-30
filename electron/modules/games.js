@@ -1166,11 +1166,28 @@ function registerGameHandlers() {
         return { success: false, error: "Download directory not set" };
       }
 
-      const sanitizedGame = sanitizeGameName(game);
+      const sanitizedGame = sanitizeGameName(gameName);
       const allDirectories = [
         settings.downloadDirectory,
         ...(settings.additionalDirectories || []),
       ];
+
+      // Merge helpers — mirror cloud-upload semantics (Math.max on numeric
+      // counters) so that restoring after a local play session never loses
+      // progress. The client's upload path already uses max-merge, so this
+      // keeps local <-> cloud consistent in both directions.
+      const mergeNumber = (localVal, cloudVal) => {
+        const l = typeof localVal === "number" ? localVal : 0;
+        const c = typeof cloudVal === "number" ? cloudVal : 0;
+        return Math.max(l, c);
+      };
+      const mergeLastPlayed = (localVal, cloudVal) => {
+        // Prefer the newer ISO timestamp (or the one that parses)
+        const lt = localVal ? new Date(localVal).getTime() : 0;
+        const ct = cloudVal ? new Date(cloudVal).getTime() : 0;
+        if (!lt && !ct) return localVal || cloudVal || null;
+        return lt >= ct ? localVal : cloudVal;
+      };
 
       // First, try to find the game in regular game folders
       let gameInfoPath = null;
@@ -1198,16 +1215,23 @@ function registerGameHandlers() {
         const gameData = JSON.parse(await fs.promises.readFile(gameInfoPath, "utf8"));
 
         if (cloudData.playTime !== undefined) {
-          gameData.playTime = cloudData.playTime;
+          gameData.playTime = mergeNumber(gameData.playTime, cloudData.playTime);
         }
         if (cloudData.launchCount !== undefined) {
-          gameData.launchCount = cloudData.launchCount;
+          gameData.launchCount = mergeNumber(
+            gameData.launchCount,
+            cloudData.launchCount
+          );
         }
         if (cloudData.lastPlayed !== undefined) {
-          gameData.lastPlayed = cloudData.lastPlayed;
+          gameData.lastPlayed = mergeLastPlayed(
+            gameData.lastPlayed,
+            cloudData.lastPlayed
+          );
         }
         if (cloudData.favorite !== undefined) {
-          gameData.favorite = cloudData.favorite;
+          // Favorite is a boolean — OR-merge so user's favorite flag is never lost
+          gameData.favorite = !!(gameData.favorite || cloudData.favorite);
         }
 
         await fs.promises.writeFile(
@@ -1217,8 +1241,8 @@ function registerGameHandlers() {
         );
 
         console.log(`Restored cloud data for ${gameName} (regular game):`, {
-          playTime: cloudData.playTime,
-          launchCount: cloudData.launchCount,
+          playTime: gameData.playTime,
+          launchCount: gameData.launchCount,
         });
 
         return { success: true };
@@ -1235,18 +1259,25 @@ function registerGameHandlers() {
         );
 
         if (gameIndex !== -1) {
-          // Update the custom game data
+          const target = gamesData.games[gameIndex];
+          // Merge the custom game data (max-merge for counters)
           if (cloudData.playTime !== undefined) {
-            gamesData.games[gameIndex].playTime = cloudData.playTime;
+            target.playTime = mergeNumber(target.playTime, cloudData.playTime);
           }
           if (cloudData.launchCount !== undefined) {
-            gamesData.games[gameIndex].launchCount = cloudData.launchCount;
+            target.launchCount = mergeNumber(
+              target.launchCount,
+              cloudData.launchCount
+            );
           }
           if (cloudData.lastPlayed !== undefined) {
-            gamesData.games[gameIndex].lastPlayed = cloudData.lastPlayed;
+            target.lastPlayed = mergeLastPlayed(
+              target.lastPlayed,
+              cloudData.lastPlayed
+            );
           }
           if (cloudData.favorite !== undefined) {
-            gamesData.games[gameIndex].favorite = cloudData.favorite;
+            target.favorite = !!(target.favorite || cloudData.favorite);
           }
 
           await fs.promises.writeFile(

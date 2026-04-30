@@ -24,6 +24,7 @@ import { cn as Cn } from "@/lib/utils";
 import {
   getUserStatus as GetUserStatus,
   updateUserStatus as UpdateUserStatus,
+  syncProfileToAscend as SyncProfileToAscend,
 } from "@/services/firebaseService";
 import {
   Archive,
@@ -655,6 +656,25 @@ const Profile = () => {
           LastSyncedProfileStatsPtr.current = Fingerprint;
           try {
             await window.electron.setTimestampValue("profileStats", Payload);
+            // Also push to cloud (Ascend) so OS migrations can restore them.
+            // Guarded by auth; silent failure keeps local flow unaffected.
+            if (User?.uid) {
+              try {
+                await SyncProfileToAscend({
+                  level: Payload.level,
+                  xp: Payload.xp,
+                  totalPlaytime: Payload.totalPlaytime,
+                  gamesPlayed: Payload.gamesPlayed,
+                  totalGames: Payload.totalGames,
+                  joinDate: Payload.JoinDate,
+                });
+              } catch (cloudErr) {
+                console.warn(
+                  `[Profile] Failed to auto-sync profileStats to cloud — will retry on next change.`,
+                  cloudErr
+                );
+              }
+            }
           } catch (e) {
             console.warn(
               `[Profile] Failed to persist profileStats locally — check write permissions / disk.`,

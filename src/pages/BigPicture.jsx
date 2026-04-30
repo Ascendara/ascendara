@@ -69,6 +69,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { useGameImage } from "@/hooks/useGameImage";
 import recentGamesService from "@/services/recentGamesService";
+import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import { sanitizeText } from "@/lib/utils";
 import * as torboxService from "@/services/torboxService";
 import installedGamesService from "@/services/installedGamesService";
@@ -3140,6 +3141,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
           return;
         }
       }
+
+      // Cloud-first pre-launch merge (silent / best-effort — never blocks launch).
+      await pullCloudGameDataBeforeLaunch(gameName);
 
       // Launch the game
       await window.electron.playGame(

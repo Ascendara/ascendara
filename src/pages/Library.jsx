@@ -2867,11 +2867,36 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
 
   const isCustomGame = game.isCustom;
 
+  // Card-body click: this game isn't installed locally, so launching/inspecting
+  // it isn't possible. Surface a clear warning telling the user to use the
+  // Add & Restore button instead. The button's own onClick is stopped from
+  // bubbling so it still works normally.
+  const handleCardClick = () => {
+    if (isRestoring) return;
+    toast.warning(
+      isCustomGame
+        ? t("library.cloudOnly.noFilesFoundCustom") ||
+            "No local files found for this custom game. Click \"Add & Restore\" to re-add it and recover your cloud playtime."
+        : t("library.cloudOnly.noFilesFound") ||
+            "No local files found for this game. Click \"Download & Restore\" to install it and recover your cloud playtime."
+    );
+  };
+
   return (
     <Card
+      onClick={handleCardClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-        "hover:-translate-y-1 hover:shadow-xl"
+        "group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+        "hover:-translate-y-1 hover:shadow-xl",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       )}
     >
       <CardContent className="p-0">
@@ -2932,7 +2957,10 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
           <span>{formatPlaytime(game.playTime)}</span>
         </div>
         <Button
-          onClick={onRestore}
+          onClick={e => {
+            e.stopPropagation();
+            onRestore?.();
+          }}
           disabled={isRestoring}
           className={cn(
             "w-full gap-2 text-white",
