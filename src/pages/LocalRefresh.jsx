@@ -274,13 +274,13 @@ const LocalRefresh = () => {
           }
         }
 
-        // Load local index path
-        if (settings?.localIndexPath) {
-          setLocalIndexPath(settings.localIndexPath);
+        // Load local index path (stored under `localIndex` in settings)
+        if (settings?.localIndex) {
+          setLocalIndexPath(settings.localIndex);
         } else if (window.electron?.getDefaultLocalIndexPath) {
           const defaultPath = await window.electron.getDefaultLocalIndexPath();
           setLocalIndexPath(defaultPath);
-          await updateSetting("localIndexPath", defaultPath);
+          await updateSetting("localIndex", defaultPath);
         }
 
         // Load last refresh time
@@ -290,7 +290,7 @@ const LocalRefresh = () => {
 
         // Resolve the index path once for status queries below
         const resolvedIndexPath =
-          settings?.localIndexPath ||
+          settings?.localIndex ||
           (window.electron?.getDefaultLocalIndexPath
             ? await window.electron.getDefaultLocalIndexPath()
             : null);
