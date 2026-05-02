@@ -609,14 +609,38 @@ def run_ludusavi_backup(game_name):
 
         # Linux : add --wine-prefix if no customSavePaths
         if sys.platform == 'linux':
-            # verify if game has customSavePaths
-            has_custom_paths = _get_custom_save_path_for_game(
-                game_name, False, None, None
-            )
+            has_custom_paths = False
+            try:
+                # Check regular game JSON
+                if sys.platform == 'linux':
+                    settings_path = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                download_dir = settings.get('downloadDirectory', '')
+                
+                if download_dir:
+                    # Check regular game
+                    game_json = os.path.join(download_dir, game_name, f"{game_name}.ascendara.json")
+                    if os.path.exists(game_json):
+                        with open(game_json, 'r', encoding='utf-8') as f:
+                            game_data = json.load(f)
+                        has_custom_paths = bool(game_data.get('customSavePaths'))
+                    
+                    # Check custom game in games.json
+                    if not has_custom_paths:
+                        games_json = os.path.join(download_dir, 'games.json')
+                        if os.path.exists(games_json):
+                            with open(games_json, 'r', encoding='utf-8') as f:
+                                games_data = json.load(f)
+                            for game in games_data.get('games', []):
+                                if game.get('game') == game_name or game.get('name') == game_name:
+                                    has_custom_paths = bool(game.get('customSavePaths'))
+                                    break
+            except Exception as e:
+                logging.warning(f"[Ludusavi] Could not check custom save paths: {e}")
+            
             if not has_custom_paths:
-                # Build slug and prefix path
-                import re
-                slug = re.sub(r'[^\w\s\-().]', '', game_name).replace(' ', '_')[:100]
+                slug = sanitize_game_slug(game_name)
                 pfx_path = os.path.join(
                     os.path.expanduser('~'), '.ascendara', 'compatdata', slug, 'pfx'
                 )
