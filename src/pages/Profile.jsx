@@ -25,6 +25,8 @@ import {
   getUserStatus as GetUserStatus,
   updateUserStatus as UpdateUserStatus,
   syncProfileToAscend as SyncProfileToAscend,
+  getProfileStats as GetProfileStats,
+  recomputeProfileStats as RecomputeProfileStats,
 } from "@/services/firebaseService";
 import {
   Archive,
@@ -625,6 +627,50 @@ const Profile = () => {
                 ? PersistedProfileStats.totalGames
                 : CalculatedStats.totalGames,
           };
+        }
+      }
+
+      // Cloud-first override: when the user is signed in, the server at
+      // api.ascendara.app is the source of truth for level / XP / totals.
+      // We fetch the persisted profileStats and, if present, use those values
+      // for display instead of the freshly computed local ones. The local
+      // `BuildProfileStatsFromGames` call above remains as an offline fallback
+      // and to build `allGames` / downloadHistory-adjacent UI state.
+      if (User?.uid) {
+        // Fire-and-forget recompute so the server reconciles against the
+        // latest cloudLibrary (important after a fresh sign-in or cloud
+        // library sync on a new device).
+        RecomputeProfileStats().catch(() => {});
+        try {
+          const CloudProfile = await GetProfileStats();
+          const CloudStats = CloudProfile?.data;
+          if (CloudStats && typeof CloudStats.xp === "number") {
+            CalculatedStats = {
+              ...CalculatedStats,
+              level: CloudStats.level ?? CalculatedStats.level,
+              xp: CloudStats.xp ?? CalculatedStats.xp,
+              currentXP: CloudStats.currentXP ?? CalculatedStats.currentXP,
+              nextLevelXp:
+                CloudStats.nextLevelXp ?? CalculatedStats.nextLevelXp,
+              totalPlaytime: Math.max(
+                CloudStats.totalPlaytime || 0,
+                CalculatedStats.totalPlaytime || 0
+              ),
+              gamesPlayed: Math.max(
+                CloudStats.gamesPlayed || 0,
+                CalculatedStats.gamesPlayed || 0
+              ),
+              totalGames: Math.max(
+                CloudStats.totalGames || 0,
+                CalculatedStats.totalGames || 0
+              ),
+            };
+          }
+        } catch (e) {
+          console.warn(
+            "[Profile] Cloud-authoritative stats unavailable, using local:",
+            e?.message || e
+          );
         }
       }
 

@@ -1,4 +1,11 @@
-import { autoUploadBackupToCloud } from "@/services/cloudBackupService";
+import {
+  autoUploadBackupToCloud,
+  hasActiveSubscription,
+} from "@/services/cloudBackupService";
+import {
+  recordSessionStart as recordCloudSessionStart,
+  recordSessionEnd as recordCloudSessionEnd,
+} from "@/services/gameSessionTracker";
 import ContextMenu from "@/components/ContextMenu";
 import Layout from "@/components/Layout";
 import MenuBar from "@/components/MenuBar";
@@ -817,6 +824,15 @@ const UserActivityTracker = React.memo(() => {
       const gameName = data?.game || "a game";
       setGamePlayingState(true);
       setActivity(ActivityType.PLAYING_GAME, gameName);
+
+      // Cloud-first profile sync: snapshot baseline so we can push only the
+      // delta on close instead of the full local total. Gated by Ascend
+      // access — non-premium users keep local-only behavior.
+      if (data?.game && hasActiveSubscription(userData)) {
+        recordCloudSessionStart(data.game).catch(err =>
+          console.warn("[CloudSync] recordSessionStart failed:", err?.message || err)
+        );
+      }
     };
 
     const handleGameClosed = async (_, data) => {
@@ -824,8 +840,27 @@ const UserActivityTracker = React.memo(() => {
       // Restore to browsing library when game closes
       setActivity(ActivityType.BROWSING_LIBRARY);
 
-      // Auto-upload backup to cloud if enabled
+      // Cloud-first profile sync: push the session delta (playtime, launch
+      // count) atomically to Firestore. Never blocks; failures are logged.
       const gameName = data?.game;
+      if (gameName && hasActiveSubscription(userData)) {
+        try {
+          const deltaResult = await recordCloudSessionEnd(gameName);
+          if (deltaResult?.success) {
+            console.log(
+              `[CloudSync] Pushed session delta for ${gameName}:`,
+              deltaResult.applied
+            );
+          }
+        } catch (err) {
+          console.warn(
+            `[CloudSync] recordSessionEnd error for ${gameName}:`,
+            err?.message || err
+          );
+        }
+      }
+
+      // Auto-upload backup to cloud if enabled
       if (gameName && user && settings) {
         try {
           const result = await autoUploadBackupToCloud(

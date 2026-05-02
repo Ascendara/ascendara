@@ -53,6 +53,7 @@ import {
   cleanupAllOldMessages,
   syncProfileToAscend,
   getProfileStats,
+  recomputeProfileStats,
   checkHardwareIdAccount,
   checkDeletedAccount,
   deleteNewAccount,
@@ -437,6 +438,27 @@ const Ascend = () => {
     }
   }, [user?.uid, showDisplayNamePrompt]);
 
+  // Re-run cloud-first stats merge once Ascend access is verified. The first
+  // loadLocalStats call (above) runs before verifyAccess resolves and would
+  // therefore fall back to local-only stats — this ensures the dashboard
+  // promptly upgrades to cloud-merged numbers as soon as access is confirmed.
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (
+      ascendAccess?.isSubscribed ||
+      ascendAccess?.isVerified ||
+      ascendAccess?.hasAccess
+    ) {
+      loadLocalStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    user?.uid,
+    ascendAccess?.isSubscribed,
+    ascendAccess?.isVerified,
+    ascendAccess?.hasAccess,
+  ]);
+
   // Set up real-time listener for friends list
   useEffect(() => {
     if (!user?.uid) return;
@@ -605,35 +627,156 @@ const Ascend = () => {
     };
   };
 
-  // Load local stats from Electron
+  // Load local stats from Electron — and, for Ascend members, merge with the
+  // cloud library so the dashboard reflects the user's full "gaming identity"
+  // across devices, not just the games installed on this machine.
+  //
+  // Merge rules (per game, keyed by lowercased name):
+  //   - playTime / launchCount: Math.max(local, cloud) — cloud is the floor
+  //   - completed / favorite:   OR-merge
+  //   - games not installed locally are still counted toward XP/level
+  // Non-premium users get the original local-only behavior.
   const loadLocalStats = async () => {
     setLoadingLocalStats(true);
     try {
       const games = (await window.electron?.getGames?.()) || [];
       const customGames = (await window.electron?.getCustomGames?.()) || [];
-      console.log("[Ascend] Loaded games:", games.length + customGames.length, "games");
-      const stats = calculateProfileStats(games, customGames);
-      console.log("[Ascend] Calculated stats:", {
-        totalGames: stats.totalGames,
-        gamesPlayed: stats.gamesPlayed,
-        xp: stats.xp,
-        level: stats.level,
-        totalPlaytime: stats.totalPlaytime,
+
+      const hasCloudAccess =
+        ascendAccess?.isSubscribed ||
+        ascendAccess?.isVerified ||
+        ascendAccess?.hasAccess;
+
+      let mergedRegular = games;
+      let mergedCustom = customGames;
+      let cloudFloorPlaytime = 0;
+
+      if (hasCloudAccess && user?.uid) {
+        try {
+          const cloudResult = await getCloudLibrary();
+          const cloudGames = cloudResult?.data?.games || [];
+          cloudFloorPlaytime = cloudResult?.data?.totalPlaytime || 0;
+
+          if (cloudGames.length > 0) {
+            const localKey = g => (g.game || g.name || "").toLowerCase();
+            const cloudByName = new Map(
+              cloudGames.map(cg => [(cg.name || "").toLowerCase(), cg])
+            );
+
+            const mergeWithCloud = (game, isCustom) => {
+              const cg = cloudByName.get(localKey(game));
+              if (!cg) return game;
+              cloudByName.delete(localKey(game));
+              return {
+                ...game,
+                playTime: Math.max(game.playTime || 0, cg.playTime || 0),
+                launchCount: Math.max(
+                  game.launchCount || 0,
+                  cg.launchCount || 0
+                ),
+                completed: game.completed || cg.completed || false,
+                favorite: game.favorite || cg.favorite || false,
+              };
+            };
+
+            mergedRegular = games.map(g => mergeWithCloud(g, false));
+            mergedCustom = customGames.map(g => mergeWithCloud(g, true));
+
+            // Cloud-only games (not installed on this machine) — synthesize
+            // minimal entries so XP/level/totalPlaytime include them.
+            const cloudOnly = Array.from(cloudByName.values()).map(cg => ({
+              game: cg.name,
+              name: cg.name,
+              playTime: cg.playTime || 0,
+              launchCount: cg.launchCount || 0,
+              completed: cg.completed || false,
+              favorite: cg.favorite || false,
+              isCustom: !!cg.isCustom,
+              cloudOnly: true,
+              gameID: cg.gameID || null,
+            }));
+
+            mergedRegular = [
+              ...mergedRegular,
+              ...cloudOnly.filter(g => !g.isCustom),
+            ];
+            mergedCustom = [
+              ...mergedCustom,
+              ...cloudOnly.filter(g => g.isCustom),
+            ];
+          }
+        } catch (e) {
+          console.warn(
+            "[Ascend] Cloud-first stats merge failed, falling back to local:",
+            e?.message || e
+          );
+        }
+      }
+
+      // Local calc is kept only as an offline fallback. When the user has
+      // cloud access, the authoritative level / XP / totals come from the
+      // server at api.ascendara.app via `recomputeProfileStats` — the client
+      // never derives these numbers when online.
+      const localFallback = calculateProfileStats(mergedRegular, mergedCustom);
+      let finalStats = {
+        level: localFallback.level,
+        xp: localFallback.xp,
+        currentXP: localFallback.currentXP,
+        nextLevelXp: localFallback.nextLevelXp,
+        totalPlaytime: Math.max(localFallback.totalPlaytime, cloudFloorPlaytime),
+        gamesPlayed: localFallback.gamesPlayed,
+        totalGames: localFallback.totalGames,
+      };
+
+      if (hasCloudAccess && user?.uid) {
+        try {
+          // Ask the server to reconcile from cloudLibrary and write fresh
+          // profileStats. Fire-and-forget its own recomputation is fine;
+          // we still read back whichever is newest.
+          recomputeProfileStats().catch(() => {});
+          const cloudProfile = await getProfileStats();
+          const cs = cloudProfile?.data;
+          if (cs && typeof cs.xp === "number") {
+            finalStats = {
+              level: cs.level ?? finalStats.level,
+              xp: cs.xp ?? finalStats.xp,
+              currentXP: cs.currentXP ?? finalStats.currentXP,
+              nextLevelXp: cs.nextLevelXp ?? finalStats.nextLevelXp,
+              totalPlaytime: Math.max(
+                cs.totalPlaytime || 0,
+                finalStats.totalPlaytime
+              ),
+              gamesPlayed: Math.max(
+                cs.gamesPlayed || 0,
+                finalStats.gamesPlayed
+              ),
+              totalGames: Math.max(cs.totalGames || 0, finalStats.totalGames),
+            };
+          }
+        } catch (e) {
+          console.warn(
+            "[Ascend] Cloud-authoritative stats unavailable, using local:",
+            e?.message || e
+          );
+        }
+      }
+
+      console.log("[Ascend] Final stats:", {
+        ...finalStats,
+        cloudFirst: hasCloudAccess,
       });
 
       setLocalStats({
-        level: stats.level,
-        xp: stats.xp,
-        currentXP: stats.currentXP,
-        nextLevelXp: stats.nextLevelXp,
-        totalPlaytime: stats.totalPlaytime,
-        gamesPlayed: stats.gamesPlayed,
-        totalGames: stats.totalGames,
+        ...finalStats,
+        cloudFirst: hasCloudAccess,
       });
 
-      // Get recent games sorted by playtime
-      const allGames = [...games, ...customGames];
-      const sortedGames = allGames
+      // Recent games — show locally installed entries first (so they remain
+      // launchable), but use merged playtime values for accurate ordering.
+      const allLocalGames = [...mergedRegular, ...mergedCustom].filter(
+        g => !g.cloudOnly
+      );
+      const sortedGames = allLocalGames
         .filter(g => g.playTime && g.playTime >= 60)
         .sort((a, b) => (b.playTime || 0) - (a.playTime || 0))
         .slice(0, 4);
@@ -772,24 +915,22 @@ const Ascend = () => {
   const handleSyncProfile = async () => {
     setIsSyncingProfile(true);
     try {
-      // Get local profile data from Electron
+      // Server-authoritative: the API at api.ascendara.app recomputes level,
+      // XP and playtime from the user's cloudLibrary and persists the result
+      // to Firestore. We just need to ensure `joinDate` is preserved (it's
+      // only known locally via the user's install timestamp on first sync).
       const joinDate = (await window.electron?.timestampTime?.()) || null;
-      const games = (await window.electron?.getGames?.()) || [];
-      const customGames = (await window.electron?.getCustomGames?.()) || [];
+      if (joinDate) {
+        // Preserve joinDate separately — the server doesn't know when the
+        // user first installed Ascendara on this machine.
+        try {
+          await syncProfileToAscend({ joinDate });
+        } catch (e) {
+          console.warn("[Ascend] joinDate sync failed:", e?.message || e);
+        }
+      }
 
-      // Use centralized calculation
-      const stats = calculateProfileStats(games, customGames);
-
-      const profileData = {
-        level: stats.level,
-        xp: stats.xp,
-        totalPlaytime: stats.totalPlaytime,
-        gamesPlayed: stats.gamesPlayed,
-        totalGames: stats.totalGames,
-        joinDate,
-      };
-
-      const result = await syncProfileToAscend(profileData);
+      const result = await recomputeProfileStats();
       if (result.success) {
         toast.success(t("ascend.profile.synced"));
         await loadProfileStats();

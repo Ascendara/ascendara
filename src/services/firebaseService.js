@@ -41,6 +41,7 @@ import {
   onSnapshot,
   increment,
   startAfter,
+  runTransaction,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -979,6 +980,197 @@ export const syncCloudLibrary = async games => {
 };
 
 /**
+ * Atomically apply a single game session's deltas to the cloud.
+ *
+ * Cloud-first profile sync: instead of clobbering cloud playtime with whatever
+ * local just happens to hold, we add the delta the user actually accumulated
+ * during this session. This is the foundation of the "Steam-like" unified
+ * profile — the cloud is authoritative and grows monotonically across devices.
+ *
+ * Uses a Firestore transaction so concurrent launches on multiple devices
+ * cannot corrupt the per-game array. Only positive deltas are applied
+ * (clamped to >= 0) so a buggy / reset local file can never decrement totals.
+ *
+ * @param {string} gameName - Game identifier (matches cloudLibrary.games[*].name).
+ * @param {object} deltas
+ * @param {number} [deltas.playtimeDelta=0] - Seconds played this session.
+ * @param {number} [deltas.launchesDelta=0] - Launches added this session (usually 1).
+ * @param {string|null} [deltas.lastPlayed=null] - ISO timestamp of session end.
+ * @param {boolean} [deltas.completed] - If true, sets completed=true (never unsets).
+ * @param {boolean} [deltas.favorite] - If true, sets favorite=true (never unsets).
+ * @param {object} [meta] - Optional metadata for new game entries.
+ * @param {boolean} [meta.isCustom=false]
+ * @param {string|null} [meta.gameID=null]
+ * @returns {Promise<{success: boolean, applied: object|null, error: string|null}>}
+ */
+export const applyGameSessionDelta = async (gameName, deltas = {}, meta = {}) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, applied: null, error: "Not authenticated" };
+    }
+
+    const name = (gameName || "").trim();
+    if (!name) {
+      return { success: false, applied: null, error: "Missing gameName" };
+    }
+
+    const playtimeDelta = Math.max(0, Math.floor(deltas.playtimeDelta || 0));
+    const launchesDelta = Math.max(0, Math.floor(deltas.launchesDelta || 0));
+    const lastPlayed = deltas.lastPlayed || null;
+    const setCompleted = deltas.completed === true;
+    const setFavorite = deltas.favorite === true;
+
+    // Nothing to do — short-circuit before hitting Firestore.
+    if (
+      playtimeDelta === 0 &&
+      launchesDelta === 0 &&
+      !lastPlayed &&
+      !setCompleted &&
+      !setFavorite
+    ) {
+      return { success: true, applied: null, error: null };
+    }
+
+    const userRef = doc(db, "users", user.uid);
+
+    const applied = await runTransaction(db, async tx => {
+      const snap = await tx.get(userRef);
+      const data = snap.exists() ? snap.data() : {};
+      const cloudLibrary = data.cloudLibrary || {};
+      const games = Array.isArray(cloudLibrary.games) ? [...cloudLibrary.games] : [];
+
+      const idx = games.findIndex(
+        g => (g?.name || "").toLowerCase() === name.toLowerCase()
+      );
+
+      const nowIso = new Date().toISOString();
+
+      let updated;
+      if (idx === -1) {
+        // First time we've seen this game in the cloud — create an entry.
+        updated = {
+          name,
+          gameID: meta.gameID || null,
+          isCustom: !!meta.isCustom,
+          playTime: playtimeDelta,
+          launchCount: launchesDelta,
+          lastPlayed: lastPlayed || (launchesDelta > 0 ? nowIso : null),
+          completed: setCompleted,
+          favorite: setFavorite,
+        };
+        games.push(updated);
+      } else {
+        const existing = games[idx] || {};
+        const newerLastPlayed = (() => {
+          if (!lastPlayed) return existing.lastPlayed || null;
+          if (!existing.lastPlayed) return lastPlayed;
+          return new Date(lastPlayed) > new Date(existing.lastPlayed)
+            ? lastPlayed
+            : existing.lastPlayed;
+        })();
+
+        updated = {
+          ...existing,
+          playTime: (existing.playTime || 0) + playtimeDelta,
+          launchCount: (existing.launchCount || 0) + launchesDelta,
+          lastPlayed: newerLastPlayed,
+          completed: existing.completed || setCompleted,
+          favorite: existing.favorite || setFavorite,
+        };
+        games[idx] = updated;
+      }
+
+      const totalPlaytime = games.reduce((acc, g) => acc + (g.playTime || 0), 0);
+
+      const newCloudLibrary = {
+        ...cloudLibrary,
+        games,
+        totalGames: games.length,
+        totalPlaytime,
+        lastSynced: nowIso,
+      };
+
+      // Profile-level totals — keep in sync so dashboards / leaderboards see
+      // accurate aggregate playtime without recomputing per-game.
+      const existingProfileStats = data.profileStats || {};
+      const newProfileStats = {
+        ...existingProfileStats,
+        totalPlaytime: (existingProfileStats.totalPlaytime || 0) + playtimeDelta,
+        lastSynced: nowIso,
+      };
+
+      tx.set(
+        userRef,
+        {
+          cloudLibrary: newCloudLibrary,
+          profileStats: newProfileStats,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return updated;
+    });
+
+    return { success: true, applied, error: null };
+  } catch (error) {
+    console.error("applyGameSessionDelta error:", error);
+    return { success: false, applied: null, error: error.message };
+  }
+};
+
+/**
+ * Trigger a server-side recompute of the authenticated user's profileStats.
+ *
+ * Level / XP / playtime are computed exclusively by the API at
+ * `api.ascendara.app` from the user's `cloudLibrary` document so the values
+ * are device-independent and tamper-resistant. The client never recomputes
+ * these numbers — it just reads `profileStats` from Firestore for display.
+ *
+ * Callers (e.g. `gameSessionTracker.recordSessionEnd`) invoke this after
+ * pushing a per-game session delta. Failures are non-fatal — the next
+ * recompute will reconcile.
+ *
+ * @returns {Promise<{success: boolean, stats: object|null, error: string|null}>}
+ */
+export const recomputeProfileStats = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, stats: null, error: "Not authenticated" };
+    }
+
+    const idToken = await user.getIdToken();
+    const response = await fetch(
+      "https://api.ascendara.app/v3/profile/recompute-stats",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      return {
+        success: false,
+        stats: null,
+        error: `HTTP ${response.status}: ${errBody}`,
+      };
+    }
+
+    const data = await response.json();
+    return { success: !!data.success, stats: data.stats || null, error: null };
+  } catch (error) {
+    console.error("recomputeProfileStats error:", error);
+    return { success: false, stats: null, error: error.message };
+  }
+};
+
+/**
  * Sync individual game achievements to cloud (full achievement data)
  * @param {string} gameName - Name of the game
  * @param {boolean} isCustom - Whether it's a custom game
@@ -1623,19 +1815,24 @@ export const searchUsers = async searchQuery => {
     }
 
     const usersRef = collection(db, "users");
-    const snapshot = await getDocs(usersRef);
+    const queryLower = searchQuery.toLowerCase();
+    
+    // Use WHERE clause to filter at database level (requires displayName index)
+    // Note: This requires a Firestore single-field index on users.displayName
+    const q = query(
+      usersRef,
+      where("displayName", ">=", queryLower),
+      where("displayName", "<=", queryLower + "\uf8ff")
+    );
+    const snapshot = await getDocs(q);
 
     const users = [];
-    const queryLower = searchQuery.toLowerCase();
 
     // Collect matching user IDs first
     const matchingUsers = [];
     snapshot.forEach(doc => {
       const data = doc.data();
-      if (
-        doc.id !== currentUser.uid &&
-        data.displayName?.toLowerCase().includes(queryLower)
-      ) {
+      if (doc.id !== currentUser.uid) {
         matchingUsers.push({ uid: doc.id, data });
       }
     });
