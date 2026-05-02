@@ -648,7 +648,7 @@ function registerUpdateHandlers() {
         try {
           fs.chmodSync(installerPath, 0o755);
 
-          const currentAppImagePath = process.execPath;
+          const currentAppImagePath = process.env.APPIMAGE || process.execPath;
 
           console.log("Branch switch - Current AppImage:", currentAppImagePath);
           console.log("Branch switch - New AppImage:", installerPath);
@@ -656,25 +656,12 @@ function registerUpdateHandlers() {
           // Create an update script that will run after the app quits
           const updateScriptPath = path.join(tempDir, "branch_update.sh");
           const updateScript = `#!/bin/bash
-# Wait for the current process to fully exit
+while kill -0 ${process.pid} 2>/dev/null; do sleep 1; done
 sleep 2
 
-# Create backup
-if [ -f "${currentAppImagePath}" ]; then
-  cp "${currentAppImagePath}" "${currentAppImagePath}.backup"
-fi
-
-# Replace the AppImage
-cp "${installerPath}" "${currentAppImagePath}"
+mv "${installerPath}" "${currentAppImagePath}"
 chmod +x "${currentAppImagePath}"
-
-# Clean up
-sleep 3
-rm -f "${currentAppImagePath}.backup"
-rm -f "${installerPath}"
 rm -f "$0"
-
-# Restart the application
 "${currentAppImagePath}" &
 `;
 
