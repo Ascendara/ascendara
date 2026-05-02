@@ -751,7 +751,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             logging.error(f"Game not found in games.json for executable path: {exe_path}")
             logging.info("[EXIT] execute due to missing game_entry for custom game")
             return
-        game_name = game_entry.get("name", os.path.basename(os.path.dirname(exe_path)))
+        game_name = game_entry.get("game") or game_entry.get("name") or os.path.basename(os.path.dirname(exe_path))
     
     logging.info(f"Resolved game_dir: {os.path.dirname(exe_path)}, exe_path: {exe_path}")
 
