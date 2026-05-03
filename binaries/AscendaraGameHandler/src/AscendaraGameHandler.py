@@ -272,6 +272,80 @@ def _clean_pyinstaller_env(env):
             env.pop(var, None)
     return env
 
+def install_vcredist(prefix_path, env, proton_path=None):
+    """Install Visual C++ redistributables (x86 + x64) using wine directly"""
+    
+    vcredist_marker = os.path.join(prefix_path, ".vcredist_installed")
+    if os.path.exists(vcredist_marker):
+        logging.info("[VCREDIST] Already installed, skipping")
+        return
+
+    # Find wine64 and wine (for x86) from proton or system
+    wine64_bin = None
+    wine32_bin = None
+    if proton_path:
+        wine64_bin = os.path.join(proton_path, "files", "bin", "wine64")
+        wine32_bin = os.path.join(proton_path, "files", "bin", "wine")
+        if not os.path.exists(wine64_bin):
+            wine64_bin = None
+        if not os.path.exists(wine32_bin):
+            wine32_bin = None
+    if not wine64_bin:
+        wine64_bin = shutil.which("wine64") or shutil.which("wine")
+    if not wine32_bin:
+        wine32_bin = shutil.which("wine")
+    
+    if not wine32_bin:
+        logging.warning("[VCREDIST] No wine binary found, skipping vcredist install")
+        return
+
+    # Microsoft URLs - x86 AND x64
+    installers = [
+        ("vc_redist.x64.exe", "https://aka.ms/vc14/vc_redist.x64.exe", wine64_bin or wine32_bin),
+        ("vc_redist.x86.exe", "https://aka.ms/vc14/vc_redist.x86.exe", wine32_bin),
+    ]
+
+    all_success = True
+    for filename, url, wine_bin in installers:
+        dest_path = os.path.join(prefix_path, filename)
+        
+        logging.info(f"[VCREDIST] Downloading {filename}...")
+        try:
+            import urllib.request
+            urllib.request.urlretrieve(url, dest_path)
+            logging.info(f"[VCREDIST] Download complete: {filename}")
+        except Exception as e:
+            logging.error(f"[VCREDIST] Download failed for {filename}: {e}")
+            all_success = False
+            continue
+
+        logging.info(f"[VCREDIST] Installing {filename} silently...")
+        try:
+            result = subprocess.run(
+                [wine_bin, dest_path, "/install", "/quiet", "/norestart"],
+                env=env,
+                timeout=120,
+                capture_output=True
+            )
+            if result.returncode in (0, 3010):
+                logging.info(f"[VCREDIST] {filename} installed successfully")
+            else:
+                logging.error(f"[VCREDIST] {filename} failed with code: {result.returncode}")
+                all_success = False
+        except Exception as e:
+            logging.error(f"[VCREDIST] Install error for {filename}: {e}")
+            all_success = False
+        finally:
+            if os.path.exists(dest_path):
+                os.remove(dest_path)
+
+    # Only create marker if both succeeded
+    if all_success:
+        open(vcredist_marker, 'w').close()
+        logging.info("[VCREDIST] All redistributables installed successfully")
+    else:
+        logging.warning("[VCREDIST] Some redistributables failed to install, will retry next launch")
+
 def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     """
     Launch a Windows executable using umu-run.
@@ -303,6 +377,8 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     cmd = [umu_bin, exe_path]
     if game_launch_cmd:
         cmd.extend(game_launch_cmd.split())
+
+    install_vcredist(prefix_path, env, proton_path=linux_config.get("proton_path"))
 
     game_dir = os.path.dirname(exe_path)
 
