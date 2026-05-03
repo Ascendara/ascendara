@@ -272,41 +272,26 @@ def _clean_pyinstaller_env(env):
             env.pop(var, None)
     return env
 
-def install_vcredist(prefix_path, proton_path=None):
-    """Install Visual C++ redistributables (x86 + x64) using wine directly"""
+def install_vcredist(prefix_path, env, umu_bin=None):
+    """Install Visual C++ redistributables (x86 + x64) using umu-run directly"""
     
     vcredist_marker = os.path.join(prefix_path, ".vcredist_installed")
     if os.path.exists(vcredist_marker):
         logging.info("[VCREDIST] Already installed, skipping")
         return
 
-    # Find wine64 and wine (for x86) from proton or system
-    wine64_bin = None
-    wine32_bin = None
-    if proton_path:
-        wine64_bin = os.path.join(proton_path, "files", "bin", "wine64")
-        wine32_bin = os.path.join(proton_path, "files", "bin", "wine")
-        if not os.path.exists(wine64_bin):
-            wine64_bin = None
-        if not os.path.exists(wine32_bin):
-            wine32_bin = None
-    if not wine64_bin:
-        wine64_bin = shutil.which("wine64") or shutil.which("wine")
-    if not wine32_bin:
-        wine32_bin = shutil.which("wine")
-    
-    if not wine32_bin:
-        logging.warning("[VCREDIST] No wine binary found, skipping vcredist install")
+    if not umu_bin:
+        logging.warning("[VCREDIST] No umu-run binary, skipping vcredist install")
         return
 
     # Microsoft URLs - x86 AND x64
     installers = [
-        ("vc_redist.x64.exe", "https://aka.ms/vc14/vc_redist.x64.exe", wine64_bin or wine32_bin),
-        ("vc_redist.x86.exe", "https://aka.ms/vc14/vc_redist.x86.exe", wine32_bin),
+        ("vc_redist.x64.exe", "https://aka.ms/vc14/vc_redist.x64.exe"),
+        ("vc_redist.x86.exe", "https://aka.ms/vc14/vc_redist.x86.exe"),
     ]
 
     all_success = True
-    for filename, url, wine_bin in installers:
+    for filename, url in installers:
         dest_path = os.path.join(prefix_path, filename)
         
         logging.info(f"[VCREDIST] Downloading {filename}...")
@@ -319,24 +304,24 @@ def install_vcredist(prefix_path, proton_path=None):
             all_success = False
             continue
 
-        logging.info(f"[VCREDIST] Installing {filename} silently...")
-
-        wine_env = {
-            "WINEPREFIX": prefix_path,
-            "HOME": os.environ.get("HOME", ""),
-            "PATH": os.environ.get("PATH", ""),
-            "DISPLAY": os.environ.get("DISPLAY", ":0"),
-            "WINEDLLOVERRIDES": "winemenubuilder.exe=d",
-            "WINEDEBUG": "-all",  # Supprime les messages debug wine
-        }
-
+        logging.info(f"[VCREDIST] Installing {filename} via umu-run...")
         try:
+            # Use umu-run to launch the exe
+            install_env = env.copy()
             result = subprocess.run(
-                [wine_bin, dest_path, "/install", "/quiet", "/norestart"],
-                env=wine_env,
+                [umu_bin, dest_path, "/install", "/quiet", "/norestart"],
+                env=install_env,
                 timeout=120,
-                capture_output=True
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            stdout = result.stdout.decode('utf-8', errors='replace').strip()
+            stderr = result.stderr.decode('utf-8', errors='replace').strip()
+            if stdout:
+                logging.info(f"[VCREDIST] stdout: {stdout}")
+            if stderr:
+                logging.info(f"[VCREDIST] stderr: {stderr}")
+
             if result.returncode in (0, 3010):
                 logging.info(f"[VCREDIST] {filename} installed successfully")
             else:
@@ -375,7 +360,6 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     env = _clean_pyinstaller_env(os.environ.copy())
     env["GAMEID"] = linux_config.get("umu_id") or "umu-default"
     env["WINEPREFIX"] = prefix_path
-    env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
 
     # optional PROTONPATH - if empty, umu-run uses UMU-Proton
     if linux_config.get("proton_path"):
@@ -388,7 +372,7 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     if game_launch_cmd:
         cmd.extend(game_launch_cmd.split())
 
-    install_vcredist(prefix_path, proton_path=linux_config.get("proton_path"))
+    install_vcredist(prefix_path, env, umu_bin=umu_bin)
 
     game_dir = os.path.dirname(exe_path)
 
