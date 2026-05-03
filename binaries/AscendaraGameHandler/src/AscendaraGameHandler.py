@@ -272,7 +272,7 @@ def _clean_pyinstaller_env(env):
             env.pop(var, None)
     return env
 
-def install_vcredist(prefix_path, env, proton_path=None):
+def install_vcredist(prefix_path, proton_path=None):
     """Install Visual C++ redistributables (x86 + x64) using wine directly"""
     
     vcredist_marker = os.path.join(prefix_path, ".vcredist_installed")
@@ -320,10 +320,20 @@ def install_vcredist(prefix_path, env, proton_path=None):
             continue
 
         logging.info(f"[VCREDIST] Installing {filename} silently...")
+
+        wine_env = {
+            "WINEPREFIX": prefix_path,
+            "HOME": os.environ.get("HOME", ""),
+            "PATH": os.environ.get("PATH", ""),
+            "DISPLAY": os.environ.get("DISPLAY", ":0"),
+            "WINEDLLOVERRIDES": "winemenubuilder.exe=d",
+            "WINEDEBUG": "-all",  # Supprime les messages debug wine
+        }
+
         try:
             result = subprocess.run(
                 [wine_bin, dest_path, "/install", "/quiet", "/norestart"],
-                env=env,
+                env=wine_env,
                 timeout=120,
                 capture_output=True
             )
@@ -378,7 +388,7 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     if game_launch_cmd:
         cmd.extend(game_launch_cmd.split())
 
-    install_vcredist(prefix_path, env, proton_path=linux_config.get("proton_path"))
+    install_vcredist(prefix_path, proton_path=linux_config.get("proton_path"))
 
     game_dir = os.path.dirname(exe_path)
 
@@ -803,7 +813,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             logging.error(f"Game not found in games.json for executable path: {exe_path}")
             logging.info("[EXIT] execute due to missing game_entry for custom game")
             return
-        game_name = game_entry.get("name", os.path.basename(os.path.dirname(exe_path)))
+        game_name = game_entry.get("game") or game_entry.get("name") or os.path.basename(os.path.dirname(exe_path))
     
     logging.info(f"Resolved game_dir: {os.path.dirname(exe_path)}, exe_path: {exe_path}")
 
