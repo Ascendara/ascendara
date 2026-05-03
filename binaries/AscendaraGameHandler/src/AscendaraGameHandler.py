@@ -272,6 +272,75 @@ def _clean_pyinstaller_env(env):
             env.pop(var, None)
     return env
 
+def install_vcredist(prefix_path, env, umu_bin=None):
+    """Install Visual C++ redistributables (x86 + x64) using umu-run directly"""
+    
+    vcredist_marker = os.path.join(prefix_path, ".vcredist_installed")
+    if os.path.exists(vcredist_marker):
+        logging.info("[VCREDIST] Already installed, skipping")
+        return
+
+    if not umu_bin:
+        logging.warning("[VCREDIST] No umu-run binary, skipping vcredist install")
+        return
+
+    # Microsoft URLs - x86 AND x64
+    installers = [
+        ("vc_redist.x64.exe", "https://aka.ms/vc14/vc_redist.x64.exe"),
+        ("vc_redist.x86.exe", "https://aka.ms/vc14/vc_redist.x86.exe"),
+    ]
+
+    all_success = True
+    for filename, url in installers:
+        dest_path = os.path.join(prefix_path, filename)
+        
+        logging.info(f"[VCREDIST] Downloading {filename}...")
+        try:
+            import urllib.request
+            urllib.request.urlretrieve(url, dest_path)
+            logging.info(f"[VCREDIST] Download complete: {filename}")
+        except Exception as e:
+            logging.error(f"[VCREDIST] Download failed for {filename}: {e}")
+            all_success = False
+            continue
+
+        logging.info(f"[VCREDIST] Installing {filename} via umu-run...")
+        try:
+            # Use umu-run to launch the exe
+            install_env = env.copy()
+            result = subprocess.run(
+                [umu_bin, dest_path, "/install", "/quiet", "/norestart"],
+                env=install_env,
+                timeout=120,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            stdout = result.stdout.decode('utf-8', errors='replace').strip()
+            stderr = result.stderr.decode('utf-8', errors='replace').strip()
+            if stdout:
+                logging.info(f"[VCREDIST] stdout: {stdout}")
+            if stderr:
+                logging.info(f"[VCREDIST] stderr: {stderr}")
+
+            if result.returncode in (0, 3010):
+                logging.info(f"[VCREDIST] {filename} installed successfully")
+            else:
+                logging.error(f"[VCREDIST] {filename} failed with code: {result.returncode}")
+                all_success = False
+        except Exception as e:
+            logging.error(f"[VCREDIST] Install error for {filename}: {e}")
+            all_success = False
+        finally:
+            if os.path.exists(dest_path):
+                os.remove(dest_path)
+
+    # Only create marker if both succeeded
+    if all_success:
+        open(vcredist_marker, 'w').close()
+        logging.info("[VCREDIST] All redistributables installed successfully")
+    else:
+        logging.warning("[VCREDIST] Some redistributables failed to install, will retry next launch")
+
 def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     """
     Launch a Windows executable using umu-run.
@@ -291,7 +360,6 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     env = _clean_pyinstaller_env(os.environ.copy())
     env["GAMEID"] = linux_config.get("umu_id") or "umu-default"
     env["WINEPREFIX"] = prefix_path
-    env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
 
     # optional PROTONPATH - if empty, umu-run uses UMU-Proton
     if linux_config.get("proton_path"):
@@ -303,6 +371,8 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
     cmd = [umu_bin, exe_path]
     if game_launch_cmd:
         cmd.extend(game_launch_cmd.split())
+
+    install_vcredist(prefix_path, env, umu_bin=umu_bin)
 
     game_dir = os.path.dirname(exe_path)
 
