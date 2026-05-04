@@ -582,26 +582,33 @@ const Library = () => {
               } else if (game.gameID) {
                 // For local index, we need to find the game's imgID
                 let imageId = game.gameID;
-                if (settings.usingLocalIndex) {
-                  try {
-                    const gameData = await gameService.findGameByGameID(game.gameID);
-                    if (gameData?.imgID) {
-                      imageId = gameData.imgID;
+                let imageLoaded = false;
+
+                // 1. Try with electron
+                try {
+                  const imageBase64 = await window.electron.getGameImage(game.name);
+                  if (imageBase64) {
+                    const dataUrl = `data:image/jpeg;base64,${imageBase64}`;
+                    images[game.name] = dataUrl;
+                    try {
+                      localStorage.setItem(localStorageKey, dataUrl);
+                    } catch (e) {
+                      console.warn("Could not cache cloud game image:", e);
                     }
-                  } catch (error) {
-                    console.warn("Could not find game in local index:", error);
-                    continue;
+                    imageLoaded = true;
                   }
+                } catch (error) {
+                  console.warn("Electron image not found for cloud game, trying fallbacks:", error);
                 }
 
-                // For local index, try to load from local file system using imgID
-                if (settings.usingLocalIndex && settings.localIndex) {
+                // 2. For local index, try to load from local file system using imgID
+                if (!imageLoaded && settings.usingLocalIndex) {
                   try {
+                    const gameData = await gameService.findGameByGameID(game.gameID);
+                    if (gameData?.imgID) imageId = gameData.imgID;
+
                     const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
-                    const imageData = await window.electron.ipcRenderer.readFile(
-                      localImagePath,
-                      "base64"
-                    );
+                    const imageData = await window.electron.ipcRenderer.readFile(localImagePath, "base64");
                     const dataUrl = `data:image/jpeg;base64,${imageData}`;
                     images[game.name] = dataUrl;
                     try {
@@ -609,30 +616,33 @@ const Library = () => {
                     } catch (e) {
                       console.warn("Could not cache cloud game image:", e);
                     }
-                    continue;
+                    imageLoaded = true;
                   } catch (localError) {
-                    console.warn(
-                      "Could not load from local index, skipping:",
-                      localError
-                    );
+                    console.warn("Could not load from local index:", localError);
                   }
-                } else {
-                  // Fetch from API using gameID
-                  const imageUrl = `https://api.ascendara.app/v3/image/${game.gameID}`;
-                  const response = await fetch(imageUrl);
-                  if (response.ok) {
-                    const blob = await response.blob();
-                    const dataUrl = await new Promise(resolve => {
-                      const reader = new FileReader();
-                      reader.onloadend = () => resolve(reader.result);
-                      reader.readAsDataURL(blob);
-                    });
-                    images[game.name] = dataUrl;
-                    try {
-                      localStorage.setItem(localStorageKey, dataUrl);
-                    } catch (e) {
-                      console.warn("Could not cache cloud game image:", e);
+                }
+
+                // 3. Ascendara API
+                if (!imageLoaded) {
+                  try {
+                    const imageUrl = `https://api.ascendara.app/v3/image/${game.gameID}`;
+                    const response = await fetch(imageUrl);
+                    if (response.ok) {
+                      const blob = await response.blob();
+                      const dataUrl = await new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                      });
+                      images[game.name] = dataUrl;
+                      try {
+                        localStorage.setItem(localStorageKey, dataUrl);
+                      } catch (e) {
+                        console.warn("Could not cache cloud game image:", e);
+                      }
                     }
+                  } catch (error) {
+                    console.error("Error loading cloud game image from API:", error);
                   }
                 }
               }
