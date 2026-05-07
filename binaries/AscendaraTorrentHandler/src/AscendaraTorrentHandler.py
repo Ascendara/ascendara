@@ -73,6 +73,30 @@ def safe_write_json(filepath, data):
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
+def load_settings():
+    """Load Ascendara settings from the platform-specific path."""
+    try:
+        if sys.platform == 'win32':
+            appdata = os.environ.get('APPDATA')
+            if appdata:
+                path = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+                if os.path.exists(path):
+                    with open(path, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+        elif sys.platform == 'darwin':
+            path = os.path.join(os.path.expanduser('~/Library/Application Support/ascendara'), 'ascendarasettings.json')
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        else:
+            path = os.path.join(os.path.expanduser('~/.config/ascendara'), 'ascendarasettings.json')
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+    except Exception as e:
+        logging.warning(f"[TorrentHandler] Could not read settings: {e}")
+    return {}
+
 def handleerror(game_info, game_info_path, e):
     game_info['online'] = ""
     game_info['dlc'] = ""
@@ -252,6 +276,22 @@ class TorrentManager:
             # Get the torrent hash from the magnet link
             torrent_hash = magnet_link.split('&')[0].split(':')[-1]
             self.current_torrent_hash = torrent_hash
+
+            # Apply download speed limit from settings if configured
+            try:
+                settings = load_settings()
+                download_limit_kbps = int(settings.get('downloadLimit', 0))
+                if download_limit_kbps > 0:
+                    limit_bytes = download_limit_kbps * 1024
+                    self.qbt_client.torrents_set_download_limit(
+                        limit=limit_bytes,
+                        torrent_hashes=torrent_hash
+                    )
+                    logging.info(f"[TorrentHandler] Speed limit set: {download_limit_kbps} KB/s for {game}")
+                else:
+                    logging.info(f"[TorrentHandler] Speed limit: unlimited for {game}")
+            except Exception as e:
+                logging.warning(f"[TorrentHandler] Could not apply speed limit: {e}")
             
             # Register cleanup on exit
             atexit.register(self.cleanup)

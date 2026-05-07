@@ -326,6 +326,10 @@ class ChunkedDownloader:
         self.session_downloaded_bytes = 0  # Track bytes downloaded in current session only
         self.start_time = time.time()
         self.last_progress_update = 0
+        # Load speed limit from settings (KB/s -> bytes/s, 0 = unlimited)
+        settings = load_settings()
+        self._speed_limit_bytes = int(settings.get('downloadLimit', 0)) * 1024
+        logging.info(f"[ChunkedDownloader] Speed limit: {self._speed_limit_bytes // 1024} KB/s" if self._speed_limit_bytes > 0 else "[ChunkedDownloader] Speed limit: unlimited")
         
     def _probe_server(self) -> bool:
         """Probe server for file size and range support."""
@@ -474,14 +478,28 @@ class ChunkedDownloader:
                     self.total_size = start_byte + content_length
                     logging.info(f"[ChunkedDownloader] Calculated total size: {read_size(self.total_size)}")
             
+            # Use smaller chunks for precise throttling, larger chunks for full speed
+            chunk_size = 4096 if self._speed_limit_bytes > 0 else self.STREAM_CHUNK_SIZE
+            throttle_start = time.time()
+            throttle_bytes = 0
             # Stream the content
-            for data in response.iter_content(chunk_size=self.STREAM_CHUNK_SIZE):
+            for data in response.iter_content(chunk_size=chunk_size):
                 if data:
                     file_handle.write(data)
                     file_handle.flush()  # Ensure data is written to disk
                     self.downloaded_bytes += len(data)
                     self.session_downloaded_bytes += len(data)
+                    throttle_bytes += len(data)
                     self._update_progress()
+                    # Apply speed limit if configured
+                    if self._speed_limit_bytes > 0:
+                        elapsed = time.time() - throttle_start
+                        if elapsed > 0:
+                            allowed_bytes = self._speed_limit_bytes * elapsed
+                            if throttle_bytes > allowed_bytes:
+                                sleep_time = (throttle_bytes - allowed_bytes) / self._speed_limit_bytes
+                                if sleep_time > 0:
+                                    time.sleep(sleep_time)
             
             return True
             
