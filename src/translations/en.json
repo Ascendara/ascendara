@@ -1928,6 +1928,7 @@
     "cookieRefreshed": "Cookie refreshed, resuming...",
     "customList": "Custom List",
     "customMode": "Custom",
+    "viewProgress": "View Progress",
     "customModeDisabled": "External sources disabled. Reverting to the official index.",
     "customModeEnabled": "External sources enabled. Set a source bucket URL to begin.",
     "fileLocation": "File",

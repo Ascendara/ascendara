@@ -5685,6 +5685,9 @@ export default function BigPicture() {
   // Ref to track previous active download count for queue processing
   const prevActiveCountRef = useRef(0);
 
+  // Ref to track previous downloading games for library refresh on completion
+  const prevDownloadingGamesRef = useRef([]);
+
   // Fuzzy matcher instance for search
   const fuzzyMatch = useMemo(() => createFuzzyMatcher(), []);
 
@@ -5783,6 +5786,18 @@ export default function BigPicture() {
     }
     prevActiveCountRef.current = activeCount;
   }, [downloadingGames, t]);
+
+  // Refresh library when a download completes (was verifying, now gone)
+  useEffect(() => {
+    const currentNames = new Set(downloadingGames.map(g => g.game));
+    const hasCompleted = prevDownloadingGamesRef.current.some(
+      game => game.downloadingData?.verifying && !currentNames.has(game.game)
+    );
+    if (hasCompleted) {
+      setRefreshTrigger(prev => prev + 1);
+    }
+    prevDownloadingGamesRef.current = downloadingGames;
+  }, [downloadingGames]);
 
   // --- TORBOX POLLING ---
   useEffect(() => {
@@ -7127,7 +7142,7 @@ export default function BigPicture() {
               <>
                 <div className="grid grid-cols-6 gap-6 pb-4">
                   {displayedStoreGames.map((game, index) => (
-                    <div key={game.imgID || `store-${index}`} data-store-card>
+                    <div key={game.imgID || `store-${index}`} data-store-card className={index === storeIndex && !isSearchBarSelected && !isMenuOpen ? "relative z-10" : undefined}>
                       <StoreGameCard
                         game={game}
                         isSelected={
