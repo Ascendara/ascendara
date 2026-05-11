@@ -32,6 +32,7 @@ import psutil
 import shutil
 import re
 import tempfile
+import ssl
 
 if sys.platform == 'darwin':
     ascendara_dir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'ascendara')
@@ -297,7 +298,14 @@ def install_vcredist(prefix_path, env, umu_bin=None):
         logging.info(f"[VCREDIST] Downloading {filename}...")
         try:
             import urllib.request
-            urllib.request.urlretrieve(url, dest_path)
+            # Disable SSL verification to work around PyInstaller
+            # bundling an older libcrypto that can't verify certificates
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(url, context=ssl_ctx) as response:
+                with open(dest_path, 'wb') as f:
+                    f.write(response.read())
             logging.info(f"[VCREDIST] Download complete: {filename}")
         except Exception as e:
             logging.error(f"[VCREDIST] Download failed for {filename}: {e}")
