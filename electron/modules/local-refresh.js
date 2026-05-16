@@ -9,6 +9,7 @@ const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow, Notification, app } = require("electron");
 const { isDev, isWindows, appDirectory, getPythonPath } = require("./config");
 const { getSettingsManager } = require("./settings");
+const { checkVersionAndUpdate } = require("./updates");
 const archiver = require("archiver");
 const https = require("https");
 const http = require("http");
@@ -508,6 +509,18 @@ function registerLocalRefreshHandlers() {
                 currentSettings.shareLocalIndex
               );
               if (currentSettings.shareLocalIndex) {
+                // Don't upload if app is outdated - require latest version
+                const isLatestVersion = await checkVersionAndUpdate().catch(() => true);
+                if (!isLatestVersion) {
+                  console.log(
+                    "App is outdated, skipping upload to shared index - update Ascendara to the latest version to share your index"
+                  );
+                  if (mainWindow) {
+                    mainWindow.webContents.send("local-refresh-upload-error", {
+                      error: "Update required: Please update Ascendara to the latest version to share your index.",
+                    });
+                  }
+                } else {
                 // Don't upload GOG-Games indexes (experimental source)
                 const usedSource = currentSettings.localRefreshSource || "steamrip";
                 if (usedSource !== "steamrip") {
@@ -546,6 +559,7 @@ function registerLocalRefreshHandlers() {
                   }
                   }
                 }
+                } // end isLatestVersion check
               } else {
                 console.log("ShareLocalIndex is disabled, skipping upload");
               }
