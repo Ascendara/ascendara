@@ -283,7 +283,7 @@ function registerSettingsHandlers() {
     const success = manager.updateSetting(key, value);
     if (success) {
       // Notify renderer about the change
-      event.sender.send("settings-changed", manager.getSettings());
+      event.sender.send("settings-updated", manager.getSettings());
       // Handle Discord RPC toggle immediately
       if (key === "rpcEnabled") {
         const { initializeDiscordRPC, destroyDiscordRPC } = require("./discord-rpc");
@@ -340,7 +340,7 @@ function registerSettingsHandlers() {
 
     const success = manager.saveSettings(sanitizedOptions);
     if (success) {
-      event.sender.send("settings-changed", sanitizedOptions);
+      event.sender.send("settings-updated", sanitizedOptions);
     }
     return success;
   });

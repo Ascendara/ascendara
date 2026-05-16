@@ -551,6 +551,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
   const handleSelectDirectory = async () => {
     const directory = await window.electron.openDirectoryDialog();
+    if (!directory) {
+      return;
+    }
     const canCreateFiles = await window.electron.canCreateFiles(directory);
     if (!canCreateFiles) {
       setWarningMessage(t("welcome.cannotWriteWarning"));
