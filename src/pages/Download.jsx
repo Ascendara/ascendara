@@ -94,6 +94,11 @@ import {
   TORBOX_PROVIDER_DISPLAY_NAMES,
 } from "@/config/providers";
 
+const LOCAL_FALLBACK_PATTERNS = {
+  fileditch: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
+  fileditchfiles: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
+};
+
 // Async validation using API patterns
 const isValidURL = async (url, provider, patterns) => {
   const trimmedUrl = url.trim();
@@ -101,7 +106,7 @@ const isValidURL = async (url, provider, patterns) => {
     return true;
   }
   if (!patterns) return false;
-  const pattern = getProviderPattern(provider, patterns);
+  const pattern = getProviderPattern(provider, patterns) || LOCAL_FALLBACK_PATTERNS[provider] || null;
   if (!pattern) return false;
   return pattern.test(trimmedUrl);
 };
@@ -2728,6 +2733,10 @@ export default function DownloadPage() {
                             case "datanodes":
                               displayName = "DataNodes";
                               break;
+                            case "fileditch":
+                            case "fileditchfiles":
+                              displayName = "FileDitch";
+                              break;
                             default:
                               displayName =
                                 provider.charAt(0).toUpperCase() + provider.slice(1);
@@ -2838,6 +2847,10 @@ export default function DownloadPage() {
                                   break;
                                 case "datanodes":
                                   displayName = "DataNodes";
+                                  break;
+                                case "fileditch":
+                                case "fileditchfiles":
+                                  displayName = "FileDitch";
                                   break;
                                 default:
                                   displayName =

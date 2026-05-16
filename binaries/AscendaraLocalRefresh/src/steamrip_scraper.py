@@ -461,6 +461,8 @@ class SteamRIPScraper(BaseScraper):
                 download_links.setdefault("datanodes", []).append(href)
             elif "1fichier.com" in href:
                 download_links.setdefault("1fichier", []).append(href)
+            elif "fileditchfiles.me" in href or "fileditch.com" in href:
+                download_links.setdefault("fileditch", []).append(href)
         
         return download_links
     
