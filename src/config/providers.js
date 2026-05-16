@@ -30,6 +30,8 @@ export const PROVIDER_DISPLAY_NAMES = {
   qiwi: "Qiwi",
   vikingfile: "VikingFile",
   torrent: "Torrent",
+  fileditch: "FileDitch",
+  fileditchfiles: "FileDitch",
 };
 
 // TorBox display-name mapping (TorBox API uses slightly different casing).
@@ -58,6 +60,8 @@ export const PROVIDER_DOMAINS = {
   datanodes: ["datanodes.to"],
   qiwi: ["qiwi.gg"],
   vikingfile: ["vikingfile.com"],
+  fileditch: ["fileditchfiles.me", "fileditch.com"],
+  fileditchfiles: ["fileditchfiles.me"],
 };
 
 /**
