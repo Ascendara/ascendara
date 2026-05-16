@@ -1312,6 +1312,37 @@ function registerMiscHandlers() {
     }
   });
 
+  ipcMain.handle('get-drives', async () => {
+    if (os.platform() === 'win32') {
+      const drives = [];
+      for (let i = 65; i <= 90; i++) {
+        const letter = String.fromCharCode(i) + ':\\';
+        try {
+          await fs.access(letter);
+          drives.push({ name: letter, path: letter });
+        } catch (e) {}
+      }
+      return drives;
+    } else {
+      // On Linux/macOS, return the root
+      return [{ name: '/', path: '/' }];
+    }
+  });
+
+  ipcMain.handle('list-directory', async (event, dirPath) => {
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      const files = entries.map(entry => ({
+        name: entry.name,
+        type: entry.isDirectory() ? 'directory' : 'file',
+        path: path.join(dirPath, entry.name),
+      }));
+      return files;
+    } catch (error) {
+      throw new Error(`Cannot read directory: ${error.message}`);
+    }
+  });
+
   // Import Steam games handler
   ipcMain.handle("import-steam-games", async (_, directory) => {
     const settings = settingsManager.getSettings();

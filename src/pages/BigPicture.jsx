@@ -101,6 +101,7 @@ import LaunchOverlay from "@/components/LaunchOverlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
+import GamepadFileBrowser from "@/components/GamepadFileBrowser";
 
 // UTILS
 const formatBytes = (bytes, decimals = 2) => {
@@ -1283,7 +1284,7 @@ const BigPictureSettingsDialog = ({
     {
       type: "controller",
       value: "keyboard",
-      label: "Keyboard",
+      label: t("bigPicture.keyboard"),
       icon: KeyboardIcon,
       category: t("bigPicture.controllerType"),
     },
@@ -2540,6 +2541,18 @@ const ExecutableManagerDialog = ({
   const [exeExists, setExeExists] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [pendingChangeIndex, setPendingChangeIndex] = useState(null);
+
+  const handleAddExecutable = async () => {
+    setPendingChangeIndex(null);
+    setShowFileBrowser(true);
+  };
+
+  const handleChangeExecutable = async (index) => {
+    setPendingChangeIndex(index);
+    setShowFileBrowser(true);
+  };
 
   useEffect(() => {
     if (open && gameName) {
@@ -2577,30 +2590,6 @@ const ExecutableManagerDialog = ({
       checkExists();
     }
   }, [executables, loading]);
-
-  const handleAddExecutable = async () => {
-    const startPath = executables.length > 0 && executables[0] ? executables[0] : null;
-    const exePath = await window.electron.openFileDialog(startPath);
-    if (exePath) {
-      setExecutables(prev => [...prev, exePath]);
-      const exists = await window.electron.checkFileExists(exePath);
-      setExeExists(prev => ({ ...prev, [exePath]: exists }));
-    }
-  };
-
-  const handleChangeExecutable = async index => {
-    const currentExe = executables[index];
-    const exePath = await window.electron.openFileDialog(currentExe || null);
-    if (exePath) {
-      setExecutables(prev => {
-        const updated = [...prev];
-        updated[index] = exePath;
-        return updated;
-      });
-      const exists = await window.electron.checkFileExists(exePath);
-      setExeExists(prev => ({ ...prev, [exePath]: exists }));
-    }
-  };
 
   const handleRemoveExecutable = index => {
     if (executables.length <= 1) return;
@@ -2641,157 +2630,47 @@ const ExecutableManagerDialog = ({
     }
   };
 
-  const getFileName = path => {
-    if (!path) return "";
-    return path.split(/[/\\]/).pop();
-  };
+  // Waiting for executables to be loaded
+  const resolvedInitialPath = !loading && executables[0]
+    ? executables[0].replace(/[\\\/][^\\\/]+$/, "")
+    : null;
 
   return (
-    <AlertDialog open={open} onOpenChange={onClose}>
-      <AlertDialogContent className="max-w-lg">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-2xl font-bold text-foreground">
-            {t("library.executableManager.title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription className="text-muted-foreground">
-            {t("library.executableManager.description")}
+    <GamepadFileBrowser
+      isOpen={open && !loading}
+      onClose={onClose}
+      onSelect={async (exePath) => {
+        if (!exePath) { onClose(); return; }
+        let newList;
+        if (pendingChangeIndex === null) {
+          newList = [...executables.filter(Boolean), exePath];
+        } else {
+          newList = [...executables];
+          newList[pendingChangeIndex] = exePath;
+        }
+        newList = newList.filter(Boolean);
+        setExecutables(newList);
+        const exists = await window.electron.checkFileExists(exePath);
+        setExeExists(prev => ({ ...prev, [exePath]: exists }));
+        setPendingChangeIndex(null);
 
-            {bigPictureMode && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg border-2 border-primary/50 bg-primary/10 p-3">
-                <MousePointer className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-primary">
-                    {t("bigPicture.mouseRequired") || "Mouse Navigation Required"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("library.executableManager.bigPictureWarning") ||
-                      "This dialog requires mouse or keyboard navigation. Controller input is not supported for managing executables."}
-                  </span>
-                </div>
-              </div>
-            )}
+        // Update executables list
+        await gameUpdateService.updateGameExecutables(gameName, newList, isCustom);
+        // Update executable json entry
+        await window.electron.modifyGameExecutable(gameName, newList[newList.length - 1]);
+        setExecutableExists(true); 
 
-            {executables.some(exe => exe && exeExists[exe] === false) && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">
-                    {t("library.executableManager.exeLocationHint")}
-                  </span>
-                  <button
-                    onClick={() =>
-                      window.electron.openURL(
-                        "https://ascendara.app/docs/troubleshooting/common-issues#executable-not-found-launch-error"
-                      )
-                    }
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    {t("library.executableManager.learnMore")}
-                    <ExternalLink className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <div className="my-2 max-h-64 space-y-2 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            executables.map((exe, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
-              >
-                <div className="flex flex-1 flex-col overflow-hidden">
-                  <div className="flex items-center gap-2">
-                    {exe && exeExists[exe] === false && (
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-500" />
-                    )}
-                    {index === 0 && (
-                      <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
-                        {t("library.executableManager.primary")}
-                      </span>
-                    )}
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {getFileName(exe) || t("library.executableManager.noFile")}
-                    </span>
-                  </div>
-                  <span className="truncate text-xs text-muted-foreground">{exe}</span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {index !== 0 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleMakePrimary(index)}
-                      title={t("library.executableManager.makePrimary")}
-                    >
-                      <GripVertical className="h-4 w-4 text-primary" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => handleChangeExecutable(index)}
-                    title={t("library.executableManager.change")}
-                  >
-                    <Pencil className="h-4 w-4 text-primary" />
-                  </Button>
-                  {executables.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive h-8 w-8"
-                      onClick={() => handleRemoveExecutable(index)}
-                      title={t("library.executableManager.remove")}
-                    >
-                      <X className="h-4 w-4 text-primary" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <Button
-          variant="outline"
-          className="w-full text-primary"
-          onClick={handleAddExecutable}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          {t("library.executableManager.addExecutable")}
-        </Button>
-
-        <AlertDialogFooter className="mt-4 flex gap-2">
-          <Button variant="outline" className="text-primary" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            className="bg-primary text-secondary"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <>
-                <Loader className="mr-2 h-4 w-4 animate-spin" />
-                {t("common.saving")}
-              </>
-            ) : (
-              t("common.save")
-            )}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        if (onSave) onSave(newList);
+        onClose();
+      }}
+      initialPath={resolvedInitialPath}
+      title={t("library.executableManager.title") || "Select Executable"}
+      filterExe={true}
+      controllerType="xbox"
+      t={t}
+    />
   );
-};
+}
 
 // Installed Game Details View Component
 const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAssets, assetSearchOpen }) => {
@@ -2817,6 +2696,8 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
   const lastButtonState = useRef({});
   const buttons = getControllerButtons(controllerType);
   const gameName = game.game || game.name;
+  const [showDirectoryBrowser, setShowDirectoryBrowser] = useState(false);
+  const [directoryBrowserPath, setDirectoryBrowserPath] = useState(null);
 
   // Executable management
   const [executableExists, setExecutableExists] = useState(true);
@@ -3194,7 +3075,22 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
 
   // Handle open directory
   const handleOpenDirectory = async () => {
-    await window.electron.openGameDirectory(gameName, game.isCustom);
+    // Rebuild path from game's executable or from the download directory 
+    let gamePath = null;
+    try {
+      if (game.executable) {
+        gamePath = game.executable.replace(/[\\\/][^\\\/]+$/, "");
+      } else {
+        const settings = await window.electron.getSettings();
+        if (settings?.downloadDirectory) {
+          gamePath = settings.downloadDirectory + "\\" + gameName;
+        }
+      }
+    } catch {
+      gamePath = null;
+    }
+    setDirectoryBrowserPath(gamePath);
+    setShowDirectoryBrowser(true);
   };
 
   // Handle delete game
@@ -3274,8 +3170,11 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
         showBrowseExeWarning ||
         showExecutableSelect ||
         showExecutableManager ||
-        assetSearchOpen
+        assetSearchOpen ||
+        showDirectoryBrowser
       ) {
+        // Block all input when directory browser is open
+        if (showDirectoryBrowser) return;
         // If asset search is open, block all navigation
         if (assetSearchOpen) return;
         if (action === "LEFT") {
@@ -3326,21 +3225,6 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
               handleDeleteGame();
             }
           } else if (showBrowseExeWarning) {
-            if (dialogButtonIndex === 0) {
-              setShowBrowseExeWarning(false);
-            } else {
-              setShowBrowseExeWarning(false);
-              window.electron.openFileDialog(game.executable).then(async exePath => {
-                if (exePath) {
-                  await gameUpdateService.updateGameExecutable(gameName, exePath);
-                  const exists = await window.electron.checkFileExists(exePath);
-                  setExecutableExists(exists);
-                  toast.success(
-                    t("library.executableUpdated") || "Executable updated successfully"
-                  );
-                }
-              });
-            }
           } else if (showExecutableSelect) {
             if (dialogButtonIndex < availableExecutables.length) {
               handleExecutableSelect(availableExecutables[dialogButtonIndex]);
@@ -3372,7 +3256,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
           else if (showOnlineFixWarning) setShowOnlineFixWarning(false);
           else if (showSteamNotRunningWarning) setShowSteamNotRunningWarning(false);
           else if (isDeleteDialogOpen) setIsDeleteDialogOpen(false);
-          else if (showBrowseExeWarning) setShowBrowseExeWarning(false);
+          else if (showBrowseExeWarning) { setShowBrowseExeWarning(false); window.__bReleasedAt = Date.now(); }
           else if (showExecutableSelect) {
             setShowExecutableSelect(false);
             setPendingLaunchOptions(null);
@@ -3635,12 +3519,21 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
   useEffect(() => {
     let rAF;
     const loop = () => {
+      if (showExecutableManager || showDirectoryBrowser) {
+        rAF = requestAnimationFrame(loop);
+        return;
+      }
       const gp = getGamepadInput();
       if (gp && canInput) {
         const now = Date.now();
         
         // Track button state changes - only trigger on new press (not hold)
         const checkButton = (buttonName, action) => {
+          // Ignore B during 800ms after file browser closed
+          if (buttonName === 'b' && window.__bReleasedAt && now - window.__bReleasedAt < 800) {
+            lastButtonState.current[buttonName] = gp[buttonName];
+            return;
+          }
           if (gp[buttonName] && !lastButtonState.current[buttonName]) {
             // Button just pressed (wasn't pressed before)
             if (now - lastInputTime.current > 150) {
@@ -3667,7 +3560,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
   }, [handleInput, canInput]);
 
   const formatPlayTime = time => {
-    if (!time || time < 60) return t("library.notPlayedYet") || "Not played yet";
+    if (!time || time < 60) return t("library.notPlayedYet");
     if (time < 3600) return `${Math.floor(time / 60)} ${t("library.minutes")}`;
     if (time < 7200) return `1 ${t("library.hour")}`;
     return `${Math.floor(time / 3600)} ${t("library.hours")}`;
@@ -4298,6 +4191,23 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
         </div>
       )}
 
+      {/* Directory Browser */}
+      {showDirectoryBrowser && (
+        <GamepadFileBrowser
+          isOpen={showDirectoryBrowser}
+          onClose={() => {
+            setShowDirectoryBrowser(false);
+            window.__bReleasedAt = Date.now();
+          }}
+          onSelect={undefined}
+          initialPath={directoryBrowserPath}
+          title={gameName}
+          filterExe={false}
+          controllerType={controllerType}
+          t={t}
+        />
+      )}
+
       {/* Footer Controls */}
       <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
         {!showMedia && !isLaunching && !isRunning && (
@@ -4454,45 +4364,24 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Browse Executable Warning Dialog - BigPicture Style */}
-      <AlertDialog open={showBrowseExeWarning} onOpenChange={setShowBrowseExeWarning}>
-        <AlertDialogContent className="max-w-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-2xl">
-              <MousePointer className="h-6 w-6 text-primary" />
-              {t("bigPicture.mouseRequired") || "Mouse Navigation Required"}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              {t("library.browseExecutableWarning") ||
-                "You will need to use your mouse to browse and select the game executable file. Controller input is not supported for file browsing."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-4 py-4">
-            <button
-              onClick={undefined}
-              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
-                dialogButtonIndex === 0
-                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
-                  : "bg-muted hover:bg-muted/80"
-              }`}
-            >
-              <X className="h-6 w-6" />
-              <span>{t("common.cancel")}</span>
-            </button>
-            <button
-              onClick={undefined}
-              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
-                dialogButtonIndex === 1
-                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
-                  : "bg-muted hover:bg-muted/80"
-              }`}
-            >
-              <FileSearch className="h-6 w-6" />
-              <span>{t("library.browseExecutable") || "Browse..."}</span>
-            </button>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Browse Executable - GamepadFileBrowser direct */}
+      <ExecutableManagerDialog
+        open={showBrowseExeWarning}
+        onClose={() => {
+          setShowBrowseExeWarning(false);
+          window.__bReleasedAt = Date.now();
+        }}
+        gameName={gameName}
+        isCustom={game.isCustom}
+        t={t}
+        bigPictureMode={true}
+        onSave={(exeList) => {
+          if (exeList && exeList.length > 0) {
+            setExecutableExists(true);
+            toast.success(t("library.executableUpdated") || "Executable updated successfully");
+          }
+        }}
+      />
 
       {/* Delete Confirmation Dialog - BigPicture Style */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
