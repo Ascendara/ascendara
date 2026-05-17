@@ -405,6 +405,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("set-custom-save-paths", gameName, isCustomGame, paths),
   openFolderDialog: () => 
     ipcRenderer.invoke("open-folder-dialog"),
+  getDrives: () => ipcRenderer.invoke('get-drives'),
+  listDirectory: (dirPath) => ipcRenderer.invoke('list-directory', dirPath),
 
   //===========================================================================
   // TOOLS & DEPENDENCIES
