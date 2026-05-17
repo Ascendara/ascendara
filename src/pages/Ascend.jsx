@@ -6413,9 +6413,11 @@ const Ascend = () => {
                             {t("ascend.settings.billingCycle")}
                           </p>
                           <p className="font-semibold">
-                            {userData?.ascendSubscription?.lifetime 
-                              ? t("ascend.settings.lifetime") 
-                              : t("ascend.settings.monthly")}
+                            {userData?.ascendSubscription?.lifetime === true
+                              ? t("ascend.settings.lifetime")
+                              : userData?.ascendSubscription?.intervalCount === 6
+                                ? t("ascend.settings.sixMonths")
+                                : t("ascend.settings.monthly")}
                           </p>
                         </motion.div>
                       </div>

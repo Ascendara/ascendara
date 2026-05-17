@@ -683,6 +683,7 @@
       "lifetime": "Lifetime",
       "manageSubscription": "Manage Subscription",
       "monthly": "Monthly",
+      "sixMonths": "6 Months",
       "noConnectedDevices": "No devices connected",
       "noProfileInfo": "Add a bio, country, or social links to personalize your profile",
       "notAllowedBio": "Bio contains words that are not allowed",
