@@ -388,7 +388,7 @@ function registerMiscHandlers() {
     const result = await dialog.showOpenDialog({
       defaultPath,
       properties: ["openFile"],
-      filters: [{ name: "Executable Files", extensions: ["exe"] }],
+      filters: [{ name: "Executable Files", extensions: ["exe", "bat", "cmd"] }],
     });
 
     return result.canceled ? null : result.filePaths[0];

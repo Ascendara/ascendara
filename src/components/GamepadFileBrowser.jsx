@@ -389,12 +389,12 @@ const GamepadFileBrowser = ({
         </span>
         {isExe && !isFocused && (
           <span className="rounded-md border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs font-bold text-green-400">
-            .exe
+            {(name.match(/\.[^.]+$/) || ['.exe'])[0].toLowerCase()}
           </span>
         )}
         {isExe && isFocused && (
           <span className="rounded-md border border-secondary/30 bg-secondary/20 px-2 py-0.5 text-xs font-bold text-secondary">
-            .exe
+            {(name.match(/\.[^.]+$/) || ['.exe'])[0].toLowerCase()}
           </span>
         )}
         {folder && isFocused && (

@@ -1035,7 +1035,11 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     # Fall back to regular launch
                     logging.info("Falling back to regular launch")
                     try:
-                        process = subprocess.Popen(launch_cmd if launch_cmd else exe_path, shell=True if launch_cmd else False)
+                        is_script = exe_path.lower().endswith(('.bat', '.cmd'))
+                        process = subprocess.Popen(
+                            launch_cmd if launch_cmd else exe_path,
+                            shell=True if (launch_cmd or is_script) else False
+                        )
                     except OSError as e:
                         if getattr(e, "winerror", None) == 740:
                             logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")
@@ -1051,7 +1055,11 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                             raise
             else:
                 try:
-                    process = subprocess.Popen(launch_cmd if launch_cmd else exe_path, shell=True if launch_cmd else False)
+                    is_script = exe_path.lower().endswith(('.bat', '.cmd'))
+                    process = subprocess.Popen(
+                        launch_cmd if launch_cmd else exe_path,
+                        shell=True if (launch_cmd or is_script) else False
+                    )
                 except OSError as e:
                     if getattr(e, "winerror", None) == 740:
                         logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")

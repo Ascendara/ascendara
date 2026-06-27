@@ -76,7 +76,7 @@ async function createGameShortcut(game) {
       $Shortcut.TargetPath = "${handlerPath}"
       $Shortcut.Arguments = '"${exePath}" ${isCustom ? 1 : 0} "--shortcut"'
       $Shortcut.WorkingDirectory = "${path.dirname(handlerPath)}"
-      $Shortcut.IconLocation = "${exePath},0"
+      ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = "${exePath},0"` : ''}
       $Shortcut.Save()
     `;
 
