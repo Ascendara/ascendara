@@ -1250,6 +1250,8 @@ class GofileDownloader:
             try:
                 # check os
                 if sys.platform == "win32":
+                    _lib_extraction_failed = False
+                    _lib_err = None
                     if file.endswith('.zip'):
                         with zipfile.ZipFile(archive_path, 'r') as zip_ref:
                             # Filter members to extract (exclude .url and _CommonRedist)
@@ -1298,8 +1300,6 @@ class GofileDownloader:
                         long_extract_dir = long_path(extract_dir)
                         # Always try the bundled Python unrar library first - it supports
                         # password-protected and encrypted archives via pwd parameter.
-                        _lib_extraction_failed = False
-                        _lib_err = None
                         try:
                             # Try opening with password first (handles encrypted-header archives)
                             try:
