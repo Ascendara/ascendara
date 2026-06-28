@@ -841,6 +841,10 @@ function registerGameHandlers() {
         if (fs.existsSync(gameDirectory)) {
           fs.rmSync(gameDirectory, { recursive: true, force: true });
           console.log(`Deleted game from directory: ${gameDirectory}`);
+          if (isLinux && proton) {
+            await proton.deleteGamePrefix(game);
+            console.log(`Deleted compat data for: ${game}`);
+          }
           return;
         }
       }
