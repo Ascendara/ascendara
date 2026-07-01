@@ -1592,11 +1592,9 @@ class AscendaraDownloader:
             if not _extraction_success:
                 if _7z_bin:
                     logging.info(f"[AscendaraDownloader] Extracting with 7z: {_7z_bin}")
-                    # Use -bsp1 to show progress in stderr, -aoa to overwrite existing files
-                    # Don't capture stdout/stderr to avoid buffer deadlock on large archives
                     _proc = subprocess.Popen(
                         [_7z_bin, 'x', '-psteamrip.com', f'-o{extract_to or self.download_dir}', '-y', '-aoa', '-bsp0', '-bb0', archive_path],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                         stdin=subprocess.DEVNULL,
                         creationflags=_CREATE_NO_WINDOW
                     )
@@ -1604,14 +1602,17 @@ class AscendaraDownloader:
                         # Dynamic timeout: 4 hours for archives >50GB, otherwise 2 hours
                         archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
                         timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
-                        _proc.wait(timeout=timeout_seconds)
+                        _, _7z_stderr = _proc.communicate(timeout=timeout_seconds)
                         if _proc.returncode in (0, 1):
                             _extraction_success = True
                             logging.info(f"[AscendaraDownloader] 7z extraction completed successfully")
                         else:
-                            raise RuntimeError(f"7z extraction failed (exit {_proc.returncode})")
+                            _7z_err_msg = _7z_stderr.decode(errors='replace').strip() if _7z_stderr else ''
+                            logging.error(f"[AscendaraDownloader] 7z stderr: {_7z_err_msg}")
+                            raise RuntimeError(f"7z extraction failed (exit {_proc.returncode}): {_7z_err_msg}")
                     except subprocess.TimeoutExpired:
                         _proc.kill()
+                        _proc.communicate()
                         raise RuntimeError(f"7z extraction timed out after {timeout_seconds // 3600} hour(s)")
                 else:
                     raise RuntimeError(
