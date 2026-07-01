@@ -561,7 +561,7 @@ def update_play_time(file_path, is_custom_game, game_entry=None, seconds_to_add=
         if is_custom_game:
             # 2. Custom Game Case
             for game in data["games"]:
-                if game["executable"] == game_entry["executable"]:
+                if not game.get('_isDeleted') and game.get('executable') == game_entry.get('executable'):
                     if "playTime" not in game:
                         game["playTime"] = 0
                     
@@ -855,7 +855,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         games_json_path = os.path.join(download_dir, 'games.json')
         with open(games_json_path, 'r', encoding='utf-8') as f:
             games_data = json.load(f)
-        game_entry = next((game for game in games_data['games'] if game['executable'] == exe_path), None)
+        game_entry = next((game for game in games_data['games'] if not game.get('_isDeleted') and game.get('executable') == exe_path), None)
         if game_entry is None:
             logging.error(f"Game not found in games.json for executable path: {exe_path}")
             logging.info("[EXIT] execute due to missing game_entry for custom game")
@@ -900,7 +900,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         with open(games_json_path, "r", encoding='utf-8') as f:
             games_data = json.load(f)
         for game in games_data["games"]:
-            if game["executable"] == exe_path:
+            if not game.get('_isDeleted') and game.get('executable') == exe_path:
                 if "launchCount" not in game:
                     game["launchCount"] = 0
                 game["launchCount"] += 1
@@ -1225,7 +1225,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             with open(games_json_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             for game in data["games"]:
-                if game["executable"] == exe_path:
+                if not game.get('_isDeleted') and game.get('executable') == exe_path:
                     game["isRunning"] = False
                     logging.info(f"Set isRunning=False for custom game {game_name}")
                     break
@@ -1249,7 +1249,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             with open(games_json_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             for game in data["games"]:
-                if game["executable"] == exe_path:
+                if not game.get('_isDeleted') and game.get('executable') == exe_path:
                     game["isRunning"] = False
                     logging.info(f"Set isRunning=False for custom game {exe_path} due to exception")
                     break
