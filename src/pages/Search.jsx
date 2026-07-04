@@ -1405,8 +1405,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
               </div>
             ) : (
               <div className="relative">
-                <GameGrid 
+                <GameGrid
                   displayedGames={displayedGames}
+                  filteredGames={filteredGames}
                   debouncedSearchQuery={debouncedSearchQuery}
                   handleDownload={handleDownload}
                   handleContextMenu={handleContextMenu}
@@ -1653,23 +1654,24 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
 });
 
 // Memoized game grid component to prevent re-renders on search input
-const GameGrid = memo(({ 
-  displayedGames, 
-  debouncedSearchQuery, 
+const GameGrid = memo(({
+  displayedGames,
+  filteredGames,
+  debouncedSearchQuery,
   handleDownload,
   handleContextMenu,
   featuredGameId,
 }) => {
-  // Identify featured game (only show when not searching)
+  // Identify featured game from the full list (only show when not searching)
   const isSearching = !!debouncedSearchQuery?.trim();
   const featuredGame = useMemo(() => {
-    if (isSearching || !featuredGameId) return null;
-    return displayedGames.find(g => g.gameID === featuredGameId) || null;
-  }, [displayedGames, featuredGameId, isSearching]);
+    if (isSearching || !featuredGameId || !filteredGames?.length) return null;
+    return filteredGames.find(g => g.gameID === featuredGameId) || null;
+  }, [filteredGames, featuredGameId, isSearching]);
 
   const regularGames = useMemo(() => {
     if (!featuredGame) return displayedGames;
-    return displayedGames.filter(g => g !== featuredGame);
+    return displayedGames.filter(g => g.gameID !== featuredGame.gameID);
   }, [displayedGames, featuredGame]);
 
   // Create stable callback references for each game
@@ -1681,8 +1683,14 @@ const GameGrid = memo(({
         callbacks.set(key, () => handleDownload(game));
       }
     });
+    if (featuredGame) {
+      const key = featuredGame.imgID || featuredGame.id || `${featuredGame.game}-${featuredGame.version}`;
+      if (!callbacks.has(key)) {
+        callbacks.set(key, () => handleDownload(featuredGame));
+      }
+    }
     return callbacks;
-  }, [displayedGames, handleDownload]);
+  }, [displayedGames, featuredGame, handleDownload]);
 
   const featuredKey = featuredGame ? (featuredGame.imgID || featuredGame.id || `${featuredGame.game}-${featuredGame.version}`) : null;
 
