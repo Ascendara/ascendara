@@ -349,93 +349,54 @@ const TorboxDownloads = () => {
     }
 
     try {
-      // First, try to get stored download data from local storage
-      const torboxData = manageStoredGameNames();
-      const storedData = torboxData[download.id] || null;
-
-      if (!storedData || !storedData.gameData) {
-        // If no stored data, try to download directly from the current download
-        if (download.files && download.files.length > 0 && download.files[0].url) {
-          // Get a direct file URL from the download
-          const fileUrl = download.files[0].url;
-          const fileName =
-            storedData?.name ||
-            download.name ||
-            download.files[0].short_name ||
-            "download";
-
-          toast.info(t("torbox.starting_download_to_pc", { name: fileName }));
-
-          try {
-            // Use electron to download the file
-            await window.electron.downloadFile(
-              fileUrl,
-              fileName,
-              false, // online
-              false, // dlc
-              false, // isVr
-              false, // updateFlow
-              "", // version
-              storedData?.imgUrl || null, // imgID
-              download.size ? formatBytes(download.size) : "", // size
-              0, // additionalDirIndex
-              "" // gameID
-            );
-
-            toast.success(t("torbox.download_started", { name: fileName }));
-          } catch (error) {
-            console.error("[TorboxDownloads] Error starting download:", error);
-            toast.error(t("torbox.error_starting_download"));
-            clearDownloadLock();
-          }
-          return;
-        }
-
-        toast.error(t("torbox.error_no_download_data"));
+      // Get the API key early - needed for both stored and fallback paths
+      const apiKey = getApiKey(settings);
+      if (!apiKey) {
+        toast.error(t("torbox.error_no_api_key"));
         clearDownloadLock();
         return;
       }
 
-      // We have stored data, use it to process the download like in Download.jsx
-      const { gameData, provider, originalUrl } = storedData;
+      // Try to get stored download data from local storage
+      const torboxData = manageStoredGameNames();
+      const storedData = torboxData[download.id] || null;
+      const hasStoredGameData = storedData && storedData.gameData;
 
-      toast.info(t("torbox.processing_download", { name: gameData.game }));
+      // Always request a fresh direct download link from TorBox.
+      // Relying on download.files[0].url breaks for zip downloads and for any
+      // download that was added to TorBox outside of Ascendara.
+      toast.info(
+        t("torbox.processing_download", {
+          name: hasStoredGameData
+            ? storedData.gameData.game
+            : download.name || t("common.file"),
+        })
+      );
 
-      // Get the API key
-      const apiKey = getApiKey(settings);
-      if (!apiKey) {
-        toast.error(t("torbox.error_no_api_key"));
-        return;
-      }
-
-      // Get a fresh direct download link
       const downloadUrlResponse = await getDirectDownloadLink(apiKey, download.id);
 
-      // Check if we have a valid response
       if (!downloadUrlResponse) {
         throw new Error("Failed to get direct download URL");
       }
 
-      // Log the response structure to understand its format
       console.log(
         "Download URL response structure:",
         JSON.stringify(downloadUrlResponse, null, 2)
       );
 
-      // Extract the URL string from the response
-      // Based on the error message, we know the URL is in the data property
       let directUrl = null;
 
-      // Simple extraction logic that checks common patterns
       if (typeof downloadUrlResponse === "string") {
         directUrl = downloadUrlResponse;
       } else if (downloadUrlResponse && typeof downloadUrlResponse === "object") {
-        // Check the most likely places for the URL based on the API response
         directUrl =
-          downloadUrlResponse.data ||
           downloadUrlResponse.download_url ||
           downloadUrlResponse.url ||
-          (downloadUrlResponse.data && downloadUrlResponse.data.url);
+          (typeof downloadUrlResponse.data === "string"
+            ? downloadUrlResponse.data
+            : null) ||
+          downloadUrlResponse.data?.download_url ||
+          downloadUrlResponse.data?.url;
       }
 
       if (!directUrl || typeof directUrl !== "string") {
@@ -443,45 +404,69 @@ const TorboxDownloads = () => {
         throw new Error("Failed to extract download URL from response");
       }
 
-      // Ensure the URL is properly formatted
       if (!directUrl.startsWith("http")) {
         directUrl = `https://${directUrl.replace(/^(?:https?:\/\/)?/, "")}`;
       }
 
       console.log("Extracted direct URL:", directUrl);
-
-      // Sanitize game name
-      const sanitizedGameName = gameData.game.replace(/[<>:"/\\|?*]/g, "");
-
       toast.success(t("torbox.download_ready"));
 
-      // Start the download using electron
-      await window.electron.downloadFile(
-        directUrl,
-        sanitizedGameName,
-        gameData.online || false,
-        gameData.dlc || false,
-        gameData.vr || false, // isVr
-        false, // updateFlow - explicitly set to false
-        gameData.version || "",
-        gameData.imgID || null,
-        gameData.size || "",
-        0, // additionalDirIndex
-        gameData.gameID || "" // gameID
-      );
+      if (hasStoredGameData) {
+        const { gameData } = storedData;
+        const sanitizedGameName = gameData.game.replace(/[<>:"/\\|?*]/g, "");
 
-      toast.success(t("torbox.download_started", { name: gameData.game }));
+        await window.electron.downloadFile(
+          directUrl,
+          sanitizedGameName,
+          gameData.online || false,
+          gameData.dlc || false,
+          gameData.vr || false,
+          false,
+          gameData.version || "",
+          gameData.imgID || null,
+          gameData.size || "",
+          0,
+          gameData.gameID || ""
+        );
+
+        toast.success(t("torbox.download_started", { name: gameData.game }));
+      } else {
+        const fileName =
+          storedData?.name ||
+          download.name ||
+          download.files?.[0]?.short_name ||
+          download.files?.[0]?.name ||
+          t("common.file");
+        const sanitizedName = fileName.replace(/[<>:"/\\|?*]/g, "");
+
+        await window.electron.downloadFile(
+          directUrl,
+          sanitizedName,
+          false,
+          false,
+          false,
+          false,
+          "",
+          storedData?.imgUrl || null,
+          download.size ? formatBytes(download.size) : "",
+          0,
+          ""
+        );
+
+        toast.success(t("torbox.download_started", { name: fileName }));
+      }
 
       // Mark this download as downloaded to PC
       const updatedDownloadedToPc = {
         ...downloadedToPc,
         [download.id]: {
           timestamp: Date.now(),
-          name: gameData.game,
+          name: hasStoredGameData
+            ? storedData.gameData.game
+            : download.name || t("common.file"),
         },
       };
 
-      // Update state and save to localStorage
       setDownloadedToPc(updatedDownloadedToPc);
       localStorage.setItem("torboxDownloadedToPc", JSON.stringify(updatedDownloadedToPc));
     } catch (error) {

@@ -1329,6 +1329,8 @@ class AscendaraDownloader:
                 extraction_errors.append(str(e))
                 continue
             
+            self._flatten_directories()
+            
             # Scan for new archives at the top level only - game asset zips are
             # nested deep inside subdirectories and must not be extracted/deleted.
             # Repack continuation archives (part2.zip, etc.) always land at root.
@@ -1987,6 +1989,24 @@ class AscendaraDownloader:
                     return True
             return False
 
+        def _has_exe(path: str) -> bool:
+            for _root, _dirs, _files in os.walk(path):
+                if any(f.lower().endswith('.exe') for f in _files):
+                    return True
+            return False
+
+        def _count_files(path: str) -> int:
+            count = 0
+            for _root, _dirs, _files in os.walk(path):
+                count += len(_files)
+            return count
+
+        # Root-level status
+        root_items = os.listdir(self.download_dir)
+        root_files = [f for f in root_items if os.path.isfile(os.path.join(self.download_dir, f))]
+        root_exe = any(f.lower().endswith('.exe') for f in root_files)
+        total_files = _count_files(self.download_dir)
+
         # Find the subdir that contains a .exe AND whose name resembles the game name
         target_dir = None
         for subdir in subdirs:
@@ -1994,12 +2014,46 @@ class AscendaraDownloader:
             if not _name_matches_game(subdir_name):
                 logging.info(f"[AscendaraDownloader] Skipping flatten candidate (name mismatch): {subdir_name}")
                 continue
-            for _root, _dirs, _files in os.walk(subdir):
-                if any(f.lower().endswith('.exe') for f in _files):
-                    target_dir = subdir
-                    break
-            if target_dir:
+            if _has_exe(subdir):
+                target_dir = subdir
+                logging.info(f"[AscendaraDownloader] Name-matched subdir contains executable: {subdir_name}")
                 break
+
+        if not target_dir and not root_exe and len(subdirs) == 1:
+            subdir = subdirs[0]
+            subdir_name = os.path.basename(subdir)
+            subdir_file_count = _count_files(subdir)
+            if _has_exe(subdir):
+                target_dir = subdir
+                logging.info(f"[AscendaraDownloader] Single subdir '{subdir_name}' contains the only executable — flattening wrapper")
+            elif total_files > 0 and subdir_file_count / total_files >= 0.8:
+                target_dir = subdir
+                logging.info(f"[AscendaraDownloader] Single subdir '{subdir_name}' contains {subdir_file_count}/{total_files} files — flattening wrapper")
+
+        # Aggressive wrapper fallback: if the root only contains Ascendara metadata
+        # files (JSON, header images, etc.) and a single subdir, assume the subdir
+        # is a wrapper and flatten it. This catches TorBox/GOFile wrappers even when
+        # the content ratio is low and Ascendara has already placed image files in
+        # the game directory.
+        if not target_dir and len(subdirs) == 1:
+            subdir = subdirs[0]
+            subdir_name = os.path.basename(subdir)
+            root_metadata_files = [
+                f for f in root_files
+                if f.endswith('.ascendara.json')
+                or f == 'filemap.ascendara.json'
+                or f.endswith('.ascendara.png')
+                or f.endswith('.ascendara.jpg')
+            ]
+            logging.info(
+                f"[AscendaraDownloader] Flatten debug: root_files={root_files}, "
+                f"root_exe={root_exe}, total_files={total_files}, "
+                f"subdir_file_count={_count_files(subdir)}, "
+                f"metadata_only={len(root_metadata_files) == len(root_files)}"
+            )
+            if len(root_metadata_files) == len(root_files):
+                target_dir = subdir
+                logging.info(f"[AscendaraDownloader] Single subdir '{subdir_name}' treated as wrapper (root only has metadata) — flattening")
 
         # Fall back: single subdir that matches the game name, even without a .exe
         if not target_dir and len(subdirs) == 1:
