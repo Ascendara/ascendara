@@ -1,6 +1,6 @@
 {
   "name": "ascendara",
-  "version": "10.6.9",
+  "version": "10.7.0",
   "main": "electron/app.js",
   "description": "Skip extracting files, navigating setup processes, or any unnecessary hassles.",
   "repository": {
