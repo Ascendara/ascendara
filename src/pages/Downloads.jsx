@@ -58,6 +58,9 @@ import {
   Play,
   FileText,
   ScrollText,
+  ShieldAlert,
+  Copy,
+  FolderCog,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -430,6 +433,7 @@ const Downloads = () => {
               downloadingData.updating ||
               downloadingData.verifying ||
               downloadingData.stopped ||
+              downloadingData.pendingManualInstall ||
               (downloadingData.verifyError && downloadingData.verifyError.length > 0) ||
               downloadingData.error)
           );
@@ -450,12 +454,13 @@ const Downloads = () => {
         prevGames.forEach(game => {
           const gameName = game.game;
           const wasVerifying = game.downloadingData?.verifying;
+          const wasPendingManualInstall = game.downloadingData?.pendingManualInstall;
           const isGone = !currentNames.has(gameName);
           const isAlreadyTracked =
             completedGamesRef.current.has(gameName) ||
             fadingGamesRef.current.has(gameName);
 
-          if (wasVerifying && isGone && !isAlreadyTracked) {
+          if ((wasVerifying || wasPendingManualInstall) && isGone && !isAlreadyTracked) {
             console.log("Game completed:", gameName);
             newlyCompleted.push(game);
 
@@ -521,7 +526,11 @@ const Downloads = () => {
             allGames.push({
               ...pg,
               isCompleted: isCompleted,
-              downloadingData: { ...pg.downloadingData, verifying: false },
+              downloadingData: {
+                ...pg.downloadingData,
+                verifying: false,
+                pendingManualInstall: false,
+              },
             });
           }
         });
@@ -1285,6 +1294,12 @@ const StatusBadge = memo(({ status, t }) => {
       className: "bg-green-500/10 text-green-600 border-green-500/20",
       animate: false,
     },
+    actionRequired: {
+      icon: ShieldAlert,
+      label: t("downloads.actionRequired") || "Action Required",
+      className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+      animate: false,
+    },
   };
 
   const config = configs[status] || configs.downloading;
@@ -1318,6 +1333,10 @@ const DownloadCard = ({
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
+  const [installerLaunched, setInstallerLaunched] = useState(false);
+  const [isFinishingInstall, setIsFinishingInstall] = useState(false);
+  const [showInstallLocationDialog, setShowInstallLocationDialog] = useState(false);
   const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
   const [heroImage, setHeroImage] = useState(null);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
@@ -1458,9 +1477,11 @@ const DownloadCard = ({
   const isVerifyingState = downloadingData?.verifying;
   const hasVerifyError =
     downloadingData?.verifyError && downloadingData.verifyError.length > 0;
+  const isPendingManualInstall = downloadingData?.pendingManualInstall;
 
   // Determine current status for badge
   const getStatus = () => {
+    if (isPendingManualInstall) return "actionRequired";
     if (isCompleted) return "completed";
     if (hasError) return "error";
     if (isStopped) return "stopped";
@@ -1484,6 +1505,54 @@ const DownloadCard = ({
       toast.error(t("downloads.verificationFailed"));
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleRunInstaller = async () => {
+    const installerPath = downloadingData?.manualInstallerPath;
+    if (!installerPath) return;
+    setIsLaunchingInstaller(true);
+    try {
+      const result = await window.electron.runElevatedInstaller(installerPath);
+      if (!result.success) throw new Error(result.error);
+      toast.success(t("downloads.installerLaunched") || "Installer launched", {
+        description:
+          t("downloads.installerLaunchedDesc") ||
+          "Follow the on-screen steps to finish installing the game.",
+      });
+      setInstallerLaunched(true);
+      setShowInstallLocationDialog(true);
+    } catch (error) {
+      console.error("Failed to launch installer:", error);
+      toast.error(t("downloads.installerLaunchFailed") || "Could not launch installer");
+    } finally {
+      setIsLaunchingInstaller(false);
+    }
+  };
+
+  const handleCopyInstallLocation = () => {
+    const dir = downloadingData?.manualInstallDir;
+    if (!dir) return;
+    navigator.clipboard.writeText(dir);
+    toast.success(t("common.copied") || "Copied to clipboard!");
+  };
+
+  const handleFinishInstall = async () => {
+    setIsFinishingInstall(true);
+    try {
+      const result = await window.electron.completeManualInstall(game.game);
+      if (!result.success) throw new Error(result.error);
+      toast.success(t("downloads.installComplete") || "Installation Complete", {
+        description:
+          t("downloads.installCompleteDesc") || "Your game is ready to play",
+      });
+    } catch (error) {
+      console.error("Failed to finalize installation:", error);
+      toast.error(
+        t("downloads.installCompleteFailed") || "Could not finalize installation"
+      );
+    } finally {
+      setIsFinishingInstall(false);
     }
   };
 
@@ -1669,9 +1738,10 @@ const DownloadCard = ({
                 </h3>
                 <div className="mt-0.5 flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{game.size}</span>
-                  {!hasError && !isStopped && !hasVerifyError && (
+                  {!hasError && !isStopped && !hasVerifyError && !isPendingManualInstall && (
                     <StatusBadge status={getStatus()} t={t} />
                   )}
+                  {isPendingManualInstall && <StatusBadge status="actionRequired" t={t} />}
                 </div>
               </div>
             </div>
@@ -1752,8 +1822,82 @@ const DownloadCard = ({
 
         {/* Content based on state */}
         <div className="mt-4">
+          {/* Pending Manual Install State */}
+          {isPendingManualInstall && !installerLaunched && (
+            <div className="space-y-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                  <ShieldAlert className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-amber-600">
+                    {t("downloads.manualInstallTitle") || "One Last Step"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("downloads.manualInstallDescription") ||
+                      "Download complete. Run the installer as Administrator to finish installing the game."}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleRunInstaller}
+                disabled={isLaunchingInstaller}
+                className="w-full gap-2 text-secondary"
+              >
+                {isLaunchingInstaller ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldAlert className="h-4 w-4" />
+                )}
+                {t("downloads.runAsAdmin") || "Run Installer as Admin"}
+              </Button>
+            </div>
+          )}
+
+          {/* Installer Launched, Awaiting User Confirmation */}
+          {isPendingManualInstall && installerLaunched && (
+            <div className="space-y-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                  <Loader className="h-5 w-5 animate-spin text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-amber-600">
+                    {t("downloads.installingTitle") || "Installing..."}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("downloads.installingDescription") ||
+                      "Follow the installer's steps. Once it finishes, click below to mark this game as installed."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowInstallLocationDialog(true)}
+                  className="gap-2"
+                >
+                  <FolderCog className="h-4 w-4" />
+                  {t("downloads.viewInstallLocation") || "View Location"}
+                </Button>
+                <Button
+                  onClick={handleFinishInstall}
+                  disabled={isFinishingInstall}
+                  className="flex-1 gap-2 text-secondary"
+                >
+                  {isFinishingInstall ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  {t("downloads.finishedInstalling") || "I've Finished Installing"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Completed State */}
-          {isCompleted && (
+          {isCompleted && !isPendingManualInstall && (
             <div className="flex items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/5 p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -2130,6 +2274,48 @@ const DownloadCard = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Install Location Reminder Dialog */}
+      <AlertDialog
+        open={showInstallLocationDialog}
+        onOpenChange={setShowInstallLocationDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <FolderCog className="h-6 w-6 text-amber-600" />
+              {t("downloads.setInstallLocationTitle") || "Set the Install Location"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-muted-foreground">
+              <p>
+                {t("downloads.setInstallLocationDescription") ||
+                  "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it."}
+              </p>
+              <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
+                <code className="flex-1 break-all text-xs text-foreground">
+                  {downloadingData?.manualInstallDir}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={handleCopyInstallLocation}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              className="bg-primary text-secondary"
+              onClick={() => setShowInstallLocationDialog(false)}
+            >
+              {t("common.gotIt") || "Got it"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

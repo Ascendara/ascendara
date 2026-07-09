@@ -25,6 +25,77 @@ const goFileProcesses = new Map();
 const retryDownloadProcesses = new Map();
 
 /**
+ * Log into qBittorrent's WebUI and remove any torrent(s) whose save path
+ * matches the given game directory. This is necessary because killing the
+ * AscendaraTorrentHandler process does NOT stop qBittorrent itself from
+ * continuing to download/seed and hold file locks, which causes EBUSY
+ * errors when the game directory is deleted afterwards.
+ */
+async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFiles) {
+  try {
+    const qbHost = settings.torrentHost || "localhost";
+    const qbPort = settings.torrentPort || 8080;
+    const qbUser = settings.torrentUsername || "admin";
+    const qbPass = settings.torrentPassword || "adminadmin";
+    const baseUrl = `http://${qbHost}:${qbPort}`;
+
+    const loginRes = await axios.post(
+      `${baseUrl}/api/v2/auth/login`,
+      `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}`,
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        validateStatus: () => true,
+        timeout: 5000,
+      }
+    );
+
+    const cookie = loginRes.headers?.["set-cookie"]?.[0];
+    if (!cookie || loginRes.data !== "Ok.") {
+      console.warn(
+        "[qBittorrent] Could not authenticate with WebUI to clean up torrent"
+      );
+      return;
+    }
+
+    const infoRes = await axios.get(`${baseUrl}/api/v2/torrents/info`, {
+      headers: { Cookie: cookie },
+      validateStatus: () => true,
+      timeout: 5000,
+    });
+
+    const normalizedDir = path.normalize(gameDirectory).toLowerCase();
+    const matchingHashes = (infoRes.data || [])
+      .filter(
+        t => t.save_path && path.normalize(t.save_path).toLowerCase().startsWith(normalizedDir)
+      )
+      .map(t => t.hash);
+
+    if (matchingHashes.length === 0) {
+      console.log(`[qBittorrent] No matching torrents found for: ${gameDirectory}`);
+      return;
+    }
+
+    await axios.post(
+      `${baseUrl}/api/v2/torrents/delete`,
+      `hashes=${matchingHashes.join("|")}&deleteFiles=${deleteFiles ? "true" : "false"}`,
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie },
+        validateStatus: () => true,
+        timeout: 5000,
+      }
+    );
+    console.log(
+      `[qBittorrent] Removed ${matchingHashes.length} torrent(s) (deleteFiles=${deleteFiles}) for: ${gameDirectory}`
+    );
+
+    // Give qBittorrent a moment to release file handles before we touch the directory
+    await new Promise(resolve => setTimeout(resolve, 500));
+  } catch (err) {
+    console.warn("[qBittorrent] Failed to clean up torrent(s):", err.message);
+  }
+}
+
+/**
  * Register download-related IPC handlers
  */
 function registerDownloadHandlers() {
@@ -86,6 +157,7 @@ function registerDownloadHandlers() {
                   downloadingData.updating ||
                   downloadingData.verifying ||
                   downloadingData.stopped ||
+                  downloadingData.pendingManualInstall ||
                   (downloadingData.verifyError &&
                     downloadingData.verifyError.length > 0) ||
                   downloadingData.error;
@@ -139,15 +211,17 @@ function registerDownloadHandlers() {
                       downloadingData.extractionProgress?.currentFile
                         ? `Extracting: ${downloadingData.extractionProgress.filesExtracted}/${downloadingData.extractionProgress.totalFiles} files`
                         : downloadingData.timeUntilComplete || "Calculating...",
-                    status: downloadingData.paused
-                      ? "paused"
-                      : downloadingData.extracting
-                        ? "extracting"
-                        : downloadingData.verifying
-                          ? "verifying"
-                          : downloadingData.stopped
-                            ? "stopped"
-                            : "downloading",
+                    status: downloadingData.pendingManualInstall
+                      ? "actionRequired"
+                      : downloadingData.paused
+                        ? "paused"
+                        : downloadingData.extracting
+                          ? "extracting"
+                          : downloadingData.verifying
+                            ? "verifying"
+                            : downloadingData.stopped
+                              ? "stopped"
+                              : "downloading",
                     size: totalSize,
                     downloaded: downloadedSize,
                     error: downloadingData.error || null,
@@ -162,6 +236,8 @@ function registerDownloadHandlers() {
                       stopped: downloadingData.stopped || false,
                       paused: downloadingData.paused || false,
                       waiting: downloadingData.waiting || false,
+                      pendingManualInstall: downloadingData.pendingManualInstall || false,
+                      manualInstallerPath: downloadingData.manualInstallerPath || null,
                       progressCompleted: downloadingData.progressCompleted,
                       progressDownloadSpeeds: downloadingData.progressDownloadSpeeds,
                       timeUntilComplete: downloadingData.timeUntilComplete,
@@ -582,6 +658,124 @@ function registerDownloadHandlers() {
     }
   );
 
+  // Run a manual installer (e.g. torrent repack setup.exe) elevated via UAC
+  ipcMain.handle("run-elevated-installer", async (_, installerPath) => {
+    try {
+      if (!installerPath || !fs.existsSync(installerPath)) {
+        return { success: false, error: "Installer not found" };
+      }
+
+      await new Promise((resolve, reject) => {
+        const escapedPath = installerPath.replace(/'/g, "''");
+        const process = spawn("powershell.exe", [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `Start-Process -FilePath '${escapedPath}' -Verb RunAs`,
+        ]);
+        let stderr = "";
+        process.stderr.on("data", data => (stderr += data.toString()));
+        process.on("error", reject);
+        process.on("exit", code => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`Failed to launch installer (exit code ${code}): ${stderr.trim()}`));
+          }
+        });
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error launching elevated installer:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Called when the user confirms they've finished running a manual installer
+  // (e.g. torrent repack setup.exe). Detects the resulting executable and
+  // clears the pendingManualInstall state so the game shows as fully installed.
+  ipcMain.handle("complete-manual-install", async (_, game) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory) {
+        throw new Error("Download directory not set");
+      }
+      const sanitizedGame = sanitizeText(game);
+      const gameDirectory = path.join(settings.downloadDirectory, sanitizedGame);
+      const gameInfoPath = path.join(
+        gameDirectory,
+        `${sanitizedGame}.ascendara.json`
+      );
+
+      if (!fs.existsSync(gameInfoPath)) {
+        return { success: false, error: "Game info not found" };
+      }
+
+      const gameInfo = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
+
+      // Try to find the installed executable if we don't already have a valid one
+      let executable = gameInfo.executable;
+      if (!executable || !fs.existsSync(executable)) {
+        const candidates = [];
+        const walk = dir => {
+          let entries = [];
+          try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+          } catch {
+            return;
+          }
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              walk(fullPath);
+            } else if (entry.name.toLowerCase().endsWith(".exe")) {
+              const lower = entry.name.toLowerCase();
+              if (
+                lower.includes("unins") ||
+                lower.includes("setup") ||
+                lower.includes("redist") ||
+                lower.includes("vcredist") ||
+                lower.includes("directx") ||
+                lower.includes("dxsetup") ||
+                lower.includes("quicksfv") ||
+                lower.includes("checksum") ||
+                lower.includes("md5") ||
+                lower.includes("readme") ||
+                lower.includes("crashreport") ||
+                lower.includes("crashpad")
+              ) {
+                continue;
+              }
+              try {
+                candidates.push({
+                  path: fullPath,
+                  size: fs.statSync(fullPath).size,
+                });
+              } catch {}
+            }
+          }
+        };
+        walk(gameDirectory);
+        candidates.sort((a, b) => b.size - a.size);
+        if (candidates.length > 0) {
+          executable = candidates[0].path;
+        }
+      }
+
+      if (executable) {
+        gameInfo.executable = executable;
+      }
+      delete gameInfo.downloadingData;
+      fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 4));
+
+      return { success: true, executable: executable || null };
+    } catch (error) {
+      console.error("Error completing manual install:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Stop download handler
   ipcMain.handle("stop-download", async (_, game, deleteContents = false) => {
     try {
@@ -715,6 +909,11 @@ function registerDownloadHandlers() {
 
       downloadProcesses.delete(sanitizedGame);
       console.log(`Total processes killed: ${killedProcesses}`);
+
+      // Step 2.5: Remove any matching torrent(s) from qBittorrent itself.
+      // Killing the handler process does not stop qBittorrent from continuing
+      // to download and holding file locks, so we must tell it directly.
+      await qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteContents);
 
       // Step 3: Wait for processes to fully terminate and release file locks
       // Use exponential backoff to verify processes are gone
