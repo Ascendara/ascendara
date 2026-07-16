@@ -1537,8 +1537,12 @@ export default function GameScreen() {
 
         setLoading(false);
 
-        // Fetch Steam API data
-        fetchSteamData(game.game || game.name);
+        // Fetch Steam API data - prefer the saved steamAppId if the user has matched/edited it
+        if (game.steamAppId) {
+          fetchSteamDataByAppId(game.steamAppId);
+        } else {
+          fetchSteamData(game.game || game.name);
+        }
       } catch (error) {
         console.error("Error loading game:", error);
         setLoading(false);
@@ -1610,9 +1614,15 @@ export default function GameScreen() {
 
   // Re-fetch Steam data when game changes
   // Steam API is always available (hardcoded), so we always fetch
+  // Prefer the saved steamAppId (user-matched/edited) over a name search,
+  // otherwise an edited match gets immediately overwritten by a name search.
   useEffect(() => {
     if (game) {
-      fetchSteamData(game.game || game.name);
+      if (game.steamAppId) {
+        fetchSteamDataByAppId(game.steamAppId);
+      } else {
+        fetchSteamData(game.game || game.name);
+      }
     }
   }, [game]);
 
