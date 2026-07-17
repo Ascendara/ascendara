@@ -498,7 +498,7 @@ contextBridge.exposeInMainWorld("electron", {
   getAuthHeaders: () => ipcRenderer.invoke("get-auth-headers"), // Use this instead
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   getImageKey: () => ipcRenderer.invoke("get-image-key"),
-  openURL: url => ipcRenderer.invoke("open-url", url),
+  openURL: (url, options) => ipcRenderer.invoke("open-url", url, options),
   fetchApiImage: (endpoint, imgID, timestamp, signature) =>
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
   getSteamGridUrls: gameName => ipcRenderer.invoke("steamgrid-get-urls", gameName),

@@ -1081,6 +1081,7 @@
     "criticReviews": "Critic Reviews",
     "dataProvidedBy": "Game data provided by",
     "developers": "Developers",
+    "downloadSource": "Download Source",
     "downloadOptions": {
       "ascendaraHandler": "Ascendara Download Handler",
       "downloadLink": "Download Link:",
@@ -1106,6 +1107,7 @@
       },
       "noProviders": "No download providers available for this game.",
       "pasteLink": "Paste your direct download link (DDL) here",
+      "buzzheavierReminder": "Tip: In the popup window, double-click the download button to start the download",
       "seamlessInstructions": {
         "description": "Ascendara will automatically process the download link and convert it to a direct download link",
         "title": "Start Seamless Download"

@@ -156,8 +156,91 @@ function registerMiscHandlers() {
   ipcMain.handle("get-auth-headers", () => authHelper.generateAuthHeaders());
 
   // Open URL
-  ipcMain.handle("open-url", async (_, url) => {
-    shell.openExternal(url);
+  ipcMain.handle("open-url", async (ipcEvent, url, options = {}) => {
+    if (options?.referrer) {
+      const externalWindow = new BrowserWindow({
+        width: 1280,
+        height: 800,
+        icon: path.join(__dirname, "..", process.platform === "linux" ? "icon.png" : "icon.ico"),
+        webPreferences: {
+          contextIsolation: true,
+          nativeWindowOpen: false,
+        },
+      });
+
+      // Block ads/popups trying to open additional windows
+      externalWindow.webContents.setWindowOpenHandler(({ url: popupUrl }) => {
+        console.log("Blocked popup in external window:", popupUrl);
+        return { action: "deny" };
+      });
+      externalWindow.webContents.on("new-window", event => {
+        event.preventDefault();
+        console.log("Blocked new-window popup in external window");
+      });
+
+      // Restrict in-window navigation to known Buzzheavier domains so ad redirects
+      // in the same window can't take the user away from the download page.
+      const allowedHosts = [
+        "buzzheavier.com",
+        "bzzhr.co",
+        "bzzhr.to",
+        "ts.bzzhr.to",
+        "fafda.to",
+        "fuckingfast.net",
+        "fuckingfast.co",
+      ];
+      externalWindow.webContents.on("will-navigate", (event, navUrl) => {
+        try {
+          const host = new URL(navUrl).hostname.toLowerCase();
+          const isAllowed = allowedHosts.some(
+            allowed => host === allowed || host.endsWith(`.${allowed}`)
+          );
+          if (!isAllowed) {
+            console.log("Blocked navigation in external window:", navUrl);
+            event.preventDefault();
+          }
+        } catch (error) {
+          console.error("Failed to parse external window navigation URL:", navUrl, error);
+        }
+      });
+
+      externalWindow.loadURL(url, { httpReferrer: options.referrer });
+
+      // When the user clicks a download button in the external window, intercept
+      // the file download and send the URL to Ascendara instead of saving it here.
+      const onWillDownload = (event, item) => {
+        event.preventDefault();
+        const downloadUrl = item.getURL();
+        console.log("Intercepted download in external window:", downloadUrl);
+
+        try {
+          // ipcEvent.sender is the main window's webContents that invoked open-url.
+          // Use it directly so the message always reaches the right renderer.
+          const sender = ipcEvent.sender;
+          if (sender && !sender.isDestroyed()) {
+            sender.send(
+              "intercepted-download-url",
+              `ascendara://${encodeURIComponent(downloadUrl)}`
+            );
+            console.log("Forwarded intercepted download URL to main window");
+            const senderWindow = BrowserWindow.fromWebContents(sender);
+            if (senderWindow && !senderWindow.isDestroyed()) {
+              senderWindow.focus();
+            }
+          }
+        } catch (error) {
+          console.error("Failed to forward intercepted download URL:", error);
+        }
+
+        externalWindow.webContents.session.removeListener("will-download", onWillDownload);
+        if (!externalWindow.isDestroyed()) {
+          externalWindow.close();
+        }
+      };
+      externalWindow.webContents.session.on("will-download", onWillDownload);
+    } else {
+      shell.openExternal(url);
+    }
   });
 
   // Resolve SteamGrid cover URLs for a game name (used by custom-source UI)

@@ -513,6 +513,11 @@ export default function DownloadPage() {
     checkExternalSourcesMode();
   }, []);
 
+  // Keep the whereToDownload ref in sync with the latest function
+  useEffect(() => {
+    whereToDownloadRef.current = whereToDownload;
+  });
+
   // Track if autoStart has been processed
   const autoStartProcessed = useRef(false);
 
@@ -583,6 +588,7 @@ export default function DownloadPage() {
   // Use a ref to track the event handler and active status
   const urlHandlerRef = useRef(null);
   const isActive = useRef(false);
+  const whereToDownloadRef = useRef(whereToDownload);
   const steamSectionRef = useRef(null);
   const mainContentRef = useRef(null);
   const scrollThreshold = 220;
@@ -1258,7 +1264,7 @@ export default function DownloadPage() {
             setSelectedProvider(provider);
             setInputLink(cleanUrl);
             setIsValidLink(true);
-            whereToDownload(cleanUrl);
+            await whereToDownloadRef.current(cleanUrl);
             return;
           }
         }
@@ -1290,6 +1296,59 @@ export default function DownloadPage() {
       setIsProcessingUrl(false);
     };
   }, [useAscendara, providerPatterns]); // Only register handler when both are ready
+
+  // Intercepted download URL listener effect - handles downloads captured from the
+  // external browser window used for Buzzheavier/SteamRIP referrer spoofing.
+  // This intentionally does not gate on providerPatterns; if the API patterns fail
+  // to load, we fall back to the local fallback patterns so the download still
+  // starts automatically.
+  useEffect(() => {
+    let isMounted = true;
+
+    const handler = async (event, url) => {
+      if (!url?.startsWith("ascendara://") || !isMounted) {
+        return;
+      }
+
+      try {
+        const encodedUrl = url.replace("ascendara://", "");
+        const decodedUrl = decodeURIComponent(encodedUrl);
+        const cleanUrl = decodedUrl.endsWith("/") ? decodedUrl.slice(0, -1) : decodedUrl;
+
+        if (cleanUrl === lastProcessedUrl) {
+          console.log("Ignoring duplicate intercepted URL:", cleanUrl);
+          return;
+        }
+        setLastProcessedUrl(cleanUrl);
+
+        console.log("Handling intercepted download URL:", cleanUrl);
+        for (const provider of VERIFIED_PROVIDERS) {
+          const patternsToUse = providerPatterns || LOCAL_FALLBACK_PATTERNS;
+          const valid = await isValidURL(cleanUrl, provider, patternsToUse);
+          if (valid) {
+            console.log("Intercepted URL matched provider:", provider);
+            setSelectedProvider(provider);
+            setInputLink(cleanUrl);
+            setIsValidLink(true);
+            await whereToDownloadRef.current(cleanUrl);
+            return;
+          }
+        }
+        console.log("No provider matched intercepted URL:", cleanUrl);
+        toast.error(t("download.toast.invalidLink"));
+      } catch (error) {
+        console.error("Error handling intercepted download URL:", error);
+        toast.error(t("download.toast.invalidProtocolUrl"));
+      }
+    };
+
+    window.electron.ipcRenderer.on("intercepted-download-url", handler);
+    return () => {
+      isMounted = false;
+      window.electron.ipcRenderer.removeListener("intercepted-download-url", handler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setTimemachineSetting(settings.showOldDownloadLinks);
@@ -1584,7 +1643,16 @@ export default function DownloadPage() {
     let link = downloadLinks[selectedProvider][0].startsWith("//")
       ? `https:${downloadLinks[selectedProvider][0]}`
       : downloadLinks[selectedProvider][0];
-    window.electron.openURL(link);
+
+    const isBuzzheavier =
+      selectedProvider.toLowerCase() === "buzzheavier" ||
+      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)/i.test(link);
+
+    if (isBuzzheavier) {
+      await window.electron.openURL(link, { referrer: "https://steamrip.com/" });
+    } else {
+      window.electron.openURL(link);
+    }
 
     const isNewUser = await checkIfNewUser();
     if (isNewUser) {
@@ -2778,24 +2846,23 @@ export default function DownloadPage() {
           ) : (torboxProviders.includes(selectedProvider) &&
               torboxService.isEnabled(settings) &&
               torboxService.getApiKey(settings)) ||
-            seamlessProviders.includes(selectedProvider) ? (
+            seamlessProviders.includes(selectedProvider) ||
+            selectedProvider === "buzzheavier" ? (
             /* Seamless / Torbox Download */
-            <div className="rounded-xl border border-border/30 bg-card p-6">
-              <div className="mx-auto max-w-lg">
-                <div className="flex flex-col items-center text-center">
-                  {/* Icon based on type */}
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <div className="rounded-xl border border-border/30 bg-card p-8 shadow-sm">
+              <div className="mx-auto flex max-w-md flex-col items-center text-center">
+                {/* Header */}
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                     {torboxProviders.includes(selectedProvider) &&
                     torboxService.isEnabled(settings) &&
                     torboxService.getApiKey(settings) ? (
-                      <TorboxIcon className="h-7 w-7 text-primary" />
+                      <TorboxIcon className="h-8 w-8 text-primary" />
                     ) : (
-                      <Zap fill="currentColor" className="h-7 w-7 text-primary" />
+                      <Zap fill="currentColor" className="h-8 w-8 text-primary" />
                     )}
                   </div>
-
-                  {/* Title */}
-                  <h2 className="flex items-center gap-2 text-xl font-semibold">
+                  <h2 className="text-2xl font-semibold">
                     {torboxProviders.includes(selectedProvider) &&
                     torboxService.isEnabled(settings) &&
                     torboxService.getApiKey(settings) &&
@@ -2803,34 +2870,7 @@ export default function DownloadPage() {
                       ? t("download.downloadOptions.torboxInstructions.title")
                       : t("download.downloadOptions.seamlessInstructions.title")}
                   </h2>
-
-                  {/* Disable TorBox button - only show when TorBox is active */}
-                  {torboxProviders.includes(selectedProvider) &&
-                    torboxService.isEnabled(settings) &&
-                    torboxService.getApiKey(settings) &&
-                    !torboxDisabledForSession && (
-                      <button
-                        onClick={() => setTorboxDisabledForSession(true)}
-                        className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors underline"
-                      >
-                        {t("download.downloadOptions.torboxInstructions.disableForDownload")}
-                      </button>
-                    )}
-
-                  {/* Re-enable TorBox button - only show when disabled */}
-                  {torboxProviders.includes(selectedProvider) &&
-                    torboxService.isEnabled(settings) &&
-                    torboxService.getApiKey(settings) &&
-                    torboxDisabledForSession && (
-                      <button
-                        onClick={() => setTorboxDisabledForSession(false)}
-                        className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors underline"
-                      >
-                        {t("download.downloadOptions.torboxInstructions.enableForDownload")}
-                      </button>
-                    )}
-
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
                     {torboxProviders.includes(selectedProvider) &&
                     torboxService.isEnabled(settings) &&
                     torboxService.getApiKey(settings) &&
@@ -2838,9 +2878,35 @@ export default function DownloadPage() {
                       ? t("download.downloadOptions.torboxInstructions.description")
                       : t("download.downloadOptions.seamlessInstructions.description")}
                   </p>
+                </div>
 
+                {/* TorBox toggle */}
+                {torboxProviders.includes(selectedProvider) &&
+                  torboxService.isEnabled(settings) &&
+                  torboxService.getApiKey(settings) &&
+                  (!torboxDisabledForSession ? (
+                    <button
+                      onClick={() => setTorboxDisabledForSession(true)}
+                      className="mt-2 text-xs text-muted-foreground underline transition-colors hover:text-foreground"
+                    >
+                      {t("download.downloadOptions.torboxInstructions.disableForDownload")}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setTorboxDisabledForSession(false)}
+                      className="mt-2 text-xs text-muted-foreground underline transition-colors hover:text-foreground"
+                    >
+                      {t("download.downloadOptions.torboxInstructions.enableForDownload")}
+                    </button>
+                  ))}
+
+                {/* Controls */}
+                <div className="mt-6 w-full max-w-xs space-y-5">
                   {/* Provider Selector */}
-                  <div className="mt-4 w-full max-w-xs">
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {t("download.downloadSource")}
+                    </label>
                     <Select value={selectedProvider} onValueChange={setSelectedProvider}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={t("download.switchProvider")} />
@@ -2858,7 +2924,7 @@ export default function DownloadPage() {
                               displayName = "MegaDB";
                               break;
                             case "buzzheavier":
-                              displayName = "BuzzHeavier";
+                              displayName = "Seamless (BuzzHeavier)";
                               break;
                             case "pixeldrain":
                               displayName = !settings.prioritizeTorboxOverSeamless
@@ -2903,11 +2969,22 @@ export default function DownloadPage() {
                     </Select>
                   </div>
 
+                  {/* Buzzheavier note */}
+                  {selectedProvider === "buzzheavier" && (
+                    <div className="rounded-md bg-primary/5 p-3 text-left text-sm text-primary">
+                      {t("download.downloadOptions.buzzheavierReminder")}
+                    </div>
+                  )}
+
                   {/* Download Button */}
                   <Button
-                    onClick={() => whereToDownload()}
+                    onClick={() =>
+                      selectedProvider === "buzzheavier"
+                        ? handleOpenInBrowser()
+                        : whereToDownload()
+                    }
                     disabled={isStartingDownload || !gameData}
-                    className="mt-6 h-12 w-full max-w-xs text-lg text-secondary"
+                    className="h-12 w-full text-lg text-secondary"
                   >
                     {isStartingDownload ? (
                       <>
