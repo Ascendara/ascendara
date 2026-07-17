@@ -1524,11 +1524,12 @@ class AscendaraDownloader:
             # Always try the bundled Python unrar library first - it supports
             # password-protected and encrypted archives via setpassword().
             logging.info(f"[AscendaraDownloader] Extracting RAR with Python unrar library: {archive_path}")
+            _lib_err_msg = None
             try:
                 return self._extract_rar_with_library(archive_path, watching_data, extract_to)
             except Exception as _lib_err:
-                logging.warning(f"[AscendaraDownloader] Python library extraction failed ({_lib_err}), falling back to CLI tools")
-                pass
+                _lib_err_msg = str(_lib_err)
+                logging.warning(f"[AscendaraDownloader] Python library extraction failed ({_lib_err_msg}), falling back to CLI tools")
 
             # Use CLI extraction tools as fallback when Python library fails
             _CREATE_NO_WINDOW = 0x08000000
@@ -1618,7 +1619,7 @@ class AscendaraDownloader:
                         raise RuntimeError(f"7z extraction timed out after {timeout_seconds // 3600} hour(s)")
                 else:
                     raise RuntimeError(
-                        f"RAR extraction failed: bundled unrar library error was: {_lib_err}. "
+                        f"RAR extraction failed: bundled unrar library error was: {_lib_err_msg}. "
                         "No CLI fallback (UnRAR.exe/7-Zip) found. Please reinstall Ascendara or install 7-Zip from https://7-zip.org/"
                     )
             logging.info(f"[AscendaraDownloader] RAR extraction with CLI tools complete")
