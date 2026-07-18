@@ -601,6 +601,45 @@ export const deleteNewAccount = async () => {
 };
 
 /**
+ * Subscribe to real-time updates of a user's Firestore document.
+ * This ensures fields like ascendSubscription.active stay in sync with
+ * server-side changes (e.g. Stripe webhooks expiring/cancelling a
+ * subscription) instead of relying on a stale one-time fetch.
+ * @param {string} uid - User ID
+ * @param {(data: object|null) => void} callback - Called with normalized user data (or null)
+ * @returns {() => void} unsubscribe function
+ */
+export const subscribeToUserData = (uid, callback) => {
+  if (!uid || !db) return () => {};
+
+  const docRef = doc(db, "users", uid);
+  return onSnapshot(
+    docRef,
+    docSnap => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        callback({
+          ...data,
+          bio: data.bio || null,
+          country: data.country || null,
+          socials: {
+            linkedDiscord: data.socials?.linkedDiscord || null,
+            epicId: data.socials?.epicId || null,
+            github: data.socials?.github || null,
+            steam: data.socials?.steam || null,
+          },
+        });
+      } else {
+        callback(null);
+      }
+    },
+    error => {
+      console.error("subscribeToUserData error:", error);
+    }
+  );
+};
+
+/**
  * Get user data from Firestore
  * @param {string} uid - User ID
  * @returns {Promise<{data: object|null, error: string|null}>}

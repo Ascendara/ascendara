@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import {
   subscribeToAuthChanges,
   getCurrentUser,
@@ -10,6 +10,7 @@ import {
   changePassword,
   deleteAccount,
   getUserData,
+  subscribeToUserData,
   updateUserData,
   resendVerificationEmail,
   reloadCurrentUser,
@@ -56,6 +57,7 @@ export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const userDataUnsubscribeRef = useRef(() => {});
 
   // Subscribe to auth state changes
   useEffect(() => {
@@ -63,6 +65,11 @@ export const AuthProvider = ({ children }) => {
 
     try {
       unsubscribe = subscribeToAuthChanges(async firebaseUser => {
+        // Tear down any existing real-time user data listener before
+        // handling the new auth state (login, logout, or user switch).
+        userDataUnsubscribeRef.current();
+        userDataUnsubscribeRef.current = () => {};
+
         try {
           if (firebaseUser) {
             console.log(
@@ -116,6 +123,10 @@ export const AuthProvider = ({ children }) => {
                 const { data: newData } = await getUserData(firebaseUser.uid);
                 setUser(firebaseUser);
                 setUserData(newData);
+                userDataUnsubscribeRef.current = subscribeToUserData(
+                  firebaseUser.uid,
+                  liveData => setUserData(liveData)
+                );
                 setLoading(false);
                 return;
               } catch (createError) {
@@ -145,6 +156,13 @@ export const AuthProvider = ({ children }) => {
             console.log("[AuthContext] Setting user and user data");
             setUser(firebaseUser);
             setUserData(data);
+            // Keep userData live so server-side changes (e.g. Stripe webhook
+            // expiring/cancelling ascendSubscription) are reflected immediately
+            // across the app instead of only on next login.
+            userDataUnsubscribeRef.current = subscribeToUserData(
+              firebaseUser.uid,
+              liveData => setUserData(liveData)
+            );
           } else {
             console.log("[AuthContext] Auth state changed - user logged out");
             setUser(null);
@@ -164,7 +182,10 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      userDataUnsubscribeRef.current();
+    };
   }, []);
 
   // Register new user
