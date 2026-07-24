@@ -1,4 +1,5 @@
 const LEVEL_XP_BASE = 50;
+const LEVEL_XP_EXPONENT = 1.5;
 const MAX_PROFILE_LEVEL = 999;
 
 const XP_RULES = {
@@ -18,6 +19,9 @@ const XP_RULES = {
 
 const DEBUG_XP = false;
 
+const xpThresholdForLevel = level =>
+  level <= 1 ? 0 : LEVEL_XP_BASE * Math.pow(level - 1, LEVEL_XP_EXPONENT);
+
 export const calculateLevelFromXP = totalXP => {
   const normalizedXP = typeof totalXP === "number" ? totalXP : 0;
 
@@ -25,7 +29,8 @@ export const calculateLevelFromXP = totalXP => {
     console.log("[LevelCalc] Input XP:", totalXP, "Normalized:", normalizedXP);
   }
 
-  const rawLevel = 1 + Math.sqrt(normalizedXP / LEVEL_XP_BASE) * 1.5;
+  const rawLevel =
+    1 + Math.pow(normalizedXP / LEVEL_XP_BASE, 1 / LEVEL_XP_EXPONENT);
   let level = Math.max(1, Math.floor(rawLevel));
   level = Math.min(level, MAX_PROFILE_LEVEL);
 
@@ -42,9 +47,8 @@ export const calculateLevelFromXP = totalXP => {
     };
   }
 
-  const xpForCurrentLevel =
-    level <= 1 ? 0 : LEVEL_XP_BASE * Math.pow((level - 1) / 1.5, 2);
-  const xpForNextLevel = LEVEL_XP_BASE * Math.pow(level / 1.5, 2);
+  const xpForCurrentLevel = xpThresholdForLevel(level);
+  const xpForNextLevel = xpThresholdForLevel(level + 1);
   const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
   const currentLevelProgress = Math.max(0, normalizedXP - xpForCurrentLevel);
 
