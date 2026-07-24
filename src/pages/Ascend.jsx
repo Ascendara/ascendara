@@ -720,15 +720,43 @@ const Ascend = () => {
       // server at api.ascendara.app via `recomputeProfileStats` — the client
       // never derives these numbers when online.
       const localFallback = calculateProfileStats(mergedRegular, mergedCustom);
+
+      // Level/XP must never decrease (e.g. after uninstalling a game or a
+      // stale/lower cloud snapshot). Always take the higher of the
+      // freshly-computed local XP vs. the last persisted local value.
+      let persistedLocalStats = null;
+      try {
+        persistedLocalStats =
+          (await window.electron?.getTimestampValue?.("profileStats")) || null;
+      } catch (e) {
+        persistedLocalStats = null;
+      }
+
+      let bestXP = Math.max(
+        localFallback.xp || 0,
+        persistedLocalStats?.xp || 0
+      );
       let finalStats = {
-        level: localFallback.level,
-        xp: localFallback.xp,
-        currentXP: localFallback.currentXP,
-        nextLevelXp: localFallback.nextLevelXp,
-        totalPlaytime: Math.max(localFallback.totalPlaytime, cloudFloorPlaytime),
-        gamesPlayed: localFallback.gamesPlayed,
-        totalGames: localFallback.totalGames,
+        ...calculateProfileStats(mergedRegular, mergedCustom),
+        totalPlaytime: Math.max(
+          localFallback.totalPlaytime,
+          cloudFloorPlaytime,
+          persistedLocalStats?.totalPlaytime || 0
+        ),
+        gamesPlayed: Math.max(
+          localFallback.gamesPlayed,
+          persistedLocalStats?.gamesPlayed || 0
+        ),
+        totalGames: Math.max(
+          localFallback.totalGames,
+          persistedLocalStats?.totalGames || 0
+        ),
       };
+
+      if (bestXP > localFallback.xp) {
+        const progress = calculateLevelFromXP(bestXP);
+        finalStats = { ...finalStats, ...progress };
+      }
 
       if (hasCloudAccess && user?.uid) {
         try {
@@ -739,11 +767,13 @@ const Ascend = () => {
           const cloudProfile = await getProfileStats();
           const cs = cloudProfile?.data;
           if (cs && typeof cs.xp === "number") {
+            // Never let a lower cloud value pull the displayed level/XP down.
+            bestXP = Math.max(cs.xp || 0, bestXP);
+            const progress = calculateLevelFromXP(bestXP);
+
             finalStats = {
-              level: cs.level ?? finalStats.level,
-              xp: cs.xp ?? finalStats.xp,
-              currentXP: cs.currentXP ?? finalStats.currentXP,
-              nextLevelXp: cs.nextLevelXp ?? finalStats.nextLevelXp,
+              ...finalStats,
+              ...progress,
               totalPlaytime: Math.max(
                 cs.totalPlaytime || 0,
                 finalStats.totalPlaytime
@@ -760,6 +790,23 @@ const Ascend = () => {
             "[Ascend] Cloud-authoritative stats unavailable, using local:",
             e?.message || e
           );
+        }
+      }
+
+      // Persist the resolved (never-decreasing) stats locally so future
+      // loads — and Profile.jsx's own persisted-stats check — see the peak.
+      if (window.electron?.setTimestampValue) {
+        try {
+          await window.electron.setTimestampValue("profileStats", {
+            ...persistedLocalStats,
+            level: finalStats.level,
+            xp: finalStats.xp,
+            totalPlaytime: finalStats.totalPlaytime,
+            gamesPlayed: finalStats.gamesPlayed,
+            totalGames: finalStats.totalGames,
+          });
+        } catch (e) {
+          console.warn("[Ascend] Failed to persist local profileStats:", e);
         }
       }
 

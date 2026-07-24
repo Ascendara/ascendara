@@ -605,29 +605,30 @@ const Profile = () => {
         PersistedProfileStats = null;
       }
 
-      if (!LoadedGames || LoadedGames.length === 0) {
-        const PersistedXP = PersistedProfileStats?.xp;
+      // Level/XP must never decrease (e.g. after uninstalling a game or
+      // discarding saved game data). Always take the higher of the
+      // freshly-computed XP vs. the last persisted value.
+      const PersistedXP = PersistedProfileStats?.xp;
 
-        if (typeof PersistedXP === "number") {
-          const Progress = CalculateLevelProgressFromXP(PersistedXP);
+      if (typeof PersistedXP === "number" && PersistedXP > CalculatedStats.xp) {
+        const Progress = CalculateLevelProgressFromXP(PersistedXP);
 
-          CalculatedStats = {
-            ...CalculatedStats,
-            ...Progress,
-            totalPlaytime:
-              typeof PersistedProfileStats?.totalPlaytime === "number"
-                ? PersistedProfileStats.totalPlaytime
-                : CalculatedStats.totalPlaytime,
-            gamesPlayed:
-              typeof PersistedProfileStats?.gamesPlayed === "number"
-                ? PersistedProfileStats.gamesPlayed
-                : CalculatedStats.gamesPlayed,
-            totalGames:
-              typeof PersistedProfileStats?.totalGames === "number"
-                ? PersistedProfileStats.totalGames
-                : CalculatedStats.totalGames,
-          };
-        }
+        CalculatedStats = {
+          ...CalculatedStats,
+          ...Progress,
+          totalPlaytime: Math.max(
+            CalculatedStats.totalPlaytime || 0,
+            PersistedProfileStats?.totalPlaytime || 0
+          ),
+          gamesPlayed: Math.max(
+            CalculatedStats.gamesPlayed || 0,
+            PersistedProfileStats?.gamesPlayed || 0
+          ),
+          totalGames: Math.max(
+            CalculatedStats.totalGames || 0,
+            PersistedProfileStats?.totalGames || 0
+          ),
+        };
       }
 
       // Cloud-first override: when the user is signed in, the server at
@@ -645,13 +646,13 @@ const Profile = () => {
           const CloudProfile = await GetProfileStats();
           const CloudStats = CloudProfile?.data;
           if (CloudStats && typeof CloudStats.xp === "number") {
+            // Never let a lower cloud value pull the displayed level/XP down.
+            const BestXP = Math.max(CloudStats.xp || 0, CalculatedStats.xp || 0);
+            const Progress = CalculateLevelProgressFromXP(BestXP);
+
             CalculatedStats = {
               ...CalculatedStats,
-              level: CloudStats.level ?? CalculatedStats.level,
-              xp: CloudStats.xp ?? CalculatedStats.xp,
-              currentXP: CloudStats.currentXP ?? CalculatedStats.currentXP,
-              nextLevelXp:
-                CloudStats.nextLevelXp ?? CalculatedStats.nextLevelXp,
+              ...Progress,
               totalPlaytime: Math.max(
                 CloudStats.totalPlaytime || 0,
                 CalculatedStats.totalPlaytime || 0
