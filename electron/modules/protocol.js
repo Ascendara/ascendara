@@ -6,6 +6,7 @@
 const { BrowserWindow, app } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { execSync } = require("child_process");
 const { isDev } = require("./config");
 const { createWindow, setHandlingProtocolUrl, setMainWindowHidden } = require("./window");
 
@@ -170,6 +171,31 @@ function registerProtocolHandlers() {
 }
 
 /**
+ * Get the executable/process name for a given PID.
+ * Used to guard against stale lock files whose PID has been recycled
+ * by an unrelated process (e.g. Steam webhelper reusing an old Ascendara PID).
+ * @param {number} pid
+ * @returns {string|null} - Lowercased process image name, or null if it can't be determined
+ */
+function getProcessName(pid) {
+  try {
+    if (process.platform === "win32") {
+      const output = execSync(`tasklist /FI "PID eq ${pid}" /FO CSV /NH`, {
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      const match = output.match(/^"([^"]+)"/);
+      return match ? match[1].toLowerCase() : null;
+    } else {
+      const output = execSync(`ps -p ${pid} -o comm=`, { encoding: "utf8" });
+      return output.trim().toLowerCase() || null;
+    }
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * Setup single instance lock and protocol handling
  * @returns {boolean} - Whether this is the primary instance
  */
@@ -199,7 +225,22 @@ function setupSingleInstance() {
         // Process doesn't exist
         processExists = false;
       }
-      
+
+      // Guard against PID reuse: on Windows, PIDs are recycled quickly after
+      // a process exits, so a stale lock file can point at an unrelated
+      // process (e.g. Steam webhelper). Verify the running process is
+      // actually our own executable before trusting the lock.
+      if (processExists) {
+        const expectedName = path.basename(process.execPath).toLowerCase();
+        const actualName = getProcessName(existingPid);
+        if (actualName && actualName !== expectedName) {
+          console.log(
+            `Lock PID ${existingPid} belongs to '${actualName}', not '${expectedName}' - treating lock as stale`
+          );
+          processExists = false;
+        }
+      }
+
       if (processExists) {
         console.log("Another instance is running (PID:", existingPid + "), passing protocol URL and exiting");
         
