@@ -1528,6 +1528,11 @@
     "overview": "Overview",
     "purchasePromptMessage": "You've played {{game}} for over 3 hours. If you're enjoying it, consider supporting the developers by purchasing the game.",
     "purchasePromptTitle": "Support the Developers",
+    "quickExitDialog": {
+      "description": "{{game}} closed right after launching. Try running the executable directly from the game folder to see if it works outside of Ascendara.",
+      "openFolder": "Open Game Folder",
+      "title": "Game Closed Unexpectedly"
+    },
     "editGameEntry": "Edit Game Entry",
     "editGameEntryDescription": "Edit the raw data for this game entry. Be careful — incorrect values may cause issues.",
     "editGameEntrySuccess": "Game entry saved successfully.",

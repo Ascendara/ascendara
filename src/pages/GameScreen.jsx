@@ -456,6 +456,36 @@ const ErrorDialog = ({
   </AlertDialog>
 );
 
+const QuickExitDialog = ({ open, onClose, gameName, onOpenFolder, t }) => (
+  <AlertDialog open={open} onOpenChange={onClose}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle className="text-2xl font-bold text-foreground">
+          {t("gameScreen.quickExitDialog.title")}
+        </AlertDialogTitle>
+        <AlertDialogDescription className="space-y-4 text-muted-foreground">
+          {t("gameScreen.quickExitDialog.description", { game: gameName })}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter className="flex gap-2">
+        <Button variant="outline" className="text-primary" onClick={onClose}>
+          {t("common.ok")}
+        </Button>
+        <Button
+          className="bg-primary text-secondary"
+          onClick={() => {
+            onOpenFolder();
+            onClose();
+          }}
+        >
+          <FolderOpen className="mr-2 h-4 w-4" />
+          {t("gameScreen.quickExitDialog.openFolder")}
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);
+
 const UninstallConfirmationDialog = ({
   open,
   onClose,
@@ -1257,6 +1287,7 @@ export default function GameScreen() {
   const [umuIdInput, setUmuIdInput] = useState("");
   const [umuIdSaving, setUmuIdSaving] = useState(false);
   const [umuInstalled, setUmuInstalled] = useState(true); // true by default for other OS
+  const [showQuickExitDialog, setShowQuickExitDialog] = useState(false);
 
   // Detect Linux platform and load prefix info
   useEffect(() => {
@@ -1687,9 +1718,33 @@ export default function GameScreen() {
       }
     };
 
+    const handleGameClosed = (_, data) => {
+      const gameName = game?.game || game?.name;
+      if (data?.game !== gameName) return;
+
+      try {
+        const lastLaunch = localStorage.getItem("last-launch-check");
+        if (!lastLaunch) return;
+
+        const { gameName: launchedGame, timestamp } = JSON.parse(lastLaunch);
+        if (launchedGame !== gameName) return;
+
+        const elapsed = Date.now() - timestamp;
+        if (elapsed < 5000) {
+          console.log(`[GameScreen] Game ${gameName} exited after ${elapsed}ms`);
+          setShowQuickExitDialog(true);
+        }
+      } catch (e) {
+        console.error("[GameScreen] Error checking quick exit:", e);
+      } finally {
+        localStorage.removeItem("last-launch-check");
+      }
+    };
+
     window.electron.ipcRenderer.on("game-launch-error", handleGameLaunchError);
     window.electron.ipcRenderer.on("cover-image-updated", handleCoverImageUpdated);
     window.electron.ipcRenderer.on("game-assets-updated", handleGameAssetsUpdated);
+    window.electron.ipcRenderer.on("game-closed", handleGameClosed);
 
     return () => {
       window.electron.ipcRenderer.removeListener(
@@ -1704,6 +1759,7 @@ export default function GameScreen() {
         "game-assets-updated",
         handleGameAssetsUpdated
       );
+      window.electron.ipcRenderer.removeListener("game-closed", handleGameClosed);
     };
   }, [isInitialized, setShowRateDialog, game]); // Add required dependencies
 
@@ -2229,6 +2285,12 @@ export default function GameScreen() {
         isShiftKeyPressed,
         specificExecutable,
         trainerExists && launchWithTrainerEnabled
+      );
+
+      // Record launch time so we can detect if the game exits immediately
+      localStorage.setItem(
+        "last-launch-check",
+        JSON.stringify({ gameName, timestamp: Date.now() })
       );
 
       // Get and cache the game image before saving to recently played
@@ -5059,6 +5121,15 @@ export default function GameScreen() {
         t={t}
         onSave={handleEditSteamInfoSave}
         setAssetSearchOpen={setAssetSearchOpen}
+      />
+
+      {/* Quick Exit Launch Failure Dialog */}
+      <QuickExitDialog
+        open={showQuickExitDialog}
+        onClose={() => setShowQuickExitDialog(false)}
+        gameName={game?.game || game?.name}
+        onOpenFolder={handleOpenDirectory}
+        t={t}
       />
 
       {/* Launch Options Dialog */}
