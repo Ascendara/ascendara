@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 import {
   getUserInfo,
   getAllDownloads,
-  controlWebDownload,
+  controlDownload,
   getApiKey,
   getDirectDownloadLink,
 } from "@/services/torboxService";
@@ -102,6 +102,17 @@ const manageStoredGameNames = () => {
     return {};
   }
 };
+
+const getDownloadKey = download =>
+  download?._storageKey ||
+  `${download?._torboxType === "torrent" ? "torrent" : "webdl"}:${download?.id}`;
+
+const getStoredDownloadData = (storedDownloads, download) =>
+  storedDownloads[getDownloadKey(download)] ||
+  storedDownloads[download?.id] ||
+  storedDownloads[download?.url] ||
+  storedDownloads[download?.original_url] ||
+  null;
 
 const TorboxDownloads = () => {
   const { t } = useLanguage();
@@ -311,10 +322,7 @@ const TorboxDownloads = () => {
         return;
       }
 
-      await controlWebDownload(apiKey, {
-        webdl_id: download.id,
-        operation: "delete",
-      });
+      await controlDownload(apiKey, download, "delete");
 
       // Update the downloads list after successful deletion
       fetchTorboxDownloads();
@@ -359,7 +367,7 @@ const TorboxDownloads = () => {
 
       // Try to get stored download data from local storage
       const torboxData = manageStoredGameNames();
-      const storedData = torboxData[download.id] || null;
+      const storedData = getStoredDownloadData(torboxData, download);
       const hasStoredGameData = storedData && storedData.gameData;
 
       // Always request a fresh direct download link from TorBox.
@@ -373,7 +381,11 @@ const TorboxDownloads = () => {
         })
       );
 
-      const downloadUrlResponse = await getDirectDownloadLink(apiKey, download.id);
+      const downloadUrlResponse = await getDirectDownloadLink(
+        apiKey,
+        download.id,
+        download._torboxType
+      );
 
       if (!downloadUrlResponse) {
         throw new Error("Failed to get direct download URL");
@@ -459,7 +471,7 @@ const TorboxDownloads = () => {
       // Mark this download as downloaded to PC
       const updatedDownloadedToPc = {
         ...downloadedToPc,
-        [download.id]: {
+        [getDownloadKey(download)]: {
           timestamp: Date.now(),
           name: hasStoredGameData
             ? storedData.gameData.game
@@ -655,6 +667,7 @@ const TorboxDownloads = () => {
                   d =>
                     (d.download_state?.toLowerCase() === "completed" ||
                       d.download_state?.toLowerCase() === "cached") &&
+                    !downloadedToPc[getDownloadKey(d)] &&
                     !downloadedToPc[d.id]
                 );
 
@@ -727,7 +740,7 @@ const TorboxDownloads = () => {
               {/* Completed tab shows downloads that have been downloaded to PC */}
               {(() => {
                 const completedDownloads = torboxDownloads.filter(
-                  d => downloadedToPc[d.id]
+                  d => downloadedToPc[getDownloadKey(d)] || downloadedToPc[d.id]
                 );
 
                 return completedDownloads.length === 0 ? (
@@ -809,10 +822,11 @@ const TorboxDownloads = () => {
             <AlertDialogAction
               onClick={async () => {
                 try {
-                  await controlWebDownload(settings.torboxApiKey, {
-                    webdl_id: confirmStop.id,
-                    operation: "stop",
-                  });
+                  await controlDownload(
+                    settings.torboxApiKey,
+                    confirmStop,
+                    "stop"
+                  );
 
                   toast.success(
                     t("torbox.download_stopped_desc", {
@@ -892,8 +906,9 @@ const TorboxDownloadCard = ({
       // Look for a match based on download ID or URL
       if (download) {
         // First check if we have a direct match by ID
-        if (download.id && torboxNames[download.id]) {
-          setStoredName(torboxNames[download.id].name);
+        const storedDownload = getStoredDownloadData(torboxNames, download);
+        if (storedDownload?.name) {
+          setStoredName(storedDownload.name);
           return;
         }
 
@@ -962,7 +977,12 @@ const TorboxDownloadCard = ({
   const isDownloadedToPc =
     download?.id &&
     window.localStorage.getItem("torboxDownloadedToPc") &&
-    JSON.parse(window.localStorage.getItem("torboxDownloadedToPc"))[download.id];
+    (() => {
+      const downloaded = JSON.parse(
+        window.localStorage.getItem("torboxDownloadedToPc")
+      );
+      return downloaded[getDownloadKey(download)] || downloaded[download.id];
+    })();
 
   // Handle download to PC with confirmation for re-downloading
   const handleDownloadClick = () => {
@@ -978,6 +998,11 @@ const TorboxDownloadCard = ({
       <CardContent className="p-5">
         <div className="mb-3 flex items-start justify-between">
           <div className="flex-1">
+            {download?._torboxType === "torrent" && (
+              <Badge variant="outline" className="mb-2 mr-2 text-xs">
+                Torrent
+              </Badge>
+            )}
             {status?.toLowerCase() === "downloading" && (
               <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-secondary">
                 <Loader className="h-3.5 w-3.5 animate-spin" />

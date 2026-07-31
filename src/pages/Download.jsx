@@ -704,6 +704,65 @@ export default function DownloadPage() {
       selectedProvider === "torrent" ||
       isMagnet(directUrl) ||
       (!selectedProvider && torrentLinksFromGame.some(isMagnet));
+    const shouldUseTorboxForTorrent =
+      torboxService.isEnabled(settings) && !torboxDisabledForSession;
+
+    const queueTorrentInTorbox = async magnetLink => {
+      if (isStartingDownload) {
+        console.log("Download already in progress, skipping");
+        return;
+      }
+
+      setIsStartingDownload(true);
+      toast.info(t("download.toast.processingLink"));
+
+      try {
+        const apiKey = torboxService.getApiKey(settings);
+        const result = await torboxService.createTorrentFromMagnet(
+          magnetLink,
+          apiKey,
+          gameData.game
+        );
+        const storageKey = result.torrentId ? `torrent:${result.torrentId}` : magnetLink;
+        const torboxData = JSON.parse(
+          localStorage.getItem("torboxGameNames") || "{}"
+        );
+        const downloadData = {
+          name: gameData.game,
+          timestamp: Date.now(),
+          imgUrl: gameData.imgID || null,
+          provider: "torrent",
+          torboxType: "torrent",
+          originalUrl: magnetLink,
+          downloadId: result.torrentId,
+          gameData: {
+            game: gameData.game,
+            version: gameData.version || "",
+            size: gameData.size || "",
+            imgID: gameData.imgID || null,
+            gameID: gameData.gameID || "",
+            online: gameData.online || false,
+            dlc: gameData.dlc || false,
+            vr: gameData.category?.includes("Virtual Reality") || false,
+            download_links: gameData.download_links || {},
+          },
+        };
+
+        torboxData[magnetLink] = downloadData;
+        torboxData[storageKey] = downloadData;
+        localStorage.setItem("torboxGameNames", JSON.stringify(torboxData));
+
+        toast.dismiss();
+        toast.success(t("download.toast.downloadQueued"));
+        navigate("/torboxdownloads");
+      } catch (error) {
+        console.error("Error processing torrent with TorBox:", error);
+        toast.dismiss();
+        toast.error(error.message || t("download.toast.torboxProcessingError"));
+      } finally {
+        setIsStartingDownload(false);
+      }
+    };
 
     if (isTorrentProvider) {
       const magnetLink =
@@ -714,6 +773,11 @@ export default function DownloadPage() {
       if (!magnetLink) {
         console.log("[DL] EARLY RETURN: no magnet link in torrent provider");
         toast.error(t("download.toast.invalidLink"));
+        return;
+      }
+
+      if (shouldUseTorboxForTorrent) {
+        await queueTorrentInTorbox(magnetLink);
         return;
       }
 
@@ -795,6 +859,11 @@ export default function DownloadPage() {
     if (settings.gameSource === "fitgirl") {
       const torrentLink = gameData.torrentLink;
       if (torrentLink) {
+        if (shouldUseTorboxForTorrent && isMagnet(torrentLink)) {
+          await queueTorrentInTorbox(torrentLink);
+          return;
+        }
+
         if (isStartingDownload) {
           console.log("Download already in progress, skipping");
           return;
@@ -1789,7 +1858,10 @@ export default function DownloadPage() {
                 typeof link === "string" &&
                 link.trim().toLowerCase().startsWith("magnet:")
             );
-            return hasMagnet && !!settings.torrentEnabled;
+            return (
+              hasMagnet &&
+              (!!settings.torrentEnabled || torboxService.isEnabled(settings))
+            );
           }
           return true;
         })
@@ -1821,7 +1893,7 @@ export default function DownloadPage() {
         setSelectedProvider(ddlProviders[0]);
       } else if (
         availableProviders.includes("torrent") &&
-        settings.torrentEnabled
+        (settings.torrentEnabled || torboxService.isEnabled(settings))
       ) {
         setSelectedProvider("torrent");
       } else {
