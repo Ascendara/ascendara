@@ -705,12 +705,14 @@ export default function DownloadPage() {
       isMagnet(directUrl) ||
       (!selectedProvider && torrentLinksFromGame.some(isMagnet));
     const shouldUseTorboxForTorrent =
-      torboxService.isEnabled(settings) && !torboxDisabledForSession;
+      settings.useTorboxForTorrents !== false &&
+      torboxService.isEnabled(settings) &&
+      !torboxDisabledForSession;
 
     const queueTorrentInTorbox = async magnetLink => {
       if (isStartingDownload) {
         console.log("Download already in progress, skipping");
-        return;
+        return { success: true };
       }
 
       setIsStartingDownload(true);
@@ -755,10 +757,11 @@ export default function DownloadPage() {
         toast.dismiss();
         toast.success(t("download.toast.downloadQueued"));
         navigate("/torboxdownloads");
+        return { success: true };
       } catch (error) {
         console.error("Error processing torrent with TorBox:", error);
         toast.dismiss();
-        toast.error(error.message || t("download.toast.torboxProcessingError"));
+        return { success: false, error };
       } finally {
         setIsStartingDownload(false);
       }
@@ -777,8 +780,16 @@ export default function DownloadPage() {
       }
 
       if (shouldUseTorboxForTorrent) {
-        await queueTorrentInTorbox(magnetLink);
-        return;
+        const torboxResult = await queueTorrentInTorbox(magnetLink);
+        if (torboxResult.success) return;
+        if (!settings.fallbackToQbittorrentOnTorboxFailure) {
+          toast.error(
+            torboxResult.error?.message ||
+              t("download.toast.torboxProcessingError")
+          );
+          return;
+        }
+        toast.info(t("download.toast.torboxTorrentFallback"));
       }
 
       if (!settings.torrentEnabled) {
@@ -860,7 +871,31 @@ export default function DownloadPage() {
       const torrentLink = gameData.torrentLink;
       if (torrentLink) {
         if (shouldUseTorboxForTorrent && isMagnet(torrentLink)) {
-          await queueTorrentInTorbox(torrentLink);
+          const torboxResult = await queueTorrentInTorbox(torrentLink);
+          if (torboxResult.success) return;
+          if (!settings.fallbackToQbittorrentOnTorboxFailure) {
+            toast.error(
+              torboxResult.error?.message ||
+                t("download.toast.torboxProcessingError")
+            );
+            return;
+          }
+          toast.info(t("download.toast.torboxTorrentFallback"));
+        }
+
+        if (!settings.torrentEnabled) {
+          toast.error(
+            t("download.toast.torrentDisabled") ||
+              "Enable torrenting in Settings to download this game."
+          );
+          return;
+        }
+
+        if (!torrentRunning) {
+          toast.error(
+            t("download.downloadOptions.torrentInstructions.noTorrent") ||
+              "qBittorrent is not running. Start qBittorrent and try again."
+          );
           return;
         }
 
@@ -1860,7 +1895,9 @@ export default function DownloadPage() {
             );
             return (
               hasMagnet &&
-              (!!settings.torrentEnabled || torboxService.isEnabled(settings))
+              (!!settings.torrentEnabled ||
+                (settings.useTorboxForTorrents !== false &&
+                  torboxService.isEnabled(settings)))
             );
           }
           return true;
@@ -1893,7 +1930,9 @@ export default function DownloadPage() {
         setSelectedProvider(ddlProviders[0]);
       } else if (
         availableProviders.includes("torrent") &&
-        (settings.torrentEnabled || torboxService.isEnabled(settings))
+        (settings.torrentEnabled ||
+          (settings.useTorboxForTorrents !== false &&
+            torboxService.isEnabled(settings)))
       ) {
         setSelectedProvider("torrent");
       } else {

@@ -30,6 +30,8 @@ class SettingsManager {
       torrentPort: 8080,
       torrentUsername: "admin",
       torrentPassword: "adminadmin",
+      useTorboxForTorrents: true,
+      fallbackToQbittorrentOnTorboxFailure: false,
       rpcEnabled: true,
       gameSource: "steamrip",
       autoCreateShortcuts: true,
