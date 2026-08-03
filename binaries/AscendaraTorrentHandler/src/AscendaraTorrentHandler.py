@@ -71,6 +71,52 @@ def read_size(size: int, decimal_places: int = 2) -> str:
         i += 1
     return f"{size_float:.{decimal_places}f} {units[i]}"
 
+def get_free_disk_space(path: str) -> int:
+    """Get free disk space in bytes for the drive containing the path."""
+    try:
+        if sys.platform == 'win32':
+            import ctypes
+            free_bytes = ctypes.c_ulonglong(0)
+            ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+                ctypes.c_wchar_p(path), None, None, ctypes.pointer(free_bytes)
+            )
+            return free_bytes.value
+        else:
+            stat = os.statvfs(path)
+            return stat.f_bavail * stat.f_frsize
+    except Exception as e:
+        logging.error(f"Error getting free disk space: {e}")
+        return 0
+
+def check_disk_space(path: str, required_bytes: int, operation: str = "operation") -> bool:
+    """Check if there's enough disk space for an operation.
+
+    Returns True if sufficient space, False otherwise.
+    """
+    try:
+        free_space = get_free_disk_space(path)
+        # Add 10% buffer for safety
+        required_with_buffer = int(required_bytes * 1.1)
+
+        if free_space < required_with_buffer:
+            logging.error(
+                f"Insufficient disk space for {operation}: "
+                f"Required: {read_size(required_with_buffer)}, "
+                f"Available: {read_size(free_space)}"
+            )
+            return False
+
+        logging.info(
+            f"Disk space check passed for {operation}: "
+            f"Required: {read_size(required_with_buffer)}, "
+            f"Available: {read_size(free_space)}"
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Error checking disk space: {e}")
+        # Return True to avoid blocking operations if check fails
+        return True
+
 def safe_write_json(filepath, data):
     temp_dir = os.path.dirname(filepath)
     temp_file_path = None
@@ -304,7 +350,27 @@ class TorrentManager:
         try:
             # Create the JSON file right before adding the torrent
             safe_write_json(game_info_path, game_info)
-            
+
+            # Check disk space before starting the torrent download
+            if size:
+                try:
+                    size_parts = size.split()
+                    if len(size_parts) == 2:
+                        size_value = float(size_parts[0])
+                        size_unit = size_parts[1].upper()
+                        multipliers = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4}
+                        estimated_download_size = int(size_value * multipliers.get(size_unit, 1024**3))
+                        total_needed = estimated_download_size * 4 if updateFlow else estimated_download_size * 3
+                        if not check_disk_space(download_dir, total_needed, "download and extraction"):
+                            error_msg = f"Insufficient disk space. Need ~{read_size(total_needed)}"
+                            logging.error(f"[TorrentHandler] {error_msg}")
+                            handleerror(game_info, game_info_path, error_msg)
+                            if theme:
+                                _launch_notification(theme, "Download Failed", error_msg)
+                            return
+                except Exception as e:
+                    logging.warning(f"[TorrentHandler] Could not parse size for disk check: {e}")
+
             # Wait for qBittorrent connection if not ready
             if self.connect_thread and self.connect_thread.is_alive():
                 self.connect_thread.join()
@@ -563,20 +629,32 @@ class TorrentManager:
 
     def _extract_archives(self, archive_files: List[str], extract_to: str, game_info: Dict, game_info_path: str):
         """Extract a list of archives into extract_to with progress reporting."""
-        # Count total files across archives for progress
+        # Count total files across archives for progress, and tally uncompressed
+        # size (where determinable) so we can verify there is enough free disk space.
         total_files = 0
+        total_uncompressed_size = 0
+        archives_with_unknown_size = []
         for archive_path in archive_files:
             ext = os.path.splitext(archive_path)[1].lower()
+            had_known_size = False
             try:
                 if ext == '.zip':
                     with zipfile.ZipFile(archive_path, 'r') as zf:
-                        total_files += sum(1 for zi in zf.infolist() if not zi.is_dir())
+                        for zi in zf.infolist():
+                            if not zi.is_dir():
+                                total_files += 1
+                                total_uncompressed_size += zi.file_size
+                        had_known_size = True
                 elif ext == '.rar':
                     if sys.platform == 'win32':
                         try:
                             from unrar import rarfile
                             with rarfile.RarFile(archive_path, 'r') as rf:
-                                total_files += sum(1 for info in rf.infolist() if not info.filename.endswith('/'))
+                                for info in rf.infolist():
+                                    if not info.filename.endswith('/'):
+                                        total_files += 1
+                                        total_uncompressed_size += getattr(info, 'file_size', 0) or 0
+                            had_known_size = True
                         except Exception as e:
                             logging.warning(f"[TorrentHandler] Could not count RAR files: {e}")
                     else:
@@ -602,6 +680,21 @@ class TorrentManager:
                                     pass
             except Exception as e:
                 logging.warning(f"[TorrentHandler] Could not count files in {archive_path}: {e}")
+            if not had_known_size:
+                archives_with_unknown_size.append(archive_path)
+
+        # For archives where we couldn't determine the exact uncompressed size,
+        # fall back to a conservative multiple of the archive's size on disk.
+        for archive_path in archives_with_unknown_size:
+            try:
+                total_uncompressed_size += int(os.path.getsize(archive_path) * 2.5)
+            except OSError:
+                pass
+
+        if total_uncompressed_size > 0 and not check_disk_space(extract_to, total_uncompressed_size, "extraction"):
+            error_msg = f"Insufficient disk space to extract. Need ~{read_size(total_uncompressed_size)}"
+            logging.error(f"[TorrentHandler] {error_msg}")
+            raise RuntimeError(error_msg)
 
         game_info["downloadingData"]["extractionProgress"]["totalFiles"] = total_files
         safe_write_json(game_info_path, game_info)

@@ -530,7 +530,17 @@ class GofileDownloader:
 
         total_files = len(files_info)
         current_file = 0
-        
+
+        if self._total_size > 0:
+            # Estimate total needed: download + extraction (3x) + backup if update
+            total_needed = self._total_size * 4 if self.updateFlow else self._total_size * 3
+            if not check_disk_space(self.download_dir, total_needed, "download and extraction"):
+                error_msg = f"Insufficient disk space. Need ~{read_size(total_needed)}"
+                logging.error(f"[AscendaraGofileHelper] {error_msg}")
+                handleerror(self.game_info, self.game_info_path, error_msg)
+                allow_sleep()
+                return
+
         try:
             for item in files_info.values():
                 current_file += 1
@@ -1180,8 +1190,10 @@ class GofileDownloader:
         watching_data = {}
         self.archive_paths = []  # Store archive paths as instance variable
         
-        # First, count total files across all archives for progress tracking
+        # First, count total files across all archives for progress tracking, and
+        # tally uncompressed size so we can verify there is enough free disk space.
         total_files_to_extract = 0
+        total_uncompressed_size = 0
         archives_to_process = []
         for root, _, files in os.walk(self.download_dir):
             for file in files:
@@ -1200,6 +1212,8 @@ class GofileDownloader:
                         if file.endswith('.zip'):
                             with zipfile.ZipFile(archive_path, 'r') as zip_ref:
                                 for zip_info in zip_ref.infolist():
+                                    if not zip_info.is_dir():
+                                        total_uncompressed_size += zip_info.file_size
                                     if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
                                         total_files_to_extract += 1
                         elif file.endswith('.rar'):
@@ -1211,6 +1225,8 @@ class GofileDownloader:
                                         for rar_info in rar_ref.infolist():
                                             # Skip directories and unwanted files
                                             is_dir = rar_info.filename.endswith('/') or rar_info.filename.endswith('\\')
+                                            if not is_dir:
+                                                total_uncompressed_size += getattr(rar_info, 'file_size', 0) or 0
                                             if not is_dir and not rar_info.filename.endswith('.url') and '_CommonRedist' not in rar_info.filename:
                                                 total_files_to_extract += 1
                                 except Exception as e:
@@ -1239,6 +1255,28 @@ class GofileDownloader:
                         logging.warning(f"[AscendaraGofileHelper] Could not count files in {archive_path}: {e}")
         
         logging.info(f"[AscendaraGofileHelper] Total files to extract: {total_files_to_extract}")
+
+        # Verify there is enough free disk space for the actual extracted content.
+        # Fall back to a conservative multiple of the archive size on disk if the
+        # uncompressed size could not be determined.
+        if total_uncompressed_size <= 0:
+            archive_sizes_on_disk = sum(
+                os.path.getsize(p) for p, _ in archives_to_process if os.path.exists(p)
+            )
+            total_uncompressed_size = int(archive_sizes_on_disk * 2.5)
+
+        if total_uncompressed_size > 0 and not check_disk_space(
+            self.download_dir, total_uncompressed_size, "extraction"
+        ):
+            error_msg = f"Insufficient disk space to extract. Need ~{read_size(total_uncompressed_size)}"
+            logging.error(f"[AscendaraGofileHelper] {error_msg}")
+            self.game_info["downloadingData"]["extracting"] = False
+            self.game_info["downloadingData"]["verifyError"] = [{
+                "file": "extraction_process",
+                "error": error_msg
+            }]
+            safe_write_json(self.game_info_path, self.game_info)
+            raise RuntimeError(error_msg)
         self._files_extracted_count = 0
         self._update_extraction_progress("Preparing...", 0, total_files_to_extract, force=True)
         

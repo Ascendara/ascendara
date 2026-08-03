@@ -835,27 +835,8 @@ class AscendaraDownloader:
             # Check disk space before starting download
             # Estimate: download size + extraction (typically 2-3x compressed size)
             # Use size from game_info if available
-            if self.size:
-                try:
-                    # Parse size string (e.g., "5.2 GB") to bytes
-                    size_parts = self.size.split()
-                    if len(size_parts) == 2:
-                        size_value = float(size_parts[0])
-                        size_unit = size_parts[1].upper()
-                        multipliers = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4}
-                        estimated_download_size = int(size_value * multipliers.get(size_unit, 1024**3))
-                        # Estimate total needed: download + extraction (3x) + backup if update
-                        total_needed = estimated_download_size * 4 if self.updateFlow else estimated_download_size * 3
-                        
-                        if not check_disk_space(self.download_dir, total_needed, "download and extraction"):
-                            error_msg = f"Insufficient disk space. Need ~{read_size(total_needed)}"
-                            logging.error(f"[AscendaraDownloader] {error_msg}")
-                            handleerror(self.game_info, self.game_info_path, error_msg)
-                            if withNotification:
-                                _launch_notification(withNotification, "Download Failed", error_msg)
-                            return
-                except Exception as e:
-                    logging.warning(f"[AscendaraDownloader] Could not parse size for disk check: {e}")
+            if not self._pre_download_disk_check():
+                return
             
             # Update state
             self.game_info["downloadingData"]["downloading"] = True
@@ -1069,12 +1050,45 @@ class AscendaraDownloader:
         
         return dest
     
+    def _pre_download_disk_check(self) -> bool:
+        """Check disk space before starting a download based on the reported install size.
+
+        Returns True if it's safe to proceed (or the check could not be performed),
+        False if there is not enough disk space (error is already recorded).
+        """
+        if not self.size:
+            return True
+        try:
+            size_parts = self.size.split()
+            if len(size_parts) != 2:
+                return True
+            size_value = float(size_parts[0])
+            size_unit = size_parts[1].upper()
+            multipliers = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4}
+            estimated_download_size = int(size_value * multipliers.get(size_unit, 1024**3))
+            # Estimate total needed: download + extraction (3x) + backup if update
+            total_needed = estimated_download_size * 4 if self.updateFlow else estimated_download_size * 3
+
+            if not check_disk_space(self.download_dir, total_needed, "download and extraction"):
+                error_msg = f"Insufficient disk space. Need ~{read_size(total_needed)}"
+                logging.error(f"[AscendaraDownloader] {error_msg}")
+                handleerror(self.game_info, self.game_info_path, error_msg)
+                if self.withNotification:
+                    _launch_notification(self.withNotification, "Download Failed", error_msg)
+                return False
+        except Exception as e:
+            logging.warning(f"[AscendaraDownloader] Could not parse size for disk check: {e}")
+        return True
+
     def _download_buzzheavier(self, url: str):
         """Download from Buzzheavier with robust chunked download and resume support."""
         from urllib.parse import urlparse, parse_qs
         import re
 
         logging.info(f"[AscendaraDownloader] Buzzheavier download: {url}")
+
+        if not self._pre_download_disk_check():
+            return
 
         parsed = urlparse(url)
         path_parts = parsed.path.strip('/').split('/')
@@ -1241,14 +1255,18 @@ class AscendaraDownloader:
                     if ext in archive_exts:
                         archives_to_process.append(os.path.join(root, file))
         
-        # Count total files for progress tracking
+        # Count total files for progress tracking, and tally the uncompressed size
+        # so we can verify there is enough free disk space before extracting.
         total_files_to_extract = 0
+        total_uncompressed_size = 0
         for arch_path in archives_to_process:
             try:
                 ext = os.path.splitext(arch_path)[1].lower()
                 if ext == '.zip':
                     with zipfile.ZipFile(arch_path, 'r') as zip_ref:
                         for zip_info in zip_ref.infolist():
+                            if not zip_info.is_dir():
+                                total_uncompressed_size += zip_info.file_size
                             if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
                                 total_files_to_extract += 1
                 elif ext == '.rar':
@@ -1259,6 +1277,8 @@ class AscendaraDownloader:
                             with rarfile.RarFile(arch_path, 'r') as rar_ref:
                                 for info in rar_ref.infolist():
                                     # Check if it's a file (not directory) - directories end with /
+                                    if not info.filename.endswith('/'):
+                                        total_uncompressed_size += getattr(info, 'file_size', 0) or 0
                                     if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename and not info.filename.endswith('/'):
                                         total_files_to_extract += 1
                         except Exception as e:
@@ -1278,6 +1298,27 @@ class AscendaraDownloader:
                 logging.warning(f"[AscendaraDownloader] Could not count files in {arch_path}: {e}")
         
         logging.info(f"[AscendaraDownloader] Total files to extract: {total_files_to_extract}")
+
+        # Verify there is enough free disk space for the actual extracted content.
+        # Fall back to a conservative multiple of the archive size on disk if the
+        # uncompressed size could not be determined (e.g. multi-volume RAR listing failed).
+        if total_uncompressed_size <= 0:
+            archive_sizes_on_disk = sum(
+                os.path.getsize(p) for p in archives_to_process if os.path.exists(p)
+            )
+            total_uncompressed_size = int(archive_sizes_on_disk * 2.5)
+
+        if total_uncompressed_size > 0 and not check_disk_space(
+            self.download_dir, total_uncompressed_size, "extraction"
+        ):
+            error_msg = f"Insufficient disk space to extract. Need ~{read_size(total_uncompressed_size)}"
+            logging.error(f"[AscendaraDownloader] {error_msg}")
+            handleerror(self.game_info, self.game_info_path, error_msg)
+            if self.withNotification:
+                _launch_notification(self.withNotification, "Extraction Failed", error_msg)
+            self.game_info["downloadingData"]["extracting"] = False
+            safe_write_json(self.game_info_path, self.game_info)
+            return
         self._total_files_to_extract = total_files_to_extract
         self._update_extraction_progress("Preparing...", 0, total_files_to_extract, force=True)
         
