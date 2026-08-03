@@ -1344,6 +1344,7 @@ function registerMiscHandlers() {
         "adminadmin";
       const { origin, baseURL } = resolveQbitEndpoint(credentials);
       qbittorrentBaseUrl = origin;
+      qbittorrentSID = null;
 
       const response = await axios.post(
         `${baseURL}/auth/login`,
@@ -1364,10 +1365,12 @@ function registerMiscHandlers() {
       }
 
       const setCookie = response.headers["set-cookie"];
-      if (setCookie && setCookie[0]) {
-        const match = setCookie[0].match(/SID=([^;]+)/);
+      const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+      for (const cookie of cookies) {
+        const match = cookie.match(/(?:^|;\s*)SID=([^;]+)/i);
         if (match) {
           qbittorrentSID = match[1];
+          break;
         }
       }
 
@@ -1379,16 +1382,16 @@ function registerMiscHandlers() {
 
   ipcMain.handle("qbittorrent:version", async () => {
     try {
-      if (!qbittorrentSID) {
-        throw new Error("No SID available - please login first");
-      }
       const origin = qbittorrentBaseUrl || resolveQbitEndpoint().origin;
+      const headers = {
+        Referer: origin,
+        Origin: origin,
+      };
+      if (qbittorrentSID) {
+        headers.Cookie = `SID=${qbittorrentSID}`;
+      }
       const response = await axios.get(`${origin}/api/v2/app/version`, {
-        headers: {
-          Referer: origin,
-          Origin: origin,
-          Cookie: `SID=${qbittorrentSID}`,
-        },
+        headers,
         withCredentials: true,
         timeout: 5000,
       });
