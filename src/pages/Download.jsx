@@ -704,6 +704,68 @@ export default function DownloadPage() {
       selectedProvider === "torrent" ||
       isMagnet(directUrl) ||
       (!selectedProvider && torrentLinksFromGame.some(isMagnet));
+    const shouldUseTorboxForTorrent =
+      settings.useTorboxForTorrents !== false &&
+      torboxService.isEnabled(settings) &&
+      !torboxDisabledForSession;
+
+    const queueTorrentInTorbox = async magnetLink => {
+      if (isStartingDownload) {
+        console.log("Download already in progress, skipping");
+        return { success: true };
+      }
+
+      setIsStartingDownload(true);
+      toast.info(t("download.toast.processingLink"));
+
+      try {
+        const apiKey = torboxService.getApiKey(settings);
+        const result = await torboxService.createTorrentFromMagnet(
+          magnetLink,
+          apiKey,
+          gameData.game
+        );
+        const storageKey = result.torrentId ? `torrent:${result.torrentId}` : magnetLink;
+        const torboxData = JSON.parse(
+          localStorage.getItem("torboxGameNames") || "{}"
+        );
+        const downloadData = {
+          name: gameData.game,
+          timestamp: Date.now(),
+          imgUrl: gameData.imgID || null,
+          provider: "torrent",
+          torboxType: "torrent",
+          originalUrl: magnetLink,
+          downloadId: result.torrentId,
+          gameData: {
+            game: gameData.game,
+            version: gameData.version || "",
+            size: gameData.size || "",
+            imgID: gameData.imgID || null,
+            gameID: gameData.gameID || "",
+            online: gameData.online || false,
+            dlc: gameData.dlc || false,
+            vr: gameData.category?.includes("Virtual Reality") || false,
+            download_links: gameData.download_links || {},
+          },
+        };
+
+        torboxData[magnetLink] = downloadData;
+        torboxData[storageKey] = downloadData;
+        localStorage.setItem("torboxGameNames", JSON.stringify(torboxData));
+
+        toast.dismiss();
+        toast.success(t("download.toast.downloadQueued"));
+        navigate("/torboxdownloads");
+        return { success: true };
+      } catch (error) {
+        console.error("Error processing torrent with TorBox:", error);
+        toast.dismiss();
+        return { success: false, error };
+      } finally {
+        setIsStartingDownload(false);
+      }
+    };
 
     if (isTorrentProvider) {
       const magnetLink =
@@ -715,6 +777,19 @@ export default function DownloadPage() {
         console.log("[DL] EARLY RETURN: no magnet link in torrent provider");
         toast.error(t("download.toast.invalidLink"));
         return;
+      }
+
+      if (shouldUseTorboxForTorrent) {
+        const torboxResult = await queueTorrentInTorbox(magnetLink);
+        if (torboxResult.success) return;
+        if (!settings.fallbackToQbittorrentOnTorboxFailure) {
+          toast.error(
+            torboxResult.error?.message ||
+              t("download.toast.torboxProcessingError")
+          );
+          return;
+        }
+        toast.info(t("download.toast.torboxTorrentFallback"));
       }
 
       if (!settings.torrentEnabled) {
@@ -795,6 +870,35 @@ export default function DownloadPage() {
     if (settings.gameSource === "fitgirl") {
       const torrentLink = gameData.torrentLink;
       if (torrentLink) {
+        if (shouldUseTorboxForTorrent && isMagnet(torrentLink)) {
+          const torboxResult = await queueTorrentInTorbox(torrentLink);
+          if (torboxResult.success) return;
+          if (!settings.fallbackToQbittorrentOnTorboxFailure) {
+            toast.error(
+              torboxResult.error?.message ||
+                t("download.toast.torboxProcessingError")
+            );
+            return;
+          }
+          toast.info(t("download.toast.torboxTorrentFallback"));
+        }
+
+        if (!settings.torrentEnabled) {
+          toast.error(
+            t("download.toast.torrentDisabled") ||
+              "Enable torrenting in Settings to download this game."
+          );
+          return;
+        }
+
+        if (!torrentRunning) {
+          toast.error(
+            t("download.downloadOptions.torrentInstructions.noTorrent") ||
+              "qBittorrent is not running. Start qBittorrent and try again."
+          );
+          return;
+        }
+
         if (isStartingDownload) {
           console.log("Download already in progress, skipping");
           return;
@@ -1789,7 +1893,12 @@ export default function DownloadPage() {
                 typeof link === "string" &&
                 link.trim().toLowerCase().startsWith("magnet:")
             );
-            return hasMagnet && !!settings.torrentEnabled;
+            return (
+              hasMagnet &&
+              (!!settings.torrentEnabled ||
+                (settings.useTorboxForTorrents !== false &&
+                  torboxService.isEnabled(settings)))
+            );
           }
           return true;
         })
@@ -1821,7 +1930,9 @@ export default function DownloadPage() {
         setSelectedProvider(ddlProviders[0]);
       } else if (
         availableProviders.includes("torrent") &&
-        settings.torrentEnabled
+        (settings.torrentEnabled ||
+          (settings.useTorboxForTorrents !== false &&
+            torboxService.isEnabled(settings)))
       ) {
         setSelectedProvider("torrent");
       } else {

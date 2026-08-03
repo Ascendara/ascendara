@@ -78,6 +78,86 @@ export const controlWebDownload = async (apiKey, options) => {
 };
 
 /**
+ * Control a torrent download.
+ * @param {string} apiKey - The TorBox API key
+ * @param {Object} options - Torrent control options
+ * @param {number|string} [options.torrent_id] - The torrent ID
+ * @param {string} options.operation - The operation to perform
+ * @param {boolean} [options.all] - Whether to apply the operation to all torrents
+ * @returns {Promise<Object>} - The API response
+ */
+export const controlTorrent = async (apiKey, options) => {
+  if (!apiKey) throw new Error("API key is required");
+  if (!options.operation) throw new Error("Operation is required");
+  if (!options.torrent_id && options.all !== true)
+    throw new Error("Either torrent_id or all=true is required");
+
+  const response = await fetch(`${API_BASE_URL}/torrents/controltorrent`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      torrent_id: options.torrent_id,
+      operation: options.operation,
+      all: options.all || false,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) {
+    throw new Error(data.detail || `Failed to ${options.operation} torrent`);
+  }
+  return data;
+};
+
+/**
+ * Control either a web download or torrent using its normalized TorBox type.
+ */
+export const controlDownload = async (apiKey, download, operation) => {
+  if (download?._torboxType === "torrent") {
+    return controlTorrent(apiKey, {
+      torrent_id: download.id,
+      operation: operation === "stop" ? "delete" : operation,
+    });
+  }
+  return controlWebDownload(apiKey, {
+    webdl_id: download?.id,
+    operation,
+  });
+};
+
+/**
+ * Add a magnet link to the user's TorBox torrent list.
+ */
+export const createTorrentFromMagnet = async (magnet, apiKey, name = "") => {
+  if (!magnet?.trim().toLowerCase().startsWith("magnet:")) {
+    throw new Error("A valid magnet link is required");
+  }
+  if (!apiKey) throw new Error("API key is required");
+
+  const formData = new FormData();
+  formData.append("magnet", magnet);
+  formData.append("allow_zip", "true");
+  if (name) formData.append("name", name);
+
+  const response = await fetch(`${API_BASE_URL}/torrents/createtorrent`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) {
+    throw new Error(data.detail || `Failed to create torrent: ${response.status}`);
+  }
+
+  const torrentId = data.data?.torrent_id ?? data.data?.id ?? data.torrent_id ?? null;
+  return { ...data, torrentId };
+};
+
+/**
  * Create a premium direct download link using the Torbox API
  * @param {string} link - The original link to convert to a premium download
  * @param {string} apiKey - The Torbox API key for authorization
@@ -142,13 +222,13 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
  * @returns {Promise<string>} - The direct download URL
  * @throws {Error} - If the API request fails
  */
-export const getDirectDownloadLink = async (apiKey, webdlId) => {
+export const getDirectDownloadLink = async (apiKey, downloadId, type = "webdl") => {
   if (!apiKey) {
     throw new Error("API key is required");
   }
 
-  if (!webdlId) {
-    throw new Error("Web download ID is required");
+  if (!downloadId) {
+    throw new Error("Download ID is required");
   }
 
   try {
@@ -160,7 +240,7 @@ export const getDirectDownloadLink = async (apiKey, webdlId) => {
     }
     let url;
     try {
-      url = new URL(`${base}/webdl/requestdl`);
+      url = new URL(`${base}/${type === "torrent" ? "torrents" : "webdl"}/requestdl`);
     } catch (err) {
       console.error(
         "[Torbox] Failed to construct URL object:",
@@ -175,13 +255,20 @@ export const getDirectDownloadLink = async (apiKey, webdlId) => {
 
     // Add required parameters
     url.searchParams.append("token", apiKey);
-    url.searchParams.append("web_id", webdlId);
+    url.searchParams.append(type === "torrent" ? "torrent_id" : "web_id", downloadId);
 
     // Always set zip_link to true (as string)
     url.searchParams.append("zip_link", "true");
 
-    console.log("[Torbox] getDirectDownloadLink constructed URL:", url.toString());
-    console.log("[Torbox] Params:", { token: apiKey, web_id: webdlId, zip_link: "true" });
+    console.log("[Torbox] Requesting direct download link:", {
+      type,
+      downloadId,
+    });
+    console.log("[Torbox] Download link params:", {
+      type,
+      downloadId,
+      zip_link: "true",
+    });
 
     const response = await fetch(url.toString(), {
       method: "GET",
@@ -253,29 +340,51 @@ export const checkDownloadState = async (apiKey, webdlId) => {
  * @returns {Promise<Array>} - Array of download objects
  * @throws {Error} - If the API request fails
  */
-export const getAllDownloads = async apiKey => {
+const getDownloadList = async (apiKey, type) => {
   if (!apiKey) throw new Error("API key is required");
 
   let base = API_BASE_URL;
   if (base.startsWith("/")) {
     base = window.location.origin + base;
   }
-  const url = `${base}/webdl/mylist`;
+  const url = `${base}/${type === "torrent" ? "torrents" : "webdl"}/mylist`;
 
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.detail || `Failed to fetch ${type} downloads`);
+  }
+
+  const items = Array.isArray(data.data) ? data.data : data.data ? [data.data] : [];
+  return items.map(item => ({
+    ...item,
+    _torboxType: type,
+    _storageKey: `${type}:${item.id}`,
+  }));
+};
+
+export const getAllDownloads = async apiKey => {
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
-    const data = await response.json();
-
-    if (!data.success || !Array.isArray(data.data)) {
-      throw new Error(data.detail || "Failed to fetch downloads list");
+    const results = await Promise.allSettled([
+      getDownloadList(apiKey, "webdl"),
+      getDownloadList(apiKey, "torrent"),
+    ]);
+    const downloads = results.flatMap(result =>
+      result.status === "fulfilled" ? result.value : []
+    );
+    if (results.every(result => result.status === "rejected")) {
+      throw results[0].reason;
     }
-
-    return data.data;
+    results
+      .filter(result => result.status === "rejected")
+      .forEach(result => console.warn("[Torbox] Partial download list failure:", result.reason));
+    return downloads;
   } catch (error) {
     console.error("[Torbox] Error fetching downloads:", error);
     throw error;
@@ -403,6 +512,7 @@ export const getUserInfo = async apiKey => {
 export default {
   isEnabled,
   getApiKey,
+  createTorrentFromMagnet,
   getDirectDownloadLinkFromUrl,
   getUserInfo,
 };

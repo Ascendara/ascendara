@@ -2195,6 +2195,73 @@ function Settings() {
                   />
                 </div>
 
+                <div
+                  id="torbox-torrents"
+                  className="flex items-center justify-between"
+                >
+                  <div
+                    className={`space-y-2${
+                      !(
+                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
+                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
+                      )
+                        ? "pointer-events-none select-none opacity-50"
+                        : ""
+                    }`}
+                  >
+                    <Label>{t("settings.useTorboxForTorrents")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.useTorboxForTorrentsDesc")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.useTorboxForTorrents ?? true}
+                    onCheckedChange={value =>
+                      handleSettingChange("useTorboxForTorrents", value)
+                    }
+                    disabled={
+                      !(
+                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
+                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
+                      )
+                    }
+                  />
+                </div>
+
+                <div
+                  id="torbox-torrent-fallback"
+                  className="flex items-center justify-between"
+                >
+                  <div
+                    className={`space-y-2${
+                      !settings.useTorboxForTorrents || !settings.torrentEnabled
+                        ? "pointer-events-none select-none opacity-50"
+                        : ""
+                    }`}
+                  >
+                    <Label>
+                      {t("settings.fallbackToQbittorrentOnTorboxFailure")}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.fallbackToQbittorrentOnTorboxFailureDesc")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={
+                      settings.fallbackToQbittorrentOnTorboxFailure ?? false
+                    }
+                    onCheckedChange={value =>
+                      handleSettingChange(
+                        "fallbackToQbittorrentOnTorboxFailure",
+                        value
+                      )
+                    }
+                    disabled={
+                      !settings.useTorboxForTorrents || !settings.torrentEnabled
+                    }
+                  />
+                </div>
+
                 {/* Single Stream Download Toggle */}
                 <div id="single-stream" className="flex items-center justify-between">
                   <div className="space-y-0.5">

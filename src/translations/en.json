@@ -1279,6 +1279,7 @@
       "reportSubmitted": "Report submitted successfully",
       "torboxOffline": "This provider is offline on Torbox at the moment. Try another provider.",
       "torboxProcessingError": "Error processing Torbox link",
+      "torboxTorrentFallback": "TorBox failed to add the torrent. Retrying with qBittorrent.",
       "torrentSent": "Torrent sent to qBittorrent",
       "gofileRateLimit": "Gofile Rate Limit Reached",
       "gofileRateLimitDesc": "Gofile has rate limited your connection. Please enable a VPN and try again in a few minutes.",
@@ -2789,6 +2790,10 @@
     "torboxApiKeyDescription": "Debrid services allow you to convert file host links into premium direct download links, bypassing speed limits and wait times. Enter your Torbox API key here to enable this feature.",
     "torboxApiKeyLearnHowtoGet": "Learn how to get your API key",
     "torboxApiKeyPlaceholder": "Paste Torbox API key",
+    "useTorboxForTorrents": "Use TorBox for torrents",
+    "useTorboxForTorrentsDesc": "Send magnet links to TorBox instead of downloading them directly through qBittorrent.",
+    "fallbackToQbittorrentOnTorboxFailure": "Fall back to qBittorrent",
+    "fallbackToQbittorrentOnTorboxFailureDesc": "If TorBox cannot add a magnet, retry it through your configured qBittorrent WebUI. This may expose torrent traffic outside TorBox, so ensure your VPN is active.",
     "torrentDescription": "Enable Ascendara's torrent functionality. This feature requires qBittorrent to be installed and is recommended for experienced users only.",
     "torrentOnAscendara": "Torrent on Ascendara",
     "torrentWarningDialog": {
