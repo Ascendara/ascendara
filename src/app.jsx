@@ -624,6 +624,8 @@ const ControllerDetectionPrompt = () => {
   const controllerType = settings?.controllerType || "xbox";
   const buttons = getControllerButtons(controllerType);
   const [selectedButton, setSelectedButton] = useState("confirm");
+  const canAcceptInputRef = useRef(false);
+  const prevButtonsRef = useRef({ confirm: false, cancel: false });
 
   useEffect(() => {
     if (hasPromptedRef.current) return;
@@ -676,7 +678,16 @@ const ControllerDetectionPrompt = () => {
   }, [showPrompt]);
 
   useEffect(() => {
-    if (!showPrompt) return;
+    if (!showPrompt) {
+      canAcceptInputRef.current = false;
+      return;
+    }
+
+    prevButtonsRef.current = { confirm: false, cancel: false };
+    canAcceptInputRef.current = false;
+    const inputDelayTimeout = setTimeout(() => {
+      canAcceptInputRef.current = true;
+    }, 500);
 
     const handleGamepadInput = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -686,9 +697,18 @@ const ControllerDetectionPrompt = () => {
 
       if (!gamepad) return;
 
-      if (gamepad.buttons[0]?.pressed) {
+      const confirmPressed = !!gamepad.buttons[0]?.pressed;
+      const cancelPressed = !!gamepad.buttons[1]?.pressed;
+      const wasConfirmPressed = prevButtonsRef.current.confirm;
+      const wasCancelPressed = prevButtonsRef.current.cancel;
+      prevButtonsRef.current = { confirm: confirmPressed, cancel: cancelPressed };
+
+      if (!canAcceptInputRef.current) return;
+
+      // Only react to a fresh press (rising edge), not a button already held down
+      if (confirmPressed && !wasConfirmPressed) {
         handleEnterBigPicture();
-      } else if (gamepad.buttons[1]?.pressed) {
+      } else if (cancelPressed && !wasCancelPressed) {
         handleDismiss();
       } else if (gamepad.buttons[12]?.pressed || gamepad.buttons[14]?.pressed) {
         setSelectedButton("cancel");
@@ -699,7 +719,10 @@ const ControllerDetectionPrompt = () => {
 
     const intervalId = setInterval(handleGamepadInput, 100);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(inputDelayTimeout);
+    };
   }, [showPrompt]);
 
   const handleEnterBigPicture = () => {
