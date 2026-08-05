@@ -3911,14 +3911,32 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
 
 CloudOnlyGameCard.displayName = "CloudOnlyGameCard";
 
+const persistPlayLaterCoverUrl = (gameName, url) => {
+  if (!gameName || !url || url.startsWith("blob:")) return;
+  try {
+    const list = JSON.parse(localStorage.getItem("play-later-games") || "[]");
+    const index = list.findIndex(g => g.game === gameName);
+    if (index === -1 || list[index].coverUrl === url) return;
+    list[index] = { ...list[index], coverUrl: url };
+    safeSetItem("play-later-games", JSON.stringify(list));
+  } catch (error) {
+    console.warn("Failed to persist Play Later cover URL:", error);
+  }
+};
+
 // Play Later game card
 const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
   const { t } = useLanguage();
-  const [imageData, setImageData] = useState(null);
+  const [imageData, setImageData] = useState(() => game.coverUrl || null);
 
-  // Load Play Later card image (no localStorage caching - quota issues with
-  // base64 data URLs; SteamGridDB lookups are cached in-memory by the service)
+  // Load Play Later card image. If we already have a persisted cover URL from
+  // a previous session, use it immediately and skip re-fetching entirely.
   useEffect(() => {
+    if (game.coverUrl) {
+      setImageData(game.coverUrl);
+      return;
+    }
+
     let isMounted = true;
     const loadImage = async () => {
       // 1. Load via imgID when available (games from Search/Download always have one)
@@ -3931,6 +3949,7 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
           });
           if (url && isMounted) {
             setImageData(url);
+            persistPlayLaterCoverUrl(game.game, url);
             return;
           }
         } catch (error) {
@@ -3946,6 +3965,7 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
           const imageUrl = steamGridImageService.default.pickUrl(assets, "card");
           if (imageUrl && isMounted) {
             setImageData(imageUrl);
+            persistPlayLaterCoverUrl(game.game, imageUrl);
             return;
           }
         } catch (error) {
@@ -3957,7 +3977,7 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
     return () => {
       isMounted = false;
     };
-  }, [game.game, game.imgID]);
+  }, [game.game, game.imgID, game.coverUrl]);
 
   const formatAddedDate = timestamp => {
     if (!timestamp) return "";
