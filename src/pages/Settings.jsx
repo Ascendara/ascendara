@@ -5846,6 +5846,7 @@ const QbittorrentStatus = ({ refreshKey = 0 } = {}) => {
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState({ checking: true });
   const [showConfigAlert, setShowConfigAlert] = useState(false);
+  const [showStillCantConnectAlert, setShowStillCantConnectAlert] = useState(false);
 
   const checkStatus = useCallback(async () => {
     setChecking(true);
@@ -5915,17 +5916,71 @@ const QbittorrentStatus = ({ refreshKey = 0 } = {}) => {
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
               {t("app.qbittorrent.configRequired")}
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4 text-muted-foreground">
-              <div className="rounded-lg bg-muted p-4">
-                <h4 className="font-semibold mb-2">{t("settings.qbitConfigDialog.currentConfig")}</h4>
-                <div className="space-y-2 text-sm">
-                  <div><span className="font-medium">{t("settings.qbitConfigDialog.host")}:</span> {settings.torrentHost || "localhost"}</div>
-                  <div><span className="font-medium">{t("settings.qbitConfigDialog.port")}:</span> {settings.torrentPort || 8080}</div>
-                  <div><span className="font-medium">{t("settings.qbitConfigDialog.username")}:</span> {settings.torrentUsername || "admin"}</div>
-                  <div><span className="font-medium">{t("settings.qbitConfigDialog.password")}:</span> {settings.torrentPassword || "adminadmin"}</div>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-muted-foreground">
+                <div className="rounded-lg bg-muted p-4">
+                  <h4 className="font-semibold mb-2">{t("settings.qbitConfigDialog.currentConfig")}</h4>
+                  <div className="space-y-2 text-sm">
+                    <div><span className="font-medium">{t("settings.qbitConfigDialog.host")}:</span> {settings.torrentHost || "localhost"}</div>
+                    <div><span className="font-medium">{t("settings.qbitConfigDialog.port")}:</span> {settings.torrentPort || 8080}</div>
+                    <div><span className="font-medium">{t("settings.qbitConfigDialog.username")}:</span> {settings.torrentUsername || "admin"}</div>
+                    <div><span className="font-medium">{t("settings.qbitConfigDialog.password")}:</span> {settings.torrentPassword || "adminadmin"}</div>
+                  </div>
                 </div>
+                <p>{t("app.qbittorrent.configInstructions")}</p>
               </div>
-              <p>{t("app.qbittorrent.configInstructions")}</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary sm:mr-auto"
+              onClick={() => {
+                setShowConfigAlert(false);
+                setShowStillCantConnectAlert(true);
+              }}
+            >
+              {t("settings.qbitConfigDialog.stillCantConnect.title")}
+            </Button>
+            <AlertDialogCancel className="text-primary">
+              {t("common.ok")}
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={showStillCantConnectAlert}
+        onOpenChange={setShowStillCantConnectAlert}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("settings.qbitConfigDialog.stillCantConnect.title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-muted-foreground">
+                <p className="text-sm">
+                  {t("settings.qbitConfigDialog.stillCantConnect.intro")}
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-sm">
+                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step1")}</li>
+                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step2")}</li>
+                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step3")}</li>
+                  <li>
+                    {t("settings.qbitConfigDialog.stillCantConnect.step4")}
+                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                      <li>{t("settings.qbitConfigDialog.stillCantConnect.step4a")}</li>
+                      <li>{t("settings.qbitConfigDialog.stillCantConnect.step4b")}</li>
+                    </ul>
+                  </li>
+                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step5")}</li>
+                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step6")}</li>
+                </ol>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.qbitConfigDialog.stillCantConnect.vpnNote")}
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

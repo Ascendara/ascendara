@@ -2833,7 +2833,20 @@
       "host": "Host",
       "port": "Port", 
       "username": "Username",
-      "password": "Password"
+      "password": "Password",
+      "stillCantConnect": {
+        "title": "Still can't connect?",
+        "intro": "If your credentials above are correct, this is usually caused by qBittorrent rejecting the local connection. Try fixing it directly inside qBittorrent:",
+        "step1": "Open qBittorrent.",
+        "step2": "Go to Tools > Options (or press Alt + O).",
+        "step3": "Click the Web UI tab on the left.",
+        "step4": "Under Authentication:",
+        "step4a": "Check \"Bypass authentication for clients on localhost\".",
+        "step4b": "Check \"Bypass authentication for clients in whitelisted IP subnets\" and add 127.0.0.1/32 to the whitelist field.",
+        "step5": "Click Apply, then OK.",
+        "step6": "Completely close qBittorrent (exit via the system tray or Task Manager), then restart both qBittorrent and Ascendara.",
+        "vpnNote": "If you use a VPN, proxy, or a tool like ExitLag, make sure it isn't rerouting your localhost traffic - exclude 127.0.0.1 and localhost or temporarily disable it while troubleshooting."
+      }
     },
     "uploadLogs": "Upload Logs",
     "userSettings": {
