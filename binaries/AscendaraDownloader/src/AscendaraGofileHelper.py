@@ -339,7 +339,8 @@ class GofileDownloader:
             if sys.platform == 'win32':
                 appdata = os.environ.get('APPDATA')
                 if appdata:
-                    candidate = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+                    app_folder = 'Ascendara' if getattr(sys, 'frozen', False) else 'Electron'
+                    candidate = os.path.join(appdata, app_folder, 'ascendarasettings.json')
                     if os.path.exists(candidate):
                         settings_path = candidate
             elif sys.platform == 'darwin':
@@ -2134,7 +2135,8 @@ class GofileDownloader:
             if sys.platform == 'win32':
                 appdata = os.environ.get('APPDATA')
                 if appdata:
-                    candidate = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+                    app_folder = 'Ascendara' if getattr(sys, 'frozen', False) else 'Electron'
+                    candidate = os.path.join(appdata, app_folder, 'ascendarasettings.json')
                     if os.path.exists(candidate):
                         settings_path = candidate
             elif sys.platform == 'darwin':

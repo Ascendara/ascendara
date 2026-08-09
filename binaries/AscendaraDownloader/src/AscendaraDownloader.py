@@ -195,10 +195,11 @@ def safe_write_json(filepath: str, data: Dict[str, Any]):
 
 def get_settings_path() -> Optional[str]:
     """Get the path to Ascendara settings file."""
+    app_folder = 'Ascendara' if getattr(sys, 'frozen', False) else 'Electron'
     if sys.platform == 'win32':
         appdata = os.environ.get('APPDATA')
         if appdata:
-            candidate = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+            candidate = os.path.join(appdata, app_folder, 'ascendarasettings.json')
             if os.path.exists(candidate):
                 return candidate
     elif sys.platform == 'darwin':

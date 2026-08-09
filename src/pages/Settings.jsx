@@ -4840,7 +4840,7 @@ function Settings() {
               {isDownloading ? t("common.downloading") : t("welcome.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </AlertDialogContent> 
       </AlertDialog>
 
       {/* No Ludusavi Tool Dialog */}

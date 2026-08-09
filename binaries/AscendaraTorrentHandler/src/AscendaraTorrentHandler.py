@@ -144,7 +144,8 @@ def load_settings():
         if sys.platform == 'win32':
             appdata = os.environ.get('APPDATA')
             if appdata:
-                path = os.path.join(appdata, 'Electron', 'ascendarasettings.json')
+                app_folder = 'Ascendara' if getattr(sys, 'frozen', False) else 'Electron'
+                path = os.path.join(appdata, app_folder, 'ascendarasettings.json')
                 if os.path.exists(path):
                     with open(path, 'r', encoding='utf-8') as f:
                         return json.load(f)
