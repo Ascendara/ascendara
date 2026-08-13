@@ -591,6 +591,7 @@ export default function DownloadPage() {
   const whereToDownloadRef = useRef(whereToDownload);
   const steamSectionRef = useRef(null);
   const mainContentRef = useRef(null);
+  const downloadSectionRef = useRef(null);
   const scrollThreshold = 220;
   const seamlessProviders = SEAMLESS_PROVIDERS;
   const VERIFIED_PROVIDERS = CENTRAL_VERIFIED_PROVIDERS;
@@ -1561,8 +1562,12 @@ export default function DownloadPage() {
           const windowHeight = window.innerHeight;
           const documentHeight = document.documentElement.scrollHeight;
           const scrollBottom = currentScrollY + windowHeight;
+          const downloadSectionBottom = downloadSectionRef.current
+            ? downloadSectionRef.current.offsetTop +
+              downloadSectionRef.current.offsetHeight
+            : scrollThreshold;
+          const snapDownThreshold = Math.max(scrollThreshold, downloadSectionBottom);
 
-          // Reset flags when user has scrolled far enough
           if (currentScrollY < scrollThreshold) {
             hasScrolledToSteam = false;
           }
@@ -1613,7 +1618,7 @@ export default function DownloadPage() {
           // Case 1: Scrolling down from top area to Steam section
           if (
             scrollDirection === "down" &&
-            currentScrollY > scrollThreshold &&
+            currentScrollY > snapDownThreshold &&
             currentScrollY < steamSectionTop - 150 &&
             !hasScrolledToSteam
           ) {
@@ -2866,6 +2871,7 @@ export default function DownloadPage() {
           </AlertDialog>
 
           {/* Download Options Section */}
+          <div ref={downloadSectionRef}>
           {settings.gameSource === "fitgirl" && gameData.torrentLink ? (
             /* FitGirl Torrent Download */
             <div className="rounded-xl border border-border/30 bg-card p-6">
@@ -3479,6 +3485,7 @@ export default function DownloadPage() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 
