@@ -101,6 +101,7 @@ const LOCAL_FALLBACK_PATTERNS = {
   fileditch: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
   fileditchfiles: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
   buzzheavier: /^https?:\/\/(?:[a-z0-9-]+\.)?(?:bzzhr\.to|fafda\.to)\/(?:d\/)?[A-Za-z0-9]+(?:\?.*)?$/i,
+  megadb: /^https?:\/\/(?:[a-z0-9-]+\.)?megadb\.(?:net|xyz)\/.+$/i,
 };
 
 // Async validation using API patterns
@@ -109,10 +110,11 @@ const isValidURL = async (url, provider, patterns) => {
   if (trimmedUrl === "") {
     return true;
   }
-  if (!patterns) return false;
-  const pattern = getProviderPattern(provider, patterns) || LOCAL_FALLBACK_PATTERNS[provider] || null;
-  if (!pattern) return false;
-  return pattern.test(trimmedUrl);
+  const apiPattern = patterns ? getProviderPattern(provider, patterns) : null;
+  const fallbackPattern = LOCAL_FALLBACK_PATTERNS[provider] || null;
+  if (apiPattern?.test(trimmedUrl)) return true;
+  if (fallbackPattern?.test(trimmedUrl)) return true;
+  return false;
 };
 
 const sanitizeGameName = name => {
@@ -1761,11 +1763,14 @@ export default function DownloadPage() {
       ? `https:${downloadLinks[selectedProvider][0]}`
       : downloadLinks[selectedProvider][0];
 
-    const isBuzzheavier =
+    const needsReferrerSpoofing =
       selectedProvider.toLowerCase() === "buzzheavier" ||
-      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)/i.test(link);
+      selectedProvider.toLowerCase() === "megadb" ||
+      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)|megadb\.net/i.test(
+        link
+      );
 
-    if (isBuzzheavier) {
+    if (needsReferrerSpoofing) {
       await window.electron.openURL(link, { referrer: "https://steamrip.com/" });
     } else {
       window.electron.openURL(link);
@@ -2994,7 +2999,8 @@ export default function DownloadPage() {
               torboxService.isEnabled(settings) &&
               torboxService.getApiKey(settings)) ||
             seamlessProviders.includes(selectedProvider) ||
-            selectedProvider === "buzzheavier" ? (
+            selectedProvider === "buzzheavier" ||
+            selectedProvider === "megadb" ? (
             /* Seamless / Torbox Download */
             <div className="rounded-xl border border-border/30 bg-card p-8 shadow-sm">
               <div className="mx-auto flex max-w-md flex-col items-center text-center">
@@ -3116,8 +3122,9 @@ export default function DownloadPage() {
                     </Select>
                   </div>
 
-                  {/* Buzzheavier note */}
-                  {selectedProvider === "buzzheavier" && (
+                  {/* Buzzheavier / MegaDB note */}
+                  {(selectedProvider === "buzzheavier" ||
+                    selectedProvider === "megadb") && (
                     <div className="rounded-md bg-primary/5 p-3 text-left text-sm text-primary">
                       {t("download.downloadOptions.buzzheavierReminder")}
                     </div>
@@ -3126,7 +3133,8 @@ export default function DownloadPage() {
                   {/* Download Button */}
                   <Button
                     onClick={() =>
-                      selectedProvider === "buzzheavier"
+                      selectedProvider === "buzzheavier" ||
+                      selectedProvider === "megadb"
                         ? handleOpenInBrowser()
                         : whereToDownload()
                     }

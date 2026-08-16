@@ -178,8 +178,6 @@ function registerMiscHandlers() {
         console.log("Blocked new-window popup in external window");
       });
 
-      // Restrict in-window navigation to known Buzzheavier domains so ad redirects
-      // in the same window can't take the user away from the download page.
       const allowedHosts = [
         "buzzheavier.com",
         "bzzhr.co",
@@ -188,6 +186,7 @@ function registerMiscHandlers() {
         "fafda.to",
         "fuckingfast.net",
         "fuckingfast.co",
+        "megadb.net",
       ];
       externalWindow.webContents.on("will-navigate", (event, navUrl) => {
         try {
