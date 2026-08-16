@@ -587,9 +587,16 @@ const Ascend = () => {
       const playtimeHours = playtimeSeconds / 3600;
       const launchCount = typeof game?.launchCount === "number" ? game.launchCount : 0;
       const isCompleted = !!game?.completed;
+      const hasEngagement = playtimeSeconds > 0 || launchCount > 0 || isCompleted;
 
       if (playtimeSeconds > 0) {
         gamesPlayedCount += 1;
+      }
+
+      totalPlaytime += playtimeSeconds;
+
+      if (!hasEngagement) {
+        return;
       }
 
       let gameXP = XP_RULES.basePerGame;
@@ -605,7 +612,6 @@ const Ascend = () => {
       }
 
       totalXP += gameXP;
-      totalPlaytime += playtimeSeconds;
     });
 
     const totalPlaytimeHours = totalPlaytime / 3600;
@@ -1187,6 +1193,12 @@ const Ascend = () => {
       if (result.success) {
         toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
         await loadCloudLibrary();
+        try {
+          await recomputeProfileStats();
+        } catch (e) {
+          console.warn("Failed to recompute profile stats after sync:", e);
+        }
+        await loadLocalStats();
       } else {
         toast.error(
           result.error || t("ascend.cloudLibrary.syncFailed") || "Failed to sync library"
@@ -1296,19 +1308,9 @@ const Ascend = () => {
           console.warn("Failed to persist restored profileStats locally:", e);
         }
 
-        // If we derived stats from the library (cloud doc was empty/stale),
-        // push them back up so subsequent restores read directly from the
-        // profile doc and so the leaderboard reflects real progress.
         if (profileDerivedFromLibrary) {
           try {
-            await syncProfileToAscend({
-              level: resolvedStats.level,
-              xp: resolvedStats.xp,
-              totalPlaytime: resolvedStats.totalPlaytime,
-              gamesPlayed: resolvedStats.gamesPlayed,
-              totalGames: resolvedStats.totalGames,
-              joinDate: resolvedStats.JoinDate,
-            });
+            await recomputeProfileStats(resolvedStats.JoinDate || null);
           } catch (e) {
             console.warn(
               "Failed to back-fill cloud profileStats from derived library data:",

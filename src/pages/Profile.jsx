@@ -396,9 +396,16 @@ const Profile = () => {
       const PlaytimeHours = PlaytimeSeconds / 3600;
       const LaunchCount = typeof Game?.launchCount === "number" ? Game.launchCount : 0;
       const IsCompleted = !!Game?.completed;
+      const HasEngagement = PlaytimeSeconds > 0 || LaunchCount > 0 || IsCompleted;
 
       if (PlaytimeSeconds > 0) {
         GamesPlayedCount += 1;
+      }
+
+      TotalPlaytimeSeconds += PlaytimeSeconds;
+
+      if (!HasEngagement) {
+        continue;
       }
 
       let XPFromThisGame = XpRules.basePerGame;
@@ -415,7 +422,6 @@ const Profile = () => {
       }
 
       TotalXP += XPFromThisGame;
-      TotalPlaytimeSeconds += PlaytimeSeconds;
     }
 
     const TotalPlaytimeHours = TotalPlaytimeSeconds / 3600;
@@ -703,18 +709,9 @@ const Profile = () => {
           LastSyncedProfileStatsPtr.current = Fingerprint;
           try {
             await window.electron.setTimestampValue("profileStats", Payload);
-            // Also push to cloud (Ascend) so OS migrations can restore them.
-            // Guarded by auth; silent failure keeps local flow unaffected.
             if (User?.uid) {
               try {
-                await SyncProfileToAscend({
-                  level: Payload.level,
-                  xp: Payload.xp,
-                  totalPlaytime: Payload.totalPlaytime,
-                  gamesPlayed: Payload.gamesPlayed,
-                  totalGames: Payload.totalGames,
-                  joinDate: Payload.JoinDate,
-                });
+                await SyncProfileToAscend({ joinDate: Payload.JoinDate });
               } catch (cloudErr) {
                 console.warn(
                   `[Profile] Failed to auto-sync profileStats to cloud — will retry on next change.`,

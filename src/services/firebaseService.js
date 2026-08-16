@@ -859,35 +859,14 @@ export const getUserStatus = async userId => {
 };
 
 /**
- * Sync local profile stats to Ascend
- * @param {object} profileData - Profile data to sync
+ * Sync local profile stats to Ascend.
+ *
+ * @param {object} profileData - May contain `joinDate`; other fields ignored.
  * @returns {Promise<{success: boolean, error: string|null}>}
  */
 export const syncProfileToAscend = async profileData => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
-
-    await updateDoc(doc(db, "users", user.uid), {
-      profileStats: {
-        level: profileData.level || 1,
-        xp: profileData.xp || 0,
-        totalPlaytime: profileData.totalPlaytime || 0,
-        gamesPlayed: profileData.gamesPlayed || 0,
-        totalGames: profileData.totalGames || 0,
-        joinDate: profileData.joinDate || null,
-        lastSynced: new Date().toISOString(),
-      },
-      updatedAt: serverTimestamp(),
-    });
-
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Sync profile error:", error);
-    return { success: false, error: error.message };
-  }
+  const result = await recomputeProfileStats(profileData?.joinDate || null);
+  return { success: result.success, error: result.error };
 };
 
 /**
@@ -1186,7 +1165,7 @@ export const applyGameSessionDelta = async (gameName, deltas = {}, meta = {}) =>
  *
  * @returns {Promise<{success: boolean, stats: object|null, error: string|null}>}
  */
-export const recomputeProfileStats = async () => {
+export const recomputeProfileStats = async (joinDate = null) => {
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -1202,6 +1181,7 @@ export const recomputeProfileStats = async () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
+        body: JSON.stringify(joinDate ? { joinDate } : {}),
       }
     );
 
