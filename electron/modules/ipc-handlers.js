@@ -204,6 +204,62 @@ function registerMiscHandlers() {
         }
       });
 
+      const sender = ipcEvent.sender;
+      let blockedHandled = false;
+      const notifyBlocked = reason => {
+        if (blockedHandled) return;
+        blockedHandled = true;
+        clearTimeout(blankPageTimeout);
+        console.log("External provider window appears blocked:", reason);
+        try {
+          if (sender && !sender.isDestroyed()) {
+            sender.send("external-window-blocked", { url, reason });
+          }
+        } catch (error) {
+          console.error("Failed to notify renderer of blocked external window:", error);
+        }
+        if (!externalWindow.isDestroyed()) {
+          externalWindow.close();
+        }
+      };
+
+      externalWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        // -3 is ERR_ABORTED, which fires for cancelled/redirected navigations
+        // (e.g. blocked ad popups) and isn't an actual load failure.
+        if (isMainFrame && errorCode !== -3) {
+          notifyBlocked(`${errorDescription} (${errorCode})`);
+        }
+      });
+
+      let blankPageTimeout;
+      externalWindow.webContents.on("did-finish-load", () => {
+        if (blockedHandled) return;
+        // Give client-side JS a moment to render before judging the page blank.
+        setTimeout(async () => {
+          if (blockedHandled || externalWindow.isDestroyed()) return;
+          try {
+            const bodyText = await externalWindow.webContents.executeJavaScript(
+              "document.body ? document.body.innerText.trim().length : 0"
+            );
+            if (bodyText === 0) {
+              notifyBlocked("Page loaded blank");
+            } else {
+              clearTimeout(blankPageTimeout);
+            }
+          } catch (error) {
+            console.error("Failed to inspect external window content:", error);
+          }
+        }, 3000);
+      });
+
+      blankPageTimeout = setTimeout(() => {
+        if (!blockedHandled && !externalWindow.isDestroyed()) {
+          notifyBlocked("Page took too long to load");
+        }
+      }, 20000);
+
+      externalWindow.once("closed", () => clearTimeout(blankPageTimeout));
+
       externalWindow.loadURL(url, { httpReferrer: options.referrer });
 
       // When the user clicks a download button in the external window, intercept

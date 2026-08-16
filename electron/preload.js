@@ -499,6 +499,11 @@ contextBridge.exposeInMainWorld("electron", {
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   getImageKey: () => ipcRenderer.invoke("get-image-key"),
   openURL: (url, options) => ipcRenderer.invoke("open-url", url, options),
+  onExternalWindowBlocked: callback => {
+    const listener = (_, data) => callback(data);
+    ipcRenderer.on("external-window-blocked", listener);
+    return () => ipcRenderer.removeListener("external-window-blocked", listener);
+  },
   fetchApiImage: (endpoint, imgID, timestamp, signature) =>
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
   getSteamGridUrls: gameName => ipcRenderer.invoke("steamgrid-get-urls", gameName),

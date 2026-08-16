@@ -358,6 +358,7 @@ export default function DownloadPage() {
   const [isGameInstalled, setIsGameInstalled] = useState(false);
   const [showReinstallWarning, setShowReinstallWarning] = useState(false);
   const [pendingReinstallUrl, setPendingReinstallUrl] = useState(null);
+  const [showProviderBlockedDialog, setShowProviderBlockedDialog] = useState(false);
 
   // Sync isFavorite when changed from elsewhere (e.g. Library favorites tab)
   useEffect(() => {
@@ -1456,6 +1457,13 @@ export default function DownloadPage() {
   }, []);
 
   useEffect(() => {
+    const removeListener = window.electron.onExternalWindowBlocked(() => {
+      setShowProviderBlockedDialog(true);
+    });
+    return () => removeListener && removeListener();
+  }, []);
+
+  useEffect(() => {
     setTimemachineSetting(settings.showOldDownloadLinks);
   }, [settings.showOldDownloadLinks]);
 
@@ -2003,6 +2011,28 @@ export default function DownloadPage() {
             >
               {t("download.reinstallWarning.continueAnyway") || "Reinstall Anyway"}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showProviderBlockedDialog}
+        onOpenChange={setShowProviderBlockedDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <TriangleAlert className="h-5 w-5 text-yellow-500" />
+              {t("download.providerBlocked.title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {t("download.providerBlocked.desc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowProviderBlockedDialog(false)}>
+              {t("download.providerBlocked.gotIt")}
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

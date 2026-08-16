@@ -1187,6 +1187,11 @@
       "desc": "This game is already installed in your library. Reinstalling may cause issues such as overwriting save data or corrupting existing files. Are you sure you want to continue?",
       "continueAnyway": "Reinstall Anyway"
     },
+    "providerBlocked": {
+      "title": "Provider Site Couldn't Load",
+      "desc": "The download page didn't load and appears to be blocked or unreachable on your network. This is usually caused by your internet connection or ISP blocking the provider's website. Try using a VPN and attempt the download again.",
+      "gotIt": "Got It"
+    },
     "platforms": "Platforms",
     "pressEscToGoBack": "Click Me or ESC key to go back",
     "protectYourself": {
