@@ -1548,8 +1548,17 @@ class AscendaraDownloader:
                     logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
                     self._files_extracted_count = self._total_files_to_extract
 
-                # Force progress writes so the app does not stay stuck on "Preparing..." during large archives.
-                self._update_extraction_progress(zip_info.filename, self._files_extracted_count, self._total_files_to_extract, force=True)
+                # Only force the very first write so the UI leaves "Preparing..." right away;
+                # after that, let the normal throttle (~2s) in _update_extraction_progress
+                # handle disk writes. Forcing a JSON write (temp file + atomic replace) on
+                # every single extracted file tanks extraction speed on archives with many
+                # small files, since each write is its own disk I/O (and AV scan) operation.
+                self._update_extraction_progress(
+                    zip_info.filename,
+                    self._files_extracted_count,
+                    self._total_files_to_extract,
+                    force=(self._files_extracted_count == 1),
+                )
     
     def _extract_rar(self, archive_path: str, watching_data: Dict, extract_to: str = None):
         """Extract a RAR file using Python unrar library (Windows) or system unrar binary (Linux/macOS)."""
@@ -1936,7 +1945,12 @@ class AscendaraDownloader:
                     files_extracted_this_archive = self._files_extracted_count + local_extracted
                     percent = (files_extracted_this_archive / self._total_files_to_extract * 100) if self._total_files_to_extract > 0 else 0
                     logging.info(f"[AscendaraDownloader] Extraction progress: {files_extracted_this_archive}/{self._total_files_to_extract} files ({percent:.1f}%) - {fname}")
-                    self._update_extraction_progress(fname, files_extracted_this_archive, self._total_files_to_extract, force=True)
+                    self._update_extraction_progress(
+                        fname,
+                        files_extracted_this_archive,
+                        self._total_files_to_extract,
+                        force=(files_extracted_this_archive == 1),
+                    )
                 
                 # Heartbeat every 5 seconds in case a file takes a long time
                 now = time.time()
