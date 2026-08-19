@@ -182,7 +182,6 @@ const FolderView = () => {
     // Immediately load and cache folder data
     const folder = getFolderByName(decodeURIComponent(folderName));
     if (folder && folder.items) {
-      // Pre-cache all images before showing content
       folder.items.forEach(game => {
         const gameId = game.game || game.name;
         if (!imageCache[gameId]) {
@@ -190,8 +189,6 @@ const FolderView = () => {
           const cachedImage = localStorage.getItem(localStorageKey);
           if (cachedImage) {
             imageCache[gameId] = cachedImage;
-          } else {
-            imageCache[gameId] = "/placeholder-game.jpg";
           }
         }
       });
