@@ -10,6 +10,7 @@ const { spawn } = require("child_process");
 const { ipcMain, app, dialog } = require("electron");
 const { isDev, isWindows, appDirectory } = require("./config");
 const { getSettingsManager } = require("./settings");
+const { sanitizeGameName } = require("./utils");
 
 /**
  * Build and write the ludusavi config.yaml used for all commands.
@@ -67,27 +68,73 @@ function writeLudusaviConfig(configDir, customGames = []) {
   fs.writeFileSync(configFilePath, yaml.trim(), "utf8");
 }
 
+function getConfiguredGameDirectories(settings) {
+  const directories = [
+    settings.downloadDirectory,
+    ...(Array.isArray(settings.additionalDirectories) ? settings.additionalDirectories : []),
+  ]
+    .map(directory => (typeof directory === "string" ? directory.trim() : ""))
+    .filter(Boolean);
+
+  return [...new Set(directories)];
+}
+
+function findRegularGameInfoPath(gameName, settings) {
+  const sanitizedGame = sanitizeGameName(gameName);
+  const candidateNames = [...new Set([gameName, sanitizedGame].filter(Boolean))];
+
+  for (const directory of getConfiguredGameDirectories(settings)) {
+    for (const candidateName of candidateNames) {
+      const gameInfoPath = path.join(
+        directory,
+        candidateName,
+        `${candidateName}.ascendara.json`
+      );
+      if (fs.existsSync(gameInfoPath)) return gameInfoPath;
+    }
+  }
+
+  return null;
+}
+
+function findCustomGameRecord(gameName, settings) {
+  for (const directory of getConfiguredGameDirectories(settings)) {
+    const gamesFilePath = path.join(directory, "games.json");
+    if (!fs.existsSync(gamesFilePath)) continue;
+
+    try {
+      const data = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+      const games = Array.isArray(data.games) ? data.games : [];
+      const index = games.findIndex(game => game.game === gameName);
+      if (index !== -1) {
+        return {
+          gamesFilePath,
+          data,
+          gameInfo: games[index],
+          index,
+        };
+      }
+    } catch {
+      // A corrupt games.json in one location should not hide a valid copy elsewhere.
+    }
+  }
+
+  return null;
+}
+
 // Helpers: read / write customSavePaths in game JSON files
 
 function readCustomSavePaths(gameName, isCustomGame, settings) {
   if (!settings.downloadDirectory) return [];
   try {
     if (isCustomGame) {
-      const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-      if (!fs.existsSync(gamesFilePath)) return [];
-      const data = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-      const gameInfo = data.games.find(g => g.game === gameName);
-      return gameInfo?.customSavePaths || [];
-    } else {
-      const gameInfoPath = path.join(
-        settings.downloadDirectory,
-        gameName,
-        `${gameName}.ascendara.json`
-      );
-      if (!fs.existsSync(gameInfoPath)) return [];
-      const data = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
-      return data?.customSavePaths || [];
+      return findCustomGameRecord(gameName, settings)?.gameInfo?.customSavePaths || [];
     }
+
+    const gameInfoPath = findRegularGameInfoPath(gameName, settings);
+    if (!gameInfoPath) return [];
+    const data = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
+    return data?.customSavePaths || [];
   } catch {
     return [];
   }
@@ -97,24 +144,20 @@ function writeCustomSavePaths(gameName, isCustomGame, settings, paths) {
   if (!settings.downloadDirectory) throw new Error("Download directory not set");
 
   if (isCustomGame) {
-    const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-    const data = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-    const gameInfo = data.games.find(g => g.game === gameName);
-    if (!gameInfo) throw new Error("Custom game not found");
-    if (paths.length > 0) gameInfo.customSavePaths = paths;
-    else delete gameInfo.customSavePaths;
-    fs.writeFileSync(gamesFilePath, JSON.stringify(data, null, 2));
-  } else {
-    const gameInfoPath = path.join(
-      settings.downloadDirectory,
-      gameName,
-      `${gameName}.ascendara.json`
-    );
-    const data = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
-    if (paths.length > 0) data.customSavePaths = paths;
-    else delete data.customSavePaths;
-    fs.writeFileSync(gameInfoPath, JSON.stringify(data, null, 2));
+    const record = findCustomGameRecord(gameName, settings);
+    if (!record) throw new Error("Custom game not found");
+    if (paths.length > 0) record.gameInfo.customSavePaths = paths;
+    else delete record.gameInfo.customSavePaths;
+    fs.writeFileSync(record.gamesFilePath, JSON.stringify(record.data, null, 2));
+    return;
   }
+
+  const gameInfoPath = findRegularGameInfoPath(gameName, settings);
+  if (!gameInfoPath) throw new Error("Game configuration not found");
+  const data = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
+  if (paths.length > 0) data.customSavePaths = paths;
+  else delete data.customSavePaths;
+  fs.writeFileSync(gameInfoPath, JSON.stringify(data, null, 2));
 }
 
 /**
@@ -122,44 +165,51 @@ function writeCustomSavePaths(gameName, isCustomGame, settings, paths) {
  * Ludusavi needs the complete list every time — not just the current game.
  */
 function collectAllCustomGames(settings) {
-  const result = [];
-  if (!settings.downloadDirectory) return result;
+  const gamesByName = new Map();
+  if (!settings.downloadDirectory) return [];
 
-  try {
-    const downloadDir = settings.downloadDirectory;
+  const addGame = (name, files) => {
+    if (!name || !Array.isArray(files) || files.length === 0) return;
+    const existing = gamesByName.get(name) || { name, files: [] };
+    existing.files = [...new Set([...existing.files, ...files])];
+    gamesByName.set(name, existing);
+  };
 
-    // Regular games (each has its own <name>.ascendara.json)
-    if (fs.existsSync(downloadDir)) {
-      for (const entry of fs.readdirSync(downloadDir, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
-        const jsonPath = path.join(
-          downloadDir,
-          entry.name,
-          `${entry.name}.ascendara.json`
-        );
-        if (!fs.existsSync(jsonPath)) continue;
-        try {
-          const data = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
-          if (data.customSavePaths?.length > 0) {
-            result.push({ name: entry.name, files: data.customSavePaths });
+  for (const downloadDir of getConfiguredGameDirectories(settings)) {
+    try {
+      // Regular games (each has its own <name>.ascendara.json)
+      if (fs.existsSync(downloadDir)) {
+        for (const entry of fs.readdirSync(downloadDir, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const jsonPath = path.join(
+            downloadDir,
+            entry.name,
+            `${entry.name}.ascendara.json`
+          );
+          if (!fs.existsSync(jsonPath)) continue;
+          try {
+            const data = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+            addGame(data.game || data.name || entry.name, data.customSavePaths);
+          } catch {
+            // Skip a corrupt game entry and continue collecting the rest.
           }
-        } catch { /* skip corrupt files */ }
-      }
-    }
-
-    // Custom games (stored in games.json)
-    const gamesFilePath = path.join(downloadDir, "games.json");
-    if (fs.existsSync(gamesFilePath)) {
-      const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-      for (const g of gamesData.games || []) {
-        if (g.customSavePaths?.length > 0) {
-          result.push({ name: g.game || g.name, files: g.customSavePaths });
         }
       }
-    }
-  } catch { /* best-effort */ }
 
-  return result;
+      // Custom games (stored in games.json)
+      const gamesFilePath = path.join(downloadDir, "games.json");
+      if (fs.existsSync(gamesFilePath)) {
+        const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+        for (const game of gamesData.games || []) {
+          addGame(game.game || game.name, game.customSavePaths);
+        }
+      }
+    } catch {
+      // One inaccessible configured location should not prevent backups elsewhere.
+    }
+  }
+
+  return Array.from(gamesByName.values());
 }
 
 /**
@@ -192,9 +242,9 @@ function registerLudusaviHandlers() {
       const settings = settingsManager.getSettings();
       const ludusaviSettings = settings.ludusavi || {};
 
-        if (!fs.existsSync(ludusaviPath)) {
-          return { success: false, error: "Ludusavi executable not found" };
-        }
+      if (!fs.existsSync(ludusaviPath)) {
+        return { success: false, error: "Ludusavi executable not found" };
+      }
 
       // Always regenerate config.yaml with up-to-date customGames before any command
       const ludusaviConfigDir = path.join(app.getPath("userData"), "ludusavi-cloud-config");
@@ -243,7 +293,7 @@ function registerLudusaviHandlers() {
             const customPaths = readCustomSavePaths(game, false, settings);
             // verify custom games
             const customPathsCustom = readCustomSavePaths(game, true, settings);
-            const hasCustomPaths = (customPaths.length + customPathsCustom.length) > 0;
+            const hasCustomPaths = customPaths.length + customPathsCustom.length > 0;
 
             if (!hasCustomPaths) {
               const slug = sanitizeGameSlug(game);
@@ -252,7 +302,9 @@ function registerLudusaviHandlers() {
                 args.push("--wine-prefix", pfxPath);
                 console.log(`[Ludusavi] Linux: using wine prefix at ${pfxPath}`);
               } else {
-                console.warn(`[Ludusavi] Linux: wine prefix not found at ${pfxPath}, backup may find nothing`);
+                console.warn(
+                  `[Ludusavi] Linux: wine prefix not found at ${pfxPath}, backup may find nothing`
+                );
               }
             }
           }
@@ -264,11 +316,11 @@ function registerLudusaviHandlers() {
           args.push("restore");
           if (game) args.push(game);
           args.push("--force");
-          
-            if (backupName) {
-              args.push("--backup", backupName);
-            }
-            
+
+          if (backupName) {
+            args.push("--backup", backupName);
+          }
+
           if (ludusaviSettings.backupLocation) {
             args.push("--path", ludusaviSettings.backupLocation);
           }
@@ -287,7 +339,7 @@ function registerLudusaviHandlers() {
           if (ludusaviSettings.backupLocation) {
             args.push("--path", ludusaviSettings.backupLocation);
           }
-          
+
           args.push("--api");
           break;
 
@@ -304,41 +356,41 @@ function registerLudusaviHandlers() {
 
       console.log(`Executing ludusavi command: ${ludusaviPath} ${args.join(" ")}`);
 
-        const process = spawn(ludusaviPath, args);
+      const process = spawn(ludusaviPath, args);
 
-        return new Promise((resolve, reject) => {
-          let stdout = "";
-          let stderr = "";
+      return new Promise((resolve, reject) => {
+        let stdout = "";
+        let stderr = "";
 
-          process.stdout.on("data", data => {
-            stdout += data.toString();
-          });
-
-          process.stderr.on("data", data => {
-            stderr += data.toString();
-          });
-
-          process.on("close", code => {
-            if (code === 0) {
-              try {
-                const result = JSON.parse(stdout);
-                resolve({ success: true, data: result });
-              } catch (e) {
-                resolve({ success: true, data: stdout });
-              }
-            } else {
-              resolve({
-                success: false,
-                error: stderr || `Process exited with code ${code}`,
-                stdout: stdout,
-              });
-            }
-          });
-
-          process.on("error", err => {
-            reject({ success: false, error: err.message });
-          });
+        process.stdout.on("data", data => {
+          stdout += data.toString();
         });
+
+        process.stderr.on("data", data => {
+          stderr += data.toString();
+        });
+
+        process.on("close", code => {
+          if (code === 0) {
+            try {
+              const result = JSON.parse(stdout);
+              resolve({ success: true, data: result });
+            } catch (e) {
+              resolve({ success: true, data: stdout });
+            }
+          } else {
+            resolve({
+              success: false,
+              error: stderr || `Process exited with code ${code}`,
+              stdout: stdout,
+            });
+          }
+        });
+
+        process.on("error", err => {
+          reject({ success: false, error: err.message });
+        });
+      });
     } catch (error) {
       console.error("Error executing ludusavi command:", error);
       return { success: false, error: error.message };
@@ -398,15 +450,13 @@ function registerLudusaviHandlers() {
       }
 
       if (isCustom) {
-        const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-        const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-        const gameInfo = gamesData.games.find(g => g.game === game);
-        if (!gameInfo) throw new Error("Custom game not found");
-        gameInfo.backups = true;
-        fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
+        const record = findCustomGameRecord(game, settings);
+        if (!record) throw new Error("Custom game not found");
+        record.gameInfo.backups = true;
+        fs.writeFileSync(record.gamesFilePath, JSON.stringify(record.data, null, 2));
       } else {
-        const gameDirectory = path.join(settings.downloadDirectory, game);
-        const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
+        const gameInfoPath = findRegularGameInfoPath(game, settings);
+        if (!gameInfoPath) throw new Error("Game configuration not found");
         const gameInfo = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
         gameInfo.backups = true;
         fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 2));
@@ -427,15 +477,13 @@ function registerLudusaviHandlers() {
       }
 
       if (isCustom) {
-        const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-        const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-        const gameInfo = gamesData.games.find(g => g.game === game);
-        if (!gameInfo) throw new Error("Custom game not found");
-        gameInfo.backups = false;
-        fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
+        const record = findCustomGameRecord(game, settings);
+        if (!record) throw new Error("Custom game not found");
+        record.gameInfo.backups = false;
+        fs.writeFileSync(record.gamesFilePath, JSON.stringify(record.data, null, 2));
       } else {
-        const gameDirectory = path.join(settings.downloadDirectory, game);
-        const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
+        const gameInfoPath = findRegularGameInfoPath(game, settings);
+        if (!gameInfoPath) throw new Error("Game configuration not found");
         const gameInfo = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
         gameInfo.backups = false;
         fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 2));
@@ -456,18 +504,15 @@ function registerLudusaviHandlers() {
       }
 
       if (isCustom) {
-        const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-        const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-        const gameInfo = gamesData.games.find(g => g.game === game);
-        if (!gameInfo) throw new Error("Custom game not found");
-        return !!gameInfo.backups;
-      } else {
-        const gameDirectory = path.join(settings.downloadDirectory, game);
-        const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
-        const gameInfoData = fs.readFileSync(gameInfoPath, "utf8");
-        const gameInfo = JSON.parse(gameInfoData);
-        return !!gameInfo.backups;
+        const record = findCustomGameRecord(game, settings);
+        if (!record) throw new Error("Custom game not found");
+        return Boolean(record.gameInfo.backups);
       }
+
+      const gameInfoPath = findRegularGameInfoPath(game, settings);
+      if (!gameInfoPath) throw new Error("Game configuration not found");
+      const gameInfo = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
+      return Boolean(gameInfo.backups);
     } catch (error) {
       console.error("Error checking if game auto backups enabled:", error);
       return false;

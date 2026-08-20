@@ -12,6 +12,7 @@ import zhCN from "./translations/zh-CN.json";
 import it from "./translations/it.json";
 import de from "./translations/de.json";
 import fr from "./translations/fr.json";
+import featureCenterResources from "./i18n/featureCenterResources";
 
 // Base languages that come with the app
 export const baseLanguages = {
@@ -87,5 +88,10 @@ i18n.use(initReactI18next).init({
     escapeValue: false,
   },
 });
+
+// Feature Center copy lives in its own bundle to keep the base translation files smaller.
+for (const [language, resources] of Object.entries(featureCenterResources)) {
+  i18n.addResourceBundle(language, "translation", resources, true, true);
+}
 
 export default i18n;

@@ -5,15 +5,42 @@
  */
 
 const crypto = require("crypto");
-const config = require("../config.prod.js");
 const buildSignatureLoader = require("./build-signature-loader");
-const SECRET_SEED = config.SECRET_SEED;
+
+// Source checkouts do not include the private production config.
+let productionConfig = {};
+try {
+  productionConfig = require("../config.prod.js");
+} catch (error) {
+  const missingPrivateConfig =
+    error?.code === "MODULE_NOT_FOUND" &&
+    String(error.message || "").includes("config.prod.js");
+
+  if (!missingPrivateConfig) throw error;
+}
+
+const SECRET_SEED =
+  process.env.ASCENDARA_SECRET_SEED || productionConfig.SECRET_SEED || null;
+let missingAuthWarningShown = false;
 
 /**
  * Generate time-based authentication headers
  * @returns {Object} Headers with X-Timestamp, X-Signature, and build signature
  */
 function generateAuthHeaders() {
+  const buildHeaders = buildSignatureLoader.getBuildSignatureHeaders();
+
+  if (!SECRET_SEED) {
+    if (!missingAuthWarningShown) {
+      console.warn(
+        "[Auth] Private API authentication is unavailable in this source build. Protected Ascendara endpoints may reject requests."
+      );
+      missingAuthWarningShown = true;
+    }
+
+    return buildHeaders;
+  }
+
   // Get current timestamp
   const timestamp = Math.floor(Date.now() / 1000).toString();
 
@@ -28,9 +55,6 @@ function generateAuthHeaders() {
     .createHmac("sha256", rotatingSecret)
     .update(timestamp)
     .digest("hex");
-
-  // Get build signature headers
-  const buildHeaders = buildSignatureLoader.getBuildSignatureHeaders();
 
   return {
     "X-Timestamp": timestamp,

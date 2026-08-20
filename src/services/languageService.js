@@ -11,8 +11,10 @@ console.log("[LangService] Initializing language service");
 const progressListeners = new Set();
 let currentTranslation = null;
 
-// Listen for translation progress updates
-electron.ipcRenderer.on("translation-progress", (event, progress) => {
+// Listen for translation progress updates through the named preload API. Keeping the
+// channel inside preload means this service only receives translation data, never an
+// Electron event object or a general-purpose IPC handle.
+electron.onTranslationProgress(progress => {
   if (progress) {
     console.log(
       `[LangService] Translation progress update - Phase: ${progress.phase}, Progress: ${progress.progress}%`

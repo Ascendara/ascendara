@@ -1,22 +1,44 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useSearch } from "@/context/SearchContext";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useLanguage } from "@/context/LanguageContext";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ChevronRight, Command, Gamepad2, Library, Search, Settings } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Library, Settings, Gamepad2, ChevronRight, Command } from "lucide-react";
+import GameProfilesCenter from "@/components/GameProfilesCenter";
+import SmartCollectionsCenter from "@/components/SmartCollectionsCenter";
+import SystemCenter from "@/components/SystemCenter";
+import { useLanguage } from "@/context/LanguageContext";
+import { useSearch } from "@/context/SearchContext";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ICONS = {
+  commands: Command,
   library: Library,
   settings: Settings,
   index: Gamepad2,
 };
 
+const TYPE_ORDER = ["commands", "library", "settings", "index"];
 const MAX_RESULTS_PER_CATEGORY = 10;
 const MAX_TOTAL_RESULTS = 50;
+const MAX_FEATURED_COMMANDS = 6;
+
+function scoreItem(item, query) {
+  const label = String(item.label || "").toLocaleLowerCase();
+  const description = String(item.description || "").toLocaleLowerCase();
+  const keywords = Array.isArray(item.keywords)
+    ? item.keywords.join(" ").toLocaleLowerCase()
+    : "";
+
+  if (!label.includes(query) && !description.includes(query) && !keywords.includes(query)) {
+    return null;
+  }
+  if (label.startsWith(query)) return 100;
+  if (label.includes(query)) return 70;
+  if (keywords.includes(query)) return 45;
+  return 25;
+}
 
 const GlobalSearch = () => {
   const { isOpen, closeSearch, getSearchableItems, searchContext } = useSearch();
@@ -27,353 +49,307 @@ const GlobalSearch = () => {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
-  const scrollRef = useRef(null);
   const itemRefs = useRef([]);
   const debounceTimerRef = useRef(null);
 
-  // Debounce search query
+  const resetSearch = useCallback(() => {
+    setInputValue("");
+    setQuery("");
+    setSelectedIndex(0);
+    itemRefs.current = [];
+  }, []);
+
   useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      setQuery(inputValue);
-    }, 150);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
+    clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => setQuery(inputValue), 120);
+    return () => clearTimeout(debounceTimerRef.current);
   }, [inputValue]);
 
   const filteredResults = useMemo(() => {
-    if (!query.trim()) return {};
+    const trimmedQuery = query.trim().toLocaleLowerCase();
 
-    const searchableItems = getSearchableItems(searchContext);
-    const lowerQuery = query.toLowerCase().trim();
+    if (!trimmedQuery) {
+      if (searchContext !== "global") return {};
+      const commands = getSearchableItems("commands")
+        .filter(item => item.featured)
+        .slice(0, MAX_FEATURED_COMMANDS);
+      return commands.length > 0 ? { commands } : {};
+    }
+
     const grouped = {};
     let totalCount = 0;
+    const items = getSearchableItems(searchContext);
 
-    // Separate library items from others for priority processing
-    const libraryItems = [];
-    const otherItems = [];
-
-    for (const item of searchableItems) {
-      if (item.type === "library") {
-        libraryItems.push(item);
-      } else {
-        otherItems.push(item);
-      }
-    }
-
-    // Process library items first
-    for (const item of libraryItems) {
+    for (const item of items) {
       if (totalCount >= MAX_TOTAL_RESULTS) break;
+      const baseScore = scoreItem(item, trimmedQuery);
+      if (baseScore === null) continue;
 
-      const lowerLabel = item.label.toLowerCase();
+      if (!grouped[item.type]) grouped[item.type] = [];
+      if (grouped[item.type].length >= MAX_RESULTS_PER_CATEGORY) continue;
 
-      // Quick check - only title matching for speed
-      if (!lowerLabel.includes(lowerQuery)) continue;
-
-      let score = 0;
-      if (lowerLabel.startsWith(lowerQuery)) {
-        score = 100;
-      } else {
-        score = 50;
-      }
-
-      // Boost library games significantly
-      score += 1000;
-
-      if (!grouped[item.type]) {
-        grouped[item.type] = [];
-      }
-
-      if (grouped[item.type].length < MAX_RESULTS_PER_CATEGORY) {
-        grouped[item.type].push({ ...item, score });
-        totalCount++;
-      }
+      grouped[item.type].push({
+        ...item,
+        score: baseScore + (item.type === "library" ? 1000 : 0),
+      });
+      totalCount += 1;
     }
 
-    // Then process other items (settings, index)
-    for (const item of otherItems) {
-      if (totalCount >= MAX_TOTAL_RESULTS) break;
-
-      const lowerLabel = item.label.toLowerCase();
-
-      // Quick check - only title matching for speed
-      if (!lowerLabel.includes(lowerQuery)) continue;
-
-      let score = 0;
-      if (lowerLabel.startsWith(lowerQuery)) {
-        score = 100;
-      } else {
-        score = 50;
-      }
-
-      if (!grouped[item.type]) {
-        grouped[item.type] = [];
-      }
-
-      if (grouped[item.type].length < MAX_RESULTS_PER_CATEGORY) {
-        grouped[item.type].push({ ...item, score });
-        totalCount++;
-      }
+    for (const itemsInGroup of Object.values(grouped)) {
+      itemsInGroup.sort((left, right) => right.score - left.score);
     }
-
-    // Sort each category by score
-    Object.keys(grouped).forEach(type => {
-      grouped[type].sort((a, b) => b.score - a.score);
-    });
 
     return grouped;
-  }, [query, getSearchableItems, searchContext]);
+  }, [getSearchableItems, query, searchContext]);
 
-  const flatResults = useMemo(() => {
-    const flat = [];
-    // Ensure library games appear first, then settings, then index
-    const typeOrder = ["library", "settings", "index"];
-
-    typeOrder.forEach(type => {
-      if (filteredResults[type]) {
-        filteredResults[type].forEach(item => {
-          flat.push(item);
-        });
+  const orderedGroups = useMemo(() => {
+    const groups = [];
+    for (const type of TYPE_ORDER) {
+      if (filteredResults[type]?.length) {
+        groups.push([type, filteredResults[type]]);
       }
-    });
-
-    // Add any other types that might exist
-    Object.entries(filteredResults).forEach(([type, items]) => {
-      if (!typeOrder.includes(type)) {
-        items.forEach(item => {
-          flat.push(item);
-        });
-      }
-    });
-
-    return flat;
+    }
+    for (const [type, items] of Object.entries(filteredResults)) {
+      if (!TYPE_ORDER.includes(type) && items.length) groups.push([type, items]);
+    }
+    return groups;
   }, [filteredResults]);
 
+  const flatResults = useMemo(
+    () => orderedGroups.flatMap(([, items]) => items),
+    [orderedGroups]
+  );
+
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
-    }
+    if (!isOpen) return;
+    const focusTimer = setTimeout(() => inputRef.current?.focus(), 40);
+    return () => clearTimeout(focusTimer);
   }, [isOpen]);
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query]);
+  }, [query, searchContext]);
 
   useEffect(() => {
-    if (selectedIndex >= 0 && itemRefs.current[selectedIndex]) {
-      itemRefs.current[selectedIndex]?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
+    if (flatResults.length === 0) {
+      setSelectedIndex(0);
+      return;
     }
+    setSelectedIndex(current => Math.min(current, flatResults.length - 1));
+  }, [flatResults.length]);
+
+  useEffect(() => {
+    itemRefs.current[selectedIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
   }, [selectedIndex]);
 
   const handleSelect = useCallback(
     item => {
-      if (item.onSelect) {
-        item.onSelect(navigate, location);
-      }
+      item.onSelect?.(navigate, location);
       closeSearch();
-      setInputValue("");
-      setQuery("");
-      setSelectedIndex(0);
+      resetSearch();
     },
-    [navigate, location, closeSearch]
+    [closeSearch, location, navigate, resetSearch]
   );
 
   const handleKeyDown = useCallback(
-    e => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex(prev => Math.min(prev + 1, flatResults.length - 1));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex(prev => Math.max(prev - 1, 0));
-      } else if (e.key === "Enter" && flatResults[selectedIndex]) {
-        e.preventDefault();
-        handleSelect(flatResults[selectedIndex]);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
+    event => {
+      if (event.key === "Escape") {
+        event.preventDefault();
         closeSearch();
-        setInputValue("");
-        setQuery("");
-        setSelectedIndex(0);
+        resetSearch();
+        return;
+      }
+
+      if (flatResults.length === 0) return;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setSelectedIndex(current => Math.min(current + 1, flatResults.length - 1));
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setSelectedIndex(current => Math.max(current - 1, 0));
+      } else if (event.key === "Enter" && flatResults[selectedIndex]) {
+        event.preventDefault();
+        handleSelect(flatResults[selectedIndex]);
       }
     },
-    [flatResults, selectedIndex, handleSelect, closeSearch]
+    [closeSearch, flatResults, handleSelect, resetSearch, selectedIndex]
   );
 
   const handleOpenChange = open => {
-    if (!open) {
-      closeSearch();
-      setInputValue("");
-      setQuery("");
-      setSelectedIndex(0);
-    }
+    if (open) return;
+    closeSearch();
+    resetSearch();
   };
 
-  const getContextLabel = () => {
-    if (searchContext === "library") return t("globalSearch.placeholder.library");
-    if (searchContext === "settings") return t("globalSearch.placeholder.settings");
-    return t("globalSearch.placeholder.global");
-  };
+  const placeholder =
+    searchContext === "library"
+      ? t("globalSearch.placeholder.library")
+      : searchContext === "settings"
+        ? t("globalSearch.placeholder.settings")
+        : t("globalSearch.placeholder.global");
 
-  const isMac =
-    typeof navigator !== "undefined" &&
-    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-  const modifierKey = isMac ? "⌘" : "Ctrl";
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  const modifierKey = platform.toUpperCase().includes("MAC") ? "⌘" : "Ctrl";
+  const showingSuggestions = query.trim() === "" && searchContext === "global";
+  const showContextEmpty = query.trim() === "" && searchContext !== "global";
+
+  let resultOffset = 0;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent
-        className="max-w-2xl gap-0 overflow-hidden p-0"
-        showCloseButton={false}
-      >
-        <DialogHeader className="sr-only px-4 pb-0 pt-4">
-          <DialogTitle>{getContextLabel()}</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogContent
+          className="w-[calc(100vw-1rem)] max-w-2xl gap-0 overflow-hidden p-0"
+          showCloseButton={false}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{placeholder}</DialogTitle>
+          </DialogHeader>
 
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <Search className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={getContextLabel()}
-            className="border-0 px-2 text-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
-          />
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-3 sm:gap-3 sm:px-4">
+            <Search className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={event => setInputValue(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              aria-label={placeholder}
+              role="combobox"
+              aria-expanded={isOpen}
+              aria-controls="ascendara-command-results"
+              className="min-w-0 border-0 px-1 text-foreground focus-visible:ring-0 focus-visible:ring-offset-0 sm:px-2"
+            />
+            <kbd className="hidden h-5 shrink-0 select-none items-center rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
               {modifierKey}+K
             </kbd>
           </div>
-        </div>
 
-        <ScrollArea className="max-h-[400px]" ref={scrollRef}>
-          {query.trim() === "" ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Search className="mb-3 h-12 w-12 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                {searchContext === "global"
-                  ? t("globalSearch.emptyState.global")
-                  : searchContext === "library"
+          <ScrollArea className="max-h-[min(62vh,440px)]" id="ascendara-command-results">
+            {showContextEmpty ? (
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <Search className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  {searchContext === "library"
                     ? t("globalSearch.emptyState.library")
                     : t("globalSearch.emptyState.settings")}
-              </p>
-            </div>
-          ) : flatResults.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Search className="mb-3 h-12 w-12 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                {t("globalSearch.noResults")}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t("globalSearch.tryDifferent")}
-              </p>
-            </div>
-          ) : (
-            <div className="py-2">
-              {Object.entries(filteredResults).map(([type, items]) => {
-                const Icon = CATEGORY_ICONS[type];
-                const label = t(`globalSearch.categories.${type}`);
-                const startIndex = flatResults.findIndex(item => item.type === type);
+                </p>
+              </div>
+            ) : flatResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <Search className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">{t("globalSearch.noResults")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("globalSearch.tryDifferent")}
+                </p>
+              </div>
+            ) : (
+              <div className="py-2" role="listbox">
+                {orderedGroups.map(([type, items]) => {
+                  const Icon = CATEGORY_ICONS[type];
+                  const label =
+                    type === "commands"
+                      ? t(
+                          showingSuggestions
+                            ? "featureCenters.commandPalette.suggested"
+                            : "featureCenters.commandPalette.category"
+                        )
+                      : t(`globalSearch.categories.${type}`);
+                  const groupStart = resultOffset;
+                  resultOffset += items.length;
 
-                return (
-                  <div key={type} className="mb-2">
-                    <div className="flex items-center gap-2 px-4 py-2">
-                      {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        {label}
-                      </span>
-                      <Badge
-                        variant="secondary"
-                        className="ml-auto text-xs text-foreground"
-                      >
-                        {items.length}
-                      </Badge>
-                    </div>
-                    <div className="space-y-0.5">
-                      {items.map((item, idx) => {
-                        const globalIndex = startIndex + idx;
-                        const isSelected = globalIndex === selectedIndex;
+                  return (
+                    <div key={type} className="mb-2 last:mb-0">
+                      <div className="flex items-center gap-2 px-4 py-2">
+                        {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {label}
+                        </span>
+                        <Badge variant="secondary" className="ml-auto text-xs text-foreground">
+                          {items.length}
+                        </Badge>
+                      </div>
 
-                        return (
-                          <div
-                            key={`${type}-${item.id || idx}`}
-                            ref={el => (itemRefs.current[globalIndex] = el)}
-                            onClick={() => handleSelect(item)}
-                            className={cn(
-                              "flex cursor-pointer items-center gap-3 px-4 py-2.5 text-foreground transition-colors",
-                              isSelected
-                                ? "bg-accent text-accent-foreground"
-                                : "hover:bg-accent/50"
-                            )}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="truncate text-sm font-medium">
-                                  {item.label}
-                                </p>
-                                {item.badge && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {item.badge}
-                                  </Badge>
+                      <div className="space-y-0.5">
+                        {items.map((item, index) => {
+                          const globalIndex = groupStart + index;
+                          const selected = globalIndex === selectedIndex;
+                          return (
+                            <button
+                              key={`${type}-${item.id || index}`}
+                              ref={element => (itemRefs.current[globalIndex] = element)}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              onMouseEnter={() => setSelectedIndex(globalIndex)}
+                              onClick={() => handleSelect(item)}
+                              className={cn(
+                                "flex w-full items-center gap-3 px-4 py-2.5 text-left text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                                selected
+                                  ? "bg-accent text-accent-foreground"
+                                  : "hover:bg-accent/50"
+                              )}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="truncate text-sm font-medium">{item.label}</p>
+                                  {item.badge && (
+                                    <Badge variant="outline" className="hidden text-xs sm:inline-flex">
+                                      {item.badge}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:truncate">
+                                    {item.description}
+                                  </p>
                                 )}
                               </div>
-                              {item.description && (
-                                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                  {item.description}
-                                </p>
-                              )}
-                            </div>
-                            <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                          </div>
-                        );
-                      })}
+                              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </ScrollArea>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
 
-        <div className="border-t border-border bg-muted/30 px-4 py-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-4">
+          <div className="hidden border-t border-border bg-muted/30 px-4 py-2 sm:block">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium">
+                <kbd className="inline-flex h-5 items-center rounded border border-border bg-background px-1.5 font-mono text-[10px]">
                   ↑↓
                 </kbd>
                 {t("globalSearch.navigate")}
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium">
+                <kbd className="inline-flex h-5 items-center rounded border border-border bg-background px-1.5 font-mono text-[10px]">
                   ↵
                 </kbd>
                 {t("globalSearch.select")}
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium">
+                <kbd className="inline-flex h-5 items-center rounded border border-border bg-background px-1.5 font-mono text-[10px]">
                   Esc
                 </kbd>
                 {t("common.close")}
               </span>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <SystemCenter />
+      <GameProfilesCenter />
+      <SmartCollectionsCenter />
+    </>
   );
 };
 

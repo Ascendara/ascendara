@@ -29,7 +29,10 @@ const Navigation = memo(({ items }) => {
     return savedSize ? parseFloat(savedSize) : 100;
   });
   const [downloadCount, setDownloadCount] = useState(0);
+  const [dockVisible, setDockVisible] = useState(true);
   const downloadCountRef = useRef(0);
+  const pointerYRef = useRef(Number.NEGATIVE_INFINITY);
+  const isDownloadPage = location.pathname === "/download";
 
   const handleMouseDown = useCallback(
     (e, isLeft) => {
@@ -251,8 +254,72 @@ const Navigation = memo(({ items }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isDownloadPage) {
+      pointerYRef.current = Number.NEGATIVE_INFINITY;
+      setDockVisible(true);
+      return undefined;
+    }
+
+    const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches;
+    if (coarsePointer) {
+      setDockVisible(true);
+      return undefined;
+    }
+
+    const handleScroll = () => {
+      if (window.scrollY <= 120) {
+        setDockVisible(true);
+        return;
+      }
+
+      setDockVisible(
+        current => current && pointerYRef.current >= window.innerHeight - 130
+      );
+    };
+
+    const handleMouseMove = event => {
+      pointerYRef.current = event.clientY;
+      if (window.scrollY <= 120) {
+        setDockVisible(true);
+        return;
+      }
+
+      setDockVisible(current =>
+        current
+          ? event.clientY >= window.innerHeight - 130
+          : event.clientY >= window.innerHeight - 24
+      );
+    };
+
+    const handleMouseLeave = () => {
+      pointerYRef.current = Number.NEGATIVE_INFINITY;
+      if (window.scrollY > 120) setDockVisible(false);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    document.documentElement.addEventListener("mouseleave", handleMouseLeave);
+    handleScroll();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("mousemove", handleMouseMove);
+      document.documentElement.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, [isDownloadPage]);
+
+  const dockIsHidden = isDownloadPage && !dockVisible;
+
   return (
-    <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 select-none p-6">
+    <div
+      aria-hidden={dockIsHidden}
+      className={`pointer-events-none fixed bottom-0 left-0 right-0 z-40 select-none p-6 transition-all duration-200 ${
+        dockIsHidden
+          ? "invisible translate-y-4 opacity-0"
+          : "visible translate-y-0 opacity-100"
+      }`}
+    >
       <div className="nav-container relative mx-auto max-w-xl" style={navStyle}>
         <div
           className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border p-3 shadow-lg backdrop-blur-lg"

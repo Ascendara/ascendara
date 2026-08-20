@@ -6,6 +6,7 @@ import Tour from "./Tour";
 import PageTransition from "./PageTransition";
 import { useTheme } from "@/context/ThemeContext";
 import { SettingsContext } from "@/context/SettingsContext";
+import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
 
 const Layout = memo(() => {
@@ -16,7 +17,10 @@ const Layout = memo(() => {
   const context = useContext(SettingsContext);
   const smoothTransitions = context?.settings?.smoothTransitions ?? true;
   const isSearchPage = location.pathname === "/search";
+  const isDownloadPage = location.pathname === "/download";
   const searchScrollRef = useRef(null);
+
+  useNaturalDownloadScroll(isDownloadPage);
 
   useEffect(() => {
     if (searchParams.get("tour") === "true") {

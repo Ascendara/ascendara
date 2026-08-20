@@ -7,6 +7,17 @@
  * - Lazy: Loaded on-demand when first accessed (improves startup time)
  */
 
+const { ipcMain } = require("electron");
+const security = require("./security");
+const rendererNetwork = require("./renderer-network");
+const recovery = require("./recovery");
+
+// Install the IPC guard before feature modules register their handlers.
+security.installIpcMainGuard(ipcMain);
+
+rendererNetwork.registerRendererNetworkHandlers(ipcMain);
+recovery.registerRecoveryHandlers(ipcMain);
+
 // Cache for lazy-loaded modules
 const lazyModuleCache = {};
 
@@ -46,6 +57,9 @@ module.exports = {
   // Core utilities
   logger: require("./logger"),
   encryption: require("./encryption"),
+  recovery,
+  rendererNetwork,
+  security,
   utils: require("./utils"),
 
   // Settings management
@@ -92,6 +106,6 @@ module.exports = {
     return lazyLoaders.qrcode();
   },
   get umuDatabase() {
-  return lazyLoaders.umuDatabase();
+    return lazyLoaders.umuDatabase();
   },
 };

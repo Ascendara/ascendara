@@ -12,24 +12,20 @@
 //=============================================================================
 
 const { contextBridge, ipcRenderer } = require("electron");
-const https = require("https");
+const { createPreloadIpcTransport } = require("./modules/preload-bridge");
+
+// Keep listener wrappers private so the page never receives Electron event objects.
+const preloadIpc = createPreloadIpcTransport(ipcRenderer);
 
 //=============================================================================
 // MAIN ELECTRON API
 //=============================================================================
 contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
-  // IPC RENDERER (Low-level IPC access)
+  // IPC RENDERER (Legacy low-level access)
   //===========================================================================
-  ipcRenderer: {
-    on: (channel, func) =>
-      ipcRenderer.on(channel, (event, ...args) => func(event, ...args)),
-    off: (channel, func) => ipcRenderer.off(channel, func),
-    removeListener: (channel, func) => ipcRenderer.removeListener(channel, func),
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-    readFile: (path, encoding) => ipcRenderer.invoke("read-local-file", path, encoding),
-    writeFile: (path, content) => ipcRenderer.invoke("write-file", path, content),
-  },
+  // Older renderer code still uses this object, so keep it while those callers migrate.
+  ipcRenderer: preloadIpc.legacy,
 
   //===========================================================================
   // WINDOW MANAGEMENT
@@ -38,24 +34,27 @@ contextBridge.exposeInMainWorld("electron", {
   maximizeWindow: () => ipcRenderer.invoke("maximize-window"),
   closeWindow: forceQuit => ipcRenderer.invoke("close-window", forceQuit),
   toggleFullscreen: () => ipcRenderer.invoke("toggle-fullscreen"),
-  maximizeWindow: () => ipcRenderer.invoke("maximize-window"),
   isWindowMaximized: () => ipcRenderer.invoke("is-window-maximized"),
   getFullscreenState: () => ipcRenderer.invoke("get-fullscreen-state"),
   clearCache: () => ipcRenderer.invoke("clear-cache"),
   openDevTools: () => ipcRenderer.invoke("open-devtools"),
   reload: () => ipcRenderer.invoke("reload"),
-  onWindowStateChange: callback => {
-    ipcRenderer.on("window-state-changed", (_, maximized) => callback(maximized));
-  },
-  onAppClose: callback => {
-    ipcRenderer.on("app-closing", () => callback());
-  },
-  onAppHidden: callback => {
-    ipcRenderer.on("app-hidden", () => callback());
-  },
-  onAppShown: callback => {
-    ipcRenderer.on("app-shown", () => callback());
-  },
+  onWindowStateChange: callback =>
+    preloadIpc.subscribe("window-state-changed", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  onAppClose: callback =>
+    preloadIpc.subscribe("app-closing", callback, {
+      selectArgs: () => [],
+    }),
+  onAppHidden: callback =>
+    preloadIpc.subscribe("app-hidden", callback, {
+      selectArgs: () => [],
+    }),
+  onAppShown: callback =>
+    preloadIpc.subscribe("app-shown", callback, {
+      selectArgs: () => [],
+    }),
 
   //===========================================================================
   // SETTINGS & CONFIGURATION
@@ -77,7 +76,8 @@ contextBridge.exposeInMainWorld("electron", {
   downloadProtonCachyOS: () => ipcRenderer.invoke("download-proton-cachyos"),
   getProtonCachyOSInfo: () => ipcRenderer.invoke("get-proton-cachyos-info"),
   checkProtonCachyOSUpdate: () => ipcRenderer.invoke("check-proton-cachyos-update"),
-  cleanupOldProtonCachyOS: keepVersion => ipcRenderer.invoke("cleanup-old-proton-cachyos", keepVersion),
+  cleanupOldProtonCachyOS: keepVersion =>
+    ipcRenderer.invoke("cleanup-old-proton-cachyos", keepVersion),
 
   getSettings: () => ipcRenderer.invoke("get-settings"),
   saveSettings: (options, directory) =>
@@ -86,10 +86,11 @@ contextBridge.exposeInMainWorld("electron", {
   getDefaultLocalIndexPath: () => ipcRenderer.invoke("get-default-local-index-path"),
   getDownloadDirectory: () => ipcRenderer.invoke("get-download-directory"),
   getSteamApiKey: () => ipcRenderer.invoke("get-steam-api-key"),
-  onSettingsChanged: callback => {
-    ipcRenderer.on("settings-updated", callback);
-    return () => ipcRenderer.removeListener("settings-updated", callback);
-  },
+  onSettingsChanged: callback =>
+    preloadIpc.subscribe("settings-updated", callback, {
+      // Keep the old (event, data) callback shape without exposing the Electron event.
+      includeEventPlaceholder: true,
+    }),
 
   // UMU Launcher
   isUmuInstalled: () => ipcRenderer.invoke("is-umu-installed"),
@@ -104,8 +105,9 @@ contextBridge.exposeInMainWorld("electron", {
   umuRefreshDatabase: () => ipcRenderer.invoke("umu-refresh-database"),
   umuFindId: gameName => ipcRenderer.invoke("umu-find-id", gameName),
   umuGetGameId: gameName => ipcRenderer.invoke("umu-get-game-id", gameName),
-  umuSetGameId: (gameName, umuId) => ipcRenderer.invoke("umu-set-game-id", gameName, umuId),
-  umuAutoDetect: (gameName) => ipcRenderer.invoke("umu-auto-detect", gameName),
+  umuSetGameId: (gameName, umuId) =>
+    ipcRenderer.invoke("umu-set-game-id", gameName, umuId),
+  umuAutoDetect: gameName => ipcRenderer.invoke("umu-auto-detect", gameName),
 
   // Crack/Emulator Settings
   getLocalCrackUsername: () => ipcRenderer.invoke("get-local-crack-username"),
@@ -155,7 +157,10 @@ contextBridge.exposeInMainWorld("electron", {
   hasAdmin: () => ipcRenderer.invoke("has-admin"),
   updateLaunchCount: () => ipcRenderer.invoke("update-launch-count"),
   getLaunchCount: () => ipcRenderer.invoke("get-launch-count"),
-  onWelcomeComplete: callback => ipcRenderer.on("welcome-complete", () => callback()),
+  onWelcomeComplete: callback =>
+    preloadIpc.subscribe("welcome-complete", callback, {
+      selectArgs: () => [],
+    }),
   triggerWelcomeComplete: () => ipcRenderer.invoke("welcome-complete"),
 
   //===========================================================================
@@ -186,6 +191,10 @@ contextBridge.exposeInMainWorld("electron", {
   cancelTranslation: () => ipcRenderer.invoke("cancel-translation"),
   getDownloadedLanguages: () => ipcRenderer.invoke("get-downloaded-languages"),
   languageFileExists: filename => ipcRenderer.invoke("language-file-exists", filename),
+  onTranslationProgress: callback =>
+    preloadIpc.subscribe("translation-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
 
   //===========================================================================
   // LOCAL INDEX REFRESH
@@ -199,38 +208,60 @@ contextBridge.exposeInMainWorld("electron", {
   getLocalRefreshStatus: outputPath =>
     ipcRenderer.invoke("get-local-refresh-status", outputPath),
   onLocalRefreshProgress: callback =>
-    ipcRenderer.on("local-refresh-progress", (_, data) => callback(data)),
+    preloadIpc.subscribe("local-refresh-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   onLocalRefreshComplete: callback =>
-    ipcRenderer.on("local-refresh-complete", (_, data) => callback(data)),
+    preloadIpc.subscribe("local-refresh-complete", callback, {
+      selectArgs: args => [args[0]],
+    }),
   onLocalRefreshError: callback =>
-    ipcRenderer.on("local-refresh-error", (_, data) => callback(data)),
+    preloadIpc.subscribe("local-refresh-error", callback, {
+      selectArgs: args => [args[0]],
+    }),
   onLocalRefreshCookieNeeded: callback =>
-    ipcRenderer.on("local-refresh-cookie-needed", () => callback()),
-  offLocalRefreshProgress: () => ipcRenderer.removeAllListeners("local-refresh-progress"),
-  offLocalRefreshComplete: () => ipcRenderer.removeAllListeners("local-refresh-complete"),
-  offLocalRefreshError: () => ipcRenderer.removeAllListeners("local-refresh-error"),
+    preloadIpc.subscribe("local-refresh-cookie-needed", callback, {
+      selectArgs: () => [],
+    }),
+  onSteamripCookieReceived: callback =>
+    preloadIpc.subscribe("steamrip-cookie-received", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  offLocalRefreshProgress: () =>
+    preloadIpc.removeAllListeners("local-refresh-progress"),
+  offLocalRefreshComplete: () =>
+    preloadIpc.removeAllListeners("local-refresh-complete"),
+  offLocalRefreshError: () => preloadIpc.removeAllListeners("local-refresh-error"),
   offLocalRefreshCookieNeeded: () =>
-    ipcRenderer.removeAllListeners("local-refresh-cookie-needed"),
+    preloadIpc.removeAllListeners("local-refresh-cookie-needed"),
   downloadSharedIndex: outputPath =>
     ipcRenderer.invoke("download-shared-index", outputPath),
   getPublicIndexDownloadStatus: () =>
     ipcRenderer.invoke("get-public-index-download-status"),
   onPublicIndexDownloadStarted: callback =>
-    ipcRenderer.on("public-index-download-started", () => callback()),
+    preloadIpc.subscribe("public-index-download-started", callback, {
+      selectArgs: () => [],
+    }),
   onPublicIndexDownloadComplete: callback =>
-    ipcRenderer.on("public-index-download-complete", () => callback()),
+    preloadIpc.subscribe("public-index-download-complete", callback, {
+      selectArgs: () => [],
+    }),
   onPublicIndexDownloadError: callback =>
-    ipcRenderer.on("public-index-download-error", (_, data) => callback(data)),
+    preloadIpc.subscribe("public-index-download-error", callback, {
+      selectArgs: args => [args[0]],
+    }),
   onPublicIndexDownloadProgress: callback =>
-    ipcRenderer.on("public-index-download-progress", (_, data) => callback(data)),
+    preloadIpc.subscribe("public-index-download-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   offPublicIndexDownloadStarted: () =>
-    ipcRenderer.removeAllListeners("public-index-download-started"),
+    preloadIpc.removeAllListeners("public-index-download-started"),
   offPublicIndexDownloadComplete: () =>
-    ipcRenderer.removeAllListeners("public-index-download-complete"),
+    preloadIpc.removeAllListeners("public-index-download-complete"),
   offPublicIndexDownloadError: () =>
-    ipcRenderer.removeAllListeners("public-index-download-error"),
+    preloadIpc.removeAllListeners("public-index-download-error"),
   offPublicIndexDownloadProgress: () =>
-    ipcRenderer.removeAllListeners("public-index-download-progress"),
+    preloadIpc.removeAllListeners("public-index-download-progress"),
 
   //===========================================================================
   // GAME MANAGEMENT
@@ -275,7 +306,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("disable-game-auto-backups", game, isCustom),
   isGameAutoBackupsEnabled: (game, isCustom) =>
     ipcRenderer.invoke("is-game-auto-backups-enabled", game, isCustom),
-  ludusavi: (action, game, backupName) => ipcRenderer.invoke("ludusavi", action, game, backupName),
+  ludusavi: (action, game, backupName) =>
+    ipcRenderer.invoke("ludusavi", action, game, backupName),
   listBackupFiles: dirPath => ipcRenderer.invoke("listBackupFiles", dirPath),
   readBackupFile: filePath => ipcRenderer.invoke("readBackupFile", filePath),
   getTempPath: () => ipcRenderer.invoke("getTempPath"),
@@ -384,20 +416,18 @@ contextBridge.exposeInMainWorld("electron", {
   getDownloads: () => ipcRenderer.invoke("get-downloads"),
 
   // Download Events
-  onDownloadProgress: callback => {
-    ipcRenderer.on("download-progress", (_, data) => callback(data));
-    return () => ipcRenderer.removeListener("download-progress", callback);
-  },
-  onDownloadComplete: callback => {
-    const listener = (_, data) => callback(data);
-    ipcRenderer.on("download-complete", listener);
-    return () => ipcRenderer.removeListener("download-complete", listener);
-  },
-  onDownloadError: callback => {
-    const listener = (_, data) => callback(data);
-    ipcRenderer.on("download-error", listener);
-    return () => ipcRenderer.removeListener("download-error", listener);
-  },
+  onDownloadProgress: callback =>
+    preloadIpc.subscribe("download-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  onDownloadComplete: callback =>
+    preloadIpc.subscribe("download-complete", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  onDownloadError: callback =>
+    preloadIpc.subscribe("download-error", callback, {
+      selectArgs: args => [args[0]],
+    }),
 
   //===========================================================================
   // FILE & DIRECTORY MANAGEMENT
@@ -411,18 +441,17 @@ contextBridge.exposeInMainWorld("electron", {
   getDriveSpace: path => ipcRenderer.invoke("get-drive-space", path),
   getAssetPath: filename => ipcRenderer.invoke("get-asset-path", filename),
   getAudioAsset: filename => ipcRenderer.invoke("get-audio-asset", filename),
-  onDirectorySizeStatus: callback => {
-    ipcRenderer.on("directory-size-status", (_, status) => callback(status));
-    return () => ipcRenderer.removeListener("directory-size-status", callback);
-  },
-  getCustomSavePaths: (gameName, isCustomGame) => 
+  onDirectorySizeStatus: callback =>
+    preloadIpc.subscribe("directory-size-status", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  getCustomSavePaths: (gameName, isCustomGame) =>
     ipcRenderer.invoke("get-custom-save-paths", gameName, isCustomGame),
-  setCustomSavePaths: (gameName, isCustomGame, paths) => 
+  setCustomSavePaths: (gameName, isCustomGame, paths) =>
     ipcRenderer.invoke("set-custom-save-paths", gameName, isCustomGame, paths),
-  openFolderDialog: () => 
-    ipcRenderer.invoke("open-folder-dialog"),
-  getDrives: () => ipcRenderer.invoke('get-drives'),
-  listDirectory: (dirPath) => ipcRenderer.invoke('list-directory', dirPath),
+  openFolderDialog: () => ipcRenderer.invoke("open-folder-dialog"),
+  getDrives: () => ipcRenderer.invoke("get-drives"),
+  listDirectory: dirPath => ipcRenderer.invoke("list-directory", dirPath),
 
   //===========================================================================
   // TOOLS & DEPENDENCIES
@@ -434,10 +463,10 @@ contextBridge.exposeInMainWorld("electron", {
   installWine: () => ipcRenderer.invoke("install-wine"),
   isSteamCMDInstalled: () => ipcRenderer.invoke("is-steamcmd-installed"),
   installSteamCMD: () => ipcRenderer.invoke("install-steamcmd"),
-  onInstallProgress: callback => {
-    ipcRenderer.on("install-progress", (_, data) => callback(data));
-    return () => ipcRenderer.removeListener("install-progress", callback);
-  },
+  onInstallProgress: callback =>
+    preloadIpc.subscribe("install-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   checkGameDependencies: () => ipcRenderer.invoke("check-game-dependencies"),
   openReqPath: game => ipcRenderer.invoke("required-libraries", game),
   folderExclusion: boolean => ipcRenderer.invoke("folder-exclusion", boolean),
@@ -454,16 +483,28 @@ contextBridge.exposeInMainWorld("electron", {
   deleteInstaller: () => ipcRenderer.invoke("delete-installer"),
   uninstallAscendara: () => ipcRenderer.invoke("uninstall-ascendara"),
   switchBranch: branch => ipcRenderer.invoke("switch-branch", branch),
-  onUpdateAvailable: callback => ipcRenderer.on("update-available", callback),
-  onUpdateReady: callback => ipcRenderer.on("update-ready", callback),
+  onUpdateAvailable: callback =>
+    preloadIpc.subscribe("update-available", callback, {
+      includeEventPlaceholder: true,
+    }),
+  onUpdateReady: callback =>
+    preloadIpc.subscribe("update-ready", callback, {
+      includeEventPlaceholder: true,
+    }),
+  onUpdateDownloadProgress: callback =>
+    preloadIpc.subscribe("update-download-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   removeUpdateAvailableListener: callback =>
-    ipcRenderer.removeListener("update-available", callback),
+    preloadIpc.unsubscribe("update-available", callback),
   removeUpdateReadyListener: callback =>
-    ipcRenderer.removeListener("update-ready", callback),
+    preloadIpc.unsubscribe("update-ready", callback),
   onBranchSwitchProgress: callback =>
-    ipcRenderer.on("branch-switch-progress", (_, progress) => callback(progress)),
+    preloadIpc.subscribe("branch-switch-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   removeBranchSwitchProgressListener: callback =>
-    ipcRenderer.removeListener("branch-switch-progress", callback),
+    preloadIpc.unsubscribe("branch-switch-progress", callback),
 
   //===========================================================================
   // THEMES & UI
@@ -499,46 +540,25 @@ contextBridge.exposeInMainWorld("electron", {
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   getImageKey: () => ipcRenderer.invoke("get-image-key"),
   openURL: (url, options) => ipcRenderer.invoke("open-url", url, options),
-  onExternalWindowBlocked: callback => {
-    const listener = (_, data) => callback(data);
-    ipcRenderer.on("external-window-blocked", listener);
-    return () => ipcRenderer.removeListener("external-window-blocked", listener);
-  },
+  onExternalWindowBlocked: callback =>
+    preloadIpc.subscribe("external-window-blocked", callback, {
+      selectArgs: args => [args[0]],
+    }),
   fetchApiImage: (endpoint, imgID, timestamp, signature) =>
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
   getSteamGridUrls: gameName => ipcRenderer.invoke("steamgrid-get-urls", gameName),
   getSteamGridHeader: gameName => ipcRenderer.invoke("steamgrid-get-header", gameName),
 
-  // HTTPS Request Helper
-  request: (url, options) => {
-    return new Promise((resolve, reject) => {
-      const req = https.request(
-        url,
-        {
-          method: options.method,
-          headers: options.headers,
-          timeout: options.timeout,
-        },
-        res => {
-          let data = "";
-          res.on("data", chunk => (data += chunk));
-          res.on("end", () => {
-            resolve({
-              ok: res.statusCode >= 200 && res.statusCode < 300,
-              status: res.statusCode,
-              data: data,
-            });
-          });
-        }
-      );
-      req.on("error", error => reject(error));
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("Request timed out"));
-      });
-      req.end();
-    });
-  },
+  // Service status checks use the restricted request handler.
+  requestAscendaraService: (url, options) =>
+    ipcRenderer.invoke("request-ascendara-service", url, options),
+
+  // External Sources keep the same HTTPS URL support as the existing source flow.
+  fetchCustomSource: url => ipcRenderer.invoke("fetch-custom-source", url),
+
+  // Older callers still use request(), so keep it as an alias for the shared dispatcher.
+  request: (url, options) =>
+    ipcRenderer.invoke("request-ascendara-service", url, options),
 
   //===========================================================================
   // SUPPORT & PROFILE

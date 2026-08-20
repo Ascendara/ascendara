@@ -185,11 +185,8 @@ export function SettingsProvider({ children }) {
       }));
     };
 
-    window.electron.ipcRenderer.on("settings-updated", handleSettingsChange);
-
-    return () => {
-      window.electron.ipcRenderer.off("settings-updated", handleSettingsChange);
-    };
+    // Keep the callback shape used by the existing settings listener.
+    return window.electron.onSettingsChanged(handleSettingsChange);
   }, []);
 
   return (
