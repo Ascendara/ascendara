@@ -25,13 +25,21 @@ const formatMessage = args => {
     .join(" ")}\n`;
 };
 
+// `end()` makes the stream unwritable before the close event fires, so checking
+// only `closed` can still allow a final shutdown log to write after the stream ends.
+const canWriteToLog = () =>
+  !logStream.destroyed &&
+  !logStream.closed &&
+  !logStream.writableEnded &&
+  !logStream.writableFinished;
+
 /**
  * Initialize the logger by overriding console methods
  */
 function initializeLogger() {
   console.log = (...args) => {
     const message = formatMessage(args);
-    if (!logStream.destroyed && !logStream.closed) {
+    if (canWriteToLog()) {
       logStream.write(message);
     }
     originalConsole.log(...args);
@@ -39,7 +47,7 @@ function initializeLogger() {
 
   console.error = (...args) => {
     const message = formatMessage(args);
-    if (!logStream.destroyed && !logStream.closed) {
+    if (canWriteToLog()) {
       logStream.write(`ERROR: ${message}`);
     }
     originalConsole.error(...args);
@@ -47,7 +55,7 @@ function initializeLogger() {
 
   console.warn = (...args) => {
     const message = formatMessage(args);
-    if (!logStream.destroyed && !logStream.closed) {
+    if (canWriteToLog()) {
       logStream.write(`WARN: ${message}`);
     }
     originalConsole.warn(...args);
@@ -58,7 +66,9 @@ function initializeLogger() {
  * Close the log stream
  */
 function closeLogger() {
-  logStream.end();
+  if (!logStream.destroyed && !logStream.closed && !logStream.writableEnded) {
+    logStream.end();
+  }
 }
 
 /**
