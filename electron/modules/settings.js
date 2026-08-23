@@ -86,6 +86,7 @@ class SettingsManager {
       },
       promptPurchaseAfter3Hours: true,
       openOnStartup: false,
+      startMinimized: false,
       // Custom Sources Mode (Hydra Library) + user-imported custom lists
       customSourcesMode: false,
       customSource: null,
@@ -298,10 +299,12 @@ function registerSettingsHandlers() {
         }
       }
       // Handle startup toggle immediately
-      if (key === "openOnStartup") {
+      if (key === "openOnStartup" || key === "startMinimized") {
+        const currentSettings = manager.getSettings();
         app.setLoginItemSettings({
-          openAtLogin: value,
-          openAsHidden: false,
+          openAtLogin: currentSettings.openOnStartup,
+          openAsHidden:
+            currentSettings.openOnStartup && currentSettings.startMinimized,
         });
       }
     }

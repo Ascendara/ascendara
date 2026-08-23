@@ -1836,8 +1836,33 @@ function Settings() {
                   </div>
                   <Switch
                     checked={settings.openOnStartup}
+                    onCheckedChange={() => {
+                      const newValue = !settings.openOnStartup;
+                      handleSettingChange("openOnStartup", newValue);
+                      if (!newValue && settings.startMinimized) {
+                        handleSettingChange("startMinimized", false);
+                      }
+                    }}
+                  />
+                </div>
+
+                <div
+                  id="start-minimized"
+                  className={`flex items-center justify-between ${
+                    !settings.openOnStartup ? "opacity-50" : ""
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <Label>{t("settings.startMinimized")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.startMinimizedDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.startMinimized}
+                    disabled={!settings.openOnStartup}
                     onCheckedChange={() =>
-                      handleSettingChange("openOnStartup", !settings.openOnStartup)
+                      handleSettingChange("startMinimized", !settings.startMinimized)
                     }
                   />
                 </div>

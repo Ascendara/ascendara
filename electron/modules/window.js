@@ -61,8 +61,17 @@ function createWindow() {
 
   // Only show the window when it's ready to be displayed
   mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
-    mainWindowHidden = false;
+    const settings = getSettingsManager().getSettings();
+    const loginItemSettings = app.getLoginItemSettings();
+    const shouldStartHidden =
+      loginItemSettings.wasOpenedAtLogin && settings.startMinimized;
+
+    if (shouldStartHidden) {
+      mainWindowHidden = true;
+    } else {
+      mainWindow.show();
+      mainWindowHidden = false;
+    }
   });
 
   // Adding hash to URL

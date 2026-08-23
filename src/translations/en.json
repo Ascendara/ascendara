@@ -2736,6 +2736,8 @@
     "notificationsDescription": "Send desktop notifications for downloads and index refreshing.",
     "openOnStartup": "Open Ascendara on Startup",
     "openOnStartupDescription": "Automatically launch Ascendara when you start your computer.",
+    "startMinimized": "Start Minimized",
+    "startMinimizedDescription": "Launch Ascendara in the background on startup instead of opening the main window.",
     "onlyWindowsSupported": "Only Windows is supported for now",
     "onlyWindowsSupported2": "This feature is only on Windows",
     "preview": {
