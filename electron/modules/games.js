@@ -108,6 +108,25 @@ async function createGameShortcut(game) {
 }
 
 /**
+ * Delete the desktop shortcut created by Ascendara for a game, if it exists
+ */
+function deleteGameShortcut(gameName) {
+  try {
+    if (!gameName) return false;
+    const shortcutPath = path.join(os.homedir(), "Desktop", `${gameName}.lnk`);
+    if (fs.existsSync(shortcutPath)) {
+      fs.unlinkSync(shortcutPath);
+      console.log(`Deleted shortcut for game: ${gameName}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Error deleting shortcut:", error);
+    return false;
+  }
+}
+
+/**
  * Register game-related IPC handlers
  */
 function registerGameHandlers() {
@@ -836,6 +855,10 @@ function registerGameHandlers() {
         ...settings.additionalDirectories,
       ];
 
+      if (isWindows) {
+        deleteGameShortcut(game);
+      }
+
       for (const directory of allDirectories) {
         const gameDirectory = path.join(directory, game);
         if (fs.existsSync(gameDirectory)) {
@@ -869,6 +892,10 @@ function registerGameHandlers() {
       if (gameIndex !== -1) {
         gamesData.games.splice(gameIndex, 1);
         fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
+
+        if (isWindows) {
+          deleteGameShortcut(game);
+        }
 
         const possibleExtensions = [".jpg", ".jpeg", ".png"];
         for (const ext of possibleExtensions) {
