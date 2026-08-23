@@ -58,6 +58,8 @@ import {
   SlidersHorizontal,
   GripVertical,
   Download,
+  History,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -273,6 +275,9 @@ const Library = () => {
   const [cloudGameImages, setCloudGameImages] = useState({});
   // Play Later games state
   const [playLaterGames, setPlayLaterGames] = useState([]);
+  // History (deleted games with preserved stats) state
+  const [deletedGames, setDeletedGames] = useState([]);
+  const [restoringDeletedGame, setRestoringDeletedGame] = useState(null);
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
   const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
   const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
@@ -287,13 +292,13 @@ const Library = () => {
   const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
   const [sidebarTabOrder, setSidebarTabOrder] = useState(() => {
     const saved = localStorage.getItem("library-tab-order");
-    return saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater"];
+    return saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
   });
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem("library-tab-order");
-    const order = saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater"];
+    const order = saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
     return order[0] || "all";
-  }); // "all" | "favoritesGallery" | "cloud" | "playLater"
+  }); // "all" | "favoritesGallery" | "cloud" | "playLater" | "history"
   const dragTabRef = useRef(null);
   const dragOverTabRef = useRef(null);
   const [groupBy, setGroupBy] = useState(() => localStorage.getItem("library-groupBy") || "none"); // "none" | "directory"
@@ -660,6 +665,53 @@ const Library = () => {
     });
   };
 
+  const handleRestoreDeletedGame = async deletedGame => {
+    const gameName = deletedGame.game || deletedGame.name;
+
+    if (!deletedGame.gameID) {
+      toast.info(
+        t("library.history.customGameInfo") ||
+          "Add this game back with the exact same name to automatically restore its saved playtime."
+      );
+      setIsAddGameOpen(true);
+      return;
+    }
+
+    setRestoringDeletedGame(gameName);
+    try {
+      let fullGame = null;
+      try {
+        fullGame = await gameService.findGameByGameID(deletedGame.gameID);
+      } catch { /* fall through */ }
+      if (!fullGame) {
+        try {
+          const results = await gameService.searchGames(gameName);
+          fullGame = results.find(r => r.game === gameName) || null;
+        } catch { /* fall through */ }
+      }
+      if (!fullGame) {
+        toast.error(t("library.cloudRestore.gameNotFound") || "Game not found. It may have been removed.");
+        return;
+      }
+      navigate("/download", { state: { gameData: fullGame } });
+    } finally {
+      setRestoringDeletedGame(null);
+    }
+  };
+
+  // Permanently forget a game's History entry, discarding its saved stats
+  const handleRemoveFromHistory = async deletedGame => {
+    const gameName = deletedGame.game || deletedGame.name;
+    try {
+      await window.electron.discardDeletedGameData(gameName);
+      setDeletedGames(prev => prev.filter(g => (g.game || g.name) !== gameName));
+      toast.success(t("library.history.removed") || "Removed from History");
+    } catch (error) {
+      console.error("Error removing game from history:", error);
+      toast.error(t("library.history.removeFailed") || "Failed to remove from History");
+    }
+  };
+
   // Check for game updates when games are loaded (only for Ascend subscribers)
   useEffect(() => {
     const checkGameUpdates = async () => {
@@ -998,6 +1050,22 @@ const Library = () => {
         ? customGames.filter(g => !g._isDeleted)
         : [];
 
+      // Track games moved to History (deleted with "Save Data") so they can
+      // be shown/restored from the History tab instead of vanishing entirely.
+      setDeletedGames(Array.isArray(customGames) ? customGames.filter(g => g._isDeleted) : []);
+
+      // If a game that has a History stub has been reinstalled, silently merge
+      // its saved playtime/stats back in and drop the stub, then reload once.
+      const reinstalledWithStub = safeInstalledGames.filter(g => g._deletedStub);
+      if (reinstalledWithStub.length > 0) {
+        await Promise.all(
+          reinstalledWithStub.map(g =>
+            window.electron.restoreDeletedGameData(g.game || g.name).catch(() => {})
+          )
+        );
+        return loadGames();
+      }
+
       // Check for pending cloud restores (games that were downloaded from cloud)
       await checkPendingCloudRestores([...safeInstalledGames, ...safeCustomGames]);
 
@@ -1292,6 +1360,12 @@ const Library = () => {
       label: t("library.playLater.title") || "Play Later",
       icon: <Clock className="h-4 w-4" />,
       count: playLaterGames.length,
+    },
+    {
+      id: "history",
+      label: t("library.history.title") || "History",
+      icon: <History className="h-4 w-4" />,
+      count: deletedGames.length,
     }
   ].filter(tab => !tab.hidden);
 
@@ -1826,6 +1900,11 @@ const Library = () => {
                 title: t("library.playLater.title") || "Play Later",
                 subtitle: t("library.playLater.subtitle") || "Games you've saved to download later.",
               },
+              history: {
+                icon: <History className="h-5 w-5 text-primary" />,
+                title: t("library.history.title") || "History",
+                subtitle: t("library.history.subtitle") || "Games you've removed. Their playtime and stats are preserved here.",
+              },
             };
             const meta = tabMeta[activeTab];
             if (!meta) return null;
@@ -1994,6 +2073,33 @@ const Library = () => {
                       game={game}
                       onDownload={() => handleDownloadPlayLater(game)}
                       onRemove={() => handleRemoveFromPlayLater(game.game)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── History tab (games deleted with "Save Data") ── */}
+          {activeTab === "history" && (
+            <>
+              {deletedGames.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <History className="mb-4 h-12 w-12 text-muted-foreground/30" />
+                  <p className="text-sm font-medium text-foreground">{t("library.history.empty") || "No game history yet"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("library.history.emptyHint") || "Delete a game and choose \"Save Data\" to keep it here."}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  {deletedGames.map(game => (
+                    <DeletedGameCard
+                      key={getLibraryCardKey(game)}
+                      game={game}
+                      onRestore={() => handleRestoreDeletedGame(game)}
+                      onRemove={() => handleRemoveFromHistory(game)}
+                      isRestoring={restoringDeletedGame === (game.game || game.name)}
                     />
                   ))}
                 </div>
@@ -4062,6 +4168,180 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
 });
 
 PlayLaterGameCard.displayName = "PlayLaterGameCard";
+
+const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
+  const { t } = useLanguage();
+  const [imageData, setImageData] = useState(() => gameImageCache.get(game.game || game.name) ?? null);
+  const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
+  const gameName = game.game || game.name || "";
+  const isCustomGame = !game.gameID;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (gameImageCache.has(gameName)) {
+      setImageData(gameImageCache.get(gameName));
+      return;
+    }
+    (async () => {
+      if (game.imgID) {
+        try {
+          const { default: imageCacheSvc } = await import("@/services/imageCacheService");
+          const url = await imageCacheSvc.getImage(game.imgID, { priority: "low", quality: "high" });
+          if (url && !cancelled) {
+            gameImageCache.set(gameName, url);
+            setImageData(url);
+            return;
+          }
+        } catch { /* fall through */ }
+      }
+      if (gameName) {
+        try {
+          const { default: sgSvc } = await import("@/services/steamGridImageService");
+          const assets = await sgSvc.getAssets(gameName);
+          const url = sgSvc.pickUrl(assets, "card");
+          if (url && !cancelled) {
+            gameImageCache.set(gameName, url);
+            setImageData(url);
+          }
+        } catch { /* silent */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [gameName, game.imgID]);
+
+  const formatPlaytime = seconds => {
+    if (!seconds || seconds < 60) return t("library.neverPlayed") || "You haven't played this game yet";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours === 0) return `${minutes} ${t("library.minutes") || "minutes"}`;
+    if (minutes === 0) return `${hours} ${t("library.hours") || "hours"}`;
+    return `${hours} ${t("library.hours") || "hours"} ${minutes} ${t("library.minutes") || "minutes"}`;
+  };
+
+  const formatDeletedAt = timestamp => {
+    if (!timestamp) return "";
+    try {
+      return new Date(timestamp).toLocaleDateString();
+    } catch {
+      return "";
+    }
+  };
+
+  return (
+    <>
+      <Card
+        className={cn(
+          "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+          "hover:-translate-y-1 hover:shadow-xl"
+        )}
+      >
+        <CardContent className="p-0">
+          <div className="relative aspect-[2/3] overflow-hidden">
+            {/* Muted overlay to distinguish from active library cards */}
+            <div className="absolute inset-0 z-10 bg-background/60" />
+            {imageData ? (
+              <img
+                src={imageData}
+                alt={gameName}
+                className="h-full w-full border-b border-border object-cover grayscale"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-muted">
+                <History className="h-12 w-12 text-muted-foreground/30" />
+              </div>
+            )}
+            {/* History badge */}
+            <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded bg-muted-foreground/80 px-2 py-0.5 text-xs font-medium text-white">
+              <History className="h-3 w-3" />
+              {t("library.history.badge") || "Removed"}
+            </span>
+            {/* Remove from history button */}
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                setIsConfirmRemoveOpen(true);
+              }}
+              className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/70 group-hover:opacity-100"
+              title={t("library.history.removeForever") || "Remove from History"}
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col items-start gap-1.5 px-3 py-2">
+          <div className="flex w-full items-center gap-1.5">
+            <h3 className="flex-1 truncate text-sm font-semibold leading-tight text-foreground">
+              {gameName}
+            </h3>
+            {game.online && <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            {game.dlc && <Gift className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          </div>
+          <div className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span className="truncate">{formatPlaytime(game.playTime)}</span>
+          </div>
+          {game.deletedAt && (
+            <div className="flex w-full items-center gap-1.5 text-[11px] text-muted-foreground/70">
+              <span className="truncate">
+                {t("library.history.removedOn") || "Removed"} {formatDeletedAt(game.deletedAt)}
+              </span>
+            </div>
+          )}
+          <Button
+            size="sm"
+            onClick={onRestore}
+            disabled={isRestoring}
+            className="w-full gap-1.5 text-xs text-white bg-gradient-to-r from-primary to-primary/70 hover:from-primary/90 hover:to-primary/60"
+          >
+            {isRestoring ? (
+              <>
+                <Loader className="h-3.5 w-3.5 animate-spin" />
+                {t("library.history.restoring") || "Finding game..."}
+              </>
+            ) : isCustomGame ? (
+              <>
+                <RotateCcw className="h-3.5 w-3.5" />
+                {t("library.history.restoreCustom") || "Re-add & Restore"}
+              </>
+            ) : (
+              <>
+                <RotateCcw className="h-3.5 w-3.5" />
+                {t("library.history.restore") || "Redownload & Restore"}
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <AlertDialog open={isConfirmRemoveOpen} onOpenChange={setIsConfirmRemoveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-foreground">
+              {t("library.history.removeForeverTitle") || "Remove from History?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {t("library.history.removeForeverDescription", { game: gameName }) ||
+                `This will permanently delete the saved playtime and stats for ${gameName}. This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setIsConfirmRemoveOpen(false);
+                onRemove();
+              }}
+            >
+              {t("library.history.removeForever") || "Remove from History"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+});
+
+DeletedGameCard.displayName = "DeletedGameCard";
 
 const AddGameForm = ({ onSuccess, onRestorePrompt }) => {
   const { t } = useLanguage();
