@@ -112,6 +112,66 @@ import {
 // Module-level cache so images survive page switches without re-fetching via IPC
 const gameImageCache = new Map();
 
+// Cloud Library images need their own cache because the effect can run more
+// than once while games are being added or removed.
+const cloudGameImageCache = new Map();
+const missingCloudGameImages = new Set();
+const pendingCloudGameImageRequests = new Map();
+const CLOUD_IMAGE_RATE_LIMIT_BACKOFF = 30_000;
+let cloudImageRateLimitUntil = 0;
+
+const loadCloudGameImageFromApi = async gameID => {
+  const cacheKey = String(gameID);
+
+  if (cloudGameImageCache.has(cacheKey)) {
+    return cloudGameImageCache.get(cacheKey);
+  }
+
+  if (pendingCloudGameImageRequests.has(cacheKey)) {
+    return pendingCloudGameImageRequests.get(cacheKey);
+  }
+
+  // Keep known missing IDs in memory so a 404 is not retried on every refresh.
+  if (missingCloudGameImages.has(cacheKey)) return null;
+
+  // A single 429 pauses the remaining API fallbacks for a short cooldown.
+  if (Date.now() < cloudImageRateLimitUntil) return null;
+
+  const request = (async () => {
+    const response = await fetch(`https://api.ascendara.app/v3/image/${gameID}`);
+    if (response.status === 404) {
+      missingCloudGameImages.add(cacheKey);
+      return null;
+    }
+    if (response.status === 429) {
+      const retryAfter = Number(response.headers.get("Retry-After"));
+      const retryDelay =
+        retryAfter > 0 ? retryAfter * 1000 : CLOUD_IMAGE_RATE_LIMIT_BACKOFF;
+      cloudImageRateLimitUntil = Date.now() + retryDelay;
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(`Cloud image request failed with status ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  })();
+
+  pendingCloudGameImageRequests.set(cacheKey, request);
+  try {
+    const imageData = await request;
+    if (imageData) cloudGameImageCache.set(cacheKey, imageData);
+    return imageData;
+  } finally {
+    pendingCloudGameImageRequests.delete(cacheKey);
+  }
+};
 
 // Normalize every place that compares game names so casing, spaces, and
 // filesystem-invalid characters cannot create duplicate library entries.
@@ -756,14 +816,20 @@ const Library = () => {
           setCloudOnlyGames(cloudOnly);
 
           // Load images for cloud-only games (only for non-custom games with gameID).
-          // Image data URLs are NOT cached in localStorage (quota issues); React
-          // state holds them in-memory for the lifetime of the page.
+          // Data URLs stay in the module cache instead of localStorage so they
+          // survive page switches without consuming the browser storage quota.
           const images = {};
           for (const game of cloudOnly
             .filter(g => g.gameID && !g.isCustom)
             .slice(0, 20)) {
             try {
               if (game.gameID) {
+                const cacheKey = String(game.gameID);
+                if (cloudGameImageCache.has(cacheKey)) {
+                  images[game.name] = cloudGameImageCache.get(cacheKey);
+                  continue;
+                }
+
                 // For local index, we need to find the game's imgID
                 let imageId = game.gameID;
                 let imageLoaded = false;
@@ -772,7 +838,9 @@ const Library = () => {
                 try {
                   const imageBase64 = await window.electron.getGameImage(game.name);
                   if (imageBase64) {
-                    images[game.name] = `data:image/jpeg;base64,${imageBase64}`;
+                    const dataUrl = `data:image/jpeg;base64,${imageBase64}`;
+                    images[game.name] = dataUrl;
+                    cloudGameImageCache.set(cacheKey, dataUrl);
                     imageLoaded = true;
                   }
                 } catch (error) {
@@ -787,7 +855,9 @@ const Library = () => {
 
                     const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
                     const imageData = await window.electron.ipcRenderer.readFile(localImagePath, "base64");
-                    images[game.name] = `data:image/jpeg;base64,${imageData}`;
+                    const dataUrl = `data:image/jpeg;base64,${imageData}`;
+                    images[game.name] = dataUrl;
+                    cloudGameImageCache.set(cacheKey, dataUrl);
                     imageLoaded = true;
                   } catch (localError) {
                     console.warn("Could not load from local index:", localError);
@@ -796,21 +866,8 @@ const Library = () => {
 
                 // 3. Ascendara API
                 if (!imageLoaded) {
-                  try {
-                    const imageUrl = `https://api.ascendara.app/v3/image/${game.gameID}`;
-                    const response = await fetch(imageUrl);
-                    if (response.ok) {
-                      const blob = await response.blob();
-                      const dataUrl = await new Promise(resolve => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                      });
-                      images[game.name] = dataUrl;
-                    }
-                  } catch (error) {
-                    console.error("Error loading cloud game image from API:", error);
-                  }
+                  const imageData = await loadCloudGameImageFromApi(game.gameID);
+                  if (imageData) images[game.name] = imageData;
                 }
               }
             } catch (error) {
