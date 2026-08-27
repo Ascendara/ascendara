@@ -577,6 +577,9 @@ async function initializeApp() {
     // Register critical IPC handlers first (needed for window to function)
     registerCriticalHandlers();
 
+    // Keep the OS login item (auto-launch) settings in sync with saved settings
+    settings.applyLoginItemSettings();
+
     // Create the main window
     const mainWindow = windowModule.createWindow();
 

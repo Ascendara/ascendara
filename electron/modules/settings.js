@@ -277,6 +277,24 @@ function getSettingsManager() {
 }
 
 /**
+ * Sync the OS login item (auto-launch) settings with the app's saved settings.
+ * Uses a `--hidden` launch argument (checked in window.js at startup) since
+ * `openAsHidden`/`wasOpenedAtLogin` are unreliable or unsupported on Windows.
+ */
+function applyLoginItemSettings() {
+  const manager = getSettingsManager();
+  const currentSettings = manager.getSettings();
+  const openAtLogin = !!currentSettings.openOnStartup;
+  const openAsHidden = openAtLogin && !!currentSettings.startMinimized;
+
+  app.setLoginItemSettings({
+    openAtLogin,
+    openAsHidden,
+    args: openAsHidden ? ["--hidden"] : [],
+  });
+}
+
+/**
  * Register settings-related IPC handlers
  */
 function registerSettingsHandlers() {
@@ -300,12 +318,7 @@ function registerSettingsHandlers() {
       }
       // Handle startup toggle immediately
       if (key === "openOnStartup" || key === "startMinimized") {
-        const currentSettings = manager.getSettings();
-        app.setLoginItemSettings({
-          openAtLogin: currentSettings.openOnStartup,
-          openAsHidden:
-            currentSettings.openOnStartup && currentSettings.startMinimized,
-        });
+        applyLoginItemSettings();
       }
     }
     return success;
@@ -361,4 +374,5 @@ module.exports = {
   SettingsManager,
   getSettingsManager,
   registerSettingsHandlers,
+  applyLoginItemSettings,
 };

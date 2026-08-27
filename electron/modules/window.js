@@ -59,12 +59,12 @@ function createWindow() {
   // Width, Height
   mainWindow.setMinimumSize(600, 400);
 
-  // Only show the window when it's ready to be displayed
+  // Only show the window when it's ready to be displayed.
+  // When launched at login with "start minimized" enabled, the app is started
+  // with a `--hidden` argument (set via app.setLoginItemSettings' `args`
+  // option in settings.js) so we keep the window hidden instead of showing it.
   mainWindow.once("ready-to-show", () => {
-    const settings = getSettingsManager().getSettings();
-    const loginItemSettings = app.getLoginItemSettings();
-    const shouldStartHidden =
-      loginItemSettings.wasOpenedAtLogin && settings.startMinimized;
+    const shouldStartHidden = process.argv.includes("--hidden");
 
     if (shouldStartHidden) {
       mainWindowHidden = true;
