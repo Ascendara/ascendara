@@ -1305,8 +1305,12 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "Cancel & Delete",
+      "deleteFilesOption": "Delete downloaded files",
+      "deleteFilesOptionDescription": "Permanently remove the files Ascendara has downloaded so far. This action cannot be undone.",
+      "keepFilesOption": "Keep downloaded files",
+      "keepFilesOptionDescription": "Stop the download but leave any files already on disk untouched.",
       "killDownload": "Kill Download",
-      "killDownloadDescription": "This will permanently stop the download and delete all downloaded files. This action cannot be undone.",
+      "killDownloadDescription": "Choose what should happen to the files Ascendara has downloaded so far.",
       "killDownloadTitle": "Kill Download for {{gameName}}?",
       "legacyGameVerification": "File verification is only available for games downloaded after Ascendara version 8.1.2",
       "openFolder": "Open Folder",
@@ -1366,6 +1370,7 @@
     },
     "kill": "Kill Download",
     "killSuccess": "Download killed and files deleted",
+    "killSuccessKeepFiles": "Download killed, files kept on disk",
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
     "lastExtracted": "Last extracted",
     "logViewerTitle": "Download Manager Log",

@@ -79,6 +79,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useSettings } from "@/context/SettingsContext";
 import {
   processNextInQueue,
@@ -373,6 +375,7 @@ const Downloads = () => {
   }, [resumingDownloads]);
   const [stopModalOpen, setStopModalOpen] = useState(false);
   const [gameToStop, setGameToStop] = useState(null);
+  const [killDeleteOption, setKillDeleteOption] = useState("delete");
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false);
   const [showAscendWarning, setShowAscendWarning] = useState(false);
   const [gameToResume, setGameToResume] = useState(null);
@@ -715,22 +718,29 @@ const Downloads = () => {
 
   const handleKillDownload = game => {
     setGameToStop(game);
+    setKillDeleteOption("delete");
     setStopModalOpen(true);
   };
 
-  const executeKillDownload = async game => {
-    console.log("Executing kill download for:", game);
+  const executeKillDownload = async (game, deleteFiles = true) => {
+    console.log("Executing kill download for:", game, "deleteFiles:", deleteFiles);
     setStoppingDownloads(prev => new Set([...prev, game.game]));
     try {
-      const result = await window.electron.stopDownload(game.game, true);
+      const result = await window.electron.stopDownload(game.game, deleteFiles);
       console.log("Kill download result:", result);
       if (!result) {
         throw new Error("Failed to kill download");
       }
-      // Clear the cached download data since the download is being deleted
-      clearCachedDownloadData(game.game);
+      if (deleteFiles) {
+        // Clear the cached download data since the download is being deleted
+        clearCachedDownloadData(game.game);
+      }
       setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
-      toast.success(t("downloads.killSuccess"));
+      toast.success(
+        deleteFiles
+          ? t("downloads.killSuccess")
+          : t("downloads.killSuccessKeepFiles")
+      );
 
       // Wait for the download to be fully removed from filesystem
       // before syncing, so the sync reflects the removal
@@ -1190,12 +1200,43 @@ const Downloads = () => {
           <AlertDialogDescription className="text-muted-foreground">
             {t("downloads.actions.killDownloadDescription")}
           </AlertDialogDescription>
+          <RadioGroup
+            value={killDeleteOption}
+            onValueChange={setKillDeleteOption}
+            className="mt-2 space-y-2"
+          >
+            <div className="flex items-start space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+              <RadioGroupItem value="delete" id="kill-delete-files" className="mt-1" />
+              <Label htmlFor="kill-delete-files" className="flex-1 cursor-pointer">
+                <span className="font-medium text-foreground">
+                  {t("downloads.actions.deleteFilesOption")}
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.actions.deleteFilesOptionDescription")}
+                </p>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+              <RadioGroupItem value="keep" id="kill-keep-files" className="mt-1" />
+              <Label htmlFor="kill-keep-files" className="flex-1 cursor-pointer">
+                <span className="font-medium text-foreground">
+                  {t("downloads.actions.keepFilesOption")}
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.actions.keepFilesOptionDescription")}
+                </p>
+              </Label>
+            </div>
+          </RadioGroup>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-primary">
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => gameToStop && executeKillDownload(gameToStop)}
+              onClick={() =>
+                gameToStop &&
+                executeKillDownload(gameToStop, killDeleteOption === "delete")
+              }
               className="text-secondary"
             >
               <XCircle className="mr-2 h-4 w-4" />
