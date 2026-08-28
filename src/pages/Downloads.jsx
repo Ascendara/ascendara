@@ -193,6 +193,7 @@ const Downloads = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { isAuthenticated, user } = useAuth();
+  const { settings } = useSettings();
 
   // Track processed commands to prevent duplicates
   const processedCommandsRef = useRef(new Set());
@@ -361,6 +362,7 @@ const Downloads = () => {
   const fadingGamesRef = React.useRef(new Set());
   const resumingDownloadsRef = React.useRef(new Set());
   const prevActiveCountRef = React.useRef(0);
+  const settingsRef = React.useRef(settings);
   useEffect(() => {
     downloadingGamesRef.current = downloadingGames;
   }, [downloadingGames]);
@@ -373,6 +375,9 @@ const Downloads = () => {
   useEffect(() => {
     resumingDownloadsRef.current = resumingDownloads;
   }, [resumingDownloads]);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
   const [stopModalOpen, setStopModalOpen] = useState(false);
   const [gameToStop, setGameToStop] = useState(null);
   const [killDeleteOption, setKillDeleteOption] = useState("delete");
@@ -503,6 +508,32 @@ const Downloads = () => {
           setCompletedGames(
             prev => new Set([...prev, ...newlyCompleted.map(g => g.game)])
           );
+
+          // Automatically create a desktop shortcut as soon as the download/install
+          // finishes, regardless of whether the game has ever been launched.
+          if (settingsRef.current.autoCreateShortcuts) {
+            newlyCompleted.forEach(async completedGame => {
+              try {
+                const executables = await window.electron.getGameExecutables(
+                  completedGame.game,
+                  false
+                );
+                const executable = executables?.[0];
+                if (!executable) return;
+                await window.electron.createGameShortcut({
+                  game: completedGame.game,
+                  name: completedGame.game,
+                  executable,
+                  custom: false,
+                });
+              } catch (error) {
+                console.error(
+                  `Failed to auto-create shortcut for ${completedGame.game}:`,
+                  error
+                );
+              }
+            });
+          }
 
           // Process next queued download when a game completes
           // This triggers immediately when the "Download Complete" card shows

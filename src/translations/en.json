@@ -2504,7 +2504,7 @@
     "ascendaraWorkshopDownloaderDescription": "The Workshop Downloader allows you to download items from the Steam Workshop without needing to have an account.",
     "ascendaraWorkshopDownloaderEnable": "Show in Navigation Bar",
     "autoCreateShortcuts": "Automatically Create Shortcuts",
-    "autoCreateShortcutsDescription": "Automatically create shortcuts on desktop for games that run successfully for the first time.",
+    "autoCreateShortcutsDescription": "Automatically create a desktop shortcut as soon as a game finishes downloading, whether or not it has been launched yet.",
     "behaviorAfterDownload": "Behavior After Download",
     "behaviorAfterDownloadDescription": "Choose what should happen to your computer after a download is finished.",
     "behaviors": {

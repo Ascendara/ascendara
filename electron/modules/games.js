@@ -629,17 +629,6 @@ function registerGameHandlers() {
             .catch(err => console.error(`Failed to fetch assets for ${game}:`, err));
         }
 
-        // Create shortcut on first launch
-        if (!isCustom) {
-          const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
-          const gameInfo = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
-          if (!gameInfo.hasBeenLaunched && settings.autoCreateShortcuts) {
-            await createGameShortcut({ game, name: game, executable, custom: false });
-            gameInfo.hasBeenLaunched = true;
-            fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 2));
-          }
-        }
-
         // Update Discord RPC
         const rpc = getRPC();
         if (rpc) {
