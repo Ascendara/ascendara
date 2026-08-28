@@ -697,12 +697,44 @@ function registerMiscHandlers() {
       const gameDirectory = path.join(settings.downloadDirectory, game);
 
       try {
+        // Never delete items that existed in this folder before Ascendara
+        // started downloading into it (e.g. a manual install with save
+        // data that happened to share the same folder name).
+        const preexistingMarkerPath = path.join(
+          gameDirectory,
+          "preexisting.ascendara.json"
+        );
+        let preexistingEntries = [];
+        if (fs.existsSync(preexistingMarkerPath)) {
+          try {
+            preexistingEntries = JSON.parse(
+              fs.readFileSync(preexistingMarkerPath, "utf8")
+            );
+          } catch (markerError) {
+            console.error(`Error reading pre-existing items marker: ${markerError}`);
+          }
+        }
+        const preexistingSet = new Set(preexistingEntries);
+
         const files = await fs.promises.readdir(gameDirectory, { withFileTypes: true });
         for (const file of files) {
+          if (preexistingSet.has(file.name)) {
+            continue;
+          }
           const fullPath = path.join(gameDirectory, file.name);
           await fs.promises.rm(fullPath, { recursive: true, force: true });
         }
-        await fs.promises.rmdir(gameDirectory);
+        if (fs.existsSync(preexistingMarkerPath)) {
+          await fs.promises.rm(preexistingMarkerPath, { force: true });
+        }
+        const remaining = await fs.promises.readdir(gameDirectory);
+        if (remaining.length === 0) {
+          await fs.promises.rmdir(gameDirectory);
+        } else {
+          console.log(
+            `Kept game directory because it still contains ${remaining.length} pre-existing item(s): ${gameDirectory}`
+          );
+        }
       } catch (error) {
         console.error("Error deleting the game directory:", error);
         throw error;

@@ -1067,12 +1067,6 @@ const Downloads = () => {
                 isResuming={resumingDownloads.has(game.game)}
                 isCompleted={completedGames.has(game.game)}
                 isFading={fadingGames.has(game.game)}
-                onDelete={deletedGame => {
-                  setDownloadingGames(prev =>
-                    prev.filter(g => g.game !== deletedGame.game)
-                  );
-                }}
-                onClearCache={clearCachedDownloadData}
               />
             ))}
           </div>
@@ -1368,12 +1362,9 @@ const DownloadCard = ({
   isResuming,
   isCompleted,
   isFading,
-  onDelete,
-  onClearCache,
 }) => {
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
   const [installerLaunched, setInstallerLaunched] = useState(false);
   const [isFinishingInstall, setIsFinishingInstall] = useState(false);
@@ -1597,14 +1588,6 @@ const DownloadCard = ({
     }
   };
 
-  const handleRemoveDownload = async game => {
-    setIsDeleting(true);
-    if (onClearCache) onClearCache(game.game);
-    await window.electron.deleteGameDirectory(game.game);
-    setIsDeleting(false);
-    if (onDelete) onDelete(game);
-  };
-
   // Check if this error was already reported
   const [wasReported, setWasReported] = useState(() => {
     try {
@@ -1796,7 +1779,7 @@ const DownloadCard = ({
                 size="icon"
                 className="h-9 w-9 rounded-xl hover:bg-muted/80"
               >
-                {isStopping || isDeleting ? (
+                {isStopping ? (
                   <Loader className="h-4 w-4 animate-spin" />
                 ) : (
                   <MoreVertical className="h-4 w-4" />
@@ -1811,11 +1794,11 @@ const DownloadCard = ({
                     {t("downloads.actions.resumeDownload")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => handleRemoveDownload(game)}
+                    onClick={() => onKill(game)}
                     className="gap-2 text-red-600 focus:text-red-600"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    {t("downloads.actions.cancelAndDelete")}
+                    <XCircle className="h-4 w-4" />
+                    {t("downloads.actions.killDownload")}
                   </DropdownMenuItem>
                 </>
               ) : hasError ? (
@@ -1825,11 +1808,11 @@ const DownloadCard = ({
                     {t("downloads.actions.retryDownload")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => handleRemoveDownload(game)}
+                    onClick={() => onKill(game)}
                     className="gap-2 text-red-600 focus:text-red-600"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    {t("downloads.actions.cancelAndDelete")}
+                    <XCircle className="h-4 w-4" />
+                    {t("downloads.actions.killDownload")}
                   </DropdownMenuItem>
                 </>
               ) : (
