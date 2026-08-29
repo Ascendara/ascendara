@@ -72,6 +72,8 @@ import {
   Trophy,
   Library,
   Heart,
+  Trash2,
+  FolderSync,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -361,6 +363,11 @@ export default function DownloadPage() {
   const [showReinstallWarning, setShowReinstallWarning] = useState(false);
   const [pendingReinstallUrl, setPendingReinstallUrl] = useState(null);
   const [showProviderBlockedDialog, setShowProviderBlockedDialog] = useState(false);
+  // Folder-name conflict: an existing directory with this game's name was
+  // found in the target games directory before starting a new download.
+  const [directoryConflict, setDirectoryConflict] = useState(null); // { path, sanitizedName, pendingArgs }
+  const [conflictStep, setConflictStep] = useState("choose"); // "choose" | "confirmDelete" | "confirmMerge"
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
 
   // Sync isFavorite when changed from elsewhere (e.g. Library favorites tab)
   useEffect(() => {
@@ -625,7 +632,56 @@ export default function DownloadPage() {
     }
   }
 
-  async function handleDownload(directUrl = null, dir = null, forceStart = false) {
+  // Resolve a detected folder-name conflict per the user's chosen action,
+  // then resume the download that was paused waiting for a decision.
+  async function resolveDirectoryConflict(action, { saveData = false } = {}) {
+    if (!directoryConflict) return;
+    const { pendingArgs, sanitizedName } = directoryConflict;
+
+    setIsResolvingConflict(true);
+    try {
+      if (action === "rename") {
+        const result = await window.electron.renameExistingGameDirectory(
+          gameData.game,
+          pendingArgs.dir || 0
+        );
+        if (!result?.success) {
+          toast.error(t("download.toast.renameFailed"));
+          return;
+        }
+        toast.success(t("download.toast.renamedExisting"));
+      } else if (action === "delete") {
+        if (saveData) {
+          await window.electron.saveDeletedGameData(sanitizedName);
+        }
+        await window.electron.deleteGame(sanitizedName);
+        toast.success(t("download.toast.deletedExisting"));
+      }
+      // "merge" requires no action here; the download will write into the
+      // existing folder, keeping any files that aren't overwritten.
+
+      setDirectoryConflict(null);
+      setConflictStep("choose");
+      await handleDownload(
+        pendingArgs.directUrl,
+        pendingArgs.dir,
+        pendingArgs.forceStart,
+        true
+      );
+    } catch (error) {
+      console.error("Failed to resolve directory conflict:", error);
+      toast.error(t("download.toast.conflictResolveFailed"));
+    } finally {
+      setIsResolvingConflict(false);
+    }
+  }
+
+  async function handleDownload(
+    directUrl = null,
+    dir = null,
+    forceStart = false,
+    skipConflictCheck = false
+  ) {
     const sanitizedGameName = sanitizeText(gameData.game);
     console.log("[DL] handleDownload called", {
       directUrl,
@@ -653,6 +709,30 @@ export default function DownloadPage() {
       console.error("No game data available");
       toast.error(t("download.toast.noGameData"));
       return;
+    }
+
+    // Scan the target games directory for a folder that already has this
+    // game's name (e.g. a leftover install) before starting a fresh
+    // download. Skipped for update flows, which intentionally reuse the
+    // existing folder, and once the user has already resolved a conflict.
+    if (!skipConflictCheck && !gameData.isUpdating) {
+      try {
+        const conflict = await window.electron.checkGameDirectoryConflict(
+          gameData.game,
+          dir || 0
+        );
+        if (conflict?.exists) {
+          setConflictStep("choose");
+          setDirectoryConflict({
+            path: conflict.path,
+            sanitizedName: conflict.sanitizedName,
+            pendingArgs: { directUrl, dir, forceStart },
+          });
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking game directory conflict:", error);
+      }
     }
 
     // Check if there's an active download
@@ -2016,6 +2096,134 @@ export default function DownloadPage() {
             >
               {t("download.reinstallWarning.continueAnyway") || "Reinstall Anyway"}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!directoryConflict}
+        onOpenChange={open => {
+          if (!open && !isResolvingConflict) {
+            setDirectoryConflict(null);
+            setConflictStep("choose");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <TriangleAlert className="h-5 w-5 text-yellow-500" />
+              {conflictStep === "confirmMerge"
+                ? t("download.directoryConflict.confirmMergeTitle")
+                : t("download.directoryConflict.title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {conflictStep === "confirmDelete"
+                ? t("library.saveGameDataDescription", { game: gameData?.game })
+                : conflictStep === "confirmMerge"
+                  ? t("download.directoryConflict.confirmMergeDesc")
+                  : t("download.directoryConflict.desc", {
+                      folder: directoryConflict?.sanitizedName,
+                    })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {conflictStep === "choose" && (
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className="h-auto flex-col items-start gap-1 py-2 text-left"
+                disabled={isResolvingConflict}
+                onClick={() => resolveDirectoryConflict("rename")}
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <FolderSync className="h-4 w-4" />
+                  {t("download.directoryConflict.rename")}
+                </span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {t("download.directoryConflict.renameDesc")}
+                </span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto flex-col items-start gap-1 py-2 text-left"
+                disabled={isResolvingConflict}
+                onClick={() => setConflictStep("confirmDelete")}
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <Trash2 className="h-4 w-4" />
+                  {t("download.directoryConflict.delete")}
+                </span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {t("download.directoryConflict.deleteDesc")}
+                </span>
+              </Button>
+              <Button
+                variant="destructive"
+                className="h-auto flex-col items-start gap-1 py-2 text-left text-foreground"
+                disabled={isResolvingConflict}
+                onClick={() => setConflictStep("confirmMerge")}
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <TriangleAlert className="h-4 w-4" />
+                  {t("download.directoryConflict.merge")}
+                </span>
+                <span className="text-xs font-normal">
+                  {t("download.directoryConflict.mergeDesc")}
+                </span>
+              </Button>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            {conflictStep !== "choose" && (
+              <Button
+                variant="outline"
+                disabled={isResolvingConflict}
+                onClick={() => setConflictStep("choose")}
+              >
+                {t("common.back") || "Back"}
+              </Button>
+            )}
+            <AlertDialogCancel
+              disabled={isResolvingConflict}
+              onClick={() => {
+                setDirectoryConflict(null);
+                setConflictStep("choose");
+              }}
+            >
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            {conflictStep === "confirmDelete" && (
+              <>
+                <Button
+                  variant="outline"
+                  className="text-primary"
+                  disabled={isResolvingConflict}
+                  onClick={() => resolveDirectoryConflict("delete", { saveData: false })}
+                >
+                  {t("library.saveGameDataNo")}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="text-foreground"
+                  disabled={isResolvingConflict}
+                  onClick={() => resolveDirectoryConflict("delete", { saveData: true })}
+                >
+                  {t("library.saveGameDataYes")}
+                </Button>
+              </>
+            )}
+            {conflictStep === "confirmMerge" && (
+              <Button
+                variant="destructive"
+                className="text-foreground"
+                disabled={isResolvingConflict}
+                onClick={() => resolveDirectoryConflict("merge")}
+              >
+                {t("download.directoryConflict.confirmMerge")}
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -10,7 +10,7 @@ const axios = require("axios");
 const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, app, BrowserWindow } = require("electron");
 const { isDev, isWindows, isLinux, appDirectory, linuxUmuBin, getPythonPath } = require("./config");
-const { sanitizeGameName, getExtensionFromMimeType, shouldLogError } = require("./utils");
+const { sanitizeGameName, sanitizeText, getExtensionFromMimeType, shouldLogError } = require("./utils");
 const { getSettingsManager } = require("./settings");
 const {
   setPlayingActivity,
@@ -820,6 +820,69 @@ function registerGameHandlers() {
       return { success: true };
     } catch (error) {
       console.error("Error discarding deleted game data:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Resolve which download directory a game would be placed into, mirroring
+  // the logic used by the download-file handler in downloads.js
+  function resolveTargetDirectory(settings, additionalDirIndex) {
+    if (!additionalDirIndex) {
+      return settings.downloadDirectory;
+    }
+    const additionalDirectories = settings.additionalDirectories || [];
+    return additionalDirectories[additionalDirIndex - 1] || settings.downloadDirectory;
+  }
+
+  // Check whether a folder with this game's name already exists in the
+  // directory a new download would be placed into (name collision check).
+  ipcMain.handle("check-game-directory-conflict", async (_, game, additionalDirIndex) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory) return { exists: false };
+
+      const sanitizedGame = sanitizeGameName(sanitizeText(game));
+      const targetDirectory = resolveTargetDirectory(settings, additionalDirIndex);
+      const gameDirectory = path.join(targetDirectory, sanitizedGame);
+
+      return {
+        exists: fs.existsSync(gameDirectory),
+        path: gameDirectory,
+        sanitizedName: sanitizedGame,
+      };
+    } catch (error) {
+      console.error("Error checking game directory conflict:", error);
+      return { exists: false, error: error.message };
+    }
+  });
+
+  // Rename an existing conflicting game folder out of the way (e.g. "_OLD")
+  // so a fresh download can use the original folder name.
+  ipcMain.handle("rename-existing-game-directory", async (_, game, additionalDirIndex) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory) return { success: false };
+
+      const sanitizedGame = sanitizeGameName(sanitizeText(game));
+      const targetDirectory = resolveTargetDirectory(settings, additionalDirIndex);
+      const gameDirectory = path.join(targetDirectory, sanitizedGame);
+
+      if (!fs.existsSync(gameDirectory)) {
+        return { success: true, skipped: true };
+      }
+
+      let newPath = `${gameDirectory}_OLD`;
+      let counter = 1;
+      while (fs.existsSync(newPath)) {
+        newPath = `${gameDirectory}_OLD${counter}`;
+        counter++;
+      }
+
+      fs.renameSync(gameDirectory, newPath);
+      console.log(`Renamed existing game directory: ${gameDirectory} -> ${newPath}`);
+      return { success: true, newPath };
+    } catch (error) {
+      console.error("Error renaming existing game directory:", error);
       return { success: false, error: error.message };
     }
   });

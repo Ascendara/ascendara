@@ -286,6 +286,10 @@ contextBridge.exposeInMainWorld("electron", {
   restoreDeletedGameData: game => ipcRenderer.invoke("restore-deleted-game-data", game),
   discardDeletedGameData: game => ipcRenderer.invoke("discard-deleted-game-data", game),
   deleteGameDirectory: game => ipcRenderer.invoke("delete-game-directory", game),
+  checkGameDirectoryConflict: (game, additionalDirIndex) =>
+    ipcRenderer.invoke("check-game-directory-conflict", game, additionalDirIndex),
+  renameExistingGameDirectory: (game, additionalDirIndex) =>
+    ipcRenderer.invoke("rename-existing-game-directory", game, additionalDirIndex),
   verifyGame: game => ipcRenderer.invoke("verify-game", game),
   importSteamGames: directory => ipcRenderer.invoke("import-steam-games", directory),
 
