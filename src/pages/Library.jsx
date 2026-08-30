@@ -60,6 +60,9 @@ import {
   Download,
   History,
   RotateCcw,
+  CheckCircle2,
+  PlayCircle,
+  Bookmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -100,6 +103,7 @@ import { getDownloadQueue } from "@/services/downloadQueueService";
 
 import NewFolderDialog from "@/components/NewFolderDialog";
 import FolderCard from "@/components/FolderCard";
+import EditCoverDialog from "@/components/EditCoverDialog";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
@@ -259,6 +263,12 @@ const Library = () => {
     const saved = localStorage.getItem("game-ratings");
     return saved ? JSON.parse(saved) : {};
   });
+  // Personal collection status (Completed / Playing / Backlog) shown as a badge
+  // on Favorites Gallery cards. Stored locally only, like ratings.
+  const [gameStatuses, setGameStatuses] = useState(() => {
+    const saved = localStorage.getItem("game-status");
+    return saved ? JSON.parse(saved) : {};
+  });
   const [favGallerySortMode, setFavGallerySortMode] = useState(() => localStorage.getItem("fav-gallery-sort") || "rating");
   const [favGalleryGenreFilter, setFavGalleryGenreFilter] = useState("all");
   const [totalGamesSize, setTotalGamesSize] = useState(0);
@@ -342,6 +352,22 @@ const Library = () => {
 
   const setGameRating = (gameName, rating) => {
     setGameRatings(prev => ({ ...prev, [gameName]: rating }));
+  };
+
+  useEffect(() => {
+    safeSetItem("game-status", JSON.stringify(gameStatuses));
+  }, [gameStatuses]);
+
+  const setGameStatus = (gameName, status) => {
+    setGameStatuses(prev => {
+      const next = { ...prev };
+      if (!status) {
+        delete next[gameName];
+      } else {
+        next[gameName] = status;
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -2117,12 +2143,24 @@ const Library = () => {
             const favMeta = JSON.parse(localStorage.getItem("game-favorites-meta") || "{}");
             const uninstalledFavStubs = favorites
               .filter(name => !installedFavNames.has(name))
-              .map(name => ({
-                game: name,
-                name,
-                _isStub: true,
-                ...(favMeta[name] || {}),
-              }));
+              .map(name => {
+                const meta = favMeta[name] || {};
+                // If this game was uninstalled with "save data" chosen, its stats
+                // live on in the History stub — merge them in so playtime doesn't
+                // appear lost in the Favorites gallery.
+                const historyStub = deletedGames.find(g => (g.game || g.name) === name);
+                return {
+                  game: name,
+                  name,
+                  _isStub: true,
+                  ...meta,
+                  ...(historyStub && {
+                    playTime: historyStub.playTime || meta.playTime || 0,
+                    lastPlayed: historyStub.lastPlayed || meta.lastPlayed || null,
+                    launchCount: historyStub.launchCount || meta.launchCount || 0,
+                  }),
+                };
+              });
             const favGames = [
               ...games.filter(g => !g.isFolder && favorites.includes(g.game || g.name)),
               ...uninstalledFavStubs,
@@ -2275,6 +2313,8 @@ const Library = () => {
                         game={game}
                         rating={gameRatings[game.game || game.name] || 0}
                         onRate={rating => setGameRating(game.game || game.name, rating)}
+                        status={gameStatuses[game.game || game.name] || null}
+                        onSetStatus={status => setGameStatus(game.game || game.name, status)}
                         onPlay={() => !game._isStub && handlePlayGame(game)}
                         onDownload={game._isStub ? async () => {
                           // Look up full game data from local index so the Download page
@@ -2635,7 +2675,13 @@ const StarRating = ({ value, onChange, size = "sm" }) => {
   );
 };
 
-const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, onUnfavorite }) => {
+const STATUS_META = {
+  completed: { icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/90" },
+  playing: { icon: PlayCircle, color: "text-blue-400", bg: "bg-blue-500/90" },
+  backlog: { icon: Bookmark, color: "text-amber-400", bg: "bg-amber-500/90" },
+};
+
+const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, onPlay, onDownload, onUnfavorite }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [imageData, setImageData] = useState(() => gameImageCache.get(game.game || game.name) ?? null);
@@ -2647,12 +2693,13 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, o
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
+  const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
 
   const handleContextMenu = e => {
     e.preventDefault();
     e.stopPropagation();
     const menuWidth = 240;
-    const menuHeight = 200;
+    const menuHeight = 380;
     let x = e.clientX;
     let y = e.clientY;
     if (x + menuWidth > window.innerWidth) x = Math.max(0, window.innerWidth - menuWidth);
@@ -2704,12 +2751,31 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, o
   useEffect(() => {
     let cancelled = false;
     const gameId = game.game || game.name;
-    if (gameImageCache.has(gameId)) {
-      setImageData(gameImageCache.get(gameId));
-      return;
-    }
-    (async () => {
-      // Stub (uninstalled): use imageCacheService by imgID, then SteamGridDB by name
+
+    const loadImage = async () => {
+      if (gameImageCache.has(gameId)) {
+        setImageData(gameImageCache.get(gameId));
+        return;
+      }
+      // Custom/installed cover lookup works regardless of install status:
+      // installed games resolve via their game folder, while any game
+      // (including uninstalled favorites) can have a cover saved to the
+      // shared "games" cover folder via the Change Cover dialog.
+      try {
+        const base64 =
+          (await window.electron.getGameImage(gameId, "grid")) ||
+          (await window.electron.getGameImage(gameId, "hero")) ||
+          (await window.electron.getGameImage(gameId));
+        if (!cancelled && base64) {
+          const dataUrl = `data:image/jpeg;base64,${base64}`;
+          gameImageCache.set(gameId, dataUrl);
+          setImageData(dataUrl);
+          return;
+        }
+      } catch { /* fall through */ }
+
+      // Stub (uninstalled, no custom cover set yet): use imageCacheService by
+      // imgID, then SteamGridDB by name
       if (game._isStub) {
         if (game.imgID) {
           try {
@@ -2733,22 +2799,25 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, o
             }
           } catch { /* silent */ }
         }
-        return;
       }
-      // Installed game: prefer portrait grid image for 2:3 card layout
-      try {
-        const base64 =
-          (await window.electron.getGameImage(gameId, "grid")) ||
-          (await window.electron.getGameImage(gameId, "hero")) ||
-          (await window.electron.getGameImage(gameId));
-        if (!cancelled && base64) {
-          const dataUrl = `data:image/jpeg;base64,${base64}`;
-          gameImageCache.set(gameId, dataUrl);
-          setImageData(dataUrl);
-        }
-      } catch { /* silent */ }
-    })();
-    return () => { cancelled = true; };
+    };
+
+    loadImage();
+
+    // Reflect cover changes made via the Change Cover dialog immediately
+    const handleCoverUpdate = event => {
+      const { gameName, dataUrl } = event.detail || {};
+      if (gameName === gameId && dataUrl && !cancelled) {
+        gameImageCache.set(gameId, dataUrl);
+        setImageData(dataUrl);
+      }
+    };
+    window.addEventListener("game-cover-updated", handleCoverUpdate);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("game-cover-updated", handleCoverUpdate);
+    };
   }, [game.game, game.name, game._isStub, game.imgID]);
 
   const formatPlaytime = secs => {
@@ -2784,6 +2853,17 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, o
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+    {/* Change Cover Dialog — works for installed games and uninstalled favorites alike */}
+    <EditCoverDialog
+      open={showEditCoverDialog}
+      onOpenChange={setShowEditCoverDialog}
+      gameName={gameName}
+      onImageUpdate={dataUrl => {
+        gameImageCache.set(gameName, dataUrl);
+        setImageData(dataUrl);
+      }}
+    />
 
     {/* Delete confirmation */}
     <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -2875,6 +2955,56 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, o
                 </button>
               )}
               <button
+                onClick={() => { setContextMenuOpen(false); setShowEditCoverDialog(true); }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                  <ImageUp className="h-4 w-4 text-foreground" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-foreground">{t("library.changeCoverImage") || "Change Cover Image"}</div>
+                  <div className="text-xs text-muted-foreground">{t("library.searchForCoverImage") || "Search for a cover image to replace the current one"}</div>
+                </div>
+              </button>
+
+              <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+              {/* Personal collection status */}
+              <div className="px-3 pb-1 pt-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("library.favoritesGallery.status.label") || "Status"}
+              </div>
+              {["completed", "playing", "backlog"].map(key => {
+                const meta = STATUS_META[key];
+                const StatusIcon = meta.icon;
+                const isActive = status === key;
+                const labels = {
+                  completed: t("library.favoritesGallery.status.completed") || "Completed",
+                  playing: t("library.favoritesGallery.status.playing") || "Playing",
+                  backlog: t("library.favoritesGallery.status.backlog") || "Backlog",
+                };
+                return (
+                  <button
+                    key={key}
+                    onClick={() => { setContextMenuOpen(false); onSetStatus(isActive ? null : key); }}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5",
+                      isActive && "bg-accent/50"
+                    )}
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                      <StatusIcon className={cn("h-4 w-4", meta.color)} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground">{labels[key]}</div>
+                    </div>
+                    {isActive && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                  </button>
+                );
+              })}
+
+              <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+              <button
                 onClick={() => { setContextMenuOpen(false); onUnfavorite(); }}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
               >
@@ -2942,6 +3072,28 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, o
             </div>
           )}
 
+          {/* Status badge top-right (Completed / Playing / Backlog) */}
+          {status && STATUS_META[status] && (() => {
+            const StatusIcon = STATUS_META[status].icon;
+            const labels = {
+              completed: t("library.favoritesGallery.status.completed") || "Completed",
+              playing: t("library.favoritesGallery.status.playing") || "Playing",
+              backlog: t("library.favoritesGallery.status.backlog") || "Backlog",
+            };
+            return (
+              <div
+                className={cn(
+                  "absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white shadow backdrop-blur-sm",
+                  STATUS_META[status].bg
+                )}
+                title={labels[status]}
+              >
+                <StatusIcon className="h-3 w-3" />
+                <span className="hidden sm:inline">{labels[status]}</span>
+              </div>
+            );
+          })()}
+
           {/* Hover overlay */}
           <div className={cn(
             "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-3 transition-opacity duration-200",
@@ -2958,8 +3110,9 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, onPlay, onDownload, o
               </div>
             )}
 
-            {/* Playtime row — hidden for uninstalled stubs */}
-            {!game._isStub && (
+            {/* Playtime row — shown whenever we have playtime data, even for
+                uninstalled favorites whose stats were preserved via History */}
+            {(!game._isStub || game.playTime > 0) && (
               <div className="mb-2 flex items-center gap-1.5 text-xs text-white/70">
                 <Clock className="h-3 w-3 shrink-0" />
                 <span>{formatPlaytime(game.playTime)}</span>

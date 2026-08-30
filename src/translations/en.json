@@ -1982,6 +1982,12 @@
       "empty": "No favorites yet",
       "emptyHint": "Hover over a game and click the heart icon to add it here.",
       "removeFromFavorites": "Remove from favorites",
+      "status": {
+        "label": "Status",
+        "completed": "Completed",
+        "playing": "Playing",
+        "backlog": "Backlog"
+      },
       "ratingDisclaimer": {
         "title": "Personal Rating",
         "description": "This rating is stored locally on your device only. It's purely personal and is never shared, posted, or submitted anywhere."
