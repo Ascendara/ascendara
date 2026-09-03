@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -328,6 +329,53 @@ const Library = () => {
   const [friendsLoaded, setFriendsLoaded] = useState(false);
   const [showRedesignDialog, setShowRedesignDialog] = useState(false);
   const [addGameRestoreEntry, setAddGameRestoreEntry] = useState(null); // {gameName, stub}
+  // OS file drag-and-drop → quick "add custom game" flow
+  const [isDraggingExeFile, setIsDraggingExeFile] = useState(false);
+  const [droppedExecutablePath, setDroppedExecutablePath] = useState(null);
+  const dropZoneCounterRef = useRef(0);
+
+  const handleLibraryDragEnter = useCallback(e => {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+    dropZoneCounterRef.current += 1;
+    setIsDraggingExeFile(true);
+  }, []);
+
+  const handleLibraryDragOver = useCallback(e => {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+  }, []);
+
+  const handleLibraryDragLeave = useCallback(e => {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+    dropZoneCounterRef.current = Math.max(0, dropZoneCounterRef.current - 1);
+    if (dropZoneCounterRef.current === 0) setIsDraggingExeFile(false);
+  }, []);
+
+  const handleLibraryDrop = useCallback(e => {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+    dropZoneCounterRef.current = 0;
+    setIsDraggingExeFile(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (!file.name?.toLowerCase().endsWith(".exe")) {
+      toast.error(t("library.addGame.dropInvalidFile"));
+      return;
+    }
+
+    try {
+      const filePath = window.electron.getPathForFile(file);
+      if (!filePath) return;
+      setDroppedExecutablePath(filePath);
+      setIsAddGameOpen(true);
+    } catch (error) {
+      console.error("Failed to resolve dropped file path:", error);
+    }
+  }, [t]);
 
   useEffect(() => {
     safeSetItem("game-favorites", JSON.stringify(favorites));
@@ -1396,7 +1444,13 @@ const Library = () => {
   ].filter(tab => !tab.hidden);
 
   return (
-    <div className="fixed inset-0 top-[60px] flex overflow-hidden bg-background">
+    <div
+      className="fixed inset-0 top-[60px] flex overflow-hidden bg-background"
+      onDragEnter={handleLibraryDragEnter}
+      onDragOver={handleLibraryDragOver}
+      onDragLeave={handleLibraryDragLeave}
+      onDrop={handleLibraryDrop}
+    >
       {/* ── Left Sidebar ─────────────────────────────────────────── */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border/30 shadow-[1px_0_0_0_hsl(var(--border)/0.15)]">
 
@@ -1580,7 +1634,14 @@ const Library = () => {
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Manage</p>
 
           <TooltipProvider>
-            <AlertDialog key="add-game-dialog" open={isAddGameOpen} onOpenChange={setIsAddGameOpen}>
+            <AlertDialog
+              key="add-game-dialog"
+              open={isAddGameOpen}
+              onOpenChange={open => {
+                setIsAddGameOpen(open);
+                if (!open) setDroppedExecutablePath(null);
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
@@ -1600,9 +1661,11 @@ const Library = () => {
                 </AlertDialogHeader>
                 <div className="max-h-[60vh] overflow-y-auto py-4">
                   <AddGameForm
+                    initialExecutablePath={droppedExecutablePath}
                     onRestorePrompt={entry => setAddGameRestoreEntry(entry)}
                     onSuccess={() => {
                       setIsAddGameOpen(false);
+                      setDroppedExecutablePath(null);
                       setSelectedGameImage(null);
                       loadGames();
                     }}
@@ -2615,6 +2678,43 @@ const Library = () => {
           </AlertDialog>
         );
       })()}
+
+      {/* ── Drag & drop overlay: dropping an .exe adds it as a custom game ── */}
+      <AnimatePresence>
+        {isDraggingExeFile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center bg-background/70 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-primary/60 bg-card/80 px-16 py-14 shadow-2xl"
+            >
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary"
+              >
+                <FolderPlus className="h-8 w-8" />
+              </motion.div>
+              <div className="space-y-1 text-center">
+                <p className="text-lg font-semibold text-foreground">
+                  {t("library.addGame.dropTitle")}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {t("library.addGame.dropDescription")}
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -4496,7 +4596,7 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
 
 DeletedGameCard.displayName = "DeletedGameCard";
 
-const AddGameForm = ({ onSuccess, onRestorePrompt }) => {
+const AddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -4666,20 +4766,32 @@ const AddGameForm = ({ onSuccess, onRestorePrompt }) => {
     }, 300); // 300ms debounce
   };
 
+  // Shared by manual file picking and OS drag-and-drop of an .exe onto the library
+  const applyExecutablePath = filePath => {
+    const gameName = filePath.split("\\").pop().replace(/\.exe$/i, "");
+    setFormData(prev => ({
+      ...prev,
+      executable: filePath,
+      name: gameName,
+    }));
+
+    // Automatically search for game cover using Steam API
+    if (gameName) {
+      handleCoverSearch(gameName);
+    }
+  };
+
+  // Prefill the form when a .exe was dropped onto the library page
+  useEffect(() => {
+    if (initialExecutablePath) {
+      applyExecutablePath(initialExecutablePath);
+    }
+  }, [initialExecutablePath]);
+
   const handleChooseExecutable = async () => {
     const file = await window.electron.openFileDialog();
     if (file) {
-      const gameName = file.split("\\").pop().replace(".exe", "");
-      setFormData(prev => ({
-        ...prev,
-        executable: file,
-        name: gameName,
-      }));
-
-      // Automatically search for game cover using Steam API
-      if (gameName) {
-        handleCoverSearch(gameName);
-      }
+      applyExecutablePath(file);
     }
   };
 

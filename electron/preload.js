@@ -11,7 +11,7 @@
 // Learn more about Developing Ascendara at https://ascendara.app/docs/developer/overview
 //=============================================================================
 
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const { createPreloadIpcTransport } = require("./modules/preload-bridge");
 
 // Keep listener wrappers private so the page never receives Electron event objects.
@@ -440,6 +440,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("open-game-directory", game, isCustom),
   openDirectoryDialog: () => ipcRenderer.invoke("open-directory-dialog"),
   openFileDialog: (exePath = null) => ipcRenderer.invoke("open-file-dialog", exePath),
+  // Resolves the absolute filesystem path for a File dragged into the app from the OS.
+  getPathForFile: file => webUtils.getPathForFile(file),
   canCreateFiles: directory => ipcRenderer.invoke("can-create-files", directory),
   checkFileExists: filePath => ipcRenderer.invoke("check-file-exists", filePath),
   getDriveSpace: path => ipcRenderer.invoke("get-drive-space", path),
