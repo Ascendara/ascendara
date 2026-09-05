@@ -97,6 +97,8 @@
     "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.24",
+    "baseline-browser-mapping": "^2.11.21",
+    "caniuse-lite": "^1.0.30001810",
     "concurrently": "^9.2.1",
     "electron": "^40.6.0",
     "electron-builder": "^26.8.1",
