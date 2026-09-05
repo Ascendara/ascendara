@@ -165,6 +165,12 @@ function registerMiscHandlers() {
         webPreferences: {
           contextIsolation: true,
           nativeWindowOpen: false,
+          // Disable sandbox for Linux compatibility (same as main window)
+          sandbox: false,
+          // Disable web security to allow CORS requests (same as main window)
+          webSecurity: false,
+          // Prevent rendering stalls when the window is idle or in the background
+          backgroundThrottling: false,
         },
       });
 
