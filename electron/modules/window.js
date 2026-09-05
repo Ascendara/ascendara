@@ -63,26 +63,56 @@ function createWindow() {
   // When launched at login with "start minimized" enabled, the app is started
   // with a `--hidden` argument (set via app.setLoginItemSettings' `args`
   // option in settings.js) so we keep the window hidden instead of showing it.
+  let windowShown = false;
   mainWindow.once("ready-to-show", () => {
+    console.log("ready-to-show event fired");
+    windowShown = true;
     const shouldStartHidden = process.argv.includes("--hidden");
 
     if (shouldStartHidden) {
       mainWindowHidden = true;
+      console.log("Window kept hidden due to --hidden flag");
     } else {
       mainWindow.show();
       mainWindowHidden = false;
+      console.log("Window shown via ready-to-show event");
     }
   });
+
+  // Fallback for Linux: if ready-to-show doesn't fire within 3 seconds, show the window anyway
+  // This handles cases where the event might not fire properly on some Linux configurations
+  if (process.platform === "linux") {
+    setTimeout(() => {
+      if (!windowShown && !process.argv.includes("--hidden")) {
+        console.log("ready-to-show timeout - forcing window show on Linux");
+        mainWindow.show();
+        mainWindowHidden = false;
+      }
+    }, 3000);
+  }
 
   // Adding hash to URL
   const urlSuffix = startInBigPicture ? "#/bigpicture" : "";
 
-  if (isDev) {
-    // Load from localhost:5173 in development
-    mainWindow.loadURL("http://localhost:5173" + urlSuffix);
-  } else {
-    mainWindow.loadURL("http://localhost:46859" + urlSuffix);
-  }
+  const targetUrl = isDev 
+    ? "http://localhost:5173" + urlSuffix 
+    : "http://localhost:46859" + urlSuffix;
+  
+  console.log(`Loading window from: ${targetUrl}`);
+  mainWindow.loadURL(targetUrl);
+
+  // Add load event listeners for debugging
+  mainWindow.webContents.on("did-start-loading", () => {
+    console.log("Window started loading");
+  });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    console.log("Window finished loading");
+  });
+
+  mainWindow.webContents.on("dom-ready", () => {
+    console.log("Window DOM ready");
+  });
 
   // Handle load failures (e.g., local server not running)
   mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
