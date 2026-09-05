@@ -25,6 +25,7 @@ import logging
 import random
 import re
 import atexit
+import ctypes
 import subprocess
 import zipfile
 from tempfile import NamedTemporaryFile
@@ -369,6 +370,8 @@ class ChunkedDownloader:
         self.session_downloaded_bytes = 0  # Track bytes downloaded in current session only
         self.start_time = time.time()
         self.last_progress_update = 0
+        self.stopped = False  # Set when the user cancels the download
+        self.last_error: Optional[str] = None  # Last network/server error for reporting
         # Load speed limit from settings (KB/s -> bytes/s, 0 = unlimited)
         settings = load_settings()
         self._speed_limit_bytes = int(settings.get('downloadLimit', 0)) * 1024
@@ -377,54 +380,48 @@ class ChunkedDownloader:
     def _probe_server(self) -> bool:
         """Probe server for file size and range support."""
         try:
-            # Try HEAD request first
-            response = self.session.head(self.url, allow_redirects=True, timeout=30)
-            
-            # Check Accept-Ranges header
-            self.supports_range = response.headers.get('Accept-Ranges', '').lower() == 'bytes'
-            
-            if 'Content-Length' in response.headers:
-                self.total_size = int(response.headers['Content-Length'])
-            
-            # If HEAD didn't give us size or returned 405, try GET with Range header
-            if response.status_code == 405 or self.total_size is None:
+            # Try HEAD request first. Many hosts reject HEAD (403/405) or omit
+            # Accept-Ranges on it, so failures here are non-fatal.
+            try:
+                response = self.session.head(self.url, allow_redirects=True, timeout=30)
+                if response.ok:
+                    self.supports_range = response.headers.get('Accept-Ranges', '').lower() == 'bytes'
+                    if 'Content-Length' in response.headers:
+                        self.total_size = int(response.headers['Content-Length'])
+                else:
+                    logging.info(f"[ChunkedDownloader] HEAD returned {response.status_code}, falling back to GET probe")
+                response.close()
+            except Exception as e:
+                logging.info(f"[ChunkedDownloader] HEAD probe failed ({e}), falling back to GET probe")
+
+            # Verify range support with a real Range request. Accept-Ranges is
+            # frequently missing even when the host honours Range, and the old
+            # code treated that as "no resume", which made every hiccup fatal.
+            if not self.supports_range or self.total_size is None:
                 try:
                     range_response = self.session.get(
-                        self.url, 
-                        stream=True, 
-                        headers={"Range": "bytes=0-0"}, 
+                        self.url,
+                        stream=True,
+                        headers={"Range": "bytes=0-0"},
                         timeout=30
                     )
-                    
-                    if 'Content-Range' in range_response.headers:
-                        # Parse total size from Content-Range: bytes 0-0/total
-                        content_range = range_response.headers['Content-Range']
-                        if '/' in content_range:
-                            total_str = content_range.split('/')[-1]
-                            if total_str != '*':
-                                self.total_size = int(total_str)
-                                self.supports_range = True
-                    elif 'Content-Length' in range_response.headers and self.total_size is None:
-                        if range_response.status_code == 200:
+                    content_range = range_response.headers.get('Content-Range', '')
+                    if range_response.status_code == 206 and '/' in content_range:
+                        total_str = content_range.split('/')[-1]
+                        if total_str != '*':
+                            self.total_size = int(total_str)
+                        self.supports_range = True
+                    elif range_response.status_code == 200:
+                        self.supports_range = False
+                        if 'Content-Length' in range_response.headers:
                             self.total_size = int(range_response.headers['Content-Length'])
-                    
                     range_response.close()
                 except Exception as e:
                     logging.warning(f"[ChunkedDownloader] Range probe failed: {e}")
-            
-            # Last resort: start a streaming GET and check content-length
-            if self.total_size is None:
-                try:
-                    stream_response = self.session.get(self.url, stream=True, timeout=30)
-                    if 'Content-Length' in stream_response.headers:
-                        self.total_size = int(stream_response.headers['Content-Length'])
-                    stream_response.close()
-                except Exception as e:
-                    logging.warning(f"[ChunkedDownloader] Stream probe failed: {e}")
-            
+
             logging.info(f"[ChunkedDownloader] Server probe: size={read_size(self.total_size) if self.total_size else 'unknown'}, range_support={self.supports_range}")
             return True
-            
+
         except Exception as e:
             logging.warning(f"[ChunkedDownloader] Server probe failed: {e}")
             return False
@@ -448,15 +445,16 @@ class ChunkedDownloader:
 
     def _update_progress(self, force: bool = False):
         """Update progress in game info file."""
-        # Check if download has been stopped
-        if self._check_for_stop():
-            logging.info("[ChunkedDownloader] Download stopped by user")
-            raise InterruptedError("Download stopped by user")
-        
         now = time.time()
         if not force and (now - self.last_progress_update) < self.PROGRESS_UPDATE_INTERVAL:
             return
-        
+
+        # Check for a user stop only on the throttled path; reading and parsing
+        # the JSON file on every network chunk was a significant slowdown.
+        if self._check_for_stop():
+            logging.info("[ChunkedDownloader] Download stopped by user")
+            raise InterruptedError("Download stopped by user")
+
         self.last_progress_update = now
         elapsed = now - self.start_time
         
@@ -503,8 +501,9 @@ class ChunkedDownloader:
     def _stream_download(self, start_byte: int, file_handle):
         """
         Stream download from start_byte, writing directly to file.
-        Returns True if completed successfully, False if interrupted, or "restart"
-        if the local partial file must be discarded.
+        Returns True if completed successfully, False if interrupted, "restart"
+        if the local partial file must be discarded, or "fatal" if the server
+        rejected the request in a way that retrying cannot fix.
         """
         headers = {}
         is_resume = start_byte > 0 and self.supports_range
@@ -535,7 +534,16 @@ class ChunkedDownloader:
                     f"got {response.status_code}; restarting instead of appending."
                 )
                 response.close()
+                # The host clearly does not honour Range; stop pretending it does.
+                self.supports_range = False
                 return "restart"
+
+            if 400 <= response.status_code < 500 and response.status_code not in (408, 429):
+                # Expired token, dead link, blocked etc. Retrying won't help.
+                self.last_error = f"HTTP {response.status_code} {response.reason} from {response.url}"
+                logging.error(f"[ChunkedDownloader] Server rejected download: {self.last_error}")
+                response.close()
+                return "fatal"
 
             response.raise_for_status()
 
@@ -583,7 +591,10 @@ class ChunkedDownloader:
                 pass
             return True
 
+        except InterruptedError:
+            raise
         except Exception as e:
+            self.last_error = str(e)
             logging.warning(f"[ChunkedDownloader] Stream interrupted at {read_size(self.downloaded_bytes)}: {e}")
             return False
 
@@ -625,35 +636,46 @@ class ChunkedDownloader:
             retry_count = 0
             retry_delay = self.RETRY_DELAY_BASE
 
+            def _discard_partial():
+                try:
+                    if os.path.exists(self.dest_path):
+                        os.remove(self.dest_path)
+                except Exception as e:
+                    logging.warning(f"[ChunkedDownloader] Could not delete invalid partial: {e}")
+                self.downloaded_bytes = 0
+                self.session_downloaded_bytes = 0
+                self.start_time = time.time()
+
+            def _backoff_and_reconnect():
+                nonlocal retry_count, retry_delay
+                retry_count += 1
+                self.game_info["downloadingData"]["retryAttempt"] = retry_count
+                safe_write_json(self.game_info_path, self.game_info)
+                logging.info(
+                    f"[ChunkedDownloader] Retry {retry_count}/{self.MAX_RETRIES} in {retry_delay:.0f}s, "
+                    f"resuming from {read_size(self.downloaded_bytes)}"
+                )
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 1.5, self.RETRY_DELAY_MAX)
+                self.session.close()
+                self.session = create_robust_session()
+
             while retry_count < self.MAX_RETRIES:
                 mode = 'ab' if self.downloaded_bytes > 0 else 'wb'
 
                 with open(self.dest_path, mode) as f:
                     stream_result = self._stream_download(self.downloaded_bytes, f)
 
+                if stream_result == "fatal":
+                    return False
+
                 if stream_result == "restart":
-                    try:
-                        if os.path.exists(self.dest_path):
-                            os.remove(self.dest_path)
-                    except Exception as e:
-                        logging.warning(f"[ChunkedDownloader] Could not delete invalid partial: {e}")
-                    self.downloaded_bytes = 0
-                    self.session_downloaded_bytes = 0
-                    retry_count += 1
-                    self.game_info["downloadingData"]["retryAttempt"] = retry_count
-                    safe_write_json(self.game_info_path, self.game_info)
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 1.5, self.RETRY_DELAY_MAX)
-                    self.session.close()
-                    self.session = create_robust_session()
+                    _discard_partial()
+                    _backoff_and_reconnect()
                     continue
 
                 if stream_result is True:
                     final_size = os.path.getsize(self.dest_path)
-                    logging.info(
-                        f"[ChunkedDownloader] DEBUG: final_size={final_size}, total_size={self.total_size}, "
-                        f"difference={abs(final_size - self.total_size) if self.total_size else 'N/A'}"
-                    )
 
                     if self.total_size is None:
                         logging.warning("[ChunkedDownloader] Total size unknown; accepting completed stream")
@@ -672,40 +694,36 @@ class ChunkedDownloader:
                             f"[ChunkedDownloader] Downloaded file larger than expected "
                             f"({read_size(final_size)} > {read_size(self.total_size)}); restarting"
                         )
-                        try:
-                            os.remove(self.dest_path)
-                        except Exception as e:
-                            logging.warning(f"[ChunkedDownloader] Could not delete oversized file: {e}")
-                        self.downloaded_bytes = 0
-                        retry_count += 1
+                        _discard_partial()
+                        _backoff_and_reconnect()
                         continue
 
-                    logging.info(
-                        f"[ChunkedDownloader] Partial: {read_size(final_size)}/{read_size(self.total_size)}, continuing..."
+                    # Server closed the connection early without an error.
+                    logging.warning(
+                        f"[ChunkedDownloader] Stream ended early: {read_size(final_size)}/{read_size(self.total_size)}"
                     )
-                    self.downloaded_bytes = final_size
+                    if self.supports_range:
+                        self.downloaded_bytes = final_size
+                    else:
+                        _discard_partial()
+                    _backoff_and_reconnect()
                     continue
 
-                if not self.supports_range:
-                    logging.error("[ChunkedDownloader] Download interrupted and server doesn't support resume")
-                    return False
-
-                retry_count += 1
-                self.downloaded_bytes = os.path.getsize(self.dest_path) if os.path.exists(self.dest_path) else 0
-                self.game_info["downloadingData"]["retryAttempt"] = retry_count
-                safe_write_json(self.game_info_path, self.game_info)
-
-                logging.info(f"[ChunkedDownloader] Retry {retry_count}/{self.MAX_RETRIES} in {retry_delay}s, resuming from {read_size(self.downloaded_bytes)}")
-                time.sleep(retry_delay)
-                retry_delay = min(retry_delay * 1.5, self.RETRY_DELAY_MAX)
-                self.session.close()
-                self.session = create_robust_session()
+                # stream_result is False: network error mid-stream
+                if self.supports_range:
+                    self.downloaded_bytes = os.path.getsize(self.dest_path) if os.path.exists(self.dest_path) else 0
+                else:
+                    # Host can't resume; start over instead of giving up on the first hiccup.
+                    logging.warning("[ChunkedDownloader] Server doesn't support resume; restarting from scratch")
+                    _discard_partial()
+                _backoff_and_reconnect()
 
             logging.error(f"[ChunkedDownloader] Max retries ({self.MAX_RETRIES}) exceeded")
             return False
 
         except InterruptedError as e:
             logging.info(f"[ChunkedDownloader] Download interrupted: {e}")
+            self.stopped = True
             return False
         except Exception as e:
             logging.error(f"[ChunkedDownloader] Download failed: {e}")
@@ -790,20 +808,25 @@ class AscendaraDownloader:
     
     def _get_filename_from_url(self, url: str) -> str:
         """Extract filename from URL or Content-Disposition header."""
-        base_name = os.path.basename(url.split('?')[0])
+        from urllib.parse import unquote
+        base_name = unquote(os.path.basename(url.split('?')[0].split('#')[0]))
         
         try:
             session = create_robust_session()
             head = session.head(url, allow_redirects=True, timeout=10)
-            cd = head.headers.get('content-disposition')
-            if cd and 'filename=' in cd:
-                fname = re.findall('filename="?([^";]+)', cd)
-                if fname:
-                    base_name = fname[0]
+            cd = head.headers.get('content-disposition', '')
+            fname = re.findall(r'filename\*?=(?:UTF-8\'\')?["\']?([^"\';\r\n]+)', cd, re.IGNORECASE)
+            if fname:
+                base_name = unquote(fname[-1].strip())
             session.close()
         except Exception:
             pass
-        
+
+        # Strip characters Windows cannot use and guard against empty names
+        # (e.g. URLs ending in "/dl/<token>" with no Content-Disposition).
+        base_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', base_name).strip().rstrip('.')
+        if not base_name or base_name in ('download', 'dl'):
+            base_name = f"{sanitize_folder_name(self.game)}.download"
         return base_name
     
     @staticmethod
@@ -857,7 +880,11 @@ class AscendaraDownloader:
             # Create chunked downloader and start download
             downloader = ChunkedDownloader(url, dest, self.game_info, self.game_info_path)
             success = downloader.download()
-            
+
+            if downloader.stopped:
+                logging.info("[AscendaraDownloader] Download cancelled by user; not reporting as error")
+                return
+
             if success:
                 logging.info(f"[AscendaraDownloader] Download completed successfully")
                 
@@ -877,8 +904,11 @@ class AscendaraDownloader:
                 if withNotification:
                     _launch_notification(withNotification, "Download Complete", f"Successfully downloaded {self.game}")
             else:
-                raise Exception("Download failed after all retries")
-                
+                detail = f": {downloader.last_error}" if downloader.last_error else ""
+                raise Exception(f"Download failed after all retries{detail}")
+
+        except InterruptedError:
+            logging.info("[AscendaraDownloader] Cancelled by user")
         except Exception as e:
             err_str = str(e)
             if any(x in err_str for x in ['SSL: WRONG_VERSION_NUMBER', 'ssl.SSLError', 'WinError 10054', 
@@ -1039,14 +1069,8 @@ class AscendaraDownloader:
                 new_dest = dest + correct_ext
             
             logging.info(f"[AscendaraDownloader] Renaming to: {new_dest}")
-            os.rename(dest, new_dest)
-            
-            if os.path.exists(dest) and dest != new_dest:
-                try:
-                    os.remove(dest)
-                except Exception:
-                    pass
-            
+            # os.rename raises FileExistsError on Windows if a stale target exists
+            os.replace(dest, new_dest)
             return new_dest
         
         return dest
@@ -1120,14 +1144,23 @@ class AscendaraDownloader:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
+                # No 'br': requests can't decode brotli without an extra package,
+                # which would turn the page into garbage and break token parsing.
+                'Accept-Encoding': 'gzip, deflate',
                 'Sec-Fetch-Dest': 'document',
                 'Sec-Fetch-Mode': 'navigate',
                 'Sec-Fetch-Site': 'none',
                 'Sec-Fetch-User': '?1',
                 'Upgrade-Insecure-Requests': '1',
             }
-            response = session.get(url, headers=page_headers)
+            response = session.get(url, headers=page_headers, timeout=30)
+            if response.status_code in (403, 429):
+                raise Exception(
+                    f"Buzzheavier blocked the request (HTTP {response.status_code}). "
+                    "The host may be rate limiting you; try again later or with a VPN."
+                )
+            if response.status_code == 404:
+                raise Exception("Buzzheavier file not found (HTTP 404). The link may have expired or been removed.")
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -1150,7 +1183,7 @@ class AscendaraDownloader:
                 'hx-request': 'true',
                 'referer': url
             }
-            head_response = session.head(download_url_with_token, headers=hx_headers, allow_redirects=False)
+            head_response = session.head(download_url_with_token, headers=hx_headers, allow_redirects=False, timeout=30)
             hx_redirect = head_response.headers.get('hx-redirect') or head_response.headers.get('Hx-Redirect')
 
             if not hx_redirect:
@@ -1168,6 +1201,8 @@ class AscendaraDownloader:
 
             session.close()
             filename = sanitize_folder_name(title) if title else file_id
+        if not filename.strip():
+            filename = f"{sanitize_folder_name(self.game)}.download"
         # Use the robust ChunkedDownloader for the actual file download
         dest_path = os.path.join(self.download_dir, filename)
         
@@ -1178,7 +1213,11 @@ class AscendaraDownloader:
         # Create chunked downloader and start download
         downloader = ChunkedDownloader(final_url, dest_path, self.game_info, self.game_info_path)
         success = downloader.download()
-        
+
+        if downloader.stopped:
+            logging.info("[Buzzheavier] Download cancelled by user; not reporting as error")
+            return
+
         if success:
             logging.info(f"[Buzzheavier] Downloaded as: {dest_path}")
             
@@ -1198,7 +1237,8 @@ class AscendaraDownloader:
             if self.withNotification:
                 _launch_notification(self.withNotification, "Download Complete", f"Successfully downloaded {self.game}")
         else:
-            raise Exception("Buzzheavier download failed after all retries")
+            detail = f": {downloader.last_error}" if downloader.last_error else ""
+            raise Exception(f"Buzzheavier download failed after all retries{detail}")
     
     def _check_for_stop(self) -> bool:
         """Check if download has been stopped by reading the JSON file."""
@@ -1275,12 +1315,18 @@ class AscendaraDownloader:
                     if sys.platform == "win32":
                         try:
                             from unrar import rarfile
-                            with rarfile.RarFile(arch_path, 'r') as rar_ref:
+                            try:
+                                rar_ref = rarfile.RarFile(arch_path, 'r', pwd='steamrip.com')
+                            except Exception:
+                                rar_ref = rarfile.RarFile(arch_path, 'r')
+                            with rar_ref:
                                 for info in rar_ref.infolist():
-                                    # Check if it's a file (not directory) - directories end with /
-                                    if not info.filename.endswith('/'):
-                                        total_uncompressed_size += getattr(info, 'file_size', 0) or 0
-                                    if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename and not info.filename.endswith('/'):
+                                    # Directory entries carry the RHDF_DIRECTORY (0x20) header flag
+                                    is_dir = bool(info.flag_bits & 0x20) or info.filename.endswith('/')
+                                    if is_dir:
+                                        continue
+                                    total_uncompressed_size += getattr(info, 'file_size', 0) or 0
+                                    if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename:
                                         total_files_to_extract += 1
                         except Exception as e:
                             logging.warning(f"[AscendaraDownloader] Could not count RAR files with library: {e}")
@@ -1366,6 +1412,11 @@ class AscendaraDownloader:
                 except Exception as e:
                     logging.warning(f"[AscendaraDownloader] Could not delete archive: {e}")
                 
+            except InterruptedError:
+                logging.info("[AscendaraDownloader] Extraction stopped by user")
+                self.game_info["downloadingData"]["extracting"] = False
+                safe_write_json(self.game_info_path, self.game_info)
+                return
             except Exception as e:
                 logging.error(f"[AscendaraDownloader] Extraction failed: {e}")
                 extraction_errors.append(str(e))
@@ -1503,62 +1554,112 @@ class AscendaraDownloader:
 
     def _extract_zip(self, archive_path: str, watching_data: Dict, extract_to: str = None):
         """Extract a ZIP file."""
+        # Note: no testzip() here. It decompresses and CRC-checks the whole
+        # archive before extraction even begins, doubling the time for large
+        # repacks. Opening validates the central directory, and every member is
+        # CRC-checked as it is extracted anyway.
         try:
-            with zipfile.ZipFile(archive_path, 'r') as test_zip:
-                test_zip.testzip()
-            logging.info(f"[AscendaraDownloader] ZIP validation passed")
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                self._extract_zip_members(archive_path, zip_ref, watching_data, extract_to)
         except zipfile.BadZipFile as e:
             logging.error(f"[AscendaraDownloader] Invalid ZIP: {e}")
             raise
-        
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-            zip_contents = zip_ref.infolist()
-            logging.info(f"[AscendaraDownloader] ZIP contains {len(zip_contents)} files")
-            
-            # Filter members to extract (exclude .url and _CommonRedist)
-            members_to_extract = [
-                zip_info for zip_info in zip_contents
-                if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename
-            ]
-            
-            logging.info(f"[AscendaraDownloader] Extracting {len(members_to_extract)} files (filtered from {len(zip_contents)})")
-            
-            # Extract file-by-file instead of extractall().
-            # Bulk extractall() is faster, but the UI sits on "Preparing..." until the archive is fully done.
-            # File-by-file extraction restores live extraction progress for users.
-            _et = extract_to or self.download_dir
-            for zip_info in members_to_extract:
-                if zip_info.is_dir():
-                    continue
+        except NotImplementedError as e:
+            # e.g. Deflate64 / PPMd / unsupported encryption: Python's zipfile can't
+            # do these but 7-Zip and UnRAR can.
+            logging.warning(f"[AscendaraDownloader] zipfile cannot extract this archive ({e}); trying CLI tools")
+            if sys.platform != "win32" or not self._extract_zip_with_cli(archive_path, extract_to or self.download_dir):
+                raise RuntimeError(f"ZIP extraction failed: {e}. Install 7-Zip from https://7-zip.org/ to extract this archive.")
+            self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
 
-                try:
-                    zip_ref.extract(zip_info, _et)
-                except RuntimeError as e:
-                    if 'password' in str(e).lower() or 'encrypted' in str(e).lower():
-                        zip_ref.extract(zip_info, _et, pwd=b'steamrip.com')
-                    else:
-                        raise
+    def _extract_zip_with_cli(self, archive_path: str, extract_to: str) -> bool:
+        """Fallback ZIP extraction using 7-Zip or UnRAR on Windows. Returns True on success."""
+        _CREATE_NO_WINDOW = 0x08000000
+        exe_dir = os.path.dirname(sys.executable)
+        candidates = [
+            shutil.which('7z'), shutil.which('7za'),
+            r'C:\Program Files\7-Zip\7z.exe', r'C:\Program Files (x86)\7-Zip\7z.exe',
+            os.path.join(exe_dir, 'UnRAR.exe'),
+            r'C:\Program Files\WinRAR\UnRAR.exe', r'C:\Program Files (x86)\WinRAR\UnRAR.exe',
+        ]
+        tool = next((p for p in candidates if p and os.path.isfile(p)), None)
+        if not tool:
+            logging.error("[AscendaraDownloader] No CLI fallback (7-Zip/UnRAR) found for ZIP extraction")
+            return False
+        if os.path.basename(tool).lower().startswith('7z'):
+            cmd = [tool, 'x', '-psteamrip.com', f'-o{extract_to}', '-y', '-aoa', '-bsp0', '-bb0', '-xr!*.url', '-xr!_CommonRedist', archive_path]
+        else:
+            cmd = [tool, 'x', '-y', '-psteamrip.com', '-x*.url', '-x_CommonRedist', archive_path, extract_to + '/']
+        logging.info(f"[AscendaraDownloader] Extracting ZIP with CLI: {tool}")
+        archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
+        timeout_seconds = 14400 if archive_size > 50 * 1024 ** 3 else 7200
+        try:
+            proc = subprocess.run(
+                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                creationflags=_CREATE_NO_WINDOW, timeout=timeout_seconds
+            )
+        except subprocess.TimeoutExpired:
+            logging.error(f"[AscendaraDownloader] CLI ZIP extraction timed out after {timeout_seconds // 3600}h")
+            return False
+        if proc.returncode not in (0, 1):
+            logging.error(f"[AscendaraDownloader] CLI ZIP extraction failed (exit {proc.returncode}): {proc.stderr.decode(errors='replace').strip()}")
+            return False
+        return True
 
-                extracted_path = os.path.join(_et, zip_info.filename)
-                key = os.path.relpath(extracted_path, self.download_dir).replace('\\', '/')
-                watching_data[key] = {"size": zip_info.file_size}
+    def _extract_zip_members(self, archive_path: str, zip_ref: zipfile.ZipFile, watching_data: Dict, extract_to: str = None):
+        """Extract members of an already-open ZIP with live progress."""
+        zip_contents = zip_ref.infolist()
+        logging.info(f"[AscendaraDownloader] ZIP contains {len(zip_contents)} files")
 
-                self._files_extracted_count += 1
-                if self._files_extracted_count > self._total_files_to_extract:
-                    logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
-                    self._files_extracted_count = self._total_files_to_extract
+        # Filter members to extract (exclude .url and _CommonRedist)
+        members_to_extract = [
+            zip_info for zip_info in zip_contents
+            if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename
+        ]
 
-                # Only force the very first write so the UI leaves "Preparing..." right away;
-                # after that, let the normal throttle (~2s) in _update_extraction_progress
-                # handle disk writes. Forcing a JSON write (temp file + atomic replace) on
-                # every single extracted file tanks extraction speed on archives with many
-                # small files, since each write is its own disk I/O (and AV scan) operation.
-                self._update_extraction_progress(
-                    zip_info.filename,
-                    self._files_extracted_count,
-                    self._total_files_to_extract,
-                    force=(self._files_extracted_count == 1),
-                )
+        logging.info(f"[AscendaraDownloader] Extracting {len(members_to_extract)} files (filtered from {len(zip_contents)})")
+
+        # ZIP members are individually addressable, so per-member extraction is
+        # as fast as extractall() and gives live progress.
+        _et = extract_to or self.download_dir
+        last_stop_check = time.time()
+        for zip_info in members_to_extract:
+            if zip_info.is_dir():
+                continue
+
+            try:
+                zip_ref.extract(zip_info, _et)
+            except RuntimeError as e:
+                if 'password' in str(e).lower() or 'encrypted' in str(e).lower():
+                    zip_ref.extract(zip_info, _et, pwd=b'steamrip.com')
+                else:
+                    raise
+
+            extracted_path = os.path.join(_et, zip_info.filename)
+            key = os.path.relpath(extracted_path, self.download_dir).replace('\\', '/')
+            watching_data[key] = {"size": zip_info.file_size}
+
+            self._files_extracted_count += 1
+            if self._files_extracted_count > self._total_files_to_extract:
+                logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
+                self._files_extracted_count = self._total_files_to_extract
+
+            # Only force the very first write so the UI leaves "Preparing..." right away;
+            # after that, let the normal throttle (~2s) in _update_extraction_progress
+            # handle disk writes. Forcing a JSON write (temp file + atomic replace) on
+            # every single extracted file tanks extraction speed on archives with many
+            # small files, since each write is its own disk I/O (and AV scan) operation.
+            self._update_extraction_progress(
+                zip_info.filename,
+                self._files_extracted_count,
+                self._total_files_to_extract,
+                force=(self._files_extracted_count == 1),
+            )
+            now = time.time()
+            if now - last_stop_check >= 5.0:
+                last_stop_check = now
+                if self._check_for_stop():
+                    raise InterruptedError("Extraction stopped by user")
     
     def _extract_rar(self, archive_path: str, watching_data: Dict, extract_to: str = None):
         """Extract a RAR file using Python unrar library (Windows) or system unrar binary (Linux/macOS)."""
@@ -1578,6 +1679,8 @@ class AscendaraDownloader:
             _lib_err_msg = None
             try:
                 return self._extract_rar_with_library(archive_path, watching_data, extract_to)
+            except InterruptedError:
+                raise
             except Exception as _lib_err:
                 _lib_err_msg = str(_lib_err)
                 logging.warning(f"[AscendaraDownloader] Python library extraction failed ({_lib_err_msg}), falling back to CLI tools")
@@ -1808,172 +1911,104 @@ class AscendaraDownloader:
         self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
     
     def _extract_rar_with_library(self, archive_path: str, watching_data: Dict, extract_to: str = None):
-        """Extract a RAR file using Python unrar library (Windows with bundled DLL)."""
-        from unrar import rarfile
-        import threading
-        
-        logging.info(f"[AscendaraDownloader] Extracting RAR with Python library: {archive_path}")
-        
-        # Snapshot files present before extraction starts — used as baseline
-        def _snapshot_files():
-            s = set()
-            try:
-                for _r, _d, _fs in os.walk(self.download_dir):
-                    for _f in _fs:
-                        if (not _f.endswith('.url') and not _f.endswith('.rar') and
-                                not _f.endswith('.zip') and not _f.endswith('.ascendara.json') and
-                                _f != 'filemap.ascendara.json'):
-                            s.add(os.path.join(_r, _f))
-            except Exception:
-                pass
-            return s
-        _baseline_files = _snapshot_files()
-        initial_file_count = len(_baseline_files)
-        
-        # Try opening with password first (handles encrypted-header archives),
-        # fall back to opening without password for non-encrypted archives.
+        """Extract a RAR file using Python unrar library (Windows with bundled DLL).
+
+        The archive is opened once in extract mode and walked front-to-back,
+        extracting or skipping each entry as it is encountered. The library's
+        per-member ``extract()`` re-opens the archive and re-scans (and, for
+        solid archives, re-decompresses) everything before the member, which is
+        O(n^2) and is what made large repacks crawl at <1 file/s.
+        """
+        from unrar import rarfile, unrarlib, constants
+
+        RHDF_DIRECTORY = 0x20  # RARHeaderDataEx.Flags bit for directory entries
+        RAR_PASSWORD = 'steamrip.com'
+        dest_dir = extract_to or self.download_dir
+        logging.info(f"[AscendaraDownloader] Extracting RAR with Python library (single pass): {archive_path}")
+
+        def _wanted(name: str) -> bool:
+            return not name.endswith('.url') and '_CommonRedist' not in name
+
+        # Listing pass (headers only) to know how many entries to expect.
         try:
-            rar_ref = rarfile.RarFile(archive_path, 'r', pwd='steamrip.com')
+            listing = rarfile.RarFile(archive_path, 'r', pwd=RAR_PASSWORD)
         except Exception:
-            rar_ref = rarfile.RarFile(archive_path, 'r')
+            listing = rarfile.RarFile(archive_path, 'r')
+        expected = sum(1 for i in listing.infolist() if _wanted(i.filename) and not (i.flag_bits & RHDF_DIRECTORY))
+        logging.info(f"[AscendaraDownloader] Extracting {expected} files from RAR")
+
+        archive = unrarlib.RAROpenArchiveDataEx(archive_path, mode=constants.RAR_OM_EXTRACT)
+        handle = listing._open(archive)
+        unrarlib.RARSetPassword(handle, RAR_PASSWORD.encode('cp437'))
+
+        local_extracted = 0
+        last_log = time.time()
+        try:
+            header = unrarlib.RARHeaderDataEx()
+            while True:
+                try:
+                    unrarlib.RARReadHeaderEx(handle, ctypes.byref(header))
+                except unrarlib.ArchiveEnd:
+                    break
+                except unrarlib.MissingPassword:
+                    raise RuntimeError("Archive is encrypted, password required")
+                except unrarlib.BadPassword:
+                    raise RuntimeError("Bad password for Archive")
+                except unrarlib.UnrarException as e:
+                    raise rarfile.BadRarFile(str(e))
+
+                name = header.FileNameW
+                is_dir = bool(header.Flags & RHDF_DIRECTORY)
+
+                if not _wanted(name):
+                    unrarlib.RARProcessFileW(handle, constants.RAR_SKIP, None, None)
+                    continue
+
+                try:
+                    unrarlib.RARProcessFileW(handle, constants.RAR_EXTRACT, dest_dir, None)
+                except unrarlib.MissingPassword:
+                    raise RuntimeError("File is encrypted, password required")
+                except unrarlib.BadPassword:
+                    raise RuntimeError("Bad password for File")
+                except unrarlib.BadDataError:
+                    raise RuntimeError(f"File CRC error: {name}")
+                except unrarlib.UnrarException as e:
+                    raise rarfile.BadRarFile(f"Bad RAR archive data at {name}: {e}")
+
+                if is_dir:
+                    continue
+
+                local_extracted += 1
+                size = header.UnpSize + (header.UnpSizeHigh << 32)
+                key = os.path.relpath(os.path.join(dest_dir, name), self.download_dir).replace('\\', '/')
+                watching_data[key] = {"size": size}
+
+                done = self._files_extracted_count + local_extracted
+                self._update_extraction_progress(
+                    os.path.basename(name), done, self._total_files_to_extract, force=(done == 1)
+                )
+                # _update_extraction_progress is throttled, so poll for a user
+                # stop here at a low rate rather than on every entry.
+                now = time.time()
+                if now - last_log >= 5.0:
+                    pct = (done / self._total_files_to_extract * 100) if self._total_files_to_extract > 0 else 0
+                    logging.info(f"[AscendaraDownloader] Extraction progress: {done}/{self._total_files_to_extract} files ({pct:.1f}%) - {os.path.basename(name)}")
+                    last_log = now
+                    if self._check_for_stop():
+                        raise InterruptedError("Extraction stopped by user")
+        finally:
             try:
-                rar_ref.setpassword('steamrip.com')
+                unrarlib.RARCloseArchive(handle)
             except Exception:
                 pass
-        with rar_ref:
-            # Filter members to extract (exclude .url and _CommonRedist)
-            rar_files = [info for info in rar_ref.infolist() 
-                        if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename]
-            
-            logging.info(f"[AscendaraDownloader] Extracting {len(rar_files)} files from RAR")
-            
-            dest_dir = extract_to or self.download_dir
-            
-            # Bulk extraction is intentionally disabled because it prevents live UI progress updates.
-            # File-by-file extraction is slower, but it keeps extractionProgress moving instead of staying on "Preparing...".
-            USE_BULK_RAR_EXTRACTION = False
-            if USE_BULK_RAR_EXTRACTION and len(rar_files) > 100:
-                logging.info(f"[AscendaraDownloader] Using fast bulk extraction for {len(rar_files)} files")
-                try:
-                    # Extract all files at once (much faster)
-                    rar_ref.extractall(dest_dir)
-                    # Update progress to show completion
-                    local_extracted = len(rar_files)
-                    self._files_extracted_count += local_extracted
-                    self._update_extraction_progress("Bulk extraction complete", self._files_extracted_count, self._total_files_to_extract, force=True)
-                    logging.info(f"[AscendaraDownloader] Fast bulk extraction complete: {local_extracted} files")
-                    return
-                except Exception as bulk_err:
-                    logging.warning(f"[AscendaraDownloader] Bulk extraction failed, falling back to file-by-file: {bulk_err}")
-                    # Reset count and fall back to file-by-file
-                    self._files_extracted_count = initial_file_count
-            
-            # Extract file-by-file for accurate per-file progress reporting (or as fallback)
-            extraction_error = []
-            local_extracted = 0
-            heartbeat_count = 0
-            last_heartbeat_time = time.time()
 
-            for rar_info in rar_files:
-                fname = os.path.basename(rar_info.filename.rstrip('/'))
-                if not fname:
-                    continue
-                
-                # Skip already-extracted files to allow resuming interrupted extractions
-                dest_path = os.path.join(dest_dir, rar_info.filename)
-                if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
-                    local_extracted += 1
-                    files_extracted_this_archive = self._files_extracted_count + local_extracted
-                    percent = (files_extracted_this_archive / self._total_files_to_extract * 100) if self._total_files_to_extract > 0 else 0
-                    self._update_extraction_progress(fname, files_extracted_this_archive, self._total_files_to_extract, force=False)
-                    now = time.time()
-                    if now - last_heartbeat_time >= 5.0:
-                        heartbeat_count += 1
-                        logging.info(f"[AscendaraDownloader] Skipping (exists) #{heartbeat_count}: {local_extracted} files so far ({percent:.1f}%) - {fname}")
-                        last_heartbeat_time = now
-                    continue
+        logging.info(f"[AscendaraDownloader] RAR extraction complete ({local_extracted}/{expected} files)")
+        self._files_extracted_count += local_extracted
 
-                EXTRACT_TIMEOUT = 1800  # 30 minutes per file before declaring a hang (for large files)
-                extract_exc = []
-                def _do_extract():
-                    try:
-                        rar_ref.extract(rar_info, dest_dir)
-                    except Exception as e:
-                        extract_exc.append(e)
-                t = threading.Thread(target=_do_extract, daemon=True)
-                t.start()
-                t.join(timeout=EXTRACT_TIMEOUT)
-                if t.is_alive():
-                    # Hung — log it and reopen the archive to recover
-                    logging.warning(f"[AscendaraDownloader] Extraction hung on {fname} after {EXTRACT_TIMEOUT}s, reopening RAR to resume")
-                    try:
-                        rar_ref.close()
-                    except Exception:
-                        pass
-                    try:
-                        rar_ref = rarfile.RarFile(archive_path, 'r')
-                        try:
-                            rar_ref.setpassword('steamrip.com')
-                        except Exception:
-                            pass
-                    except Exception as reopen_e:
-                        logging.error(f"[AscendaraDownloader] Could not reopen RAR after hang: {reopen_e}")
-                        break
-                    # The hung thread is abandoned (daemon); the file may be incomplete —
-                    # delete it so the skip check re-extracts it on next pass
-                    try:
-                        if os.path.exists(dest_path):
-                            os.remove(dest_path)
-                    except Exception:
-                        pass
-                    # Re-extract the hung file with the fresh handle
-                    try:
-                        rar_ref.extract(rar_info, dest_dir)
-                        local_extracted += 1
-                        files_extracted_this_archive = self._files_extracted_count + local_extracted
-                        percent = (files_extracted_this_archive / self._total_files_to_extract * 100) if self._total_files_to_extract > 0 else 0
-                        logging.info(f"[AscendaraDownloader] Recovered extraction: {files_extracted_this_archive}/{self._total_files_to_extract} files ({percent:.1f}%) - {fname}")
-                        self._update_extraction_progress(fname, files_extracted_this_archive, self._total_files_to_extract, force=True)
-                    except Exception as e:
-                        logging.warning(f"[AscendaraDownloader] Failed to re-extract {fname} after hang: {e}")
-                        extraction_error.append(e)
-                elif extract_exc:
-                    logging.warning(f"[AscendaraDownloader] Failed to extract {fname}: {extract_exc[0]}")
-                    extraction_error.append(extract_exc[0])
-                else:
-                    local_extracted += 1
-                    files_extracted_this_archive = self._files_extracted_count + local_extracted
-                    percent = (files_extracted_this_archive / self._total_files_to_extract * 100) if self._total_files_to_extract > 0 else 0
-                    logging.info(f"[AscendaraDownloader] Extraction progress: {files_extracted_this_archive}/{self._total_files_to_extract} files ({percent:.1f}%) - {fname}")
-                    self._update_extraction_progress(
-                        fname,
-                        files_extracted_this_archive,
-                        self._total_files_to_extract,
-                        force=(files_extracted_this_archive == 1),
-                    )
-                
-                # Heartbeat every 5 seconds in case a file takes a long time
-                now = time.time()
-                if now - last_heartbeat_time >= 5.0:
-                    heartbeat_count += 1
-                    files_extracted_this_archive = self._files_extracted_count + local_extracted
-                    percent = (files_extracted_this_archive / self._total_files_to_extract * 100) if self._total_files_to_extract > 0 else 0
-                    logging.info(f"[AscendaraDownloader] Extraction heartbeat #{heartbeat_count}: {local_extracted} files extracted so far ({percent:.1f}%) - currently: {fname}")
-                    last_heartbeat_time = now
-            
-            if extraction_error:
-                logging.error(f"[AscendaraDownloader] RAR extraction failed: {extraction_error[0]}")
-                raise extraction_error[0]
-            
-            logging.info(f"[AscendaraDownloader] RAR extraction complete")
-            
-            # Update extracted count using the precise per-file count
-            self._files_extracted_count += local_extracted
-            
-            # Cap the count to never exceed total
-            if self._files_extracted_count > self._total_files_to_extract:
-                logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
-                self._files_extracted_count = self._total_files_to_extract
+        # Cap the count to never exceed total
+        if self._files_extracted_count > self._total_files_to_extract:
+            logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
+            self._files_extracted_count = self._total_files_to_extract
         
         # Clean up unwanted files (.url and _CommonRedist)
         for root, dirs, files_in_dir in os.walk(self.download_dir):
