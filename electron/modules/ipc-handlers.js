@@ -184,6 +184,29 @@ function registerMiscHandlers() {
         console.log("Blocked new-window popup in external window");
       });
 
+      // Block known ad/tracker hosts and resources from loading in the
+      // external window (e.g. injected ad images/scripts on megadb/buzzheavier).
+      const blockedResourceHosts = ["aichouphaugn.com"];
+      externalWindow.webContents.session.webRequest.onBeforeRequest(
+        { urls: ["*://*/*"] },
+        (details, callback) => {
+          try {
+            const host = new URL(details.url).hostname.toLowerCase();
+            const isBlockedHost = blockedResourceHosts.some(
+              blocked => host === blocked || host.endsWith(`.${blocked}`)
+            );
+            if (isBlockedHost || isBlockedUrl) {
+              console.log("Blocked ad resource in external window:", details.url);
+              callback({ cancel: true });
+              return;
+            }
+          } catch (error) {
+            console.error("Failed to parse external window resource URL:", details.url, error);
+          }
+          callback({ cancel: false });
+        }
+      );
+
       const allowedHosts = [
         "buzzheavier.com",
         "bzzhr.co",
@@ -255,6 +278,65 @@ function registerMiscHandlers() {
             console.error("Failed to inspect external window content:", error);
           }
         }, 3000);
+      });
+
+      // Some ad networks (e.g. Adsterra "Social Bar") don't open a real popup
+      // window at all -- they inject a fake "notification"/"reminder" overlay
+      // directly into the page DOM. Blocking the network request for the
+      // popup/image isn't enough since the overlay markup itself still
+      // renders. Strip out any overlay whose text matches known ad phrasing,
+      // and keep watching for ones injected later (these often appear after
+      // a delay or on an interval).
+      externalWindow.webContents.on("did-finish-load", () => {
+        if (externalWindow.isDestroyed()) return;
+        externalWindow.webContents
+          .executeJavaScript(
+            `(function () {
+              if (window.__ascendaraAdOverlayObserver) return;
+              const blockedHosts = ${JSON.stringify(blockedResourceHosts)};
+              function findOverlayRoot(image) {
+                let el = image.parentElement;
+                while (el && el !== document.body && el !== document.documentElement) {
+                  const position = window.getComputedStyle(el).position;
+                  if (
+                    (position === "fixed" || position === "absolute") &&
+                    el.style.left === "50%" && el.style.top === "50%"
+                  ) {
+                    return el;
+                  }
+                  el = el.parentElement;
+                }
+                return null;
+              }
+              function sweep() {
+                for (const image of document.querySelectorAll("img[src]")) {
+                  let host;
+                  try {
+                    host = new URL(image.src, document.baseURI).hostname.toLowerCase();
+                  } catch {
+                    continue;
+                  }
+                  if (!blockedHosts.some(blocked =>
+                    host === blocked || host.endsWith("." + blocked)
+                  )) continue;
+                  const overlay = findOverlayRoot(image);
+                  if (overlay && overlay.isConnected) overlay.remove();
+                }
+              }
+              sweep();
+              const observer = new MutationObserver(sweep);
+              observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ["src", "style", "class"],
+              });
+              window.__ascendaraAdOverlayObserver = observer;
+            })();`
+          )
+          .catch(error => {
+            console.error("Failed to inject ad overlay cleanup script:", error);
+          });
       });
 
       blankPageTimeout = setTimeout(() => {
