@@ -2129,7 +2129,7 @@ export default function DownloadPage() {
           </AlertDialogHeader>
 
           {conflictStep === "choose" && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 text-foreground">
               <Button
                 variant="outline"
                 className="h-auto flex-col items-start gap-1 py-2 text-left"
@@ -2159,8 +2159,7 @@ export default function DownloadPage() {
                 </span>
               </Button>
               <Button
-                variant="destructive"
-                className="h-auto flex-col items-start gap-1 py-2 text-left text-foreground"
+                className="h-auto bg-secondary flex-col items-start gap-1 py-2 text-left text-foreground"
                 disabled={isResolvingConflict}
                 onClick={() => setConflictStep("confirmMerge")}
               >

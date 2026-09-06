@@ -195,7 +195,7 @@ function registerMiscHandlers() {
             const isBlockedHost = blockedResourceHosts.some(
               blocked => host === blocked || host.endsWith(`.${blocked}`)
             );
-            if (isBlockedHost || isBlockedUrl) {
+            if (isBlockedHost) {
               console.log("Blocked ad resource in external window:", details.url);
               callback({ cancel: true });
               return;
