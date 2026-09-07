@@ -1635,6 +1635,7 @@ const DownloadCard = ({
     "no_files_error",
     "provider_blocked_error",
     "[Errno 28] No space left on device",
+    "Insufficient disk space",
     "[WinError 225]",
     "Connection broken",
     "IncompleteRead",
