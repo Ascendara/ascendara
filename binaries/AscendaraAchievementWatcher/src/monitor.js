@@ -107,7 +107,7 @@ module.exports.getFolders = async userDir_file => {
         dir: path.join(process.env["APPDATA"], "EMPRESS"),
         options: {
           recursive: true,
-          filter: /([0-9]+)\\remote\\([0-9]+)/,
+          filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
           file: [files.achievement[1]],
         },
       },
@@ -115,7 +115,7 @@ module.exports.getFolders = async userDir_file => {
         dir: path.join(process.env["Public"], "Documents/EMPRESS"),
         options: {
           recursive: true,
-          filter: /([0-9]+)\\remote\\([0-9]+)/,
+          filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
           file: [files.achievement[1]],
         },
       },
@@ -127,7 +127,7 @@ module.exports.getFolders = async userDir_file => {
         dir: path.join(process.env["Public"], "Documents/OnlineFix"),
         options: {
           recursive: true,
-          filter: /([0-9]+)\\Stats/,
+          filter: /([0-9]+)[\\/]Stats/i,
           file: [files.achievement[0], files.achievement[1]],
         },
       },
@@ -137,7 +137,7 @@ module.exports.getFolders = async userDir_file => {
           disableCheckIfProcessIsRunning: true,
           disableCheckTimestamp: true,
           recursive: true,
-          filter: /([0-9]+)\\stats/,
+          filter: /([0-9]+)[\\/]stats/i,
           file: [files.achievement[0], files.achievement[1]],
         },
       },
@@ -186,7 +186,7 @@ module.exports.getFolders = async userDir_file => {
             {
               path: "users/Public/Documents/EMPRESS",
               file: [files.achievement[1]],
-              filter: /([0-9]+)\\remote\\([0-9]+)/
+              filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/
             },
             {
               path: "users/Public/Documents/Steam/RUNE",
@@ -196,7 +196,7 @@ module.exports.getFolders = async userDir_file => {
             {
               path: "users/Public/Documents/OnlineFix",
               file: [files.achievement[0], files.achievement[1]],
-              filter: /([0-9]+)\\Stats/
+              filter: /([0-9]+)[\\/]Stats/i
             },
             // AppData/Roaming
             {
@@ -217,7 +217,7 @@ module.exports.getFolders = async userDir_file => {
             {
               path: "users/steamuser/AppData/Roaming/EMPRESS",
               file: [files.achievement[1]],
-              filter: /([0-9]+)\\remote\\([0-9]+)/
+              filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/
             },
             {
               path: "users/steamuser/AppData/Roaming/SmartSteamEmu",
@@ -234,7 +234,7 @@ module.exports.getFolders = async userDir_file => {
             {
               path: "ProgramData/Steam",
               file: [files.achievement[0], files.achievement[1]],
-              filter: /([0-9]+)\\stats/,
+              filter: /([0-9]+)[\\/]stats/i,
               options: { disableCheckIfProcessIsRunning: true, disableCheckTimestamp: true }
             }
           ];
