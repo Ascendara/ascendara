@@ -296,12 +296,17 @@ def handleerror(game_info: Dict, game_info_path: str, error: Any):
     game_info['online'] = ""
     game_info['dlc'] = ""
     game_info['isRunning'] = False
-    game_info['version'] = ""
     game_info['executable'] = ""
     if 'downloadingData' in game_info:
+        prev_data = game_info['downloadingData'] or {}
         game_info['downloadingData'] = {
             "error": True,
-            "message": str(error)
+            "message": str(error),
+            # Preserve the last known progress/speed so error reports reflect
+            # how far the download/extraction actually got instead of showing 0%/N-A.
+            "progressCompleted": prev_data.get("progressCompleted", "0.00"),
+            "progressDownloadSpeeds": prev_data.get("progressDownloadSpeeds", "0.00 KB/s"),
+            "timeUntilComplete": prev_data.get("timeUntilComplete", "0s"),
         }
     else:
         logging.error(f"[handleerror] downloadingData missing. Exception: {error}")

@@ -1656,6 +1656,27 @@ const DownloadCard = ({
       if (!response.ok) throw new Error("Failed to obtain token");
       const { token } = await response.json();
 
+      const details = [
+        "**Game Information**",
+        `• Name: ${game.game}`,
+        `• Version: ${game.version || "Unknown"}`,
+        `• Size: ${game.size || "Unknown"}`,
+        "",
+        "**Error**",
+        "```",
+        downloadingData.message || "Unknown error",
+        "```",
+        "",
+        "**Download State**",
+        `• Progress: ${downloadingData.progressCompleted || "0"}%`,
+        `• Speed: ${downloadingData.progressDownloadSpeeds || "N/A"}`,
+        "",
+        "**System Info**",
+        `• Platform: ${window.electron.getPlatform() || "Unknown"}`,
+        `• App Version: v${__APP_VERSION__ || "Unknown"}`,
+        `• Timestamp: ${new Date().toISOString()}`,
+      ].join("\n");
+
       const reportResponse = await fetch("https://api.ascendara.app/app/report/feature", {
         method: "POST",
         headers: {
@@ -1665,20 +1686,7 @@ const DownloadCard = ({
         body: JSON.stringify({
           reportType: "GameDownload",
           reason: `Download Error: ${game.game}`,
-          details: `Error Details:
-          • Game Name: ${game.game}
-          • Game Version: ${game.version || "N/A"}
-          • Game Size: ${game.size || "N/A"}
-          • Error Message: ${downloadingData.message || "Unknown error"}
-
-          Download State:
-          • Progress: ${downloadingData.progressCompleted || "0"}%
-          • Download Speed: ${downloadingData.progressDownloadSpeeds || "N/A"}
-
-          System Info:
-          • Timestamp: ${new Date().toISOString()}
-          • Platform: ${window.electron.getPlatform() || "Unknown"}
-          • App Version: ${__APP_VERSION__ || "Unknown"}`,
+          details,
           gameName: game.game,
         }),
       });
