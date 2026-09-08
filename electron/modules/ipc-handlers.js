@@ -1164,17 +1164,13 @@ function registerMiscHandlers() {
           }
         }
 
-        try {
-          await fs.promises.access(gamesFilePath, fs.constants.F_OK);
-        } catch (error) {
-          await fs.promises.mkdir(settings.downloadDirectory, { recursive: true });
-          await fs.promises.writeFile(
-            gamesFilePath,
-            JSON.stringify({ games: [] }, null, 2)
-          );
+        const gamesData = fs.existsSync(gamesFilePath)
+          ? JSON.parse(fs.readFileSync(gamesFilePath, "utf8"))
+          : { games: [] };
+        const { sameGame } = require("./launcher-import");
+        if (gamesData.games.some(existing => !existing._isDeleted && sameGame(existing, { game, executable }))) {
+          return { success: false, error: "This game is already in your library." };
         }
-
-        const gamesData = JSON.parse(await fs.promises.readFile(gamesFilePath, "utf8"));
         gamesData.games.push({
           game,
           online,
@@ -1183,7 +1179,13 @@ function registerMiscHandlers() {
           executable,
           isRunning: false,
         });
-        await fs.promises.writeFile(gamesFilePath, JSON.stringify(gamesData, null, 2));
+        const temporary = `${gamesFilePath}.${crypto.randomUUID()}.tmp`;
+        try {
+          fs.writeFileSync(temporary, JSON.stringify(gamesData, null, 2));
+          fs.renameSync(temporary, gamesFilePath);
+        } finally {
+          if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+        }
         console.log(`Successfully added custom game: ${game}`);
         return { success: true };
       } catch (error) {
@@ -1691,124 +1693,7 @@ function registerMiscHandlers() {
   });
 
   // Import Steam games handler
-  ipcMain.handle("import-steam-games", async (_, directory) => {
-    const settings = settingsManager.getSettings();
-    try {
-      if (!settings.downloadDirectory) {
-        throw new Error("Download directory not set. Please configure it in Settings.");
-      }
-      const downloadDirectory = settings.downloadDirectory;
-      const gamesFilePath = path.join(downloadDirectory, "games.json");
-      const gamesDirectory = path.join(downloadDirectory, "games");
-
-      if (!fs.existsSync(gamesDirectory)) {
-        fs.mkdirSync(gamesDirectory, { recursive: true });
-      }
-
-      const directories = await fs.promises.readdir(directory, { withFileTypes: true });
-      const gameFolders = directories.filter(dirent => dirent.isDirectory());
-
-      try {
-        await fs.promises.access(gamesFilePath, fs.constants.F_OK);
-      } catch (error) {
-        await fs.promises.mkdir(downloadDirectory, { recursive: true });
-        await fs.promises.writeFile(
-          gamesFilePath,
-          JSON.stringify({ games: [] }, null, 2)
-        );
-      }
-      const gamesData = JSON.parse(await fs.promises.readFile(gamesFilePath, "utf8"));
-
-      for (const folder of gameFolders) {
-        try {
-          if (!gamesData.games.some(g => g.game === folder.name)) {
-            const newGame = {
-              game: folder.name,
-              online: false,
-              dlc: false,
-              version: "-1",
-              executable: path.join(directory, folder.name, `${folder.name}.exe`),
-              isRunning: false,
-            };
-            gamesData.games.push(newGame);
-            console.log(`Added game: ${folder.name}`);
-
-            // Fetch game assets (grid, hero, logo) from SteamGridDB to game directory
-            try {
-              const gameDirectory = path.join(directory, folder.name);
-              console.log(`Fetching assets for ${folder.name} from SteamGridDB`);
-              await steamgrid.fetchGameAssets(folder.name, gameDirectory);
-              console.log(`Successfully fetched assets for ${folder.name}`);
-            } catch (imageError) {
-              console.error(
-                `Error fetching assets for ${folder.name}:`,
-                imageError.message
-              );
-            }
-
-            // Also download cover image to centralized games directory for library display
-            try {
-              console.log(`Downloading cover for ${folder.name} to games directory`);
-              const authHelper = require("./auth-helper");
-              const authHeaders = authHelper.generateAuthHeaders();
-              
-              // Search for game on SteamGridDB
-              const cleanName = folder.name
-                .replace(/ v[\d\.]+.*$/i, "")
-                .replace(/ premium edition/i, "")
-                .trim();
-              
-              const searchUrl = `https://api.ascendara.app/api/proxy/steamgriddb/search/autocomplete/${encodeURIComponent(cleanName)}`;
-              const searchResponse = await axios.get(searchUrl, { headers: authHeaders });
-              
-              if (searchResponse.data.success && searchResponse.data.data.length > 0) {
-                const gameId = searchResponse.data.data[0].id;
-                
-                // Fetch grid image
-                const gridsUrl = `https://api.ascendara.app/api/proxy/steamgriddb/grids/game/${gameId}?styles=alternate&dimensions=600x900`;
-                const gridsResponse = await axios.get(gridsUrl, { headers: authHeaders });
-                
-                if (gridsResponse.data.success && gridsResponse.data.data.length > 0) {
-                  const imageUrl = gridsResponse.data.data[0].url;
-                  
-                  // Download the image
-                  const imageResponse = await axios({
-                    url: imageUrl,
-                    method: "GET",
-                    responseType: "arraybuffer",
-                  });
-                  
-                  const imageBuffer = Buffer.from(imageResponse.data);
-                  const mimeType = imageResponse.headers["content-type"];
-                  const extension = getExtensionFromMimeType(mimeType);
-                  
-                  // Save to centralized games directory
-                  await fs.promises.writeFile(
-                    path.join(gamesDirectory, `${folder.name}.ascendara${extension}`),
-                    imageBuffer
-                  );
-                  console.log(`Successfully saved cover for ${folder.name}`);
-                }
-              }
-            } catch (coverError) {
-              console.warn(`Could not download cover for ${folder.name}:`, coverError.message);
-            }
-          } else {
-            console.log(`Game already exists: ${folder.name}`);
-          }
-        } catch (err) {
-          console.error(`Error processing game folder ${folder.name}:`, err.message);
-          continue;
-        }
-      }
-
-      await fs.promises.writeFile(gamesFilePath, JSON.stringify(gamesData, null, 2));
-      return true;
-    } catch (error) {
-      console.error("Error during import:", error.message);
-      return false;
-    }
-  });
+  require("./launcher-import").registerLauncherImportHandlers();
 
   // Download finished handler
   ipcMain.handle("download-finished", async (_, game) => {

@@ -2694,6 +2694,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
 
   // Executable management
   const [executableExists, setExecutableExists] = useState(true);
+  const canLaunchGame = executableExists;
   const [showExecutableManager, setShowExecutableManager] = useState(false);
   const [showExecutableSelect, setShowExecutableSelect] = useState(false);
   const [availableExecutables, setAvailableExecutables] = useState([]);
@@ -2762,6 +2763,8 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
       if (game.executable) {
         const exists = await window.electron.checkFileExists(game.executable);
         setExecutableExists(exists);
+      } else {
+        setExecutableExists(false);
       }
     };
     checkExecutable();
@@ -3020,7 +3023,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
       await pullCloudGameDataBeforeLaunch(gameName);
 
       // Launch the game
-      await window.electron.playGame(
+      const result = await window.electron.playGame(
         gameName,
         game.isCustom,
         game.backups ?? false,
@@ -3028,6 +3031,12 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
         specificExecutable,
         trainerExists && launchWithTrainerEnabled
       );
+
+      if (result === false || result?.success === false) {
+        toast.error(result?.error || t("library.launchFailed"));
+        setIsLaunching(false);
+        return;
+      }
 
       // Save to recently played
       recentGamesService.addRecentGame({
@@ -3070,7 +3079,9 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
     // Rebuild path from game's executable or from the download directory 
     let gamePath = null;
     try {
-      if (game.executable) {
+      if (game.launcher) {
+        gamePath = game.installPath || null;
+      } else if (game.executable) {
         gamePath = game.executable.replace(/[\\\/][^\\\/]+$/, "");
       } else {
         const settings = await window.electron.getSettings();
@@ -3418,7 +3429,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
           );
         } else if (!showMedia) {
           if (selectedButton === "play" && !isLaunching && !isRunning) {
-            if (!executableExists) {
+            if (!canLaunchGame) {
               setShowBrowseExeWarning(true);
             } else {
               handlePlayGame();
@@ -3800,7 +3811,7 @@ const InstalledGameDetailsView = ({ game, onBack, t, controllerType, onChangeAss
             )}
 
             <div className="flex gap-4">
-              {executableExists ? (
+              {canLaunchGame ? (
                 <button
                   onClick={handlePlayGame}
                   disabled={isLaunching || isRunning}
@@ -6214,6 +6225,7 @@ export default function BigPicture() {
             isCustom: false,
           })),
           ...(custom || []).map(game => ({
+            ...game,
             name: game.game,
             game: game.game,
             version: game.version,

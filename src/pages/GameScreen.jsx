@@ -1176,6 +1176,7 @@ export default function GameScreen() {
   const [loading, setLoading] = useState(!gameData);
   const [imageData, setImageData] = useState("");
   const [executableExists, setExecutableExists] = useState(true);
+  const canLaunchGame = executableExists;
   const [favorites, setFavorites] = useState(() => {
     const savedFavorites = localStorage.getItem("game-favorites");
     return savedFavorites ? JSON.parse(savedFavorites) : [];
@@ -1497,6 +1498,8 @@ export default function GameScreen() {
         if (game.executable) {
           const exists = await window.electron.checkFileExists(game.executable);
           setExecutableExists(exists);
+        } else {
+          setExecutableExists(false);
         }
 
         // Check if game is running
@@ -2215,7 +2218,7 @@ export default function GameScreen() {
       if (isShiftKeyPressed) {
         console.log("Launching game with admin privileges");
       }
-      await window.electron.playGame(
+      const result = await window.electron.playGame(
         gameName,
         game.isCustom,
         game.backups ?? false,
@@ -2223,6 +2226,12 @@ export default function GameScreen() {
         specificExecutable,
         trainerExists && launchWithTrainerEnabled
       );
+
+      if (result === false || result?.success === false) {
+        if (result?.error) showError(gameName, result.error);
+        setIsLaunching(false);
+        return;
+      }
 
       // Record launch time so we can detect if the game exits immediately
       localStorage.setItem(
@@ -2254,6 +2263,7 @@ export default function GameScreen() {
       setIsLaunching(false);
     } catch (error) {
       console.error("Error launching game:", error);
+      showError(gameName, error.message);
       setIsLaunching(false);
     }
   };
@@ -2559,7 +2569,7 @@ export default function GameScreen() {
                     <h1>{game.game}</h1>
                   </button>
                 )}
-                {executableExists ? (
+                {canLaunchGame ? (
                   <Button
                     variant="icon"
                     size="sm"
@@ -2794,7 +2804,7 @@ export default function GameScreen() {
 
                 {/* Main actions */}
                 <div className="space-y-3">
-                  {executableExists ? (
+                  {canLaunchGame ? (
                     <>
                       <Button
                         className="w-full gap-2 py-6 text-lg text-secondary"
@@ -2854,19 +2864,7 @@ export default function GameScreen() {
                     <Button
                       className="w-full gap-2 py-6 text-lg text-secondary"
                       size="lg"
-                      onClick={async () => {
-                        const exePath = await window.electron.openFileDialog(
-                          game.executable
-                        );
-                        if (exePath) {
-                          await gameUpdateService.updateGameExecutable(
-                            game.game || game.name,
-                            exePath
-                          );
-                          const exists = await window.electron.checkFileExists(exePath);
-                          setExecutableExists(exists);
-                        }
-                      }}
+                      onClick={() => setShowExecutableManager(true)}
                     >
                       <FileSearch className="h-5 w-5" />
                       {t("library.setExecutable")}

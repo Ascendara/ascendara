@@ -102,6 +102,7 @@ import {
 import { calculateLibraryValue } from "@/services/cheapsharkService";
 import { getDownloadQueue } from "@/services/downloadQueueService";
 
+import ImportGamesDialog from "@/components/ImportGamesDialog";
 import NewFolderDialog from "@/components/NewFolderDialog";
 import FolderCard from "@/components/FolderCard";
 import EditCoverDialog from "@/components/EditCoverDialog";
@@ -232,6 +233,29 @@ const Library = () => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
+  const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
+  const [isImportingGames, setIsImportingGames] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const unsubscribe = window.electron.onGameAssetsUpdated(async ({ game, success }) => {
+      if (!success) return;
+      gameImageCache.delete(game);
+      try {
+        const image = await window.electron.getGameImage(game, "grid");
+        if (!active || !image) return;
+        const dataUrl = `data:image/jpeg;base64,${image}`;
+        gameImageCache.set(game, dataUrl);
+        window.dispatchEvent(new CustomEvent("game-cover-updated", { detail: { gameName: game, dataUrl } }));
+      } catch (error) {
+        console.warn("Could not refresh imported artwork:", error);
+      }
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1166,6 +1190,7 @@ const Library = () => {
           };
         }),
         ...(safeCustomGames || []).map(game => ({
+          ...game,
           name: game.game,
           game: game.game, // Keep original property for compatibility
           version: game.version,
@@ -1673,6 +1698,22 @@ const Library = () => {
                 </div>
               </AlertDialogContent>
             </AlertDialog>
+
+            <button
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
+              onClick={() => setIsImportGamesOpen(true)}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
+                {isImportingGames ? <Loader className="h-4 w-4 animate-spin text-primary" /> : <Import className="h-4 w-4" />}
+              </span>
+              <span>{t("library.launcherImport.title")}</span>
+            </button>
+            <ImportGamesDialog
+              open={isImportGamesOpen}
+              onOpenChange={setIsImportGamesOpen}
+              onLibraryChanged={loadGames}
+              onBusyChange={setIsImportingGames}
+            />
 
             <button
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
@@ -3361,7 +3402,25 @@ const InstalledGameCard = memo(
         } catch (error) {
           console.error("Error loading game image:", error);
         }
-        // No image found on disk — attempt to repair (re-download) it
+        // No portrait grid on disk — fall back to an existing banner/hero image
+        // so the card slot isn't left blank while a proper cover is found.
+        try {
+          const bannerBase64 =
+            (await window.electron.getGameImage(gameId, "hero")) ||
+            (await window.electron.getGameImage(gameId));
+          if (bannerBase64 && isMounted) {
+            const dataUrl = `data:image/jpeg;base64,${bannerBase64}`;
+            gameImageCache.set(gameId, dataUrl);
+            setImageData(dataUrl);
+            return;
+          }
+        } catch (error) {
+          console.error("Error loading fallback game image:", error);
+        }
+
+        // Still nothing on disk — attempt to repair (re-download) it. Installed
+        // games use the local index/SteamGridDB header repair; custom and
+        // imported games query SteamGridDB directly by name.
         if (!game.isCustom && isMounted) {
           try {
             const repairedBase64 = await window.electron.repairGameImage(gameId);
@@ -3369,10 +3428,23 @@ const InstalledGameCard = memo(
               const dataUrl = `data:image/jpeg;base64,${repairedBase64}`;
               gameImageCache.set(gameId, dataUrl);
               setImageData(dataUrl);
+              return;
             }
           } catch (e) {
             console.warn("Could not repair game image:", e);
           }
+        }
+
+        if (game.isCustom && isMounted) {
+          try {
+            const { default: sgSvc } = await import("@/services/steamGridImageService");
+            const assets = await sgSvc.getAssets(gameId);
+            const url = sgSvc.pickUrl(assets, "card");
+            if (url && isMounted) {
+              gameImageCache.set(gameId, url);
+              setImageData(url);
+            }
+          } catch { /* silent */ }
         }
       };
 
@@ -3433,9 +3505,13 @@ const InstalledGameCard = memo(
       };
 
       loadLogo();
+      const unsubscribe = window.electron.onGameAssetsUpdated(({ game: updatedGame }) => {
+        if (updatedGame === gameId) loadLogo();
+      });
 
       return () => {
         isMounted = false;
+        unsubscribe();
       };
     }, [game.game, game.name]);
 
@@ -4599,52 +4675,6 @@ DeletedGameCard.displayName = "DeletedGameCard";
 const AddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [showImportingDialog, setShowImportingDialog] = useState(false);
-  const [importSuccess, setImportSuccess] = useState(null);
-  const [steamappsDirectory, setSteamappsDirectory] = useState("");
-  const [isSteamappsDirectoryInvalid, setIsSteamappsDirectoryInvalid] = useState(false);
-
-  // Handler for directory picking
-  const handleChooseSteamappsDirectory = async () => {
-    const dir = await window.electron.openDirectoryDialog();
-    if (dir) setSteamappsDirectory(dir);
-  };
-
-  // Check if the steamappsDirectory contains 'common'
-  useEffect(() => {
-    if (steamappsDirectory && !steamappsDirectory.toLowerCase().includes("common")) {
-      setIsSteamappsDirectoryInvalid(true);
-    } else {
-      setIsSteamappsDirectoryInvalid(false);
-    }
-  }, [steamappsDirectory]);
-
-  const handleImportSteamGames = async () => {
-    if (!steamappsDirectory) return;
-    setIsSteamappsDirectoryInvalid(false);
-    setShowImportDialog(false);
-    setShowImportingDialog(true);
-    setImportSuccess(null);
-    try {
-      await window.electron.importSteamGames(steamappsDirectory);
-      setImportSuccess(true);
-      await loadGames();
-      setTimeout(() => {
-        setShowImportingDialog(false);
-        setImportSuccess(null);
-      }, 1500);
-    } catch (error) {
-      setImportSuccess(false);
-    }
-  };
-
-  // Close importing dialog
-  const handleCloseImportingDialog = () => {
-    setShowImportingDialog(false);
-    setImportSuccess(null);
-  };
-
   const [formData, setFormData] = useState({
     executable: "",
     name: "",
@@ -4956,16 +4986,6 @@ const AddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }) => {
               : t("library.chooseExecutableFile")}
           </span>
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 text-muted-foreground hover:bg-accent"
-          onClick={() => setShowImportDialog(true)}
-        >
-          <Import className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-          {t("library.importSteamGames")}
-        </Button>
       </div>
 
       {/* ── Game name ── */}
@@ -5096,75 +5116,6 @@ const AddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }) => {
           </div>
         )}
       </div>
-
-      {/* ── Import Steam Games Dialog ── */}
-      <AlertDialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold text-foreground">
-              {t("library.importSteamGames")}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-foreground">
-              <span>
-                {t("library.importSteamGamesDescription")}{" "}
-                <a
-                  className="cursor-pointer text-primary hover:underline"
-                  onClick={() => window.electron.openURL("https://ascendara.app/docs/features/overview#importing-from-steam")}
-                >
-                  {t("common.learnMore")} <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                </a>
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="steamapps-directory" className="text-foreground">
-              {t("library.steamappsDirectory")}
-            </Label>
-            <div className="flex gap-2">
-              <Input id="steamapps-directory" value={steamappsDirectory} readOnly className="flex-1 bg-background" />
-              <Button type="button" variant="outline" onClick={handleChooseSteamappsDirectory} className="bg-primary text-secondary">
-                {t("library.chooseDirectory")}
-              </Button>
-            </div>
-            {isSteamappsDirectoryInvalid && (
-              <p className="text-sm font-semibold text-destructive">{t("library.steamappsDirectoryMissingCommon")}</p>
-            )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSteamappsDirectory("")} className="text-primary">
-              {t("common.cancel")}
-            </AlertDialogCancel>
-            <Button type="button" onClick={handleImportSteamGames} disabled={!steamappsDirectory} className="bg-primary text-secondary">
-              {t("library.import")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* ── Importing progress dialog ── */}
-      <AlertDialog open={showImportingDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold text-foreground">
-              {importSuccess === null && <><Loader className="mr-2 inline h-5 w-5 animate-spin text-muted-foreground" />{t("library.importingGames")}</>}
-              {importSuccess === true && t("library.importSuccessTitle")}
-              {importSuccess === false && t("library.importFailedTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-foreground">
-              {importSuccess === null && t("library.importingGamesDesc")}
-              {importSuccess === true && t("library.importSuccessDesc")}
-              {importSuccess === false && t("library.importFailedDesc")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            {importSuccess !== null && (
-              <Button className="bg-primary text-secondary" onClick={handleCloseImportingDialog}>
-                {t("common.ok")}
-              </Button>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* ── Footer ── */}
       <AlertDialogFooter>

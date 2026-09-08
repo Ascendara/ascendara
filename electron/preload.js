@@ -291,12 +291,16 @@ contextBridge.exposeInMainWorld("electron", {
   renameExistingGameDirectory: (game, additionalDirIndex) =>
     ipcRenderer.invoke("rename-existing-game-directory", game, additionalDirIndex),
   verifyGame: game => ipcRenderer.invoke("verify-game", game),
-  importSteamGames: directory => ipcRenderer.invoke("import-steam-games", directory),
+  getLauncherImportState: () => ipcRenderer.invoke("get-launcher-import-state"),
+  startLauncherImport: launchers => ipcRenderer.invoke("start-launcher-import", launchers),
+  cancelLauncherImport: () => ipcRenderer.invoke("cancel-launcher-import"),
+  onLauncherImportProgress: callback => preloadIpc.subscribe("launcher-import-progress", callback),
 
   // Game Cover/Image
   updateGameCover: (gameName, imgID, imageData) =>
     ipcRenderer.invoke("update-game-cover", gameName, imgID, imageData),
   getGameImage: (game, type) => ipcRenderer.invoke("get-game-image", game, type),
+  onGameAssetsUpdated: callback => preloadIpc.subscribe("game-assets-updated", callback),
   repairGameImage: game => ipcRenderer.invoke("repair-game-image", game),
   getLocalImageUrl: imagePath => ipcRenderer.invoke("get-local-image-url", imagePath),
   saveGameAsset: (gameName, filename, dataUrl) =>

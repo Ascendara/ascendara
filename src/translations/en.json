@@ -1706,6 +1706,105 @@
     "viewGame": "View Game"
   },
   "library": {
+    "launcherImport": {
+      "title": "Import Games",
+      "description": "Bring games from your launchers into one library. Choose where to look, and Ascendara will add installed games and find their artwork.",
+      "sidebarLabel": "Import Games",
+      "sidebarBusy": "Import in progress",
+      "installedOnly": "Installed games only",
+      "noSignIn": "No account sign-in needed to import",
+      "chooseLaunchers": "Choose launchers",
+      "checking": "Checking support",
+      "localInstallations": "Local installations",
+      "unsupported": "Unavailable on this platform",
+      "selectionHint": "Select one or more launchers. Games already in your library are skipped.",
+      "launchers": {
+        "steam": "Steam",
+        "epic": "Epic Games",
+        "gog": "GOG Galaxy",
+        "ubisoft": "Ubisoft Connect",
+        "battlenet": "Battle.net"
+      },
+      "stepsLabel": "Import stages",
+      "steps": {
+        "scanning": "Scan installations",
+        "importing": "Add to library",
+        "assets": "Find artwork"
+      },
+      "status": {
+        "loading": "Checking for an existing import…",
+        "idle": "Your games, together",
+        "starting": "Starting your import…",
+        "scanning": "Looking for installed games…",
+        "importing": "Adding games to your library…",
+        "assets": "Downloading game artwork…",
+        "complete": "Import complete",
+        "partial": "Import finished with a few issues",
+        "cancelled": "Import stopped",
+        "error": "Import could not finish",
+        "stopping": "Finishing the current task…"
+      },
+      "statusHelp": {
+        "idle": "Scan local launcher records, add installed games, then download available artwork automatically.",
+        "background": "You can hide this dialog and keep browsing while Ascendara stays open. Reopen Import Games in the Library to check progress.",
+        "finished": "Review the results below. Games already added stay in your library, even if another game or its artwork could not be imported.",
+        "cancelled": "Games already added are kept. Unfinished artwork may remain pending. You can scan again for games that were not added.",
+        "stopping": "The current scan or download will finish before the queue stops. Games already added will not be removed."
+      },
+      "scanProgress": "{{completed}} of {{total}} launchers scanned",
+      "addProgress": "{{completed}} of {{total}} games processed",
+      "artworkProgress": "{{completed}} of {{total}} artwork tasks finished",
+      "counters": {
+        "found": "Found",
+        "added": "Added",
+        "skipped": "Skipped",
+        "failed": "Failed"
+      },
+      "errors": {
+        "stateUnavailable": "Import status is unavailable. Please try again. If this continues, restart Ascendara.",
+        "busy": "An import is already running. Wait for it to finish or stop its queue before starting another.",
+        "invalidLaunchers": "Choose at least one launcher supported on this platform and try again.",
+        "directoryRequired": "Choose a download directory in Settings before importing games, then return here and try again.",
+        "failed": "The import could not be started or its status could not be refreshed. Please try again. Any games already added are kept.",
+        "cancelFailed": "The stop request could not be confirmed. Check progress and try again if the import is still running."
+      },
+      "launcherResults": "Launcher scan results",
+      "launcherStatus": {
+        "pending": "Waiting to scan",
+        "scanning": "Scanning…",
+        "complete": "Installed games found: {{count}}",
+        "error": "Could not finish scanning"
+      },
+      "launcherError": "This launcher could not be fully scanned. Open the launcher, finish installing your games, and try again. Other launchers can still be imported.",
+      "launcherWarning": "Some installation records could not be read or were incomplete. Valid games are still included. Open the launcher and finish or repair the installation before retrying.",
+      "results": "Game results ({{count}})",
+      "resultsLabel": "Individual game import and artwork results",
+      "unknownGame": "Unknown game",
+      "itemStatus": {
+        "added": "Added",
+        "skipped": "Already in library",
+        "error": "Could not add"
+      },
+      "assets": {
+        "pending": "Artwork: queued",
+        "downloading": "Artwork: downloading…",
+        "complete": "Artwork: ready",
+        "partial": "Artwork: some images unavailable",
+        "missing": "Artwork: no matching images found",
+        "error": "Artwork: download failed"
+      },
+      "emptyTitle": "No installed games found",
+      "emptyDescription": "Open a selected launcher and finish installing a game, then scan again. Games you own but have not installed are not imported.",
+      "launcherRequired": "Keep the original launcher installed. Some games may still need it for DRM or sign-in when playing.",
+      "playtimeNote": "Ascendara automatically detects game executables during import. If an executable cannot be found, choose it in the Executable Manager before playing.",
+      "stopQueue": "Stop queue",
+      "stopRequested": "Stopping…",
+      "runInBackground": "Run in background",
+      "close": "Close",
+      "retry": "Try again",
+      "scanAgain": "Scan again",
+      "start": "Scan and import"
+    },
     "addFavorite": "Add to Favorites",
     "addGame": {
       "duplicateError": "A game with this name already exists in your library. Please choose a different name.",

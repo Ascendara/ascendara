@@ -212,7 +212,7 @@ function cleanGameName(gameName) {
     .trim();
 }
 
-async function resolveGameId(gameName, authHeaders) {
+async function resolveGameId(gameName, authHeaders, reportErrors = false) {
   const cleanName = cleanGameName(gameName);
   if (!cleanName) return null;
   try {
@@ -225,6 +225,7 @@ async function resolveGameId(gameName, authHeaders) {
     }
   } catch (e) {
     console.warn(`[SteamGrid] URL search failed for "${cleanName}":`, e.message);
+    if (reportErrors) throw e;
   }
   return null;
 }
@@ -266,12 +267,12 @@ async function getHeaderUrl(gameName) {
  * + up to 4 asset queries. Only call this when you actually need all four
  * variants (e.g. populating an installed game directory).
  */
-async function getImageUrls(gameName) {
+async function getImageUrls(gameName, { reportErrors = false } = {}) {
   if (!gameName || typeof gameName !== "string") {
     return { gameId: null, grid: null, hero: null, logo: null, header: null };
   }
   const authHeaders = authHelper.generateAuthHeaders();
-  const gameId = await resolveGameId(gameName, authHeaders);
+  const gameId = await resolveGameId(gameName, authHeaders, reportErrors);
   const result = { gameId, grid: null, hero: null, logo: null, header: null };
   if (!gameId) return result;
 
@@ -298,6 +299,7 @@ async function getImageUrls(gameName) {
       }
     } catch (e) {
       console.warn(`[SteamGrid] URL fetch failed (${key}) for "${gameName}":`, e.message);
+      if (reportErrors) result.failed = true;
       if (e.response?.status === 429) break; // stop early when rate-limited
     }
   }
