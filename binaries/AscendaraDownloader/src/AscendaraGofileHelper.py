@@ -1337,7 +1337,6 @@ class GofileDownloader:
                             
                             logging.info(f"[AscendaraGofileHelper] ZIP extraction complete")
                     elif file.endswith('.rar'):
-                        from unrar import rarfile
                         import threading
                         
                         # Use long path prefix for extraction to support paths > 260 chars
@@ -1345,6 +1344,7 @@ class GofileDownloader:
                         # Always try the bundled Python unrar library first - it supports
                         # password-protected and encrypted archives via pwd parameter.
                         try:
+                            from unrar import rarfile
                             # Try opening with password first (handles encrypted-header archives)
                             try:
                                 _rar_ref_test = rarfile.RarFile(archive_path, 'r', pwd='steamrip.com')
@@ -1413,10 +1413,27 @@ class GofileDownloader:
                                 if extraction_error:
                                     raise extraction_error[0]
                                 self._update_extraction_progress("Complete", self._files_extracted_count, max(total_files_to_extract, 1), force=True)
+                        except InterruptedError:
+                            raise
                         except Exception as _le:
-                            _lib_extraction_failed = True
-                            _lib_err = _le
-                            logging.warning(f"[AscendaraGofileHelper] Python library extraction failed ({_le}), falling back to CLI tools")
+                            logging.warning(f"[AscendaraGofileHelper] Python library extraction failed ({_le}), trying bundled streaming recovery")
+                            try:
+                                from AscendaraRarRecovery import extract_rar_recovery
+                                self._files_extracted_count = 0
+
+                                def on_recovered_file(name, size):
+                                    self._files_extracted_count += 1
+                                    self._update_extraction_progress(name, self._files_extracted_count, max(total_files_to_extract, 1))
+
+                                extract_rar_recovery(archive_path, extract_dir, on_file=on_recovered_file,
+                                                     should_stop=self._check_for_stop)
+                                self._update_extraction_progress("Complete", self._files_extracted_count, max(total_files_to_extract, 1), force=True)
+                            except (InterruptedError, OSError, ValueError):
+                                raise
+                            except Exception as recovery_error:
+                                _lib_extraction_failed = True
+                                _lib_err = recovery_error
+                                logging.warning(f"[AscendaraGofileHelper] Bundled streaming recovery failed: {recovery_error}")
 
                         if _lib_extraction_failed:
                             _CREATE_NO_WINDOW = 0x08000000
@@ -1471,7 +1488,7 @@ class GofileDownloader:
                                     archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
                                     timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
                                     _proc.wait(timeout=timeout_seconds)
-                                    if _proc.returncode in (0, 1):
+                                    if _proc.returncode == 0:
                                         _extraction_success = True
                                         logging.info(f"[AscendaraGofileHelper] unrar extraction completed successfully")
                                     else:
@@ -1493,7 +1510,7 @@ class GofileDownloader:
                                         archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
                                         timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
                                         _, _7z_stderr = _proc.communicate(timeout=timeout_seconds)
-                                        if _proc.returncode in (0, 1):
+                                        if _proc.returncode == 0:
                                             _extraction_success = True
                                             logging.info(f"[AscendaraGofileHelper] 7z extraction completed successfully")
                                         else:
@@ -1506,8 +1523,7 @@ class GofileDownloader:
                                         raise RuntimeError(f"7z extraction timed out after {timeout_seconds // 3600} hour(s)")
                                 else:
                                     raise RuntimeError(
-                                        f"RAR extraction failed: bundled unrar library error was: {_lib_err}. "
-                                        "No CLI fallback (UnRAR.exe/7-Zip) found. Please reinstall Ascendara or install 7-Zip from https://7-zip.org/"
+                                        f"RAR extraction failed after bundled recovery: {_lib_err}"
                                     )
                             logging.info(f"[AscendaraGofileHelper] RAR extraction with CLI tools complete")
                             self._update_extraction_progress("Complete", self._files_extracted_count, max(total_files_to_extract, 1), force=True)

@@ -1673,11 +1673,6 @@ class AscendaraDownloader:
 
         # On Windows, use the Python unrar library with bundled DLL
         if sys.platform == "win32":
-            try:
-                from unrar import rarfile
-            except ImportError:
-                raise RuntimeError("UnRAR library not found. Please reinstall Ascendara.")
-
             # Always try the bundled Python unrar library first - it supports
             # password-protected and encrypted archives via setpassword().
             logging.info(f"[AscendaraDownloader] Extracting RAR with Python unrar library: {archive_path}")
@@ -1688,7 +1683,30 @@ class AscendaraDownloader:
                 raise
             except Exception as _lib_err:
                 _lib_err_msg = str(_lib_err)
-                logging.warning(f"[AscendaraDownloader] Python library extraction failed ({_lib_err_msg}), falling back to CLI tools")
+                logging.warning(f"[AscendaraDownloader] Python library extraction failed ({_lib_err_msg}), trying bundled streaming recovery")
+
+            try:
+                from AscendaraRarRecovery import extract_rar_recovery
+                initial_count = self._files_extracted_count
+                recovered_count = 0
+
+                def on_recovered_file(name, size):
+                    nonlocal recovered_count
+                    recovered_count += 1
+                    key = os.path.relpath(os.path.join(extract_to or self.download_dir, name), self.download_dir).replace('\\', '/')
+                    watching_data[key] = {"size": size}
+                    self._update_extraction_progress(name, initial_count + recovered_count, self._total_files_to_extract)
+
+                extract_rar_recovery(archive_path, extract_to or self.download_dir,
+                                     on_file=on_recovered_file, should_stop=self._check_for_stop)
+                self._files_extracted_count = initial_count + recovered_count
+                self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
+                return
+            except (InterruptedError, OSError, ValueError):
+                raise
+            except Exception as recovery_error:
+                _lib_err_msg = str(recovery_error)
+                logging.warning(f"[AscendaraDownloader] Bundled streaming recovery failed: {_lib_err_msg}")
 
             # Use CLI extraction tools as fallback when Python library fails
             _CREATE_NO_WINDOW = 0x08000000
@@ -1743,7 +1761,7 @@ class AscendaraDownloader:
                     archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
                     timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
                     _proc.wait(timeout=timeout_seconds)
-                    if _proc.returncode in (0, 1):
+                    if _proc.returncode == 0:
                         _extraction_success = True
                         logging.info(f"[AscendaraDownloader] unrar extraction completed successfully")
                     else:
@@ -1765,7 +1783,7 @@ class AscendaraDownloader:
                         archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
                         timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
                         _, _7z_stderr = _proc.communicate(timeout=timeout_seconds)
-                        if _proc.returncode in (0, 1):
+                        if _proc.returncode == 0:
                             _extraction_success = True
                             logging.info(f"[AscendaraDownloader] 7z extraction completed successfully")
                         else:
@@ -1778,8 +1796,7 @@ class AscendaraDownloader:
                         raise RuntimeError(f"7z extraction timed out after {timeout_seconds // 3600} hour(s)")
                 else:
                     raise RuntimeError(
-                        f"RAR extraction failed: bundled unrar library error was: {_lib_err_msg}. "
-                        "No CLI fallback (UnRAR.exe/7-Zip) found. Please reinstall Ascendara or install 7-Zip from https://7-zip.org/"
+                        f"RAR extraction failed after bundled recovery: {_lib_err_msg}"
                     )
             logging.info(f"[AscendaraDownloader] RAR extraction with CLI tools complete")
             for dirpath, _, filenames in os.walk(self.download_dir):
