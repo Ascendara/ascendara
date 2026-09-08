@@ -1639,6 +1639,7 @@ const DownloadCard = ({
     "[WinError 225]",
     "Connection broken",
     "IncompleteRead",
+    "HTTP 410",
   ];
 
   const isPredefinedError = message => {
@@ -1728,6 +1729,7 @@ const DownloadCard = ({
     if (msg.includes("no_files_error")) return t("downloads.noFilesError");
     if (msg.includes("provider_blocked_error"))
       return t("downloads.connectionResetError");
+    if (msg.includes("HTTP 410")) return t("downloads.resourceGoneError");
     if (msg.includes("[Errno 28] No space left on device"))
       return t(
         "downloads.noSpaceLeftError",

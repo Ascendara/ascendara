@@ -1395,6 +1395,7 @@
     "connectionResetError": "The download could not start because the connection was aborted. Your internet service provider may be blocking this specific download source, consider using a VPN.",
     "contentTypeError": "The downloader reported a content type error. This most likely means the download link has expired.",
     "currentTotalSpeed": "Current Total Speed",
+    "resourceGoneError": "This game was removed from the download provider and is no longer available. Try updating your local index or using a different provider.",
     "downloadError": "Download Error",
     "downloading": "Downloading",
     "downloadsInProgress": "{{count}} download in progress",
