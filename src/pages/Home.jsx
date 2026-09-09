@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import RecentGameCard from "@/components/RecentGameCard";
 import GameContextMenu from "@/components/GameContextMenu";
+import SteamNotRunningDialog from "@/components/SteamNotRunningDialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import {
@@ -50,6 +51,7 @@ import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 import recentGamesService from "@/services/recentGamesService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { sanitizeText } from "@/lib/utils";
 
@@ -510,6 +512,7 @@ const Home = memo(() => {
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextMenuGame, setContextMenuGame] = useState(null);
   const [playLaterGames, setPlayLaterGames] = useState([]);
+  const [showSteamNotRunningWarning, setShowSteamNotRunningWarning] = useState(false);
 
   // Load Play Later games
   useEffect(() => {
@@ -996,6 +999,25 @@ const Home = memo(() => {
   const handlePlayGame = async game => {
     try {
       const gameName = game.game || game.name;
+
+      // Check if game is already running
+      if (await window.electron.isGameRunning(gameName)) {
+        toast.error(t("library.alreadyRunning", { game: gameName }));
+        return;
+      }
+
+      // Check if Steam is running for onlinefix games
+      if (game.online) {
+        const hideSteamWarning = localStorage.getItem("hideSteamWarning");
+        if (!hideSteamWarning) {
+          if (!(await window.electron.isSteamRunning())) {
+            toast.error(t("library.steamNotRunning"));
+            setShowSteamNotRunningWarning(true);
+            return;
+          }
+        }
+      }
+
       // Cloud-first pre-launch merge (silent / best-effort).
       await pullCloudGameDataBeforeLaunch(gameName);
       await window.electron.playGame(gameName, game.isCustom);
@@ -1183,6 +1205,12 @@ const Home = memo(() => {
         onReadMore={handleReadMore}
         onPlayLater={handlePlayLaterFromContext}
         isPlayLater={contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)}
+      />
+
+      <SteamNotRunningDialog
+        open={showSteamNotRunningWarning}
+        onClose={() => setShowSteamNotRunningWarning(false)}
+        t={t}
       />
 
       <div className="px-6 py-6">

@@ -379,6 +379,35 @@ function registerDownloadHandlers() {
           }
         }
         gameDirectory = path.join(targetDirectory, sanitizedGame);
+
+        // If the destination folder already exists and wasn't created by a
+        // previous Ascendara download (no tracking JSON present), it likely
+        // contains files unrelated to this download (e.g. a manual install
+        // with save data). Snapshot its current top-level contents so they
+        // are never touched if the user later kills/deletes the download.
+        const existingJsonPath = path.join(
+          gameDirectory,
+          `${sanitizedGame}.ascendara.json`
+        );
+        if (fs.existsSync(gameDirectory) && !fs.existsSync(existingJsonPath)) {
+          try {
+            const preexistingEntries = await fs.promises.readdir(gameDirectory);
+            if (preexistingEntries.length > 0) {
+              console.log(
+                `Destination folder already exists with ${preexistingEntries.length} pre-existing item(s), preserving them: ${gameDirectory}`
+              );
+              await fs.promises.writeFile(
+                path.join(gameDirectory, "preexisting.ascendara.json"),
+                JSON.stringify(preexistingEntries, null, 2)
+              );
+            }
+          } catch (snapshotError) {
+            console.error(
+              `Failed to snapshot pre-existing directory contents: ${snapshotError}`
+            );
+          }
+        }
+
         await fs.promises.mkdir(gameDirectory, { recursive: true });
       }
 
@@ -964,6 +993,29 @@ function registerDownloadHandlers() {
       // Step 5: Delete contents if requested
       if (deleteContents) {
         console.log(`Deleting game directory: ${gameDirectory}`);
+
+        // Never delete items that existed in this folder before Ascendara
+        // started downloading into it (e.g. a manual install with save
+        // data that happened to share the same folder name).
+        const preexistingMarkerPath = path.join(
+          gameDirectory,
+          "preexisting.ascendara.json"
+        );
+        let preexistingEntries = [];
+        if (fs.existsSync(preexistingMarkerPath)) {
+          try {
+            preexistingEntries = JSON.parse(
+              fs.readFileSync(preexistingMarkerPath, "utf8")
+            );
+            console.log(
+              `Preserving ${preexistingEntries.length} pre-existing item(s) found before this download started`
+            );
+          } catch (markerError) {
+            console.error(`Error reading pre-existing items marker: ${markerError}`);
+          }
+        }
+        const preexistingSet = new Set(preexistingEntries);
+
         let attempts = 0;
         const maxAttempts = 5;
         while (attempts < maxAttempts) {
@@ -972,11 +1024,25 @@ function registerDownloadHandlers() {
               withFileTypes: true,
             });
             for (const file of files) {
+              if (preexistingSet.has(file.name)) {
+                continue;
+              }
               const fullPath = path.join(gameDirectory, file.name);
               await fs.promises.rm(fullPath, { recursive: true, force: true });
             }
-            await fs.promises.rmdir(gameDirectory);
-            console.log(`Successfully deleted game directory`);
+            if (fs.existsSync(preexistingMarkerPath)) {
+              await fs.promises.rm(preexistingMarkerPath, { force: true });
+            }
+            // Only remove the directory itself if nothing pre-existing is left in it
+            const remaining = await fs.promises.readdir(gameDirectory);
+            if (remaining.length === 0) {
+              await fs.promises.rmdir(gameDirectory);
+              console.log(`Successfully deleted game directory`);
+            } else {
+              console.log(
+                `Kept game directory because it still contains ${remaining.length} pre-existing item(s): ${gameDirectory}`
+              );
+            }
             break;
           } catch (deleteError) {
             attempts++;

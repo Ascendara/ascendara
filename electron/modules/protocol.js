@@ -16,6 +16,29 @@ let pendingUrls = new Set();
 const URL_DEBOUNCE_TIME = 2000;
 
 /**
+ * Bring the main window to the foreground, restoring/showing it if needed.
+ * Used when another launch attempt (protocol URL, second instance, or a
+ * plain relaunch while already running hidden) needs to surface the app.
+ */
+function focusMainWindow() {
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length === 0) {
+    console.log("No windows found, creating new window");
+    createWindow();
+    return;
+  }
+
+  const mainWindow = windows[0];
+  setMainWindowHidden(false);
+  if (!mainWindow.isVisible()) mainWindow.show();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.setAlwaysOnTop(true);
+  mainWindow.focus();
+  mainWindow.center();
+  setTimeout(() => mainWindow.setAlwaysOnTop(false), 100);
+}
+
+/**
  * Handle protocol URL
  * @param {string} url - The protocol URL to handle
  */
@@ -244,12 +267,17 @@ function setupSingleInstance() {
       if (processExists) {
         console.log("Another instance is running (PID:", existingPid + "), passing protocol URL and exiting");
         
-        // If we have a protocol URL in argv, write it to the protocol file
+        // If we have a protocol URL in argv, write it to the protocol file.
+        // Otherwise (e.g. user just relaunched the app normally), signal the
+        // existing instance to bring its window to the front - this matters
+        // when it was started hidden (start minimized on login).
         const protocolUrl = process.argv.find(arg => arg.startsWith("ascendara://"));
-        if (protocolUrl) {
-          fs.writeFileSync(protocolFile, protocolUrl, "utf8");
-          console.log("Wrote protocol URL to file for existing instance");
-        }
+        fs.writeFileSync(protocolFile, protocolUrl || "ascendara://show-window", "utf8");
+        console.log(
+          protocolUrl
+            ? "Wrote protocol URL to file for existing instance"
+            : "Wrote show-window signal to file for existing instance"
+        );
         
         app.exit(0);
         return false;
@@ -279,7 +307,11 @@ function setupSingleInstance() {
       if (filename === "protocol.txt" && fs.existsSync(protocolFile)) {
         try {
           const protocolUrl = fs.readFileSync(protocolFile, "utf8").trim();
-          if (protocolUrl && protocolUrl.startsWith("ascendara://")) {
+          if (protocolUrl === "ascendara://show-window") {
+            console.log("Received show-window signal from another instance");
+            focusMainWindow();
+            fs.unlinkSync(protocolFile);
+          } else if (protocolUrl && protocolUrl.startsWith("ascendara://")) {
             console.log("Received protocol URL from another instance:", protocolUrl);
             handleProtocolUrl(protocolUrl);
             // Delete the file after reading
@@ -352,25 +384,12 @@ function setupSingleInstance() {
     }
 
     const windows = BrowserWindow.getAllWindows();
+    focusMainWindow();
 
-    if (windows.length > 0) {
-      const mainWindow = windows[0];
-      setMainWindowHidden(false);
-      if (!mainWindow.isVisible()) mainWindow.show();
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.setAlwaysOnTop(true);
-      mainWindow.focus();
-      mainWindow.center();
-      setTimeout(() => mainWindow.setAlwaysOnTop(false), 100);
-      
-      // Only send second-instance-detected if there's no protocol URL
-      // (protocol URL handling will navigate to the appropriate page)
-      if (!protocolUrl) {
-        mainWindow.webContents.send("second-instance-detected");
-      }
-    } else {
-      console.log("No windows found, creating new window");
-      createWindow();
+    // Only send second-instance-detected if there's no protocol URL
+    // (protocol URL handling will navigate to the appropriate page)
+    if (windows.length > 0 && !protocolUrl) {
+      windows[0].webContents.send("second-instance-detected");
     }
   });
 

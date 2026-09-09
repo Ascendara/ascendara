@@ -165,6 +165,12 @@ function registerMiscHandlers() {
         webPreferences: {
           contextIsolation: true,
           nativeWindowOpen: false,
+          // Disable sandbox for Linux compatibility (same as main window)
+          sandbox: false,
+          // Disable web security to allow CORS requests (same as main window)
+          webSecurity: false,
+          // Prevent rendering stalls when the window is idle or in the background
+          backgroundThrottling: false,
         },
       });
 
@@ -177,6 +183,29 @@ function registerMiscHandlers() {
         event.preventDefault();
         console.log("Blocked new-window popup in external window");
       });
+
+      // Block known ad/tracker hosts and resources from loading in the
+      // external window (e.g. injected ad images/scripts on megadb/buzzheavier).
+      const blockedResourceHosts = ["aichouphaugn.com"];
+      externalWindow.webContents.session.webRequest.onBeforeRequest(
+        { urls: ["*://*/*"] },
+        (details, callback) => {
+          try {
+            const host = new URL(details.url).hostname.toLowerCase();
+            const isBlockedHost = blockedResourceHosts.some(
+              blocked => host === blocked || host.endsWith(`.${blocked}`)
+            );
+            if (isBlockedHost) {
+              console.log("Blocked ad resource in external window:", details.url);
+              callback({ cancel: true });
+              return;
+            }
+          } catch (error) {
+            console.error("Failed to parse external window resource URL:", details.url, error);
+          }
+          callback({ cancel: false });
+        }
+      );
 
       const allowedHosts = [
         "buzzheavier.com",
@@ -249,6 +278,65 @@ function registerMiscHandlers() {
             console.error("Failed to inspect external window content:", error);
           }
         }, 3000);
+      });
+
+      // Some ad networks (e.g. Adsterra "Social Bar") don't open a real popup
+      // window at all -- they inject a fake "notification"/"reminder" overlay
+      // directly into the page DOM. Blocking the network request for the
+      // popup/image isn't enough since the overlay markup itself still
+      // renders. Strip out any overlay whose text matches known ad phrasing,
+      // and keep watching for ones injected later (these often appear after
+      // a delay or on an interval).
+      externalWindow.webContents.on("did-finish-load", () => {
+        if (externalWindow.isDestroyed()) return;
+        externalWindow.webContents
+          .executeJavaScript(
+            `(function () {
+              if (window.__ascendaraAdOverlayObserver) return;
+              const blockedHosts = ${JSON.stringify(blockedResourceHosts)};
+              function findOverlayRoot(image) {
+                let el = image.parentElement;
+                while (el && el !== document.body && el !== document.documentElement) {
+                  const position = window.getComputedStyle(el).position;
+                  if (
+                    (position === "fixed" || position === "absolute") &&
+                    el.style.left === "50%" && el.style.top === "50%"
+                  ) {
+                    return el;
+                  }
+                  el = el.parentElement;
+                }
+                return null;
+              }
+              function sweep() {
+                for (const image of document.querySelectorAll("img[src]")) {
+                  let host;
+                  try {
+                    host = new URL(image.src, document.baseURI).hostname.toLowerCase();
+                  } catch {
+                    continue;
+                  }
+                  if (!blockedHosts.some(blocked =>
+                    host === blocked || host.endsWith("." + blocked)
+                  )) continue;
+                  const overlay = findOverlayRoot(image);
+                  if (overlay && overlay.isConnected) overlay.remove();
+                }
+              }
+              sweep();
+              const observer = new MutationObserver(sweep);
+              observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ["src", "style", "class"],
+              });
+              window.__ascendaraAdOverlayObserver = observer;
+            })();`
+          )
+          .catch(error => {
+            console.error("Failed to inject ad overlay cleanup script:", error);
+          });
       });
 
       blankPageTimeout = setTimeout(() => {
@@ -697,12 +785,44 @@ function registerMiscHandlers() {
       const gameDirectory = path.join(settings.downloadDirectory, game);
 
       try {
+        // Never delete items that existed in this folder before Ascendara
+        // started downloading into it (e.g. a manual install with save
+        // data that happened to share the same folder name).
+        const preexistingMarkerPath = path.join(
+          gameDirectory,
+          "preexisting.ascendara.json"
+        );
+        let preexistingEntries = [];
+        if (fs.existsSync(preexistingMarkerPath)) {
+          try {
+            preexistingEntries = JSON.parse(
+              fs.readFileSync(preexistingMarkerPath, "utf8")
+            );
+          } catch (markerError) {
+            console.error(`Error reading pre-existing items marker: ${markerError}`);
+          }
+        }
+        const preexistingSet = new Set(preexistingEntries);
+
         const files = await fs.promises.readdir(gameDirectory, { withFileTypes: true });
         for (const file of files) {
+          if (preexistingSet.has(file.name)) {
+            continue;
+          }
           const fullPath = path.join(gameDirectory, file.name);
           await fs.promises.rm(fullPath, { recursive: true, force: true });
         }
-        await fs.promises.rmdir(gameDirectory);
+        if (fs.existsSync(preexistingMarkerPath)) {
+          await fs.promises.rm(preexistingMarkerPath, { force: true });
+        }
+        const remaining = await fs.promises.readdir(gameDirectory);
+        if (remaining.length === 0) {
+          await fs.promises.rmdir(gameDirectory);
+        } else {
+          console.log(
+            `Kept game directory because it still contains ${remaining.length} pre-existing item(s): ${gameDirectory}`
+          );
+        }
       } catch (error) {
         console.error("Error deleting the game directory:", error);
         throw error;

@@ -79,6 +79,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useSettings } from "@/context/SettingsContext";
 import {
   processNextInQueue,
@@ -191,6 +193,7 @@ const Downloads = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { isAuthenticated, user } = useAuth();
+  const { settings } = useSettings();
 
   // Track processed commands to prevent duplicates
   const processedCommandsRef = useRef(new Set());
@@ -359,6 +362,7 @@ const Downloads = () => {
   const fadingGamesRef = React.useRef(new Set());
   const resumingDownloadsRef = React.useRef(new Set());
   const prevActiveCountRef = React.useRef(0);
+  const settingsRef = React.useRef(settings);
   useEffect(() => {
     downloadingGamesRef.current = downloadingGames;
   }, [downloadingGames]);
@@ -371,8 +375,12 @@ const Downloads = () => {
   useEffect(() => {
     resumingDownloadsRef.current = resumingDownloads;
   }, [resumingDownloads]);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
   const [stopModalOpen, setStopModalOpen] = useState(false);
   const [gameToStop, setGameToStop] = useState(null);
+  const [killDeleteOption, setKillDeleteOption] = useState("delete");
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false);
   const [showAscendWarning, setShowAscendWarning] = useState(false);
   const [gameToResume, setGameToResume] = useState(null);
@@ -500,6 +508,32 @@ const Downloads = () => {
           setCompletedGames(
             prev => new Set([...prev, ...newlyCompleted.map(g => g.game)])
           );
+
+          // Automatically create a desktop shortcut as soon as the download/install
+          // finishes, regardless of whether the game has ever been launched.
+          if (settingsRef.current.autoCreateShortcuts) {
+            newlyCompleted.forEach(async completedGame => {
+              try {
+                const executables = await window.electron.getGameExecutables(
+                  completedGame.game,
+                  false
+                );
+                const executable = executables?.[0];
+                if (!executable) return;
+                await window.electron.createGameShortcut({
+                  game: completedGame.game,
+                  name: completedGame.game,
+                  executable,
+                  custom: false,
+                });
+              } catch (error) {
+                console.error(
+                  `Failed to auto-create shortcut for ${completedGame.game}:`,
+                  error
+                );
+              }
+            });
+          }
 
           // Process next queued download when a game completes
           // This triggers immediately when the "Download Complete" card shows
@@ -715,22 +749,29 @@ const Downloads = () => {
 
   const handleKillDownload = game => {
     setGameToStop(game);
+    setKillDeleteOption("delete");
     setStopModalOpen(true);
   };
 
-  const executeKillDownload = async game => {
-    console.log("Executing kill download for:", game);
+  const executeKillDownload = async (game, deleteFiles = true) => {
+    console.log("Executing kill download for:", game, "deleteFiles:", deleteFiles);
     setStoppingDownloads(prev => new Set([...prev, game.game]));
     try {
-      const result = await window.electron.stopDownload(game.game, true);
+      const result = await window.electron.stopDownload(game.game, deleteFiles);
       console.log("Kill download result:", result);
       if (!result) {
         throw new Error("Failed to kill download");
       }
-      // Clear the cached download data since the download is being deleted
-      clearCachedDownloadData(game.game);
+      if (deleteFiles) {
+        // Clear the cached download data since the download is being deleted
+        clearCachedDownloadData(game.game);
+      }
       setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
-      toast.success(t("downloads.killSuccess"));
+      toast.success(
+        deleteFiles
+          ? t("downloads.killSuccess")
+          : t("downloads.killSuccessKeepFiles")
+      );
 
       // Wait for the download to be fully removed from filesystem
       // before syncing, so the sync reflects the removal
@@ -1057,12 +1098,6 @@ const Downloads = () => {
                 isResuming={resumingDownloads.has(game.game)}
                 isCompleted={completedGames.has(game.game)}
                 isFading={fadingGames.has(game.game)}
-                onDelete={deletedGame => {
-                  setDownloadingGames(prev =>
-                    prev.filter(g => g.game !== deletedGame.game)
-                  );
-                }}
-                onClearCache={clearCachedDownloadData}
               />
             ))}
           </div>
@@ -1190,12 +1225,43 @@ const Downloads = () => {
           <AlertDialogDescription className="text-muted-foreground">
             {t("downloads.actions.killDownloadDescription")}
           </AlertDialogDescription>
+          <RadioGroup
+            value={killDeleteOption}
+            onValueChange={setKillDeleteOption}
+            className="mt-2 space-y-2"
+          >
+            <div className="flex items-start space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+              <RadioGroupItem value="delete" id="kill-delete-files" className="mt-1" />
+              <Label htmlFor="kill-delete-files" className="flex-1 cursor-pointer">
+                <span className="font-medium text-foreground">
+                  {t("downloads.actions.deleteFilesOption")}
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.actions.deleteFilesOptionDescription")}
+                </p>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
+              <RadioGroupItem value="keep" id="kill-keep-files" className="mt-1" />
+              <Label htmlFor="kill-keep-files" className="flex-1 cursor-pointer">
+                <span className="font-medium text-foreground">
+                  {t("downloads.actions.keepFilesOption")}
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.actions.keepFilesOptionDescription")}
+                </p>
+              </Label>
+            </div>
+          </RadioGroup>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-primary">
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => gameToStop && executeKillDownload(gameToStop)}
+              onClick={() =>
+                gameToStop &&
+                executeKillDownload(gameToStop, killDeleteOption === "delete")
+              }
               className="text-secondary"
             >
               <XCircle className="mr-2 h-4 w-4" />
@@ -1327,12 +1393,9 @@ const DownloadCard = ({
   isResuming,
   isCompleted,
   isFading,
-  onDelete,
-  onClearCache,
 }) => {
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
   const [installerLaunched, setInstallerLaunched] = useState(false);
   const [isFinishingInstall, setIsFinishingInstall] = useState(false);
@@ -1556,14 +1619,6 @@ const DownloadCard = ({
     }
   };
 
-  const handleRemoveDownload = async game => {
-    setIsDeleting(true);
-    if (onClearCache) onClearCache(game.game);
-    await window.electron.deleteGameDirectory(game.game);
-    setIsDeleting(false);
-    if (onDelete) onDelete(game);
-  };
-
   // Check if this error was already reported
   const [wasReported, setWasReported] = useState(() => {
     try {
@@ -1580,6 +1635,7 @@ const DownloadCard = ({
     "no_files_error",
     "provider_blocked_error",
     "[Errno 28] No space left on device",
+    "Insufficient disk space",
     "[WinError 225]",
     "Connection broken",
     "IncompleteRead",
@@ -1601,6 +1657,27 @@ const DownloadCard = ({
       if (!response.ok) throw new Error("Failed to obtain token");
       const { token } = await response.json();
 
+      const details = [
+        "**Game Information**",
+        `• Name: ${game.game}`,
+        `• Version: ${game.version || "Unknown"}`,
+        `• Size: ${game.size || "Unknown"}`,
+        "",
+        "**Error**",
+        "```",
+        downloadingData.message || "Unknown error",
+        "```",
+        "",
+        "**Download State**",
+        `• Progress: ${downloadingData.progressCompleted || "0"}%`,
+        `• Speed: ${downloadingData.progressDownloadSpeeds || "N/A"}`,
+        "",
+        "**System Info**",
+        `• Platform: ${window.electron.getPlatform() || "Unknown"}`,
+        `• App Version: v${__APP_VERSION__ || "Unknown"}`,
+        `• Timestamp: ${new Date().toISOString()}`,
+      ].join("\n");
+
       const reportResponse = await fetch("https://api.ascendara.app/app/report/feature", {
         method: "POST",
         headers: {
@@ -1610,20 +1687,7 @@ const DownloadCard = ({
         body: JSON.stringify({
           reportType: "GameDownload",
           reason: `Download Error: ${game.game}`,
-          details: `Error Details:
-          • Game Name: ${game.game}
-          • Game Version: ${game.version || "N/A"}
-          • Game Size: ${game.size || "N/A"}
-          • Error Message: ${downloadingData.message || "Unknown error"}
-
-          Download State:
-          • Progress: ${downloadingData.progressCompleted || "0"}%
-          • Download Speed: ${downloadingData.progressDownloadSpeeds || "N/A"}
-
-          System Info:
-          • Timestamp: ${new Date().toISOString()}
-          • Platform: ${window.electron.getPlatform() || "Unknown"}
-          • App Version: ${__APP_VERSION__ || "Unknown"}`,
+          details,
           gameName: game.game,
         }),
       });
@@ -1755,7 +1819,7 @@ const DownloadCard = ({
                 size="icon"
                 className="h-9 w-9 rounded-xl hover:bg-muted/80"
               >
-                {isStopping || isDeleting ? (
+                {isStopping ? (
                   <Loader className="h-4 w-4 animate-spin" />
                 ) : (
                   <MoreVertical className="h-4 w-4" />
@@ -1770,11 +1834,11 @@ const DownloadCard = ({
                     {t("downloads.actions.resumeDownload")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => handleRemoveDownload(game)}
+                    onClick={() => onKill(game)}
                     className="gap-2 text-red-600 focus:text-red-600"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    {t("downloads.actions.cancelAndDelete")}
+                    <XCircle className="h-4 w-4" />
+                    {t("downloads.actions.killDownload")}
                   </DropdownMenuItem>
                 </>
               ) : hasError ? (
@@ -1784,11 +1848,11 @@ const DownloadCard = ({
                     {t("downloads.actions.retryDownload")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => handleRemoveDownload(game)}
+                    onClick={() => onKill(game)}
                     className="gap-2 text-red-600 focus:text-red-600"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    {t("downloads.actions.cancelAndDelete")}
+                    <XCircle className="h-4 w-4" />
+                    {t("downloads.actions.killDownload")}
                   </DropdownMenuItem>
                 </>
               ) : (

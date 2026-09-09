@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/tooltip";
 import AscendSidebar from "@/components/AscendSidebar";
 import LevelingCard from "@/components/LevelingCard";
-import CommunityHub from "@/components/CommunityHub";
 import AdStats from "@/components/AdStats";
 import SubscriptionPlanDialog from "@/components/SubscriptionPlanDialog";
 import { toast } from "sonner";
@@ -8902,13 +8901,6 @@ const Ascend = () => {
             </div>
           );
 
-        case "community":
-          return (
-            <div className="relative h-[calc(100vh-200px)]">
-              <CommunityHub user={user} userData={userData} />
-            </div>
-          );
-
         case "cloudbackups":
           return (
             <div className="mb-24 space-y-6">
@@ -9195,7 +9187,7 @@ const Ascend = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <h3 className="mt-4 text-lg font-semibold">
-                        {t("ascend.premium.webView.title") || "Game Communities"}
+                        {t("ascend.premium.webView.title")}
                       </h3>
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -9446,30 +9438,6 @@ const Ascend = () => {
                     <p className="mt-2 text-sm text-muted-foreground">
                       {t("ascend.premium.downloadQueue.description") ||
                         "Queue multiple downloads and let Ascendara handle them automatically. Start downloads and come back when they're all ready."}
-                    </p>
-                  </div>
-                </motion.div>
-
-                {/* Game Communities */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-                >
-                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-500/10 blur-2xl transition-all group-hover:bg-rose-500/20" />
-                  <div className="relative">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
-                      <Gamepad2 className="h-6 w-6" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="mt-4 text-lg font-semibold">
-                        {t("ascend.premium.communities.title") || "Game Communities"}
-                      </h3>
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {t("ascend.premium.communities.description") ||
-                        "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions."}
                     </p>
                   </div>
                 </motion.div>

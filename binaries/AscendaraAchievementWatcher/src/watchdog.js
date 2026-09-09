@@ -82,13 +82,18 @@ async function getSteamApiLang() {
 }
 let sendNotification = async opts => {
   try {
+    const helperName =
+      process.platform === "win32"
+        ? "AscendaraNotificationHelper.exe"
+        : "AscendaraNotificationHelper";
     const exePath =
       process.env.NODE_ENV === "development"
         ? path.join(
             path.dirname(process.execPath),
-            "../../AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe"
+            "../../AscendaraNotificationHelper/dist",
+            helperName
           )
-        : path.join(path.dirname(process.execPath), "AscendaraNotificationHelper.exe");
+        : path.join(path.dirname(process.execPath), helperName);
     let args = [];
     args.push("--is-achievement");
     let settings = await getSettings();
@@ -340,8 +345,10 @@ async function processFileEvent(name, options, self) {
         if (onlineFixIdx !== -1 && parts.length > onlineFixIdx + 1) {
           appID = parts[onlineFixIdx + 1];
         } else {
+          // Use a separator-agnostic pattern so this works on both
+          // Windows ("\\") and Linux/Proton ("/") paths.
           appID = filePath.dir
-            .replace(/(\\stats$)|(\\SteamEmu$)|(\\SteamEmu\\UserStats$)/gi, "")
+            .replace(/([\\/]stats$)|([\\/]SteamEmu$)|([\\/]SteamEmu[\\/]UserStats$)/gi, "")
             .match(/([0-9]+$)/g)[0];
         }
       }
@@ -353,42 +360,11 @@ async function processFileEvent(name, options, self) {
 
     let game = await self.load(appID);
 
-    let isRunning = false;
-
-    if (options.disableCheckIfProcessIsRunning === true) {
-      isRunning = true;
-    } else if (self.options.notification_advanced.checkIfProcessIsRunning) {
-      if (await isFullscreenAppRunning()) {
-        isRunning = true;
-        console.log(
-          "Fullscreen application detected on primary display. Assuming process is running"
-        );
-      } else if (game.binary) {
-        isRunning = await tasklist.isProcessRunning(game.binary).catch(err => {
-          console.error(err);
-          console.warn("Assuming process is NOT running");
-          return false;
-        });
-
-        if (!isRunning) {
-          console.log("Trying with '-Win64-Shipping' (Unreal Engine Game) ...");
-          isRunning = await tasklist
-            .isProcessRunning(game.binary.replace(".exe", "-Win64-Shipping.exe"))
-            .catch(err => {
-              console.error(err);
-              console.warn("Assuming process is NOT running");
-              return false;
-            });
-        }
-      } else {
-        console.warn(
-          `Warning! Missing "${game.name}" (${game.appid}) binary name > Overriding user choice to check if process is running`
-        );
-        isRunning = true;
-      }
-    } else {
-      isRunning = true;
-    }
+    // NOTE: `notification_advanced.checkIfProcessIsRunning` is never enabled
+    // anywhere in this app, so we always fall through to "assume running".
+    // (A previous cross-platform process-running check referenced an
+    // undefined `tasklist`/`isFullscreenAppRunning` and was removed.)
+    let isRunning = true;
 
     if (isRunning) {
       let achievements = await monitor.parse(name);

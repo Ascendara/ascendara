@@ -299,11 +299,16 @@ def handleerror(game_info, game_info_path, e):
     game_info['online'] = ""
     game_info['dlc'] = ""
     game_info['isRunning'] = False
-    game_info['version'] = ""
     game_info['executable'] = ""
+    prev_data = game_info.get('downloadingData') or {}
     game_info['downloadingData'] = {
         "error": True,
-        "message": str(e)
+        "message": str(e),
+        # Preserve the last known progress/speed so error reports reflect
+        # how far the download/extraction actually got instead of showing 0%/N-A.
+        "progressCompleted": prev_data.get("progressCompleted", "0.00"),
+        "progressDownloadSpeeds": prev_data.get("progressDownloadSpeeds", "0.00 KB/s"),
+        "timeUntilComplete": prev_data.get("timeUntilComplete", "0s"),
     }
     safe_write_json(game_info_path, game_info)
 
@@ -2250,6 +2255,14 @@ def main():
                 
                 # Only update if error is not already set in downloadingData
                 if not game_info.get('downloadingData', {}).get('error'):
+                    prev_data = game_info.get('downloadingData') or {}
+                    # Preserve the last known progress/speed so error reports reflect
+                    # how far the download/extraction actually got instead of showing 0%/N-A.
+                    progress_fields = {
+                        "progressCompleted": prev_data.get("progressCompleted", "0.00"),
+                        "progressDownloadSpeeds": prev_data.get("progressDownloadSpeeds", "0.00 KB/s"),
+                        "timeUntilComplete": prev_data.get("timeUntilComplete", "0s"),
+                    }
                     # Check if it's a rate limit error and use user-friendly message
                     if "RATE_LIMIT:" in error_str or "error-rateLimit" in error_str:
                         user_friendly_msg = "Gofile rate limit reached. Please enable a VPN and try again in a few minutes."
@@ -2260,7 +2273,8 @@ def main():
                             "message": user_friendly_msg,
                             "downloading": False,
                             "extracting": False,
-                            "verifying": False
+                            "verifying": False,
+                            **progress_fields
                         }
                         
                         if args.withNotification:
@@ -2276,7 +2290,8 @@ def main():
                             "message": error_str,
                             "downloading": False,
                             "extracting": False,
-                            "verifying": False
+                            "verifying": False,
+                            **progress_fields
                         }
                     
                     safe_write_json(game_info_path, game_info)

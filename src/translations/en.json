@@ -1159,7 +1159,36 @@
       "nextStep": "Next Step →",
       "noThanks": "No Thanks",
       "startGuide": "Start Guide",
-      "steps": "[{'description': 'The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don\\'t have it, close the guide and click the \"Don\\'t have the extension? Get it for Chrome or Firefox\" button to download it.', 'title': 'The Ascendara Download Handler'}, {'description': 'After installing the extension, click the extension icon to enable the handler.', 'title': 'Step 1: Enable the Handler'}, {'description': 'The extension can stay on as it will only send known providers to Ascendara.', 'title': 'The Download Handler'}, {'description': 'Complete the CAPTCHA, and start the download.', 'title': 'Step 2: Start the download'}, {'description': 'Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.', 'title': 'Step 3: Using the Extension'}, {'description': 'Click the button to Open Ascendara.', 'title': 'Step 4: Downloading'}, {'description': \"Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.\", 'title': \"That's it!\"}]",
+      "steps": [
+        {
+          "title": "The Ascendara Download Handler",
+          "description": "The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don't have it, close the guide and click the \"Don't have the extension? Get it for Chrome or Firefox\" button to download it."
+        },
+        {
+          "title": "Step 1: Enable the Handler",
+          "description": "After installing the extension, click the extension icon to enable the handler."
+        },
+        {
+          "title": "The Download Handler",
+          "description": "The extension can stay on as it will only send known providers to Ascendara."
+        },
+        {
+          "title": "Step 2: Start the download",
+          "description": "Complete the CAPTCHA, and start the download."
+        },
+        {
+          "title": "Step 3: Using the Extension",
+          "description": "Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara."
+        },
+        {
+          "title": "Step 4: Downloading",
+          "description": "Click the button to Open Ascendara."
+        },
+        {
+          "title": "That's it!",
+          "description": "Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it."
+        }
+      ],
       "title": "Downloading with Ascendara"
     },
     "noDownloadPath": {
@@ -1186,6 +1215,19 @@
       "title": "Game Already Installed",
       "desc": "This game is already installed in your library. Reinstalling may cause issues such as overwriting save data or corrupting existing files. Are you sure you want to continue?",
       "continueAnyway": "Reinstall Anyway"
+    },
+    "directoryConflict": {
+      "title": "Folder Already Exists",
+      "desc": "A folder named \"{{folder}}\" already exists in your games directory. What would you like to do with it?",
+      "rename": "Rename Existing Folder",
+      "renameDesc": "Ascendara will rename the existing folder (adding \"_OLD\") and download fresh into a new one.",
+      "delete": "Delete Existing Folder",
+      "deleteDesc": "Permanently remove the existing folder before downloading.",
+      "merge": "Merge With New Download",
+      "mergeDesc": "Download into the existing folder, keeping files that aren't overwritten. This can corrupt game data if the contents don't match.",
+      "confirmMergeTitle": "Merge Folders?",
+      "confirmMergeDesc": "Merging could corrupt game data if the existing files don't match this download. Are you sure you want to continue?",
+      "confirmMerge": "Merge Anyway"
     },
     "providerBlocked": {
       "title": "Provider Site Couldn't Load",
@@ -1289,7 +1331,11 @@
       "gofileRateLimit": "Gofile Rate Limit Reached",
       "gofileRateLimitDesc": "Gofile has rate limited your connection. Please enable a VPN and try again in a few minutes.",
       "gofileAccountError": "Gofile Account Creation Failed",
-      "gofileAccountErrorDesc": "Unable to create a temporary Gofile account. Try enabling a VPN or wait a few minutes before retrying."
+      "gofileAccountErrorDesc": "Unable to create a temporary Gofile account. Try enabling a VPN or wait a few minutes before retrying.",
+      "renamedExisting": "Existing folder renamed",
+      "renameFailed": "Failed to rename existing folder",
+      "deletedExisting": "Existing folder deleted",
+      "conflictResolveFailed": "Failed to resolve folder conflict"
     },
     "topCriticScore": "Top Critic Score",
     "trainer": "Trainer Menu",
@@ -1305,8 +1351,12 @@
   "downloads": {
     "actions": {
       "cancelAndDelete": "Cancel & Delete",
+      "deleteFilesOption": "Delete downloaded files",
+      "deleteFilesOptionDescription": "Permanently remove the files Ascendara has downloaded so far. This action cannot be undone.",
+      "keepFilesOption": "Keep downloaded files",
+      "keepFilesOptionDescription": "Stop the download but leave any files already on disk untouched.",
       "killDownload": "Kill Download",
-      "killDownloadDescription": "This will permanently stop the download and delete all downloaded files. This action cannot be undone.",
+      "killDownloadDescription": "Choose what should happen to the files Ascendara has downloaded so far.",
       "killDownloadTitle": "Kill Download for {{gameName}}?",
       "legacyGameVerification": "File verification is only available for games downloaded after Ascendara version 8.1.2",
       "openFolder": "Open Folder",
@@ -1366,6 +1416,7 @@
     },
     "kill": "Kill Download",
     "killSuccess": "Download killed and files deleted",
+    "killSuccessKeepFiles": "Download killed, files kept on disk",
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
     "lastExtracted": "Last extracted",
     "logViewerTitle": "Download Manager Log",
@@ -1657,11 +1708,14 @@
     "addFavorite": "Add to Favorites",
     "addGame": {
       "duplicateError": "A game with this name already exists in your library. Please choose a different name.",
+      "dropDescription": "Release to add it as a custom game",
+      "dropInvalidFile": "Please drop a valid .exe file",
+      "dropTitle": "Drop your game's .exe here",
       "success": "Game added to library successfully!",
       "title": "Add to Library"
     },
     "addGameDescription1": "Add your own games or import from Steam.",
-    "addGameDescription2": "Add a game to your Ascendara library to easily launch it and track play time. No files will be modified when adding a game.",
+    "addGameDescription2": "Add a game to your Ascendara library to easily launch it and track play time. No files will be modified when adding a game. Next time drag and drop your game exe to add it faster",
     "addToFavorites": "Add to Favorites",
     "alreadyRunning": "{{game}} is already running",
     "assetSearch": {
@@ -1784,7 +1838,7 @@
     "delete": "Delete",
     "deleteConfirmMessage": "Are you sure you want to delete {{game}} from your library? This will remove the game from your Ascendara library and delete all associated files. This action cannot be undone.",
     "saveGameDataTitle": "Save Game Data?",
-    "saveGameDataDescription": "Would you like to keep your playtime, achievements, and stats for {{game}}? Your data will be preserved and restored if you reinstall the game later.",
+    "saveGameDataDescription": "Would you like to keep your playtime, achievements, and stats for {{game}}? It'll be moved to your History tab, and your data will be preserved and restored if you reinstall the game later.",
     "saveGameDataYes": "Save Data",
     "saveGameDataNo": "No Thanks",
     "restoreGameDataTitle": "Restore Game Data?",
@@ -1842,6 +1896,23 @@
     "gamesInLibrary": "Total Games",
     "gamesSpace": "Installed",
     "hasOnlineFix": "Has Online Fix",
+    "history": {
+      "title": "History",
+      "subtitle": "Games you've removed. Their playtime and stats are preserved here.",
+      "badge": "Removed",
+      "empty": "No game history yet",
+      "emptyHint": "Delete a game and choose \"Save Data\" to keep it here.",
+      "removedOn": "Removed",
+      "restore": "Redownload & Restore",
+      "restoreCustom": "Re-add & Restore",
+      "restoring": "Finding game...",
+      "customGameInfo": "Add this game back with the exact same name to automatically restore its saved playtime.",
+      "removeForever": "Remove from History",
+      "removeForeverTitle": "Remove from History?",
+      "removeForeverDescription": "This will permanently delete the saved playtime and stats for {{game}}. This action cannot be undone.",
+      "removed": "Removed from History",
+      "removeFailed": "Failed to remove from History"
+    },
     "hour": "hour",
     "hours": "hours",
     "iconLegend": {
@@ -1943,6 +2014,12 @@
       "empty": "No favorites yet",
       "emptyHint": "Hover over a game and click the heart icon to add it here.",
       "removeFromFavorites": "Remove from favorites",
+      "status": {
+        "label": "Status",
+        "completed": "Completed",
+        "playing": "Playing",
+        "backlog": "Backlog"
+      },
       "ratingDisclaimer": {
         "title": "Personal Rating",
         "description": "This rating is stored locally on your device only. It's purely personal and is never shared, posted, or submitted anywhere."
@@ -2482,7 +2559,7 @@
     "ascendaraWorkshopDownloaderDescription": "The Workshop Downloader allows you to download items from the Steam Workshop without needing to have an account.",
     "ascendaraWorkshopDownloaderEnable": "Show in Navigation Bar",
     "autoCreateShortcuts": "Automatically Create Shortcuts",
-    "autoCreateShortcutsDescription": "Automatically create shortcuts on desktop for games that run successfully for the first time.",
+    "autoCreateShortcutsDescription": "Automatically create a desktop shortcut as soon as a game finishes downloading, whether or not it has been launched yet.",
     "behaviorAfterDownload": "Behavior After Download",
     "behaviorAfterDownloadDescription": "Choose what should happen to your computer after a download is finished.",
     "behaviors": {
@@ -2719,6 +2796,8 @@
     "notificationsDescription": "Send desktop notifications for downloads and index refreshing.",
     "openOnStartup": "Open Ascendara on Startup",
     "openOnStartupDescription": "Automatically launch Ascendara when you start your computer.",
+    "startMinimized": "Start Minimized",
+    "startMinimizedDescription": "Launch Ascendara in the background on startup instead of opening the main window.",
     "onlyWindowsSupported": "Only Windows is supported for now",
     "onlyWindowsSupported2": "This feature is only on Windows",
     "preview": {

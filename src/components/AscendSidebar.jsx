@@ -167,11 +167,6 @@ const AscendSidebar = ({
   const mainNavItems = [
     { id: "search", icon: Search, label: t("ascend.nav.search") },
     {
-      id: "community",
-      icon: UsersRound,
-      label: t("ascend.nav.community") || "Community",
-    },
-    {
       id: "premium",
       icon: Crown,
       label: t("ascend.nav.premium") || "Premium Features",

@@ -22,6 +22,10 @@ const { isLinux } = require("./modules/config");
 // Disable sandbox for Linux compatibility (must be set before app ready)
 if (process.platform === "linux") {
   app.commandLine.appendSwitch("--no-sandbox");
+  // Ignore GPU blocklist to prevent WebGL errors in external windows
+  app.commandLine.appendSwitch("--ignore-gpu-blocklist");
+  // Disable GPU process crash limit to prevent crashes from affecting the app
+  app.commandLine.appendSwitch("--disable-gpu-process-crash-limit");
 }
 
 // Import modules
@@ -576,6 +580,9 @@ async function initializeApp() {
 
     // Register critical IPC handlers first (needed for window to function)
     registerCriticalHandlers();
+
+    // Keep the OS login item (auto-launch) settings in sync with saved settings
+    settings.applyLoginItemSettings();
 
     // Create the main window
     const mainWindow = windowModule.createWindow();

@@ -10,7 +10,7 @@ const axios = require("axios");
 const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, app, BrowserWindow } = require("electron");
 const { isDev, isWindows, isLinux, appDirectory, linuxUmuBin, getPythonPath } = require("./config");
-const { sanitizeGameName, getExtensionFromMimeType, shouldLogError } = require("./utils");
+const { sanitizeGameName, sanitizeText, getExtensionFromMimeType, shouldLogError } = require("./utils");
 const { getSettingsManager } = require("./settings");
 const {
   setPlayingActivity,
@@ -103,6 +103,25 @@ async function createGameShortcut(game) {
     return true;
   } catch (error) {
     console.error("Error creating shortcut:", error);
+    return false;
+  }
+}
+
+/**
+ * Delete the desktop shortcut created by Ascendara for a game, if it exists
+ */
+function deleteGameShortcut(gameName) {
+  try {
+    if (!gameName) return false;
+    const shortcutPath = path.join(os.homedir(), "Desktop", `${gameName}.lnk`);
+    if (fs.existsSync(shortcutPath)) {
+      fs.unlinkSync(shortcutPath);
+      console.log(`Deleted shortcut for game: ${gameName}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Error deleting shortcut:", error);
     return false;
   }
 }
@@ -610,17 +629,6 @@ function registerGameHandlers() {
             .catch(err => console.error(`Failed to fetch assets for ${game}:`, err));
         }
 
-        // Create shortcut on first launch
-        if (!isCustom) {
-          const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
-          const gameInfo = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
-          if (!gameInfo.hasBeenLaunched && settings.autoCreateShortcuts) {
-            await createGameShortcut({ game, name: game, executable, custom: false });
-            gameInfo.hasBeenLaunched = true;
-            fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 2));
-          }
-        }
-
         // Update Discord RPC
         const rpc = getRPC();
         if (rpc) {
@@ -816,6 +824,69 @@ function registerGameHandlers() {
     }
   });
 
+  // Resolve which download directory a game would be placed into, mirroring
+  // the logic used by the download-file handler in downloads.js
+  function resolveTargetDirectory(settings, additionalDirIndex) {
+    if (!additionalDirIndex) {
+      return settings.downloadDirectory;
+    }
+    const additionalDirectories = settings.additionalDirectories || [];
+    return additionalDirectories[additionalDirIndex - 1] || settings.downloadDirectory;
+  }
+
+  // Check whether a folder with this game's name already exists in the
+  // directory a new download would be placed into (name collision check).
+  ipcMain.handle("check-game-directory-conflict", async (_, game, additionalDirIndex) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory) return { exists: false };
+
+      const sanitizedGame = sanitizeGameName(sanitizeText(game));
+      const targetDirectory = resolveTargetDirectory(settings, additionalDirIndex);
+      const gameDirectory = path.join(targetDirectory, sanitizedGame);
+
+      return {
+        exists: fs.existsSync(gameDirectory),
+        path: gameDirectory,
+        sanitizedName: sanitizedGame,
+      };
+    } catch (error) {
+      console.error("Error checking game directory conflict:", error);
+      return { exists: false, error: error.message };
+    }
+  });
+
+  // Rename an existing conflicting game folder out of the way (e.g. "_OLD")
+  // so a fresh download can use the original folder name.
+  ipcMain.handle("rename-existing-game-directory", async (_, game, additionalDirIndex) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!settings.downloadDirectory) return { success: false };
+
+      const sanitizedGame = sanitizeGameName(sanitizeText(game));
+      const targetDirectory = resolveTargetDirectory(settings, additionalDirIndex);
+      const gameDirectory = path.join(targetDirectory, sanitizedGame);
+
+      if (!fs.existsSync(gameDirectory)) {
+        return { success: true, skipped: true };
+      }
+
+      let newPath = `${gameDirectory}_OLD`;
+      let counter = 1;
+      while (fs.existsSync(newPath)) {
+        newPath = `${gameDirectory}_OLD${counter}`;
+        counter++;
+      }
+
+      fs.renameSync(gameDirectory, newPath);
+      console.log(`Renamed existing game directory: ${gameDirectory} -> ${newPath}`);
+      return { success: true, newPath };
+    } catch (error) {
+      console.error("Error renaming existing game directory:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Delete game
   ipcMain.handle("delete-game", async (_, game) => {
     try {
@@ -835,6 +906,10 @@ function registerGameHandlers() {
         settings.downloadDirectory,
         ...settings.additionalDirectories,
       ];
+
+      if (isWindows) {
+        deleteGameShortcut(game);
+      }
 
       for (const directory of allDirectories) {
         const gameDirectory = path.join(directory, game);
@@ -869,6 +944,10 @@ function registerGameHandlers() {
       if (gameIndex !== -1) {
         gamesData.games.splice(gameIndex, 1);
         fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
+
+        if (isWindows) {
+          deleteGameShortcut(game);
+        }
 
         const possibleExtensions = [".jpg", ".jpeg", ".png"];
         for (const ext of possibleExtensions) {
