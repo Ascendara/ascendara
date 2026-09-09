@@ -510,7 +510,9 @@ class ChunkedDownloader:
         if the local partial file must be discarded, or "fatal" if the server
         rejected the request in a way that retrying cannot fix.
         """
-        headers = {}
+        from AscendaraDownloadRecovery import response_size
+        headers = {'Accept-Encoding': 'identity'}
+        response = None
         is_resume = start_byte > 0 and self.supports_range
         if is_resume:
             headers['Range'] = f'bytes={start_byte}-'
@@ -531,7 +533,11 @@ class ChunkedDownloader:
                 response.close()
                 return "restart"
 
-            if is_resume and response.status_code != 206:
+            if response.status_code in (408, 429) or response.status_code >= 500:
+                self.last_error = f"HTTP {response.status_code} during download"
+                return False
+
+            if is_resume and response.status_code == 200:
                 # Critical corruption fix: if the host ignores Range and sends the
                 # entire file with 200 OK, appending it would corrupt the archive.
                 logging.warning(
@@ -553,20 +559,14 @@ class ChunkedDownloader:
             response.raise_for_status()
 
             # Prefer Content-Range for resumed responses. For fresh downloads, use Content-Length.
-            if 'Content-Range' in response.headers:
-                content_range = response.headers['Content-Range']
-                if '/' in content_range:
-                    total_str = content_range.split('/')[-1]
-                    if total_str != '*':
-                        self.total_size = int(total_str)
-                        logging.info(f"[ChunkedDownloader] Got total size from Content-Range: {read_size(self.total_size)}")
-            elif not is_resume and 'Content-Length' in response.headers:
-                self.total_size = int(response.headers['Content-Length'])
-                logging.info(f"[ChunkedDownloader] Got total size from Content-Length: {read_size(self.total_size)}")
-            elif self.total_size is None and 'Content-Length' in response.headers:
-                content_length = int(response.headers['Content-Length'])
-                self.total_size = start_byte + content_length
-                logging.info(f"[ChunkedDownloader] Calculated total size: {read_size(self.total_size)}")
+            try:
+                total_size = response_size(response, start_byte)
+                if is_resume and self.total_size is not None and total_size != self.total_size:
+                    raise ValueError('Remote archive size changed while resuming')
+            except ValueError as error:
+                self.last_error = str(error)
+                return "restart"
+            self.total_size = total_size
 
             chunk_size = 4096 if self._speed_limit_bytes > 0 else self.STREAM_CHUNK_SIZE
             throttle_start = time.time()
@@ -599,9 +599,14 @@ class ChunkedDownloader:
         except InterruptedError:
             raise
         except Exception as e:
+            if isinstance(e, OSError) and e.errno is not None:
+                raise
             self.last_error = str(e)
             logging.warning(f"[ChunkedDownloader] Stream interrupted at {read_size(self.downloaded_bytes)}: {e}")
             return False
+        finally:
+            if response is not None:
+                response.close()
 
     def download(self) -> bool:
         """
@@ -660,7 +665,8 @@ class ChunkedDownloader:
                     f"[ChunkedDownloader] Retry {retry_count}/{self.MAX_RETRIES} in {retry_delay:.0f}s, "
                     f"resuming from {read_size(self.downloaded_bytes)}"
                 )
-                time.sleep(retry_delay)
+                from AscendaraDownloadRecovery import wait_for_retry
+                wait_for_retry(retry_delay, self._check_for_stop)
                 retry_delay = min(retry_delay * 1.5, self.RETRY_DELAY_MAX)
                 self.session.close()
                 self.session = create_robust_session()
@@ -902,6 +908,7 @@ class AscendaraDownloader:
                 
                 # Detect and fix file extension
                 dest = self._fix_file_extension(dest)
+                self._archive_sources = {os.path.abspath(dest): url}
                 
                 # Extract files
                 self._extract_files(dest)
@@ -1235,6 +1242,7 @@ class AscendaraDownloader:
             
             # Detect and fix file extension
             dest_path = self._fix_file_extension(dest_path)
+            self._archive_sources = {os.path.abspath(dest_path): final_url}
             
             # Extract files
             self._extract_files(dest_path)
@@ -1255,6 +1263,32 @@ class AscendaraDownloader:
         except Exception as e:
             logging.warning(f"[AscendaraDownloader] Error checking stop state: {e}")
         return False
+
+    def _repair_archive(self, error, archive_path, attempt):
+        from AscendaraDownloadRecovery import recover_archive
+
+        def download(source, destination):
+            downloader = ChunkedDownloader(source, destination, self.game_info, self.game_info_path)
+            if not downloader.download():
+                if downloader.stopped:
+                    raise InterruptedError('Archive repair cancelled')
+                raise RuntimeError('Archive repair download failed; the original archive has been kept')
+
+        def on_retry():
+            logging.warning(f"[AscendaraDownloader] Re-downloading damaged archive: {os.path.basename(archive_path)}")
+            self.game_info['downloadingData'].update({
+                'extracting': False, 'downloading': True, 'verifying': False,
+                'progressCompleted': '0.00', 'retryAttempt': attempt + 1,
+                'timeUntilComplete': 'Repairing archive',
+            })
+            safe_write_json(self.game_info_path, self.game_info)
+
+        recover_archive(error, archive_path, attempt, getattr(self, '_archive_sources', {}),
+                        download, self._check_for_stop, on_retry)
+        self.game_info['downloadingData'].update({'downloading': False, 'extracting': True,
+                                                 'progressCompleted': '100.00'})
+        self.game_info['downloadingData'].pop('retryAttempt', None)
+        safe_write_json(self.game_info_path, self.game_info)
 
     def _extract_files(self, archive_path: Optional[str] = None):
         """Extract archive files and flatten nested directories."""
@@ -1289,6 +1323,7 @@ class AscendaraDownloader:
         archive_exts = {'.rar', '.zip'}
         
         # Determine archives to process
+        continuation_parts = []
         if archive_path and os.path.exists(archive_path):
             archives_to_process = [archive_path]
             logging.info(f"[AscendaraDownloader] Extracting: {archive_path}")
@@ -1299,7 +1334,15 @@ class AscendaraDownloader:
                 for file in files:
                     ext = os.path.splitext(file)[1].lower()
                     if ext in archive_exts:
+                        multipart = re.match(r'^.+\.part(\d+)\.rar$', file, re.IGNORECASE)
+                        if multipart and int(multipart.group(1)) != 1:
+                            continuation_parts.append(os.path.join(root, file))
+                            continue
                         archives_to_process.append(os.path.join(root, file))
+        from AscendaraDownloadRecovery import archive_sources
+        for part in continuation_parts:
+            if not archive_sources(part, dict.fromkeys(archives_to_process)):
+                raise RuntimeError(f'Missing first RAR volume for {os.path.basename(part)}. Choose a source containing all archive volumes.')
         
         # Count total files for progress tracking, and tally the uncompressed size
         # so we can verify there is enough free disk space before extracting.
@@ -1377,6 +1420,7 @@ class AscendaraDownloader:
         processed_archives = set()
         any_extraction_succeeded = False
         extraction_errors = []
+        repair_attempts = {}
         
         while archives_to_process:
             # Check if download has been stopped
@@ -1402,6 +1446,7 @@ class AscendaraDownloader:
                 _extract_to = _archive_parent
                 os.makedirs(_extract_to, exist_ok=True)
             
+            initial_count = self._files_extracted_count
             try:
                 if ext == '.zip':
                     self._extract_zip(current_archive, watching_data, _extract_to)
@@ -1424,7 +1469,17 @@ class AscendaraDownloader:
                 return
             except Exception as e:
                 logging.error(f"[AscendaraDownloader] Extraction failed: {e}")
-                extraction_errors.append(str(e))
+                try:
+                    attempt = repair_attempts.get(current_archive, 0)
+                    self._repair_archive(e, current_archive, attempt)
+                    self._files_extracted_count = initial_count
+                    repair_attempts[current_archive] = attempt + 1
+                    processed_archives.discard(current_archive)
+                    archives_to_process.insert(0, current_archive)
+                except InterruptedError:
+                    raise
+                except Exception as repair_error:
+                    extraction_errors.append(str(repair_error))
                 continue
             
             self._flatten_directories()
@@ -1442,6 +1497,9 @@ class AscendaraDownloader:
                         # instead of queuing a doomed extraction that leaves GBs on disk.
                         _mp = re.match(r'^.+\.part(\d+)\.rar$', file, re.IGNORECASE)
                         if _mp and int(_mp.group(1)) != 1:
+                            from AscendaraDownloadRecovery import archive_sources
+                            if not archive_sources(current_archive, {new_archive: None}):
+                                continue
                             logging.info(f"[AscendaraDownloader] Deleting non-first RAR part (content already extracted): {file}")
                             try:
                                 os.remove(new_archive)
@@ -1476,7 +1534,7 @@ class AscendaraDownloader:
                             logging.warning(f"[AscendaraDownloader] Could not count files in nested archive {new_archive}: {e}")
         
         # If every archive failed to extract, raise so the caller can handle the error
-        if not any_extraction_succeeded and extraction_errors:
+        if extraction_errors:
             raise RuntimeError(f"Extraction failed: {extraction_errors[0]}")
         
         # Force final progress update before flattening
@@ -1682,6 +1740,9 @@ class AscendaraDownloader:
             except InterruptedError:
                 raise
             except Exception as _lib_err:
+                from AscendaraDownloadRecovery import is_archive_integrity_error
+                if is_archive_integrity_error(_lib_err):
+                    raise
                 _lib_err_msg = str(_lib_err)
                 logging.warning(f"[AscendaraDownloader] Python library extraction failed ({_lib_err_msg}), trying bundled streaming recovery")
 
@@ -1705,6 +1766,8 @@ class AscendaraDownloader:
             except (InterruptedError, OSError, ValueError):
                 raise
             except Exception as recovery_error:
+                if is_archive_integrity_error(recovery_error):
+                    raise
                 _lib_err_msg = str(recovery_error)
                 logging.warning(f"[AscendaraDownloader] Bundled streaming recovery failed: {_lib_err_msg}")
 
@@ -1811,12 +1874,13 @@ class AscendaraDownloader:
             return
         
         # On Linux/macOS, use system unrar binary
-        unrar_bin = _shutil.which("unrar") or _shutil.which("unrar-free")
+        from AscendaraDownloadRecovery import find_unrar
+        unrar_bin = find_unrar()
         if not unrar_bin:
             if sys.platform == "darwin":
                 raise RuntimeError("System 'unrar' binary not found. Install it with: brew install unrar")
             else:
-                raise RuntimeError("System 'unrar' binary not found. Install it with: sudo apt-get install unrar")
+                raise RuntimeError('The bundled RAR extractor is unavailable. Update Ascendara or report this packaging issue; re-downloading the archive will not fix it.')
 
         logging.info(f"[AscendaraDownloader] Extracting RAR with system unrar: {archive_path}")
 
@@ -1834,7 +1898,7 @@ class AscendaraDownloader:
         last_filename = [""]
 
         proc = subprocess.Popen(
-            [unrar_bin, "x", "-y", "-psteamrip.com", archive_path, self.download_dir + "/"],
+            [unrar_bin, "x", "-y", "-psteamrip.com", archive_path, (extract_to or self.download_dir) + "/"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
@@ -1876,7 +1940,7 @@ class AscendaraDownloader:
         returncode = proc.wait()
         stdout_thread.join(timeout=5)
 
-        if returncode not in (0, 1):
+        if returncode != 0:
             stderr_out = proc.stderr.read().decode(errors='replace').strip()
             extraction_error.append(RuntimeError(
                 f"unrar exited with code {returncode}: {stderr_out}"

@@ -175,10 +175,22 @@ def build_python_binaries_linux():
             if not run_command([venv_pip, 'install', '--quiet', '-r', req_file]):
                 print(f"Warning: Failed to install requirements for {binary_name}, continuing...")
 
+    unrar = shutil.which('unrar')
+    license_paths = [os.environ.get('ASCENDARA_UNRAR_LICENSE', ''),
+                     '/usr/share/doc/unrar/copyright', '/usr/share/licenses/unrar/license.txt',
+                     '/usr/share/licenses/unrar/LICENSE']
+    unrar_license = next((path for path in license_paths if path and os.path.isfile(path)), None)
+    if not unrar or not unrar_license:
+        print('Linux builds require UnRAR and its redistribution license on the build machine. '
+              'Install the build dependency and, if needed, set ASCENDARA_UNRAR_LICENSE to its license file.')
+        return False
+    extraction_args = ['--add-binary', f'{unrar}:.',
+                       '--add-data', f'{unrar_license}:licenses/unrar']
+
     # Map: (output name, script path relative to binaries_dir, extra PyInstaller args)
     binaries = [
-        ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         []),
-        ('AscendaraGofileHelper',        'AscendaraDownloader/src/AscendaraGofileHelper.py',        []),
+        ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         extraction_args),
+        ('AscendaraGofileHelper',        'AscendaraDownloader/src/AscendaraGofileHelper.py',        extraction_args),
         ('AscendaraGameHandler',         'AscendaraGameHandler/src/AscendaraGameHandler.py',        []),
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
         ('AscendaraLocalRefresh',        'AscendaraLocalRefresh/src/AscendaraLocalRefresh.py',      []),

@@ -534,8 +534,13 @@ class GofileDownloader:
             except:
                 continue
 
+        self._archive_sources = {
+            os.path.abspath(os.path.join(self.download_dir, info['path'], info['filename'])): info
+            for info in files_info.values()
+        }
         total_files = len(files_info)
         current_file = 0
+        failed_downloads = []
 
         if self._total_size > 0:
             # Estimate total needed: download + extraction (3x) + backup if update
@@ -553,12 +558,18 @@ class GofileDownloader:
                 try:
                     logging.info(f"[AscendaraGofileHelper] Downloading file {current_file}/{total_files}: {item.get('name', 'Unknown')}")
                     self._downloadContent(item)
+                except InterruptedError:
+                    raise
                 except Exception as e:
+                    failed_downloads.append(item['filename'])
                     logging.error(f"[AscendaraGofileHelper] Error downloading {item.get('name', 'Unknown')}: {str(e)}")
                     # Wait a bit before trying the next file
-                    time.sleep(2)
+                    from AscendaraDownloadRecovery import wait_for_retry
+                    wait_for_retry(2, self._check_for_stop)
                     continue
 
+            if failed_downloads:
+                raise RuntimeError(f"Download incomplete after retries; extraction was not started. Missing files: {', '.join(failed_downloads)}")
             logging.info("[AscendaraGofileHelper] All files downloaded successfully, starting extraction...")
             self._extract_files()
             
@@ -671,7 +682,8 @@ class GofileDownloader:
                         files_info[child["id"]] = {
                             "path": folder_path,
                             "filename": child["name"],
-                            "link": child["link"]
+                            "link": child["link"],
+                            "size": child.get('size')
                         }
                         logging.debug(f"[AscendaraGofileHelper] Added file: {child['name']}")
                     else:
@@ -680,27 +692,32 @@ class GofileDownloader:
             files_info[data["id"]] = {
                 "path": current_path,
                 "filename": data["name"],
-                "link": data["link"]
+                "link": data["link"],
+                "size": data.get('size')
             }
 
         return files_info
 
-    def _downloadContent(self, file_info, chunk_size=None):  # chunk_size determined by limit
+    def _downloadContent(self, file_info, chunk_size=None, destination=None):  # chunk_size determined by limit
+        from AscendaraDownloadRecovery import response_size, wait_for_retry
 
-        filepath = os.path.join(self.download_dir, file_info["path"], file_info["filename"])
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-            logging.info(f"{filepath} already exists, skipping.")
+        filepath = destination or os.path.join(self.download_dir, file_info["path"], file_info["filename"])
+        if destination is None and file_info.get('size') and os.path.isfile(filepath) and os.path.getsize(filepath) == int(file_info['size']):
+            logging.info(f"{filepath} already exists with the expected size, skipping.")
             return
 
+        restart_from_zero = destination is not None
         tmp_file = f"{filepath}.part"
         url = file_info["link"]
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
-        for retry in range(self._max_retries):
+        for retry in range(self._max_retries):  # Exponential backoff
             try:
+                if self._check_for_stop():
+                    raise InterruptedError('Download cancelled')
                 headers = {
                     "Cookie": f"accountToken={self._token}",
-                    "Accept-Encoding": "gzip, deflate, br",
+                    "Accept-Encoding": "identity",
                     "User-Agent": os.getenv("GF_USERAGENT", "Mozilla/5.0"),
                     "Accept": "*/*",
                     "Referer": f"{url}{('/' if not url.endswith('/') else '')}",
@@ -714,25 +731,28 @@ class GofileDownloader:
                 }
 
                 part_size = 0
-                if os.path.isfile(tmp_file):
+                if not restart_from_zero and os.path.isfile(tmp_file):
                     part_size = int(os.path.getsize(tmp_file))
-                    headers["Range"] = f"bytes={part_size}-"
+                    if part_size:
+                        headers["Range"] = f"bytes={part_size}-"
 
                 with requests.get(url, headers=headers, stream=True, timeout=(9, self._download_timeout)) as response:
-                    if ((response.status_code in (403, 404, 405, 500)) or
-                        (part_size == 0 and response.status_code != 200) or
-                        (part_size > 0 and response.status_code != 206)):
-                        logging.warning(f"[AscendaraGofileHelper] Couldn't download the file from {url}. Status code: {response.status_code}")
-                        if retry < self._max_retries - 1:
-                            logging.info(f"[AscendaraGofileHelper] Retrying download ({retry + 2}/{self._max_retries})...")
-                            time.sleep(2 ** retry)  # Exponential backoff
-                            continue
-                        return
-
-                    total_size = int(response.headers.get("Content-Length", 0)) + part_size
-                    if not total_size:
-                        logging.warning(f"[AscendaraGofileHelper] Couldn't find the file size from {url}.")
-                        return
+                    if response.status_code == 416:
+                        restart_from_zero = True
+                        raise IOError('Server rejected partial archive; restarting download')
+                    response.raise_for_status()
+                    if part_size and response.status_code == 200:
+                        part_size = 0
+                    try:
+                        total_size = response_size(response, part_size)
+                        if file_info.get('size') and total_size != int(file_info['size']):
+                            raise ValueError('Remote archive size differs from the source metadata')
+                    except ValueError as error:
+                        restart_from_zero = True
+                        raise IOError(str(error)) from error
+                    if total_size is None:
+                        raise IOError('Server did not provide an archive size')
+                    restart_from_zero = False
 
                     mode = 'ab' if part_size > 0 else 'wb'
                     with open(tmp_file, mode) as f:
@@ -820,6 +840,10 @@ class GofileDownloader:
                                 last_update = current_time
                                 bytes_since_last_update = 0
 
+                    if downloaded != total_size or os.path.getsize(tmp_file) != total_size:
+                        restart_from_zero = downloaded > total_size
+                        raise IOError(f'Incomplete archive download: {downloaded}/{total_size} bytes')
+
                     # Download completed successfully
                     try:
                         # First try to remove the destination file if it exists
@@ -855,17 +879,15 @@ class GofileDownloader:
                     return
             except InterruptedError as e:
                 logging.info(f"[AscendaraGofileHelper] Download interrupted: {e}")
-                if os.path.exists(tmp_file):
-                    os.remove(tmp_file)
                 raise
             except (requests.exceptions.RequestException, IOError) as e:
+                if isinstance(e, OSError) and e.errno is not None:
+                    raise
                 logging.error(f"[AscendaraGofileHelper] Error downloading {url}: {str(e)}")
                 if retry < self._max_retries - 1:
                     logging.info(f"[AscendaraGofileHelper] Retrying download ({retry + 2}/{self._max_retries})...")
-                    time.sleep(2 ** retry)  # Exponential backoff
+                    wait_for_retry(min(2 ** retry, 60), self._check_for_stop)  # Exponential backoff
                     continue
-                if os.path.exists(tmp_file):
-                    os.remove(tmp_file)
                 raise
 
         raise Exception(f"Failed to download {url} after {self._max_retries} retries")
@@ -966,6 +988,9 @@ class GofileDownloader:
 
     def _check_extraction_tools(self):
         """Check if required extraction tools are available and try to install if missing."""
+        if sys.platform.startswith('linux'):
+            from AscendaraDownloadRecovery import find_unrar
+            return bool(find_unrar())
         if sys.platform != "win32":
             try:
                 import shutil
@@ -1153,6 +1178,30 @@ class GofileDownloader:
             except Exception as e:
                 logging.warning(f"[AscendaraGofileHelper] Could not cleanup backup: {e}")
     
+    def _repair_archive(self, error, archive_path, attempt):
+        from AscendaraDownloadRecovery import archive_sources, recover_archive
+        sources = getattr(self, '_archive_sources', {})
+
+        def on_retry():
+            logging.warning(f"[AscendaraGofileHelper] Re-downloading damaged archive: {os.path.basename(archive_path)}")
+            self._last_progress = 0
+            for info in archive_sources(archive_path, sources).values():
+                self._current_file_progress[f"{info['path']}/{info['filename']}"] = 0
+            self.game_info['downloadingData'].update({
+                'extracting': False, 'downloading': True, 'verifying': False,
+                'progressCompleted': '0.00', 'retryAttempt': attempt + 1,
+                'timeUntilComplete': 'Repairing archive',
+            })
+            safe_write_json(self.game_info_path, self.game_info)
+
+        recover_archive(error, archive_path, attempt, sources,
+                        lambda source, target: self._downloadContent(source, destination=target),
+                        self._check_for_stop, on_retry)
+        self.game_info['downloadingData'].update({'downloading': False, 'extracting': True,
+                                                 'progressCompleted': '100.00'})
+        self.game_info['downloadingData'].pop('retryAttempt', None)
+        safe_write_json(self.game_info_path, self.game_info)
+
     def _extract_files(self):
         # Check if download has been stopped before starting extraction
         if self._check_for_stop():
@@ -1180,8 +1229,8 @@ class GofileDownloader:
         self._last_progress_update = 0  # Track last JSON write time
 
         # Check if extraction tools are available
-        if not self._check_extraction_tools():
-            error_msg = "Required extraction tools are not available. Please install 'unrar' (e.g. sudo apt-get install unrar)."
+        if any(file.lower().endswith('.rar') for _, _, files in os.walk(self.download_dir) for file in files) and not self._check_extraction_tools():
+            error_msg = 'The RAR extraction component is unavailable. Update Ascendara or report this packaging issue; the downloaded archives have been kept.'
             logging.error(error_msg)
             self.game_info["downloadingData"]["extracting"] = False
             self.game_info["downloadingData"]["verifyError"] = [{
@@ -1260,6 +1309,11 @@ class GofileDownloader:
                     except Exception as e:
                         logging.warning(f"[AscendaraGofileHelper] Could not count files in {archive_path}: {e}")
         
+        from AscendaraDownloadRecovery import archive_sources
+        first_archives = dict.fromkeys(path for path, _ in archives_to_process)
+        for part in self.archive_paths:
+            if not archive_sources(part, first_archives):
+                raise RuntimeError(f'Missing first RAR volume for {os.path.basename(part)}. Choose a source containing all archive volumes.')
         logging.info(f"[AscendaraGofileHelper] Total files to extract: {total_files_to_extract}")
 
         # Verify there is enough free disk space for the actual extracted content.
@@ -1287,7 +1341,9 @@ class GofileDownloader:
         self._update_extraction_progress("Preparing...", 0, total_files_to_extract, force=True)
         
         # Extract all archives with progress tracking
+        repair_attempts = {}
         for archive_path, file in archives_to_process:
+            initial_count = self._files_extracted_count
             extract_dir = self.download_dir
             logging.info(f"[AscendaraGofileHelper] Extracting {archive_path}")
             
@@ -1316,13 +1372,13 @@ class GofileDownloader:
                                             zip_ref.extract(zip_info, extract_dir, pwd=b'steamrip.com')
                                         except Exception as e2:
                                             logging.warning(f"[AscendaraGofileHelper] Failed to extract {zip_info.filename} with password: {e2}")
-                                            continue
+                                            raise
                                     else:
                                         logging.warning(f"[AscendaraGofileHelper] Failed to extract {zip_info.filename}: {e}")
-                                        continue
+                                        raise
                                 except Exception as e:
                                     logging.warning(f"[AscendaraGofileHelper] Failed to extract {zip_info.filename}: {e}")
-                                    continue
+                                    raise
                                 
                                 extracted_path = os.path.join(extract_dir, zip_info.filename)
                                 key = f"{os.path.relpath(extracted_path, self.download_dir)}"
@@ -1370,7 +1426,10 @@ class GofileDownloader:
                                     try:
                                         try:
                                             rar_ref.extractall(long_extract_dir)
-                                        except Exception:
+                                        except Exception as extraction_failure:
+                                            from AscendaraDownloadRecovery import is_archive_integrity_error
+                                            if is_archive_integrity_error(extraction_failure):
+                                                raise
                                             rar_ref.extractall(extract_dir)
                                     except Exception as e:
                                         extraction_error.append(e)
@@ -1416,6 +1475,9 @@ class GofileDownloader:
                         except InterruptedError:
                             raise
                         except Exception as _le:
+                            from AscendaraDownloadRecovery import is_archive_integrity_error
+                            if is_archive_integrity_error(_le):
+                                raise
                             logging.warning(f"[AscendaraGofileHelper] Python library extraction failed ({_le}), trying bundled streaming recovery")
                             try:
                                 from AscendaraRarRecovery import extract_rar_recovery
@@ -1431,6 +1493,8 @@ class GofileDownloader:
                             except (InterruptedError, OSError, ValueError):
                                 raise
                             except Exception as recovery_error:
+                                if is_archive_integrity_error(recovery_error):
+                                    raise
                                 _lib_extraction_failed = True
                                 _lib_err = recovery_error
                                 logging.warning(f"[AscendaraGofileHelper] Bundled streaming recovery failed: {recovery_error}")
@@ -1552,12 +1616,13 @@ class GofileDownloader:
                                 t.start()
                                 rc = proc.wait()
                                 t.join(timeout=5)
-                                if rc not in (0, 1):
+                                if rc != 0:
                                     raise RuntimeError(f"unar exited with code {rc}: {proc.stderr.read().decode(errors='replace').strip()}")
                             else:
-                                unrar_bin = shutil.which('unrar') or shutil.which('unrar-free')
+                                from AscendaraDownloadRecovery import find_unrar
+                                unrar_bin = find_unrar()
                                 if not unrar_bin:
-                                    raise RuntimeError("No RAR extraction tool available. Install with: sudo apt-get install unrar")
+                                    raise RuntimeError('The bundled RAR extractor is unavailable. Update Ascendara or report this packaging issue.')
                                 proc = subprocess.Popen(
                                     [unrar_bin, 'x', '-y', '-psteamrip.com', archive_path, extract_dir + '/'],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -1585,7 +1650,7 @@ class GofileDownloader:
                                 t.start()
                                 rc = proc.wait()
                                 t.join(timeout=5)
-                                if rc not in (0, 1):
+                                if rc != 0:
                                     raise RuntimeError(f"unrar exited with code {rc}: {proc.stderr.read().decode(errors='replace').strip()}")
                         elif file.endswith('.zip'):
                             with zipfile.ZipFile(archive_path, 'r') as zip_ref:
@@ -1642,9 +1707,15 @@ class GofileDownloader:
                         raise
                 # Archive deletion moved to after verification to prevent data loss on extraction failures
                 logging.info(f"[AscendaraGofileHelper] Extraction complete for {archive_path}, will delete after verification")
+            except InterruptedError:
+                raise
             except Exception as e:
                 logging.error(f"[AscendaraGofileHelper] Error extracting {archive_path}: {str(e)}")
-                raise
+                attempt = repair_attempts.get(archive_path, 0)
+                self._repair_archive(e, archive_path, attempt)
+                repair_attempts[archive_path] = attempt + 1
+                self._files_extracted_count = initial_count
+                archives_to_process.append((archive_path, file))
 
         # Flatten nested directories - but be careful not to delete the game directory itself
         nested_dir = os.path.join(self.download_dir, sanitize_folder_name(self.game))
