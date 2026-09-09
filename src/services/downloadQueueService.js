@@ -1,6 +1,8 @@
 // Download Queue Service for Ascend users
 // Manages a queue of downloads that start automatically when the previous one finishes
 
+import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
+
 const QUEUE_STORAGE_KEY = "ascendDownloadQueue";
 
 // Get the current download queue
@@ -124,6 +126,18 @@ const _processNextInQueueInternal = async () => {
   const hasActive = await hasActiveDownloads();
   if (hasActive) {
     return null; // Wait for current download to finish
+  }
+
+  // If the user chose to switch this game from an imported (launcher-tied) copy
+  // to an Ascendara-managed download, remove the old imported entry right as the
+  // real download starts, so it downloads like any other normal game from here on.
+  const importedGameName = pendingLibrarySwapService.take(nextItem.gameName);
+  if (importedGameName) {
+    try {
+      await window.electron.removeCustomGame(importedGameName);
+    } catch (error) {
+      console.warn("Could not remove imported game before queued swap download:", error);
+    }
   }
 
   // Start the download

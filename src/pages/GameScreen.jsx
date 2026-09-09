@@ -51,12 +51,13 @@ import {
   CloudOff,
   Terminal,
   RefreshCw,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeText } from "@/lib/utils";
 import { useSettings } from "@/context/SettingsContext";
 import { useAudioPlayer, killAudioAndMiniplayer } from "@/services/audioPlayerService";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getCloudLibrary, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
+import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
@@ -1309,6 +1311,7 @@ export default function GameScreen() {
   const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [isStartingUpdate, setIsStartingUpdate] = useState(false);
+  const [importCatalogMatch, setImportCatalogMatch] = useState(null);
 
   // Logo state
   const [logoData, setLogoData] = useState(null);
@@ -1582,6 +1585,33 @@ export default function GameScreen() {
 
     checkForUpdates();
   }, [game]);
+
+  // Imported (launcher-tied) games don't have version tracking or update checks.
+  // Look up a matching Ascendara catalog entry so we can offer switching to a
+  // fully managed download instead.
+  useEffect(() => {
+    let cancelled = false;
+    setImportCatalogMatch(null);
+    if (!game?.launcher) return;
+    gameService
+      .findCatalogMatch(game.game)
+      .then(match => {
+        if (!cancelled) setImportCatalogMatch(match);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [game?.launcher, game?.game]);
+
+  const handleSwitchToAscendaraManaged = () => {
+    if (!importCatalogMatch) return;
+    pendingLibrarySwapService.add(
+      sanitizeText(importCatalogMatch.game),
+      game.game
+    );
+    navigate("/download", { state: { gameData: importCatalogMatch } });
+  };
 
   // Re-fetch Steam data when game changes
   // Steam API is always available (hardcoded), so we always fetch
@@ -2685,6 +2715,23 @@ export default function GameScreen() {
                   <span>{game.size}</span>
                 </div>
               )}
+              {!game.isCustom && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex cursor-help items-center gap-1 text-sm text-primary/80">
+                        <Check className="h-4 w-4" />
+                        <span>{t("library.launcherImport.managedBadge")}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-secondary">
+                        {t("library.launcherImport.managedBadgeTooltip")}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               <div className="flex items-center gap-1 text-sm text-primary/80">
                 <Clock className="h-4 w-4" />
                 <span className="font-medium">{formatPlaytime(game.playTime)}</span>
@@ -3489,6 +3536,47 @@ export default function GameScreen() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {game.launcher && (
+                    <Card className="border-yellow-500/50">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col items-center text-center">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="relative mb-2">
+                                  <RefreshCw className="h-5 w-5 text-yellow-500" />
+                                  <Info className="absolute -right-2 -top-2 h-4 w-4 text-yellow-500" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-xs">
+                                <p className="text-xs">
+                                  {t("library.launcherImport.noUpdateTrackingHint")}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <span className="text-xs text-muted-foreground">
+                            {t("library.launcherImport.notManagedBadge")}
+                          </span>
+                          {importCatalogMatch ? (
+                            <button
+                              type="button"
+                              onClick={handleSwitchToAscendaraManaged}
+                              className="mt-1 flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                            >
+                              <ArrowRightLeft className="h-3.5 w-3.5" />
+                              {t("library.launcherImport.switchAction")}
+                            </button>
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold">
+                              {t(`library.launcherImport.launchers.${game.launcher}`)}
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {game.executable && (
                     <Card className={!executableExists ? "border-red-500/50" : ""}>

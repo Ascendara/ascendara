@@ -751,6 +751,23 @@ const gameService = {
     );
   },
 
+  normalizeForMatch(name) {
+    return cleanHydraTitle(name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  },
+
+  async findCatalogMatch(name) {
+    const target = this.normalizeForMatch(name);
+    if (!target) return null;
+    const { games, metadata } = await this.getCachedData();
+    if (metadata?.customSource || !Array.isArray(games)) return null;
+    return (
+      games.find(game => this.normalizeForMatch(game.game) === target) || null
+    );
+  },
+
   async getGamesByCategory(category) {
     const { games } = await this.getCachedData();
     return games.filter(

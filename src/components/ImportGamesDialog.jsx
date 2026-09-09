@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
+  ArrowRightLeft,
   Check,
   CheckCircle2,
   Download,
@@ -25,7 +27,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/context/LanguageContext";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeText } from "@/lib/utils";
+import gameService from "@/services/gameService";
+import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
 
 const LAUNCHERS = ["steam", "epic", "gog", "ubisoft", "battlenet"];
 const ACTIVE_PHASES = ["scanning", "importing", "assets"];
@@ -43,17 +47,20 @@ export default function ImportGamesDialog({
   onBusyChange,
 }) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [state, setState] = useState(null);
   const [selected, setSelected] = useState(LAUNCHERS);
   const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [catalogMatches, setCatalogMatches] = useState({});
   const latest = useRef(null);
   const mounted = useRef(false);
   const startGuard = useRef(false);
   const stopGuard = useRef(false);
   const eventVersion = useRef(0);
+  const checkedMatches = useRef(new Set());
   const callbacks = useRef({ onLibraryChanged, onBusyChange });
 
   useEffect(() => {
@@ -132,6 +139,40 @@ export default function ImportGamesDialog({
   const selectedIds = supported.filter(id => selected.includes(id));
   const launchers = state?.launchers || [];
   const items = state?.items || [];
+
+  useEffect(() => {
+    const pending = items.filter(
+      item =>
+        item.status === "added" &&
+        typeof item.game === "string" &&
+        !checkedMatches.current.has(item.game)
+    );
+    if (!pending.length) return;
+    pending.forEach(item => checkedMatches.current.add(item.game));
+    (async () => {
+      for (const item of pending) {
+        try {
+          const match = await gameService.findCatalogMatch(item.game);
+          if (mounted.current && match) {
+            setCatalogMatches(prev => ({ ...prev, [item.game]: match }));
+          }
+        } catch {
+          // Catalog lookup is best-effort; missing matches are simply not offered
+        }
+      }
+    })();
+  }, [items]);
+
+  const handleSwapToDownload = catalogGame => {
+    const importedGameName = Object.entries(catalogMatches).find(
+      ([, match]) => match === catalogGame
+    )?.[0];
+    if (importedGameName) {
+      pendingLibrarySwapService.add(sanitizeText(catalogGame.game), importedGameName);
+    }
+    onOpenChange(false);
+    navigate("/download", { state: { gameData: catalogGame } });
+  };
   const found = launchers.reduce((total, launcher) => total + (launcher.found || 0), 0);
   const scanned = launchers.filter(launcher =>
     ["complete", "error"].includes(launcher.status)
@@ -529,6 +570,16 @@ export default function ImportGamesDialog({
                             {t(`library.launcherImport.assets.${item.assets}`)}
                           </p>
                         )}
+                        {typeof item.game === "string" && catalogMatches[item.game] && (
+                          <button
+                            type="button"
+                            onClick={() => handleSwapToDownload(catalogMatches[item.game])}
+                            className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                          >
+                            <ArrowRightLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {t("library.launcherImport.catalogMatchAction")}
+                          </button>
+                        )}
                       </div>
                       <span
                         className={cn(
@@ -592,7 +643,7 @@ export default function ImportGamesDialog({
             </>
           ) : (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" className="text-primary" onClick={() => onOpenChange(false)}>
                 {t("library.launcherImport.close")}
               </Button>
               {!state ? (

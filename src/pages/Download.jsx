@@ -36,6 +36,7 @@ import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import { addToQueue, hasActiveDownloads, getDownloadQueue } from "@/services/downloadQueueService";
+import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
 import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
 import {
   BadgeCheckIcon,
@@ -676,6 +677,20 @@ export default function DownloadPage() {
     }
   }
 
+  // If the user chose to switch this game from an imported (launcher-tied) copy
+  // to an Ascendara-managed download, remove the old imported entry right as the
+  // real download starts, so it downloads like any other normal game from here on.
+  async function consumePendingLauncherSwap(sanitizedGameName) {
+    const importedGameName = pendingLibrarySwapService.take(sanitizedGameName);
+    if (!importedGameName) return;
+    try {
+      await window.electron.removeCustomGame(importedGameName);
+      toast.success(t("library.launcherImport.swapComplete", { game: gameData.game }));
+    } catch (error) {
+      console.warn("Could not remove imported game before swap download:", error);
+    }
+  }
+
   async function handleDownload(
     directUrl = null,
     dir = null,
@@ -897,6 +912,7 @@ export default function DownloadPage() {
         return;
       }
       setIsStartingDownload(true);
+      await consumePendingLauncherSwap(sanitizedGameName);
       cacheDownloadData(sanitizedGameName, gameData);
 
       try {
@@ -989,6 +1005,7 @@ export default function DownloadPage() {
         }
 
         setIsStartingDownload(true);
+        await consumePendingLauncherSwap(sanitizedGameName);
 
         // Cache the download page data for retry functionality
         cacheDownloadData(sanitizedGameName, gameData);
@@ -1314,6 +1331,7 @@ export default function DownloadPage() {
     console.log("Starting download with URL:", urlToUse);
 
     setIsStartingDownload(true);
+    await consumePendingLauncherSwap(sanitizedGameName);
 
     // Cache the download page data for retry functionality
     cacheDownloadData(sanitizedGameName, gameData);
