@@ -6200,7 +6200,12 @@ export default function BigPicture() {
         try {
           custom = await window.electron.getCustomGames();
         } catch (e) {}
-        let games = [...installed, ...custom];
+        // Deleted custom games are kept as stubs for Library history, but they are
+        // no longer playable and should not appear in Big Picture.
+        const activeCustomGames = Array.isArray(custom)
+          ? custom.filter(game => !game?._isDeleted)
+          : [];
+        let games = [...installed, ...activeCustomGames];
 
         setAllGames(games);
 
@@ -6213,7 +6218,7 @@ export default function BigPicture() {
             ...game,
             isCustom: false,
           })),
-          ...(custom || []).map(game => ({
+          ...activeCustomGames.map(game => ({
             name: game.game,
             game: game.game,
             version: game.version,
