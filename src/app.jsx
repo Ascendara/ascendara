@@ -1121,7 +1121,7 @@ const MessageNotificationChecker = () => {
       return;
     }
 
-    const checkForNewMessages = async () => {
+    const checkForNewMessages = async (isInitialCheck = false) => {
       try {
         // Skip notifications if user is on Ascend page (real-time listener handles it)
         if (location.pathname === "/ascend") {
@@ -1130,6 +1130,16 @@ const MessageNotificationChecker = () => {
 
         const result = await getUnreadMessageCount();
         if (result.error || result.newMessages.length === 0) return;
+
+        // On the first check after mount/login, just record existing unread
+        // counts as the baseline instead of notifying for messages that were
+        // already unread before we started watching.
+        if (isInitialCheck) {
+          result.newMessages.forEach(msg => {
+            lastCheckedRef.current[msg.conversationId] = msg.unreadCount;
+          });
+          return;
+        }
 
         // Check for new messages we haven't notified about
         result.newMessages.forEach(msg => {
@@ -1158,8 +1168,9 @@ const MessageNotificationChecker = () => {
       }
     };
 
-    // Initial check after a short delay
-    const initialTimeout = setTimeout(checkForNewMessages, 5000);
+    // Initial check after a short delay - just establishes the baseline,
+    // doesn't notify for messages that were already unread before this ran
+    const initialTimeout = setTimeout(() => checkForNewMessages(true), 5000);
 
     // Reduce polling frequency from 30s to 60s to reduce CPU usage
     checkIntervalRef.current = setInterval(checkForNewMessages, 60000);
@@ -1930,11 +1941,16 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+const LIGHT_THEMES = ["light", "blue", "purple", "emerald", "rose", "amber"];
+
 function ToasterWithTheme() {
   const { theme } = useTheme();
+  const sonnerTheme = LIGHT_THEMES.includes(theme) ? "light" : "dark";
 
   return (
     <Toaster
+      key={theme}
+      theme={sonnerTheme}
       position="top-right"
       toastOptions={{
         style: {
