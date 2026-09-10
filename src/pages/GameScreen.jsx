@@ -52,6 +52,7 @@ import {
   Terminal,
   RefreshCw,
   ArrowRightLeft,
+  CheckCircle2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
@@ -1188,6 +1189,7 @@ export default function GameScreen() {
   const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
+  const [isDeleteTransitioning, setIsDeleteTransitioning] = useState(false);
   const [isVerifyingOpen, setIsVerifyingOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
@@ -2370,7 +2372,8 @@ export default function GameScreen() {
 
       setIsUninstalling(false);
       setIsSaveDataDialogOpen(false);
-      navigate("/library");
+      setIsDeleteTransitioning(true);
+      setTimeout(() => navigate("/library"), 650);
     } catch (error) {
       console.error("Error deleting game:", error);
       setIsUninstalling(false);
@@ -4833,6 +4836,22 @@ export default function GameScreen() {
         isUninstalling={isUninstalling}
         t={t}
       />
+
+      {/* Delete/Remove transition overlay - eases the trip back to the library */}
+      {isDeleteTransitioning && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 animate-in zoom-in-50 duration-300">
+            <CheckCircle2 className="h-8 w-8 text-primary" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground animate-in fade-in slide-in-from-bottom-1 duration-300">
+            {game.isCustom
+              ? t("library.removeGameFromLibrary")
+              : t("library.deleteGame")}
+            {" "}
+            {(game.game || game.name) && `\u2022 ${game.game || game.name}`}
+          </p>
+        </div>
+      )}
 
       {/* Restore Game Data Dialog */}
       <AlertDialog open={isRestorePromptOpen} onOpenChange={() => {}}>

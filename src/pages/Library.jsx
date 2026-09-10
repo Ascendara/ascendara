@@ -1233,6 +1233,16 @@ const Library = () => {
     }
   };
 
+  // Called by game cards after a delete/remove completes. Optimistically drops
+  // the game from local state for an instant, seamless UI update, then
+  // resyncs with disk in the background (no full page/app reload needed).
+  const handleGameRemoved = gameId => {
+    if (gameId) {
+      setGames(prev => prev.filter(g => (g.game || g.name) !== gameId));
+    }
+    loadGames();
+  };
+
   const handleCloudSync = async () => {
     if (!user) {
       navigate("/ascend");
@@ -2094,6 +2104,7 @@ const Library = () => {
                       isSelected={selectedGames.includes(game.game)}
                       onSelectCheckbox={() => handleSelectGame(game)}
                       updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
+                      onRemoved={handleGameRemoved}
                     />
                   </DraggableGameCard>
                 )}
@@ -2441,6 +2452,7 @@ const Library = () => {
                           navigate("/download", { state: { gameData: fullGame || { ...game, ...meta } } });
                         } : undefined}
                         onUnfavorite={() => toggleFavorite(game.game || game.name)}
+                        onRemoved={handleGameRemoved}
                       />
                     ))}
                   </div>
@@ -2822,7 +2834,7 @@ const STATUS_META = {
   backlog: { icon: Bookmark, color: "text-amber-400", bg: "bg-amber-500/90" },
 };
 
-const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, onPlay, onDownload, onUnfavorite }) => {
+const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, onPlay, onDownload, onUnfavorite, onRemoved }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [imageData, setImageData] = useState(() => gameImageCache.get(game.game || game.name) ?? null);
@@ -2835,6 +2847,7 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, 
   const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
   const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   const handleContextMenu = e => {
     e.preventDefault();
@@ -2872,7 +2885,8 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, 
       }
       setIsUninstalling(false);
       setIsSaveDataDialogOpen(false);
-      window.location.reload();
+      setIsRemoving(true);
+      setTimeout(() => onRemoved?.(gameId), 280);
     } catch {
       setIsUninstalling(false);
     }
@@ -3160,7 +3174,7 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, 
                 <>
                   <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
                   <button
-                    onClick={() => { setContextMenuOpen(false); setIsDeleteDialogOpen(true); }}
+                    onClick={() => { setContextMenuOpen(false); game.isCustom ? confirmDelete() : setIsDeleteDialogOpen(true); }}
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
                   >
                     <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
@@ -3183,8 +3197,8 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, 
     <Card
       className={cn(
         "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-        "hover:-translate-y-1 hover:shadow-2xl hover:border-primary/40",
-        "cursor-pointer"
+        !isRemoving && "hover:-translate-y-1 hover:shadow-2xl hover:border-primary/40 cursor-pointer",
+        isRemoving && "pointer-events-none animate-out fade-out zoom-out-95 slide-out-to-bottom-2 duration-300"
       )}
       onClick={game._isStub ? onDownload : onPlay}
       onContextMenu={handleContextMenu}
@@ -3315,6 +3329,7 @@ const InstalledGameCard = memo(
     selectionMode,
     onSelectCheckbox,
     updateInfo,
+    onRemoved,
   }) => {
     const { t } = useLanguage();
     const { settings } = useSettings();
@@ -3330,6 +3345,7 @@ const InstalledGameCard = memo(
     const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
     const [isUninstalling, setIsUninstalling] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
     const isFavorite = favorites.includes(game.game || game.name);
 
     useEffect(() => {
@@ -3570,7 +3586,11 @@ const InstalledGameCard = memo(
     const handleRemoveGame = e => {
       e.stopPropagation();
       setContextMenuOpen(false);
-      setIsDeleteDialogOpen(true);
+      if (game.isCustom) {
+        confirmDeleteGame();
+      } else {
+        setIsDeleteDialogOpen(true);
+      }
     };
 
     const handleDeleteGame = e => {
@@ -3605,7 +3625,8 @@ const InstalledGameCard = memo(
 
         setIsUninstalling(false);
         setIsSaveDataDialogOpen(false);
-        window.location.reload();
+        setIsRemoving(true);
+        setTimeout(() => onRemoved?.(gameId), 280);
       } catch (error) {
         console.error("Error deleting game:", error);
         setIsUninstalling(false);
@@ -3897,7 +3918,8 @@ const InstalledGameCard = memo(
             (game._isDownloading || game._isQueued) && "opacity-60 cursor-default",
             isSelected && "ring-2 ring-primary",
             selectionMode && game.isCustom && "selectable-card",
-            !game._isDownloading && !game._isQueued && "cursor-pointer"
+            !game._isDownloading && !game._isQueued && "cursor-pointer",
+            isRemoving && "pointer-events-none animate-out fade-out zoom-out-95 slide-out-to-bottom-2 duration-300"
           )}
           onClick={e => {
             if (game._isDownloading || game._isQueued) return;
