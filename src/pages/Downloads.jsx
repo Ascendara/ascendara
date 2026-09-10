@@ -270,7 +270,7 @@ const Downloads = () => {
             }
           } else if (command === "stop" || command === "cancel" || command === "kill") {
             // Stop/cancel/kill all mean delete the download
-            const result = await window.electron.stopDownload(downloadId, true);
+            const result = await window.electron.stopDownload(downloadId, true, true);
             console.log("[Downloads] Stop result:", result);
             if (result) {
               commandSuccess = true;
@@ -757,7 +757,7 @@ const Downloads = () => {
     console.log("Executing kill download for:", game, "deleteFiles:", deleteFiles);
     setStoppingDownloads(prev => new Set([...prev, game.game]));
     try {
-      const result = await window.electron.stopDownload(game.game, deleteFiles);
+      const result = await window.electron.stopDownload(game.game, deleteFiles, true);
       console.log("Kill download result:", result);
       if (!result) {
         throw new Error("Failed to kill download");

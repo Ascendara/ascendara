@@ -57,3 +57,4 @@ src/pages/webview-api.py
 scripts/upload.py
 binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh_old.py
 /binaries/AscendaraLocalRefresh/src/__pycache__
+binaries/AscendaraDownloader/src/AscendaraDownloader_OLD.py

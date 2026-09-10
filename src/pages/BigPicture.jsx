@@ -5915,7 +5915,7 @@ export default function BigPicture() {
 
     setStoppingDownloads(prev => new Set([...prev, gameToKill.game]));
     try {
-      const result = await window.electron.stopDownload(gameToKill.game, true);
+      const result = await window.electron.stopDownload(gameToKill.game, true, true);
       if (!result) {
         throw new Error("Failed to kill download");
       }

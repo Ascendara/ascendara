@@ -1,45 +1,551 @@
-# ==============================================================================
-# Ascendara Downloader
-# ==============================================================================
-# High-performance multi-threaded downloader for Ascendara.
-# Handles game downloads, and extracting processes with support for
-# resume and verification. Read more about the Download Manager Tool here:
-# https://ascendara.app/docs/binary-tool/downloader
+"""Ascendara Downloader V4.
 
-
-
-
-
-
-
-
-
-
-import os
-import sys
-import json
-import time
-import shutil
-import string
-import logging
-import random
-import re
+The CLI and frontend compatibility routines are retained from the existing
+downloader. Transfer, extraction supervision, staging and installation are new.
+Run this file with the same positional arguments as AscendaraDownloader.py.
+"""
 import atexit
 import ctypes
+from contextlib import nullcontext
+from collections import deque
+import hashlib
+import json
+import logging
+import math
+import multiprocessing
+import os
+import re
+import shutil
+import stat
+import string
 import subprocess
+import sys
+import tempfile
+import threading
+import time
 import zipfile
-from tempfile import NamedTemporaryFile
+import zlib
 from argparse import ArgumentParser
-from typing import Optional, Dict, Any, Tuple
+from tempfile import NamedTemporaryFile
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
+
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
-
-# Sleep Prevention
-
+from AscendaraTransfer import Transfer
+from AscendaraGofile import GofileClient, content_id as gofile_content_id
+from AscendaraRarRecovery import (
+    _load_api, _extended_path, _check_path, _member_path, _native_error,
+    _file_error, _check_archive_target,
+)
 
 _caffeinate_proc = None
+
+def cleanup_temporary(path, root, empty_only=False):
+    """Remove an owned temporary path, retrying Windows locks/read-only files."""
+    path, root = os.path.abspath(path), os.path.abspath(root)
+    if os.path.normcase(path) == os.path.normcase(root):
+        raise ValueError('Cleanup cannot remove the game directory')
+    _check_path(root, path)
+    target = _extended_path(path)
+
+    def writable_retry(function, failed_path, error):
+        if not os.path.islink(failed_path):
+            os.chmod(failed_path, stat.S_IWRITE | stat.S_IREAD)
+        function(failed_path)
+
+    for attempt in range(5):
+        try:
+            if empty_only:
+                os.rmdir(target)
+            elif os.path.isdir(target):
+                shutil.rmtree(target, onerror=writable_retry)
+            else:
+                try:
+                    os.remove(target)
+                except PermissionError:
+                    os.chmod(target, stat.S_IWRITE | stat.S_IREAD)
+                    os.remove(target)
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError:
+            if empty_only and os.path.isdir(target) and os.listdir(target):
+                return False
+            if attempt == 4:
+                logging.warning('Temporary download files remain at %s', path, exc_info=True)
+                return False
+            time.sleep(.25 * (attempt + 1))
+
+def safe_write_json(filepath, data, reset_stop=False):
+    """Atomic UTF-8 writes; preserve Electron's stop request and surface failures."""
+    if ('downloadingData' in data or 'game' in data) and not reset_stop:
+        try:
+            with open(filepath, encoding='utf-8') as stream:
+                if json.load(stream).get('downloadingData', {}).get('stopped'):
+                    raise InterruptedError('Download stopped by user')
+        except InterruptedError:
+            raise
+        except (OSError, json.JSONDecodeError):
+            pass
+    temporary = None
+    try:
+        with NamedTemporaryFile('w', encoding='utf-8', delete=False,
+                                dir=os.path.dirname(os.path.abspath(filepath)), suffix='.tmp') as stream:
+            temporary = stream.name
+            json.dump(data, stream, indent=4)
+        for attempt in range(5):
+            try:
+                os.replace(temporary, filepath)
+                return
+            except PermissionError:
+                if attempt == 4:
+                    raise
+                time.sleep(.05 * 2 ** attempt)
+    finally:
+        if temporary and os.path.exists(temporary):
+            os.remove(temporary)
+
+
+def create_robust_session():
+    session = requests.Session()
+    # Transfer owns retries; do not multiply adapter retries by transfer retries.
+    session.headers.update({'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'identity'})
+    session.mount('https://', HTTPAdapter(max_retries=0))
+    session.mount('http://', HTTPAdapter(max_retries=0))
+    return session
+
+
+class VerificationFailure(RuntimeError):
+    pass
+
+
+class SmoothETA:
+    """Smooth the predicted finish time while letting seconds count down normally."""
+    def __init__(self):
+        self.remaining = None
+        self.updated_at = None
+        self.previous_done = 0
+        self.previous_total = None
+
+    def update(self, done, total, speed, now):
+        if total != self.previous_total or done < self.previous_done:
+            self.remaining = None
+            self.updated_at = None
+        self.previous_done, self.previous_total = done, total
+        if not total or done >= total:
+            self.remaining = None
+            self.updated_at = None
+            return 0
+        if speed <= 0:
+            return math.ceil(self.remaining) if self.remaining is not None else 0
+        measured = max(0, (total - done) / speed)
+        if self.remaining is None:
+            self.remaining = measured
+        else:
+            elapsed = max(0, now - self.updated_at)
+            predicted = max(0, self.remaining - elapsed)
+            # Filter corrections to the finish time, not the countdown itself.
+            # Ten seconds of smoothing absorbs brief speed dips, but a sustained
+            # slowdown can still move the estimate upward instead of reaching 0 early.
+            correction = measured - predicted
+            weight = -math.expm1(-elapsed / 10.0)
+            self.remaining = predicted + correction * weight
+        self.updated_at = now
+        # Reserve 0s for actual completion, including the final partial second.
+        return max(1, math.ceil(self.remaining))
+
+
+class ChunkedDownloader:
+    """Compatibility adapter for direct downloads and archive repair."""
+    def __init__(self, url, dest_path, game_info, game_info_path, session=None, expected_size=None):
+        self.url, self.dest_path = url, dest_path
+        self.game_info, self.game_info_path = game_info, game_info_path
+        self.stopped, self.last_error = False, None
+        self._eta = SmoothETA()
+        self.session, self.expected_size = session, expected_size
+
+    def _check_for_stop(self):
+        try:
+            with open(self.game_info_path, encoding='utf-8') as stream:
+                self.stopped = self.stopped or json.load(stream).get('downloadingData', {}).get('stopped', False)
+        except FileNotFoundError:
+            self.stopped = True
+        except (OSError, ValueError):
+            pass
+        return self.stopped
+
+    def _progress(self, done, total, speed):
+        if self._check_for_stop():
+            raise InterruptedError('Download cancelled')
+        eta = self._eta.update(done, total, speed, time.monotonic())
+        eta_text = f'{eta}s' if eta < 60 else f'{eta // 60}m {eta % 60}s'
+        if eta >= 3600:
+            eta_text = f'{eta // 3600}h {(eta % 3600) // 60}m'
+        data = self.game_info['downloadingData']
+        data.update(downloading=True, extracting=False, verifying=False,
+                    progressCompleted=f'{min(100, done / total * 100) if total else 0:.2f}',
+                    progressDownloadSpeeds=read_size(speed) + '/s',
+                    timeUntilComplete=eta_text if total else f'Downloaded: {read_size(done)}')
+        safe_write_json(self.game_info_path, self.game_info)
+
+    def download(self):
+        try:
+            limit = max(0, int(load_settings().get('downloadLimit', 0))) * 1024
+            self._progress(0, None, 0)
+            def retry(attempt):
+                self.game_info['downloadingData']['retryAttempt'] = attempt
+                safe_write_json(self.game_info_path, self.game_info)
+            with (nullcontext(self.session) if self.session is not None else create_robust_session()) as session:
+                Transfer(self.url, self.dest_path, session, self._progress, self._check_for_stop,
+                         limit, retry, self.expected_size).run()
+            self.game_info['downloadingData'].pop('retryAttempt', None)
+            return True
+        except InterruptedError:
+            self.stopped = True
+            return False
+        except Exception as exc:
+            self.last_error = str(exc)
+            return False
+
+
+def verify_manifest(root, manifest, check_cancelled):
+    errors = []
+    next_check = 0
+    for name, info in manifest.items():
+        now = time.monotonic()
+        if now >= next_check:
+            check_cancelled()
+            next_check = now + .5
+        path = _member_path(root, name)
+        if not os.path.isfile(path):
+            errors.append({'file': name, 'error': 'File not found'})
+        elif os.path.getsize(path) != info['size']:
+            errors.append({'file': name, 'error': f"Size mismatch: expected {info['size']}, got {os.path.getsize(path)}"})
+    check_cancelled()
+    return errors
+
+
+def flatten_payload(root, manifest, game):
+    """Strip a single wrapper using the manifest, without scanning the game tree."""
+    roots = {name.split('/')[0] for name in manifest}
+    if len(roots) != 1:
+        return manifest
+    wrapper = next(iter(roots))
+    if not os.path.isdir(os.path.join(root, wrapper)):
+        return manifest
+    # A lone engine asset folder is not a repack wrapper.
+    match = re.sub(r'[^a-z0-9]', '', wrapper.lower()) == re.sub(r'[^a-z0-9]', '', game.lower())
+    if not match and not any(name.lower().endswith('.exe') for name in manifest):
+        return manifest
+    prefix = wrapper + '/'
+    mapped = {name[len(prefix):]: info for name, info in manifest.items()}
+    for name in mapped:
+        _member_path(root, name)
+    source = os.path.join(root, wrapper)
+    # A same-name nested wrapper needs a temporary rename to avoid self-collision.
+    temporary = tempfile.mkdtemp(prefix='.flatten-', dir=os.path.dirname(root))
+    os.rmdir(temporary)
+    os.replace(source, temporary)
+    for name in os.listdir(temporary):
+        os.replace(os.path.join(temporary, name), os.path.join(root, name))
+    os.rmdir(temporary)
+    return mapped
+
+
+def _wanted(name):
+    return not name.lower().endswith('.url') and '_commonredist' not in name.lower()
+
+
+class StopSignal:
+    """One shared byte; no semaphore can be left locked by a crashed decoder."""
+    def __init__(self, context):
+        self.flag = context.RawValue('b', 0)
+
+    def is_set(self):
+        return bool(self.flag.value)
+
+    def set(self):
+        self.flag.value = 1
+
+    def wait(self, seconds):
+        time.sleep(seconds)
+        return self.is_set()
+
+
+def _find_7z():
+    roots = [getattr(sys, '_MEIPASS', ''), os.path.dirname(sys.executable),
+             os.path.dirname(__file__), r'C:\Program Files\7-Zip', r'C:\Program Files (x86)\7-Zip']
+    candidates = [shutil.which('7z'), shutil.which('7zz'), shutil.which('7za')]
+    candidates += [os.path.join(root, name) for root in roots for name in ('7z.exe', '7zz', '7z')]
+    return next((path for path in candidates if path and os.path.isfile(path)), None)
+
+
+def _run_cli(command, cancelled, activity):
+    """Drain combined output continuously and always reap the native child."""
+    from collections import deque
+    tail = deque(maxlen=64)
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, creationflags=0x08000000 if os.name == 'nt' else 0)
+    def drain():
+        import codecs
+        decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
+        while True:
+            chunk = process.stdout.read1(4096)
+            if not chunk:
+                return
+            tail.append(chunk)
+            activity(decoder.decode(chunk))
+    reader = threading.Thread(target=drain, daemon=True)
+    reader.start()
+    try:
+        while process.poll() is None:
+            cancelled()
+            time.sleep(.1)
+        reader.join()
+        if process.returncode != 0:
+            raise RuntimeError(f'Extractor exited with code {process.returncode}: ' +
+                               b''.join(tail).decode('utf-8', errors='replace')[-4000:])
+        return b''.join(tail).decode('utf-8', errors='replace')
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        reader.join(timeout=3)
+        process.stdout.close()
+
+
+def extraction_worker(archive, destination, manifest_path, connection, stop):
+    """Only this process touches archive decoders. No frontend JSON writes here."""
+    last_sent = 0
+    state = {'name': 'Preparing...', 'files': 0, 'total': 0, 'percent': 0}
+    manifest = {}
+    parent = multiprocessing.parent_process()
+    def parent_watch():
+        while not stop.wait(.5):
+            if parent is not None and not parent.is_alive():
+                stop.set()
+                time.sleep(5)
+                os._exit(1)
+    threading.Thread(target=parent_watch, daemon=True).start()
+    def cancelled():
+        if stop.is_set():
+            raise InterruptedError('Extraction cancelled')
+    def report(force=False):
+        nonlocal last_sent
+        cancelled()
+        now = time.monotonic()
+        if force or now - last_sent >= .5:
+            connection.send(('progress', dict(state)))
+            last_sent = now
+    def completed(name, size):
+        normalized = name.replace('\\', '/')
+        manifest[normalized] = {'size': size}
+        state.update(name=normalized, files=len(manifest))
+        state['total'] = max(state['total'], len(manifest))
+        report()
+    try:
+        report(True)
+        kind, _ = AscendaraDownloader.detect_file_type(archive)
+        use_cli = False
+        if kind == 'zip':
+            with zipfile.ZipFile(archive) as source:
+                # Python's ZipCrypto implementation is particularly slow on large repacks.
+                use_cli = any(i.flag_bits & 1 or i.compress_type not in (0, 8, 12, 14)
+                              for i in source.infolist())
+        if kind == 'zip' and not use_cli:
+            state.update(engine='Python ZIP', bytes=0)
+            with zipfile.ZipFile(archive) as source:
+                members = [i for i in source.infolist() if _wanted(i.filename)]
+                # Validate every path before creating any output, including links.
+                for item in members:
+                    target = _member_path(destination, item.filename)
+                    _check_archive_target(archive, target)
+                    if stat.S_ISLNK(item.external_attr >> 16):
+                        raise ValueError(f'Refusing archive link: {item.filename}')
+                files = [i for i in members if not i.is_dir()]
+                total_bytes = sum(i.file_size for i in files)
+                if total_bytes > shutil.disk_usage(destination).free:
+                    raise OSError('Insufficient disk space for extraction')
+                state['total'] = len(files)
+                report(True)
+                done_bytes = 0
+                for item in members:
+                    cancelled()
+                    target = _member_path(destination, item.filename)
+                    if item.is_dir():
+                        os.makedirs(target, exist_ok=True)
+                        continue
+                    state['name'] = item.filename
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                    with source.open(item, pwd=b'steamrip.com') as incoming, open(target, 'wb', buffering=1024*1024) as output:
+                        while True:
+                            cancelled()
+                            chunk = incoming.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            output.write(chunk)
+                            done_bytes += len(chunk)
+                            state['bytes'] = done_bytes
+                            state['percent'] = done_bytes / total_bytes * 100 if total_bytes else 0
+                            report()
+                    completed(item.filename, item.file_size)
+        elif kind == 'rar' and os.name == 'nt':
+            state.update(engine='UnRAR native', bytes=0)
+            # Header-only pass: no test/decompression pass before extraction.
+            api = _load_api()
+            opening = api.OpenData(_extended_path(archive), mode=0)
+            handle = api.open(ctypes.byref(opening))
+            if not handle:
+                _native_error(opening.OpenResult or 15, 'Opening archive')
+            total_bytes = 0
+            try:
+                _native_error(opening.OpenResult, 'Opening archive')
+                api.password(handle, b'steamrip.com')
+                while True:
+                    cancelled()
+                    header = api.Header()
+                    code = api.read(handle, ctypes.byref(header))
+                    if code == 10:
+                        break
+                    _native_error(code, 'Reading archive header')
+                    name = header.FileNameW or header.FileName.decode('utf-8')
+                    _member_path(destination, name)
+                    if _wanted(name) and not header.Flags & 0x20:
+                        state['total'] += 1
+                        total_bytes += header.UnpSize + (header.UnpSizeHigh << 32)
+                    _native_error(api.process(handle, 0, None, None), 'Listing archive')
+                    report()
+            finally:
+                api.close(handle)
+            if total_bytes > shutil.disk_usage(destination).free:
+                raise OSError('Insufficient disk space for extraction')
+            finished_bytes = 0
+            def rar_progress(name, written, expected):
+                state.update(name=name, bytes=finished_bytes + min(written, expected),
+                             percent=(finished_bytes + min(written, expected)) / total_bytes * 100 if total_bytes else 0)
+                report()
+            def rar_file(name, size):
+                nonlocal finished_bytes
+                finished_bytes += size
+                state['bytes'] = finished_bytes
+                completed(name, size)
+            extract_rar_stream(archive, destination, on_file=rar_file,
+                               should_stop=stop.is_set, on_progress=rar_progress)
+        elif kind in ('7z', 'rar', 'zip'):
+            state['engine'] = '7-Zip CLI'
+            tool = _find_7z()
+            if not tool:
+                raise RuntimeError(f'{kind.upper()} extraction requires a bundled or installed 7-Zip command-line tool')
+            # Stream the full listing to disk; large manifests must not be kept in a pipe tail.
+            listing_path = manifest_path + '.listing'
+            with open(listing_path, 'w', encoding='utf-8', newline='') as listing:
+                def listing_activity(text):
+                    listing.write(text)
+                    report()
+                _run_cli([tool, 'l', '-slt', '-ba', '-sccUTF-8', '-psteamrip.com', '--', archive], cancelled, listing_activity)
+            with open(listing_path, encoding='utf-8') as listing:
+                records = listing.read().split('\n\n')
+            for record in records:
+                values = dict(line.split(' = ', 1) for line in record.splitlines() if ' = ' in line)
+                name = values.get('Path')
+                if not name:
+                    continue
+                _check_archive_target(archive, _member_path(destination, name))
+                if values.get('Symbolic Link') or values.get('Hard Link') or 'l' in values.get('Attributes', '').split(' ')[-1][:1]:
+                    raise ValueError(f'Refusing archive link: {name}')
+                if values.get('Folder') != '+' and not values.get('Attributes', '').startswith('D') and _wanted(name):
+                    manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
+            total_bytes = sum(v['size'] for v in manifest.values())
+            if total_bytes > shutil.disk_usage(destination).free:
+                raise OSError('Insufficient disk space for extraction')
+            state['total'] = len(manifest)
+            def cli_activity(text):
+                percentages = re.findall(r'(\d+)%', text)
+                if percentages:
+                    state['percent'] = int(percentages[-1])
+                names = re.findall(r'^- (.+)', text, re.M)
+                if names:
+                    state['name'] = names[-1]
+                state['files'] = min(state['total'], state['files'] + len(names))
+                report()
+            _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bsp1', '-bb1', '-sccUTF-8',
+                      '-xr!*.url', '-xr!_CommonRedist', '-o' + destination, '--', archive], cancelled, cli_activity)
+        elif kind == 'exe':
+            name = os.path.basename(archive)
+            shutil.copyfile(archive, _member_path(destination, name))
+            completed(name, os.path.getsize(archive))
+        else:
+            raise RuntimeError('Downloaded file is not a supported ZIP, RAR, 7z archive or executable')
+        if not manifest:
+            raise RuntimeError('Archive contains no installable files')
+        errors = verify_manifest(destination, manifest, cancelled)
+        if errors:
+            raise RuntimeError(f'Incomplete archive output: {errors[0]}')
+        state.update(files=len(manifest), total=len(manifest), percent=100, name='Finalizing...')
+        report(True)
+        with open(manifest_path, 'w', encoding='utf-8') as stream:
+            json.dump(manifest, stream)
+        connection.send(('done', None))
+    except BaseException as exc:
+        if isinstance(exc, zlib.error):
+            exc = RuntimeError(f'Archive corrupt data: {exc}')
+        try:
+            connection.send(('error', (type(exc).__name__, str(exc))))
+        except (OSError, EOFError):
+            pass
+    finally:
+        connection.close()
+
+
+def supervise_extraction(archive, destination, check_cancelled, progress, workdir, idle_timeout=300):
+    context = multiprocessing.get_context('spawn')
+    receiver, sender = context.Pipe(duplex=False)
+    stop = StopSignal(context)
+    manifest_path = os.path.join(workdir, 'worker-manifest.json')
+    process = context.Process(target=extraction_worker,
+                              args=(archive, destination, manifest_path, sender, stop), daemon=True)
+    process.start()
+    sender.close()
+    last_activity = time.monotonic()
+    try:
+        while True:
+            check_cancelled()
+            if receiver.poll(.2):
+                try:
+                    event, value = receiver.recv()
+                except EOFError:
+                    raise RuntimeError(f'Extraction worker exited unexpectedly (code {process.exitcode})')
+                last_activity = time.monotonic()
+                if event == 'progress':
+                    progress(value)
+                elif event == 'error':
+                    kind, message = value
+                    exception = {'InterruptedError': InterruptedError, 'OSError': OSError,
+                                 'ValueError': ValueError}.get(kind, RuntimeError)
+                    raise exception(message)
+                elif event == 'done':
+                    with open(manifest_path, encoding='utf-8') as stream:
+                        return json.load(stream)
+            elif not process.is_alive():
+                raise RuntimeError(f'Extraction worker exited unexpectedly (code {process.exitcode})')
+            if time.monotonic() - last_activity > idle_timeout:
+                raise RuntimeError(f'Extraction stalled: no decoder activity for {idle_timeout} seconds. Source archive retained.')
+    finally:
+        stop.set()
+        process.join(timeout=5)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=3)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        receiver.close()
+        process.close()
 
 def prevent_sleep():
     """Prevent the system from sleeping while a download is active."""
@@ -62,6 +568,7 @@ def prevent_sleep():
     except Exception as e:
         logging.warning(f"[AscendaraDownloader] Could not enable sleep prevention: {e}")
 
+
 def allow_sleep():
     """Re-allow the system to sleep after download is complete."""
     global _caffeinate_proc
@@ -79,9 +586,6 @@ def allow_sleep():
         logging.warning(f"[AscendaraDownloader] Could not disable sleep prevention: {e}")
 
 
-# Logging Setup
-
-
 def get_ascendara_log_path():
     if sys.platform == "win32":
         appdata = os.getenv("APPDATA")
@@ -90,20 +594,6 @@ def get_ascendara_log_path():
     ascendara_dir = os.path.join(appdata, "Ascendara by tagoWorks")
     os.makedirs(ascendara_dir, exist_ok=True)
     return os.path.join(ascendara_dir, "downloadmanager.log")
-
-LOG_PATH = get_ascendara_log_path()
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_PATH, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logging.info(f"[AscendaraDownloaderV2] Logging to {LOG_PATH}")
-
-
-# Crash Reporter
 
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
@@ -121,13 +611,11 @@ def _launch_crash_reporter_on_exit(error_code, error_message):
     except Exception as e:
         logging.error(f"Failed to launch crash reporter: {e}")
 
+
 def launch_crash_reporter(error_code, error_message):
     if not hasattr(launch_crash_reporter, "_registered"):
         atexit.register(_launch_crash_reporter_on_exit, error_code, error_message)
         launch_crash_reporter._registered = True
-
-
-# Notification Helper
 
 
 def _launch_notification(theme, title, message):
@@ -149,9 +637,6 @@ def _launch_notification(theme, title, message):
         logging.error(f"Failed to launch notification helper: {e}")
 
 
-# Utility Functions
-
-
 def read_size(size: int, decimal_places: int = 2) -> str:
     if size == 0:
         return "0 B"
@@ -163,36 +648,11 @@ def read_size(size: int, decimal_places: int = 2) -> str:
         i += 1
     return f"{size_float:.{decimal_places}f} {units[i]}"
 
+
 def sanitize_folder_name(name: str) -> str:
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
     return ''.join(c for c in name if c in valid_chars)
 
-def safe_write_json(filepath: str, data: Dict[str, Any]):
-    """Safely write JSON with atomic replace and retry logic."""
-    temp_dir = os.path.dirname(filepath)
-    temp_file_path = None
-    retry_attempts = 5
-    
-    try:
-        with NamedTemporaryFile('w', delete=False, dir=temp_dir, suffix='.tmp') as temp_file:
-            json.dump(data, temp_file, indent=4)
-            temp_file_path = temp_file.name
-        
-        for attempt in range(retry_attempts):
-            try:
-                os.replace(temp_file_path, filepath)
-                return
-            except PermissionError as e:
-                wait_time = 0.5 * (2 ** attempt) + random.uniform(0, 0.2)
-                time.sleep(wait_time)
-                if attempt == retry_attempts - 1:
-                    logging.error(f"safe_write_json: Could not write to {filepath}: {e}")
-    finally:
-        if temp_file_path and os.path.exists(temp_file_path):
-            try:
-                os.remove(temp_file_path)
-            except Exception:
-                pass
 
 def get_settings_path() -> Optional[str]:
     """Get the path to Ascendara settings file."""
@@ -213,6 +673,7 @@ def get_settings_path() -> Optional[str]:
             return candidate
     return None
 
+
 def load_settings() -> Dict[str, Any]:
     """Load Ascendara settings."""
     settings_path = get_settings_path()
@@ -223,6 +684,7 @@ def load_settings() -> Dict[str, Any]:
         except Exception as e:
             logging.error(f"Could not read settings: {e}")
     return {}
+
 
 def get_directory_size(path: str) -> int:
     """Calculate total size of a directory in bytes."""
@@ -238,6 +700,7 @@ def get_directory_size(path: str) -> int:
     except Exception as e:
         logging.warning(f"Error calculating directory size for {path}: {e}")
     return total_size
+
 
 def get_free_disk_space(path: str) -> int:
     """Get free disk space in bytes for the drive containing the path."""
@@ -255,6 +718,7 @@ def get_free_disk_space(path: str) -> int:
     except Exception as e:
         logging.error(f"Error getting free disk space: {e}")
         return 0
+
 
 def check_disk_space(path: str, required_bytes: int, operation: str = "operation") -> bool:
     """Check if there's enough disk space for an operation.
@@ -291,6 +755,7 @@ def check_disk_space(path: str, required_bytes: int, operation: str = "operation
         # Return True to avoid blocking operations if check fails
         return True
 
+
 def handleerror(game_info: Dict, game_info_path: str, error: Any):
     """Handle download errors by updating game info."""
     game_info['online'] = ""
@@ -313,457 +778,26 @@ def handleerror(game_info: Dict, game_info_path: str, error: Any):
     safe_write_json(game_info_path, game_info)
 
 
-# Robust HTTP Session with Connection Pooling
-
-
-def create_robust_session() -> requests.Session:
-    """Create a requests session with retry logic and connection pooling."""
-    session = requests.Session()
-    
-    # Configure retry strategy
-    retry_strategy = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["HEAD", "GET", "OPTIONS"]
-    )
-    
-    # Mount adapters with connection pooling
-    adapter = HTTPAdapter(
-        max_retries=retry_strategy,
-        pool_connections=10,
-        pool_maxsize=10
-    )
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    
-    # Set default headers
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Accept-Encoding': 'identity',
-        'Connection': 'keep-alive',
-    })
-    
-    return session
-
-
-# Chunked Downloader Core
-
-
-class ChunkedDownloader:
-    """
-    Robust chunked downloader that handles large files with proper resume support.
-    Uses smaller chunk sizes and validates each chunk before proceeding.
-    """
-    
-    STREAM_CHUNK_SIZE = 1024 * 1024  # 1MB read chunks for streaming
-    PROGRESS_UPDATE_INTERVAL = 0.5  # Update progress every 0.5 seconds
-    MAX_RETRIES = 10  # Max retries for the entire download
-    RETRY_DELAY_BASE = 2
-    RETRY_DELAY_MAX = 60
-    
-    def __init__(self, url: str, dest_path: str, game_info: Dict, game_info_path: str):
-        self.url = url
-        self.dest_path = dest_path
-        self.game_info = game_info
-        self.game_info_path = game_info_path
-        self.session = create_robust_session()
-        self.total_size: Optional[int] = None
-        self.supports_range = False
-        self.downloaded_bytes = 0
-        self.session_downloaded_bytes = 0  # Track bytes downloaded in current session only
-        self.start_time = time.time()
-        self.last_progress_update = 0
-        self.stopped = False  # Set when the user cancels the download
-        self.last_error: Optional[str] = None  # Last network/server error for reporting
-        # Load speed limit from settings (KB/s -> bytes/s, 0 = unlimited)
-        settings = load_settings()
-        self._speed_limit_bytes = int(settings.get('downloadLimit', 0)) * 1024
-        logging.info(f"[ChunkedDownloader] Speed limit: {self._speed_limit_bytes // 1024} KB/s" if self._speed_limit_bytes > 0 else "[ChunkedDownloader] Speed limit: unlimited")
-        
-    def _probe_server(self) -> bool:
-        """Probe server for file size and range support."""
-        try:
-            # Try HEAD request first. Many hosts reject HEAD (403/405) or omit
-            # Accept-Ranges on it, so failures here are non-fatal.
-            try:
-                response = self.session.head(self.url, allow_redirects=True, timeout=30)
-                if response.ok:
-                    self.supports_range = response.headers.get('Accept-Ranges', '').lower() == 'bytes'
-                    if 'Content-Length' in response.headers:
-                        self.total_size = int(response.headers['Content-Length'])
-                else:
-                    logging.info(f"[ChunkedDownloader] HEAD returned {response.status_code}, falling back to GET probe")
-                response.close()
-            except Exception as e:
-                logging.info(f"[ChunkedDownloader] HEAD probe failed ({e}), falling back to GET probe")
-
-            # Verify range support with a real Range request. Accept-Ranges is
-            # frequently missing even when the host honours Range, and the old
-            # code treated that as "no resume", which made every hiccup fatal.
-            if not self.supports_range or self.total_size is None:
-                try:
-                    range_response = self.session.get(
-                        self.url,
-                        stream=True,
-                        headers={"Range": "bytes=0-0"},
-                        timeout=30
-                    )
-                    content_range = range_response.headers.get('Content-Range', '')
-                    if range_response.status_code == 206 and '/' in content_range:
-                        total_str = content_range.split('/')[-1]
-                        if total_str != '*':
-                            self.total_size = int(total_str)
-                        self.supports_range = True
-                    elif range_response.status_code == 200:
-                        self.supports_range = False
-                        if 'Content-Length' in range_response.headers:
-                            self.total_size = int(range_response.headers['Content-Length'])
-                    range_response.close()
-                except Exception as e:
-                    logging.warning(f"[ChunkedDownloader] Range probe failed: {e}")
-
-            logging.info(f"[ChunkedDownloader] Server probe: size={read_size(self.total_size) if self.total_size else 'unknown'}, range_support={self.supports_range}")
-            return True
-
-        except Exception as e:
-            logging.warning(f"[ChunkedDownloader] Server probe failed: {e}")
-            return False
-    
-    def _get_existing_size(self) -> int:
-        """Get size of existing partial download."""
-        if os.path.exists(self.dest_path):
-            return os.path.getsize(self.dest_path)
-        return 0
-    
-    def _check_for_stop(self) -> bool:
-        """Check if download has been stopped by reading the JSON file."""
-        try:
-            if os.path.exists(self.game_info_path):
-                with open(self.game_info_path, 'r') as f:
-                    current_game_info = json.load(f)
-                    return current_game_info.get('downloadingData', {}).get('stopped', False)
-        except Exception as e:
-            logging.warning(f"[ChunkedDownloader] Error checking stop state: {e}")
+def parse_boolean(value):
+    if isinstance(value, bool):
+        return value
+    if value.lower() in ['true', '1', 'yes']:
+        return True
+    elif value.lower() in ['false', '0', 'no']:
         return False
-
-    def _update_progress(self, force: bool = False):
-        """Update progress in game info file."""
-        now = time.time()
-        if not force and (now - self.last_progress_update) < self.PROGRESS_UPDATE_INTERVAL:
-            return
-
-        # Check for a user stop only on the throttled path; reading and parsing
-        # the JSON file on every network chunk was a significant slowdown.
-        if self._check_for_stop():
-            logging.info("[ChunkedDownloader] Download stopped by user")
-            raise InterruptedError("Download stopped by user")
-
-        self.last_progress_update = now
-        elapsed = now - self.start_time
-        
-        if elapsed > 0:
-            speed = self.session_downloaded_bytes / elapsed
-        else:
-            speed = 0
-        
-        if self.total_size and self.total_size > 0:
-            progress = (self.downloaded_bytes / self.total_size) * 100
-            remaining = self.total_size - self.downloaded_bytes
-            eta = remaining / speed if speed > 0 else 0
-        else:
-            # Unknown total size - show downloaded amount instead of percentage
-            progress = 0  # Will show as "downloading..." in UI
-            eta = 0
-        
-        # Format speed
-        if speed >= 1024**2:
-            speed_str = f"{speed/1024**2:.2f} MB/s"
-        elif speed >= 1024:
-            speed_str = f"{speed/1024:.2f} KB/s"
-        else:
-            speed_str = f"{speed:.2f} B/s"
-        
-        # Format ETA
-        if self.total_size is None or self.total_size == 0:
-            eta_str = f"Downloaded: {read_size(self.downloaded_bytes)}"
-        else:
-            eta_int = int(eta)
-            if eta_int < 60:
-                eta_str = f"{eta_int}s"
-            elif eta_int < 3600:
-                eta_str = f"{eta_int // 60}m {eta_int % 60}s"
-            else:
-                eta_str = f"{eta_int // 3600}h {(eta_int % 3600) // 60}m"
-        
-        self.game_info["downloadingData"]["progressCompleted"] = f"{progress:.2f}"
-        self.game_info["downloadingData"]["progressDownloadSpeeds"] = speed_str
-        self.game_info["downloadingData"]["timeUntilComplete"] = eta_str
-        self.game_info["downloadingData"]["downloading"] = True
-        safe_write_json(self.game_info_path, self.game_info)
-    
-    def _stream_download(self, start_byte: int, file_handle):
-        """
-        Stream download from start_byte, writing directly to file.
-        Returns True if completed successfully, False if interrupted, "restart"
-        if the local partial file must be discarded, or "fatal" if the server
-        rejected the request in a way that retrying cannot fix.
-        """
-        from AscendaraDownloadRecovery import response_size
-        headers = {'Accept-Encoding': 'identity'}
-        response = None
-        is_resume = start_byte > 0 and self.supports_range
-        if is_resume:
-            headers['Range'] = f'bytes={start_byte}-'
-
-        try:
-            response = self.session.get(
-                self.url,
-                headers=headers,
-                stream=True,
-                timeout=(30, 300)  # 30s connect, 5min read timeout
-            )
-
-            if response.status_code == 416:
-                # Existing partial is invalid/too large/stale. Do not mark complete.
-                logging.warning(
-                    f"[ChunkedDownloader] Range not satisfiable at {read_size(start_byte)}; restarting download"
-                )
-                response.close()
-                return "restart"
-
-            if response.status_code in (408, 429) or response.status_code >= 500:
-                self.last_error = f"HTTP {response.status_code} during download"
-                return False
-
-            if is_resume and response.status_code == 200:
-                # Critical corruption fix: if the host ignores Range and sends the
-                # entire file with 200 OK, appending it would corrupt the archive.
-                logging.warning(
-                    f"[ChunkedDownloader] Server ignored Range request. Expected 206, "
-                    f"got {response.status_code}; restarting instead of appending."
-                )
-                response.close()
-                # The host clearly does not honour Range; stop pretending it does.
-                self.supports_range = False
-                return "restart"
-
-            if 400 <= response.status_code < 500 and response.status_code not in (408, 429):
-                # Expired token, dead link, blocked etc. Retrying won't help.
-                self.last_error = f"HTTP {response.status_code} {response.reason} from {response.url}"
-                logging.error(f"[ChunkedDownloader] Server rejected download: {self.last_error}")
-                response.close()
-                return "fatal"
-
-            response.raise_for_status()
-
-            # Prefer Content-Range for resumed responses. For fresh downloads, use Content-Length.
-            try:
-                total_size = response_size(response, start_byte)
-                if is_resume and self.total_size is not None and total_size != self.total_size:
-                    raise ValueError('Remote archive size changed while resuming')
-            except ValueError as error:
-                self.last_error = str(error)
-                return "restart"
-            self.total_size = total_size
-
-            chunk_size = 4096 if self._speed_limit_bytes > 0 else self.STREAM_CHUNK_SIZE
-            throttle_start = time.time()
-            throttle_bytes = 0
-
-            for data in response.iter_content(chunk_size=chunk_size):
-                if data:
-                    file_handle.write(data)
-                    self.downloaded_bytes += len(data)
-                    self.session_downloaded_bytes += len(data)
-                    throttle_bytes += len(data)
-                    self._update_progress()
-
-                    if self._speed_limit_bytes > 0:
-                        elapsed = time.time() - throttle_start
-                        if elapsed > 0:
-                            allowed_bytes = self._speed_limit_bytes * elapsed
-                            if throttle_bytes > allowed_bytes:
-                                sleep_time = (throttle_bytes - allowed_bytes) / self._speed_limit_bytes
-                                if sleep_time > 0:
-                                    time.sleep(sleep_time)
-
-            file_handle.flush()
-            try:
-                os.fsync(file_handle.fileno())
-            except Exception:
-                pass
-            return True
-
-        except InterruptedError:
-            raise
-        except Exception as e:
-            if isinstance(e, OSError) and e.errno is not None:
-                raise
-            self.last_error = str(e)
-            logging.warning(f"[ChunkedDownloader] Stream interrupted at {read_size(self.downloaded_bytes)}: {e}")
-            return False
-        finally:
-            if response is not None:
-                response.close()
-
-    def download(self) -> bool:
-        """
-        Download the file with streaming and automatic resume on failure.
-        Returns True if successful, False otherwise.
-        """
-        try:
-            self._probe_server()
-            existing_size = self._get_existing_size()
-
-            if self.total_size and existing_size == self.total_size:
-                logging.info(f"[ChunkedDownloader] File already complete: {read_size(existing_size)}")
-                self.downloaded_bytes = existing_size
-                return True
-
-            if self.total_size and existing_size > self.total_size:
-                logging.warning(
-                    f"[ChunkedDownloader] Existing file is larger than expected "
-                    f"({read_size(existing_size)} > {read_size(self.total_size)}); deleting corrupt partial"
-                )
-                try:
-                    os.remove(self.dest_path)
-                except FileNotFoundError:
-                    pass
-                existing_size = 0
-
-            if existing_size > 0 and self.supports_range:
-                logging.info(f"[ChunkedDownloader] Resuming from {read_size(existing_size)}")
-                self.downloaded_bytes = existing_size
-            else:
-                if existing_size > 0 and not self.supports_range:
-                    logging.warning("[ChunkedDownloader] Server doesn't support range requests, starting fresh")
-                    os.remove(self.dest_path)
-                self.downloaded_bytes = 0
-
-            self.start_time = time.time()
-            retry_count = 0
-            retry_delay = self.RETRY_DELAY_BASE
-
-            def _discard_partial():
-                try:
-                    if os.path.exists(self.dest_path):
-                        os.remove(self.dest_path)
-                except Exception as e:
-                    logging.warning(f"[ChunkedDownloader] Could not delete invalid partial: {e}")
-                self.downloaded_bytes = 0
-                self.session_downloaded_bytes = 0
-                self.start_time = time.time()
-
-            def _backoff_and_reconnect():
-                nonlocal retry_count, retry_delay
-                retry_count += 1
-                self.game_info["downloadingData"]["retryAttempt"] = retry_count
-                safe_write_json(self.game_info_path, self.game_info)
-                logging.info(
-                    f"[ChunkedDownloader] Retry {retry_count}/{self.MAX_RETRIES} in {retry_delay:.0f}s, "
-                    f"resuming from {read_size(self.downloaded_bytes)}"
-                )
-                from AscendaraDownloadRecovery import wait_for_retry
-                wait_for_retry(retry_delay, self._check_for_stop)
-                retry_delay = min(retry_delay * 1.5, self.RETRY_DELAY_MAX)
-                self.session.close()
-                self.session = create_robust_session()
-
-            while retry_count < self.MAX_RETRIES:
-                mode = 'ab' if self.downloaded_bytes > 0 else 'wb'
-
-                with open(self.dest_path, mode) as f:
-                    stream_result = self._stream_download(self.downloaded_bytes, f)
-
-                if stream_result == "fatal":
-                    return False
-
-                if stream_result == "restart":
-                    _discard_partial()
-                    _backoff_and_reconnect()
-                    continue
-
-                if stream_result is True:
-                    final_size = os.path.getsize(self.dest_path)
-
-                    if self.total_size is None:
-                        logging.warning("[ChunkedDownloader] Total size unknown; accepting completed stream")
-                        return True
-
-                    if final_size == self.total_size:
-                        if 'retryAttempt' in self.game_info.get('downloadingData', {}):
-                            del self.game_info['downloadingData']['retryAttempt']
-                            safe_write_json(self.game_info_path, self.game_info)
-                        self._update_progress(force=True)
-                        logging.info(f"[ChunkedDownloader] Download complete: {read_size(final_size)}")
-                        return True
-
-                    if final_size > self.total_size:
-                        logging.warning(
-                            f"[ChunkedDownloader] Downloaded file larger than expected "
-                            f"({read_size(final_size)} > {read_size(self.total_size)}); restarting"
-                        )
-                        _discard_partial()
-                        _backoff_and_reconnect()
-                        continue
-
-                    # Server closed the connection early without an error.
-                    logging.warning(
-                        f"[ChunkedDownloader] Stream ended early: {read_size(final_size)}/{read_size(self.total_size)}"
-                    )
-                    if self.supports_range:
-                        self.downloaded_bytes = final_size
-                    else:
-                        _discard_partial()
-                    _backoff_and_reconnect()
-                    continue
-
-                # stream_result is False: network error mid-stream
-                if self.supports_range:
-                    self.downloaded_bytes = os.path.getsize(self.dest_path) if os.path.exists(self.dest_path) else 0
-                else:
-                    # Host can't resume; start over instead of giving up on the first hiccup.
-                    logging.warning("[ChunkedDownloader] Server doesn't support resume; restarting from scratch")
-                    _discard_partial()
-                _backoff_and_reconnect()
-
-            logging.error(f"[ChunkedDownloader] Max retries ({self.MAX_RETRIES}) exceeded")
-            return False
-
-        except InterruptedError as e:
-            logging.info(f"[ChunkedDownloader] Download interrupted: {e}")
-            self.stopped = True
-            return False
-        except Exception as e:
-            logging.error(f"[ChunkedDownloader] Download failed: {e}")
-            raise
-        finally:
-            self.session.close()
+    else:
+        raise ValueError(f"Invalid boolean value: {value}")
 
 
-# Main Downloader Class
 
+# V4 engine is defined below the compatibility helpers.
 
 class AscendaraDownloader:
-    """
-    Main downloader class that orchestrates download, extraction, and verification.
-    """
-    
-    VALID_BUZZHEAVIER_DOMAINS = [
-        'buzzheavier.com',
-        'bzzhr.co',
-        'bzzhr.to',
-        'ts.bzzhr.to',
-        'fafda.to',
-        'fuckingfast.net',
-        'fuckingfast.co'
-    ]
-    
     def __init__(self, game: str, online: bool, dlc: bool, isVr: bool, 
                  updateFlow: bool, version: str, size: str, download_dir: str, gameID: str = ""):
         self.game = game
+        if sanitize_folder_name(game).strip(' .') == '':
+            raise ValueError('Game name must contain a valid folder name')
         self.online = online
         self.dlc = dlc
         self.isVr = isVr
@@ -771,7 +805,7 @@ class AscendaraDownloader:
         self.version = version
         self.size = size
         self.gameID = gameID
-        self.download_dir = os.path.join(download_dir, sanitize_folder_name(game))
+        self.download_dir = os.path.abspath(os.path.join(download_dir, sanitize_folder_name(game)))
         os.makedirs(self.download_dir, exist_ok=True)
         self.game_info_path = os.path.join(self.download_dir, f"{sanitize_folder_name(game)}.ascendara.json")
         self.withNotification = None
@@ -815,8 +849,10 @@ class AscendaraDownloader:
                     }
                 }
             }
-        safe_write_json(self.game_info_path, self.game_info)
-    
+        self.game_info.get('downloadingData', {}).pop('stopped', None)
+        safe_write_json(self.game_info_path, self.game_info, reset_stop=True)
+
+
     def _get_filename_from_url(self, url: str) -> str:
         """Extract filename from URL or Content-Disposition header."""
         from urllib.parse import unquote
@@ -839,7 +875,8 @@ class AscendaraDownloader:
         if not base_name or base_name in ('download', 'dl'):
             base_name = f"{sanitize_folder_name(self.game)}.download"
         return base_name
-    
+
+
     @staticmethod
     def detect_file_type(filepath: str) -> Tuple[str, Optional[str]]:
         """Detect file type from magic bytes."""
@@ -856,215 +893,8 @@ class AscendaraDownloader:
             return 'exe', None
         else:
             return 'unknown', sig.hex()
-    
-    def download(self, url: str, withNotification: Optional[str] = None):
-        """Main download entry point."""
-        self.withNotification = withNotification
-        prevent_sleep()
-        try:
-            # Check for Buzzheavier URLs
-            if any(domain in url for domain in self.VALID_BUZZHEAVIER_DOMAINS):
-                self._download_buzzheavier(url)
-                return
-            
-            # Check disk space before starting download
-            # Estimate: download size + extraction (typically 2-3x compressed size)
-            # Use size from game_info if available
-            if not self._pre_download_disk_check():
-                return
-            
-            # Update state
-            self.game_info["downloadingData"]["downloading"] = True
-            safe_write_json(self.game_info_path, self.game_info)
-            
-            # Get filename
-            base_name = self._get_filename_from_url(url)
-            dest = os.path.join(self.download_dir, base_name)
-            
-            logging.info(f"[AscendaraDownloader] Starting download: {url}")
-            logging.info(f"[AscendaraDownloader] Destination: {dest}")
-            
-            # Notification: Download Started
-            if withNotification:
-                _launch_notification(withNotification, "Download Started", f"Starting download for {self.game}")
-            
-            # Create chunked downloader and start download
-            downloader = ChunkedDownloader(url, dest, self.game_info, self.game_info_path)
-            success = downloader.download()
 
-            if downloader.stopped:
-                logging.info("[AscendaraDownloader] Download cancelled by user; not reporting as error")
-                return
 
-            if success:
-                logging.info(f"[AscendaraDownloader] Download completed successfully")
-                
-                # Update state
-                self.game_info["downloadingData"]["downloading"] = False
-                self.game_info["downloadingData"]["progressCompleted"] = "100.00"
-                self.game_info["downloadingData"]["progressDownloadSpeeds"] = "0.00 KB/s"
-                self.game_info["downloadingData"]["timeUntilComplete"] = "0s"
-                safe_write_json(self.game_info_path, self.game_info)
-                
-                # Detect and fix file extension
-                dest = self._fix_file_extension(dest)
-                self._archive_sources = {os.path.abspath(dest): url}
-                
-                # Extract files
-                self._extract_files(dest)
-                
-                if withNotification:
-                    _launch_notification(withNotification, "Download Complete", f"Successfully downloaded {self.game}")
-            else:
-                detail = f": {downloader.last_error}" if downloader.last_error else ""
-                raise Exception(f"Download failed after all retries{detail}")
-
-        except InterruptedError:
-            logging.info("[AscendaraDownloader] Cancelled by user")
-        except Exception as e:
-            err_str = str(e)
-            if any(x in err_str for x in ['SSL: WRONG_VERSION_NUMBER', 'ssl.SSLError', 'WinError 10054', 
-                                           'forcibly closed', 'ConnectionResetError']):
-                logging.error(f"[AscendaraDownloader] Provider blocked error: {e}")
-                handleerror(self.game_info, self.game_info_path, 'provider_blocked_error')
-            else:
-                logging.error(f"[AscendaraDownloader] Download error: {e}")
-                handleerror(self.game_info, self.game_info_path, e)
-            
-            if withNotification:
-                _launch_notification(withNotification, "Download Error", f"Error downloading {self.game}: {e}")
-        finally:
-            allow_sleep()
-    
-    def _create_update_backup(self) -> Optional[str]:
-        """Create a backup of existing game files before updating.
-        Returns the backup directory path if successful, None otherwise.
-        """
-        if not self.updateFlow:
-            return None
-        
-        backup_dir = os.path.join(self.download_dir, ".ascendara_backup")
-        
-        try:
-            # Calculate size of existing game files
-            existing_size = get_directory_size(self.download_dir)
-            logging.info(f"[AscendaraDownloader] Existing game size: {read_size(existing_size)}")
-            
-            # Check if we have enough space for backup (need space for copy)
-            if not check_disk_space(self.download_dir, existing_size, "backup creation"):
-                logging.error(f"[AscendaraDownloader] Insufficient disk space to create backup")
-                if self.withNotification:
-                    _launch_notification(
-                        self.withNotification,
-                        "Update Failed",
-                        "Insufficient disk space to create backup"
-                    )
-                return None
-            
-            # Remove old backup if it exists
-            if os.path.exists(backup_dir):
-                logging.info(f"[AscendaraDownloader] Removing old backup: {backup_dir}")
-                shutil.rmtree(backup_dir, ignore_errors=True)
-            
-            # Create new backup directory
-            os.makedirs(backup_dir, exist_ok=True)
-            logging.info(f"[AscendaraDownloader] Creating backup for update: {backup_dir}")
-            
-            # Backup all files except archives, temp files, and the JSON file
-            backup_count = 0
-            skip_extensions = {'.rar', '.zip', '.7z', '.tmp', '.part', '.download'}
-            skip_names = {'.ascendara_backup', 'filemap.ascendara.json'}
-            
-            for item in os.listdir(self.download_dir):
-                item_path = os.path.join(self.download_dir, item)
-                
-                # Skip backup directory itself and JSON file
-                if item in skip_names or item.endswith('.ascendara.json'):
-                    continue
-                
-                # Skip archive files and temp files
-                if os.path.isfile(item_path):
-                    ext = os.path.splitext(item)[1].lower()
-                    if ext in skip_extensions:
-                        continue
-                
-                # Backup the item
-                backup_item_path = os.path.join(backup_dir, item)
-                try:
-                    if os.path.isdir(item_path):
-                        shutil.copytree(item_path, backup_item_path, dirs_exist_ok=True)
-                        logging.info(f"[AscendaraDownloader] Backed up directory: {item}")
-                    else:
-                        shutil.copy2(item_path, backup_item_path)
-                        logging.info(f"[AscendaraDownloader] Backed up file: {item}")
-                    backup_count += 1
-                except Exception as e:
-                    logging.warning(f"[AscendaraDownloader] Could not backup {item}: {e}")
-            
-            logging.info(f"[AscendaraDownloader] Backup complete: {backup_count} items backed up")
-            return backup_dir
-            
-        except Exception as e:
-            logging.error(f"[AscendaraDownloader] Failed to create backup: {e}")
-            return None
-    
-    def _restore_from_backup(self, backup_dir: str) -> bool:
-        """Restore game files from backup.
-        Returns True if successful, False otherwise.
-        """
-        if not backup_dir or not os.path.exists(backup_dir):
-            logging.error(f"[AscendaraDownloader] Backup directory not found: {backup_dir}")
-            return False
-        
-        try:
-            logging.info(f"[AscendaraDownloader] Restoring from backup: {backup_dir}")
-            
-            # Remove failed update files (except JSON and backup)
-            for item in os.listdir(self.download_dir):
-                if item == '.ascendara_backup' or item.endswith('.ascendara.json'):
-                    continue
-                
-                item_path = os.path.join(self.download_dir, item)
-                try:
-                    if os.path.isdir(item_path):
-                        shutil.rmtree(item_path, ignore_errors=True)
-                    else:
-                        os.remove(item_path)
-                except Exception as e:
-                    logging.warning(f"[AscendaraDownloader] Could not remove {item}: {e}")
-            
-            # Restore backed up files
-            restore_count = 0
-            for item in os.listdir(backup_dir):
-                backup_item_path = os.path.join(backup_dir, item)
-                restore_item_path = os.path.join(self.download_dir, item)
-                
-                try:
-                    if os.path.isdir(backup_item_path):
-                        shutil.copytree(backup_item_path, restore_item_path, dirs_exist_ok=True)
-                    else:
-                        shutil.copy2(backup_item_path, restore_item_path)
-                    restore_count += 1
-                except Exception as e:
-                    logging.error(f"[AscendaraDownloader] Could not restore {item}: {e}")
-                    return False
-            
-            logging.info(f"[AscendaraDownloader] Restore complete: {restore_count} items restored")
-            return True
-            
-        except Exception as e:
-            logging.error(f"[AscendaraDownloader] Failed to restore from backup: {e}")
-            return False
-    
-    def _cleanup_backup(self, backup_dir: str):
-        """Remove backup directory after successful update."""
-        if backup_dir and os.path.exists(backup_dir):
-            try:
-                shutil.rmtree(backup_dir, ignore_errors=True)
-                logging.info(f"[AscendaraDownloader] Cleaned up backup: {backup_dir}")
-            except Exception as e:
-                logging.warning(f"[AscendaraDownloader] Could not cleanup backup: {e}")
-    
     def _fix_file_extension(self, dest: str) -> str:
         """Fix file extension based on detected file type."""
         filetype, hexsig = self.detect_file_type(dest)
@@ -1086,7 +916,8 @@ class AscendaraDownloader:
             return new_dest
         
         return dest
-    
+
+
     def _pre_download_disk_check(self) -> bool:
         """Check disk space before starting a download based on the reported install size.
 
@@ -1116,6 +947,7 @@ class AscendaraDownloader:
         except Exception as e:
             logging.warning(f"[AscendaraDownloader] Could not parse size for disk check: {e}")
         return True
+
 
     def _download_buzzheavier(self, url: str):
         """Download from Buzzheavier with robust chunked download and resume support."""
@@ -1216,7 +1048,7 @@ class AscendaraDownloader:
         if not filename.strip():
             filename = f"{sanitize_folder_name(self.game)}.download"
         # Use the robust ChunkedDownloader for the actual file download
-        dest_path = os.path.join(self.download_dir, filename)
+        dest_path = self._download_path(filename)
         
         # Update state
         self.game_info["downloadingData"]["downloading"] = True
@@ -1247,28 +1079,22 @@ class AscendaraDownloader:
             # Extract files
             self._extract_files(dest_path)
             
-            if self.withNotification:
+            if self.withNotification and "downloadingData" not in self.game_info:
                 _launch_notification(self.withNotification, "Download Complete", f"Successfully downloaded {self.game}")
         else:
             detail = f": {downloader.last_error}" if downloader.last_error else ""
             raise Exception(f"Buzzheavier download failed after all retries{detail}")
-    
-    def _check_for_stop(self) -> bool:
-        """Check if download has been stopped by reading the JSON file."""
-        try:
-            if os.path.exists(self.game_info_path):
-                with open(self.game_info_path, 'r') as f:
-                    current_game_info = json.load(f)
-                    return current_game_info.get('downloadingData', {}).get('stopped', False)
-        except Exception as e:
-            logging.warning(f"[AscendaraDownloader] Error checking stop state: {e}")
-        return False
+
 
     def _repair_archive(self, error, archive_path, attempt):
         from AscendaraDownloadRecovery import recover_archive
 
         def download(source, destination):
-            downloader = ChunkedDownloader(source, destination, self.game_info, self.game_info_path)
+            if isinstance(source, dict):
+                downloader = ChunkedDownloader(source['link'], destination, self.game_info, self.game_info_path,
+                                               session=self._gofile_session, expected_size=source.get('size'))
+            else:
+                downloader = ChunkedDownloader(source, destination, self.game_info, self.game_info_path)
             if not downloader.download():
                 if downloader.stopped:
                     raise InterruptedError('Archive repair cancelled')
@@ -1290,1142 +1116,7 @@ class AscendaraDownloader:
         self.game_info['downloadingData'].pop('retryAttempt', None)
         safe_write_json(self.game_info_path, self.game_info)
 
-    def _extract_files(self, archive_path: Optional[str] = None):
-        """Extract archive files and flatten nested directories."""
-        # Check if download has been stopped before starting extraction
-        if self._check_for_stop():
-            logging.info("[AscendaraDownloader] Extraction stopped by user")
-            return
-        
-        # Create backup before extraction if this is an update
-        backup_dir = self._create_update_backup()
-        
-        self.game_info["downloadingData"]["extracting"] = True
-        # Initialize extraction progress tracking
-        self.game_info["downloadingData"]["extractionProgress"] = {
-            "currentFile": "",
-            "filesExtracted": 0,
-            "totalFiles": 0,
-            "percentComplete": "0.00",
-            "extractionSpeed": "0 files/s"
-        }
-        safe_write_json(self.game_info_path, self.game_info)
-        
-        # Track extraction timing
-        self._extraction_start_time = time.time()
-        self._files_extracted_count = 0
-        self._last_progress_update = 0  # Track last JSON write time
-        self._speed_window_time = self._extraction_start_time
-        self._speed_window_count = 0
-        
-        watching_path = os.path.join(self.download_dir, "filemap.ascendara.json")
-        watching_data = {}
-        archive_exts = {'.rar', '.zip'}
-        
-        # Determine archives to process
-        continuation_parts = []
-        if archive_path and os.path.exists(archive_path):
-            archives_to_process = [archive_path]
-            logging.info(f"[AscendaraDownloader] Extracting: {archive_path}")
-        else:
-            logging.info(f"[AscendaraDownloader] Scanning for archives in: {self.download_dir}")
-            archives_to_process = []
-            for root, _, files in os.walk(self.download_dir):
-                for file in files:
-                    ext = os.path.splitext(file)[1].lower()
-                    if ext in archive_exts:
-                        multipart = re.match(r'^.+\.part(\d+)\.rar$', file, re.IGNORECASE)
-                        if multipart and int(multipart.group(1)) != 1:
-                            continuation_parts.append(os.path.join(root, file))
-                            continue
-                        archives_to_process.append(os.path.join(root, file))
-        from AscendaraDownloadRecovery import archive_sources
-        for part in continuation_parts:
-            if not archive_sources(part, dict.fromkeys(archives_to_process)):
-                raise RuntimeError(f'Missing first RAR volume for {os.path.basename(part)}. Choose a source containing all archive volumes.')
-        
-        # Count total files for progress tracking, and tally the uncompressed size
-        # so we can verify there is enough free disk space before extracting.
-        total_files_to_extract = 0
-        total_uncompressed_size = 0
-        for arch_path in archives_to_process:
-            try:
-                ext = os.path.splitext(arch_path)[1].lower()
-                if ext == '.zip':
-                    with zipfile.ZipFile(arch_path, 'r') as zip_ref:
-                        for zip_info in zip_ref.infolist():
-                            if not zip_info.is_dir():
-                                total_uncompressed_size += zip_info.file_size
-                            if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
-                                total_files_to_extract += 1
-                elif ext == '.rar':
-                    # On Windows, use Python unrar library; on Linux/macOS, use system binary
-                    if sys.platform == "win32":
-                        try:
-                            from unrar import rarfile
-                            try:
-                                rar_ref = rarfile.RarFile(arch_path, 'r', pwd='steamrip.com')
-                            except Exception:
-                                rar_ref = rarfile.RarFile(arch_path, 'r')
-                            with rar_ref:
-                                for info in rar_ref.infolist():
-                                    # Directory entries carry the RHDF_DIRECTORY (0x20) header flag
-                                    is_dir = bool(info.flag_bits & 0x20) or info.filename.endswith('/')
-                                    if is_dir:
-                                        continue
-                                    total_uncompressed_size += getattr(info, 'file_size', 0) or 0
-                                    if not info.filename.endswith('.url') and '_CommonRedist' not in info.filename:
-                                        total_files_to_extract += 1
-                        except Exception as e:
-                            logging.warning(f"[AscendaraDownloader] Could not count RAR files with library: {e}")
-                    else:
-                        import shutil as _shutil
-                        _unrar = _shutil.which('unrar') or _shutil.which('unrar-free')
-                        if _unrar:
-                            _result = subprocess.run([_unrar, 'l', arch_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                            for _line in _result.stdout.decode(errors='replace').splitlines():
-                                _parts = _line.split()
-                                if len(_parts) >= 5 and _parts[0] not in ('-', 'Name', '---'):
-                                    _fname = _parts[-1]
-                                    if not _fname.endswith('.url') and '_CommonRedist' not in _fname and not _fname.endswith('/'):
-                                        total_files_to_extract += 1
-            except Exception as e:
-                logging.warning(f"[AscendaraDownloader] Could not count files in {arch_path}: {e}")
-        
-        logging.info(f"[AscendaraDownloader] Total files to extract: {total_files_to_extract}")
 
-        # Verify there is enough free disk space for the actual extracted content.
-        # Fall back to a conservative multiple of the archive size on disk if the
-        # uncompressed size could not be determined (e.g. multi-volume RAR listing failed).
-        if total_uncompressed_size <= 0:
-            archive_sizes_on_disk = sum(
-                os.path.getsize(p) for p in archives_to_process if os.path.exists(p)
-            )
-            total_uncompressed_size = int(archive_sizes_on_disk * 2.5)
-
-        if total_uncompressed_size > 0 and not check_disk_space(
-            self.download_dir, total_uncompressed_size, "extraction"
-        ):
-            error_msg = f"Insufficient disk space to extract. Need ~{read_size(total_uncompressed_size)}"
-            logging.error(f"[AscendaraDownloader] {error_msg}")
-            handleerror(self.game_info, self.game_info_path, error_msg)
-            if self.withNotification:
-                _launch_notification(self.withNotification, "Extraction Failed", error_msg)
-            self.game_info["downloadingData"]["extracting"] = False
-            safe_write_json(self.game_info_path, self.game_info)
-            return
-        self._total_files_to_extract = total_files_to_extract
-        self._update_extraction_progress("Preparing...", 0, total_files_to_extract, force=True)
-        
-        processed_archives = set()
-        any_extraction_succeeded = False
-        extraction_errors = []
-        repair_attempts = {}
-        
-        while archives_to_process:
-            # Check if download has been stopped
-            if self._check_for_stop():
-                logging.info("[AscendaraDownloader] Extraction stopped by user")
-                return
-            
-            current_archive = archives_to_process.pop(0)
-            
-            if current_archive in processed_archives:
-                continue
-            
-            processed_archives.add(current_archive)
-            ext = os.path.splitext(current_archive)[1].lower()
-            logging.info(f"[AscendaraDownloader] Extracting: {current_archive}")
-            
-            # Nested archives extract to their own parent dir to preserve
-            # directory structure; top-level archives extract to download_dir
-            _archive_parent = os.path.dirname(os.path.normpath(current_archive))
-            if os.path.normpath(_archive_parent) == os.path.normpath(self.download_dir):
-                _extract_to = self.download_dir
-            else:
-                _extract_to = _archive_parent
-                os.makedirs(_extract_to, exist_ok=True)
-            
-            initial_count = self._files_extracted_count
-            try:
-                if ext == '.zip':
-                    self._extract_zip(current_archive, watching_data, _extract_to)
-                elif ext == '.rar':
-                    self._extract_rar(current_archive, watching_data, _extract_to)
-                
-                any_extraction_succeeded = True
-                
-                # Delete archive after extraction
-                try:
-                    os.remove(current_archive)
-                    logging.info(f"[AscendaraDownloader] Deleted archive: {current_archive}")
-                except Exception as e:
-                    logging.warning(f"[AscendaraDownloader] Could not delete archive: {e}")
-                
-            except InterruptedError:
-                logging.info("[AscendaraDownloader] Extraction stopped by user")
-                self.game_info["downloadingData"]["extracting"] = False
-                safe_write_json(self.game_info_path, self.game_info)
-                return
-            except Exception as e:
-                logging.error(f"[AscendaraDownloader] Extraction failed: {e}")
-                try:
-                    attempt = repair_attempts.get(current_archive, 0)
-                    self._repair_archive(e, current_archive, attempt)
-                    self._files_extracted_count = initial_count
-                    repair_attempts[current_archive] = attempt + 1
-                    processed_archives.discard(current_archive)
-                    archives_to_process.insert(0, current_archive)
-                except InterruptedError:
-                    raise
-                except Exception as repair_error:
-                    extraction_errors.append(str(repair_error))
-                continue
-            
-            self._flatten_directories()
-            
-            # Scan for new archives at the top level only - game asset zips are
-            # nested deep inside subdirectories and must not be extracted/deleted.
-            # Repack continuation archives (part2.zip, etc.) always land at root.
-            for file in os.listdir(self.download_dir):
-                ext = os.path.splitext(file)[1].lower()
-                if ext in archive_exts:
-                    new_archive = os.path.join(self.download_dir, file)
-                    if new_archive not in processed_archives and new_archive not in archives_to_process:
-                        # Non-first parts of multi-part RAR sets were already consumed
-                        # by unrar when the first part was extracted. Delete them now
-                        # instead of queuing a doomed extraction that leaves GBs on disk.
-                        _mp = re.match(r'^.+\.part(\d+)\.rar$', file, re.IGNORECASE)
-                        if _mp and int(_mp.group(1)) != 1:
-                            from AscendaraDownloadRecovery import archive_sources
-                            if not archive_sources(current_archive, {new_archive: None}):
-                                continue
-                            logging.info(f"[AscendaraDownloader] Deleting non-first RAR part (content already extracted): {file}")
-                            try:
-                                os.remove(new_archive)
-                            except Exception as _e:
-                                logging.warning(f"[AscendaraDownloader] Could not delete non-first RAR part: {_e}")
-                            continue
-                        archives_to_process.append(new_archive)
-                        logging.info(f"[AscendaraDownloader] Found nested archive: {new_archive}")
-                        # Count files in nested archive and update total
-                        try:
-                            nested_file_count = 0
-                            if ext == '.zip':
-                                with zipfile.ZipFile(new_archive, 'r') as zip_ref:
-                                    for zip_info in zip_ref.infolist():
-                                        if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename and not zip_info.is_dir():
-                                            nested_file_count += 1
-                            elif ext == '.rar':
-                                import shutil as _shutil
-                                _unrar = _shutil.which('unrar') or _shutil.which('unrar-free')
-                                if _unrar:
-                                    _result = subprocess.run([_unrar, 'l', new_archive], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                                    for _line in _result.stdout.decode(errors='replace').splitlines():
-                                        _parts = _line.split()
-                                        if len(_parts) >= 5 and _parts[0] not in ('-', 'Name', '---'):
-                                            _fname = _parts[-1]
-                                            if not _fname.endswith('.url') and '_CommonRedist' not in _fname and not _fname.endswith('/'):
-                                                nested_file_count += 1
-                            if nested_file_count > 0:
-                                self._total_files_to_extract += nested_file_count
-                                logging.info(f"[AscendaraDownloader] Added {nested_file_count} files from nested archive (new total: {self._total_files_to_extract})")
-                        except Exception as e:
-                            logging.warning(f"[AscendaraDownloader] Could not count files in nested archive {new_archive}: {e}")
-        
-        # If every archive failed to extract, raise so the caller can handle the error
-        if extraction_errors:
-            raise RuntimeError(f"Extraction failed: {extraction_errors[0]}")
-        
-        # Force final progress update before flattening
-        self._update_extraction_progress("Finalizing...", self._files_extracted_count, self._total_files_to_extract, force=True)
-        
-        # Flatten nested directories
-        self._flatten_directories()
-        
-        # Rebuild filemap
-        watching_data = {}
-        for dirpath, _, filenames in os.walk(self.download_dir):
-            rel_dir = os.path.relpath(dirpath, self.download_dir)
-            for fname in filenames:
-                if fname.endswith('.url') or '_CommonRedist' in dirpath:
-                    continue
-                if os.path.splitext(fname)[1].lower() in archive_exts:
-                    continue
-                rel_path = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != '.' else fname
-                rel_path = rel_path.replace('\\', '/')
-                watching_data[rel_path] = {"size": os.path.getsize(os.path.join(dirpath, fname))}
-        
-        safe_write_json(watching_path, watching_data)
-        
-        # Clean up .url files and _CommonRedist
-        self._cleanup_junk_files()
-        
-        # Update state
-        self.game_info["downloadingData"]["extracting"] = False
-        self.game_info["downloadingData"]["verifying"] = True
-        safe_write_json(self.game_info_path, self.game_info)
-        
-        if self.withNotification:
-            _launch_notification(self.withNotification, "Extraction Complete", f"Extraction complete for {self.game}")
-        
-        # Verify
-        self._verify_extracted_files(watching_path, backup_dir)
-    
-    def _update_extraction_progress(self, current_file: str, files_extracted: int, total_files: int, force: bool = False):
-        """Update extraction progress in the game info JSON.
-        
-        Args:
-            current_file: Name of the file being extracted
-            files_extracted: Number of files extracted so far
-            total_files: Total number of files to extract
-            force: Force immediate JSON write (used for completion)
-        """
-        current_time = time.time()
-        elapsed = current_time - self._extraction_start_time
-        # Sliding-window speed: rate over the last 10 s instead of all-time average
-        window_elapsed = current_time - self._speed_window_time
-        window_files = files_extracted - self._speed_window_count
-        if window_elapsed >= 10.0:
-            speed = window_files / window_elapsed
-            self._speed_window_time = current_time
-            self._speed_window_count = files_extracted
-        elif window_elapsed > 0:
-            speed = window_files / window_elapsed
-        else:
-            speed = 0
-        
-        # Cap files_extracted to never exceed total_files
-        files_extracted = min(files_extracted, total_files)
-        percent = (files_extracted / total_files * 100) if total_files > 0 else 0
-        # Ensure percent never exceeds 100
-        percent = min(percent, 100.0)
-        
-        # Always update in-memory data
-        self.game_info["downloadingData"]["extractionProgress"] = {
-            "currentFile": current_file[:50] + "..." if len(current_file) > 50 else current_file,
-            "filesExtracted": files_extracted,
-            "totalFiles": total_files,
-            "percentComplete": f"{percent:.2f}",
-            "extractionSpeed": f"{speed:.1f} files/s" if speed >= 1 else f"{speed:.2f} files/s"
-        }
-        
-        # Only write to disk every 1.5 seconds or when forced (completion/error)
-        if force or (current_time - self._last_progress_update) >= 2:
-            safe_write_json(self.game_info_path, self.game_info)
-            self._last_progress_update = current_time
-
-    def _extract_zip(self, archive_path: str, watching_data: Dict, extract_to: str = None):
-        """Extract a ZIP file."""
-        # Note: no testzip() here. It decompresses and CRC-checks the whole
-        # archive before extraction even begins, doubling the time for large
-        # repacks. Opening validates the central directory, and every member is
-        # CRC-checked as it is extracted anyway.
-        try:
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                self._extract_zip_members(archive_path, zip_ref, watching_data, extract_to)
-        except zipfile.BadZipFile as e:
-            logging.error(f"[AscendaraDownloader] Invalid ZIP: {e}")
-            raise
-        except NotImplementedError as e:
-            # e.g. Deflate64 / PPMd / unsupported encryption: Python's zipfile can't
-            # do these but 7-Zip and UnRAR can.
-            logging.warning(f"[AscendaraDownloader] zipfile cannot extract this archive ({e}); trying CLI tools")
-            if sys.platform != "win32" or not self._extract_zip_with_cli(archive_path, extract_to or self.download_dir):
-                raise RuntimeError(f"ZIP extraction failed: {e}. Install 7-Zip from https://7-zip.org/ to extract this archive.")
-            self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
-
-    def _extract_zip_with_cli(self, archive_path: str, extract_to: str) -> bool:
-        """Fallback ZIP extraction using 7-Zip or UnRAR on Windows. Returns True on success."""
-        _CREATE_NO_WINDOW = 0x08000000
-        exe_dir = os.path.dirname(sys.executable)
-        candidates = [
-            shutil.which('7z'), shutil.which('7za'),
-            r'C:\Program Files\7-Zip\7z.exe', r'C:\Program Files (x86)\7-Zip\7z.exe',
-            os.path.join(exe_dir, 'UnRAR.exe'),
-            r'C:\Program Files\WinRAR\UnRAR.exe', r'C:\Program Files (x86)\WinRAR\UnRAR.exe',
-        ]
-        tool = next((p for p in candidates if p and os.path.isfile(p)), None)
-        if not tool:
-            logging.error("[AscendaraDownloader] No CLI fallback (7-Zip/UnRAR) found for ZIP extraction")
-            return False
-        if os.path.basename(tool).lower().startswith('7z'):
-            cmd = [tool, 'x', '-psteamrip.com', f'-o{extract_to}', '-y', '-aoa', '-bsp0', '-bb0', '-xr!*.url', '-xr!_CommonRedist', archive_path]
-        else:
-            cmd = [tool, 'x', '-y', '-psteamrip.com', '-x*.url', '-x_CommonRedist', archive_path, extract_to + '/']
-        logging.info(f"[AscendaraDownloader] Extracting ZIP with CLI: {tool}")
-        archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
-        timeout_seconds = 14400 if archive_size > 50 * 1024 ** 3 else 7200
-        try:
-            proc = subprocess.run(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
-                creationflags=_CREATE_NO_WINDOW, timeout=timeout_seconds
-            )
-        except subprocess.TimeoutExpired:
-            logging.error(f"[AscendaraDownloader] CLI ZIP extraction timed out after {timeout_seconds // 3600}h")
-            return False
-        if proc.returncode not in (0, 1):
-            logging.error(f"[AscendaraDownloader] CLI ZIP extraction failed (exit {proc.returncode}): {proc.stderr.decode(errors='replace').strip()}")
-            return False
-        return True
-
-    def _extract_zip_members(self, archive_path: str, zip_ref: zipfile.ZipFile, watching_data: Dict, extract_to: str = None):
-        """Extract members of an already-open ZIP with live progress."""
-        zip_contents = zip_ref.infolist()
-        logging.info(f"[AscendaraDownloader] ZIP contains {len(zip_contents)} files")
-
-        # Filter members to extract (exclude .url and _CommonRedist)
-        members_to_extract = [
-            zip_info for zip_info in zip_contents
-            if not zip_info.filename.endswith('.url') and '_CommonRedist' not in zip_info.filename
-        ]
-
-        logging.info(f"[AscendaraDownloader] Extracting {len(members_to_extract)} files (filtered from {len(zip_contents)})")
-
-        # ZIP members are individually addressable, so per-member extraction is
-        # as fast as extractall() and gives live progress.
-        _et = extract_to or self.download_dir
-        last_stop_check = time.time()
-        for zip_info in members_to_extract:
-            if zip_info.is_dir():
-                continue
-
-            try:
-                zip_ref.extract(zip_info, _et)
-            except RuntimeError as e:
-                if 'password' in str(e).lower() or 'encrypted' in str(e).lower():
-                    zip_ref.extract(zip_info, _et, pwd=b'steamrip.com')
-                else:
-                    raise
-
-            extracted_path = os.path.join(_et, zip_info.filename)
-            key = os.path.relpath(extracted_path, self.download_dir).replace('\\', '/')
-            watching_data[key] = {"size": zip_info.file_size}
-
-            self._files_extracted_count += 1
-            if self._files_extracted_count > self._total_files_to_extract:
-                logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
-                self._files_extracted_count = self._total_files_to_extract
-
-            # Only force the very first write so the UI leaves "Preparing..." right away;
-            # after that, let the normal throttle (~2s) in _update_extraction_progress
-            # handle disk writes. Forcing a JSON write (temp file + atomic replace) on
-            # every single extracted file tanks extraction speed on archives with many
-            # small files, since each write is its own disk I/O (and AV scan) operation.
-            self._update_extraction_progress(
-                zip_info.filename,
-                self._files_extracted_count,
-                self._total_files_to_extract,
-                force=(self._files_extracted_count == 1),
-            )
-            now = time.time()
-            if now - last_stop_check >= 5.0:
-                last_stop_check = now
-                if self._check_for_stop():
-                    raise InterruptedError("Extraction stopped by user")
-    
-    def _extract_rar(self, archive_path: str, watching_data: Dict, extract_to: str = None):
-        """Extract a RAR file using Python unrar library (Windows) or system unrar binary (Linux/macOS)."""
-        import threading
-        import shutil as _shutil
-
-        # On Windows, use the Python unrar library with bundled DLL
-        if sys.platform == "win32":
-            # Always try the bundled Python unrar library first - it supports
-            # password-protected and encrypted archives via setpassword().
-            logging.info(f"[AscendaraDownloader] Extracting RAR with Python unrar library: {archive_path}")
-            _lib_err_msg = None
-            try:
-                return self._extract_rar_with_library(archive_path, watching_data, extract_to)
-            except InterruptedError:
-                raise
-            except Exception as _lib_err:
-                from AscendaraDownloadRecovery import is_archive_integrity_error
-                if is_archive_integrity_error(_lib_err):
-                    raise
-                _lib_err_msg = str(_lib_err)
-                logging.warning(f"[AscendaraDownloader] Python library extraction failed ({_lib_err_msg}), trying bundled streaming recovery")
-
-            try:
-                from AscendaraRarRecovery import extract_rar_recovery
-                initial_count = self._files_extracted_count
-                recovered_count = 0
-
-                def on_recovered_file(name, size):
-                    nonlocal recovered_count
-                    recovered_count += 1
-                    key = os.path.relpath(os.path.join(extract_to or self.download_dir, name), self.download_dir).replace('\\', '/')
-                    watching_data[key] = {"size": size}
-                    self._update_extraction_progress(name, initial_count + recovered_count, self._total_files_to_extract)
-
-                extract_rar_recovery(archive_path, extract_to or self.download_dir,
-                                     on_file=on_recovered_file, should_stop=self._check_for_stop)
-                self._files_extracted_count = initial_count + recovered_count
-                self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
-                return
-            except (InterruptedError, OSError, ValueError):
-                raise
-            except Exception as recovery_error:
-                if is_archive_integrity_error(recovery_error):
-                    raise
-                _lib_err_msg = str(recovery_error)
-                logging.warning(f"[AscendaraDownloader] Bundled streaming recovery failed: {_lib_err_msg}")
-
-            # Use CLI extraction tools as fallback when Python library fails
-            _CREATE_NO_WINDOW = 0x08000000
-            # Look for UnRAR/7z: check bundled exe directory first, then system paths
-            _exe_dir = os.path.dirname(sys.executable)
-            _unrar_paths = [
-                os.path.join(_exe_dir, 'UnRAR.exe'),
-                _shutil.which('unrar'), _shutil.which('WinRAR'),
-            ]
-            try:
-                import winreg as _winreg
-                for _hive in (_winreg.HKEY_LOCAL_MACHINE, _winreg.HKEY_CURRENT_USER):
-                    for _rk in (r'SOFTWARE\WinRAR', r'SOFTWARE\WOW6432Node\WinRAR'):
-                        try:
-                            with _winreg.OpenKey(_hive, _rk) as _k:
-                                for _v in ('exe64', 'exe32'):
-                                    try:
-                                        _exe = _winreg.QueryValueEx(_k, _v)[0]
-                                        _dir = os.path.dirname(_exe)
-                                        _unrar_paths.append(os.path.join(_dir, 'UnRAR.exe'))
-                                        _unrar_paths.append(_exe)
-                                    except Exception:
-                                        pass
-                        except Exception:
-                            pass
-            except ImportError:
-                pass
-            _unrar_paths += [
-                r'C:\Program Files\WinRAR\UnRAR.exe',
-                r'C:\Program Files (x86)\WinRAR\UnRAR.exe',
-                r'C:\Program Files\WinRAR\WinRAR.exe',
-                r'C:\Program Files (x86)\WinRAR\WinRAR.exe',
-            ]
-            _unrar_bin = next((p for p in _unrar_paths if p and os.path.isfile(p)), None)
-            _7z_paths = [
-                _shutil.which('7z'), _shutil.which('7za'),
-                r'C:\Program Files\7-Zip\7z.exe',
-                r'C:\Program Files (x86)\7-Zip\7z.exe',
-            ]
-            _7z_bin = next((p for p in _7z_paths if p and os.path.isfile(p)), None)
-            _extraction_success = False
-            if _unrar_bin:
-                logging.info(f"[AscendaraDownloader] Extracting with unrar CLI: {_unrar_bin}")
-                _proc = subprocess.Popen(
-                    [_unrar_bin, 'x', '-y', '-psteamrip.com', archive_path, (extract_to or self.download_dir) + '/'],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL,
-                    creationflags=_CREATE_NO_WINDOW
-                )
-                try:
-                    # Dynamic timeout: 4 hours for archives >50GB, otherwise 2 hours
-                    archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
-                    timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
-                    _proc.wait(timeout=timeout_seconds)
-                    if _proc.returncode == 0:
-                        _extraction_success = True
-                        logging.info(f"[AscendaraDownloader] unrar extraction completed successfully")
-                    else:
-                        logging.warning(f"[AscendaraDownloader] unrar failed (exit {_proc.returncode}), trying 7z")
-                except subprocess.TimeoutExpired:
-                    _proc.kill()
-                    logging.warning("[AscendaraDownloader] unrar timed out, trying 7z")
-            if not _extraction_success:
-                if _7z_bin:
-                    logging.info(f"[AscendaraDownloader] Extracting with 7z: {_7z_bin}")
-                    _proc = subprocess.Popen(
-                        [_7z_bin, 'x', '-psteamrip.com', f'-o{extract_to or self.download_dir}', '-y', '-aoa', '-bsp0', '-bb0', archive_path],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                        stdin=subprocess.DEVNULL,
-                        creationflags=_CREATE_NO_WINDOW
-                    )
-                    try:
-                        # Dynamic timeout: 4 hours for archives >50GB, otherwise 2 hours
-                        archive_size = os.path.getsize(archive_path) if os.path.exists(archive_path) else 0
-                        timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
-                        _, _7z_stderr = _proc.communicate(timeout=timeout_seconds)
-                        if _proc.returncode == 0:
-                            _extraction_success = True
-                            logging.info(f"[AscendaraDownloader] 7z extraction completed successfully")
-                        else:
-                            _7z_err_msg = _7z_stderr.decode(errors='replace').strip() if _7z_stderr else ''
-                            logging.error(f"[AscendaraDownloader] 7z stderr: {_7z_err_msg}")
-                            raise RuntimeError(f"7z extraction failed (exit {_proc.returncode}): {_7z_err_msg}")
-                    except subprocess.TimeoutExpired:
-                        _proc.kill()
-                        _proc.communicate()
-                        raise RuntimeError(f"7z extraction timed out after {timeout_seconds // 3600} hour(s)")
-                else:
-                    raise RuntimeError(
-                        f"RAR extraction failed after bundled recovery: {_lib_err_msg}"
-                    )
-            logging.info(f"[AscendaraDownloader] RAR extraction with CLI tools complete")
-            for dirpath, _, filenames in os.walk(self.download_dir):
-                for fname in filenames:
-                    if fname.endswith('.url') or fname.endswith('.rar') or fname.endswith('.zip') or '_CommonRedist' in dirpath:
-                        continue
-                    full_path = os.path.join(dirpath, fname)
-                    key = os.path.relpath(full_path, self.download_dir).replace('\\', '/')
-                    if key not in watching_data:
-                        watching_data[key] = {"size": os.path.getsize(full_path)}
-            self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
-            return
-        
-        # On Linux/macOS, use system unrar binary
-        from AscendaraDownloadRecovery import find_unrar
-        unrar_bin = find_unrar()
-        if not unrar_bin:
-            if sys.platform == "darwin":
-                raise RuntimeError("System 'unrar' binary not found. Install it with: brew install unrar")
-            else:
-                raise RuntimeError('The bundled RAR extractor is unavailable. Update Ascendara or report this packaging issue; re-downloading the archive will not fix it.')
-
-        logging.info(f"[AscendaraDownloader] Extracting RAR with system unrar: {archive_path}")
-
-        # Count existing files before extraction for progress tracking
-        initial_file_count = 0
-        try:
-            for root, dirs, files_in_dir in os.walk(self.download_dir):
-                initial_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
-        except Exception:
-            pass
-
-        # Run unrar with Popen so we can read filenames line-by-line as they extract
-        extraction_error = []
-        files_extracted_count = [0]
-        last_filename = [""]
-
-        proc = subprocess.Popen(
-            [unrar_bin, "x", "-y", "-psteamrip.com", archive_path, (extract_to or self.download_dir) + "/"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-
-        def read_stdout():
-            try:
-                last_seen = [""]
-                for raw_line in proc.stdout:
-                    # unrar uses \r for in-place progress; split on \r and \n
-                    raw = raw_line.decode(errors='replace')
-                    for segment in re.split(r'[\r\n]', raw):
-                        line = segment.strip()
-                        # Strip ANSI escape sequences
-                        line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', line)
-                        # Strip non-printable characters (box-drawing, etc.)
-                        line = re.sub(r'[^\x20-\x7E]', '', line)
-                        if not (line.startswith('Extracting') or line.startswith('extracting')):
-                            continue
-                        # Remove trailing percentage/OK noise (unrar in-place progress)
-                        rest = line.split(None, 1)[-1] if len(line.split(None, 1)) > 1 else ''
-                        # Strip from first occurrence of padded percentage onward (handles "file   11% 12% 13%")
-                        rest = re.sub(r'\s{2,}\d+\s*%.*$', '', rest)
-                        rest = re.sub(r'\s+OK\s*$', '', rest)
-                        rest = rest.strip()
-                        fname = os.path.basename(rest)
-                        # Only count/update when the filename actually changes
-                        if fname and fname != last_seen[0] and not fname.endswith('.url') and '_CommonRedist' not in fname:
-                            last_seen[0] = fname
-                            files_extracted_count[0] += 1
-                            last_filename[0] = fname
-                            total = self._files_extracted_count + files_extracted_count[0]
-                            self._update_extraction_progress(fname, total, self._total_files_to_extract)
-            except Exception:
-                pass
-
-        stdout_thread = threading.Thread(target=read_stdout, daemon=True)
-        stdout_thread.start()
-
-        returncode = proc.wait()
-        stdout_thread.join(timeout=5)
-
-        if returncode != 0:
-            stderr_out = proc.stderr.read().decode(errors='replace').strip()
-            extraction_error.append(RuntimeError(
-                f"unrar exited with code {returncode}: {stderr_out}"
-            ))
-
-        if extraction_error:
-            logging.error(f"[AscendaraDownloader] RAR extraction failed: {extraction_error[0]}")
-            raise extraction_error[0]
-
-        logging.info(f"[AscendaraDownloader] RAR extraction complete")
-
-        # Update extracted count from newly added files
-        final_file_count = 0
-        try:
-            for root, dirs, files_in_dir in os.walk(self.download_dir):
-                final_file_count += len([f for f in files_in_dir if not f.endswith('.url') and not f.endswith('.rar') and not f.endswith('.zip')])
-        except Exception:
-            pass
-        newly_extracted = max(0, final_file_count - initial_file_count)
-        self._files_extracted_count += newly_extracted
-        
-        # Cap the count to never exceed total
-        if self._files_extracted_count > self._total_files_to_extract:
-            logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
-            self._files_extracted_count = self._total_files_to_extract
-
-        # Clean up unwanted files (.url and _CommonRedist)
-        for root, dirs, files_in_dir in os.walk(self.download_dir):
-            if '_CommonRedist' in root:
-                try:
-                    shutil.rmtree(root)
-                    logging.info(f"[AscendaraDownloader] Removed _CommonRedist: {root}")
-                except Exception as e:
-                    logging.warning(f"[AscendaraDownloader] Could not remove _CommonRedist: {e}")
-                continue
-
-            for fname in files_in_dir:
-                if fname.endswith('.url'):
-                    try:
-                        os.remove(os.path.join(root, fname))
-                    except Exception:
-                        pass
-
-        # Build watching data from extracted files
-        for dirpath, _, filenames in os.walk(self.download_dir):
-            for fname in filenames:
-                if fname.endswith('.url') or fname.endswith('.rar') or fname.endswith('.zip') or '_CommonRedist' in dirpath:
-                    continue
-                full_path = os.path.join(dirpath, fname)
-                key = os.path.relpath(full_path, self.download_dir).replace('\\', '/')
-                if key not in watching_data:
-                    watching_data[key] = {"size": os.path.getsize(full_path)}
-
-        self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
-    
-    def _extract_rar_with_library(self, archive_path: str, watching_data: Dict, extract_to: str = None):
-        """Extract a RAR file using Python unrar library (Windows with bundled DLL).
-
-        The archive is opened once in extract mode and walked front-to-back,
-        extracting or skipping each entry as it is encountered. The library's
-        per-member ``extract()`` re-opens the archive and re-scans (and, for
-        solid archives, re-decompresses) everything before the member, which is
-        O(n^2) and is what made large repacks crawl at <1 file/s.
-        """
-        from unrar import rarfile, unrarlib, constants
-
-        RHDF_DIRECTORY = 0x20  # RARHeaderDataEx.Flags bit for directory entries
-        RAR_PASSWORD = 'steamrip.com'
-        dest_dir = extract_to or self.download_dir
-        logging.info(f"[AscendaraDownloader] Extracting RAR with Python library (single pass): {archive_path}")
-
-        def _wanted(name: str) -> bool:
-            return not name.endswith('.url') and '_CommonRedist' not in name
-
-        # Listing pass (headers only) to know how many entries to expect.
-        try:
-            listing = rarfile.RarFile(archive_path, 'r', pwd=RAR_PASSWORD)
-        except Exception:
-            listing = rarfile.RarFile(archive_path, 'r')
-        expected = sum(1 for i in listing.infolist() if _wanted(i.filename) and not (i.flag_bits & RHDF_DIRECTORY))
-        logging.info(f"[AscendaraDownloader] Extracting {expected} files from RAR")
-
-        archive = unrarlib.RAROpenArchiveDataEx(archive_path, mode=constants.RAR_OM_EXTRACT)
-        handle = listing._open(archive)
-        unrarlib.RARSetPassword(handle, RAR_PASSWORD.encode('cp437'))
-
-        local_extracted = 0
-        last_log = time.time()
-        try:
-            header = unrarlib.RARHeaderDataEx()
-            while True:
-                try:
-                    unrarlib.RARReadHeaderEx(handle, ctypes.byref(header))
-                except unrarlib.ArchiveEnd:
-                    break
-                except unrarlib.MissingPassword:
-                    raise RuntimeError("Archive is encrypted, password required")
-                except unrarlib.BadPassword:
-                    raise RuntimeError("Bad password for Archive")
-                except unrarlib.UnrarException as e:
-                    raise rarfile.BadRarFile(str(e))
-
-                name = header.FileNameW
-                is_dir = bool(header.Flags & RHDF_DIRECTORY)
-
-                if not _wanted(name):
-                    unrarlib.RARProcessFileW(handle, constants.RAR_SKIP, None, None)
-                    continue
-
-                try:
-                    unrarlib.RARProcessFileW(handle, constants.RAR_EXTRACT, dest_dir, None)
-                except unrarlib.MissingPassword:
-                    raise RuntimeError("File is encrypted, password required")
-                except unrarlib.BadPassword:
-                    raise RuntimeError("Bad password for File")
-                except unrarlib.BadDataError:
-                    raise RuntimeError(f"File CRC error: {name}")
-                except unrarlib.UnrarException as e:
-                    raise rarfile.BadRarFile(f"Bad RAR archive data at {name}: {e}")
-
-                if is_dir:
-                    continue
-
-                local_extracted += 1
-                size = header.UnpSize + (header.UnpSizeHigh << 32)
-                key = os.path.relpath(os.path.join(dest_dir, name), self.download_dir).replace('\\', '/')
-                watching_data[key] = {"size": size}
-
-                done = self._files_extracted_count + local_extracted
-                self._update_extraction_progress(
-                    os.path.basename(name), done, self._total_files_to_extract, force=(done == 1)
-                )
-                # _update_extraction_progress is throttled, so poll for a user
-                # stop here at a low rate rather than on every entry.
-                now = time.time()
-                if now - last_log >= 5.0:
-                    pct = (done / self._total_files_to_extract * 100) if self._total_files_to_extract > 0 else 0
-                    logging.info(f"[AscendaraDownloader] Extraction progress: {done}/{self._total_files_to_extract} files ({pct:.1f}%) - {os.path.basename(name)}")
-                    last_log = now
-                    if self._check_for_stop():
-                        raise InterruptedError("Extraction stopped by user")
-        finally:
-            try:
-                unrarlib.RARCloseArchive(handle)
-            except Exception:
-                pass
-
-        logging.info(f"[AscendaraDownloader] RAR extraction complete ({local_extracted}/{expected} files)")
-        self._files_extracted_count += local_extracted
-
-        # Cap the count to never exceed total
-        if self._files_extracted_count > self._total_files_to_extract:
-            logging.warning(f"[AscendaraDownloader] Extracted count ({self._files_extracted_count}) exceeds total ({self._total_files_to_extract}), capping")
-            self._files_extracted_count = self._total_files_to_extract
-        
-        # Clean up unwanted files (.url and _CommonRedist)
-        for root, dirs, files_in_dir in os.walk(self.download_dir):
-            if '_CommonRedist' in root:
-                try:
-                    shutil.rmtree(root)
-                    logging.info(f"[AscendaraDownloader] Removed _CommonRedist: {root}")
-                except Exception as e:
-                    logging.warning(f"[AscendaraDownloader] Could not remove _CommonRedist: {e}")
-                continue
-            
-            for fname in files_in_dir:
-                if fname.endswith('.url'):
-                    try:
-                        os.remove(os.path.join(root, fname))
-                    except Exception:
-                        pass
-        
-        # Build watching data from extracted files
-        for dirpath, _, filenames in os.walk(self.download_dir):
-            for fname in filenames:
-                if fname.endswith('.url') or fname.endswith('.rar') or fname.endswith('.zip') or '_CommonRedist' in dirpath:
-                    continue
-                full_path = os.path.join(dirpath, fname)
-                key = os.path.relpath(full_path, self.download_dir).replace('\\', '/')
-                if key not in watching_data:
-                    watching_data[key] = {"size": os.path.getsize(full_path)}
-        
-        self._update_extraction_progress("Complete", self._files_extracted_count, self._total_files_to_extract, force=True)
-    
-    def _flatten_directories(self):
-        """Move game files from the extraction subdirectory up to the root game dir, preserving all folder structure."""
-        protected_files = {
-            f"{sanitize_folder_name(self.game)}.ascendara.json",
-            "filemap.ascendara.json",
-        }
-        
-        # List immediate subdirs (skip system/metadata dirs)
-        subdirs = []
-        for item in os.listdir(self.download_dir):
-            item_path = os.path.join(self.download_dir, item)
-            if os.path.isdir(item_path) and item != '_CommonRedist' and not item.endswith('.ascendara'):
-                subdirs.append(item_path)
-        
-        logging.info(f"[AscendaraDownloader] Found {len(subdirs)} subdirectories")
-        
-        if not subdirs:
-            logging.info("[AscendaraDownloader] No directories to flatten")
-            return
-        
-        # Only flatten if the subdirectory name resembles the game name.
-        # Repack wrappers are typically named after the game (e.g. "Forza Horizon 6",
-        # "ForzaHorizon6"). Legitimate game subdirectories use short internal names
-        # (e.g. "FH6", "data", "bin") that don't match the game title.
-        def _name_matches_game(dirname: str) -> bool:
-            game_clean = re.sub(r'[^a-z0-9]', '', self.game.lower())
-            dir_clean  = re.sub(r'[^a-z0-9]', '', dirname.lower())
-            if not dir_clean:
-                return False
-            # Exact match after stripping punctuation/spaces
-            if game_clean == dir_clean:
-                return True
-            # Dir name is a prefix of the game name (handles truncated titles)
-            if len(dir_clean) >= 4 and game_clean.startswith(dir_clean):
-                return True
-            # Game name starts with the dir name (e.g. game="ForzaHorizon6", dir="Forza")
-            if len(dir_clean) >= 4 and dir_clean in game_clean:
-                # Only if the match covers a significant portion (≥50%) of the game name
-                if len(dir_clean) >= len(game_clean) * 0.5:
-                    return True
-            return False
-
-        def _has_exe(path: str) -> bool:
-            for _root, _dirs, _files in os.walk(path):
-                if any(f.lower().endswith('.exe') for f in _files):
-                    return True
-            return False
-
-        def _count_files(path: str) -> int:
-            count = 0
-            for _root, _dirs, _files in os.walk(path):
-                count += len(_files)
-            return count
-
-        # Root-level status
-        root_items = os.listdir(self.download_dir)
-        root_files = [f for f in root_items if os.path.isfile(os.path.join(self.download_dir, f))]
-        root_exe = any(f.lower().endswith('.exe') for f in root_files)
-        total_files = _count_files(self.download_dir)
-
-        # Find the subdir that contains a .exe AND whose name resembles the game name
-        target_dir = None
-        for subdir in subdirs:
-            subdir_name = os.path.basename(subdir)
-            if not _name_matches_game(subdir_name):
-                logging.info(f"[AscendaraDownloader] Skipping flatten candidate (name mismatch): {subdir_name}")
-                continue
-            if _has_exe(subdir):
-                target_dir = subdir
-                logging.info(f"[AscendaraDownloader] Name-matched subdir contains executable: {subdir_name}")
-                break
-
-        if not target_dir and not root_exe and len(subdirs) == 1:
-            subdir = subdirs[0]
-            subdir_name = os.path.basename(subdir)
-            subdir_file_count = _count_files(subdir)
-            if _has_exe(subdir):
-                target_dir = subdir
-                logging.info(f"[AscendaraDownloader] Single subdir '{subdir_name}' contains the only executable — flattening wrapper")
-            elif total_files > 0 and subdir_file_count / total_files >= 0.8:
-                target_dir = subdir
-                logging.info(f"[AscendaraDownloader] Single subdir '{subdir_name}' contains {subdir_file_count}/{total_files} files — flattening wrapper")
-
-        # Aggressive wrapper fallback: if the root only contains Ascendara metadata
-        # files (JSON, header images, etc.) and a single subdir, assume the subdir
-        # is a wrapper and flatten it. This catches TorBox/GOFile wrappers even when
-        # the content ratio is low and Ascendara has already placed image files in
-        # the game directory.
-        if not target_dir and len(subdirs) == 1:
-            subdir = subdirs[0]
-            subdir_name = os.path.basename(subdir)
-            root_metadata_files = [
-                f for f in root_files
-                if f.endswith('.ascendara.json')
-                or f == 'filemap.ascendara.json'
-                or f.endswith('.ascendara.png')
-                or f.endswith('.ascendara.jpg')
-            ]
-            logging.info(
-                f"[AscendaraDownloader] Flatten debug: root_files={root_files}, "
-                f"root_exe={root_exe}, total_files={total_files}, "
-                f"subdir_file_count={_count_files(subdir)}, "
-                f"metadata_only={len(root_metadata_files) == len(root_files)}"
-            )
-            if len(root_metadata_files) == len(root_files):
-                target_dir = subdir
-                logging.info(f"[AscendaraDownloader] Single subdir '{subdir_name}' treated as wrapper (root only has metadata) — flattening")
-
-        # Fall back: single subdir that matches the game name, even without a .exe
-        if not target_dir and len(subdirs) == 1:
-            subdir_name = os.path.basename(subdirs[0])
-            if _name_matches_game(subdir_name):
-                target_dir = subdirs[0]
-            else:
-                logging.info(f"[AscendaraDownloader] Single subdir '{subdir_name}' does not match game name — skipping flatten")
-                return
-
-        if not target_dir:
-            logging.info("[AscendaraDownloader] No flatten-eligible subdirectory found — skipping flatten")
-            return
-        
-        logging.info(f"[AscendaraDownloader] Flattening: {target_dir}")
-        
-        for item in list(os.listdir(target_dir)):
-            src = os.path.join(target_dir, item)
-            dst = os.path.join(self.download_dir, item)
-            
-            if os.path.normpath(dst) == os.path.normpath(target_dir):
-                continue
-            if item in protected_files:
-                continue
-            if not os.path.exists(src):
-                continue
-            
-            if os.path.exists(dst):
-                if os.path.isdir(dst):
-                    shutil.rmtree(dst, ignore_errors=True)
-                else:
-                    os.remove(dst)
-            
-            try:
-                shutil.move(src, dst)
-            except Exception as e:
-                logging.error(f"[AscendaraDownloader] Failed to move {src}: {e}")
-        
-        # Remove empty shell directory
-        try:
-            if not os.listdir(target_dir):
-                shutil.rmtree(target_dir, ignore_errors=True)
-                logging.info(f"[AscendaraDownloader] Deleted empty dir: {target_dir}")
-        except Exception:
-            pass
-    
-    def _cleanup_junk_files(self):
-        """Remove .url files and _CommonRedist folders."""
-        for root, dirs, files in os.walk(self.download_dir, topdown=False):
-            for fname in files:
-                if fname.endswith('.url'):
-                    file_path = os.path.join(root, fname)
-                    try:
-                        os.remove(file_path)
-                        logging.info(f"[AscendaraDownloader] Deleted .url: {file_path}")
-                    except Exception:
-                        pass
-            
-            for d in dirs:
-                if d.lower() == '_commonredist':
-                    dir_path = os.path.join(root, d)
-                    try:
-                        shutil.rmtree(dir_path)
-                        logging.info(f"[AscendaraDownloader] Deleted _CommonRedist: {dir_path}")
-                    except Exception:
-                        pass
-    
-    def _verify_extracted_files(self, watching_path: str, backup_dir: Optional[str] = None):
-        """Verify extracted files match expected sizes.
-        
-        Args:
-            watching_path: Path to the filemap JSON
-            backup_dir: Path to backup directory (for updates)
-        """
-        # Check if download has been stopped before starting verification
-        if self._check_for_stop():
-            logging.info("[AscendaraDownloader] Verification stopped by user")
-            return
-        
-        logging.info(f"[AscendaraDownloader] Starting verification of extracted files")
-        verify_start_time = time.time()
-        try:
-            with open(watching_path, 'r') as f:
-                watching_data = json.load(f)
-            
-            logging.info(f"[AscendaraDownloader] Verifying {len(watching_data)} files")
-            verify_errors = []
-            
-            # Log any remaining archives; game content may legitimately include archives.
-            # Only warn for archives in root (likely failed cleanup), log others as debug (game content).
-            _archive_warning_count = 0
-            _max_archive_warnings = 10
-            for root, dirs, files in os.walk(self.download_dir):
-                for file in files:
-                    if file.endswith('.rar') or file.endswith('.zip') or file.endswith('.7z'):
-                        archive_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(archive_path, self.download_dir)
-                        # Check if archive is in root directory (no path separator)
-                        is_in_root = os.path.dirname(rel_path) == ''
-                        if is_in_root:
-                            if _archive_warning_count < _max_archive_warnings:
-                                logging.warning(f"[AscendaraDownloader] Found archive in root after extraction (may need cleanup): {rel_path}")
-                                _archive_warning_count += 1
-                            elif _archive_warning_count == _max_archive_warnings:
-                                logging.warning(f"[AscendaraDownloader] ... suppressing additional archive warnings")
-                                _archive_warning_count += 1
-                        else:
-                            # Game content archives - log at debug level to reduce spam
-                            logging.debug(f"[AscendaraDownloader] Found archive in subdirectory (game content): {rel_path}")
-            
-            verified_count = 0
-            for file_path, file_info in watching_data.items():
-                # Check if download has been stopped during verification
-                if self._check_for_stop():
-                    logging.info("[AscendaraDownloader] Verification stopped by user")
-                    return
-                
-                if os.path.basename(file_path) == 'filemap.ascendara.json':
-                    continue
-                
-                full_path = os.path.join(self.download_dir, file_path)
-                if not os.path.exists(full_path):
-                    verify_errors.append({"file": file_path, "error": "File not found"})
-                    logging.warning(f"[AscendaraDownloader] Verification failed - file not found: {file_path}")
-                elif os.path.getsize(full_path) != file_info['size']:
-                    verify_errors.append({"file": file_path, "error": f"Size mismatch: expected {file_info['size']}, got {os.path.getsize(full_path)}"})
-                    logging.warning(f"[AscendaraDownloader] Verification failed - size mismatch: {file_path}")
-                else:
-                    verified_count += 1
-            
-            logging.info(f"[AscendaraDownloader] Verification complete: {verified_count} files OK, {len(verify_errors)} errors")
-            
-            # Ensure verifying state shows for at least 1 second in the UI
-            elapsed = time.time() - verify_start_time
-            if elapsed < 1.0:
-                time.sleep(1.0 - elapsed)
-            
-            self.game_info["downloadingData"]["verifying"] = False
-            if verify_errors:
-                self.game_info["downloadingData"]["verifyError"] = verify_errors
-                
-                # Restore from backup if this is an update
-                if backup_dir:
-                    logging.warning(f"[AscendaraDownloader] Update verification failed, restoring from backup")
-                    if self._restore_from_backup(backup_dir):
-                        logging.info(f"[AscendaraDownloader] Successfully restored original files")
-                        if self.withNotification:
-                            _launch_notification(
-                                self.withNotification,
-                                "Update Failed - Restored",
-                                f"Update failed but original files were restored"
-                            )
-                    else:
-                        logging.error(f"[AscendaraDownloader] Failed to restore from backup")
-                        if self.withNotification:
-                            _launch_notification(
-                                self.withNotification,
-                                "Update Failed",
-                                f"Update failed and restore failed - backup at {backup_dir}"
-                            )
-            
-            safe_write_json(self.game_info_path, self.game_info)
-            
-            if not verify_errors:
-                self._detect_and_set_executable()
-                self._handle_post_download_behavior()
-                
-                # Cleanup backup after successful update
-                if backup_dir:
-                    self._cleanup_backup(backup_dir)
-                    logging.info(f"[AscendaraDownloader] Update completed successfully, backup cleaned up")
-                
-                if "downloadingData" in self.game_info:
-                    del self.game_info["downloadingData"]
-                    safe_write_json(self.game_info_path, self.game_info)
-        except Exception as e:
-            logging.error(f"[AscendaraDownloader] Verification error: {e}")
-            
-            # Restore from backup if this is an update
-            if backup_dir:
-                logging.warning(f"[AscendaraDownloader] Update error, restoring from backup")
-                if self._restore_from_backup(backup_dir):
-                    logging.info(f"[AscendaraDownloader] Successfully restored original files after error")
-                    if self.withNotification:
-                        _launch_notification(
-                            self.withNotification,
-                            "Update Failed - Restored",
-                            f"Update failed but original files were restored"
-                        )
-                else:
-                    logging.error(f"[AscendaraDownloader] Failed to restore from backup after error")
-            
-            handleerror(self.game_info, self.game_info_path, e)
-    
     def _detect_and_set_executable(self):
         """Intelligently detect and set the correct executable file for the game."""
         try:
@@ -2533,7 +1224,8 @@ class AscendaraDownloader:
                 
         except Exception as e:
             logging.error(f"[AscendaraDownloader] Error detecting executable: {e}")
-    
+
+
     def _find_exe_in_text_files(self):
         """Search text files for executable references."""
         try:
@@ -2572,7 +1264,8 @@ class AscendaraDownloader:
         except Exception as e:
             logging.error(f"[AscendaraDownloader] Error searching text files: {e}")
             return None
-    
+
+
     def _handle_post_download_behavior(self):
         """Handle post-download actions like lock, sleep, shutdown."""
         allow_sleep()
@@ -2605,45 +1298,562 @@ class AscendaraDownloader:
             logging.error(f"[AscendaraDownloader] Post-download behavior error: {e}")
 
 
-# CLI Entrypoint
+
+    VALID_BUZZHEAVIER_DOMAINS = ('buzzheavier.com', 'bzzhr.co', 'bzzhr.to',
+                               'ts.bzzhr.to', 'fafda.to', 'fuckingfast.net', 'fuckingfast.co')
+
+    def _check_for_stop(self):
+        if getattr(self, '_stopped', False):
+            return True
+        now = time.monotonic()
+        if now - getattr(self, '_last_stop_poll', -1) < .2:
+            return False
+        self._last_stop_poll = now
+        try:
+            with open(self.game_info_path, encoding='utf-8') as stream:
+                self._stopped = json.load(stream).get('downloadingData', {}).get('stopped', False)
+        except FileNotFoundError:
+            self._stopped = True
+        except (OSError, ValueError):
+            pass  # Electron may be halfway through writing the stop request.
+        return getattr(self, '_stopped', False)
+
+    def _check_cancelled(self):
+        if self._check_for_stop():
+            raise InterruptedError('Download stopped by user')
+
+    def _download_path(self, filename):
+        folder = _member_path(self.download_dir, '.ascendara-downloads')
+        os.makedirs(folder, exist_ok=True)
+        return _member_path(folder, filename)
+
+    def download(self, url, withNotification=None, provider='auto', password=None):
+        self.withNotification = withNotification
+        prevent_sleep()
+        try:
+            if provider not in ('auto', 'direct', 'gofile'):
+                raise ValueError('Unknown download provider')
+            normalized = url if '://' in url else 'https://' + url.lstrip('/')
+            share_host = (urlparse(normalized).hostname or '').lower()
+            if provider == 'gofile' or (provider == 'auto' and share_host in ('gofile.io', 'www.gofile.io')):
+                self._download_gofile(normalized, password)
+                if withNotification and 'downloadingData' not in self.game_info:
+                    _launch_notification(withNotification, 'Download Complete', f'Successfully downloaded {self.game}')
+                return
+            host = (urlparse(url).hostname or '').lower()
+            if any(host == domain or host.endswith('.' + domain) for domain in self.VALID_BUZZHEAVIER_DOMAINS):
+                self._download_buzzheavier(url)
+                return
+            if not self._pre_download_disk_check():
+                return
+            self._check_cancelled()
+            if withNotification:
+                _launch_notification(withNotification, 'Download Started', f'Starting download for {self.game}')
+            destination = self._download_path(self._get_filename_from_url(url))
+            if destination.endswith('.ascendara.json'):
+                raise ValueError('Download filename conflicts with Ascendara metadata')
+            transfer = ChunkedDownloader(url, destination, self.game_info, self.game_info_path)
+            if not transfer.download():
+                if transfer.stopped:
+                    raise InterruptedError('Download stopped by user')
+                raise RuntimeError(transfer.last_error)
+            destination = self._fix_file_extension(destination)
+            self._archive_sources = {os.path.abspath(destination): url}
+            self._extract_files(destination)
+            if withNotification and 'downloadingData' not in self.game_info:
+                _launch_notification(withNotification, 'Download Complete', f'Successfully downloaded {self.game}')
+        except InterruptedError:
+            logging.info('Download cancelled; retaining source archive and partial download')
+        except VerificationFailure:
+            logging.error('Verification failed; previous installation restored')
+        except Exception as exc:
+            logging.exception('V4 download failed')
+            if not self._check_for_stop():
+                message = str(exc)
+                if any(term in message for term in ('SSL: WRONG_VERSION_NUMBER', 'WinError 10054', 'forcibly closed')):
+                    message = 'provider_blocked_error'
+                handleerror(self.game_info, self.game_info_path, message)
+                if withNotification:
+                    _launch_notification(withNotification, 'Download Error', f'Error downloading {self.game}: {exc}')
+        finally:
+            allow_sleep()
+
+    def _extract_files(self, archive_path=None, loose_files=None, cleanup_folder=None):
+        self._check_cancelled()
+        loose_files = loose_files or []
+        archives = ([os.path.abspath(p) for p in archive_path] if isinstance(archive_path, (list, tuple)) else
+                    [os.path.abspath(archive_path)] if archive_path else
+                    [os.path.join(self.download_dir, name) for name in os.listdir(self.download_dir)
+                     if name.lower().endswith(('.zip', '.rar', '.7z'))])
+        from AscendaraDownloadRecovery import archive_sources
+        for part in archives:
+            if re.search(r'\.part(?!0*1\.)\d+\.rar$', part, re.I):
+                first_parts = {p: None for p in archives if re.search(r'\.part0*1\.rar$', p, re.I)}
+                if not archive_sources(part, first_parts):
+                    raise RuntimeError(f'Missing first RAR volume for {os.path.basename(part)}')
+        archives = [p for p in archives if not re.search(r'\.part(?!0*1\.)\d+\.rar$', p, re.I)]
+        if not archives and not loose_files:
+            raise RuntimeError('No archive found to extract')
+        data = self.game_info['downloadingData']
+        data.update(downloading=False, extracting=True, verifying=False,
+                    progressCompleted='100.00', progressDownloadSpeeds='0.00 KB/s', timeUntilComplete='0s')
+        safe_write_json(self.game_info_path, self.game_info)
+        started = time.monotonic()
+        manifest = {}
+        processed = []
+        # Same-volume staging makes installation a rename rather than a second copy.
+        stage = tempfile.mkdtemp(prefix='.ascendara-stage-', dir=self.download_dir)
+        self._preserve_stage = False
+        try:
+            payload = os.path.join(stage, 'payload')
+            os.mkdir(payload)
+            last_copy_update = 0
+            for item in loose_files:
+                self._check_cancelled()
+                target = _member_path(payload, item['filename'])
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                expected = item['size']
+                if expected > shutil.disk_usage(payload).free:
+                    raise OSError('Insufficient disk space for downloaded game files')
+                copied = 0
+                with open(item['source'], 'rb') as incoming, open(target, 'wb') as output:
+                    while True:
+                        self._check_cancelled()
+                        chunk = incoming.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        output.write(chunk)
+                        copied += len(chunk)
+                        now = time.monotonic()
+                        if now - last_copy_update >= .5:
+                            self._extraction_progress({'name': item['filename'], 'files': len(manifest),
+                                                       'total': len(loose_files)}, started)
+                            last_copy_update = now
+                if copied != expected:
+                    raise RuntimeError(f'Incomplete downloaded file: {item["filename"]}')
+                manifest[item['filename']] = {'size': expected}
+            pending = list(archives)
+            while pending:
+                self._check_cancelled()
+                archive = pending.pop(0)
+                for attempt in range(2):
+                    try:
+                        result = supervise_extraction(archive, payload, self._check_cancelled,
+                            lambda state: self._extraction_progress(state, started), stage)
+                        break
+                    except InterruptedError:
+                        raise
+                    except Exception as exc:
+                        self._repair_archive(exc, archive, attempt)
+                manifest.update(result)
+                processed.append(archive)
+                from AscendaraDownloadRecovery import archive_sources
+                if os.path.commonpath([payload, archive]) == payload:
+                    family = archive_sources(archive, {os.path.join(payload, n): None for n in os.listdir(payload)})
+                    for path in family:
+                        os.remove(path)
+                        manifest.pop(os.path.relpath(path, payload).replace('\\', '/'), None)
+                # All primary archives may contribute to the same wrapper directory.
+                if not pending:
+                    manifest = flatten_payload(payload, manifest, self.game)
+                # Only unpack root continuation archives; nested game assets stay intact.
+                for name in list(manifest):
+                    if '/' not in name and name.lower().endswith(('.zip', '.rar', '.7z')):
+                        nested = os.path.join(payload, name)
+                        if re.search(r'\.part(?!0*1\.)\d+\.rar$', name, re.I):
+                            continue
+                        if nested in pending:
+                            continue
+                        if nested in processed:
+                            raise RuntimeError('Recursive archive wrapper detected')
+                        pending.append(nested)
+                if len(processed) + len(pending) > len(archives) + 32:
+                    raise RuntimeError('Too many nested archive wrappers')
+            # Remove only archives actually consumed successfully (including their volumes).
+            from AscendaraDownloadRecovery import archive_sources
+            for archive in processed:
+                if os.path.commonpath([payload, archive]) == payload:
+                    family = archive_sources(archive, {os.path.join(payload, n): None for n in os.listdir(payload)})
+                    for path in family:
+                        os.remove(path)
+                        manifest.pop(os.path.relpath(path, payload).replace('\\', '/'), None)
+            manifest = flatten_payload(payload, manifest, self.game)
+            errors = verify_manifest(payload, manifest, self._check_cancelled)
+            if errors:
+                data.update(extracting=False, verifying=False, verifyError=errors)
+                safe_write_json(self.game_info_path, self.game_info)
+                return
+            self._check_cancelled()
+            self._install_payload(payload, manifest, stage)
+        finally:
+            if not self._preserve_stage:
+                cleanup_temporary(stage, self.download_dir)
+        # Archives survive every failure above, including failed verification.
+        for archive in archives:
+            if not archive.lower().endswith(('.zip', '.rar', '.7z')):
+                continue
+            if os.path.commonpath([self.download_dir, archive]) != self.download_dir:
+                continue
+            archive_dir = os.path.dirname(archive)
+            family = archive_sources(archive, {os.path.join(archive_dir, n): None
+                                               for n in os.listdir(archive_dir)})
+            for path in family:
+                cleanup_temporary(path, self.download_dir)
+        if cleanup_folder is not None:
+            cleanup_temporary(cleanup_folder, self.download_dir)
+        cleanup_temporary(os.path.join(self.download_dir, '.ascendara-downloads'),
+                          self.download_dir, empty_only=True)
+        # Publish completion only after cleanup, before sleep/shutdown actions.
+        del self.game_info['downloadingData']
+        safe_write_json(self.game_info_path, self.game_info)
+        self._handle_post_download_behavior()
+
+    def _download_gofile(self, url, password=None):
+        self._check_cancelled()
+        folder_id = gofile_content_id(url)
+        folder = self._download_path('gofile-' + folder_id)
+        os.makedirs(folder, exist_ok=True)
+        receipts = _member_path(folder, '.ascendara-receipts')
+        os.makedirs(receipts, exist_ok=True)
+        data = self.game_info['downloadingData']
+        data.update(downloading=True, extracting=False, verifying=False, timeUntilComplete='Getting download links...')
+        safe_write_json(self.game_info_path, self.game_info)
+        if self.withNotification:
+            _launch_notification(self.withNotification, 'Download Started', f'Starting download for {self.game}')
+        with create_robust_session() as api, create_robust_session() as session:
+            client = GofileClient(api, self._check_cancelled)
+            items = client.resolve(url, password)
+            client.authenticate_downloads(session)
+            # This session must remain open through automatic archive repair.
+            self._gofile_session = session
+            self._archive_sources = {}
+            sizes = {item['id']: item['size'] for item in items}
+            for item in items:
+                if item['filename'].lower().startswith('.ascendara') or item['filename'].lower().endswith(('.resume.json', '.ascendara.json')):
+                    raise ValueError('GOFile filename conflicts with downloader metadata')
+                item['source'] = _member_path(folder, item['filename'])
+                self._archive_sources[item['source']] = dict(item)
+            # Each transfer checks remaining disk space. Counting the whole batch
+            # here would count completed, cached files twice when resuming.
+            reporter = ChunkedDownloader('', '', self.game_info, self.game_info_path)
+            completed, last_speed, last_update = 0, 0, 0
+            limit = max(0, int(load_settings().get('downloadLimit', 0))) * 1024
+            for item in items:
+                self._check_cancelled()
+                receipt_path = os.path.join(receipts, hashlib.sha256(item['id'].encode()).hexdigest() + '.json')
+                identity = {key: item[key] for key in ('id', 'filename', 'size', 'md5')}
+                cached = False
+                try:
+                    with open(receipt_path, encoding='utf-8') as stream:
+                        cached = (json.load(stream) == identity and item['size'] is not None
+                                  and os.path.getsize(item['source']) == item['size'])
+                except (OSError, ValueError):
+                    pass
+                def progress(done, total, speed):
+                    nonlocal last_speed, last_update
+                    if total is not None:
+                        sizes[item['id']] = total
+                    if speed > 0:
+                        last_speed = speed
+                    now = time.monotonic()
+                    if now - last_update >= .5:
+                        batch_total = sum(sizes.values()) if all(v is not None for v in sizes.values()) else None
+                        reporter._progress(completed + done, batch_total, last_speed)
+                        last_update = now
+                def retry(attempt):
+                    data['retryAttempt'] = attempt
+                    safe_write_json(self.game_info_path, self.game_info)
+                if not cached:
+                    Transfer(item['link'], item['source'], session, progress, self._check_for_stop,
+                             limit, retry, item['size']).run()
+                    item['size'] = os.path.getsize(item['source'])
+                    identity['size'] = item['size']
+                    safe_write_json(receipt_path, identity)
+                completed += item['size']
+                sizes[item['id']] = item['size']
+            self._check_cancelled()
+            data.pop('retryAttempt', None)
+            reporter._progress(completed, completed, 0)
+            self.game_info['size'] = read_size(completed)
+            archives, loose = [], []
+            for item in items:
+                if item['filename'].lower().endswith(('.zip', '.rar', '.7z')):
+                    archives.append(item['source'])
+                elif re.search(r'\.[r-z]\d{2}$', item['filename'], re.I):
+                    from AscendaraDownloadRecovery import archive_sources
+                    candidates = {i['source']: None for i in items if i['filename'].lower().endswith('.rar')}
+                    if not archive_sources(item['source'], candidates):
+                        raise RuntimeError(f'Missing first RAR volume for {item["filename"]}')
+                elif _wanted(item['filename']):
+                    loose.append(item)
+            self._extract_files(archives, loose, cleanup_folder=folder)
+            self._gofile_session = None
+
+    def _extraction_progress(self, state, started):
+        self._check_cancelled()
+        now = time.monotonic()
+        done, total = state['files'], state['total']
+        byte_count = state.get('bytes')
+        samples = getattr(self, '_extraction_samples', None)
+        if (samples is None or getattr(self, '_extraction_sample_start', None) != started or
+                samples and (done < samples[-1][1] or
+                             (byte_count is None) != (samples[-1][2] is None) or
+                             byte_count is not None and samples[-1][2] is not None and byte_count < samples[-1][2])):
+            samples = self._extraction_samples = deque()
+            self._extraction_sample_start = started
+        samples.append((now, done, byte_count))
+        while len(samples) > 2 and samples[1][0] <= now - 10:
+            samples.popleft()
+        elapsed = max(.001, now - samples[0][0])
+        file_rate = max(0, done - samples[0][1]) / elapsed
+        speed = f'{file_rate:.2f} files/s'
+        if byte_count is not None and samples[0][2] is not None:
+            byte_rate = max(0, byte_count - samples[0][2]) / elapsed
+            speed = f'{read_size(byte_rate)}/s ({speed})'
+        name = state['name'].replace('\\', '/').rstrip('/').rsplit('/', 1)[-1]
+        percent = state.get('percent', done / total * 100 if total else 0)
+        self.game_info['downloadingData']['extractionProgress'] = {
+            'currentFile': name, 'filesExtracted': done,
+            'totalFiles': total, 'percentComplete': f'{min(100, percent):.2f}',
+            'extractionSpeed': speed,
+        }
+        safe_write_json(self.game_info_path, self.game_info)
+        if now - getattr(self, '_last_extraction_log', 0) >= 15:
+            logging.info('Extraction [%s]: %s, %s/%s files, %.2f%%, %s',
+                         state.get('engine', 'Preparing'), speed, done, total, percent, name)
+            self._last_extraction_log = now
+
+    def _install_payload(self, payload, manifest, stage):
+        """Journal overwritten files by rename and roll back a failed installation."""
+        rollback = os.path.join(stage, 'rollback')
+        os.mkdir(rollback)
+        journal = []
+        old_filemap = os.path.join(self.download_dir, 'filemap.ascendara.json')
+        old_map = None
+        if os.path.isfile(old_filemap):
+            with open(old_filemap, 'rb') as stream:
+                old_map = stream.read()
+        installed_manifest = {}
+        if self.updateFlow and old_map is not None:
+            installed_manifest = {name: info for name, info in json.loads(old_map).items()
+                                  if not name.endswith('.ascendara.json')}
+        installed_manifest.update(manifest)
+        # Retain a readable recovery map if the process is killed during installation.
+        safe_write_json(os.path.join(rollback, 'paths.json'),
+                        {str(index): name for index, name in enumerate(manifest)})
+        if old_map is not None:
+            with open(os.path.join(rollback, 'previous-filemap.json'), 'wb') as stream:
+                stream.write(old_map)
+        try:
+            for name in manifest:
+                self._check_cancelled()
+                if any(part.lower().endswith('.ascendara.json') or part.lower().startswith(('.ascendara-', '.ascendara_')) for part in name.split('/')):
+                    raise ValueError(f'Archive conflicts with Ascendara metadata: {name}')
+                target = _member_path(self.download_dir, name)
+                source = _member_path(payload, name)
+                backup = None
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                if os.path.exists(target):
+                    if not os.path.isfile(target):
+                        raise ValueError(f'Archive file conflicts with existing directory: {name}')
+                    backup = os.path.join(rollback, str(len(journal)))
+                    os.replace(target, backup)
+                journal.append((target, backup))
+                os.replace(source, target)
+            safe_write_json(old_filemap, installed_manifest)
+            data = self.game_info['downloadingData']
+            data.update(extracting=False, verifying=True)
+            safe_write_json(self.game_info_path, self.game_info)
+            if self.withNotification:
+                _launch_notification(self.withNotification, 'Extraction Complete', f'Extraction complete for {self.game}')
+            verify_started = time.monotonic()
+            errors = verify_manifest(self.download_dir, installed_manifest, self._check_cancelled)
+            from AscendaraDownloadRecovery import wait_for_retry
+            wait_for_retry(max(0, 1 - (time.monotonic() - verify_started)), self._check_for_stop)
+            data['verifying'] = False
+            if errors:
+                data['verifyError'] = errors
+                safe_write_json(self.game_info_path, self.game_info)
+                raise VerificationFailure('Installed files failed size verification')
+            self._detect_and_set_executable()
+            self._check_cancelled()
+        except BaseException:
+            self.game_info.setdefault('downloadingData', data if 'data' in locals() else {})
+            try:
+                for target, backup in reversed(journal):
+                    if os.path.isfile(target):
+                        os.remove(target)
+                    if backup:
+                        os.replace(backup, target)
+                if old_map is not None:
+                    with open(old_filemap, 'wb') as stream:
+                        stream.write(old_map)
+                elif os.path.exists(old_filemap):
+                    os.remove(old_filemap)
+            except BaseException:
+                self._preserve_stage = True
+                logging.exception('Rollback could not finish. Recovery files retained at %s', stage)
+                raise
+            raise
 
 
-def parse_boolean(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ['true', '1', 'yes']:
-        return True
-    elif value.lower() in ['false', '0', 'no']:
-        return False
-    else:
-        raise ValueError(f"Invalid boolean value: {value}")
+def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
+                         on_file=None, should_stop=None, on_progress=None):
+    """Extract in one native UnRAR pass, with Python used only for supervision.
+
+    Existing regular files are overwritten. Failed files can remain partial.
+    The destination must not be concurrently modified by another process.
+    Native UnRAR writes output and checks CRC; Python verifies the expected size.
+    on_file(name, size) runs after each file passes CRC and closes successfully.
+    should_stop() is checked per header and at most every 0.5 seconds in chunks;
+    a true result raises InterruptedError after the native call returns.
+    """
+    api = _load_api()
+    archive_path = _extended_path(archive_path)
+    root = _extended_path(dest_dir)
+    _check_path(root, root)
+    try:
+        os.makedirs(root, exist_ok=True)
+    except OSError as exc:
+        raise _file_error('create destination for', root, exc) from exc
+    target = None
+    callback_error = None
+    next_stop_check = 0.0
+    next_progress = 0.0
+    written = 0
+    name = ''
+    expected_size = 0
+    extracting_file = False
+
+    def check_stop(force=False):
+        nonlocal next_stop_check
+        if should_stop is not None:
+            now = time.monotonic()
+            if force or now >= next_stop_check:
+                next_stop_check = now + 0.5
+                if should_stop():
+                    raise InterruptedError('RAR extraction cancelled')
+
+    def on_event(message, user_data, data, size):
+        nonlocal callback_error, written, next_progress
+        if callback_error is not None:
+            return -1
+        try:
+            if message == 1:
+                check_stop()
+                if size < 0 or (size and not data):
+                    raise ValueError('Invalid UnRAR decompression buffer')
+                if extracting_file:
+                    written += size
+                now = time.monotonic()
+                if on_progress is not None and now >= next_progress:
+                    on_progress(name, written, expected_size)
+                    next_progress = now + .5
+                return 1
+            if message in (0, 3):
+                return 1 if size == 1 else -1
+            return -1
+        except BaseException as exc:
+            callback_error = exc
+            return -1
+
+    callback = api.Callback(on_event)
+    data = api.OpenData(_extended_path(archive_path), mode=1)
+    handle = api.open(ctypes.byref(data))
+    if not handle:
+        _native_error(data.OpenResult or 15, 'Opening archive')
+    count = 0
+    try:
+        _native_error(data.OpenResult, 'Opening archive')
+        api.callback(handle, callback, 0)
+        if password is not None:
+            api.password(handle, password.encode('utf-8') if isinstance(password, str) else password)
+        while True:
+            check_stop(force=True)
+            written = 0
+            header = api.Header()
+            code = api.read(handle, ctypes.byref(header))
+            if callback_error is not None:
+                raise callback_error
+            if code == 10:
+                break
+            _native_error(code, 'Reading archive header')
+            name = header.FileNameW or header.FileName.decode('utf-8', errors='strict')
+            expected_size = header.UnpSize + (header.UnpSizeHigh << 32)
+            target = _member_path(root, name)
+            if (getattr(header, 'RedirType', 0)
+                    or header.HostOS == 3 and stat.S_ISLNK(header.FileAttr)
+                    or header.HostOS != 3 and header.FileAttr & 0x400):
+                raise ValueError(f'Refusing archive link: {name!r}')
+            skip = not _wanted(name)
+            directory = bool(header.Flags & 0x20) or name.endswith(('/', '\\'))
+            extracting_file = not skip and not directory
+            if not skip:
+                _check_archive_target(archive_path, target)
+                try:
+                    os.makedirs(target if directory else os.path.dirname(target), exist_ok=True)
+                    _check_path(root, target)
+                except OSError as exc:
+                    raise _file_error('create', target, exc) from exc
+            # RAR_EXTRACT=2 writes inside UnRAR. RAR_SKIP=0 also avoids testing
+            # unwanted files; UnRAR handles dictionary continuity for solid sets.
+            code = api.process(handle, 0 if skip else 2, None if skip else root + os.sep, None)
+            if callback_error is not None:
+                raise callback_error
+            check_stop(force=True)
+            if code in (16, 17, 19):
+                raise OSError(f'Native RAR extraction could not write {name!r} (UnRAR error {code})')
+            _native_error(code, f'Extracting {name!r}')
+            if not skip and not directory:
+                actual_size = os.path.getsize(target)
+                if actual_size != expected_size:
+                    raise RuntimeError(f'Incomplete RAR output for {name!r}: expected {expected_size} bytes, wrote {actual_size}')
+                count += 1
+                if on_file is not None:
+                    on_file(name, expected_size)
+        return count
+    finally:
+        code = api.close(handle)
+        if sys.exc_info()[0] is None:
+            _native_error(code, 'Closing archive')
+
+
+def create_argument_parser():
+    parser = ArgumentParser(description='Ascendara Downloader V4')
+    parser.add_argument('url', help='Download URL')
+    parser.add_argument('game', help='Name of the game')
+    parser.add_argument('online', type=parse_boolean)
+    parser.add_argument('dlc', type=parse_boolean)
+    parser.add_argument('isVr', type=parse_boolean)
+    parser.add_argument('updateFlow', type=parse_boolean)
+    parser.add_argument('version')
+    parser.add_argument('size')
+    parser.add_argument('download_dir')
+    parser.add_argument('gameID', nargs='?', default='')
+    parser.add_argument('--withNotification', default=None)
+    parser.add_argument('--provider', choices=('auto', 'direct', 'gofile'), default='auto',
+                        help='Download provider; auto detects GOFile sharing URLs')
+    parser.add_argument('--password', default=None, help='Password for a protected GOFile folder')
+    return parser
+
 
 def main():
-    parser = ArgumentParser(description="Ascendara Downloader V2 - Robust Chunked Downloader")
-    parser.add_argument("url", help="Download URL")
-    parser.add_argument("game", help="Name of the game")
-    parser.add_argument("online", type=parse_boolean, help="Is the game online (true/false)?")
-    parser.add_argument("dlc", type=parse_boolean, help="Is DLC included (true/false)?")
-    parser.add_argument("isVr", type=parse_boolean, help="Is the game a VR game (true/false)?")
-    parser.add_argument("updateFlow", type=parse_boolean, help="Is this an update (true/false)?")
-    parser.add_argument("version", help="Version of the game")
-    parser.add_argument("size", help="Size of the file (ex: 12 GB, 439 MB)")
-    parser.add_argument("download_dir", help="Directory to save the downloaded files")
-    parser.add_argument("gameID", nargs="?", default="", help="Game ID from SteamRIP")
-    parser.add_argument("--withNotification", help="Theme name for notifications", default=None)
-    args = parser.parse_args()
-    
+    args = create_argument_parser().parse_args()
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
+                        handlers=[logging.FileHandler(get_ascendara_log_path(), encoding='utf-8'),
+                                  logging.StreamHandler(sys.stdout)])
     try:
-        downloader = AscendaraDownloader(
-            args.game, args.online, args.dlc, args.isVr, 
-            args.updateFlow, args.version, args.size, 
-            args.download_dir, args.gameID
-        )
-        downloader.download(args.url, withNotification=args.withNotification)
-    except Exception as e:
-        logging.error(f"[AscendaraDownloaderV2] Fatal error: {e}", exc_info=True)
-        launch_crash_reporter(1, str(e))
+        downloader = AscendaraDownloader(args.game, args.online, args.dlc, args.isVr,
+                                         args.updateFlow, args.version, args.size,
+                                         args.download_dir, args.gameID)
+        downloader.download(args.url, args.withNotification, args.provider, args.password)
+    except Exception as exc:
+        logging.exception('AscendaraDownloaderV4 fatal error')
+        launch_crash_reporter(1, str(exc))
         raise
 
+
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     main()
+

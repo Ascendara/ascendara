@@ -403,8 +403,8 @@ contextBridge.exposeInMainWorld("electron", {
       additionalDirIndex,
       gameID
     ),
-  stopDownload: (game, deleteContents) =>
-    ipcRenderer.invoke("stop-download", game, deleteContents),
+  stopDownload: (game, deleteContents, isKill) =>
+    ipcRenderer.invoke("stop-download", game, deleteContents, isKill),
   runElevatedInstaller: installerPath =>
     ipcRenderer.invoke("run-elevated-installer", installerPath),
   completeManualInstall: game => ipcRenderer.invoke("complete-manual-install", game),

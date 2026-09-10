@@ -486,17 +486,13 @@ function registerDownloadHandlers() {
             ? path.join(
                 isTorrentLink
                   ? "./binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe"
-                  : link.includes("gofile.io")
-                    ? "./binaries/AscendaraDownloader/dist/AscendaraGofileHelper.exe"
-                    : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
+                  : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
               )
             : path.join(
                 appDirectory,
                 isTorrentLink
                   ? "/resources/AscendaraTorrentHandler.exe"
-                  : link.includes("gofile.io")
-                    ? "/resources/AscendaraGofileHelper.exe"
-                    : "/resources/AscendaraDownloader.exe"
+                  : "/resources/AscendaraDownloader.exe"
               );
 
           spawnCommand = isTorrentLink
@@ -512,7 +508,7 @@ function registerDownloadHandlers() {
                 settings.downloadDirectory,
               ]
             : [
-                link.includes("gofile.io") ? "https://" + link : link,
+                link,
                 sanitizedGame,
                 online,
                 dlc,
@@ -529,9 +525,7 @@ function registerDownloadHandlers() {
             const scriptPath = path.join(
               isTorrentLink
                 ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py"
-                : link.includes("gofile.io")
-                  ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
-                  : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+                : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
             );
             spawnCommand = isTorrentLink
               ? [
@@ -548,7 +542,7 @@ function registerDownloadHandlers() {
                 ]
               : [
                   scriptPath,
-                  link.includes("gofile.io") ? "https://" + link : link,
+                  link,
                   game,
                   online,
                   dlc,
@@ -562,11 +556,7 @@ function registerDownloadHandlers() {
           } else {
             executablePath = path.join(
               process.resourcesPath,
-              isTorrentLink
-                ? "AscendaraTorrentHandler"
-                : link.includes("gofile.io")
-                  ? "AscendaraGofileHelper"
-                  : "AscendaraDownloader"
+              isTorrentLink ? "AscendaraTorrentHandler" : "AscendaraDownloader"
             );
             spawnCommand = isTorrentLink
               ? [
@@ -581,7 +571,7 @@ function registerDownloadHandlers() {
                   settings.downloadDirectory,
                 ]
               : [
-                    link.includes("gofile.io") ? "https://" + link : link,
+                    link,
                     game,
                     online,
                     dlc,
@@ -806,10 +796,10 @@ function registerDownloadHandlers() {
   });
 
   // Stop download handler
-  ipcMain.handle("stop-download", async (_, game, deleteContents = false) => {
+  ipcMain.handle("stop-download", async (_, game, deleteContents = false, isKill = false) => {
     try {
       console.log(
-        `Stopping download for game: ${game}, deleteContents: ${deleteContents}`
+        `Stopping download for game: ${game}, deleteContents: ${deleteContents}, isKill: ${isKill}`
       );
       const sanitizedGame = sanitizeText(game);
       const settings = settingsManager.getSettings();
@@ -841,7 +831,14 @@ function registerDownloadHandlers() {
       if (fs.existsSync(jsonFile)) {
         try {
           const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-          gameInfo.downloadingData = { stopped: true };
+          if (isKill) {
+            // Killing (even with files kept) means the user is abandoning the
+            // download, not pausing it - clear downloadingData entirely so it
+            // no longer shows up as an active/resumable download.
+            delete gameInfo.downloadingData;
+          } else {
+            gameInfo.downloadingData = { stopped: true };
+          }
           fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
           console.log(`Marked download as stopped in JSON: ${jsonFile}`);
         } catch (jsonError) {
@@ -978,11 +975,15 @@ function registerDownloadHandlers() {
         waitTime *= 2; // Exponential backoff
       }
 
-      // Step 4: Ensure JSON is in stopped state (in case downloader overwrote it)
+      // Step 4: Ensure JSON is in the expected state (in case downloader overwrote it)
       if (fs.existsSync(jsonFile)) {
         try {
           const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-          gameInfo.downloadingData = { stopped: true };
+          if (isKill) {
+            delete gameInfo.downloadingData;
+          } else {
+            gameInfo.downloadingData = { stopped: true };
+          }
           fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
           console.log(`Confirmed stopped state in JSON: ${jsonFile}`);
         } catch (jsonError) {
@@ -1211,28 +1212,10 @@ function registerDownloadHandlers() {
       }
       const gamesDirectory = settings.downloadDirectory;
 
-      let executablePath;
-      let spawnCommand;
-
-      if (link.includes("gofile.io")) {
-        executablePath = isDev
-          ? path.join("./binaries/AscendaraDownloader/dist/AscendaraGofileHelper.exe")
-          : path.join(appDirectory, "/resources/AscendaraGofileHelper.exe");
-        spawnCommand = [
-          "https://" + link,
-          game,
-          online,
-          dlc,
-          version,
-          "0",
-          gamesDirectory,
-        ];
-      } else {
-        executablePath = isDev
-          ? path.join("./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe")
-          : path.join(appDirectory, "/resources/AscendaraDownloader.exe");
-        spawnCommand = [link, game, online, dlc, version, "0", gamesDirectory];
-      }
+      const executablePath = isDev
+        ? path.join("./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe")
+        : path.join(appDirectory, "/resources/AscendaraDownloader.exe");
+      const spawnCommand = [link, game, online, dlc, version, "0", gamesDirectory];
 
       const downloadProcess = spawn(executablePath, spawnCommand);
       retryDownloadProcesses.set(game, downloadProcess);
@@ -1337,20 +1320,11 @@ function registerDownloadHandlers() {
 
       if (isWindows) {
         executablePath = isDev
-          ? path.join(
-              downloadLink.includes("gofile.io")
-                ? "./binaries/AscendaraDownloader/dist/AscendaraGofileHelper.exe"
-                : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
-            )
-          : path.join(
-              appDirectory,
-              downloadLink.includes("gofile.io")
-                ? "/resources/AscendaraGofileHelper.exe"
-                : "/resources/AscendaraDownloader.exe"
-            );
+          ? path.join("./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe")
+          : path.join(appDirectory, "/resources/AscendaraDownloader.exe");
 
         spawnCommand = [
-          downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+          downloadLink,
           sanitizedGame,
           online,
           dlc,
@@ -1365,13 +1339,11 @@ function registerDownloadHandlers() {
         if (isDev) {
           executablePath = getPythonPath();
           const scriptPath = path.join(
-            downloadLink.includes("gofile.io")
-              ? "./binaries/AscendaraDownloader/src/AscendaraGofileHelper.py"
-              : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+            "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
           );
           spawnCommand = [
             scriptPath,
-            downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+            downloadLink,
             game,
             online,
             dlc,
@@ -1383,14 +1355,9 @@ function registerDownloadHandlers() {
             gameID || "",
           ];
         } else {
-          executablePath = path.join(
-            process.resourcesPath,
-            downloadLink.includes("gofile.io")
-              ? "AscendaraGofileHelper"
-              : "AscendaraDownloader"
-          );
+          executablePath = path.join(process.resourcesPath, "AscendaraDownloader");
           spawnCommand = [
-            downloadLink.includes("gofile.io") ? "https://" + downloadLink : downloadLink,
+            downloadLink,
             game,
             online,
             dlc,
