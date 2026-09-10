@@ -548,6 +548,29 @@ def is_process_running(exe_path):
         logging.info(f"[EXIT] is_process_running() - Exception")
         return False
 
+def get_running_processes_in_dir(game_dir, exclude_pids=None):
+
+    exclude_pids = exclude_pids or set()
+    matches = []
+    try:
+        game_dir_norm = os.path.normcase(os.path.normpath(game_dir))
+    except Exception:
+        return matches
+
+    for proc in psutil.process_iter(['pid', 'exe']):
+        try:
+            if proc.pid in exclude_pids:
+                continue
+            exe = proc.info.get('exe')
+            if not exe:
+                continue
+            exe_norm = os.path.normcase(os.path.normpath(exe))
+            if exe_norm == game_dir_norm or exe_norm.startswith(game_dir_norm + os.sep):
+                matches.append(proc)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+    return matches
+
 def update_play_time(file_path, is_custom_game, game_entry=None, seconds_to_add=180):
     """Update the playTime field in either the game's JSON file or games.json for custom games"""
     logging.info(f"[ENTRY] update_play_time(file_path={file_path}, is_custom_game={is_custom_game}, add={seconds_to_add})")
@@ -1081,6 +1104,17 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         last_update = start_time
         last_play_time = 0
 
+        # Root directory to watch for related/child game processes. Some games
+        # launch a stub/bootstrapper (anti-cheat setup, launcher, etc.) that
+        # spawns the real game executable and exits almost immediately - if
+        # that happens we don't want to stop tracking play time just because
+        # the process we launched has ended.
+        if not is_custom_game and json_file_path:
+            game_root_dir = os.path.dirname(json_file_path)
+        else:
+            game_root_dir = os.path.dirname(exe_path)
+        handler_pid = os.getpid()
+
         # Determine if Proton was used for game launch (needed for trainer)
         use_proton = False
         proton_config = None
@@ -1175,7 +1209,29 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 logging.warning(f"Trainer not found at: {trainer_path}")
 
         logging.info("Entering game process monitoring loop (180s intervals)")
-        while process.poll() is None:
+        stub_exited_logged = False
+        session_end_time = start_time
+        while True:
+            if process.poll() is None:
+                game_alive = True
+            else:
+                # The process we launched has exited. Before assuming the game
+                # is closed, check whether a related process (the real game,
+                # launched by a bootstrapper/stub/anti-cheat wrapper) is still
+                # running inside the game's install directory.
+                if not stub_exited_logged:
+                    logging.info(
+                        f"Launched process for {game_name} exited (code={process.returncode}); "
+                        f"checking for related processes still running under {game_root_dir}"
+                    )
+                    stub_exited_logged = True
+                related_processes = get_running_processes_in_dir(game_root_dir, exclude_pids={handler_pid})
+                game_alive = len(related_processes) > 0
+
+            if not game_alive:
+                session_end_time = time.time()
+                break
+
             current_time = time.time()
             elapsed = int(current_time - last_update)
             
@@ -1195,8 +1251,22 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             time.sleep(1)
         logging.info("Game process ended")
 
+        # Record whatever time was played since the last full 180s tick, so
+        # short sessions (or the final partial interval of a longer session)
+        # still get counted instead of being thrown away.
+        leftover_seconds = int(session_end_time - last_update)
+        if leftover_seconds > 0:
+            if is_custom_game and games_json_path:
+                update_play_time(games_json_path, True, game_entry, seconds_to_add=leftover_seconds)
+            elif json_file_path:
+                update_play_time(json_file_path, False, seconds_to_add=leftover_seconds)
+            last_play_time += leftover_seconds
+            logging.info(f"Final playtime update: added {leftover_seconds} leftover second(s) for {game_name}")
+
         process.wait()
         return_code = process.returncode
+        if stub_exited_logged:
+            logging.info(f"Related game process(es) under {game_root_dir} have exited; treating game as closed")
         logging.info(f"Game process exited with return code: {return_code}")
 
         # Close trainer if it was launched

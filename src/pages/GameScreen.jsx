@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
   Heart,
@@ -1188,6 +1189,7 @@ export default function GameScreen() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [playtimeJustUpdated, setPlaytimeJustUpdated] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
   const [isDeleteTransitioning, setIsDeleteTransitioning] = useState(false);
   const [isVerifyingOpen, setIsVerifyingOpen] = useState(false);
@@ -1690,26 +1692,43 @@ export default function GameScreen() {
       }
     };
 
-    const handleGameClosed = (_, data) => {
+    const handleGameClosed = async (_, data) => {
       const gameName = game?.game || game?.name;
       if (data?.game !== gameName) return;
 
       try {
         const lastLaunch = localStorage.getItem("last-launch-check");
-        if (!lastLaunch) return;
-
-        const { gameName: launchedGame, timestamp } = JSON.parse(lastLaunch);
-        if (launchedGame !== gameName) return;
-
-        const elapsed = Date.now() - timestamp;
-        if (elapsed < 5000) {
-          console.log(`[GameScreen] Game ${gameName} exited after ${elapsed}ms`);
-          setShowQuickExitDialog(true);
+        if (lastLaunch) {
+          const { gameName: launchedGame, timestamp } = JSON.parse(lastLaunch);
+          if (launchedGame === gameName) {
+            const elapsed = Date.now() - timestamp;
+            if (elapsed < 5000) {
+              console.log(`[GameScreen] Game ${gameName} exited after ${elapsed}ms`);
+              setShowQuickExitDialog(true);
+            }
+          }
         }
       } catch (e) {
         console.error("[GameScreen] Error checking quick exit:", e);
       } finally {
         localStorage.removeItem("last-launch-check");
+      }
+
+      // Pull the freshly-written playTime/launchCount/isRunning/lastPlayed off
+      // disk now that the GameHandler has finished updating the game's JSON,
+      // so the stats on screen reflect the session that just ended.
+      try {
+        const freshList = game?.isCustom
+          ? await window.electron.getCustomGames()
+          : await window.electron.getGames();
+        const freshGame = (freshList || []).find(g => (g.game || g.name) === gameName);
+        if (freshGame) {
+          setGame(prev => (prev ? { ...prev, ...freshGame } : freshGame));
+          setPlaytimeJustUpdated(true);
+          setTimeout(() => setPlaytimeJustUpdated(false), 1500);
+        }
+      } catch (e) {
+        console.error("[GameScreen] Failed to refresh game stats after close:", e);
       }
     };
 
@@ -2737,7 +2756,24 @@ export default function GameScreen() {
               )}
               <div className="flex items-center gap-1 text-sm text-primary/80">
                 <Clock className="h-4 w-4" />
-                <span className="font-medium">{formatPlaytime(game.playTime)}</span>
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={game.playTime}
+                    initial={{ opacity: 0, y: -6, scale: 0.9 }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                      scale: 1,
+                      color: playtimeJustUpdated
+                        ? "var(--primary)"
+                        : "currentColor",
+                    }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="font-medium"
+                  >
+                    {formatPlaytime(game.playTime)}
+                  </motion.span>
+                </AnimatePresence>
               </div>
             </div>
           </div>
@@ -3533,9 +3569,24 @@ export default function GameScreen() {
                         <span className="text-xs text-muted-foreground">
                           {t("library.playTime")}
                         </span>
-                        <p className="mt-1 text-sm font-semibold">
-                          {formatPlaytime(game.playTime)}
-                        </p>
+                        <AnimatePresence mode="wait">
+                          <motion.p
+                            key={game.playTime}
+                            initial={{ opacity: 0, y: -6, scale: 0.9 }}
+                            animate={{
+                              opacity: 1,
+                              y: 0,
+                              scale: 1,
+                              color: playtimeJustUpdated
+                                ? "var(--primary)"
+                                : "currentColor",
+                            }}
+                            transition={{ duration: 0.4, ease: "easeOut" }}
+                            className="mt-1 text-sm font-semibold"
+                          >
+                            {formatPlaytime(game.playTime)}
+                          </motion.p>
+                        </AnimatePresence>
                       </div>
                     </CardContent>
                   </Card>
