@@ -3518,6 +3518,8 @@ const InstalledGameCard = memo(
     const handleContextMenu = e => {
       e.preventDefault();
       e.stopPropagation();
+
+      if (game._isDownloading) return;
       
       const x = e.clientX;
       const y = e.clientY;
