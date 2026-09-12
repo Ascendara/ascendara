@@ -1,6 +1,6 @@
 """GOFile discovery and authentication, shared by the V4 download pipeline.
 
-The website-token protocol follows AscendaraGofileHelper. This module does not
+The website-token protocol follows the old Ascendara Gofile Helper script. This module does not
 write game state, extract archives, launch a helper process, or log credentials.
 """
 import hashlib

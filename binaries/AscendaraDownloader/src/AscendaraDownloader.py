@@ -2,7 +2,7 @@
 
 The CLI and frontend compatibility routines are retained from the existing
 downloader. Transfer, extraction supervision, staging and installation are new.
-Run this file with the same positional arguments as AscendaraDownloader.py.
+Run this file with the same positional arguments as the old AscendaraDownloader.
 """
 import atexit
 import ctypes
