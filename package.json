@@ -137,10 +137,6 @@
         "to": "."
       },
       {
-        "from": "binaries/AscendaraDownloader/dist/AscendaraGofileHelper.exe",
-        "to": "."
-      },
-      {
         "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler.exe",
         "to": "."
       },
@@ -196,10 +192,6 @@
         },
         {
           "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraDownloader/dist/AscendaraGofileHelper",
           "to": "."
         },
         {
