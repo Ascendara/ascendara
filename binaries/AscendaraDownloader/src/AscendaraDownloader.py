@@ -335,12 +335,34 @@ def _find_7z():
     return next((path for path in candidates if path and os.path.isfile(path)), None)
 
 
+def _external_tool_env():
+    """Environment for spawning system binaries, undoing PyInstaller's LD_LIBRARY_PATH hijack.
+
+    On Linux, PyInstaller's onefile bootloader points LD_LIBRARY_PATH at its bundled
+    libs (readline/tinctures/libssl, etc.) so the frozen interpreter can find them.
+    That variable leaks into every child process. Tools like p7zip's `7z` wrapper
+    exec `/bin/sh`, which then tries to resolve readline symbols against our bundled
+    (incompatible) library and dies with "undefined symbol: rl_print_keybinding".
+    Restore the original value PyInstaller saves in LD_LIBRARY_PATH_ORIG, or strip it.
+    """
+    if os.name == 'nt' or 'LD_LIBRARY_PATH' not in os.environ:
+        return None
+    env = os.environ.copy()
+    original = env.pop('LD_LIBRARY_PATH_ORIG', None)
+    if original:
+        env['LD_LIBRARY_PATH'] = original
+    else:
+        env.pop('LD_LIBRARY_PATH', None)
+    return env
+
+
 def _run_cli(command, cancelled, activity):
     """Drain combined output continuously and always reap the native child."""
     from collections import deque
     tail = deque(maxlen=64)
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                               stderr=subprocess.STDOUT, creationflags=0x08000000 if os.name == 'nt' else 0)
+                               stderr=subprocess.STDOUT, env=_external_tool_env(),
+                               creationflags=0x08000000 if os.name == 'nt' else 0)
     def drain():
         import codecs
         decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
