@@ -45,6 +45,7 @@ export default function ImportGamesDialog({
   onOpenChange,
   onLibraryChanged,
   onBusyChange,
+  allowCatalogSwap = true,
 }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -141,6 +142,7 @@ export default function ImportGamesDialog({
   const items = state?.items || [];
 
   useEffect(() => {
+    if (!allowCatalogSwap) return;
     const pending = items.filter(
       item =>
         item.status === "added" &&
@@ -161,7 +163,7 @@ export default function ImportGamesDialog({
         }
       }
     })();
-  }, [items]);
+  }, [items, allowCatalogSwap]);
 
   const handleSwapToDownload = catalogGame => {
     const importedGameName = Object.entries(catalogMatches).find(
@@ -570,16 +572,23 @@ export default function ImportGamesDialog({
                             {t(`library.launcherImport.assets.${item.assets}`)}
                           </p>
                         )}
-                        {typeof item.game === "string" && catalogMatches[item.game] && (
-                          <button
-                            type="button"
-                            onClick={() => handleSwapToDownload(catalogMatches[item.game])}
-                            className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                          >
-                            <ArrowRightLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
-                            {t("library.launcherImport.catalogMatchAction")}
-                          </button>
-                        )}
+                        {allowCatalogSwap &&
+                          typeof item.game === "string" &&
+                          catalogMatches[item.game] && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSwapToDownload(catalogMatches[item.game])
+                              }
+                              className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                            >
+                              <ArrowRightLeft
+                                className="h-3 w-3 shrink-0"
+                                aria-hidden="true"
+                              />
+                              {t("library.launcherImport.catalogMatchAction")}
+                            </button>
+                          )}
                       </div>
                       <span
                         className={cn(

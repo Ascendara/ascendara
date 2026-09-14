@@ -32,6 +32,21 @@ import {
   Crown,
   Star,
   Info,
+  Gamepad2,
+  ArrowRightLeft,
+  Users,
+  Smartphone,
+  MessageCircle,
+  User,
+  CloudIcon,
+  CloudUpload,
+  Trophy,
+  RefreshCw,
+  Eye,
+  Puzzle,
+  Infinity as InfinityIcon,
+  ListOrdered,
+  Sparkle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -50,6 +65,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { validateInput } from "@/services/profanityFilterService";
+import ImportGamesDialog from "@/components/ImportGamesDialog";
 
 const executableToLabelMap = {
   "dotNetFx40_Full_x86_x64.exe": t => ".NET Framework 4.0",
@@ -271,9 +287,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const totalDependencies = 5; // Total number of dependencies
   const [errorMessage, setErrorMessage] = useState("");
   const [showErrorDialog, setShowErrorDialog] = useState(false);
-  const [analyticsConsent, setAnalyticsConsent] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
-  const [showAnalyticsStep, setShowAnalyticsStep] = useState(false);
+  const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [referralSource, setReferralSource] = useState("");
   const [isIndexRefreshing, setIsIndexRefreshing] = useState(restoredRefreshState);
@@ -320,19 +335,82 @@ const Welcome = ({ welcomeData, onComplete }) => {
     [t]
   );
 
-  const analyticsFeatures = useMemo(
+  const ascendPremiumFeatures = useMemo(
     () => [
       {
-        title: t("welcome.helpIdentifyAndFix"),
-        description: t("welcome.helpIdentifyAndFixDesc"),
+        icon: CloudIcon,
+        title: t("ascend.premium.cloudSync.title"),
+        desc: t("ascend.premium.cloudSync.description"),
       },
       {
-        title: t("welcome.influenceFutureFeatures"),
-        description: t("welcome.influenceFutureFeaturesDesc"),
+        icon: Users,
+        title: t("ascend.premium.friends.title"),
+        desc: t("ascend.premium.friends.description"),
       },
       {
-        title: t("welcome.bePartOfImproving"),
-        description: t("welcome.bePartOfImprovingDesc"),
+        icon: MessageCircle,
+        title: t("ascend.premium.chat.title"),
+        desc: t("ascend.premium.chat.description"),
+      },
+      {
+        icon: Smartphone,
+        title: t("ascend.premium.webView.title"),
+        desc: t("ascend.premium.webView.description"),
+      },
+      {
+        icon: CloudUpload,
+        title: t("ascend.premium.cloudBackups.title"),
+        desc: t("ascend.premium.cloudBackups.description"),
+      },
+      {
+        icon: User,
+        title: t("ascend.premium.profile.title"),
+        desc: t("ascend.premium.profile.description"),
+      },
+      {
+        icon: Trophy,
+        title: t("ascend.premium.leaderboard.title"),
+        desc: t("ascend.premium.leaderboard.description"),
+      },
+      {
+        icon: RefreshCw,
+        title: t("ascend.premium.autoUpdate.title"),
+        desc: t("ascend.premium.autoUpdate.description"),
+      },
+      {
+        icon: Eye,
+        title: t("ascend.premium.upcoming.title"),
+        desc: t("ascend.premium.upcoming.description"),
+      },
+      {
+        icon: Puzzle,
+        title: t("ascend.premium.nexusMods.title"),
+        desc: t("ascend.premium.nexusMods.description"),
+      },
+      {
+        icon: InfinityIcon,
+        title: t("ascend.premium.unlimitedDownloads.title"),
+        desc: t("ascend.premium.unlimitedDownloads.description"),
+      },
+      {
+        icon: Zap,
+        title: t("ascend.premium.flingTrainer.title"),
+        desc: t("ascend.premium.flingTrainer.description"),
+      },
+      {
+        icon: ListOrdered,
+        title: t("ascend.premium.downloadQueue.title"),
+        desc: t("ascend.premium.downloadQueue.description"),
+      },
+      {
+        icon: Sparkles,
+        title: t("ascend.premium.experimentalBranch.title"),
+        desc: t("ascend.premium.experimentalBranch.description"),
+      },
+      {
+        icon: Sparkle,
+        title: t("ascend.premium.moreComing.title"),
+        desc: t("ascend.premium.moreComing.description"),
       },
     ],
     [t]
@@ -471,8 +549,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "directory") {
       setStep("theme");
     } else if (step === "theme") {
-      setStep("analytics");
-    } else if (step === "analytics") {
+      setStep("importGames");
+    } else if (step === "importGames") {
       setStep("updates");
     } else if (step === "updates") {
       setStep(isOnWindows ? "dependencies" : "linuxDeps");
@@ -616,30 +694,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
       y: 0,
       transition: { duration: 0.8, ease: "easeOut" },
     },
-  };
-
-  const handleAnalyticsChoice = async enableAnalytics => {
-    try {
-      // Get current settings first
-      const currentSettings = await window.electron.getSettings();
-
-      // Update only the analytics setting while preserving others
-      const updatedSettings = {
-        ...currentSettings,
-        sendAnalytics: enableAnalytics,
-      };
-
-      // Save the updated settings with the current download directory
-      await window.electron.saveSettings(
-        updatedSettings,
-        currentSettings.downloadDirectory || ""
-      );
-
-      setAnalyticsConsent(enableAnalytics);
-      handleNext();
-    } catch (error) {
-      console.error("Error saving analytics preference:", error);
-    }
   };
 
   const handleExit = async showTour => {
@@ -945,132 +999,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
   }, []);
 
   if (welcomeData.isV7Welcome) {
-    if (showAnalyticsStep) {
-      return (
-        <div
-          className={`relative flex h-screen items-center justify-center overflow-hidden bg-background transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-background" />
-          <div className="absolute left-0 top-0 h-32 w-full bg-gradient-to-b from-primary/10 to-transparent" />
-
-          <motion.div
-            className="relative z-10 mx-auto w-full max-w-4xl px-6"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            <motion.div className="mb-8 text-center" variants={itemVariants}>
-              <h2 className="mb-4 text-3xl font-bold">{t("welcome.helpImprove")}</h2>
-              <p className="mb-8 text-lg text-muted-foreground">
-                {t("welcome.chooseHowToHelp")}
-              </p>
-            </motion.div>
-
-            <motion.div
-              className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2"
-              variants={itemVariants}
-            >
-              {/* Share Analytics Option */}
-              <button
-                onClick={() => setAnalyticsConsent(true)}
-                className={`rounded-xl p-6 transition-all duration-200 ${
-                  analyticsConsent
-                    ? "scale-105 border-2 border-primary bg-gradient-to-br from-primary/10 via-primary/5 to-transparent"
-                    : "border border-primary/10 bg-card/30 hover:border-primary/30"
-                }`}
-              >
-                <div className="mb-4 flex items-center space-x-3">
-                  <div
-                    className={`rounded-lg p-2 ${analyticsConsent ? "bg-primary/20" : "bg-muted"}`}
-                  >
-                    <Rocket
-                      className={`h-6 w-6 ${analyticsConsent ? "text-primary" : "text-muted-foreground"}`}
-                    />
-                  </div>
-                  <h3 className="text-xl font-semibold">
-                    {t("welcome.shareAndImprove")}
-                  </h3>
-                </div>
-                <ul className="mb-6 space-y-3 text-left">
-                  <li className="flex items-start space-x-2">
-                    <CircleCheck
-                      className={`h-5 w-5 ${analyticsConsent ? "text-primary" : "text-muted-foreground"} mt-0.5 shrink-0`}
-                    />
-                    <span>{t("welcome.helpIdentifyAndFix")}</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CircleCheck
-                      className={`h-5 w-5 ${analyticsConsent ? "text-primary" : "text-muted-foreground"} mt-0.5 shrink-0`}
-                    />
-                    <span>{t("welcome.influenceFutureFeatures")}</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CircleCheck
-                      className={`h-5 w-5 ${analyticsConsent ? "text-primary" : "text-muted-foreground"} mt-0.5 shrink-0`}
-                    />
-                    <span>{t("welcome.bePartOfImproving")}</span>
-                  </li>
-                </ul>
-              </button>
-
-              {/* Privacy Option */}
-              <button
-                onClick={() => setAnalyticsConsent(false)}
-                className={`rounded-xl p-6 transition-all duration-200 ${
-                  !analyticsConsent
-                    ? "scale-105 border-2 border-primary bg-gradient-to-br from-primary/10 via-primary/5 to-transparent"
-                    : "border border-primary/10 bg-card/30 hover:border-primary/30"
-                }`}
-              >
-                <div className="mb-4 flex items-center space-x-3">
-                  <div
-                    className={`rounded-lg p-2 ${!analyticsConsent ? "bg-primary/20" : "bg-muted"}`}
-                  >
-                    <Shield
-                      className={`h-6 w-6 ${!analyticsConsent ? "text-primary" : "text-muted-foreground"}`}
-                    />
-                  </div>
-                  <h3 className="text-xl font-semibold">{t("welcome.stayPrivate")}</h3>
-                </div>
-                <div className="mb-6 space-y-4 text-left">
-                  <p>{t("welcome.optOutOfSharing")}</p>
-                  <div className="rounded-lg bg-card/30 p-4">
-                    <p className="text-sm text-muted-foreground">
-                      {t("welcome.ascendaraNeverCollects")}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </motion.div>
-            <motion.div
-              className="flex flex-col items-center justify-center"
-              variants={itemVariants}
-            >
-              <Button
-                size="lg"
-                onClick={() => {
-                  handleAnalyticsChoice(analyticsConsent);
-                  handleExit(true);
-                }}
-                className="mb-4 bg-primary/10 px-12 py-6 text-lg font-semibold text-primary hover:bg-primary/20"
-              >
-                {t("welcome.seeWhatsNew")}
-              </Button>
-              <button
-                onClick={() => {
-                  handleAnalyticsChoice(analyticsConsent);
-                  handleExit(false);
-                }}
-                className="text-sm text-foreground/60 transition-colors hover:text-primary"
-              >
-                {t("welcome.exploreOnMyOwn")}
-              </button>
-            </motion.div>
-          </motion.div>
-        </div>
-      );
-    }
-
     return (
       <div
         className={`relative flex h-screen items-center justify-center overflow-hidden bg-background transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}
@@ -1134,16 +1062,22 @@ const Welcome = ({ welcomeData, onComplete }) => {
           </motion.p>
 
           <motion.div
-            className="flex flex-col items-center space-y-4 text-secondary"
+            className="flex flex-col items-center space-y-4"
             variants={itemVariants}
           >
             <Button
               size="lg"
-              onClick={() => setShowAnalyticsStep(true)}
-              className="bg-primary px-8 py-6 text-lg font-semibold hover:bg-primary/90"
+              onClick={() => handleExit(true)}
+              className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
             >
-              {t("welcome.continue")}
+              {t("welcome.seeWhatsNew")}
             </Button>
+            <button
+              onClick={() => handleExit(false)}
+              className="text-sm text-foreground/60 transition-colors hover:text-primary"
+            >
+              {t("welcome.exploreOnMyOwn")}
+            </button>
           </motion.div>
         </motion.div>
       </div>
@@ -1534,7 +1468,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               animate="visible"
               exit="exit"
             >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
+              <motion.div className="mb-4 text-center" variants={itemVariants}>
                 <h2 className="mb-2 text-3xl font-bold text-primary">
                   {t("welcome.noticeAppIsFree.title")}
                 </h2>
@@ -1544,10 +1478,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
               </motion.div>
 
               <motion.div 
-                className="mb-12 max-w-2xl w-full"
+                className="mb-6 max-w-2xl w-full"
                 variants={itemVariants}
               >
-                <div className="rounded-lg bg-card/30 p-6 space-y-4">
+                <div className="rounded-lg bg-card/30 p-6 space-y-3">
                   <div className="flex items-start space-x-3 text-left">
                     <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
                     <p className="text-md">{t("welcome.noticeAppIsFree.point1")}</p>
@@ -1567,7 +1501,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 </div>
 
                 <motion.div 
-                  className="mt-6 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 p-6"
+                  className="mt-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 p-6"
                   variants={itemVariants}
                 >
                   <div className="flex items-center justify-between">
@@ -1589,6 +1523,37 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       </a>
                     </div>
                     <Crown className="h-8 w-8 text-purple-500/50" />
+                  </div>
+
+                  <div
+                    className="group relative mt-4 h-32 overflow-hidden rounded-lg border border-purple-500/20 bg-background/40"
+                    style={{
+                      maskImage:
+                        "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)",
+                      WebkitMaskImage:
+                        "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)",
+                    }}
+                  >
+                    <div className="animate-marquee-vertical flex flex-col group-hover:[animation-play-state:paused]">
+                      {[...ascendPremiumFeatures, ...ascendPremiumFeatures].map(
+                        (feature, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-3 px-4 py-2.5 text-left"
+                          >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-500/10">
+                              <feature.icon className="h-4 w-4 text-purple-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{feature.title}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {feature.desc}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               </motion.div>
@@ -2173,101 +2138,78 @@ const Welcome = ({ welcomeData, onComplete }) => {
             </div>
           )}
 
-          {step === "analytics" && (
+          {step === "importGames" && (
             <motion.div
-              key="analytics"
+              key="importGames"
               className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
             >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <h2 className="mb-2 text-3xl font-bold text-primary">
-                  {t("welcome.analytics")}
+              <motion.div
+                className="mb-8 flex items-center justify-center"
+                variants={itemVariants}
+              >
+                <h2 className="text-4xl font-bold text-primary">
+                  {t("welcome.importGamesTitle")}
                 </h2>
-                <p className="text-lg text-muted-foreground">
-                  {t("welcome.analyticsDesc")}
-                </p>
+              </motion.div>
+              <motion.p
+                className="mb-8 max-w-2xl text-xl text-foreground/80"
+                variants={itemVariants}
+              >
+                {t("welcome.importGamesDesc")}
+              </motion.p>
+
+              <motion.div
+                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6 text-left"
+                variants={itemVariants}
+              >
+                <div className="flex items-start space-x-3">
+                  <Gamepad2 className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>{t("welcome.importGamesLaunchers")}</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <Shield className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>{t("welcome.importGamesNoSignIn")}</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <PlusCircle className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>{t("welcome.importGamesLater")}</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <ArrowRightLeft className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>{t("welcome.importGamesManagedSwap")}</p>
+                </div>
               </motion.div>
 
               <motion.div
-                className="mb-12 grid w-full max-w-4xl grid-cols-1 gap-6 md:grid-cols-2"
+                className="flex justify-center space-x-4"
                 variants={itemVariants}
               >
-                {/* Share Analytics Option */}
-                <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 transition-colors hover:border-primary/30">
-                  <div className="mb-4 flex items-center space-x-3">
-                    <div className="rounded-lg bg-primary/20 p-2">
-                      <Rocket className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-primary">
-                      {t("welcome.shareAndImprove")}
-                    </h3>
-                  </div>
-                  <div className="mb-6 space-y-4">
-                    {analyticsFeatures.map(feature => (
-                      <div key={feature.title} className="flex items-start space-x-2">
-                        <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                        <div className="text-left">
-                          <p className="font-medium text-muted-foreground">
-                            {feature.title}
-                          </p>
-                          <p className="text-sm text-foreground/70">
-                            {feature.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    size="lg"
-                    className="w-full bg-primary text-secondary hover:bg-primary/90"
-                    onClick={() => handleAnalyticsChoice(true)}
-                  >
-                    {t("welcome.shareAnonymousData")}
-                  </Button>
-                </div>
-
-                {/* Privacy Option */}
-                <div className="flex flex-col rounded-xl border border-border bg-card/30 p-6">
-                  <div className="mb-4 flex items-center space-x-3">
-                    <div className="rounded-lg bg-muted p-2">
-                      <Shield className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-muted-foreground">
-                      {t("welcome.stayPrivate")}
-                    </h3>
-                  </div>
-                  <p className="mb-6 text-left text-muted-foreground">
-                    {t("welcome.optOutOfSharingAnonymousUsageData")}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="mt-auto w-full text-muted-foreground"
-                    onClick={() => handleAnalyticsChoice(false)}
-                  >
-                    {t("welcome.continueWithoutSharing")}
-                  </Button>
-                </div>
+                <Button
+                  size="lg"
+                  onClick={() => setIsImportGamesOpen(true)}
+                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                >
+                  {t("welcome.importGamesButton")}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleNext}
+                  size="lg"
+                  className="px-8 py-6 text-lg font-semibold text-primary hover:bg-primary/10"
+                >
+                  {t("welcome.skip")}
+                </Button>
               </motion.div>
 
-              <motion.p
-                className="max-w-2xl text-sm text-muted-foreground"
-                variants={itemVariants}
-              >
-                {t("welcome.ascendaraNeverCollectsPersonalInfo")}&nbsp;
-                <span
-                  className="cursor-pointer text-primary hover:underline"
-                  onClick={() =>
-                    window.electron.openURL("https://ascendara.app/analytics")
-                  }
-                >
-                  {t("common.learnMore")}{" "}
-                  <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                </span>
-              </motion.p>
+              <ImportGamesDialog
+                open={isImportGamesOpen}
+                onOpenChange={setIsImportGamesOpen}
+                allowCatalogSwap={false}
+              />
             </motion.div>
           )}
 
