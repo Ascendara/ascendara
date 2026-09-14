@@ -351,7 +351,6 @@ const Library = () => {
   const [showAscendPanel, setShowAscendPanel] = useState(false);
   const [friends, setFriends] = useState([]);
   const [friendsLoaded, setFriendsLoaded] = useState(false);
-  const [showRedesignDialog, setShowRedesignDialog] = useState(false);
   const [addGameRestoreEntry, setAddGameRestoreEntry] = useState(null); // {gameName, stub}
   // OS file drag-and-drop → quick "add custom game" flow
   const [isDraggingExeFile, setIsDraggingExeFile] = useState(false);
@@ -441,22 +440,6 @@ const Library = () => {
       return next;
     });
   };
-
-  useEffect(() => {
-    const checkRedesignDialog = async () => {
-      const alreadyShown = localStorage.getItem("library-welcome-v2-shown");
-      if (alreadyShown) return;
-      try {
-        const hasLaunched = await window.electron.hasLaunched();
-        if (hasLaunched) {
-          setTimeout(() => setShowRedesignDialog(true), 800);
-        }
-      } catch (e) {
-        console.error("Failed to check launch status for redesign dialog:", e);
-      }
-    };
-    checkRedesignDialog();
-  }, []);
 
   useLibrarySearch();
 
@@ -2635,52 +2618,6 @@ const Library = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Library Welcome Dialog ── */}
-      <AlertDialog open={showRedesignDialog} onOpenChange={setShowRedesignDialog}>
-        <AlertDialogContent className="border-border sm:max-w-[500px]">
-          <AlertDialogHeader>
-            <div className="mb-2 flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
-                <Sparkles className="h-5 w-5 text-primary" />
-              </div>
-              <AlertDialogTitle className="text-xl mt-2 font-bold text-foreground">
-                {t("library.redesignWelcome.title")}
-              </AlertDialogTitle>
-            </div>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 pt-1">
-                <p className="text-sm text-muted-foreground">
-                  {t("library.redesignWelcome.subtitle")}
-                </p>
-                <div className="space-y-2.5 rounded-lg bg-muted/40 p-3 text-sm">
-                  {[
-                    { icon: <GripVertical className="h-4 w-4 text-primary" />, title: t("library.redesignWelcome.feature1Title"), desc: t("library.redesignWelcome.feature1Desc") },
-                    { icon: <Heart className="h-4 w-4 text-primary" />, title: t("library.redesignWelcome.feature2Title"), desc: t("library.redesignWelcome.feature2Desc") },
-                    { icon: <Star className="h-4 w-4 text-primary" />, title: t("library.redesignWelcome.feature3Title"), desc: t("library.redesignWelcome.feature3Desc") },
-                    { icon: <ArrowDown className="h-4 w-4 text-primary" />, title: t("library.redesignWelcome.feature4Title"), desc: t("library.redesignWelcome.feature4Desc") },
-                    { icon: <SquareLibrary className="h-4 w-4 text-primary" />, title: t("library.redesignWelcome.feature5Title"), desc: t("library.redesignWelcome.feature5Desc") },
-                  ].map(({ icon, title, desc }) => (
-                    <div key={title} className="flex items-start gap-2.5">
-                      <div className="mt-0.5 shrink-0">{icon}</div>
-                      <span className="text-foreground/80"><span className="font-medium text-foreground">{title}</span> — {desc}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              onClick={() => {
-                localStorage.setItem("library-welcome-v2-shown", "true");
-                setShowRedesignDialog(false);
-              }}
-            >
-              {t("library.redesignWelcome.cta")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* ── Restore Game Data Dialog (for re-added custom games) ── */}
       {addGameRestoreEntry && (() => {
