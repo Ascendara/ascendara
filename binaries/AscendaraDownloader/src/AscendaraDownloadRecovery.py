@@ -5,6 +5,19 @@ import shutil
 import sys
 import tempfile
 import time
+from email.utils import parsedate_to_datetime
+
+
+def retry_delay(value, fallback, maximum=120):
+    """Honor numeric or HTTP-date Retry-After values, with a bounded wait."""
+    try:
+        delay = float(value)
+    except (TypeError, ValueError):
+        try:
+            delay = parsedate_to_datetime(value).timestamp() - time.time()
+        except (TypeError, ValueError, OverflowError):
+            delay = fallback
+    return min(maximum, max(0, delay))
 
 
 def response_size(response, start=0):

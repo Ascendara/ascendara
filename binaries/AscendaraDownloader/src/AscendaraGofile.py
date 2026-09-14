@@ -11,6 +11,11 @@ import time
 from urllib.parse import urlparse, quote
 
 import requests
+from AscendaraDownloadRecovery import retry_delay, wait_for_retry
+
+
+class GofileRateLimit(RuntimeError):
+    pass
 
 
 def content_id(url):
@@ -41,27 +46,47 @@ class GofileClient:
         return hashlib.sha256(raw.encode()).hexdigest()
 
     def _request(self, method, path, params=None):
+        for attempt in range(5):
+            try:
+                return self._request_once(method, path, params)
+            except (requests.RequestException, ValueError, GofileRateLimit) as exc:
+                response = getattr(exc, 'response', None)
+                status = response.status_code if response is not None else None
+                retryable = status is None or status in (408, 429) or status >= 500
+                if not retryable or attempt == 4:
+                    if status == 429 or isinstance(exc, GofileRateLimit):
+                        raise RuntimeError('GOFile rate limit persisted after retries. Please try again later.') from exc
+                    detail = f'HTTP {status}' if status is not None else type(exc).__name__
+                    raise RuntimeError(f'Unable to fetch GOFile content information ({detail}, {method} {path.split("/")[0]}). '
+                                       'Refresh the source or try again later.') from exc
+                fallback = 30 * (attempt + 1) if status == 429 or isinstance(exc, GofileRateLimit) else 2 ** attempt
+                delay = retry_delay(response.headers.get('Retry-After') if response is not None else None, fallback)
+                logging.warning('GOFile discovery retry %s in %.1fs (%s)', attempt + 1, delay,
+                                f'HTTP {status}' if status else type(exc).__name__)
+                def stopped():
+                    self.check_cancelled()
+                    return False
+                wait_for_retry(delay, stopped)
+
+    def _request_once(self, method, path, params=None):
         self.check_cancelled()
         headers = {'User-Agent': self.user_agent, 'Accept': '*/*',
                    'Origin': 'https://gofile.io', 'Referer': 'https://gofile.io/',
                    'X-Website-Token': self._website_token(), 'X-BL': 'en-US'}
         if self.token:
             headers['Authorization'] = f'Bearer {self.token}'
-        try:
-            with self.session.request(method, 'https://api.gofile.io/' + path,
-                                      headers=headers, params=params, timeout=(10, 15),
-                                      allow_redirects=False) as response:
-                if response.status_code == 429:
-                    raise RuntimeError('GOFile rate limit reached. Please wait a few minutes and try again.')
-                response.raise_for_status()
-                payload = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            raise RuntimeError('Unable to fetch GOFile content information. Please try again.') from exc
+        with self.session.request(method, 'https://api.gofile.io/' + path,
+                                  headers=headers, params=params, timeout=(10, 30),
+                                  allow_redirects=False) as response:
+            response.raise_for_status()
+            payload = response.json()
         self.check_cancelled()
         if not isinstance(payload, dict):
             raise RuntimeError('GOFile returned invalid content information')
         status = payload.get('status')
         if status != 'ok':
+            if status == 'error-rateLimit':
+                raise GofileRateLimit('GOFile rate limit reached')
             messages = {
                 'error-rateLimit': 'GOFile rate limit reached. Please wait a few minutes and try again.',
                 'error-passwordRequired': 'This GOFile folder requires --password.',

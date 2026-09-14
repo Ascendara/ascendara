@@ -32,7 +32,7 @@ from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
-from AscendaraTransfer import Transfer
+from AscendaraTransfer import Transfer, validate_download_url
 from AscendaraGofile import GofileClient, content_id as gofile_content_id
 from AscendaraRarRecovery import (
     _load_api, _extended_path, _check_path, _member_path, _native_error,
@@ -41,10 +41,39 @@ from AscendaraRarRecovery import (
 
 _caffeinate_proc = None
 
+def replace_file(source, target, check_cancelled=lambda: None):
+    """Atomic same-volume move with bounded retries for Windows file contention."""
+    source, target = _extended_path(source), _extended_path(target)
+    from AscendaraDownloadRecovery import wait_for_retry
+    for attempt in range(9):
+        check_cancelled()
+        try:
+            os.replace(source, target)
+            return
+        except OSError as exc:
+            transient = isinstance(exc, (PermissionError, FileNotFoundError)) or getattr(exc, 'winerror', None) in (5, 32, 33)
+            if not transient or attempt == 8:
+                if isinstance(exc, FileNotFoundError) and not os.path.exists(source):
+                    raise FileNotFoundError(f'Extracted or temporary file disappeared before it could be moved: {source}. '
+                                            'Check security-software history '
+                                            'and whether another process removed the file.') from exc
+                raise
+            if isinstance(exc, PermissionError) and os.path.isfile(target):
+                try:
+                    info = os.stat(target)
+                    if not info.st_mode & stat.S_IWRITE:
+                        os.chmod(target, info.st_mode | stat.S_IWRITE)
+                except OSError:
+                    pass  # A sharing lock can also prevent attribute access.
+            def stopped():
+                check_cancelled()
+                return False
+            wait_for_retry(min(.1 * 2 ** attempt, 1), stopped)
+
 def cleanup_temporary(path, root, empty_only=False):
     """Remove an owned temporary path, retrying Windows locks/read-only files."""
     path, root = os.path.abspath(path), os.path.abspath(root)
-    if os.path.normcase(path) == os.path.normcase(root):
+    if os.path.normcase(_extended_path(path)) == os.path.normcase(_extended_path(root)):
         raise ValueError('Cleanup cannot remove the game directory')
     _check_path(root, path)
     target = _extended_path(path)
@@ -79,7 +108,10 @@ def cleanup_temporary(path, root, empty_only=False):
 
 def safe_write_json(filepath, data, reset_stop=False):
     """Atomic UTF-8 writes; preserve Electron's stop request and surface failures."""
-    if ('downloadingData' in data or 'game' in data) and not reset_stop:
+    filepath = _extended_path(filepath)
+    def check_stopped():
+        if reset_stop or not ('downloadingData' in data or 'game' in data):
+            return
         try:
             with open(filepath, encoding='utf-8') as stream:
                 if json.load(stream).get('downloadingData', {}).get('stopped'):
@@ -88,23 +120,20 @@ def safe_write_json(filepath, data, reset_stop=False):
             raise
         except (OSError, json.JSONDecodeError):
             pass
+    check_stopped()
     temporary = None
     try:
         with NamedTemporaryFile('w', encoding='utf-8', delete=False,
                                 dir=os.path.dirname(os.path.abspath(filepath)), suffix='.tmp') as stream:
             temporary = stream.name
             json.dump(data, stream, indent=4)
-        for attempt in range(5):
-            try:
-                os.replace(temporary, filepath)
-                return
-            except PermissionError:
-                if attempt == 4:
-                    raise
-                time.sleep(.05 * 2 ** attempt)
+        replace_file(temporary, filepath, check_stopped)
     finally:
         if temporary and os.path.exists(temporary):
-            os.remove(temporary)
+            try:
+                os.remove(temporary)
+            except OSError:
+                logging.warning('Could not remove temporary JSON file: %s', temporary)
 
 
 def create_robust_session():
@@ -117,6 +146,10 @@ def create_robust_session():
 
 
 class VerificationFailure(RuntimeError):
+    pass
+
+class IncompleteArchiveOutput(RuntimeError):
+    """Decoder finished, but its output did not pass staging verification."""
     pass
 
 
@@ -210,6 +243,7 @@ class ChunkedDownloader:
 
 
 def verify_manifest(root, manifest, check_cancelled):
+    root = _extended_path(root)
     errors = []
     next_check = 0
     for name, info in manifest.items():
@@ -218,16 +252,36 @@ def verify_manifest(root, manifest, check_cancelled):
             check_cancelled()
             next_check = now + .5
         path = _member_path(root, name)
-        if not os.path.isfile(path):
+        try:
+            for attempt in range(4):
+                try:
+                    actual = os.stat(path)
+                    break
+                except (FileNotFoundError, PermissionError):
+                    if attempt == 3:
+                        raise
+                    from AscendaraDownloadRecovery import wait_for_retry
+                    def stopped():
+                        check_cancelled()
+                        return False
+                    wait_for_retry(.2 * 2 ** attempt, stopped)
+            if not stat.S_ISREG(actual.st_mode):
+                errors.append({'file': name, 'error': 'Expected a regular file'})
+            elif actual.st_size != info['size']:
+                errors.append({'file': name, 'error': f"Size mismatch: expected {info['size']}, got {actual.st_size}"})
+        except FileNotFoundError:
             errors.append({'file': name, 'error': 'File not found'})
-        elif os.path.getsize(path) != info['size']:
-            errors.append({'file': name, 'error': f"Size mismatch: expected {info['size']}, got {os.path.getsize(path)}"})
+        except InterruptedError:
+            raise
+        except OSError as exc:
+            errors.append({'file': name, 'error': str(exc)})
     check_cancelled()
     return errors
 
 
 def flatten_payload(root, manifest, game):
     """Strip a single wrapper using the manifest, without scanning the game tree."""
+    root = _extended_path(root)
     roots = {name.split('/')[0] for name in manifest}
     if len(roots) != 1:
         return manifest
@@ -246,9 +300,9 @@ def flatten_payload(root, manifest, game):
     # A same-name nested wrapper needs a temporary rename to avoid self-collision.
     temporary = tempfile.mkdtemp(prefix='.flatten-', dir=os.path.dirname(root))
     os.rmdir(temporary)
-    os.replace(source, temporary)
+    replace_file(source, temporary)
     for name in os.listdir(temporary):
-        os.replace(os.path.join(temporary, name), os.path.join(root, name))
+        replace_file(os.path.join(temporary, name), os.path.join(root, name))
     os.rmdir(temporary)
     return mapped
 
@@ -321,6 +375,7 @@ def _run_cli(command, cancelled, activity):
 
 def extraction_worker(archive, destination, manifest_path, connection, stop):
     """Only this process touches archive decoders. No frontend JSON writes here."""
+    archive, destination, manifest_path = map(_extended_path, (archive, destination, manifest_path))
     last_sent = 0
     state = {'name': 'Preparing...', 'files': 0, 'total': 0, 'percent': 0}
     manifest = {}
@@ -485,7 +540,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
             raise RuntimeError('Archive contains no installable files')
         errors = verify_manifest(destination, manifest, cancelled)
         if errors:
-            raise RuntimeError(f'Incomplete archive output: {errors[0]}')
+            raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}')
         state.update(files=len(manifest), total=len(manifest), percent=100, name='Finalizing...')
         report(True)
         with open(manifest_path, 'w', encoding='utf-8') as stream:
@@ -526,6 +581,7 @@ def supervise_extraction(archive, destination, check_cancelled, progress, workdi
                 elif event == 'error':
                     kind, message = value
                     exception = {'InterruptedError': InterruptedError, 'OSError': OSError,
+                                 'IncompleteArchiveOutput': IncompleteArchiveOutput,
                                  'ValueError': ValueError}.get(kind, RuntimeError)
                     raise exception(message)
                 elif event == 'done':
@@ -1331,6 +1387,8 @@ class AscendaraDownloader:
         self.withNotification = withNotification
         prevent_sleep()
         try:
+            if not isinstance(url, str) or not url.strip():
+                validate_download_url(url)
             if provider not in ('auto', 'direct', 'gofile'):
                 raise ValueError('Unknown download provider')
             normalized = url if '://' in url else 'https://' + url.lstrip('/')
@@ -1341,6 +1399,7 @@ class AscendaraDownloader:
                     _launch_notification(withNotification, 'Download Complete', f'Successfully downloaded {self.game}')
                 return
             host = (urlparse(url).hostname or '').lower()
+            url = validate_download_url(url)
             if any(host == domain or host.endswith('.' + domain) for domain in self.VALID_BUZZHEAVIER_DOMAINS):
                 self._download_buzzheavier(url)
                 return
@@ -1379,6 +1438,29 @@ class AscendaraDownloader:
             allow_sleep()
 
     def _extract_files(self, archive_path=None, loose_files=None, cleanup_folder=None):
+        # Restart the whole staging transaction: earlier archives and nested
+        # wrappers may have contributed files to the same payload directory.
+        for attempt in range(2):
+            try:
+                return self._extract_files_once(archive_path, loose_files, cleanup_folder)
+            except IncompleteArchiveOutput as exc:
+                if attempt == 1:
+                    raise IncompleteArchiveOutput(
+                        f'{exc}. Extraction failed again after one automatic retry. '
+                        'The downloaded source files were retained.') from exc
+                self._check_cancelled()
+                logging.warning('Retrying extraction from retained archives in a fresh stage: %s', exc)
+                data = self.game_info['downloadingData']
+                data.update(downloading=False, extracting=True, verifying=False,
+                            retryAttempt=1, timeUntilComplete='Retrying extraction...')
+                data.pop('verifyError', None)
+                self._extraction_progress({'name': 'Retrying extraction...', 'files': 0,
+                                           'total': 0, 'percent': 0}, time.monotonic())
+                safe_write_json(self.game_info_path, self.game_info)
+                from AscendaraDownloadRecovery import wait_for_retry
+                wait_for_retry(2, self._check_for_stop)
+
+    def _extract_files_once(self, archive_path=None, loose_files=None, cleanup_folder=None):
         self._check_cancelled()
         loose_files = loose_files or []
         archives = ([os.path.abspath(p) for p in archive_path] if isinstance(archive_path, (list, tuple)) else
@@ -1443,6 +1525,8 @@ class AscendaraDownloader:
                         break
                     except InterruptedError:
                         raise
+                    except IncompleteArchiveOutput:
+                        raise  # Retry extraction locally; this is not a CRC repair.
                     except Exception as exc:
                         self._repair_archive(exc, archive, attempt)
                 manifest.update(result)
@@ -1480,9 +1564,7 @@ class AscendaraDownloader:
             manifest = flatten_payload(payload, manifest, self.game)
             errors = verify_manifest(payload, manifest, self._check_cancelled)
             if errors:
-                data.update(extracting=False, verifying=False, verifyError=errors)
-                safe_write_json(self.game_info_path, self.game_info)
-                return
+                raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}')
             self._check_cancelled()
             self._install_payload(payload, manifest, stage)
         finally:
@@ -1625,10 +1707,11 @@ class AscendaraDownloader:
 
     def _install_payload(self, payload, manifest, stage):
         """Journal overwritten files by rename and roll back a failed installation."""
+        payload, stage = _extended_path(payload), _extended_path(stage)
         rollback = os.path.join(stage, 'rollback')
         os.mkdir(rollback)
         journal = []
-        old_filemap = os.path.join(self.download_dir, 'filemap.ascendara.json')
+        old_filemap = _extended_path(os.path.join(self.download_dir, 'filemap.ascendara.json'))
         old_map = None
         if os.path.isfile(old_filemap):
             with open(old_filemap, 'rb') as stream:
@@ -1649,7 +1732,7 @@ class AscendaraDownloader:
                 self._check_cancelled()
                 if any(part.lower().endswith('.ascendara.json') or part.lower().startswith(('.ascendara-', '.ascendara_')) for part in name.split('/')):
                     raise ValueError(f'Archive conflicts with Ascendara metadata: {name}')
-                target = _member_path(self.download_dir, name)
+                target = _member_path(_extended_path(self.download_dir), name)
                 source = _member_path(payload, name)
                 backup = None
                 os.makedirs(os.path.dirname(target), exist_ok=True)
@@ -1657,9 +1740,9 @@ class AscendaraDownloader:
                     if not os.path.isfile(target):
                         raise ValueError(f'Archive file conflicts with existing directory: {name}')
                     backup = os.path.join(rollback, str(len(journal)))
-                    os.replace(target, backup)
+                    replace_file(target, backup, self._check_cancelled)
                 journal.append((target, backup))
-                os.replace(source, target)
+                replace_file(source, target, self._check_cancelled)
             safe_write_json(old_filemap, installed_manifest)
             data = self.game_info['downloadingData']
             data.update(extracting=False, verifying=True)
@@ -1682,9 +1765,10 @@ class AscendaraDownloader:
             try:
                 for target, backup in reversed(journal):
                     if os.path.isfile(target):
-                        os.remove(target)
+                        if not cleanup_temporary(target, self.download_dir):
+                            raise OSError(f'Could not remove installed file during rollback: {target}')
                     if backup:
-                        os.replace(backup, target)
+                        replace_file(backup, target)
                 if old_map is not None:
                     with open(old_filemap, 'wb') as stream:
                         stream.write(old_map)

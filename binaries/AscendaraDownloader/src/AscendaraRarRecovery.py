@@ -61,6 +61,8 @@ def _load_api():
 
 
 def _check_path(root, target):
+    # Native extraction and Python inspection must resolve the same long paths.
+    root, target = _extended_path(root), _extended_path(target)
     if os.path.commonpath([root, target]) != root:
         raise ValueError(f'Archive path escapes destination: {target!r}')
     current = target
@@ -113,6 +115,7 @@ def _file_error(action, path, exc):
 
 
 def _check_archive_target(archive, target):
+    archive, target = _extended_path(archive), _extended_path(target)
     source = os.path.normcase(os.path.realpath(archive))
     destination = os.path.normcase(os.path.realpath(target))
     same = source == destination

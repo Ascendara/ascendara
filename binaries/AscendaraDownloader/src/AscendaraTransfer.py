@@ -3,10 +3,20 @@ import json
 import os
 import shutil
 import time
+from urllib.parse import urlparse
 
 import requests
 
-from AscendaraDownloadRecovery import response_size, wait_for_retry
+from AscendaraDownloadRecovery import response_size, wait_for_retry, retry_delay
+
+
+def validate_download_url(url):
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError('No download link was provided. Refresh the game source or choose another download link.')
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https') or not parsed.hostname:
+        raise ValueError('The download link is invalid. Refresh the game source or choose another download link.')
+    return url.strip()
 
 
 class Transfer:
@@ -18,6 +28,7 @@ class Transfer:
         self.expected_size = expected_size
 
     def run(self):
+        self.url = validate_download_url(self.url)
         # A validator sidecar prevents appending bytes from a changed remote file.
         sidecar = self.destination + '.resume.json'
         metadata = {}
@@ -30,23 +41,29 @@ class Transfer:
             metadata = {}
         received = 0
         started = time.monotonic()
-        for attempt in range(6):
+        failures, high_water = 0, 0
+        for attempt in range(48):
             if self.stopped():
                 raise InterruptedError('Download cancelled')
             offset = os.path.getsize(self.destination) if os.path.exists(self.destination) else 0
             if not metadata.get('validator'):
                 offset = 0
+            high_water = max(high_water, offset)
+            delay = None
             headers = {'Accept-Encoding': 'identity'}
             if offset:
                 headers.update({'Range': f'bytes={offset}-', 'If-Range': metadata['validator']})
             try:
-                with self.session.get(self.url, headers=headers, stream=True, timeout=(15, 30)) as response:
+                with self.session.get(self.url, headers=headers, stream=True, timeout=(15, 60)) as response:
                     # Restart an already-complete or no-longer-valid partial transfer.
                     if response.status_code == 416:
                         metadata = {}
-                        continue
+                        raise ValueError('Download server rejected the saved range; restarting the transfer')
                     if 400 <= response.status_code < 500 and response.status_code not in (408, 429):
-                        raise RuntimeError(f'Download server rejected the request (HTTP {response.status_code})')
+                        detail = ' The download link may have expired or been removed; refresh the source or choose another link.' if response.status_code in (403, 404, 410) else ''
+                        raise RuntimeError(f'Download server rejected the request (HTTP {response.status_code}).{detail}')
+                    if response.status_code in (429, 503):
+                        delay = retry_delay(response.headers.get('Retry-After'), min(2 ** failures, 30))
                     response.raise_for_status()
                     if response.status_code == 200:
                         offset = 0
@@ -85,6 +102,11 @@ class Transfer:
                                 continue
                             output.write(chunk)
                             written += len(chunk)
+                            # Intermittent stalls during a large, advancing download
+                            # must not exhaust a lifetime budget of six attempts.
+                            if written >= high_water + 8 * 1024 * 1024:
+                                failures = 0
+                                high_water = written
                             received += len(chunk)
                             now = time.monotonic()
                             if now - last >= .5:
@@ -104,8 +126,9 @@ class Transfer:
                     os.remove(sidecar)
                     return
             except (requests.RequestException, ValueError) as exc:
-                if attempt == 5:
-                    raise RuntimeError(f'Download failed after 6 attempts: {exc}') from exc
-                self.retry(attempt + 1)
-                wait_for_retry(min(2 ** attempt, 16), self.stopped)
-        raise RuntimeError('Server repeatedly rejected the download range')
+                failures += 1
+                if failures >= 6 or attempt == 47:
+                    raise RuntimeError(f'Download stopped after repeated connection failures; partial data was retained: {exc}') from exc
+                self.retry(failures)
+                wait_for_retry(delay if delay is not None else min(2 ** (failures - 1), 16), self.stopped)
+        raise RuntimeError('Server repeatedly rejected the download range; refresh the source link')
