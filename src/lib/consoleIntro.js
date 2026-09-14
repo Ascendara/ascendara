@@ -30,14 +30,6 @@ const consoleStyles = {
     "background: rgba(211, 47, 47, 0.05)",
     "border-left: 3px solid #D32F2F",
   ].join(";"),
-  analytics: [
-    "font-size: 14px",
-    "color: #00796B",
-    "padding: 4px 8px",
-    "margin: 2px 0",
-    "background: rgba(0, 121, 107, 0.05)",
-    "border-left: 3px solid #00796B",
-  ].join(";"),
 };
 
 const printWelcome = () => {
@@ -63,11 +55,7 @@ const printSecurity = message => {
   console.log(`%c🔒 ${message}`, consoleStyles.security);
 };
 
-const printAnalytics = message => {
-  console.log(`%c📊 ${message}`, consoleStyles.analytics);
-};
-
-export const initializeConsole = analytics => {
+export const initializeConsole = () => {
   printWelcome();
 
   printHeader("About Console Logs");
@@ -77,16 +65,6 @@ export const initializeConsole = analytics => {
   printHeader("Security Notice");
   printSecurity("Never share console logs - they contain sensitive session data");
   printSecurity("Clear console before sharing screenshots or recordings");
-
-  printHeader("Analytics & Tracking");
-
-  // Verify we're using the real analytics service
-  if ("isDummy" in analytics) {
-    printAnalytics("Using dummy analytics service implementation");
-  } else {
-    printAnalytics("Using Ascendara analytics service");
-    printAnalytics("Real-time analytics and error tracking are active");
-  }
 };
 
-export { printWelcome, printHeader, printInfo, printSecurity, printAnalytics };
+export { printWelcome, printHeader, printInfo, printSecurity };

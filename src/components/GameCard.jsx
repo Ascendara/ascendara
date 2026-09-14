@@ -46,7 +46,6 @@ import torboxService from "@/services/torboxService";
 import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
-import { analytics } from "@/services/analyticsService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import verifiedGamesService from "@/services/verifiedGamesService";
 import { SEAMLESS_PROVIDERS, TORBOX_PROVIDERS, TORBOX_ELIGIBLE_SEAMLESS } from "@/config/providers";
@@ -215,13 +214,6 @@ const GameCard = memo(function GameCard({ game, compact }) {
 
       if (isInstalled && !needsUpdate) return;
       setIsLoading(true);
-      let buttonType = "download";
-      if (needsUpdate) buttonType = "update";
-      else if (isInstalled) buttonType = "install";
-      analytics.trackGameButtonClick(game.game, buttonType, {
-        isInstalled,
-        needsUpdate,
-      });
 
       const downloadLinks = game.download_links || {};
       setTimeout(() => {

@@ -29,7 +29,6 @@ import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useGameIndexSearch } from "@/hooks/useGameIndexSearch";
 import { useSettingsSearch } from "@/hooks/useSettingsSearch";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
-import { analytics } from "@/services/analyticsService";
 import {
   initializeStatusService,
   cleanupStatusService,
@@ -789,7 +788,6 @@ const ScrollToTop = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    analytics.trackPageView(pathname);
   }, [pathname]);
 
   return null;
@@ -1874,25 +1872,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Track error with analytics
-    analytics.trackError(error, {
-      componentStack: errorInfo.componentStack,
-      severity: "fatal",
-      componentName: this.constructor.name,
-      previousRoute: this.props.location?.state?.from,
-      userFlow: this.props.location?.state?.flow,
-      props: JSON.stringify(this.props, (key, value) => {
-        // Avoid circular references and sensitive data
-        if (key === "children" || typeof value === "function") return "[Redacted]";
-        return value;
-      }),
-      state: JSON.stringify(this.state),
-      customData: {
-        renderPhase: "componentDidCatch",
-        reactVersion: React.version,
-        lastRender: Date.now(),
-      },
-    });
+    console.error("Fatal error caught by ErrorBoundary:", error, errorInfo);
   }
 
   render() {

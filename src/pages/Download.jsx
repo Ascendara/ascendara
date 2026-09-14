@@ -3489,7 +3489,7 @@ export default function DownloadPage() {
                           </Label>
                           <div className="flex items-center gap-2">
                             <div
-                              className="group flex flex-1 cursor-pointer items-center justify-between rounded-lg border border-border/50 bg-muted/50 px-3 py-2 text-sm transition-colors hover:bg-muted"
+                              className="group flex min-w-0 flex-1 cursor-pointer items-center justify-between rounded-lg border border-border/50 bg-muted/50 px-3 py-2 text-sm transition-colors hover:bg-muted"
                               onClick={handleCopyLink}
                             >
                               <span className="truncate text-muted-foreground">

@@ -38,7 +38,6 @@ import {
   X,
   ExternalLink,
   History,
-  ChartNoAxesCombined,
   ArrowRight,
   Download,
   Scale,
@@ -80,7 +79,6 @@ import {
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { Link, useNavigate } from "react-router-dom";
-import { analytics } from "@/services/analyticsService";
 import { getAvailableLanguages, handleLanguageChange } from "@/services/languageService";
 import {
   AlertDialog,
@@ -1286,7 +1284,6 @@ function Settings() {
     } else {
       handleSettingChange("torrentEnabled", false);
       window.dispatchEvent(new CustomEvent("torrentSettingChanged", { detail: false }));
-      analytics.trackFeatureUsage("torrenting_EXPERIMENTAL", { enabled: false });
     }
   };
 
@@ -1299,7 +1296,6 @@ function Settings() {
       setShowTorrentWarning(false);
       handleSettingChange("torrentEnabled", true);
       window.dispatchEvent(new CustomEvent("torrentSettingChanged", { detail: true }));
-      analytics.trackFeatureUsage("torrenting_EXPERIMENTAL", { enabled: true });
     }
   };
   const handleToggleLudusavi = async () => {
@@ -2741,7 +2737,6 @@ function Settings() {
                         checked={settings.ludusavi.enabled}
                         onCheckedChange={value => {
                           handleToggleLudusavi(value);
-                          analytics.trackFeatureUsage("gameBackups", { enabled: value });
                         }}
                         disabled={!settings.ludusavi.backupLocation}
                       />
@@ -4110,45 +4105,6 @@ function Settings() {
               </Button>
             </Card>
 
-            {/* Analytics Card */}
-            <Card id="analytics" className="border-border p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <ChartNoAxesCombined className="mb-2 h-5 w-5 text-primary" />
-                <h2 className="text-xl font-semibold text-primary">
-                  {t("settings.ascendaraAnalytics")}
-                </h2>
-              </div>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.ascendaraAnalyticsDescription")}&nbsp;
-                    <a
-                      className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                      onClick={() =>
-                        window.electron.openURL("https://ascendara.app/analytics")
-                      }
-                    >
-                      {t("common.learnMore")}
-                      <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </p>
-                  <div className="flex items-center justify-between space-x-4">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-medium">
-                        {t("settings.ascendaraToggleAnalytics")}
-                      </Label>
-                    </div>
-                    <Switch
-                      checked={settings.sendAnalytics}
-                      onCheckedChange={() =>
-                        handleSettingChange("sendAnalytics", !settings.sendAnalytics)
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </Card>
-
             {/* Timemachine Card */}
             <Card id="timemachine" className="border-border p-6">
               <div className="mb-2 flex items-center gap-2">
@@ -4183,9 +4139,6 @@ function Settings() {
                       checked={settings.showOldDownloadLinks}
                       onCheckedChange={value => {
                         handleSettingChange("showOldDownloadLinks", value);
-                        analytics.trackFeatureUsage("ascendaraTimechine", {
-                          enabled: value,
-                        });
                       }}
                     />
                   </div>
@@ -4232,10 +4185,6 @@ function Settings() {
                               disabled={!isOnWindows}
                               onCheckedChange={value => {
                                 handleSettingChange("viewWorkshopPage", value);
-                                analytics.trackFeatureUsage(
-                                  "ascendaraWorkshopDownloader",
-                                  { enabled: value }
-                                );
                               }}
                             />
                           </div>

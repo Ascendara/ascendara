@@ -53,6 +53,10 @@ module.exports = {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        "marquee-vertical": {
+          from: { transform: "translateY(0)" },
+          to: { transform: "translateY(-50%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -62,6 +66,7 @@ module.exports = {
         shimmer: "shimmer 3s ease-in-out infinite",
         shine: "shine 3s ease-in-out infinite",
         "page-fade-in": "page-fade-in 0.2s ease-out",
+        "marquee-vertical": "marquee-vertical 22s linear infinite",
       },
     },
   },
