@@ -2420,7 +2420,10 @@ export default function DownloadPage() {
                       </h1>
 
                       {/* Antivirus Warning for Online Games */}
-                      {gameData.online && !settings.excludeFolders && !antivirusWarningDismissed && (
+                      {gameData.online &&
+                        !settings.excludeFolders &&
+                        !antivirusWarningDismissed &&
+                        window.electron.getPlatform() === "win32" && (
                         <div className="mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
                           <div className="flex items-start gap-2">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-600" />
