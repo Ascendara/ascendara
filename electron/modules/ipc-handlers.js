@@ -45,6 +45,44 @@ const getTwitchToken = async (clientId, clientSecret) => {
 
 // IGDB functions removed - now using Steam API only
 
+const MAX_GAME_SCAN_ENTRIES = 10000;
+
+async function findFolderExecutables(folderPath) {
+  const queue = [folderPath];
+  const executables = [];
+  let visited = 0;
+  let inaccessible = 0;
+  let hitLimit = false;
+  while (queue.length && visited < MAX_GAME_SCAN_ENTRIES) {
+    const directory = queue.shift();
+    let entries;
+    try {
+      entries = await fs.promises.readdir(directory, { withFileTypes: true });
+    } catch {
+      inaccessible += 1;
+      continue;
+    }
+    for (const entry of entries) {
+      if (visited >= MAX_GAME_SCAN_ENTRIES) {
+        hitLimit = true;
+        break;
+      }
+      visited += 1;
+      if (entry.isSymbolicLink()) continue;
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) queue.push(entryPath);
+      else if (entry.isFile() && /\.exe$/i.test(entry.name)) {
+        executables.push({
+          path: entryPath,
+          relativePath: path.relative(folderPath, entryPath),
+        });
+      }
+    }
+  }
+  executables.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  return { executables, inaccessible, truncated: hitLimit || queue.length > 0 };
+}
+
 /**
  * Register miscellaneous IPC handlers
  */
@@ -618,6 +656,42 @@ function registerMiscHandlers() {
     });
 
     return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle("scan-game-folders", async event => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(window, {
+      title: "Select a folder containing game folders",
+      properties: ["openDirectory"],
+    });
+    if (result.canceled || !result.filePaths[0]) return { success: true, canceled: true };
+    const rootPath = result.filePaths[0];
+    try {
+      const rootEntries = await fs.promises.readdir(rootPath, { withFileTypes: true });
+      const directories = rootEntries.filter(entry => entry.isDirectory() && !entry.isSymbolicLink());
+      const games = [];
+      let skipped = 0;
+      let inaccessible = 0;
+      for (const directory of directories) {
+        const folderPath = path.join(rootPath, directory.name);
+        const scan = await findFolderExecutables(folderPath);
+        inaccessible += scan.inaccessible;
+        if (!scan.executables.length) {
+          skipped += 1;
+          continue;
+        }
+        games.push({
+          folderPath,
+          name: directory.name,
+          executables: scan.executables,
+          truncated: scan.truncated,
+        });
+      }
+      games.sort((a, b) => a.name.localeCompare(b.name));
+      return { success: true, canceled: false, rootPath, games, skipped, inaccessible };
+    } catch (error) {
+      return { success: false, error: error.message || "Failed to scan folder" };
+    }
   });
 
   // Profile image handlers

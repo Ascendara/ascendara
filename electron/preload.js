@@ -446,6 +446,7 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("open-game-directory", game, isCustom),
   openDirectoryDialog: () => ipcRenderer.invoke("open-directory-dialog"),
   openFileDialog: (exePath = null) => ipcRenderer.invoke("open-file-dialog", exePath),
+  scanGameFolders: () => ipcRenderer.invoke("scan-game-folders"),
   // Resolves the absolute filesystem path for a File dragged into the app from the OS.
   getPathForFile: file => webUtils.getPathForFile(file),
   canCreateFiles: directory => ipcRenderer.invoke("can-create-files", directory),

@@ -1668,7 +1668,7 @@ const Library = () => {
                   <span>{t("library.addGame.title") || "Add Game"}</span>
                 </button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="border-border bg-background sm:max-w-[425px]">
+              <AlertDialogContent className="flex max-h-[90vh] flex-col border-border bg-background sm:max-w-3xl">
                 <AlertDialogHeader className="space-y-2">
                   <AlertDialogTitle className="text-2xl font-bold text-foreground">
                     {t("library.addGame.title")}
@@ -1677,10 +1677,11 @@ const Library = () => {
                     {t("library.addGameDescription2")}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <div className="max-h-[60vh] overflow-y-auto py-4">
+                <div className="flex-1 overflow-y-auto py-4">
                   <AddGameForm
                     initialExecutablePath={droppedExecutablePath}
                     onRestorePrompt={entry => setAddGameRestoreEntry(entry)}
+                    onLibraryChanged={loadGames}
                     onSuccess={() => {
                       setIsAddGameOpen(false);
                       setDroppedExecutablePath(null);
@@ -4633,7 +4634,405 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
 
 DeletedGameCard.displayName = "DeletedGameCard";
 
-const AddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }) => {
+const AddGameForm = ({
+  onSuccess,
+  onRestorePrompt,
+  onLibraryChanged,
+  initialExecutablePath,
+}) => {
+  const { t } = useLanguage();
+  const [mode, setMode] = useState("manual");
+  const [scanBusy, setScanBusy] = useState(false);
+
+  useEffect(() => {
+    if (initialExecutablePath) setMode("manual");
+  }, [initialExecutablePath]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={scanBusy}
+          className={cn(
+            "h-9 flex-1 text-sm text-foreground",
+            mode === "manual" && "border-primary/50 bg-primary/10 text-primary"
+          )}
+          onClick={() => setMode("manual")}
+        >
+          {t("library.addGame.folderScan.modeManual")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={scanBusy}
+          className={cn(
+            "h-9 flex-1 text-sm text-foreground",
+            mode === "scan" && "border-primary/50 bg-primary/10 text-primary"
+          )}
+          onClick={() => setMode("scan")}
+        >
+          {t("library.addGame.folderScan.modeFolder")}
+        </Button>
+      </div>
+      {mode === "manual" ? (
+        <ManualAddGameForm
+          onSuccess={onSuccess}
+          onRestorePrompt={onRestorePrompt}
+          initialExecutablePath={initialExecutablePath}
+        />
+      ) : (
+        <FolderScanGameForm
+          onSuccess={onSuccess}
+          onLibraryChanged={onLibraryChanged}
+          onBusyChange={setScanBusy}
+        />
+      )}
+    </div>
+  );
+};
+
+const FolderScanGameForm = ({ onSuccess, onLibraryChanged, onBusyChange }) => {
+  const { t } = useLanguage();
+  const [isScanning, setIsScanning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasScanned, setHasScanned] = useState(false);
+  const [rootPath, setRootPath] = useState("");
+  const [games, setGames] = useState([]);
+  const [skippedCount, setSkippedCount] = useState(0);
+  const [inaccessibleCount, setInaccessibleCount] = useState(0);
+  const [existingNames, setExistingNames] = useState(() => new Set());
+
+  useEffect(() => {
+    onBusyChange?.(isScanning || isSubmitting);
+  }, [isScanning, isSubmitting, onBusyChange]);
+
+  const updateRow = (id, patch) => {
+    setGames(prev => prev.map(g => (g.id === id ? { ...g, ...patch } : g)));
+  };
+
+  const handleScan = async () => {
+    if (isScanning || isSubmitting) return;
+    setIsScanning(true);
+    try {
+      const result = await window.electron.scanGameFolders();
+      if (!result) {
+        toast.error(t("library.addGame.folderScan.scanFailed"));
+        return;
+      }
+      if (result.canceled) return;
+      if (!result.success) {
+        toast.error(result.error || t("library.addGame.folderScan.scanFailed"));
+        return;
+      }
+
+      const installed = await window.electron.getGames();
+      const custom = await window.electron.getCustomGames();
+      const names = new Set();
+      [...(installed || []), ...(custom || []).filter(game => !game._isDeleted)].forEach(
+        game => {
+          const normalized = normalizeGameName(game.game || game.name);
+          if (normalized) names.add(normalized);
+        }
+      );
+      setExistingNames(names);
+
+      setRootPath(result.rootPath || "");
+      setSkippedCount(result.skipped || 0);
+      setInaccessibleCount(result.inaccessible || 0);
+      setGames(
+        (result.games || []).map(candidate => ({
+          ...candidate,
+          id: candidate.folderPath,
+          included: true,
+          name: candidate.name,
+          executable:
+            candidate.executables.length === 1 ? candidate.executables[0].path : "",
+          version: "",
+          isOnline: false,
+          hasDLC: false,
+          error: "",
+        }))
+      );
+      setHasScanned(true);
+    } catch (error) {
+      console.error("[FolderScanGameForm] Scan failed:", error);
+      toast.error(t("library.addGame.folderScan.scanFailed"));
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const getRowError = game => {
+    const normalized = normalizeGameName(game.name);
+    if (!game.name.trim()) return t("library.addGame.folderScan.missingName");
+    if (!game.executable) return t("library.addGame.folderScan.missingExecutable");
+    if (existingNames.has(normalized))
+      return t("library.addGame.folderScan.duplicateExisting");
+    if (
+      games.some(
+        g => g.id !== game.id && g.included && normalizeGameName(g.name) === normalized
+      )
+    ) {
+      return t("library.addGame.folderScan.duplicateScan");
+    }
+    return "";
+  };
+
+  const includedGames = games.filter(g => g.included);
+  const canImport =
+    !isScanning &&
+    !isSubmitting &&
+    includedGames.length > 0 &&
+    includedGames.every(g => !getRowError(g));
+
+  const handleImport = async () => {
+    if (!canImport) return;
+    setIsSubmitting(true);
+    const failed = [];
+    let successCount = 0;
+    for (const game of games) {
+      if (!game.included) continue;
+      try {
+        const result = await window.electron.addGame(
+          game.name.trim(),
+          game.isOnline,
+          game.hasDLC,
+          game.version.trim(),
+          game.executable
+        );
+        if (result && result.success === true) {
+          successCount += 1;
+        } else {
+          failed.push({
+            ...game,
+            error: result?.error || t("library.addGame.folderScan.scanFailed"),
+          });
+        }
+      } catch (error) {
+        failed.push({
+          ...game,
+          error: error.message || t("library.addGame.folderScan.scanFailed"),
+        });
+      }
+    }
+    if (successCount > 0) onLibraryChanged?.();
+    setIsSubmitting(false);
+    if (failed.length === 0) {
+      toast.success(t("library.addGame.folderScan.success", { count: successCount }));
+      onSuccess();
+      return;
+    }
+    setGames(failed);
+    toast.error(
+      t("library.addGame.folderScan.partialFailure", {
+        success: successCount,
+        failed: failed.length,
+      })
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <Button
+        type="button"
+        variant="outline"
+        className="h-9 w-full justify-start text-sm font-normal hover:bg-accent"
+        onClick={handleScan}
+        disabled={isScanning || isSubmitting}
+      >
+        {isScanning ? (
+          <Loader className="mr-2 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+        ) : (
+          <FolderOpen className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        )}
+        <span className="truncate font-semibold text-muted-foreground">
+          {isScanning
+            ? t("library.addGame.folderScan.scanning")
+            : hasScanned
+              ? t("library.addGame.folderScan.scanAgain")
+              : t("library.addGame.folderScan.chooseFolder")}
+        </span>
+      </Button>
+
+      {!hasScanned && (
+        <p className="text-center text-xs text-muted-foreground">
+          {t("library.addGame.folderScan.intro")}
+        </p>
+      )}
+
+      {hasScanned && (
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p className="truncate" title={rootPath}>
+            {rootPath}
+          </p>
+          <p>{t("library.addGame.folderScan.found", { count: games.length })}</p>
+          {skippedCount > 0 && (
+            <p>{t("library.addGame.folderScan.skipped", { count: skippedCount })}</p>
+          )}
+          {inaccessibleCount > 0 && (
+            <p>
+              {t("library.addGame.folderScan.inaccessible", { count: inaccessibleCount })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {hasScanned && games.length === 0 && (
+        <p className="text-center text-xs text-muted-foreground">
+          {t("library.addGame.folderScan.noGames")}
+        </p>
+      )}
+
+      <div className="space-y-3">
+        {games.map(game => {
+          const rowError = game.included ? getRowError(game) : "";
+          return (
+            <div
+              key={game.id}
+              className={cn(
+                "space-y-2 rounded-lg border border-border p-3",
+                !game.included && "opacity-60"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={game.included}
+                  disabled={isSubmitting}
+                  onChange={e =>
+                    updateRow(game.id, { included: e.target.checked, error: "" })
+                  }
+                  className="h-4 w-4 shrink-0 accent-primary"
+                />
+                <Input
+                  value={game.name}
+                  disabled={!game.included || isSubmitting}
+                  onChange={e => updateRow(game.id, { name: e.target.value, error: "" })}
+                  className="h-8 flex-1 bg-background text-sm"
+                />
+              </div>
+
+              {game.included && game.executables.length > 1 && !game.executable && (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {t("library.addGame.folderScan.multipleExecutables")}
+                </p>
+              )}
+
+              <select
+                value={game.executable}
+                disabled={!game.included || isSubmitting}
+                onChange={e =>
+                  updateRow(game.id, { executable: e.target.value, error: "" })
+                }
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                aria-label={t("library.addGame.folderScan.executable")}
+              >
+                <option value="">
+                  {t("library.addGame.folderScan.selectExecutable")}
+                </option>
+                {game.executables.map(exe => (
+                  <option key={exe.path} value={exe.path}>
+                    {exe.relativePath}
+                  </option>
+                ))}
+              </select>
+
+              {game.truncated && (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {t("library.addGame.folderScan.scanTruncated")}
+                </p>
+              )}
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {t("library.addGame.folderScan.metadata")}
+                </p>
+                <Input
+                  value={game.version}
+                  disabled={!game.included || isSubmitting}
+                  onChange={e => updateRow(game.id, { version: e.target.value })}
+                  placeholder={t("library.addGame.folderScan.version")}
+                  className="h-8 bg-background text-sm"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={!game.included || isSubmitting}
+                    onClick={() => updateRow(game.id, { isOnline: !game.isOnline })}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors",
+                      game.isOnline
+                        ? "border-primary/50 bg-primary/10 text-primary"
+                        : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/60"
+                    )}
+                  >
+                    <Gamepad2 className="h-3.5 w-3.5" />
+                    {t("library.addGame.folderScan.online")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!game.included || isSubmitting}
+                    onClick={() => updateRow(game.id, { hasDLC: !game.hasDLC })}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors",
+                      game.hasDLC
+                        ? "border-primary/50 bg-primary/10 text-primary"
+                        : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/60"
+                    )}
+                  >
+                    <Gift className="h-3.5 w-3.5" />
+                    {t("library.addGame.folderScan.dlc")}
+                  </button>
+                </div>
+              </div>
+
+              {(rowError || game.error) && game.included && (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {rowError || game.error}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <AlertDialogFooter>
+        <Button
+          variant="outline"
+          onClick={() => onSuccess()}
+          disabled={isScanning || isSubmitting}
+          className="text-primary"
+        >
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="button"
+          onClick={handleImport}
+          disabled={!canImport}
+          className="bg-primary text-secondary"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              {t("library.addGame.folderScan.importing")}
+            </>
+          ) : (
+            t("library.addGame.folderScan.importSelected", {
+              count: includedGames.length,
+            })
+          )}
+        </Button>
+      </AlertDialogFooter>
+    </div>
+  );
+};
+
+const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
   const [formData, setFormData] = useState({
