@@ -367,18 +367,31 @@ def _run_cli(command, cancelled, activity):
     """Drain combined output continuously and always reap the native child."""
     from collections import deque
     tail = deque(maxlen=64)
+    diagnostics = []
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, env=_external_tool_env(),
                                creationflags=0x08000000 if os.name == 'nt' else 0)
     def drain():
         import codecs
         decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
+        pending = ''
+        def remember(line):
+            line = line.replace('\b', '').strip()
+            if len(diagnostics) < 12 and re.search(
+                    r'error|unsupported|cannot|can not|failed|wrong password|not enough', line, re.I):
+                diagnostics.append(line[:500])
         while True:
             chunk = process.stdout.read1(4096)
             if not chunk:
+                remember(pending + decoder.decode(b'', final=True))
                 return
             tail.append(chunk)
-            activity(decoder.decode(chunk))
+            text = decoder.decode(chunk)
+            lines = re.split(r'[\r\n]', pending + text)
+            pending = lines.pop()[-8192:]
+            for line in lines:
+                remember(line)
+            activity(text)
     reader = threading.Thread(target=drain, daemon=True)
     reader.start()
     try:
@@ -388,7 +401,8 @@ def _run_cli(command, cancelled, activity):
         reader.join()
         if process.returncode != 0:
             raise RuntimeError(f'Extractor exited with code {process.returncode}: ' +
-                               b''.join(tail).decode('utf-8', errors='replace')[-4000:])
+                               '\n'.join(diagnostics) + '\n' +
+                               b''.join(tail).decode('utf-8', errors='replace').replace('\b', '')[-4000:])
         return b''.join(tail).decode('utf-8', errors='replace')
     finally:
         if process.poll() is None:
@@ -400,6 +414,83 @@ def _run_cli(command, cancelled, activity):
                 process.wait()
         reader.join(timeout=3)
         process.stdout.close()
+
+
+def _unrar_manifest(tool, archive, destination, listing_path, cancelled, activity):
+    """Inspect RAR headers with the extraction decoder, without requiring 7-Zip."""
+    with open(listing_path, 'w', encoding='utf-8') as listing:
+        def listing_activity(text):
+            listing.write(text)
+            activity(text)
+        _run_cli([tool, 'lt', '-v', '-cfg-', '-c-', '-psteamrip.com', '--', archive],
+                 cancelled, listing_activity)
+    manifest = {}
+    with open(listing_path, encoding='utf-8') as listing:
+        records = listing.read().split('\n\n')
+    for record in records:
+        values = dict(line.lstrip().split(': ', 1) for line in record.splitlines() if ': ' in line)
+        name = values.get('Name')
+        if name is None:
+            continue
+        _check_archive_target(archive, _member_path(destination, name))
+        # Links and file references must not bypass staging path validation.
+        if values.get('Type') not in ('File', 'Directory'):
+            raise ValueError(f'Refusing archive link or unsupported entry: {name}')
+        if values['Type'] == 'File' and _wanted(name):
+            manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
+    return manifest
+
+
+class UnrarProgress:
+    """Read UnRAR's in-place console updates across arbitrary pipe chunks."""
+    def __init__(self, destination, manifest, state):
+        self.destination = os.path.join(destination, '').replace('\\', '/')
+        self.manifest = manifest
+        self.state = state
+        self.pending = ''
+        self.completed = set()
+        self.completed_bytes = 0
+
+    def feed(self, text):
+        lines = (self.pending + text).replace('\r', '\n').split('\n')
+        self.pending = lines.pop()
+        for line in [*lines, self.pending]:
+            percentages = re.findall(r'(\d+)%', line)
+            if percentages:
+                self.state['percent'] = min(100, int(percentages[-1]))
+            # UnRAR pads the filename then writes percentages using backspaces.
+            # Keep the unfinished line so neither names nor percentages are lost
+            # when the pipe splits a message in the middle.
+            match = re.match(r'^Extracting\s+(.+)', line)
+            if not match:
+                continue
+            name = match.group(1).split('\b', 1)[0].rstrip()
+            name = re.sub(r'\s+OK$', '', name).rstrip()
+            name = re.sub(r'\s+\d+%$', '', name).rstrip().replace('\\', '/')
+            if name.startswith(self.destination):
+                name = name[len(self.destination):]
+            if name not in self.manifest:
+                continue  # Ignore "Extracting from <archive>" and directory messages.
+            self.state['name'] = name
+            if re.search(r'\bOK\s*$', line) and name not in self.completed:
+                self.completed.add(name)
+                self.completed_bytes += self.manifest[name]['size']
+                self.state.update(files=len(self.completed), bytes=self.completed_bytes)
+        # Bound memory even if an extractor emits a malformed, unterminated line.
+        self.pending = self.pending[-16384:]
+
+
+def _extract_unrar(tool, archive, destination, names, cancelled, activity):
+    # Archived read-only attributes can prevent unpacking continuation archives
+    # and moving/deleting staging files on Linux.
+    # A UTF-8 list avoids command-line size limits for large manifests.
+    with NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.unrar-list') as selection:
+        for name in sorted(names):
+            selection.write(name + '\n')
+        selection.flush()
+        filters = ['-scfl', '-n@' + selection.name] if names else []
+        _run_cli([tool, 'x', '-cfg-', '-y', '-o+', '-ai', '-psteamrip.com', '-@',
+                  *filters, '--', archive, os.path.join(destination, '')], cancelled, activity)
 
 
 def _retry_archive_members(kind, archive, destination, names, cancelled, activity, use_cli=False):
@@ -429,6 +520,12 @@ def _retry_archive_members(kind, archive, destination, names, cancelled, activit
         extract_rar_stream(archive, destination, should_stop=lambda: _cancelled_value(cancelled),
                            members=selected, on_file=lambda name, size: activity(name))
         return
+    if kind == 'rar':
+        from AscendaraDownloadRecovery import find_unrar
+        tool = find_unrar()
+        if tool:
+            _extract_unrar(tool, archive, destination, selected, cancelled, activity)
+            return
     if kind in ('7z', 'rar', 'zip'):
         tool = _find_7z()
         if not tool:
@@ -484,6 +581,8 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
     try:
         report(True)
         kind, _ = AscendaraDownloader.detect_file_type(archive, cancelled)
+        from AscendaraDownloadRecovery import find_unrar
+        unrar = find_unrar() if kind == 'rar' and os.name != 'nt' else None
         use_cli = False
         if kind == 'zip':
             with zipfile.ZipFile(archive) as source:
@@ -569,6 +668,22 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
                 completed(name, size)
             extract_rar_stream(archive, destination, on_file=rar_file,
                                should_stop=stop.is_set, on_progress=rar_progress)
+        elif unrar:
+            state['engine'] = 'UnRAR CLI'
+            manifest = _unrar_manifest(unrar, archive, destination, manifest_path + '.listing',
+                                       cancelled, lambda text: report())
+            if not manifest:
+                raise RuntimeError('Archive contains no installable files')
+            total_bytes = sum(item['size'] for item in manifest.values())
+            if total_bytes > shutil.disk_usage(destination).free:
+                raise OSError('Insufficient disk space for extraction')
+            state.update(total=len(manifest), name='Extracting...', bytes=0)
+            report(True)
+            progress = UnrarProgress(destination, manifest, state)
+            def unrar_activity(text):
+                progress.feed(text)
+                report()
+            _extract_unrar(unrar, archive, destination, manifest, cancelled, unrar_activity)
         elif kind in ('7z', 'rar', 'zip'):
             state['engine'] = '7-Zip CLI'
             tool = _find_7z()
