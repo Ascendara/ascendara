@@ -101,6 +101,42 @@ async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFile
 function registerDownloadHandlers() {
   const settingsManager = getSettingsManager();
 
+  ipcMain.handle("extraction-recovery-action", async (_, game, requestId, action) => {
+    if (!["retry", "cancel"].includes(action)) {
+      return { success: false, error: "Invalid extraction recovery action." };
+    }
+    try {
+      const settings = settingsManager.getSettings();
+      const sanitizedGame = sanitizeGameName(sanitizeText(game));
+      const directories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ].filter(Boolean);
+      for (const directory of directories) {
+        const gameInfoPath = path.join(
+          directory,
+          sanitizedGame,
+          `${sanitizedGame}.ascendara.json`
+        );
+        if (!fs.existsSync(gameInfoPath)) continue;
+        const gameInfo = JSON.parse(await fs.promises.readFile(gameInfoPath, "utf8"));
+        const data = gameInfo.downloadingData;
+        if (
+          !data?.awaitingRecoveryAction ||
+          data.recoverableError?.requestId !== requestId
+        ) {
+          return { success: false, error: "The extraction recovery request has expired." };
+        }
+        data.recoveryAction = action;
+        await fs.promises.writeFile(gameInfoPath, JSON.stringify(gameInfo, null, 4), "utf8");
+        return { success: true };
+      }
+      return { success: false, error: "Download metadata was not found." };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   // Check if any game is downloading
   ipcMain.handle("is-downloader-running", async () => {
     try {

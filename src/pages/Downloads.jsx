@@ -442,6 +442,7 @@ const Downloads = () => {
               downloadingData.verifying ||
               downloadingData.stopped ||
               downloadingData.pendingManualInstall ||
+              downloadingData.awaitingRecoveryAction ||
               (downloadingData.verifyError && downloadingData.verifyError.length > 0) ||
               downloadingData.error)
           );
@@ -1399,6 +1400,7 @@ const DownloadCard = ({
   const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
   const [installerLaunched, setInstallerLaunched] = useState(false);
   const [isFinishingInstall, setIsFinishingInstall] = useState(false);
+  const [isSubmittingRecovery, setIsSubmittingRecovery] = useState(false);
   const [showInstallLocationDialog, setShowInstallLocationDialog] = useState(false);
   const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
   const [heroImage, setHeroImage] = useState(null);
@@ -1452,7 +1454,7 @@ const DownloadCard = ({
   const noticeShownForFileRef = useRef(null);
   const [clockIndex, setClockIndex] = useState(0);
   const { t } = useLanguage();
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
 
   const { downloadingData } = game;
 
@@ -1541,10 +1543,12 @@ const DownloadCard = ({
   const hasVerifyError =
     downloadingData?.verifyError && downloadingData.verifyError.length > 0;
   const isPendingManualInstall = downloadingData?.pendingManualInstall;
+  const isAwaitingRecovery = downloadingData?.awaitingRecoveryAction;
+  const recoverableError = downloadingData?.recoverableError;
 
   // Determine current status for badge
   const getStatus = () => {
-    if (isPendingManualInstall) return "actionRequired";
+    if (isPendingManualInstall || isAwaitingRecovery) return "actionRequired";
     if (isCompleted) return "completed";
     if (hasError) return "error";
     if (isStopped) return "stopped";
@@ -1553,6 +1557,41 @@ const DownloadCard = ({
     if (isWaiting) return "waiting";
     if (isUpdating) return "updating";
     return "downloading";
+  };
+
+  const handleExtractionRecovery = async (enableProtection = false, action = "retry") => {
+    if (!recoverableError?.requestId) return;
+    setIsSubmittingRecovery(true);
+    try {
+      if (enableProtection) {
+        const protection = await window.electron.folderExclusion(true);
+        if (!protection?.success) {
+          throw new Error(
+            protection?.error || t("downloads.extractionRecovery.protectionFailed")
+          );
+        }
+        await updateSetting("excludeFolders", true);
+      }
+      const result = await window.electron.extractionRecoveryAction(
+        game.game,
+        recoverableError.requestId,
+        action
+      );
+      if (!result?.success) {
+        throw new Error(result?.error || t("downloads.extractionRecovery.continueFailed"));
+      }
+      if (action === "retry") {
+        toast.success(
+          enableProtection
+            ? t("downloads.extractionRecovery.protectionEnabledRetrying")
+            : t("downloads.extractionRecovery.retrying")
+        );
+      }
+    } catch (error) {
+      toast.error(error.message || t("downloads.extractionRecovery.continueFailed"));
+    } finally {
+      setIsSubmittingRecovery(false);
+    }
   };
 
   const handleVerifyGame = async () => {
@@ -1888,6 +1927,64 @@ const DownloadCard = ({
 
         {/* Content based on state */}
         <div className="mt-4">
+          {isAwaitingRecovery && recoverableError?.type === "missingExtractedFiles" && (
+            <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                  <ShieldAlert className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-amber-600">
+                    {t("downloads.extractionRecovery.title")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("downloads.extractionRecovery.description")}
+                  </p>
+                </div>
+              </div>
+              <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/50 p-2 text-xs">
+                {(recoverableError.files || []).map((error, index) => (
+                  <div key={`${error.file}-${index}`} className="py-0.5 text-muted-foreground">
+                    <span className="font-medium">{error.file}</span>
+                    <span className="ml-2">{error.error}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {window.electron.getPlatform() === "win32" && !settings.excludeFolders && (
+                  <Button
+                    onClick={() => handleExtractionRecovery(true)}
+                    disabled={isSubmittingRecovery}
+                    className="gap-2 text-secondary"
+                  >
+                    {isSubmittingRecovery ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldAlert className="h-4 w-4" />
+                    )}
+                    {t("downloads.extractionRecovery.enableProtectionAndRetry")}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => handleExtractionRecovery(false)}
+                  disabled={isSubmittingRecovery}
+                  className="gap-2"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  {t("downloads.extractionRecovery.retryMissingFiles")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleExtractionRecovery(false, "cancel")}
+                  disabled={isSubmittingRecovery}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Pending Manual Install State */}
           {isPendingManualInstall && !installerLaunched && (
             <div className="space-y-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">

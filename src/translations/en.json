@@ -1403,6 +1403,16 @@
     "errorReported": "Issue Reported Successfully",
     "errorReportedDescription": "Thank you for helping improve Ascendara. Ascendara developer team will investigate this issue.",
     "extractionFailedError": "Archive extraction failed. The downloaded archive could not be extracted - the download may be corrupted or incomplete.",
+    "extractionRecovery": {
+      "continueFailed": "Could not continue extraction.",
+      "description": "Windows Security or another antivirus may have removed these files. The source archive is being kept while Ascendara waits for your choice.",
+      "enableProtectionAndRetry": "Enable protection and retry",
+      "protectionEnabledRetrying": "Directory protection enabled. Retrying the missing files.",
+      "protectionFailed": "Could not enable directory protection.",
+      "retrying": "Retrying the missing files.",
+      "retryMissingFiles": "Retry missing files",
+      "title": "Files disappeared after extraction"
+    },
     "retryExtraction": "Retry Extraction",
     "errors": {
       "killFailed": "Failed to kill download",

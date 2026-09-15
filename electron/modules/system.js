@@ -9,7 +9,7 @@ const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
 const { machineIdSync } = require("node-machine-id");
-const { exec, spawn } = require("child_process");
+const { exec, execFile, spawn } = require("child_process");
 const { ipcMain, app, dialog, shell, BrowserWindow, Notification } = require("electron");
 const unzipper = require("unzipper");
 const {
@@ -443,63 +443,67 @@ function registerSystemHandlers() {
   });
 
   // Folder exclusion (Windows Defender)
-  ipcMain.handle("folder-exclusion", async (_, boolean) => {
-    try {
-      const checkDefender = await new Promise(resolve => {
-        exec(
-          'powershell -Command "Get-MpPreference | Select-Object -ExpandProperty ExclusionPath"',
+  ipcMain.handle("folder-exclusion", async (_, enabled) => {
+    const runPowerShell = args =>
+      new Promise((resolve, reject) => {
+        execFile(
+          "powershell.exe",
+          ["-NoProfile", "-NonInteractive", ...args],
+          { windowsHide: true },
           (error, stdout, stderr) => {
-            if (error) {
-              resolve({ defenderActive: false, error: stderr || error.message });
-            } else {
-              resolve({ defenderActive: true, exclusions: stdout });
-            }
+            if (error) reject(new Error(String(stderr || error.message).trim()));
+            else resolve(stdout);
           }
         );
       });
-
-      if (!checkDefender.defenderActive) {
-        return {
-          success: false,
-          error: "Windows Defender is not active or another antivirus is in use.",
-        };
-      }
-
+    const normalize = value => path.resolve(value).replace(/[\\/]+$/, "").toLowerCase();
+    try {
+      await runPowerShell(["-Command", "Get-MpPreference | Out-Null"]);
       const settings = settingsManager.getSettings();
-      const downloadDir = settings.downloadDirectory;
-      const additionalDirs = Array.isArray(settings.additionalDirectories)
-        ? settings.additionalDirectories
-        : [];
-
-      if (!downloadDir && additionalDirs.length === 0) {
+      const directories = [
+        settings.downloadDirectory,
+        ...(Array.isArray(settings.additionalDirectories) ? settings.additionalDirectories : []),
+      ].filter(Boolean);
+      if (directories.length === 0) {
         return { success: false, error: "No directories configured for exclusion." };
       }
 
-      const commandType = boolean ? "Add-MpPreference" : "Remove-MpPreference";
-      let psCommands = [];
-      if (downloadDir) psCommands.push(`${commandType} -ExclusionPath "${downloadDir}"`);
-      for (const dir of additionalDirs) {
-        if (dir) psCommands.push(`${commandType} -ExclusionPath "${dir}"`);
+      const commandType = enabled ? "Add-MpPreference" : "Remove-MpPreference";
+      const elevatedCommand = directories
+        .map(directory => `${commandType} -ExclusionPath '${directory.replace(/'/g, "''")}'`)
+        .join("; ");
+      const encodedCommand = Buffer.from(elevatedCommand, "utf16le").toString("base64");
+      const launcher = `Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encodedCommand}'`;
+      await runPowerShell(["-Command", launcher]);
+
+      const output = await runPowerShell([
+        "-Command",
+        "(Get-MpPreference).ExclusionPath | ForEach-Object { Write-Output $_ }",
+      ]);
+      const exclusions = new Set(
+        output
+          .split(/\r?\n/)
+          .map(value => value.trim())
+          .filter(Boolean)
+          .map(normalize)
+      );
+      const confirmed = directories.every(directory => exclusions.has(normalize(directory)));
+      if (confirmed !== enabled) {
+        return {
+          success: false,
+          error: enabled
+            ? "Windows Security did not confirm the directory exclusion."
+            : "Windows Security did not remove every directory exclusion.",
+        };
       }
-
-      if (psCommands.length === 0) {
-        return { success: false, error: "No valid directories for exclusion." };
-      }
-
-      const joinedCommands = psCommands.join("; ");
-      const fullPS = `Start-Process powershell -Verb runAs -ArgumentList '${joinedCommands}'`;
-
-      return await new Promise(resolve => {
-        exec(`powershell -Command "${fullPS}"`, (error, stdout, stderr) => {
-          if (error) {
-            resolve({ success: false, error: stderr || error.message });
-          } else {
-            resolve({ success: true });
-          }
-        });
-      });
+      settingsManager.updateSetting("excludeFolders", enabled);
+      return { success: true, directories };
     } catch (err) {
-      return { success: false, error: err.message };
+      return {
+        success: false,
+        error:
+          err.message || "Windows Defender is not active or another antivirus is in use.",
+      };
     }
   });
 

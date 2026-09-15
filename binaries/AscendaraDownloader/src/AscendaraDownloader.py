@@ -6,6 +6,7 @@ Run this file with the same positional arguments as the old AscendaraDownloader.
 """
 import atexit
 import ctypes
+import errno
 from contextlib import nullcontext
 from collections import deque
 import hashlib
@@ -150,6 +151,12 @@ class VerificationFailure(RuntimeError):
 
 class IncompleteArchiveOutput(RuntimeError):
     """Decoder finished, but its output did not pass staging verification."""
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors or []
+
+
+class ExtractionRecoveryCancelled(RuntimeError):
     pass
 
 
@@ -395,6 +402,55 @@ def _run_cli(command, cancelled, activity):
         process.stdout.close()
 
 
+def _retry_archive_members(kind, archive, destination, names, cancelled, activity, use_cli=False):
+    selected = {name.replace('\\', '/') for name in names}
+    if kind == 'zip' and not use_cli:
+        with zipfile.ZipFile(archive) as source:
+            members = {item.filename.replace('\\', '/'): item for item in source.infolist()}
+            for name in selected:
+                item = members.get(name)
+                if item is None or item.is_dir():
+                    raise IncompleteArchiveOutput(f'Archive member is unavailable for recovery: {name}')
+                target = _member_path(destination, item.filename)
+                _check_archive_target(archive, target)
+                if stat.S_ISLNK(item.external_attr >> 16):
+                    raise ValueError(f'Refusing archive link: {item.filename}')
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with source.open(item, pwd=b'steamrip.com') as incoming, open(target, 'wb', buffering=1024*1024) as output:
+                    while True:
+                        cancelled()
+                        chunk = incoming.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        output.write(chunk)
+                activity(item.filename)
+        return
+    if kind == 'rar' and os.name == 'nt':
+        extract_rar_stream(archive, destination, should_stop=lambda: _cancelled_value(cancelled),
+                           members=selected, on_file=lambda name, size: activity(name))
+        return
+    if kind in ('7z', 'rar', 'zip'):
+        tool = _find_7z()
+        if not tool:
+            raise RuntimeError(f'{kind.upper()} recovery requires a bundled or installed 7-Zip command-line tool')
+        _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bb1', '-sccUTF-8',
+                  '-o' + destination, '--', archive, *sorted(selected)], cancelled, activity)
+        return
+    if kind == 'exe':
+        name = os.path.basename(archive).replace('\\', '/')
+        if name not in selected:
+            raise IncompleteArchiveOutput(f'Archive member is unavailable for recovery: {next(iter(selected))}')
+        shutil.copyfile(archive, _member_path(destination, name))
+        activity(name)
+        return
+    raise RuntimeError(f'{kind.upper()} files do not support targeted extraction recovery')
+
+
+def _cancelled_value(cancelled):
+    cancelled()
+    return False
+
+
 def extraction_worker(archive, destination, manifest_path, connection, stop):
     """Only this process touches archive decoders. No frontend JSON writes here."""
     archive, destination, manifest_path = map(_extended_path, (archive, destination, manifest_path))
@@ -427,7 +483,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
         report()
     try:
         report(True)
-        kind, _ = AscendaraDownloader.detect_file_type(archive)
+        kind, _ = AscendaraDownloader.detect_file_type(archive, cancelled)
         use_cli = False
         if kind == 'zip':
             with zipfile.ZipFile(archive) as source:
@@ -562,7 +618,26 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
             raise RuntimeError('Archive contains no installable files')
         errors = verify_manifest(destination, manifest, cancelled)
         if errors:
-            raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}')
+            connection.send(('recoverable', {
+                'type': 'missingExtractedFiles',
+                'archive': os.path.basename(archive),
+                'files': errors,
+            }))
+            while True:
+                cancelled()
+                if connection.poll(.2):
+                    action = connection.recv()
+                    break
+            if action != 'retry':
+                raise ExtractionRecoveryCancelled('Extraction recovery cancelled; the downloaded source files were retained')
+            state.update(name='Recovering missing files...', percent=0)
+            report(True)
+            failed_names = [error['file'] for error in errors]
+            _retry_archive_members(kind, archive, destination, failed_names, cancelled,
+                                   lambda name: state.update(name=name), use_cli)
+            errors = verify_manifest(destination, manifest, cancelled)
+            if errors:
+                raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}', errors)
         state.update(files=len(manifest), total=len(manifest), percent=100, name='Finalizing...')
         report(True)
         with open(manifest_path, 'w', encoding='utf-8') as stream:
@@ -579,9 +654,9 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
         connection.close()
 
 
-def supervise_extraction(archive, destination, check_cancelled, progress, workdir, idle_timeout=300):
+def supervise_extraction(archive, destination, check_cancelled, progress, recovery, workdir, idle_timeout=300):
     context = multiprocessing.get_context('spawn')
-    receiver, sender = context.Pipe(duplex=False)
+    receiver, sender = context.Pipe(duplex=True)
     stop = StopSignal(context)
     manifest_path = os.path.join(workdir, 'worker-manifest.json')
     process = context.Process(target=extraction_worker,
@@ -600,10 +675,14 @@ def supervise_extraction(archive, destination, check_cancelled, progress, workdi
                 last_activity = time.monotonic()
                 if event == 'progress':
                     progress(value)
+                elif event == 'recoverable':
+                    receiver.send(recovery(value))
+                    last_activity = time.monotonic()
                 elif event == 'error':
                     kind, message = value
                     exception = {'InterruptedError': InterruptedError, 'OSError': OSError,
                                  'IncompleteArchiveOutput': IncompleteArchiveOutput,
+                                 'ExtractionRecoveryCancelled': ExtractionRecoveryCancelled,
                                  'ValueError': ValueError}.get(kind, RuntimeError)
                     raise exception(message)
                 elif event == 'done':
@@ -956,10 +1035,33 @@ class AscendaraDownloader:
 
 
     @staticmethod
-    def detect_file_type(filepath: str) -> Tuple[str, Optional[str]]:
+    def detect_file_type(filepath: str, check_cancelled=lambda: None) -> Tuple[str, Optional[str]]:
         """Detect file type from magic bytes."""
-        with open(filepath, 'rb') as f:
-            sig = f.read(8)
+        # Reopen for every attempt; never retry a read on an invalid handle.
+        # Keep filesystem failures separate from corrupt-archive repair.
+        from AscendaraDownloadRecovery import wait_for_retry
+        native_path = _extended_path(filepath)
+        for attempt in range(4):
+            check_cancelled()
+            try:
+                with open(native_path, 'rb') as f:
+                    sig = f.read(8)
+                break
+            except InterruptedError:
+                raise
+            except OSError as exc:
+                retryable = isinstance(exc, PermissionError) or (os.name == 'nt' and exc.errno == errno.EINVAL)
+                if not retryable or attempt == 3:
+                    logging.exception('Archive header read failed: path=%r errno=%s winerror=%s',
+                                      filepath, exc.errno, getattr(exc, 'winerror', None))
+                    raise OSError(exc.errno, f'Cannot read downloaded archive header: {exc.strerror or str(exc)}. '
+                                  'The source file was retained.', filepath) from exc
+                logging.warning('Retrying archive header read (%s/3): errno=%s winerror=%s path=%r',
+                                attempt + 1, exc.errno, getattr(exc, 'winerror', None), filepath)
+                def stopped():
+                    check_cancelled()
+                    return False
+                wait_for_retry(.25 * 2 ** attempt, stopped)
         
         if sig.startswith(b'PK\x03\x04') or sig.startswith(b'PK\x05\x06') or sig.startswith(b'PK\x07\x08'):
             return 'zip', None
@@ -975,7 +1077,7 @@ class AscendaraDownloader:
 
     def _fix_file_extension(self, dest: str) -> str:
         """Fix file extension based on detected file type."""
-        filetype, hexsig = self.detect_file_type(dest)
+        filetype, hexsig = self.detect_file_type(dest, self._check_cancelled)
         logging.info(f"[AscendaraDownloader] Detected file type: {filetype}")
         
         ext_map = {'zip': '.zip', 'rar': '.rar', '7z': '.7z', 'exe': '.exe'}
@@ -990,7 +1092,7 @@ class AscendaraDownloader:
             
             logging.info(f"[AscendaraDownloader] Renaming to: {new_dest}")
             # os.rename raises FileExistsError on Windows if a stale target exists
-            os.replace(dest, new_dest)
+            replace_file(dest, new_dest, self._check_cancelled)
             return new_dest
         
         return dest
@@ -1466,6 +1568,15 @@ class AscendaraDownloader:
             try:
                 return self._extract_files_once(archive_path, loose_files, cleanup_folder)
             except IncompleteArchiveOutput as exc:
+                if not getattr(self, '_recovery_prompted', False):
+                    action = self._await_extraction_recovery({
+                        'type': 'missingExtractedFiles',
+                        'archive': 'staged payload',
+                        'files': exc.errors,
+                    })
+                    if action != 'retry':
+                        raise ExtractionRecoveryCancelled(
+                            'Extraction recovery cancelled; the downloaded source files were retained') from exc
                 if attempt == 1:
                     raise IncompleteArchiveOutput(
                         f'{exc}. Extraction failed again after one automatic retry. '
@@ -1481,6 +1592,38 @@ class AscendaraDownloader:
                 safe_write_json(self.game_info_path, self.game_info)
                 from AscendaraDownloadRecovery import wait_for_retry
                 wait_for_retry(2, self._check_for_stop)
+
+    def _await_extraction_recovery(self, details):
+        if getattr(self, '_recovery_prompted', False):
+            return 'retry'
+        self._recovery_prompted = True
+        request_id = f'{os.getpid()}-{time.time_ns()}'
+        data = self.game_info['downloadingData']
+        data.update(downloading=False, extracting=False, verifying=False,
+                    awaitingRecoveryAction=True, timeUntilComplete='Action required')
+        data['recoverableError'] = dict(details, requestId=request_id)
+        data.pop('recoveryAction', None)
+        safe_write_json(self.game_info_path, self.game_info)
+        while True:
+            self._check_cancelled()
+            try:
+                with open(self.game_info_path, encoding='utf-8') as stream:
+                    current = json.load(stream)
+            except (OSError, ValueError):
+                time.sleep(.2)
+                continue
+            current_data = current.get('downloadingData', {})
+            action = current_data.get('recoveryAction')
+            if (action in ('retry', 'cancel') and
+                    current_data.get('recoverableError', {}).get('requestId') == request_id):
+                self.game_info = current
+                current_data.pop('recoveryAction', None)
+                current_data.pop('recoverableError', None)
+                current_data.update(awaitingRecoveryAction=False, extracting=action == 'retry',
+                                    timeUntilComplete='Recovering extracted files...' if action == 'retry' else 'Cancelled')
+                safe_write_json(self.game_info_path, self.game_info)
+                return action
+            time.sleep(.2)
 
     def _extract_files_once(self, archive_path=None, loose_files=None, cleanup_folder=None):
         self._check_cancelled()
@@ -1543,9 +1686,10 @@ class AscendaraDownloader:
                 for attempt in range(2):
                     try:
                         result = supervise_extraction(archive, payload, self._check_cancelled,
-                            lambda state: self._extraction_progress(state, started), stage)
+                            lambda state: self._extraction_progress(state, started),
+                            self._await_extraction_recovery, stage)
                         break
-                    except InterruptedError:
+                    except (InterruptedError, ExtractionRecoveryCancelled):
                         raise
                     except IncompleteArchiveOutput:
                         raise  # Retry extraction locally; this is not a CRC repair.
@@ -1586,7 +1730,7 @@ class AscendaraDownloader:
             manifest = flatten_payload(payload, manifest, self.game)
             errors = verify_manifest(payload, manifest, self._check_cancelled)
             if errors:
-                raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}')
+                raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}', errors)
             self._check_cancelled()
             self._install_payload(payload, manifest, stage)
         finally:
@@ -1804,7 +1948,7 @@ class AscendaraDownloader:
 
 
 def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
-                         on_file=None, should_stop=None, on_progress=None):
+                         on_file=None, should_stop=None, on_progress=None, members=None):
     """Extract in one native UnRAR pass, with Python used only for supervision.
 
     Existing regular files are overwritten. Failed files can remain partial.
@@ -1891,7 +2035,8 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
                     or header.HostOS == 3 and stat.S_ISLNK(header.FileAttr)
                     or header.HostOS != 3 and header.FileAttr & 0x400):
                 raise ValueError(f'Refusing archive link: {name!r}')
-            skip = not _wanted(name)
+            normalized = name.replace('\\', '/')
+            skip = not _wanted(name) or members is not None and normalized not in members
             directory = bool(header.Flags & 0x20) or name.endswith(('/', '\\'))
             extracting_file = not skip and not directory
             if not skip:
