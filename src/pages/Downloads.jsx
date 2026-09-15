@@ -2351,7 +2351,7 @@ const DownloadCard = ({
                       </div>
                       {downloadingData.extractionProgress.currentFile ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("downloads.lastExtracted")}</span>
+                          <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("downloads.currentFile", "Current file")}</span>
                           <div className="flex items-center gap-1.5 rounded-md bg-muted/70 px-2 py-0.5">
                             <FileText className="h-3 w-3 text-muted-foreground" />
                             <span

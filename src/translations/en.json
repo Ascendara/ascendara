@@ -1430,6 +1430,7 @@
     "killSuccessKeepFiles": "Download killed, files kept on disk",
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
     "lastExtracted": "Last extracted",
+    "currentFile": "Current file",
     "logViewerTitle": "Download Manager Log",
     "noLogContent": "No log content available.",
     "limitedTo": "Limited to",

@@ -450,6 +450,7 @@ class UnrarProgress:
         self.pending = ''
         self.completed = set()
         self.completed_bytes = 0
+        self.next_sample = 0
 
     def feed(self, text):
         lines = (self.pending + text).replace('\r', '\n').split('\n')
@@ -478,6 +479,20 @@ class UnrarProgress:
                 self.state.update(files=len(self.completed), bytes=self.completed_bytes)
         # Bound memory even if an extractor emits a malformed, unterminated line.
         self.pending = self.pending[-16384:]
+        now = time.monotonic()
+        if now >= self.next_sample:
+            self.next_sample = now + .5
+            name = self.state['name']
+            partial_bytes = 0
+            if name in self.manifest and name not in self.completed:
+                try:
+                    # Sample only the active output, never walk the whole game tree.
+                    partial_bytes = min(os.stat(os.path.join(self.destination, name)).st_size,
+                                        self.manifest[name]['size'])
+                except OSError:
+                    pass  # The decoder may not have created the file yet.
+            self.state['bytes'] = max(self.state.get('bytes', 0),
+                                      self.completed_bytes + partial_bytes)
 
 
 def _extract_unrar(tool, archive, destination, names, cancelled, activity):
@@ -1972,7 +1987,7 @@ class AscendaraDownloader:
         speed = f'{file_rate:.2f} files/s'
         if byte_count is not None and samples[0][2] is not None:
             byte_rate = max(0, byte_count - samples[0][2]) / elapsed
-            speed = f'{read_size(byte_rate)}/s ({speed})'
+            speed = f'{read_size(byte_rate)}/s'
         name = state['name'].replace('\\', '/').rstrip('/').rsplit('/', 1)[-1]
         percent = state.get('percent', done / total * 100 if total else 0)
         self.game_info['downloadingData']['extractionProgress'] = {
