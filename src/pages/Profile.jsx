@@ -1417,7 +1417,7 @@ const Profile = () => {
             <CardTitle className="text-Left group flex w-full items-center justify-start gap-2">
               <Sparkles className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
               <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                {T("profile.Stats") || "Stats"}
+                {T("profile.stats") || "Stats"}
               </span>
             </CardTitle>
           </CardHeader>
