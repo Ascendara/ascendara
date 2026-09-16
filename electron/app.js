@@ -187,6 +187,8 @@ function createTray() {
  * Start the achievement watcher process (Windows and Linux)
  */
 function startAchievementWatcher() {
+  // Migrate the legacy completion flag before the watcher can rewrite it.
+  require("./modules/onboarding").hasCompletedOnboarding();
   if (process.platform !== "win32" && process.platform !== "linux") {
     return;
   }
@@ -590,7 +592,7 @@ async function initializeApp() {
     // Create system tray
     createTray();
 
-    // Start achievement watcher (Windows only)
+    // Start achievement watcher (Windows and Linux)
     startAchievementWatcher();
 
     // Defer non-critical initialization until after window loads

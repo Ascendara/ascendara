@@ -24,6 +24,11 @@ const { getSettingsManager } = require("./settings");
 const { sanitizeText, getExtensionFromMimeType } = require("./utils");
 const { initializeDiscordRPC, destroyDiscordRPC, setRPCState } = require("./discord-rpc");
 const steamgrid = require("./steamgrid");
+const {
+  completeOnboarding,
+  hasCompletedOnboarding,
+  resetOnboarding,
+} = require("./onboarding");
 
 let apiKeyOverride = null;
 let has_launched = false;
@@ -1553,7 +1558,7 @@ function registerMiscHandlers() {
     const uninstallerPath = path.join(executableDir, "Uninstall Ascendara.exe");
 
     try {
-      fs.unlinkSync(path.join(process.env.USERPROFILE, "timestamp.ascendara.json"));
+      resetOnboarding();
     } catch (error) {}
 
     try {
@@ -1664,6 +1669,7 @@ function registerMiscHandlers() {
 
   // Is new handler
   ipcMain.handle("is-new", () => {
+    if (hasCompletedOnboarding()) return false;
     try {
       fs.accessSync(TIMESTAMP_FILE);
       return false;
@@ -1673,15 +1679,7 @@ function registerMiscHandlers() {
   });
 
   // Is v7 handler
-  ipcMain.handle("is-v7", () => {
-    try {
-      const data = fs.readFileSync(TIMESTAMP_FILE, "utf8");
-      const timestamp = JSON.parse(data);
-      return timestamp.hasOwnProperty("v7") && timestamp.v7 === true;
-    } catch (error) {
-      return false;
-    }
-  });
+  ipcMain.handle("is-v7", () => hasCompletedOnboarding());
 
   // Set v7 handler
   ipcMain.handle("set-v7", () => {
@@ -1697,6 +1695,7 @@ function registerMiscHandlers() {
       }
 
       fs.writeFileSync(TIMESTAMP_FILE, JSON.stringify(timestamp, null, 2));
+      completeOnboarding();
       return true;
     } catch (error) {
       console.error("Error setting v7:", error);
@@ -1721,6 +1720,7 @@ function registerMiscHandlers() {
       v7: true,
     };
     fs.writeFileSync(TIMESTAMP_FILE, JSON.stringify(timestamp, null, 2));
+    completeOnboarding();
   });
 
   // Start Steam handler

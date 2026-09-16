@@ -20,6 +20,7 @@ const {
 const { hideWindow, showWindow } = require("./window");
 
 const steamgrid = require("./steamgrid");
+const { resetOnboarding } = require("./onboarding");
 
 // Load proton module only on linux
 const proton = isLinux ? require("./proton") : null;
@@ -938,11 +939,7 @@ function registerGameHandlers() {
   ipcMain.handle("delete-game", async (_, game) => {
     try {
       if (game === "local") {
-        const timestampFilePath = path.join(
-          process.env.USERPROFILE,
-          "timestamp.ascendara.json"
-        );
-        fs.unlinkSync(timestampFilePath);
+        resetOnboarding();
         return;
       }
 
