@@ -123,7 +123,12 @@ class Transfer:
                     if not written and self.expected_size != 0:
                         raise ValueError('Download server returned an empty file')
                     self.progress(written, total or written, 0)
-                    os.remove(sidecar)
+                    try:
+                        os.remove(sidecar)
+                    except FileNotFoundError:
+                        # Resume metadata is disposable after a verified transfer.
+                        # Another cleanup may already have removed it.
+                        pass
                     return
             except (requests.RequestException, ValueError) as exc:
                 failures += 1

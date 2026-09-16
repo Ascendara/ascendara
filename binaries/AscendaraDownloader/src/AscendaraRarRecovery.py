@@ -73,6 +73,10 @@ def _check_path(root, target):
                 raise ValueError(f'Refusing symlink or reparse-point path: {current!r}')
             if current == target and not stat.S_ISDIR(info.st_mode) and info.st_nlink > 1:
                 raise ValueError(f'Refusing hard-linked output: {current!r}')
+        # Ancestors of the chosen destination may be user-managed symlinks
+        # (for example /mnt). Reject links at and below the output root only.
+        if current == root:
+            break
         parent = os.path.dirname(current)
         if parent == current:
             break

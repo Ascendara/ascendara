@@ -151,9 +151,10 @@ class VerificationFailure(RuntimeError):
 
 class IncompleteArchiveOutput(RuntimeError):
     """Decoder finished, but its output did not pass staging verification."""
-    def __init__(self, message, errors=None):
+    def __init__(self, message, errors=None, recovery_attempted=False):
         super().__init__(message)
         self.errors = errors or []
+        self.recovery_attempted = recovery_attempted
 
 
 class ExtractionRecoveryCancelled(RuntimeError):
@@ -767,7 +768,8 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
                                    lambda name: state.update(name=name), use_cli)
             errors = verify_manifest(destination, manifest, cancelled)
             if errors:
-                raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}', errors)
+                raise IncompleteArchiveOutput(f'Incomplete archive output: {errors[0]}', errors,
+                                              recovery_attempted=True)
         state.update(files=len(manifest), total=len(manifest), percent=100, name='Finalizing...')
         report(True)
         with open(manifest_path, 'w', encoding='utf-8') as stream:
@@ -777,7 +779,9 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
         if isinstance(exc, zlib.error):
             exc = RuntimeError(f'Archive corrupt data: {exc}')
         try:
-            connection.send(('error', (type(exc).__name__, str(exc))))
+            details = ({'errors': exc.errors, 'recovery_attempted': exc.recovery_attempted}
+                       if isinstance(exc, IncompleteArchiveOutput) else {})
+            connection.send(('error', (type(exc).__name__, str(exc), details)))
         except (OSError, EOFError):
             pass
     finally:
@@ -809,12 +813,12 @@ def supervise_extraction(archive, destination, check_cancelled, progress, recove
                     receiver.send(recovery(value))
                     last_activity = time.monotonic()
                 elif event == 'error':
-                    kind, message = value
+                    kind, message, details = value
                     exception = {'InterruptedError': InterruptedError, 'OSError': OSError,
                                  'IncompleteArchiveOutput': IncompleteArchiveOutput,
                                  'ExtractionRecoveryCancelled': ExtractionRecoveryCancelled,
                                  'ValueError': ValueError}.get(kind, RuntimeError)
-                    raise exception(message)
+                    raise exception(message, **details)
                 elif event == 'done':
                     with open(manifest_path, encoding='utf-8') as stream:
                         return json.load(stream)
@@ -1698,6 +1702,15 @@ class AscendaraDownloader:
             try:
                 return self._extract_files_once(archive_path, loose_files, cleanup_folder)
             except IncompleteArchiveOutput as exc:
+                # The worker already retried the affected members. Repeating the
+                # entire game extraction cannot fix files being removed again.
+                if exc.recovery_attempted or attempt == 1:
+                    raise IncompleteArchiveOutput(
+                        f'{exc}. Extracted files are still missing or incomplete after recovery. '
+                        'Check security-software quarantine/history and whether another program '
+                        'removed or blocked the listed files. The cause could not be confirmed. '
+                        'The downloaded source files were retained.', exc.errors,
+                        recovery_attempted=True) from exc
                 if not getattr(self, '_recovery_prompted', False):
                     action = self._await_extraction_recovery({
                         'type': 'missingExtractedFiles',
@@ -1707,10 +1720,6 @@ class AscendaraDownloader:
                     if action != 'retry':
                         raise ExtractionRecoveryCancelled(
                             'Extraction recovery cancelled; the downloaded source files were retained') from exc
-                if attempt == 1:
-                    raise IncompleteArchiveOutput(
-                        f'{exc}. Extraction failed again after one automatic retry. '
-                        'The downloaded source files were retained.') from exc
                 self._check_cancelled()
                 logging.warning('Retrying extraction from retained archives in a fresh stage: %s', exc)
                 data = self.game_info['downloadingData']
