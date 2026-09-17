@@ -513,6 +513,7 @@ function GameDetails({ game, platform, profile, running, onClose, onChanged, onS
                 )}
                 <div className="flex flex-wrap gap-2">
                   <Button
+                    className="text-secondary"
                     disabled={busy || running || game.missing}
                     onClick={() => action(() => retroCall("launch", game.id, disc))}
                   >
@@ -1076,6 +1077,7 @@ export default function Retro() {
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={mode === "library" ? "default" : "outline"}
+            className={mode === "library" ? "text-secondary" : undefined}
             onClick={() => setMode("library")}
           >
             <Library className="mr-2 h-4 w-4" />
@@ -1083,6 +1085,7 @@ export default function Retro() {
           </Button>
           <Button
             variant={mode === "catalogue" ? "default" : "outline"}
+            className={mode === "catalogue" ? "text-secondary" : undefined}
             onClick={() => {
               setMode("catalogue");
               if (filter === "all") setFilter("ps1");
