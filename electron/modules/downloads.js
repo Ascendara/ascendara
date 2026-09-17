@@ -17,6 +17,7 @@ const {
   updateTimestampFile,
 } = require("./utils");
 const { getSettingsManager } = require("./settings");
+const { prepareDownloaderRuntime } = require("./downloaderRuntime");
 
 const steamgrid = require("./steamgrid");
 
@@ -683,6 +684,12 @@ function registerDownloadHandlers() {
         await updateTimestampFile(timestampData);
 
         console.log(`Spawning executable: ${executablePath}`);
+        if (process.platform === "linux" && !isDev && !isTorrentLink) {
+          executablePath = await prepareDownloaderRuntime(
+            executablePath,
+            path.join(app.getPath("userData"), "downloader-runtime")
+          );
+        }
         if (!isWindows && !isDev && !fs.existsSync(executablePath)) {
           const errMsg = `Binary not found: ${executablePath}`;
           console.error(errMsg);
@@ -1413,6 +1420,13 @@ function registerDownloadHandlers() {
       // Add notification flags if enabled
       if (settings.notifications) {
         spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
+      }
+
+      if (process.platform === "linux" && !isDev) {
+        executablePath = await prepareDownloaderRuntime(
+          executablePath,
+          path.join(app.getPath("userData"), "downloader-runtime")
+        );
       }
 
       // Clear the stopped state from JSON

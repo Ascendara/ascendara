@@ -1191,11 +1191,30 @@ class AscendaraDownloader:
         # Keep filesystem failures separate from corrupt-archive repair.
         from AscendaraDownloadRecovery import wait_for_retry
         native_path = _extended_path(filepath)
+        paths = [native_path]
+        ordinary_path = os.path.abspath(filepath)
+        if os.name == 'nt' and ordinary_path != native_path:
+            paths.append(ordinary_path)
         for attempt in range(4):
             check_cancelled()
             try:
-                with open(native_path, 'rb') as f:
-                    sig = f.read(8)
+                for index, candidate in enumerate(paths):
+                    try:
+                        # Read only the signature, without BufferedReader's larger
+                        # read-ahead request to Windows filesystem/filter drivers.
+                        with open(candidate, 'rb', buffering=0) as f:
+                            sig = b''
+                            while len(sig) < 8:
+                                check_cancelled()
+                                chunk = f.read(8 - len(sig))
+                                if not chunk:
+                                    break
+                                sig += chunk
+                        break
+                    except OSError as exc:
+                        if exc.errno != errno.EINVAL or index == len(paths) - 1:
+                            raise
+                        logging.warning('Archive header path rejected; trying ordinary path: %r', candidate)
                 break
             except InterruptedError:
                 raise
@@ -1227,7 +1246,26 @@ class AscendaraDownloader:
 
     def _fix_file_extension(self, dest: str) -> str:
         """Fix file extension based on detected file type."""
-        filetype, hexsig = self.detect_file_type(dest, self._check_cancelled)
+        while True:
+            try:
+                filetype, hexsig = self.detect_file_type(dest, self._check_cancelled)
+                break
+            except InterruptedError:
+                raise
+            except OSError as exc:
+                # This check runs before the extraction worker/recovery loop.
+                # Give a temporarily unreadable source the same local retry UI.
+                action = self._await_extraction_recovery({
+                    'type': 'archiveExtractionFailed',
+                    'archive': os.path.basename(dest),
+                    'message': 'The downloaded file could not be read. Check that the drive is '
+                               'available and the file is not blocked by another program, then retry extraction.',
+                    'extractionError': str(exc),
+                    'files': [],
+                }, force=True)
+                if action != 'retry':
+                    raise ExtractionRecoveryCancelled(
+                        'Extraction recovery cancelled; the downloaded source files were retained') from exc
         logging.info(f"[AscendaraDownloader] Detected file type: {filetype}")
         
         ext_map = {'zip': '.zip', 'rar': '.rar', '7z': '.7z', 'exe': '.exe'}
