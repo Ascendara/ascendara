@@ -6,6 +6,7 @@ import {
   Disc3,
   HardDrive,
   ArrowDownWideNarrow,
+  ArrowLeft,
   Play,
   Settings2,
   FolderOpen,
@@ -28,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import RetroCloudSaves from "@/components/RetroCloudSaves";
 import {
   Select,
@@ -396,6 +397,7 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
               {t("retro.setup.saveSetup")}
             </Button>
             <Button
+              className="text-secondary"
               disabled={busy || taskBusy || !draft.romFolders.length}
               onClick={() => save(true)}
             >
@@ -649,6 +651,7 @@ function GameDetails({ game, platform, profile, running, onClose, onChanged, onS
                   </label>
                 </div>
                 <Button
+                  className="text-secondary"
                   disabled={busy || !title.trim()}
                   onClick={() =>
                     action(async () => {
@@ -710,6 +713,7 @@ function SavesDialog({ platform, profile, onClose, onSetup, running }) {
         <p className="text-sm text-muted-foreground">{t("retro.saves.closeEmulator")}</p>
         <div className="flex flex-wrap gap-2">
           <Button
+            className="text-secondary"
             disabled={busy || !profile?.saveFolder}
             onClick={() =>
               action(async () => {
@@ -836,6 +840,7 @@ function SavesDialog({ platform, profile, onClose, onSetup, running }) {
 }
 
 export default function Retro() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const [state, setState] = useState(null),
@@ -943,7 +948,9 @@ export default function Retro() {
       <div className="mx-auto max-w-4xl p-8">
         <h1 className="text-3xl font-bold">{t("retro.title")}</h1>
         <p className="text-destructive my-4">{error}</p>
-        <Button onClick={refresh}>{t("retro.errors.retry")}</Button>
+        <Button className="text-secondary" onClick={refresh}>
+          {t("retro.errors.retry")}
+        </Button>
       </div>
     );
   if (!state)
@@ -959,6 +966,15 @@ export default function Retro() {
     <div className="mx-auto max-w-7xl space-y-7 px-2 py-8 md:px-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
+            onClick={() => navigate("/library")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {t("common.library") || "Library"}
+          </Button>
           <div className="mb-2 flex items-center gap-3">
             <h1 className="text-3xl font-bold">{t("retro.title")}</h1>
           </div>
@@ -1147,6 +1163,7 @@ export default function Retro() {
               />
               <Button
                 variant={favorites ? "default" : "outline"}
+                className={favorites ? "text-secondary" : undefined}
                 onClick={() => setFavorites(!favorites)}
                 aria-pressed={favorites}
               >
@@ -1155,6 +1172,7 @@ export default function Retro() {
               </Button>
               <Button
                 variant={review ? "default" : "outline"}
+                className={review ? "text-secondary" : undefined}
                 onClick={() => setReview(!review)}
                 aria-pressed={review}
               >
@@ -1177,7 +1195,7 @@ export default function Retro() {
                   {t("retro.empty.description")}
                 </p>
                 <Button
-                  className="mt-5"
+                  className="mt-5 text-secondary"
                   onClick={() => setSetup(filter === "all" ? "ps1" : filter)}
                 >
                   {t("retro.empty.setupConsole")}

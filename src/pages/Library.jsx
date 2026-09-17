@@ -1430,7 +1430,7 @@ const Library = () => {
   const sidebarTabs = [
     {
       id: "all",
-      label: t("library.pageTitle") || "Library",
+      label: t("library.pageTitle") || "All Games",
       icon: <SquareLibrary className="h-4 w-4" />,
       count: games.filter(g => !g.isFolder).length + getGamesInFolders().length,
     },
@@ -1645,6 +1645,16 @@ const Library = () => {
               </div>
             ));
           })()}
+
+          <button
+            onClick={() => navigate("/retro")}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
+              <Gamepad2 className="h-4 w-4" />
+            </span>
+            <span className="flex-1 text-left">Retro</span>
+          </button>
         </nav>
 
         {/* ── Actions ── */}

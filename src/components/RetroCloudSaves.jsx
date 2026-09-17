@@ -111,7 +111,7 @@ export default function RetroCloudSaves({
               : "Sign in and get Ascend to back up your Retro saves to the cloud."}
           </p>
           <Link
-            className="text-primary-foreground inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium"
+            className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-secondary"
             to="/ascend"
           >
             {user ? "Explore Ascend" : "Sign in to Ascend"}
@@ -147,6 +147,7 @@ export default function RetroCloudSaves({
           )}
           <div className="flex flex-wrap gap-2">
             <Button
+              className="text-secondary"
               disabled={busy || loading || running || !profile?.saveFolder}
               onClick={() =>
                 perform("upload", async () => {
