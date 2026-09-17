@@ -363,6 +363,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
         desc: t("ascend.premium.cloudBackups.description"),
       },
       {
+        icon: Gamepad2,
+        title: t("ascend.premium.retroCloudSaves.title"),
+        desc: t("ascend.premium.retroCloudSaves.description"),
+      },
+      {
         icon: User,
         title: t("ascend.premium.profile.title"),
         desc: t("ascend.premium.profile.description"),

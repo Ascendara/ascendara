@@ -69,6 +69,7 @@
       "nexusMods": "Mods Integration",
       "profiles": "Profiles",
       "profilesDesc": "Set up your bio, public profile, and stats. Also view other users' profiles and stats on Ascend.",
+      "retroCloudSaves": "Retro Cloud Saves",
       "trainers": "Trainer Integration",
       "unlimitedDownloads": "Unlimited Downloads"
     },
@@ -539,6 +540,10 @@
         "description": "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours.",
         "title": "Profile & Bio"
       },
+      "retroCloudSaves": {
+        "description": "Back up your Retro library's memory cards and save folders to the cloud, then restore them on any device. Ascendara keeps a recovery copy of your local saves before every restore.",
+        "title": "Retro Cloud Saves"
+      },
       "subtitle": "These are the current available features you have access to with Ascend",
       "title": "Premium Features",
       "unlimitedDownloads": {
@@ -750,6 +755,7 @@
         "smartDownloadQueue": "Smart download queue",
         "automaticUpdates": "Automatic game updates",
         "cloudBackups": "Cloud save backups",
+        "retroCloudSaves": "Retro cloud saves",
         "nexusModsIntegration": "Nexus Mods integration",
         "socialFeatures": "Social features & communities",
         "redirectingToCheckout": "Redirecting to Stripe Checkout",
@@ -2128,7 +2134,7 @@
     "ofPlaytime": "on this game",
     "openFolder": "Open",
     "openGameDirectory": "Open Game Directory",
-    "pageTitle": "Your Library",
+    "pageTitle": "All Games",
     "pageSubtitle": "All your installed games in one place.",
     "redesignWelcome": {
       "title": "What the...",

@@ -6570,6 +6570,11 @@ const Ascend = () => {
                             desc: "Data synced across devices",
                           },
                           {
+                            icon: Gamepad2,
+                            title: "Retro Cloud Saves",
+                            desc: "Emulator saves backed up",
+                          },
+                          {
                             icon: Trophy,
                             title: "Public Leaderboard",
                             desc: "Compete with the community",
@@ -6678,6 +6683,11 @@ const Ascend = () => {
                             icon: CloudUpload,
                             title: t("ascend.premium.cloudBackups.title"),
                             desc: t("ascend.premium.cloudBackups.description"),
+                          },
+                          {
+                            icon: Gamepad2,
+                            title: t("ascend.premium.retroCloudSaves.title"),
+                            desc: t("ascend.premium.retroCloudSaves.description"),
                           },
                           {
                             icon: Trophy,
@@ -9326,6 +9336,28 @@ const Ascend = () => {
                   </div>
                 </motion.div>
 
+                {/* Retro Cloud Saves */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-500/10 blur-2xl transition-all group-hover:bg-rose-500/20" />
+                  <div className="relative">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
+                      <Gamepad2 className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      {t("ascend.premium.retroCloudSaves.title") || "Retro Cloud Saves"}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("ascend.premium.retroCloudSaves.description") ||
+                        "Back up your Retro library's memory cards and save folders to the cloud, then restore them on any device. Ascendara keeps a recovery copy of your local saves before every restore."}
+                    </p>
+                  </div>
+                </motion.div>
+
                 {/* Auto Game Update Checking */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -9748,6 +9780,12 @@ const Ascend = () => {
                   labelKey: "account.features.leaderboard",
                   bgClass: "bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/15",
                   iconClass: "text-yellow-400",
+                },
+                {
+                  icon: Gamepad2,
+                  labelKey: "account.features.retroCloudSaves",
+                  bgClass: "bg-rose-500/10 border-rose-500/20 hover:bg-rose-500/15",
+                  iconClass: "text-rose-400",
                 },
                 {
                   icon: Infinity,

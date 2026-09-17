@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Check, X, Download, Zap, Cloud, Users, Puzzle, Shield, ExternalLink, Loader2 } from "lucide-react";
+import { Check, X, Download, Zap, Cloud, Users, Puzzle, Shield, Gamepad2, ExternalLink, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -43,6 +43,7 @@ const SubscriptionPlanDialog = ({
     { icon: Zap, text: t("ascend.settings.subscriptionDialogV2.smartDownloadQueue") },
     { icon: Cloud, text: t("ascend.settings.subscriptionDialogV2.automaticUpdates") },
     { icon: Shield, text: t("ascend.settings.subscriptionDialogV2.cloudBackups") },
+    { icon: Gamepad2, text: t("ascend.settings.subscriptionDialogV2.retroCloudSaves") },
     { icon: Puzzle, text: t("ascend.settings.subscriptionDialogV2.nexusModsIntegration") },
     { icon: Users, text: t("ascend.settings.subscriptionDialogV2.socialFeatures") },
   ];
