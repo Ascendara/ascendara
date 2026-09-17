@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
+import { Link } from "react-router-dom";
+import { retroBackupPlatform, restoreRetroCloudBackup } from "@/services/retroService";
 import { getAuthToken as getAuthTokenHelper } from "@/utils/authHelper";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import { getDeviceIcon, getDeviceDescription } from "@/lib/deviceParser";
@@ -1549,6 +1551,7 @@ const Ascend = () => {
         // Check which backups exist locally
         const backupsWithLocalCheck = await Promise.all(
           result.backups.map(async backup => {
+            if (retroBackupPlatform(backup.gameName)) return { ...backup, existsLocally: false };
             let existsLocally = false;
 
             try {
@@ -1661,6 +1664,13 @@ const Ascend = () => {
   const handleRestoreBackup = async (backupId, gameName, backupName) => {
     setRestoringBackup(backupId);
     try {
+      const retroPlatform = retroBackupPlatform(gameName);
+      if (retroPlatform) {
+        const result = await restoreRetroCloudBackup(retroPlatform, backupId);
+        if (result) toast.success(`Restored ${result.restored} Retro save files`);
+        setRestoringBackup(null);
+        return;
+      }
       // Get download URL from backend
       const result = await getBackupDownloadUrl(backupId);
       if (!result.downloadUrl) {
@@ -9062,6 +9072,14 @@ const Ascend = () => {
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                      {retroBackupPlatform(backup.gameName) && (
+                                        <Link
+                                          to={`/retro?saves=${retroBackupPlatform(backup.gameName)}`}
+                                          className="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium text-foreground hover:bg-accent"
+                                        >
+                                          Restore Retro saves
+                                        </Link>
+                                      )}
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                           <Button

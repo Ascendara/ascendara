@@ -66,6 +66,7 @@ import GameScreen from "./pages/GameScreen";
 import Profile from "./pages/Profile";
 import Ascend from "./pages/Ascend";
 import Library from "./pages/Library";
+import Retro from "./pages/Retro";
 import FolderView from "./pages/FolderView";
 import LocalRefresh from "./pages/LocalRefresh";
 // Search is rendered persistently in Layout, not via Routes
@@ -799,6 +800,7 @@ const DiscordRPCTracker = () => {
   const { settings } = useSettings();
   const lastPathRef = useRef(null);
   const idleTimerRef = useRef(null);
+  const isGamePlayingRef = useRef(false);
 
   const isDownloadPath = path =>
     path === "/download" || path === "/downloads" || path === "/torboxdownloads";
@@ -815,6 +817,9 @@ const DiscordRPCTracker = () => {
     idleTimerRef.current = setTimeout(() => {
       if (!window.electron?.switchRPC) return;
       if (!settings?.rpcEnabled) return;
+      // Never fall back to "idle" while a game is running or the user is
+      // watching a download's progress.
+      if (isGamePlayingRef.current) return;
       if (isDownloadPath(lastPathRef.current)) return;
       window.electron.switchRPC("idle");
     }, 2 * 60 * 1000);
@@ -826,6 +831,13 @@ const DiscordRPCTracker = () => {
     if (lastPathRef.current === pathname) return;
     lastPathRef.current = pathname;
 
+    // While a game is playing, the "Playing a Game" activity is owned by the
+    // main process and should not be replaced by navigation-driven states.
+    if (isGamePlayingRef.current) {
+      clearIdleTimer();
+      return;
+    }
+
     if (isDownloadPath(pathname)) {
       clearIdleTimer();
       window.electron.switchRPC("downloading");
@@ -834,6 +846,34 @@ const DiscordRPCTracker = () => {
       scheduleIdle();
     }
   }, [pathname, settings?.rpcEnabled]);
+
+  // Track when a game is launched/closed so idle/default/downloading states
+  // never override the "Playing a Game" Discord activity.
+  useEffect(() => {
+    const handleGameLaunch = () => {
+      isGamePlayingRef.current = true;
+      clearIdleTimer();
+    };
+
+    const handleGameClosed = () => {
+      isGamePlayingRef.current = false;
+      if (!window.electron?.switchRPC || !settings?.rpcEnabled) return;
+      if (isDownloadPath(lastPathRef.current)) {
+        window.electron.switchRPC("downloading");
+      } else {
+        window.electron.switchRPC("default");
+        scheduleIdle();
+      }
+    };
+
+    window.electron?.ipcRenderer?.on("game-launch-success", handleGameLaunch);
+    window.electron?.ipcRenderer?.on("game-closed", handleGameClosed);
+
+    return () => {
+      window.electron?.ipcRenderer?.off("game-launch-success", handleGameLaunch);
+      window.electron?.ipcRenderer?.off("game-closed", handleGameClosed);
+    };
+  }, [settings?.rpcEnabled]);
 
   useEffect(() => {
     return () => clearIdleTimer();
@@ -1816,6 +1856,7 @@ const AppRoutes = () => {
             <Route index element={<Home />} />
             <Route path="search" element={null} />
             <Route path="library" element={<Library />} />
+            <Route path="retro" element={<Retro />} />
             <Route path="folderview/:folderName" element={<FolderView />} />
             <Route path="gamescreen" element={<GameScreen />} />
             <Route path="downloads" element={<Downloads />} />

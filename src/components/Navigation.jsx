@@ -7,6 +7,7 @@ import {
   Home,
   Search,
   Library,
+  Gamepad2,
   Settings2,
   Download,
   ChevronRight,
@@ -116,6 +117,12 @@ const Navigation = memo(({ items }) => {
         label: t("common.library"),
         icon: Library,
         color: "from-green-500 to-emerald-400",
+      },
+      {
+        path: "/retro",
+        label: "Retro",
+        icon: Gamepad2,
+        color: "from-violet-500 to-fuchsia-400",
       },
       {
         path: "/downloads",
