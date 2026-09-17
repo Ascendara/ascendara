@@ -1545,6 +1545,7 @@ const DownloadCard = ({
   const isPendingManualInstall = downloadingData?.pendingManualInstall;
   const isAwaitingRecovery = downloadingData?.awaitingRecoveryAction;
   const recoverableError = downloadingData?.recoverableError;
+  const isArchiveRecovery = recoverableError?.type === "archiveExtractionFailed";
 
   // Determine current status for badge
   const getStatus = () => {
@@ -1584,7 +1585,9 @@ const DownloadCard = ({
         toast.success(
           enableProtection
             ? t("downloads.extractionRecovery.protectionEnabledRetrying")
-            : t("downloads.extractionRecovery.retrying")
+            : isArchiveRecovery
+              ? t("downloads.extractionRecovery.retryingArchive")
+              : t("downloads.extractionRecovery.retrying")
         );
       }
     } catch (error) {
@@ -1673,6 +1676,7 @@ const DownloadCard = ({
     "content_type_error",
     "no_files_error",
     "provider_blocked_error",
+    "download_connection_error",
     "[Errno 28] No space left on device",
     "Insufficient disk space",
     "[WinError 225]",
@@ -1705,7 +1709,7 @@ const DownloadCard = ({
         "",
         "**Error**",
         "```",
-        downloadingData.message || "Unknown error",
+        getErrorMessage() || "Unknown error",
         "```",
         "",
         "**Download State**",
@@ -1767,6 +1771,8 @@ const DownloadCard = ({
     if (msg.includes("content_type_error")) return t("downloads.contentTypeError");
     if (msg.includes("no_files_error")) return t("downloads.noFilesError");
     if (msg.includes("provider_blocked_error"))
+      return t("downloads.connectionResetError");
+    if (msg.includes("download_connection_error"))
       return t("downloads.connectionResetError");
     if (msg.includes("HTTP 410")) return t("downloads.resourceGoneError");
     if (msg.includes("[Errno 28] No space left on device"))
@@ -1927,7 +1933,8 @@ const DownloadCard = ({
 
         {/* Content based on state */}
         <div className="mt-4">
-          {isAwaitingRecovery && recoverableError?.type === "missingExtractedFiles" && (
+          {isAwaitingRecovery &&
+            (recoverableError?.type === "missingExtractedFiles" || isArchiveRecovery) && (
             <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
@@ -1935,14 +1942,27 @@ const DownloadCard = ({
                 </div>
                 <div className="min-w-0">
                   <p className="font-medium text-amber-600">
-                    {t("downloads.extractionRecovery.title")}
+                    {t(isArchiveRecovery
+                      ? "downloads.extractionRecovery.archiveTitle"
+                      : "downloads.extractionRecovery.title")}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {t("downloads.extractionRecovery.description")}
+                    {t(isArchiveRecovery
+                      ? "downloads.extractionRecovery.archiveDescription"
+                      : "downloads.extractionRecovery.description")}
                   </p>
                 </div>
               </div>
               <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/50 p-2 text-xs">
+                {isArchiveRecovery && (
+                  <div className="space-y-1 break-words text-muted-foreground">
+                    <p className="font-medium">{recoverableError.archive}</p>
+                    <p>{recoverableError.message}</p>
+                    {recoverableError.extractionError !== recoverableError.message && (
+                      <p>{recoverableError.extractionError}</p>
+                    )}
+                  </div>
+                )}
                 {(recoverableError.files || []).map((error, index) => (
                   <div key={`${error.file}-${index}`} className="py-0.5 text-muted-foreground">
                     <span className="font-medium">{error.file}</span>
@@ -1951,7 +1971,7 @@ const DownloadCard = ({
                 ))}
               </div>
               <div className="flex flex-wrap gap-2">
-                {window.electron.getPlatform() === "win32" && !settings.excludeFolders && (
+                {!isArchiveRecovery && window.electron.getPlatform() === "win32" && !settings.excludeFolders && (
                   <Button
                     onClick={() => handleExtractionRecovery(true)}
                     disabled={isSubmittingRecovery}
@@ -1972,7 +1992,9 @@ const DownloadCard = ({
                   className="gap-2"
                 >
                   <RefreshCcw className="h-4 w-4" />
-                  {t("downloads.extractionRecovery.retryMissingFiles")}
+                  {t(isArchiveRecovery
+                    ? "downloads.retryExtraction"
+                    : "downloads.extractionRecovery.retryMissingFiles")}
                 </Button>
                 <Button
                   variant="ghost"

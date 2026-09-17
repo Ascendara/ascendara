@@ -194,6 +194,7 @@ function registerDownloadHandlers() {
                   downloadingData.verifying ||
                   downloadingData.stopped ||
                   downloadingData.pendingManualInstall ||
+                  downloadingData.awaitingRecoveryAction ||
                   (downloadingData.verifyError &&
                     downloadingData.verifyError.length > 0) ||
                   downloadingData.error;
@@ -273,6 +274,8 @@ function registerDownloadHandlers() {
                       paused: downloadingData.paused || false,
                       waiting: downloadingData.waiting || false,
                       pendingManualInstall: downloadingData.pendingManualInstall || false,
+                      awaitingRecoveryAction: downloadingData.awaitingRecoveryAction || false,
+                      recoverableError: downloadingData.recoverableError || null,
                       manualInstallerPath: downloadingData.manualInstallerPath || null,
                       progressCompleted: downloadingData.progressCompleted,
                       progressDownloadSpeeds: downloadingData.progressDownloadSpeeds,

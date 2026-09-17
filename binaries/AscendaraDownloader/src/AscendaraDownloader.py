@@ -1069,6 +1069,22 @@ def handleerror(game_info: Dict, game_info_path: str, error: Any):
     safe_write_json(game_info_path, game_info)
 
 
+def simplify_download_error(error: Any) -> str:
+    """Replace noisy provider/TLS failures with an actionable message."""
+    message = str(error)
+    lowered = message.lower()
+    network_markers = (
+        'httpsconnectionpool', 'connection pool', 'sslerror', 'ssl:',
+        'ssleoferror', 'decryption_failed_or_bad_record_mac',
+        'connection reset', 'connection aborted', 'connection broken',
+        'incomplete read', 'repeated connection failures',
+        'max retries exceeded', 'eof occurred in violation of protocol',
+    )
+    if any(marker in lowered for marker in network_markers):
+        return 'download_connection_error'
+    return message
+
+
 def parse_boolean(value):
     if isinstance(value, bool):
         return value
@@ -1412,7 +1428,8 @@ class AscendaraDownloader:
             if not downloader.download():
                 if downloader.stopped:
                     raise InterruptedError('Archive repair cancelled')
-                raise RuntimeError('Archive repair download failed; the original archive has been kept')
+                raise RuntimeError('Archive repair download failed; the original archive has been kept. '
+                                   f'{downloader.last_error or "No transfer error details were provided"}')
 
         def on_retry():
             logging.warning(f"[AscendaraDownloader] Re-downloading damaged archive: {os.path.basename(archive_path)}")
@@ -1686,8 +1703,8 @@ class AscendaraDownloader:
         except Exception as exc:
             logging.exception('V4 download failed')
             if not self._check_for_stop():
-                message = str(exc)
-                if any(term in message for term in ('SSL: WRONG_VERSION_NUMBER', 'WinError 10054', 'forcibly closed')):
+                message = simplify_download_error(exc)
+                if any(term in str(exc) for term in ('SSL: WRONG_VERSION_NUMBER', 'WinError 10054', 'forcibly closed')):
                     message = 'provider_blocked_error'
                 handleerror(self.game_info, self.game_info_path, message)
                 if withNotification:
@@ -1732,14 +1749,17 @@ class AscendaraDownloader:
                 from AscendaraDownloadRecovery import wait_for_retry
                 wait_for_retry(2, self._check_for_stop)
 
-    def _await_extraction_recovery(self, details):
-        if getattr(self, '_recovery_prompted', False):
+    def _await_extraction_recovery(self, details, force=False):
+        if not force and getattr(self, '_recovery_prompted', False):
             return 'retry'
         self._recovery_prompted = True
         request_id = f'{os.getpid()}-{time.time_ns()}'
         data = self.game_info['downloadingData']
         data.update(downloading=False, extracting=False, verifying=False,
-                    awaitingRecoveryAction=True, timeUntilComplete='Action required')
+                    awaitingRecoveryAction=True, timeUntilComplete='Action required',
+                    progressDownloadSpeeds='0.00 KB/s')
+        for key in ('error', 'message', 'retryAttempt'):
+            data.pop(key, None)
         data['recoverableError'] = dict(details, requestId=request_id)
         data.pop('recoveryAction', None)
         safe_write_json(self.game_info_path, self.game_info)
@@ -1763,6 +1783,52 @@ class AscendaraDownloader:
                 safe_write_json(self.game_info_path, self.game_info)
                 return action
             time.sleep(.2)
+
+    def _extract_archive_with_recovery(self, archive, payload, stage, started):
+        """Keep the stage alive while the user retries only the failed archive."""
+        repair_attempted = False
+        manual_retry = False
+        while True:
+            self._check_cancelled()
+            try:
+                return supervise_extraction(archive, payload, self._check_cancelled,
+                    lambda state: self._extraction_progress(state, started),
+                    self._await_extraction_recovery, stage)
+            except (InterruptedError, ExtractionRecoveryCancelled):
+                raise
+            except Exception as exc:
+                failure = exc
+                # Preserve the existing one-shot repair, but a user's extraction
+                # retry must never silently start another download.
+                if not manual_retry and not repair_attempted and not isinstance(exc, IncompleteArchiveOutput):
+                    repair_attempted = True
+                    try:
+                        self._repair_archive(exc, archive, 0)
+                    except (InterruptedError, ExtractionRecoveryCancelled):
+                        raise
+                    except Exception as repair_error:
+                        failure = repair_error
+                    else:
+                        continue
+                logging.warning('Extraction needs user action for %s: %s', archive, failure)
+                action = self._await_extraction_recovery({
+                    'type': 'archiveExtractionFailed',
+                    'archive': os.path.basename(archive),
+                    'message': str(failure),
+                    'extractionError': str(exc),
+                    'files': getattr(exc, 'errors', []),
+                }, force=True)
+                if action != 'retry':
+                    raise ExtractionRecoveryCancelled(
+                        'Extraction recovery cancelled; the downloaded source files were retained') from failure
+                manual_retry = True
+                data = self.game_info['downloadingData']
+                data.update(downloading=False, extracting=True, verifying=False,
+                            progressCompleted='100.00', progressDownloadSpeeds='0.00 KB/s',
+                            timeUntilComplete='Retrying extraction...')
+                self._extraction_progress({'name': os.path.basename(archive), 'files': 0,
+                                          'total': 0, 'percent': 0}, started)
+                safe_write_json(self.game_info_path, self.game_info)
 
     def _extract_files_once(self, archive_path=None, loose_files=None, cleanup_folder=None):
         self._check_cancelled()
@@ -1822,18 +1888,7 @@ class AscendaraDownloader:
             while pending:
                 self._check_cancelled()
                 archive = pending.pop(0)
-                for attempt in range(2):
-                    try:
-                        result = supervise_extraction(archive, payload, self._check_cancelled,
-                            lambda state: self._extraction_progress(state, started),
-                            self._await_extraction_recovery, stage)
-                        break
-                    except (InterruptedError, ExtractionRecoveryCancelled):
-                        raise
-                    except IncompleteArchiveOutput:
-                        raise  # Retry extraction locally; this is not a CRC repair.
-                    except Exception as exc:
-                        self._repair_archive(exc, archive, attempt)
+                result = self._extract_archive_with_recovery(archive, payload, stage, started)
                 manifest.update(result)
                 processed.append(archive)
                 from AscendaraDownloadRecovery import archive_sources
