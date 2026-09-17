@@ -15,7 +15,6 @@ const { getSettingsManager } = require("./settings");
 const {
   setPlayingActivity,
   updateDiscordRPCToLibrary,
-  getRPC,
 } = require("./discord-rpc");
 const { hideWindow, showWindow } = require("./window");
 
@@ -678,10 +677,7 @@ function registerGameHandlers() {
         }
 
         // Update Discord RPC
-        const rpc = getRPC();
-        if (rpc) {
-          setPlayingActivity(game);
-        }
+        setPlayingActivity(game, `pc:${game}`);
 
         runGame.on("exit", code => {
           console.log(`Game ${game} exited with code ${code}`);
@@ -689,7 +685,7 @@ function registerGameHandlers() {
           if (settings.hideOnGameLaunch !== false) {
             showWindow();
           }
-          setTimeout(updateDiscordRPCToLibrary, 1000);
+          updateDiscordRPCToLibrary(`pc:${game}`);
           event.sender.send("game-closed", { game });
         });
 
@@ -707,7 +703,7 @@ function registerGameHandlers() {
     const runGame = runGameProcesses.get(game);
     if (runGame) {
       runGame.kill();
-      setTimeout(updateDiscordRPCToLibrary, 1000);
+      updateDiscordRPCToLibrary(`pc:${game}`);
     }
   });
 

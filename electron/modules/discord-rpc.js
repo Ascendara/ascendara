@@ -14,6 +14,10 @@ let rpcIsConnected = false;
 let rpcConnectionAttempts = 0;
 const MAX_RPC_ATTEMPTS = 3;
 let currentlyPlayingGame = null;
+// Keep separate sessions so closing a Retro emulator cannot clear a PC game's
+// presence, or another Retro game that is still running.
+const playingSessions = new Map();
+let activityRevision = 0;
 let retryTimeout = null;
 
 /**
@@ -119,7 +123,7 @@ async function initializeDiscordRPC() {
 
     // Restore playing state if a game is running, otherwise show library state
     if (currentlyPlayingGame) {
-      setPlayingActivity(currentlyPlayingGame);
+      publishPlayingActivity();
     } else {
       rpc
         .setActivity({
@@ -183,16 +187,24 @@ async function initializeDiscordRPC() {
 /**
  * Update Discord RPC to library state
  */
-function updateDiscordRPCToLibrary() {
+function updateDiscordRPCToLibrary(sessionId = "pc") {
+  playingSessions.delete(sessionId);
+  const revision = ++activityRevision;
+  if (playingSessions.size) {
+    publishPlayingActivity();
+    return;
+  }
   currentlyPlayingGame = null;
   if (!rpc || !rpcIsConnected) return;
 
   // First disconnect any existing activity
-  rpc
+  const client = rpc;
+  client
     .clearActivity()
     .then(() => {
       // Wait a bit longer to ensure clean state
       setTimeout(() => {
+        if (revision !== activityRevision || currentlyPlayingGame || client !== rpc || !rpcIsConnected) return;
         // Then set new activity
         rpc
           .setActivity({
@@ -214,15 +226,24 @@ function updateDiscordRPCToLibrary() {
  * Set Discord RPC activity for playing a game
  * @param {string} gameName - Name of the game being played
  */
-function setPlayingActivity(gameName) {
-  currentlyPlayingGame = gameName;
+function setPlayingActivity(gameName, sessionId = "pc") {
+  playingSessions.delete(sessionId);
+  playingSessions.set(sessionId, { name: gameName, startedAt: new Date() });
+  ++activityRevision;
+  publishPlayingActivity();
+}
+
+function publishPlayingActivity() {
+  const session = [...playingSessions.values()].at(-1);
+  currentlyPlayingGame = session?.name || null;
+  if (!session) return;
   if (!rpc || !rpcIsConnected) return;
 
   rpc
     .setActivity({
       details: "Playing a Game",
-      state: `${gameName}`,
-      startTimestamp: new Date(),
+      state: session.name,
+      startTimestamp: session.startedAt,
       largeImageKey: "ascendara",
       largeImageText: "Ascendara",
       buttons: [
@@ -247,6 +268,12 @@ function setRPCState(state) {
   }
   if (!rpc || !rpcIsConnected) {
     console.log("Discord RPC not connected, skipping activity update");
+    return;
+  }
+  // Never let generic UI states (idle/default/downloading) override the
+  // "Playing a Game" activity while a game is actually running.
+  if (currentlyPlayingGame) {
+    console.log("Discord RPC: a game is currently playing, ignoring state change to", state);
     return;
   }
 

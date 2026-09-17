@@ -21,6 +21,26 @@ const preloadIpc = createPreloadIpcTransport(ipcRenderer);
 // MAIN ELECTRON API
 //=============================================================================
 contextBridge.exposeInMainWorld("electron", {
+  retro: {
+    getState: () => ipcRenderer.invoke("retro-state"),
+    pick: kind => ipcRenderer.invoke("retro-pick", kind),
+    saveProfile: (id, profile) => ipcRenderer.invoke("retro-save-profile", id, profile),
+    scan: id => ipcRenderer.invoke("retro-scan", id),
+    updateCatalogue: source => ipcRenderer.invoke("retro-catalogue", source),
+    search: (id, query) => ipcRenderer.invoke("retro-search", id, query),
+    updateGame: (id, data) => ipcRenderer.invoke("retro-update-game", id, data),
+    setCover: (id, file) => ipcRenderer.invoke("retro-cover", id, file),
+    remove: id => ipcRenderer.invoke("retro-remove", id),
+    reveal: id => ipcRenderer.invoke("retro-reveal", id),
+    website: id => ipcRenderer.invoke("retro-website", id),
+    launch: (id, disc) => ipcRenderer.invoke("retro-launch", id, disc),
+    backup: (id, cloud) => ipcRenderer.invoke("retro-backup", id, cloud),
+    restore: (id, data) => ipcRenderer.invoke("retro-restore", id, data),
+    recoveryFolder: () => ipcRenderer.invoke("retro-recovery-folder"),
+    cards: id => ipcRenderer.invoke("retro-cards", id),
+    cardAction: (id, original, name, duplicate) => ipcRenderer.invoke("retro-card-action", id, original, name, duplicate),
+    onChanged: callback => preloadIpc.subscribe("retro-changed", callback),
+  },
   //===========================================================================
   // IPC RENDERER (Legacy low-level access)
   //===========================================================================

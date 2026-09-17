@@ -269,6 +269,7 @@ function registerCriticalHandlers() {
   updates.registerUpdateHandlers();
   downloads.registerDownloadHandlers();
   games.registerGameHandlers();
+  require("./modules/retro").registerRetroHandlers();
   system.registerSystemHandlers();
   if (isLinux) {
     const { registerProtonHandlers } = require("./modules/proton");
