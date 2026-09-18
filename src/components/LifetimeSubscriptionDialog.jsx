@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Crown, Sparkles, Zap, Loader2, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getAuthToken } from "@/utils/authHelper";
+import { userAuthenticatedFetch } from "@/utils/authHelper";
 
 const LifetimeSubscriptionDialog = ({ launchCount }) => {
   const { t } = useTranslation();
@@ -31,41 +31,43 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
     const checkLifetimeEligibility = async () => {
       try {
         const subscription = userData?.ascendSubscription;
-        
+
         // Show dialog for both non-subscribers and active subscribers without lifetime
-        const shouldShowDialog = 
+        const shouldShowDialog =
           !subscription?.active || // No active subscription
           (subscription?.active === true && subscription?.lifetime !== true); // Active but not lifetime
-        
+
         // Only show after 5 launches (a couple days of usage)
         if (shouldShowDialog && !hasCheckedRef.current && launchCount >= 5) {
           hasCheckedRef.current = true;
-          
+
           // Fetch discount information from API only if user has active subscription
           if (subscription?.active === true) {
             try {
-              const token = await user.getIdToken();
-              const response = await fetch('https://api.ascendara.app/stripe/calculate-lifetime-discount', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ userId: user.uid })
-              });
-              
+              const response = await userAuthenticatedFetch(
+                user,
+                "https://api.ascendara.app/stripe/calculate-lifetime-discount",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ userId: user.uid }),
+                }
+              );
+
               if (response.ok) {
                 const data = await response.json();
                 setDiscountInfo(data);
-                console.log('[LifetimeDialog] Discount info:', data);
+                console.log("[LifetimeDialog] Discount info:", data);
               }
             } catch (error) {
-              console.error('[LifetimeDialog] Error fetching discount:', error);
+              console.error("[LifetimeDialog] Error fetching discount:", error);
             }
           }
-          
+
           setLoading(false);
-          
+
           // Show dialog after a delay to let app initialize
           setTimeout(() => {
             setShowDialog(true);
@@ -86,69 +88,33 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
     try {
       setShowDialog(false);
       setShowRedirectDialog(true);
-      
-      // Get auth token using the helper function
-      const authToken = await getAuthToken();
-      
+
       // Determine which price ID to use
-      const priceId = isLifetime 
+      const priceId = isLifetime
         ? "price_1TKjjMCfu5zjwIKZyrWXZFJ1" // Lifetime
         : "price_1QnMnNCfu5zjwIKZFbCRwBHd"; // Monthly $1.50
-      
-      // Use the discount amount we already fetched (only for lifetime upgrades)
-      const discountAmount = isLifetime ? (discountInfo?.discount || 0) : 0;
-      
+
       // Create checkout session
-      const response = await fetch(
+      const response = await userAuthenticatedFetch(
+        user,
         "https://api.ascendara.app/stripe/create-checkout-session",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify({
             userId: user.uid,
             priceId: priceId,
-            discountAmount: discountAmount,
             successUrl: "https://ascendara.app/thank-you?subscription=success",
             cancelUrl: "ascendara://checkout-canceled",
           }),
         }
       );
-      
+
       if (response.ok) {
         const { url } = await response.json();
         window.electron?.openURL?.(url);
-      } else if (response.status === 401) {
-        // Token expired or invalid, retry with a fresh token
-        console.log("Token expired, retrying with fresh token...");
-        const newToken = await getAuthToken();
-        const retryResponse = await fetch(
-          "https://api.ascendara.app/stripe/create-checkout-session",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${newToken}`,
-            },
-            body: JSON.stringify({
-              userId: user.uid,
-              priceId: priceId,
-              discountAmount: discountAmount,
-              successUrl: "https://ascendara.app/thank-you?subscription=success",
-              cancelUrl: "ascendara://checkout-canceled",
-            }),
-          }
-        );
-        
-        if (retryResponse.ok) {
-          const { url } = await retryResponse.json();
-          window.electron?.openURL?.(url);
-        } else {
-          console.error("Failed to create checkout session after retry");
-          setShowRedirectDialog(false);
-        }
       } else {
         console.error("Failed to create checkout session:", response.status);
         setShowRedirectDialog(false);

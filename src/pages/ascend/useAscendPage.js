@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useNavigate } from "react-router-dom";
-import { getAuthToken as getAuthTokenHelper } from "@/utils/authHelper";
+import { getUserAuthHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
 import { retroBackupPlatform, restoreRetroCloudBackup } from "@/services/retroService";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import {
@@ -52,8 +52,6 @@ import {
   subscribeToOutgoingRequests,
   cleanupMessageListeners,
 } from "@/services/firebaseService";
-
-const getAuthToken = getAuthTokenHelper;
 
 export default function useAscendPage() {
   const navigate = useNavigate();
@@ -260,17 +258,24 @@ export default function useAscendPage() {
 
   // Check if app is on latest version
   useEffect(() => {
+    let apiRequiresUpdate = false;
+    const requireUpdate = () => {
+      apiRequiresUpdate = true;
+      setIsOutdated(true);
+    };
+    window.addEventListener("ascendara:update-required", requireUpdate);
     const checkVersion = async () => {
       try {
         const isLatest = await checkForUpdates();
-        setIsOutdated(!isLatest);
+        setIsOutdated(apiRequiresUpdate || !isLatest);
       } catch (error) {
         console.error("Error checking version:", error);
-        setIsOutdated(false);
+        setIsOutdated(apiRequiresUpdate);
       }
       setCheckingVersion(false);
     };
     checkVersion();
+    return () => window.removeEventListener("ascendara:update-required", requireUpdate);
   }, []);
 
   // Handle account pending deletion error
@@ -1987,10 +1992,10 @@ export default function useAscendPage() {
         }
       }
 
-      // Verify the user account still exists in Firebase
+      // Require the signed-in user's Firebase credentials before checkout.
       try {
-        const authToken = await getAuthToken();
-        if (!authToken) {
+        const authHeaders = await getUserAuthHeaders(user);
+        if (!authHeaders.Authorization) {
           toast.error(
             t("account.errors.authenticationFailed") ||
               "Authentication failed. Please try again."
@@ -2063,58 +2068,19 @@ export default function useAscendPage() {
     try {
       setShowPlanDialog(false);
 
-      // Get a fresh token for the request
-      const authToken = await getAuthToken();
+      // The API calculates any eligible lifetime discount during checkout.
 
-      // Check if this is a lifetime upgrade and fetch discount info
-      let discountAmount = 0;
-      const isLifetimePlan = priceId === "price_1TKjjMCfu5zjwIKZyrWXZFJ1";
-
-      if (
-        isLifetimePlan &&
-        userData?.ascendSubscription?.active &&
-        !userData?.ascendSubscription?.lifetime
-      ) {
-        try {
-          const discountResponse = await fetch(
-            "https://api.ascendara.app/stripe/calculate-lifetime-discount",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ userId: user.uid }),
-            }
-          );
-
-          if (discountResponse.ok) {
-            const discountData = await discountResponse.json();
-            if (discountData.eligible && discountData.discount > 0) {
-              discountAmount = discountData.discount;
-              console.log(
-                `[Checkout] Applying $${discountAmount} discount for lifetime upgrade`
-              );
-            }
-          }
-        } catch (discountError) {
-          console.error("[Checkout] Error fetching discount:", discountError);
-          // Continue without discount if there's an error
-        }
-      }
-
-      const response = await fetch(
+      const response = await userAuthenticatedFetch(
+        user,
         "https://api.ascendara.app/stripe/create-checkout-session",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify({
             userId: user.uid,
             priceId: priceId,
-            discountAmount: discountAmount,
             successUrl: "https://ascendara.app/thank-you?subscription=success",
             cancelUrl: "ascendara://checkout-canceled",
           }),
@@ -2124,34 +2090,6 @@ export default function useAscendPage() {
       if (response.ok) {
         const { url } = await response.json();
         window.electron?.openURL?.(url);
-      } else if (response.status === 401) {
-        // Token expired or invalid, retry with a fresh token
-        console.log("Token expired, retrying with fresh token...");
-        const newToken = await getAuthToken();
-        const retryResponse = await fetch(
-          "https://api.ascendara.app/stripe/create-checkout-session",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${newToken}`,
-            },
-            body: JSON.stringify({
-              userId: user.uid,
-              priceId: priceId,
-              discountAmount: discountAmount,
-              successUrl: "https://ascendara.app/thank-you?subscription=success",
-              cancelUrl: "ascendara://checkout-canceled",
-            }),
-          }
-        );
-
-        if (retryResponse.ok) {
-          const { url } = await retryResponse.json();
-          window.electron?.openURL?.(url);
-        } else {
-          toast.error(t("ascend.settings.checkoutError"));
-        }
       } else {
         toast.error(t("ascend.settings.checkoutError"));
       }
@@ -2164,18 +2102,20 @@ export default function useAscendPage() {
   // Open Stripe Customer Portal for managing subscription
   const handleManageSubscription = async () => {
     try {
-      const authToken = await getAuthToken();
-      const response = await fetch("https://api.ascendara.app/stripe/customer-portal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          returnUrl: "ascendara://checkout-canceled",
-        }),
-      });
+      const response = await userAuthenticatedFetch(
+        user,
+        "https://api.ascendara.app/stripe/customer-portal",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            returnUrl: "ascendara://checkout-canceled",
+          }),
+        }
+      );
       if (response.ok) {
         const { url } = await response.json();
         window.electron?.openURL?.(url);
@@ -2191,18 +2131,20 @@ export default function useAscendPage() {
   // Open Stripe Customer Portal for viewing invoices
   const handleViewInvoices = async () => {
     try {
-      const authToken = await getAuthToken();
-      const response = await fetch("https://api.ascendara.app/stripe/customer-portal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          returnUrl: "ascendara://checkout-canceled",
-        }),
-      });
+      const response = await userAuthenticatedFetch(
+        user,
+        "https://api.ascendara.app/stripe/customer-portal",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            returnUrl: "ascendara://checkout-canceled",
+          }),
+        }
+      );
       if (response.ok) {
         const { url } = await response.json();
         window.electron?.openURL?.(url);
@@ -2231,18 +2173,20 @@ export default function useAscendPage() {
 
       console.log(`Verifying checkout (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
 
-      const authToken = await getAuthToken();
-      const response = await fetch("https://api.ascendara.app/stripe/verify-checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          sessionId: sessionId,
-          userId: user.uid,
-        }),
-      });
+      const response = await userAuthenticatedFetch(
+        user,
+        "https://api.ascendara.app/stripe/verify-checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            userId: user.uid,
+          }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();

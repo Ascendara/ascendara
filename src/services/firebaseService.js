@@ -1,4 +1,5 @@
 // Firebase SDK initialization for Ascendara account management
+import { userAuthenticatedFetch } from "@/utils/authHelper";
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import {
@@ -532,17 +533,21 @@ export const deleteAccount = async password => {
     const userData = userDoc.exists() ? userDoc.data() : {};
 
     // Send deletion request to API
-    const response = await fetch("https://api.ascendara.app/account/request-deletion", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId: user.uid,
-        email: user.email,
-        displayName: userData.displayName || user.displayName || "Unknown",
-      }),
-    });
+    const response = await userAuthenticatedFetch(
+      user,
+      "https://api.ascendara.app/account/request-deletion",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          email: user.email,
+          displayName: userData.displayName || user.displayName || "Unknown",
+        }),
+      }
+    );
 
     const result = await response.json();
 
@@ -1172,14 +1177,13 @@ export const recomputeProfileStats = async (joinDate = null) => {
       return { success: false, stats: null, error: "Not authenticated" };
     }
 
-    const idToken = await user.getIdToken();
-    const response = await fetch(
+    const response = await userAuthenticatedFetch(
+      user,
       "https://api.ascendara.app/v3/profile/recompute-stats",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify(joinDate ? { joinDate } : {}),
       }
@@ -3011,29 +3015,6 @@ export const getNotifications = async () => {
 };
 
 /**
- * Get Ascendara auth token
- * @returns {Promise<string>}
- */
-const getAuthToken = async () => {
-  try {
-    const authHeaders = await window.electron.getAuthHeaders();
-    const response = await fetch("https://api.ascendara.app/auth/token", {
-      headers: authHeaders,
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to obtain token");
-    }
-
-    const data = await response.json();
-    return data.token;
-  } catch (error) {
-    console.error("Error getting token:", error);
-    throw error;
-  }
-};
-
-/**
  * Upload a game save backup to cloud storage
  * @param {File} file - The backup file to upload
  * @param {string} gameName - Name of the game
@@ -3047,18 +3028,20 @@ export const uploadBackup = async (file, gameName, backupName) => {
       return { success: false, backupId: null, error: "Not authenticated" };
     }
 
-    const token = await getAuthToken();
     const formData = new FormData();
     formData.append("file", file);
     formData.append("gameName", gameName);
     formData.append("backupName", backupName);
     formData.append("userId", user.uid);
-    formData.append("token", token);
 
-    const response = await fetch("https://api.ascendara.app/ascend/backups/upload", {
-      method: "POST",
-      body: formData,
-    });
+    const response = await userAuthenticatedFetch(
+      user,
+      "https://api.ascendara.app/ascend/backups/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
 
     const data = await response.json();
 
@@ -3090,18 +3073,15 @@ export const listBackups = async (gameName = null) => {
       return { backups: [], error: "Not authenticated" };
     }
 
-    const token = await getAuthToken();
     const url = new URL("https://api.ascendara.app/ascend/backups/list");
     url.searchParams.append("userId", user.uid);
     if (gameName) {
       url.searchParams.append("gameName", gameName);
     }
 
-    const response = await fetch(url, {
+    const response = await userAuthenticatedFetch(user, url, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: {},
     });
 
     const data = await response.json();
@@ -3138,15 +3118,12 @@ export const getBackupDownloadUrl = async backupId => {
       };
     }
 
-    const token = await getAuthToken();
     const url = new URL(`https://api.ascendara.app/ascend/backups/download/${backupId}`);
     url.searchParams.append("userId", user.uid);
 
-    const response = await fetch(url, {
+    const response = await userAuthenticatedFetch(user, url, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: {},
     });
 
     const data = await response.json();
@@ -3185,15 +3162,12 @@ export const deleteBackup = async backupId => {
       return { success: false, error: "Not authenticated" };
     }
 
-    const token = await getAuthToken();
     const url = new URL(`https://api.ascendara.app/ascend/backups/delete/${backupId}`);
     url.searchParams.append("userId", user.uid);
 
-    const response = await fetch(url, {
+    const response = await userAuthenticatedFetch(user, url, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: {},
     });
 
     const data = await response.json();
