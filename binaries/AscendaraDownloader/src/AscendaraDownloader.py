@@ -40,7 +40,77 @@ from AscendaraRarRecovery import (
     _file_error, _check_archive_target,
 )
 
+DOWNLOADER_VERSION = '4.0.0'
+DOWNLOADER_VERSION_URL = 'https://api.ascendara.app/downloader-version'
+DOWNLOADER_DOWNLOAD_URL = 'https://cdn.ascendara.app/files/AscendaraDownloader.exe'
+
 _caffeinate_proc = None
+
+
+def _version_parts(value):
+    """Return a comparable numeric version tuple, or None for invalid input."""
+    if not isinstance(value, str) or not re.fullmatch(r'v?\d+(?:\.\d+){0,3}', value.strip()):
+        return None
+    parts = tuple(int(part) for part in value.strip().lstrip('v').split('.'))
+    return parts + (0,) * (4 - len(parts))
+
+
+def _schedule_downloader_update():
+    """Download and install a newer packaged downloader after this process exits."""
+    if not getattr(sys, 'frozen', False) or sys.platform != 'win32':
+        return False
+    try:
+        local_version = _version_parts(DOWNLOADER_VERSION)
+        response = requests.get(DOWNLOADER_VERSION_URL, timeout=5)
+        response.raise_for_status()
+        payload = response.json()
+        remote_version = _version_parts(payload.get('version') if isinstance(payload, dict) else None)
+        if local_version is None or remote_version is None or remote_version <= local_version:
+            return False
+
+        executable = os.path.abspath(sys.executable)
+        executable_dir = os.path.dirname(executable)
+        with requests.get(DOWNLOADER_DOWNLOAD_URL, stream=True, timeout=(5, 60)) as download:
+            download.raise_for_status()
+            with NamedTemporaryFile('wb', delete=False, dir=executable_dir,
+                                    prefix='AscendaraDownloader-', suffix='.new') as stream:
+                replacement = stream.name
+                for chunk in download.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        stream.write(chunk)
+        # A PE header rejects error pages and other accidental CDN responses.
+        with open(replacement, 'rb') as stream:
+            if stream.read(2) != b'MZ':
+                raise ValueError('Downloaded updater is not a Windows executable')
+
+        script = NamedTemporaryFile('w', delete=False, dir=executable_dir,
+                                    prefix='AscendaraDownloader-update-', suffix='.cmd', encoding='utf-8')
+        with script:
+            script.write('@echo off\r\n'
+                         'set "target=%s"\r\n'
+                         'set "replacement=%s"\r\n'
+                         'set "pid=%s"\r\n'
+                         ':wait\r\n'
+                         'tasklist /fi "PID eq %%pid%%" /nh | find "%%pid%%" >nul\r\n'
+                         'if not errorlevel 1 (\r\n'
+                         '  timeout /t 1 /nobreak >nul\r\n'
+                         '  goto wait\r\n'
+                         ')\r\n'
+                         'move /y "%%replacement%%" "%%target%%" >nul\r\n'
+                         'del "%%~f0"\r\n' % (executable, replacement, os.getpid()))
+        subprocess.Popen(['cmd.exe', '/d', '/c', script.name], close_fds=True,
+                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        logging.info('Scheduled AscendaraDownloader update: %s -> %s', DOWNLOADER_VERSION, payload['version'])
+        return True
+    except Exception:
+        replacement = locals().get('replacement')
+        if replacement:
+            try:
+                os.remove(replacement)
+            except OSError:
+                pass
+        logging.warning('Could not check for an AscendaraDownloader update', exc_info=True)
+        return False
 
 def replace_file(source, target, check_cancelled=lambda: None):
     """Atomic same-volume move with bounded retries for Windows file contention."""
@@ -2325,6 +2395,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
                         handlers=[logging.FileHandler(get_ascendara_log_path(), encoding='utf-8'),
                                   logging.StreamHandler(sys.stdout)])
+    _schedule_downloader_update()
     try:
         downloader = AscendaraDownloader(args.game, args.online, args.dlc, args.isVr,
                                          args.updateFlow, args.version, args.size,
