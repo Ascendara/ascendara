@@ -677,6 +677,18 @@ h2 {
   animation: fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-page-fade {
+  animation: page-fade-in 0.25s ease-out both;
+}
+
 @keyframes dropdownIn {
   0% {
     opacity: 0;

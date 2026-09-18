@@ -1,11 +1,10 @@
-import { useState, useEffect, useContext, memo, useRef } from "react";
+import { useState, useEffect, memo, useRef } from "react";
 import { Outlet, useSearchParams, useLocation } from "react-router-dom";
 import Navigation from "./Navigation";
 import MenuBar from "./MenuBar";
 import Tour from "./Tour";
 import PageTransition from "./PageTransition";
 import { useTheme } from "@/context/ThemeContext";
-import { SettingsContext } from "@/context/SettingsContext";
 import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
 
@@ -14,8 +13,6 @@ const Layout = memo(() => {
   const [showTour, setShowTour] = useState(false);
   const { theme, resolvedTheme } = useTheme();
   const location = useLocation();
-  const context = useContext(SettingsContext);
-  const smoothTransitions = context?.settings?.smoothTransitions ?? true;
   const isSearchPage = location.pathname === "/search";
   const isDownloadPage = location.pathname === "/download";
   const searchScrollRef = useRef(null);

@@ -75,31 +75,53 @@ import {
 function lazyPage(load) {
   const Page = React.lazy(load);
   return function LazyPage(props) {
-    const { t } = useTranslation();
     return (
-      <React.Suspense fallback={<div className="flex flex-1 items-center justify-center p-12" role="status">{t("common.loading", "Loading...")}</div>}>
+      <React.Suspense fallback={null}>
         <Page {...props} />
       </React.Suspense>
     );
   };
 }
 
-const DownloadPage = lazyPage(() => import("./pages/Download"));
-const Downloads = lazyPage(() => import("./pages/Downloads"));
-const ExtraLanguages = lazyPage(() => import("./pages/ExtraLanguages"));
-const WorkshopDownloader = lazyPage(() => import("./pages/WorkshopDownloader"));
-const SidecarAndDependencies = lazyPage(() => import("./pages/SidecarAndDependencies"));
-const TorboxDownloads = lazyPage(() => import("./pages/TorboxDownloads"));
-const GameScreen = lazyPage(() => import("./pages/GameScreen"));
-const Profile = lazyPage(() => import("./pages/Profile"));
-const Ascend = lazyPage(() => import("./pages/Ascend"));
-const Library = lazyPage(() => import("./pages/Library"));
-const Retro = lazyPage(() => import("./pages/Retro"));
-const FolderView = lazyPage(() => import("./pages/FolderView"));
-const LocalRefresh = lazyPage(() => import("./pages/LocalRefresh"));
-const Settings = lazyPage(() => import("./pages/Settings"));
-const Welcome = lazyPage(() => import("./pages/Welcome"));
-const BigPicture = lazyPage(() => import("./pages/BigPicture"));
+const pageLoaders = {
+  download: () => import("./pages/Download"),
+  downloads: () => import("./pages/Downloads"),
+  extraLanguages: () => import("./pages/ExtraLanguages"),
+  workshopDownloader: () => import("./pages/WorkshopDownloader"),
+  sidecarAndDependencies: () => import("./pages/SidecarAndDependencies"),
+  torboxDownloads: () => import("./pages/TorboxDownloads"),
+  gameScreen: () => import("./pages/GameScreen"),
+  profile: () => import("./pages/Profile"),
+  ascend: () => import("./pages/Ascend"),
+  library: () => import("./pages/Library"),
+  retro: () => import("./pages/Retro"),
+  folderView: () => import("./pages/FolderView"),
+  localRefresh: () => import("./pages/LocalRefresh"),
+  settings: () => import("./pages/Settings"),
+  welcome: () => import("./pages/Welcome"),
+  bigPicture: () => import("./pages/BigPicture"),
+};
+
+const DownloadPage = lazyPage(pageLoaders.download);
+const Downloads = lazyPage(pageLoaders.downloads);
+const ExtraLanguages = lazyPage(pageLoaders.extraLanguages);
+const WorkshopDownloader = lazyPage(pageLoaders.workshopDownloader);
+const SidecarAndDependencies = lazyPage(pageLoaders.sidecarAndDependencies);
+const TorboxDownloads = lazyPage(pageLoaders.torboxDownloads);
+const GameScreen = lazyPage(pageLoaders.gameScreen);
+const Profile = lazyPage(pageLoaders.profile);
+const Ascend = lazyPage(pageLoaders.ascend);
+const Library = lazyPage(pageLoaders.library);
+const Retro = lazyPage(pageLoaders.retro);
+const FolderView = lazyPage(pageLoaders.folderView);
+const LocalRefresh = lazyPage(pageLoaders.localRefresh);
+const Settings = lazyPage(pageLoaders.settings);
+const Welcome = lazyPage(pageLoaders.welcome);
+const BigPicture = lazyPage(pageLoaders.bigPicture);
+
+// Warm every page chunk in the background while the splash screen is up so
+// navigating between pages renders instantly instead of flashing a fallback.
+Object.values(pageLoaders).forEach(load => load().catch(() => {}));
 
 const LinuxUpdateDialog = ({ open, onOpenChange }) => {
   const { t } = useTranslation();
