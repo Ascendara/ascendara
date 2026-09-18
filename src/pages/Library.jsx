@@ -1396,6 +1396,12 @@ const Library = () => {
       label: t("library.history.title") || "History",
       icon: <History className="h-4 w-4" />,
       count: deletedGames.length,
+    },
+    {
+      id: "retro",
+      label: "Retro",
+      icon: <Gamepad2 className="h-4 w-4" />,
+      nav: "/retro",
     }
   ].filter(tab => !tab.hidden);
 
@@ -1554,7 +1560,7 @@ const Library = () => {
                 </div>
 
                 <button
-                  onClick={() => { setActiveTab(tab.id); }}
+                  onClick={() => { tab.nav ? navigate(tab.nav) : setActiveTab(tab.id); }}
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all",
                     activeTab === tab.id
@@ -1583,16 +1589,6 @@ const Library = () => {
               </div>
             ));
           })()}
-
-          <button
-            onClick={() => navigate("/retro")}
-            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
-          >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-              <Gamepad2 className="h-4 w-4" />
-            </span>
-            <span className="flex-1 text-left">Retro</span>
-          </button>
         </nav>
 
         {/* ── Actions ── */}
