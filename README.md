@@ -1,7 +1,7 @@
 <div align="center">
     <img align="center" width="128" height="128" src="./src/public/icon.png" alt="Ascendara Logo">
     <h1>Ascendara</h1>
-    <p><em>The best way to test games before you buy them.</em></p>
+    <p><em>Less setup. More play.</em></p>
     <p>
         <a href="https://discord.gg/ap6W3xMTKW"><img src="https://img.shields.io/discord/939249162887766139?color=7289da&label=discord&logo=discord&logoColor=white" alt="Discord"></a>
         <a href="https://github.com/tagoWorks/ascendara/releases/latest"><img src="https://img.shields.io/github/v/release/tagoWorks/ascendara?include_prereleases&label=latest%20release" alt="Latest Release"></a>
@@ -32,37 +32,62 @@ Ascendara simplifies your game management experience by providing a seamless way
 
 ## ✨ Features
 
-- 🚀 **Seamless Downloads**
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🚀 Seamless Downloads</h3>
+      <p>Lightning-fast 2 click downloads for supported games. No browser needed.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>☁️ Cloud Backups</h3>
+      <p>Keep your game saves backed up securely in the cloud with Ascend.</p>
+    </td>
+  </tr>
 
-  Lightning-fast 2 click download for games that support it. No browser needed at all.
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🔌 Game Information</h3>
+      <p>View game details, artwork, story information, soundtrack info, and more.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🌐 Browser Integration</h3>
+      <p>Send supported game downloads directly to Ascendara from your browser.</p>
+    </td>
+  </tr>
 
-- ☁️ **Cloud Backups**
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🎨 Theme Customization</h3>
+      <p>Customize Ascendara with different themes and visual styles.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🕑 Local Indexing</h3>
+      <p>Search through supported games quickly using Ascendara's local index.</p>
+    </td>
+  </tr>
 
-  Upload game backup files to a secure Cloudflare storage system for safekeeping.
+  <tr>
+    <td width="50%" valign="top">
+      <h3>📱 Encrypted Remote Access</h3>
+      <p>Check download progress remotely with end-to-end encrypted communication.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🕹️ Big Picture Mode</h3>
+      <p>Browse your library and launch games with a controller-friendly interface made for the couch.</p>
+    </td>
+  </tr>
 
-- 🔌 **Game Information**
-
-  View game info, including the game's story, soundtrack, and more with Ascendara Xtra.
-
-- 🌐 **Browser Integration**
-
-  Seamlessly integrate with your browser for one-click game downloads and management.
-
-- 🎨 **Theme Customization**
-
-  Beautiful, appealing themes to choose from for a truly unique experience.
-
-- 🕑 **Local Indexing**
-
-  Search for games at crazy speeds and always stay up to date.
-
-- 📱 **Encrypted Remote Access**
-
-  View download progression from anywhere, all data is end-to-end encrypted.
-  
-- 🌍 **105 Languages Support**
-
-  Full interface support for 105 different languages, making Ascendara accessible worldwide.
+  <tr>
+    <td width="50%" valign="top">
+      <h3>💾 Ascendara Retro</h3>
+      <p>Keep your older console games in their own library with artwork, setup memory, and easy launching.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🌍 105 Language Support</h3>
+      <p>Use Ascendara in a wide range of languages from around the world.</p>
+    </td>
+  </tr>
+</table>
 
 <details>
 <summary>See the 12 base languages</summary>
@@ -221,27 +246,25 @@ These languages come with the app by default:
 </div>
 </details>
 
-## 📦 The Ascendara Installer
+## 📦 Install Ascendara
 
-This installer simply downloads the full setup package from GitHub and goes through the installation.
-The latest version of Ascendara will always be installed through the tool, but you can download specific
-versions directly from the [releases page](https://github.com/Ascendara/ascendara/releases). You can view the complete source code of the installer [here on GitHub](https://github.com/Ascendara/installer).
+Ascendara is available for both **Windows** and **Linux**.
+
+The installer always downloads the latest version. Older versions can be found on the [GitHub Releases](https://github.com/Ascendara/ascendara/releases) page.
+
+The installer is also open source and available [here](https://github.com/Ascendara/installer).
 
 ### Windows
 
-| File                                                                             | SHA-256                                                          | VirusTotal Results                                                                                                      |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| [AscendaraInstaller.exe](https://cdn.ascendara.app/files/AscendaraInstaller.exe) | bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b | [3/72 Detections](https://www.virustotal.com/gui/file/bfe193fea584a97e06a42ee44a7520e6e5036df1172ea6b29e960e392652249b) |
+[**Download Ascendara for Windows**](https://cdn.ascendara.app/files/AscendaraInstaller.exe)
 
 ### Linux
 
-Run the following command to install Ascendara:
+Run:
 
 ```bash
 curl -fsSL https://ascendara.app/install.sh | bash
 ```
-
-You can view the install script [here](https://github.com/Ascendara/installer/blob/main/install.sh).
 
 ## 🤝 Contributing
 
