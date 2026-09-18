@@ -22,6 +22,7 @@ import {
   BookOpen,
   Plus,
   X,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -857,7 +858,8 @@ export default function Retro() {
     [review, setReview] = useState(false),
     [limit, setLimit] = useState(60);
   const [sort, setSort] = useState("title"),
-    [searchBusy, setSearchBusy] = useState(false);
+    [searchBusy, setSearchBusy] = useState(false),
+    [showWelcome, setShowWelcome] = useState(false);
   const refresh = useCallback(async () => {
     try {
       setState(await retroCall("getState"));
@@ -867,6 +869,10 @@ export default function Retro() {
     }
   }, []);
   useEffect(() => {
+    if (!localStorage.getItem("retro-welcome-seen")) {
+      setShowWelcome(true);
+      localStorage.setItem("retro-welcome-seen", "true");
+    }
     refresh();
     return window.electron?.retro?.onChanged(event => {
       if (event.job)
@@ -1358,6 +1364,40 @@ export default function Retro() {
           onClose={() => setSavePlatform(null)}
         />
       )}
+      <Dialog open={showWelcome} onOpenChange={setShowWelcome}>
+        <DialogContent className={`${dialogStyle} max-w-lg`}>
+          <DialogHeader className="space-y-2 border-b border-border pb-4 pr-6 text-left">
+            <DialogTitle className="flex items-center gap-2 text-xl font-semibold leading-snug text-foreground">
+              <Gamepad2 className="h-5 w-5 text-primary" />
+              {t("retro.welcome.title")}
+            </DialogTitle>
+            <DialogDescription className="leading-relaxed">
+              {t("retro.welcome.description")}
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground">
+            <li>{t("retro.welcome.pointEmulators")}</li>
+            <li>{t("retro.welcome.pointFolders")}</li>
+            <li>{t("retro.welcome.pointFrontend")}</li>
+          </ul>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+            <Button
+              variant="outline"
+              onClick={() =>
+                window.electron.openURL(
+                  "https://www.ascendara.app/docs/features/retro#first-time-setup"
+                )
+              }
+            >
+              {t("common.learnMore")}
+              <ExternalLink className="ml-2 h-4 w-4" />
+            </Button>
+            <Button className="text-secondary" onClick={() => setShowWelcome(false)}>
+              {t("common.getStarted")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

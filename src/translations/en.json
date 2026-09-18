@@ -2723,7 +2723,14 @@
       "catalogueCount": "{{count}} catalogue games · Metadata by LaunchBox",
       "library": "My library"
     },
-    "title": "Retro"
+    "title": "Retro",
+    "welcome": {
+      "description": "Retro is a front end for the classic games already on your computer — it brings your collection together in one place.",
+      "pointEmulators": "Set up an emulator for each console you want to play.",
+      "pointFolders": "Keep your game and save folders organized beforehand so scans and save backups work smoothly.",
+      "pointFrontend": "Ascendara doesn't download or run the games itself — it launches everything through your own emulators.",
+      "title": "Welcome to Retro"
+    }
   },
   "search": {
     "alphabeticalAZ": "Alphabetical A-Z",
