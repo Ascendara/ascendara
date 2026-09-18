@@ -267,6 +267,7 @@ function registerRetroHandlers() {
     return cards;
   }));
   handle("card-action", (id, original, name, duplicate) => withSaves(id, async root => {
+// eslint-disable-next-line no-control-regex -- Reject control characters in external paths.
     if (!["ps1", "ps2"].includes(id) || typeof name !== "string" || !/^[^<>:"/\\|?*\x00-\x1f]+\.(ps2|mcd|mcr)$/i.test(name) || path.basename(original) !== original) throw new Error("Invalid memory card name");
     if (path.extname(name).toLowerCase() !== path.extname(original).toLowerCase()) throw new Error("Keep the original memory card extension");
     const source = await saves.safeTarget(root, original), target = await saves.safeTarget(root, name);

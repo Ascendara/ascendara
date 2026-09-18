@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLocation } from "react-router-dom";
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import "@/components/ui/tabs";
 import {
   Accordion,
   AccordionContent,
@@ -26,59 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  ShieldAlert,
-  Languages,
-  Loader,
-  Hand,
-  RefreshCw,
-  CircleAlert,
-  Plus,
-  FolderOpen,
-  X,
-  ExternalLink,
-  History,
-  ArrowRight,
-  Download,
-  Scale,
-  Clock,
-  FlaskConical,
-  ChevronLeft,
-  ChevronRight,
-  Zap,
-  Battery,
-  BatteryMedium,
-  BatteryLow,
-  BatteryFull,
-  SquareTerminal,
-  Package,
-  AlertTriangle,
-  FolderSync,
-  FileCheck2,
-  CpuIcon,
-  CornerDownRight,
-  Database,
-  LoaderIcon,
-  Palette,
-  Download as DownloadIcon,
-  UploadIcon,
-  Globe,
-  MessageCircleQuestion,
-  Star,
-  Home,
-  Bell,
-  CheckCircle,
-  Info,
-  Search,
-  Library,
-  Settings2,
-  Gamepad2,
-  Terminal,
-  Wine,
-  ClipboardList,
-} from "lucide-react";
+import { ShieldAlert, Languages, Loader, Hand, RefreshCw, CircleAlert, Plus, FolderOpen, X, ExternalLink, History, ArrowRight, Download, Scale, FlaskConical, ChevronLeft, ChevronRight, Zap, Battery, BatteryMedium, BatteryLow, BatteryFull, SquareTerminal, Package, AlertTriangle, FolderSync, FileCheck2, CpuIcon, CornerDownRight, Database, LoaderIcon, Palette, Download as DownloadIcon, UploadIcon, Globe, MessageCircleQuestion, Star, Home, CheckCircle, Info, Search, Library, Settings2, Gamepad2, ClipboardList } from "lucide-react";
 import gameService from "@/services/gameService";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getAvailableLanguages, handleLanguageChange } from "@/services/languageService";
 import {
   AlertDialog,
@@ -4800,13 +4750,11 @@ function Settings() {
                 try {
                   setIsDownloading(true);
                   await window.electron.installTool("torrent");
+                  setShowNoTorrentDialog(false);
                 } catch (error) {
                   console.error("Failed to install torrent tool:", error);
                 } finally {
                   setIsDownloading(false);
-                  if (!error) {
-                    setShowNoTorrentDialog(false);
-                  }
                 }
               }}
               disabled={isDownloading}

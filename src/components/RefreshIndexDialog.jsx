@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   AlertDialog,
@@ -10,20 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  ExternalLink,
-  CircleCheck,
-  ChevronRight,
-  ChevronLeft,
-  Globe,
-  Puzzle,
-  Terminal,
-  Cookie,
-  Copy,
-  Check,
-  Loader,
-  Radio,
-} from "lucide-react";
+import { ExternalLink, CircleCheck, ChevronRight, ChevronLeft, Terminal, Cookie, Copy, Check, Loader, Radio } from "lucide-react";
 
 const STEAMRIP_POSTS_URL = "https://steamrip.com/wp-json/wp/v2/posts?per_page=1&page=1";
 

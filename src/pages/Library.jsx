@@ -1,70 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuCheckboxItem,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import "@/components/ui/switch";
+import "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
-import {
-  Plus,
-  FolderOpen,
-  ExternalLink,
-  User,
-  HardDrive,
-  Gamepad2,
-  Gift,
-  Search as SearchIcon,
-  AlertTriangle,
-  Heart,
-  SquareLibrary,
-  Tag,
-  PackageOpen,
-  Loader,
-  Import,
-  AlertCircle,
-  CheckSquareIcon,
-  SortAscIcon,
-  ArrowUpAZ,
-  ArrowDownAZ,
-  ImageUp,
-  FolderPlus,
-  ChevronDown,
-  ChevronUp,
-  Cloud,
-  CloudDownload,
-  CloudUpload,
-  Clock,
-  DollarSign,
-  ArrowDown,
-  Play,
-  Trash2,
-  Sparkles,
-  MessageSquareText,
-  TriangleAlert,
-  Layers,
-  Timer,
-  HardDriveDownload,
-  Star,
-  SlidersHorizontal,
-  GripVertical,
-  Download,
-  History,
-  RotateCcw,
-  CheckCircle2,
-  PlayCircle,
-  Bookmark,
-} from "lucide-react";
+import { Plus, FolderOpen, ExternalLink, User, HardDrive, Gamepad2, Gift, Search as SearchIcon, AlertTriangle, Heart, SquareLibrary, Tag, Loader, Import, CheckSquareIcon, ArrowUpAZ, ArrowDownAZ, ImageUp, FolderPlus, ChevronDown, Cloud, CloudDownload, CloudUpload, Clock, DollarSign, ArrowDown, Play, Trash2, Sparkles, MessageSquareText, TriangleAlert, Timer, HardDriveDownload, Star, SlidersHorizontal, GripVertical, Download, History, RotateCcw, CheckCircle2, PlayCircle, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -77,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Separator } from "@/components/ui/separator";
+import "@/components/ui/separator";
 import {
   TooltipProvider,
   Tooltip,
@@ -108,14 +53,7 @@ import FolderCard from "@/components/FolderCard";
 import EditCoverDialog from "@/components/EditCoverDialog";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import {
-  loadFolders,
-  saveFolders,
-  createFolder,
-  addGameToFolder,
-  filterGamesNotInFolders,
-  getGamesInFolders,
-} from "@/lib/folderManager";
+import { loadFolders, createFolder, addGameToFolder, filterGamesNotInFolders, getGamesInFolders } from "@/lib/folderManager";
 
 // Module-level cache so images survive page switches without re-fetching via IPC
 const gameImageCache = new Map();

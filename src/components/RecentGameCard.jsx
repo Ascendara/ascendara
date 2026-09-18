@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { cn } from "@/lib/utils";
 import { sanitizeText } from "@/lib/utils";

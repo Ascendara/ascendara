@@ -1,15 +1,5 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "react";
-import {
-  ThemeProvider as NextThemeProvider,
-  useTheme as useNextTheme,
-} from "next-themes";
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import { ThemeProvider as NextThemeProvider } from "next-themes";
 
 const ThemeContext = createContext();
 

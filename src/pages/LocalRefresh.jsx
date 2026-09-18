@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -6,46 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import {
-  RefreshCw,
-  Play,
-  StopCircle,
-  CircleCheck,
-  AlertCircle,
-  Loader,
-  Database,
-  Clock,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
-  ArrowLeft,
-  ArrowRight,
-  FolderOpen,
-  Folder,
-  Settings2,
-  Star,
-  Info,
-  X,
-  Plus,
-  Ban,
-  Cpu,
-  Zap,
-  LoaderIcon,
-  Share2,
-  Upload,
-  Download,
-  Cloud,
-  ExternalLink,
-  Calendar,
-  PencilIcon,
-  Globe,
-  ShieldCheck,
-  Search as SearchIcon,
-  AlertTriangle,
-  ClipboardList,
-  Plug,
-  PlugIcon,
-} from "lucide-react";
+import { RefreshCw, Play, StopCircle, CircleCheck, AlertCircle, Loader, Database, Clock, ChevronDown, ChevronUp, ArrowLeft, ArrowRight, Folder, Settings2, Star, Info, X, Plus, Ban, Cpu, Zap, Share2, Upload, Cloud, ExternalLink, Calendar, PencilIcon, Globe, ShieldCheck, Search as SearchIcon, AlertTriangle, ClipboardList, PlugIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";

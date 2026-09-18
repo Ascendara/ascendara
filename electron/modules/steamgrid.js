@@ -98,7 +98,7 @@ async function fetchGameAssets(gameName, gameDir) {
 
   try {
     const cleanName = gameName
-      .replace(/ v[\d\.]+.*$/i, "")
+      .replace(/ v[\d.]+.*$/i, "")
       .replace(/ premium edition/i, "")
       .trim();
     console.log(`[SteamGrid] Searching for: "${cleanName}"`);
@@ -205,7 +205,7 @@ async function fetchGameAssets(gameName, gameDir) {
  */
 function cleanGameName(gameName) {
   return gameName
-    .replace(/ v[\d\.]+.*$/i, "")
+    .replace(/ v[\d.]+.*$/i, "")
     .replace(/ premium edition/i, "")
     .replace(/\(\s*\)/g, "") // strip empty parentheses from mangled Hydra titles
     .replace(/\s{2,}/g, " ")

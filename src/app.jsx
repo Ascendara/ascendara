@@ -55,39 +55,12 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { Toaster, toast } from "sonner";
-import DownloadPage from "./pages/Download";
-import Downloads from "./pages/Downloads";
-import ExtraLanguages from "./pages/ExtraLanguages";
 import Home from "./pages/Home";
-import WorkshopDownloader from "./pages/WorkshopDownloader";
-import SidecarAndDependencies from "./pages/SidecarAndDependencies";
-import TorboxDownloads from "./pages/TorboxDownloads";
-import GameScreen from "./pages/GameScreen";
-import Profile from "./pages/Profile";
-import Ascend from "./pages/Ascend";
-import Library from "./pages/Library";
-import Retro from "./pages/Retro";
-import FolderView from "./pages/FolderView";
-import LocalRefresh from "./pages/LocalRefresh";
 // Search is rendered persistently in Layout, not via Routes
-import Settings from "./pages/Settings";
-import Welcome from "./pages/Welcome";
 import i18n from "./i18n";
 import "./index.css";
 import "./styles/scrollbar.css";
-import {
-  AlertTriangle,
-  BugIcon,
-  RefreshCwIcon,
-  Clock,
-  Gamepad2,
-  X,
-  Circle,
-  Square,
-  Triangle,
-  Terminal,
-  Copy,
-} from "lucide-react";
+import { AlertTriangle, RefreshCwIcon, Clock, Gamepad2, X, Circle, Square, Triangle, Terminal, Copy } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -98,7 +71,35 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import BigPicture from "./pages/BigPicture";
+// Keep the shell and home page ready at startup; load other screens on demand.
+function lazyPage(load) {
+  const Page = React.lazy(load);
+  return function LazyPage(props) {
+    const { t } = useTranslation();
+    return (
+      <React.Suspense fallback={<div className="flex flex-1 items-center justify-center p-12" role="status">{t("common.loading", "Loading...")}</div>}>
+        <Page {...props} />
+      </React.Suspense>
+    );
+  };
+}
+
+const DownloadPage = lazyPage(() => import("./pages/Download"));
+const Downloads = lazyPage(() => import("./pages/Downloads"));
+const ExtraLanguages = lazyPage(() => import("./pages/ExtraLanguages"));
+const WorkshopDownloader = lazyPage(() => import("./pages/WorkshopDownloader"));
+const SidecarAndDependencies = lazyPage(() => import("./pages/SidecarAndDependencies"));
+const TorboxDownloads = lazyPage(() => import("./pages/TorboxDownloads"));
+const GameScreen = lazyPage(() => import("./pages/GameScreen"));
+const Profile = lazyPage(() => import("./pages/Profile"));
+const Ascend = lazyPage(() => import("./pages/Ascend"));
+const Library = lazyPage(() => import("./pages/Library"));
+const Retro = lazyPage(() => import("./pages/Retro"));
+const FolderView = lazyPage(() => import("./pages/FolderView"));
+const LocalRefresh = lazyPage(() => import("./pages/LocalRefresh"));
+const Settings = lazyPage(() => import("./pages/Settings"));
+const Welcome = lazyPage(() => import("./pages/Welcome"));
+const BigPicture = lazyPage(() => import("./pages/BigPicture"));
 
 const LinuxUpdateDialog = ({ open, onOpenChange }) => {
   const { t } = useTranslation();
@@ -917,7 +918,7 @@ const UserActivityTracker = React.memo(() => {
         case "/ascend":
           await setActivity(ActivityType.IN_ASCEND);
           break;
-        case "/download":
+        case "/download": {
           // When viewing a specific game's download page
           const gameName = state?.gameData?.game || state?.gameData?.name;
           if (gameName) {
@@ -926,13 +927,15 @@ const UserActivityTracker = React.memo(() => {
             await setActivity(ActivityType.SEARCHING_GAMES);
           }
           break;
-        case "/gamescreen":
+        }
+        case "/gamescreen": {
           // When viewing a game's details
           const gameScreenName = state?.game?.game || state?.game?.name;
           if (gameScreenName) {
             await setActivity(ActivityType.VIEWING_GAME, gameScreenName);
           }
           break;
+        }
         default:
           await setActivity(ActivityType.IDLE);
           break;

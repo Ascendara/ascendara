@@ -13,7 +13,7 @@ import {
   Crown,
   ListOrdered,
   Puzzle,
-  Infinity,
+  Infinity as InfinityIcon,
   Smartphone,
   FlaskConical,
 } from "lucide-react";
@@ -307,7 +307,7 @@ export default function PremiumSection({ t }) {
           <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl transition-all group-hover:bg-emerald-500/20" />
           <div className="relative">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-              <Infinity className="h-6 w-6" />
+              <InfinityIcon className="h-6 w-6" />
             </div>
             <h3 className="mt-4 text-lg font-semibold">
               {t("ascend.premium.unlimitedDownloads.title") || "Unlimited Downloads"}

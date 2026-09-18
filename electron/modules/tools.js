@@ -7,7 +7,6 @@ const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
 const { ipcMain, BrowserWindow } = require("electron");
-const { app } = require("electron");
 const {
   isDev,
   isWindows,
@@ -132,7 +131,7 @@ function registerToolHandlers() {
       try {
         const { linuxConfigDir } = require("./config");
         const os = require("os");
-        const { exec } = require("child_process");
+        const { execFile } = require("child_process");
         const ludusaviTargetPath = path.join(linuxConfigDir, "ludusavi");
 
         // 1. Fetch last release from GitHub
@@ -165,7 +164,7 @@ function registerToolHandlers() {
         // 4. Extract with tar in linuxConfigDir
         fs.ensureDirSync(linuxConfigDir);
         await new Promise((resolve, reject) => {
-          exec(`tar -xzf "${tmpTar}" -C "${linuxConfigDir}"`, (err, stdout, stderr) => {
+          execFile("tar", ["-xzf", tmpTar, "-C", linuxConfigDir], (err, stdout, stderr) => {
             if (err) {
               console.error("[Ludusavi] tar error:", stderr);
               reject(err);

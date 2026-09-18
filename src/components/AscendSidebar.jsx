@@ -1,36 +1,7 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Home,
-  Search,
-  Users,
-  MessageCircle,
-  UserPlus,
-  Settings,
-  Bell,
-  Sparkles,
-  Circle,
-  Moon,
-  MinusCircle,
-  EyeOff,
-  ChevronUp,
-  ChevronDown,
-  Clock,
-  CreditCard,
-  CloudIcon,
-  BadgeCheck,
-  Crown,
-  Hammer,
-  BadgeDollarSign,
-  Trophy,
-  Rocket,
-  Gamepad2,
-  HardDrive,
-  UsersRound,
-  Megaphone,
-  BarChart,
-} from "lucide-react";
+import { Home, Search, Users, MessageCircle, UserPlus, Settings, Bell, Sparkles, Circle, Moon, MinusCircle, EyeOff, ChevronUp, ChevronDown, Clock, CloudIcon, BadgeCheck, Crown, Hammer, BadgeDollarSign, Trophy, Rocket, Gamepad2, HardDrive, Megaphone, BarChart } from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
 

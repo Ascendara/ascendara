@@ -10,14 +10,13 @@ const os = require("os");
 const crypto = require("crypto");
 const { machineIdSync } = require("node-machine-id");
 const { exec, execFile, spawn } = require("child_process");
-const { ipcMain, app, dialog, shell, BrowserWindow, Notification } = require("electron");
+const { ipcMain, app, BrowserWindow } = require("electron");
 const unzipper = require("unzipper");
 const {
   isDev,
   isWindows,
   isLinux,
   TIMESTAMP_FILE,
-  appDirectory,
   DEPENDENCY_REGISTRY_PATHS,
 } = require("./config");
 const { updateTimestampFile } = require("./utils");

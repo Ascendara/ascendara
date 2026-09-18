@@ -36,7 +36,7 @@ const getCachedGame = (gameName, apiType = "steam") => {
     const { data, timestamp } = JSON.parse(cachedData);
 
     // Check if cache is expired
-    if (Date.now() - timestamp > CACHE_EXPIRY) {
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > CACHE_EXPIRY) {
       // Remove expired cache
       localStorage.removeItem(cacheKey);
       return null;
@@ -223,7 +223,7 @@ const getCachePrefix = apiType => {
 const clearExpiredCache = () => {
   try {
     // Get all localStorage keys
-    for (let i = 0; i < localStorage.length; i++) {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
 
       // Check if it's one of our cache keys
@@ -233,7 +233,7 @@ const clearExpiredCache = () => {
           const { timestamp } = JSON.parse(cachedData);
 
           // Remove if expired
-          if (Date.now() - timestamp > CACHE_EXPIRY) {
+          if (!Number.isFinite(timestamp) || Date.now() - timestamp > CACHE_EXPIRY) {
             localStorage.removeItem(key);
           }
         } catch (e) {
@@ -253,7 +253,7 @@ const clearExpiredCache = () => {
  * @returns {boolean} True if it's a game API cache key
  */
 const isGameApiCacheKey = key => {
-  return Object.values(CACHE_PREFIXES).some(prefix => key.startsWith(prefix));
+  return typeof key === "string" && Object.values(CACHE_PREFIXES).some(prefix => key.startsWith(prefix));
 };
 
 /**
@@ -360,10 +360,6 @@ const getCacheStats = (apiType = null) => {
     return { count: 0, totalSize: 0, apiStats: {} };
   }
 };
-
-// For backward compatibility
-const legacyGetCachedGame = gameName => getCachedGame(gameName, "steam");
-const legacyCacheGame = (gameName, gameData) => cacheGame(gameName, gameData, "steam");
 
 /**
  * Keep the total size of game-API caches under a soft budget. Evicts oldest
@@ -501,7 +497,4 @@ export default {
   safeSetItem,
   isQuotaExceededError,
 
-  // Legacy API for backward compatibility
-  getCachedGame: legacyGetCachedGame,
-  cacheGame: legacyCacheGame,
 };

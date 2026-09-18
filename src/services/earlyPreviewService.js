@@ -53,13 +53,12 @@ const fetchEarlyChanges = async () => {
 };
 
 const voteForFeature = async (featureId, voteType) => {
-  const promise = new Promise(async (resolve, reject) => {
-    try {
+  const promise = (async () => {
+    {
       // Ensure featureId is a number
       const numericFeatureId = parseInt(featureId, 10);
       if (isNaN(numericFeatureId)) {
-        reject(new Error("Invalid feature ID"));
-        return;
+        throw new Error("Invalid feature ID");
       }
 
       const token = await getToken();
@@ -78,7 +77,7 @@ const voteForFeature = async (featureId, voteType) => {
       const data = await response.json();
 
       if (response.ok) {
-        resolve(data);
+        return data;
       } else if (response.status === 401) {
         // If token expired, try once with a new token
         const newToken = await getToken();
@@ -98,17 +97,15 @@ const voteForFeature = async (featureId, voteType) => {
         );
 
         if (retryResponse.ok) {
-          resolve(await retryResponse.json());
+          return await retryResponse.json();
         } else {
-          reject(new Error("Failed to submit vote after token refresh"));
+          throw new Error("Failed to submit vote after token refresh");
         }
       } else {
-        reject(new Error("Failed to submit vote"));
+        throw new Error("Failed to submit vote");
       }
-    } catch (error) {
-      reject(error);
     }
-  });
+  })();
 
   return promise;
 };

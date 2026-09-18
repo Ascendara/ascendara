@@ -14,10 +14,11 @@ require("dotenv").config();
 
 const { app, BrowserWindow, Tray, Menu, nativeImage, powerMonitor } = require("electron");
 const http = require("http");
-const https = require("https");
+const { proxyLocalRequest } = require("./modules/local-api-proxy");
 const path = require("path");
 const fs = require("fs-extra");
 const { isLinux } = require("./modules/config");
+const { isAllowedLocalRequest, resolvePublicFile } = require("./modules/local-server-security");
 
 // Disable sandbox for Linux compatibility (must be set before app ready)
 if (process.platform === "linux") {
@@ -194,7 +195,6 @@ function startAchievementWatcher() {
   }
 
   const { spawn } = require("child_process");
-  const os = require("os");
 
   const isLinux = process.platform === "linux";
   const watcherExePath = isLinux
@@ -344,218 +344,27 @@ async function initializeApp() {
     // This allows Firebase auth to work since 'localhost' can be added to authorized domains
     if (!isDev) {
       localServer = http.createServer((req, res) => {
-        // Handle KHInsider proxy requests
-        if (req.url.startsWith("/api/khinsider")) {
-          const targetPath = req.url.replace(/^\/api\/khinsider/, "");
-          const targetUrl = `https://downloads.khinsider.com${targetPath}`;
-
-          const parsedUrl = new URL(targetUrl);
-          const proxyOptions = {
-            hostname: parsedUrl.hostname,
-            port: 443,
-            path: parsedUrl.pathname + parsedUrl.search,
-            method: req.method,
-            headers: { ...req.headers, host: parsedUrl.hostname },
-          };
-
-          delete proxyOptions.headers["host"];
-          delete proxyOptions.headers["connection"];
-
-          const proxyReq = https.request(proxyOptions, proxyRes => {
-            res.setHeader("Access-Control-Allow-Origin", "*");
-            res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-            res.writeHead(proxyRes.statusCode, proxyRes.headers);
-            proxyRes.pipe(res);
-          });
-
-          proxyReq.on("error", err => {
-            console.error("KHInsider proxy error:", err);
-            res.writeHead(502);
-            res.end("Proxy error");
-          });
-
-          proxyReq.end();
+        if (!isAllowedLocalRequest(req)) {
+          res.writeHead(403);
+          res.end("Forbidden");
           return;
         }
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        if (proxyLocalRequest(req, res)) return;
 
-        // Handle Torbox API proxy requests
-        if (req.url.startsWith("/api/torbox")) {
-          const targetPath = req.url.replace(/^\/api\/torbox/, "");
-          const targetUrl = `https://api.torbox.app/v1/api${targetPath}`;
-
-          // Collect request body for POST/PUT requests
-          let body = [];
-          req.on("data", chunk => body.push(chunk));
-          req.on("end", () => {
-            body = Buffer.concat(body);
-
-            const parsedUrl = new URL(targetUrl);
-            const proxyOptions = {
-              hostname: parsedUrl.hostname,
-              port: 443,
-              path: parsedUrl.pathname + parsedUrl.search,
-              method: req.method,
-              headers: { ...req.headers, host: parsedUrl.hostname },
-            };
-
-            // Remove headers that shouldn't be forwarded
-            delete proxyOptions.headers["host"];
-            delete proxyOptions.headers["connection"];
-            delete proxyOptions.headers["content-length"];
-            if (body.length > 0) {
-              proxyOptions.headers["content-length"] = body.length;
-            }
-
-            const proxyReq = https.request(proxyOptions, proxyRes => {
-              // Set CORS headers
-              res.setHeader("Access-Control-Allow-Origin", "*");
-              res.setHeader(
-                "Access-Control-Allow-Methods",
-                "GET, POST, PUT, DELETE, OPTIONS"
-              );
-              res.setHeader(
-                "Access-Control-Allow-Headers",
-                "Content-Type, Authorization"
-              );
-
-              res.writeHead(proxyRes.statusCode, proxyRes.headers);
-              proxyRes.pipe(res);
-            });
-
-            proxyReq.on("error", err => {
-              console.error("Torbox proxy error:", err);
-              res.writeHead(502);
-              res.end("Proxy error");
-            });
-
-            if (body.length > 0) {
-              proxyReq.write(body);
-            }
-            proxyReq.end();
-          });
+        const fullPath = resolvePublicFile(__dirname, req.url);
+        if (!fullPath || !["GET", "HEAD"].includes(req.method)) {
+          res.writeHead(404);
+          res.end("Not found");
           return;
         }
-
-        // Handle FLiNG Trainer proxy requests
-        if (req.url.startsWith("/api/flingtrainer")) {
-          const targetPath = req.url.replace(/^\/api\/flingtrainer/, "");
-          const targetUrl = `https://flingtrainer.com${targetPath}`;
-
-          const parsedUrl = new URL(targetUrl);
-          const proxyOptions = {
-            hostname: parsedUrl.hostname,
-            port: 443,
-            path: parsedUrl.pathname + parsedUrl.search,
-            method: req.method,
-            headers: { ...req.headers, host: parsedUrl.hostname },
-          };
-
-          delete proxyOptions.headers["host"];
-          delete proxyOptions.headers["connection"];
-
-          const proxyReq = https.request(proxyOptions, proxyRes => {
-            res.setHeader("Access-Control-Allow-Origin", "*");
-            res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-            res.writeHead(proxyRes.statusCode, proxyRes.headers);
-            proxyRes.pipe(res);
-          });
-
-          proxyReq.on("error", err => {
-            console.error("FlingTrainer proxy error:", err);
-            res.writeHead(502);
-            res.end("Proxy error");
-          });
-
-          proxyReq.end();
-          return;
-        }
-
-        // Handle Analytics proxy requests
-        if (req.url.startsWith("/api/analytics")) {
-          const targetPath = req.url.replace(/^\/api\/analytics/, "");
-          const targetUrl = `https://analytics.ascendara.app${targetPath}`;
-
-          // Collect request body for POST/PUT requests
-          let body = [];
-          req.on("data", chunk => body.push(chunk));
-          req.on("end", () => {
-            body = Buffer.concat(body);
-
-            const parsedUrl = new URL(targetUrl);
-            const proxyOptions = {
-              hostname: parsedUrl.hostname,
-              port: 443,
-              path: parsedUrl.pathname + parsedUrl.search,
-              method: req.method,
-              headers: { ...req.headers, host: parsedUrl.hostname },
-            };
-
-            // Remove headers that shouldn't be forwarded
-            delete proxyOptions.headers["host"];
-            delete proxyOptions.headers["connection"];
-            delete proxyOptions.headers["content-length"];
-            if (body.length > 0) {
-              proxyOptions.headers["content-length"] = body.length;
-            }
-
-            const proxyReq = https.request(proxyOptions, proxyRes => {
-              // Set CORS headers
-              res.setHeader("Access-Control-Allow-Origin", "*");
-              res.setHeader(
-                "Access-Control-Allow-Methods",
-                "GET, POST, PUT, DELETE, OPTIONS"
-              );
-              res.setHeader(
-                "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, X-API-Key, X-Signature"
-              );
-
-              res.writeHead(proxyRes.statusCode, proxyRes.headers);
-              proxyRes.pipe(res);
-            });
-
-            proxyReq.on("error", err => {
-              console.error("Analytics proxy error:", err);
-              res.writeHead(502);
-              res.end("Proxy error");
-            });
-
-            if (body.length > 0) {
-              proxyReq.write(body);
-            }
-            proxyReq.end();
-          });
-          return;
-        }
-
-        // Handle CORS preflight for API routes
-        if (req.method === "OPTIONS" && req.url.startsWith("/api/")) {
-          res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader(
-            "Access-Control-Allow-Methods",
-            "GET, POST, PUT, DELETE, OPTIONS"
-          );
-          res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-          res.writeHead(204);
-          res.end();
-          return;
-        }
-
-        let filePath = req.url === "/" ? "/index.html" : req.url;
-        // Remove query strings
-        filePath = filePath.split("?")[0];
-        const fullPath = path.join(__dirname, filePath);
         const ext = path.extname(fullPath).toLowerCase();
         const contentType = mimeTypes[ext] || "application/octet-stream";
 
         fs.readFile(fullPath)
           .then(data => {
             res.writeHead(200, { "Content-Type": contentType });
-            res.end(data);
+            res.end(req.method === "HEAD" ? undefined : data);
           })
           .catch(() => {
             // For SPA routing, serve index.html for non-file routes

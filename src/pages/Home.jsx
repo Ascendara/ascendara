@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback, useRef } from "react";
+import { useState, useEffect, memo, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,31 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import {
-  Flame,
-  Globe,
-  ChevronLeft,
-  ChevronRight,
-  Zap,
-  Play,
-  Sparkles,
-  TrendingUp,
-  Gamepad2,
-  RefreshCw,
-  ArrowRight,
-  Gift,
-  Heart,
-  ExternalLink,
-  HandCoins,
-  BanknoteIcon,
-  Search,
-  Info,
-  Library,
-  Download,
-  Settings as SettingsIcon,
-  MessageSquare,
-  HelpCircle,
-} from "lucide-react";
+import { Flame, Globe, ChevronLeft, ChevronRight, Zap, Play, Sparkles, TrendingUp, Gamepad2, RefreshCw, ArrowRight, Gift, ExternalLink, HandCoins, BanknoteIcon, Search, Library, Download, MessageSquare, HelpCircle } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/gameService";
 import imageCacheService from "@/services/imageCacheService";

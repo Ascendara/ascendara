@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight, Command, Gamepad2, Library, Search, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

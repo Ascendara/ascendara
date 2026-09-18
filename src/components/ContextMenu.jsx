@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquareText, TriangleAlert, Sparkles } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";

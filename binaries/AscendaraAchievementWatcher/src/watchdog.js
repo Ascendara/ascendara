@@ -10,6 +10,7 @@ const monitor = require("./monitor.js");
 const steam = require("./steam.js");
 const steamLangDefs = require("./steam.json");
 const track = require("./track.js");
+const crc32 = require("./crc32.js");
 const { getSettings } = require("./userConfig.js");
 const { spawn } = require("child_process");
 
@@ -126,184 +127,7 @@ let sendNotification = async opts => {
   }
 };
 
-var app = {
-  isRecording: false,
-  cache: [],
-  options: {
-    notification_advanced: {
-      tick: 2000, // ms between notifications
-    },
-  },
-  watcher: [],
-  tick: 0,
-  toastID: "Microsoft.XboxApp_8wekyb3d8bbwe!Microsoft.XboxApp",
-  start: async function () {
-    try {
-      let self = this;
-      self.cache = [];
-      console.log("Achievement Watchdog starting ...");
 
-      // Build game directory list from settings - only scan for emulator configs
-      const settings = await getSettings();
-      const downloadDir = settings.downloadDirectory;
-      const gameDirList = [];
-
-      if (downloadDir) {
-        try {
-          // Add game folders that have emulator config files OR .ascendara.json (Ascendara-installed games)
-          const gameFolders = await fs.readdir(downloadDir, { withFileTypes: true });
-          const emuConfigFiles = [
-            "ALI213.ini", "valve.ini", "hlm.ini", "ds.ini",
-            "steam_api.ini", "SteamConfig.ini"
-          ];
-
-          for (const dirent of gameFolders) {
-            if (dirent.isDirectory()) {
-              const gameFolderPath = path.join(downloadDir, dirent.name);
-              let shouldMonitor = false;
-
-              // Check if this folder has any emulator config
-              for (const configFile of emuConfigFiles) {
-                try {
-                  await fs.access(path.join(gameFolderPath, configFile));
-                  shouldMonitor = true;
-                  console.log(`[Watcher] Adding ${dirent.name} - found emulator config: ${configFile}`);
-                  break;
-                } catch (e) {
-                  // Config file doesn't exist, continue
-                }
-              }
-
-              // Also monitor if folder has .ascendara.json (installed through Ascendara)
-              if (!shouldMonitor) {
-                try {
-                  const ascendaraJsonPath = path.join(gameFolderPath, `${dirent.name}.ascendara.json`);
-                  await fs.access(ascendaraJsonPath);
-                  shouldMonitor = true;
-                  console.log(`[Watcher] Adding ${dirent.name} - found .ascendara.json`);
-                } catch (e) {
-                  // .ascendara.json doesn't exist
-                }
-              }
-
-              // Also monitor if folder has achievements.ascendara.json (previously tracked)
-              if (!shouldMonitor) {
-                try {
-                  const achievementsPath = path.join(gameFolderPath, "achievements.ascendara.json");
-                  await fs.access(achievementsPath);
-                  shouldMonitor = true;
-                  console.log(`[Watcher] Adding ${dirent.name} - found existing achievements.ascendara.json`);
-                } catch (e) {
-                  // achievements file doesn't exist
-                }
-              }
-
-              if (shouldMonitor) {
-                gameDirList.push({
-                  path: gameFolderPath,
-                  notify: true,
-                });
-              }
-            }
-          }
-          console.log(`Found ${gameDirList.length} game directories to monitor`);
-        } catch (err) {
-          console.warn("Failed to scan download directory:", err);
-        }
-      }
-
-      // Create temporary file for monitor.getFolders()
-      const tempFile = path.join(
-        process.env.TEMP || process.env.TMP || "/tmp",
-        "ascendara_game_dirs.json"
-      );
-      await fs.writeFile(tempFile, JSON.stringify(gameDirList), "utf8");
-
-      const folders = await monitor.getFolders(tempFile);
-      console.log(`monitor.getFolders() returned ${folders.length} folders`);
-      
-      // Limit total watchers
-      const foldersToWatch = folders.slice(0, MAX_WATCHERS);
-      if (folders.length > MAX_WATCHERS) {
-        console.warn(`Limiting watchers to ${MAX_WATCHERS} (found ${folders.length} potential folders)`);
-      }
-      
-      let watcherCount = 0;
-      for (let folder of foldersToWatch) {
-        try {
-          await fs.access(folder.dir);
-          // If no error, folder exists
-          self.watch(watcherCount, folder.dir, folder.options);
-          watcherCount++;
-        } catch (err) {
-          // Folder does not exist, skip
-        }
-      }
-      
-      console.log(`Started ${watcherCount} file watchers`);
-      
-      // Start cache cleanup interval
-      setInterval(() => {
-        if (self.cache.length > MAX_CACHE_SIZE) {
-          console.log(`Cleaning cache (size: ${self.cache.length})`);
-          self.cache = self.cache.slice(-MAX_CACHE_SIZE);
-        }
-      }, CACHE_CLEANUP_INTERVAL_MS);
-      
-    } catch (err) {
-      console.log(err);
-      instance.unlock();
-      await updateWatchdogStatus(false);
-      process.exit();
-    }
-  },
-  watch: function (i, dir, options) {
-    let self = this;
-    console.log(
-      `Monitoring achievement changes in directory: "${dir}" with options:`,
-      options
-    );
-    if (options.file && options.file.length > 0) {
-      console.log(
-        `Watching files in ${dir}: ${JSON.stringify(options.file)} with filter: ${options.filter}`
-      );
-    } else {
-      console.warn(
-        `WARNING: No files specified to watch in ${dir}. options.file is:`,
-        options.file
-      );
-    }
-
-    self.watcher[i] = watch(
-      dir,
-      { recursive: options.recursive, filter: options.filter },
-      async function (evt, name) {
-        console.log(`File event: ${evt} on file: ${name}`);
-        try {
-          if (evt !== "update") {
-            console.log(`Ignoring event: ${evt} (only processing 'update' events)`);
-            return;
-          }
-
-          // Debounce file events to prevent excessive processing
-          const debounceKey = `${dir}:${name}`;
-          if (fileEventTimers.has(debounceKey)) {
-            clearTimeout(fileEventTimers.get(debounceKey));
-          }
-          
-          const timerId = setTimeout(async () => {
-            fileEventTimers.delete(debounceKey);
-            await processFileEvent(name, options, self);
-          }, FILE_EVENT_DEBOUNCE_MS);
-          
-          fileEventTimers.set(debounceKey, timerId);
-        } catch (err) {
-          console.warn(err);
-        }
-      }
-    );
-  },
-};
 
 // Extracted file event processing logic
 async function processFileEvent(name, options, self) {
@@ -674,7 +498,7 @@ var app = {
     );
   },
   load: async function (appID) {
-    try {
+    {
       let self = this;
 
       console.log(`loading steam schema for ${appID}`);
@@ -691,8 +515,6 @@ var app = {
         console.log("from file cache or remote");
       }
       return game;
-    } catch (err) {
-      throw err;
     }
   },
 };

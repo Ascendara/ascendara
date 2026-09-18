@@ -1,4 +1,4 @@
-import React from "react";
+
 import { useTranslation } from "react-i18next";
 import { FlaskConical, TestTube2 } from "lucide-react";
 import {

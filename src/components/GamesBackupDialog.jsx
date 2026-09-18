@@ -1,8 +1,9 @@
+import { MAX_CLOUD_BACKUP_BYTES, validateBackupFolderName, validateCloudBackupEntries } from "@/lib/cloudBackupValidation";
 import {
   uploadBackupToCloud,
   hasActiveSubscription,
 } from "@/services/cloudBackupService";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -218,8 +219,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         } else if (selectedButtonIndex === 1) {
           showRestoreConfirmation();
         } else if (selectedButtonIndex === 2) {
-          loadBackupsList();
-          setActiveScreen("backupsList");
+          handleListBackups();
         } else if (selectedButtonIndex === 3) {
           onOpenChange(false);
         }
@@ -588,9 +588,10 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         }
 
         const blob = await response.blob();
+        if (blob.size > MAX_CLOUD_BACKUP_BYTES) throw new Error("Cloud backup is too large");
         const arrayBuffer = await blob.arrayBuffer();
 
-        const gameBackupFolder = `${settings.ludusavi.backupLocation}/${gameName}`;
+        const gameBackupFolder = `${settings.ludusavi.backupLocation}/${validateBackupFolderName(gameName)}`;
         
         // Extract the combined archive (contains both .zip and mapping.yaml)
         toast.info("Extracting backup files...");
@@ -599,11 +600,11 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         const combinedZip = await JSZip.loadAsync(arrayBuffer);
         
         // Extract all files from the combined archive
-        const files = Object.keys(combinedZip.files);
+        const files = validateCloudBackupEntries(combinedZip);
         let extractedBackupName = null;
         
-        for (const filename of files) {
-          const file = combinedZip.files[filename];
+        for (const file of files) {
+          const filename = file.name;
           if (!file.dir) {
             const content = await file.async('uint8array');
             const filePath = `${gameBackupFolder}/${filename}`;

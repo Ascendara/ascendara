@@ -22,7 +22,6 @@ const {
   getPythonPath,
 } = require("./config");
 const { updateTimestampFile } = require("./utils");
-const { getSettingsManager } = require("./settings");
 
 let isLatest = true;
 let updateDownloaded = false;
@@ -38,7 +37,7 @@ let translationUpdateInProgress = false;
  */
 async function checkBrokenVersion() {
   try {
-    const response = await axios.get("https://api.ascendara.app/app/brokenversions");
+    const response = await axios.get("https://api.ascendara.app/app/brokenversions", { timeout: 10000 });
     const brokenVersions = response.data;
     isBrokenVersion = brokenVersions.includes(appVersion);
     console.log(
@@ -173,7 +172,7 @@ async function checkReferenceLanguage() {
       timestamp = JSON.parse(fs.readFileSync(TIMESTAMP_FILE, "utf8"));
     }
     // If extraLangVer doesn't exist, no extra languages are installed, so skip check
-    if (!timestamp.hasOwnProperty("extraLangVer")) {
+    if (!Object.hasOwn(timestamp, "extraLangVer")) {
       return;
     }
     const extraLangVer = timestamp["extraLangVer"];

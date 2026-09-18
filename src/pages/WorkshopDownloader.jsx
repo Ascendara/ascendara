@@ -1,22 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Wallpaper,
-  FolderOpen,
-  ArrowRight,
-  Settings2,
-  Coffee,
-  Link,
-  Download,
-  Loader,
-  DownloadCloud,
-  ExternalLink,
-  Package,
-} from "lucide-react";
+import "@/components/ui/label";
+import { FolderOpen, ArrowRight, Link, Loader, DownloadCloud, ExternalLink, Package } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";

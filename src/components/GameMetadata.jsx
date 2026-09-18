@@ -1,5 +1,5 @@
-import React from "react";
-import { Calendar, Users, Tag, Award, Monitor, Apple } from "lucide-react";
+
+import { Calendar, Users, Tag, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
  * Displays metadata information about a game
  */
 const GameMetadata = ({ gameInfo, className }) => {
+  const { t } = useTranslation();
   if (!gameInfo) return null;
 
   // Extract relevant information
@@ -35,8 +36,6 @@ const GameMetadata = ({ gameInfo, className }) => {
 
   // Get platforms
   const gamePlatforms = platforms?.map(platform => platform.name).filter(Boolean) || [];
-
-  const { t } = useTranslation();
 
   return (
     <div className={cn("space-y-4", className)}>

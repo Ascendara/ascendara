@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -24,23 +24,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import {
-  Download,
-  Server,
-  HardDrive,
-  Clock,
-  CircleCheck,
-  AlertCircle,
-  Loader2,
-  MoreVertical,
-  Trash,
-  StopCircle,
-  RefreshCw,
-  Coffee,
-  AlertTriangle,
-  Loader,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Download, Server, HardDrive, CircleCheck, AlertCircle, Loader2, MoreVertical, Trash, StopCircle, RefreshCw, Coffee, Loader } from "lucide-react";
+import "@/lib/utils";
 import {
   getUserInfo,
   getAllDownloads,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
 import { subscribeToDownloads, getActiveDownloadCount } from "@/services/khinsiderService";

@@ -1,22 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
-import {
-  subscribeToAuthChanges,
-  getCurrentUser,
-  loginUser,
-  logoutUser,
-  registerUser,
-  resetPassword,
-  updateUserProfile,
-  changePassword,
-  deleteAccount,
-  getUserData,
-  subscribeToUserData,
-  updateUserData,
-  resendVerificationEmail,
-  reloadCurrentUser,
-  signInWithGoogle,
-  updateUserStatus,
-} from "@/services/firebaseService";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { subscribeToAuthChanges, loginUser, logoutUser, registerUser, resetPassword, updateUserProfile, changePassword, deleteAccount, getUserData, subscribeToUserData, updateUserData, resendVerificationEmail, reloadCurrentUser, signInWithGoogle, updateUserStatus } from "@/services/firebaseService";
 
 const AuthContext = createContext(null);
 

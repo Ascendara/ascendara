@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,17 +16,7 @@ import {
   onTranslationProgress,
   getAvailableLanguages,
 } from "@/services/languageService";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // Base languages that are always available
 const baseLanguages = [
@@ -382,7 +372,6 @@ function ExtraLanguages() {
                   setIsDownloading(true);
                   await window.electron.installTool("translator");
                   setShowDownloadDialog(false);
-                  setHasTranslationTool(true);
                 } catch (error) {
                   console.error("Failed to install translator tool:", error);
                 } finally {

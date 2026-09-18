@@ -25,7 +25,7 @@ import {
   ExternalLink,
   ListOrdered,
   Puzzle,
-  Infinity,
+  Infinity as InfinityIcon,
   Smartphone,
 } from "lucide-react";
 import {
@@ -268,7 +268,7 @@ export default function AuthSection({
                   iconClass: "text-rose-400",
                 },
                 {
-                  icon: Infinity,
+                  icon: InfinityIcon,
                   labelKey: "account.features.unlimitedDownloads",
                   bgClass: "bg-violet-500/10 border-violet-500/20 hover:bg-violet-500/15",
                   iconClass: "text-violet-400",

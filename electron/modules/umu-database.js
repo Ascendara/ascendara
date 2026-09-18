@@ -152,10 +152,6 @@ async function findUmuId(gameName) {
 
 // ─── Read / Write in game's json ──────────────────────────────
 
-function getGameJsonPath(gameDir) {
-  return path.join(gameDir, ".ascendara.json");
-}
-
 async function getGameUmuId(gameName) {
     const location = await findGameDataLocation(gameName);
     if (!location) return null;

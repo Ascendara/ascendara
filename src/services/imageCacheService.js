@@ -282,11 +282,9 @@ class ImageCacheService {
     }
 
     // Load from API (only when NOT using local index)
-    try {
+    {
       const result = await this._loadFromAPI(imgID, settings, options);
       return result;
-    } catch (error) {
-      throw error;
     }
   }
 
@@ -583,7 +581,7 @@ class ImageCacheService {
     try {
       // Since we don't know which game this imgID belongs to, we can't target specific keys
       // This is a best-effort approach to find and clear relevant localStorage items
-      for (let i = 0; i < localStorage.length; i++) {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
         if (key.startsWith("game-cover-") || key.startsWith("game-image-")) {
           const value = localStorage.getItem(key);

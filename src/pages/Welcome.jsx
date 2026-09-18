@@ -1,53 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import {
-  Rocket,
-  Shield,
-  Download,
-  PuzzleIcon,
-  PackageOpen,
-  Palette,
-  Zap,
-  Layout,
-  CircleCheck,
-  Loader,
-  XCircle,
-  Globe2,
-  ExternalLink,
-  ArrowRight,
-  PlusCircle,
-  SquareArrowRight,
-  FolderDownIcon,
-  Unplug,
-  Wine,
-  Database,
-  AlertTriangle,
-  Sparkles,
-  BellRing,
-  Gift,
-  Crown,
-  Star,
-  Info,
-  Gamepad2,
-  ArrowRightLeft,
-  Users,
-  Smartphone,
-  MessageCircle,
-  User,
-  CloudIcon,
-  CloudUpload,
-  Trophy,
-  RefreshCw,
-  Eye,
-  Puzzle,
-  Infinity as InfinityIcon,
-  ListOrdered,
-  Sparkle,
-} from "lucide-react";
+import { Rocket, Shield, Download, PuzzleIcon, PackageOpen, Palette, Zap, Layout, CircleCheck, Loader, XCircle, Globe2, ExternalLink, ArrowRight, PlusCircle, SquareArrowRight, FolderDownIcon, Unplug, Wine, Database, AlertTriangle, Sparkles, BellRing, Crown, Info, Gamepad2, ArrowRightLeft, Users, Smartphone, MessageCircle, User, CloudIcon, CloudUpload, Trophy, RefreshCw, Eye, Puzzle, Infinity as InfinityIcon, ListOrdered, Sparkle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,

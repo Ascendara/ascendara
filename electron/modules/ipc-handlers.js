@@ -24,6 +24,7 @@ const { getSettingsManager } = require("./settings");
 const { sanitizeText, getExtensionFromMimeType } = require("./utils");
 const { initializeDiscordRPC, destroyDiscordRPC, setRPCState } = require("./discord-rpc");
 const steamgrid = require("./steamgrid");
+const { isSafeExternalUrl, isTrustedIpcSender } = require("./security");
 const {
   completeOnboarding,
   hasCompletedOnboarding,
@@ -32,21 +33,6 @@ const {
 
 let apiKeyOverride = null;
 let has_launched = false;
-
-/**
- * Get Twitch access token
- */
-const getTwitchToken = async (clientId, clientSecret) => {
-  try {
-    const response = await axios.post(
-      `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`
-    );
-    return response.data.access_token;
-  } catch (error) {
-    console.error("Error getting Twitch token:", error.message);
-    throw error;
-  }
-};
 
 // IGDB functions removed - now using Steam API only
 
@@ -200,18 +186,21 @@ function registerMiscHandlers() {
 
   // Open URL
   ipcMain.handle("open-url", async (ipcEvent, url, options = {}) => {
+    if (!isSafeExternalUrl(url)) throw new Error("Only HTTP(S) links are allowed");
     if (options?.referrer) {
+      if (!isSafeExternalUrl(options.referrer)) throw new Error("Invalid referrer");
       const externalWindow = new BrowserWindow({
         width: 1280,
         height: 800,
         icon: path.join(__dirname, "..", process.platform === "linux" ? "icon.png" : "icon.ico"),
         webPreferences: {
           contextIsolation: true,
+          nodeIntegration: false,
+          partition: "external-providers",
           nativeWindowOpen: false,
-          // Disable sandbox for Linux compatibility (same as main window)
-          sandbox: false,
-          // Disable web security to allow CORS requests (same as main window)
-          webSecurity: false,
+          // Remote provider pages receive no Node access or preload bridge.
+          sandbox: true,
+          webSecurity: true,
           // Prevent rendering stalls when the window is idle or in the background
           backgroundThrottling: false,
         },
@@ -263,7 +252,7 @@ function registerMiscHandlers() {
       externalWindow.webContents.on("will-navigate", (event, navUrl) => {
         try {
           const host = new URL(navUrl).hostname.toLowerCase();
-          const isAllowed = allowedHosts.some(
+          const isAllowed = isSafeExternalUrl(navUrl) && allowedHosts.some(
             allowed => host === allowed || host.endsWith(`.${allowed}`)
           );
           if (!isAllowed) {
@@ -271,6 +260,7 @@ function registerMiscHandlers() {
             event.preventDefault();
           }
         } catch (error) {
+          event.preventDefault();
           console.error("Failed to parse external window navigation URL:", navUrl, error);
         }
       });
@@ -394,7 +384,8 @@ function registerMiscHandlers() {
 
       // When the user clicks a download button in the external window, intercept
       // the file download and send the URL to Ascendara instead of saving it here.
-      const onWillDownload = (event, item) => {
+      const onWillDownload = (event, item, webContents) => {
+        if (webContents !== externalWindow.webContents) return;
         event.preventDefault();
         const downloadUrl = item.getURL();
         console.log("Intercepted download in external window:", downloadUrl);
@@ -424,8 +415,10 @@ function registerMiscHandlers() {
         }
       };
       externalWindow.webContents.session.on("will-download", onWillDownload);
+      const providerSession = externalWindow.webContents.session;
+      externalWindow.once("closed", () => providerSession.removeListener("will-download", onWillDownload));
     } else {
-      shell.openExternal(url);
+      await shell.openExternal(url);
     }
   });
 
@@ -820,7 +813,8 @@ function registerMiscHandlers() {
   });
 
   // Settings changed listener
-  ipcMain.on("settings-changed", () => {
+  ipcMain.on("settings-changed", event => {
+    if (!isTrustedIpcSender(event)) return;
     BrowserWindow.getAllWindows().forEach(window => {
       window.webContents.send("settings-updated");
     });

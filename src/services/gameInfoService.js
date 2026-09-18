@@ -337,7 +337,7 @@ const cleanDescriptionText = description => {
     cleanText = cleanText.replace(headerRegex, (match, prefix, suffix) => {
       // If the suffix is not a space or punctuation, we need to add a space
       // This handles cases like "OverviewThe game is..." -> "Overview\nThe game is..."
-      if (suffix && !suffix.match(/[\s\.,;:]/)) {
+      if (suffix && !suffix.match(/[\s.,;:]/)) {
         return `${prefix}${header}\n\n${suffix}`;
       }
       return `${prefix}${header}\n\n${suffix}`;
@@ -514,7 +514,7 @@ const extractGameFeatures = description => {
     // Split by bullet points or newlines
     const featureText = featureMatches[1];
     const featureItems = featureText
-      .split(/[•\-\*\n]+/)
+      .split(/[•\-*\n]+/)
       .filter(item => item.trim().length > 0);
 
     featureItems.forEach(item => {

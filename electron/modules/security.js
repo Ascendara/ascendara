@@ -7,6 +7,12 @@ const APP_ORIGINS = new Set([
 
 // Avoid wrapping the same ipcMain instance twice.
 const guardedIpcMainInstances = new WeakSet();
+const trustedWebContents = new WeakMap();
+
+function registerTrustedWebContents(contents, origin) {
+  if (!APP_ORIGINS.has(origin)) throw new Error("Invalid app origin");
+  trustedWebContents.set(contents, origin);
+}
 
 function parseHttpUrl(rawUrl) {
   try {
@@ -35,7 +41,28 @@ function getIpcSenderUrl(event) {
 }
 
 function isTrustedIpcSender(event) {
-  return isAllowedAppNavigation(getIpcSenderUrl(event));
+  const frame = event?.senderFrame;
+  // A missing/destroyed frame must not inherit trust from its parent window.
+  return Boolean(
+    frame && frame === event.sender?.mainFrame &&
+    trustedWebContents.get(event.sender) === frame.origin &&
+    APP_ORIGINS.has(frame.origin) && isAllowedAppNavigation(frame.url)
+  );
+}
+
+function isSafeExternalUrl(rawUrl) {
+  const parsed = parseHttpUrl(rawUrl);
+  return Boolean(parsed && !parsed.username && !parsed.password);
+}
+
+function isAllowedAuthPopup(rawUrl) {
+  const parsed = parseHttpUrl(rawUrl);
+  return Boolean(parsed && parsed.protocol === "https:" && !parsed.username &&
+    !parsed.password && !parsed.port && (
+      parsed.hostname === "accounts.google.com" ||
+      parsed.hostname.endsWith(".firebaseapp.com") ||
+      parsed.hostname === "googleapis.com" || parsed.hostname.endsWith(".googleapis.com")
+    ));
 }
 
 function createTrustedIpcListener(channel, listener, onBlocked) {
@@ -91,5 +118,8 @@ module.exports = {
   getIpcSenderUrl,
   installIpcMainGuard,
   isAllowedAppNavigation,
+  isAllowedAuthPopup,
+  isSafeExternalUrl,
   isTrustedIpcSender,
+  registerTrustedWebContents,
 };

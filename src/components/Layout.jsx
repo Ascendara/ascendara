@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, memo, useMemo, useRef } from "react";
+import { useState, useEffect, useContext, memo, useRef } from "react";
 import { Outlet, useSearchParams, useLocation } from "react-router-dom";
 import Navigation from "./Navigation";
 import MenuBar from "./MenuBar";

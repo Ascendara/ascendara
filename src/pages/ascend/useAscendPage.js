@@ -1534,11 +1534,11 @@ export default function useAscendPage() {
 
       const blob = await response.blob();
       const arrayBuffer = await blob.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      const buffer = new Uint8Array(arrayBuffer);
 
       // Save to temp location
       const tempPath = await window.electron.getTempPath();
-      const backupFilePath = `${tempPath}/${backupName}.zip`;
+      const backupFilePath = `${tempPath}/ascendara-restore-${crypto.randomUUID()}.zip`;
       await window.electron.writeFile(backupFilePath, buffer);
 
       // Extract and restore using Ludusavi
@@ -2597,7 +2597,7 @@ export default function useAscendPage() {
       }
       // Password: at least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character
       const passwordRegex =
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
       if (!passwordRegex.test(formData.password)) {
         toast.error(t("account.errors.passwordRequirements"));
         setIsSubmitting(false);

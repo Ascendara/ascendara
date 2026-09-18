@@ -1,18 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  HardDrive,
-  Folder,
-  FolderOpen,
-  File,
-  Check,
-  X,
-  Home,
-  ArrowUp,
-  Monitor,
-  Loader,
-} from "lucide-react";
+import { ChevronRight, HardDrive, Folder, FolderOpen, File, Check, X, Home, ArrowUp, Monitor, Loader } from "lucide-react";
 
 // Gamepad polling
 const getGamepadInput = () => {

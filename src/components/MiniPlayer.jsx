@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useAudioPlayer,
@@ -26,7 +26,7 @@ import {
   Minimize2,
 } from "lucide-react";
 
-import { Music2 } from "lucide-react";
+
 
 import { useState } from "react";
 

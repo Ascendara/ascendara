@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, MessageCircle, DollarSign, X } from "lucide-react";
 import { useTranslation } from "react-i18next";

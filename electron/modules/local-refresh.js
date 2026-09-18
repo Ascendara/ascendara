@@ -12,8 +12,6 @@ const { getSettingsManager } = require("./settings");
 const { checkVersionAndUpdate } = require("./updates");
 const archiver = require("archiver");
 const https = require("https");
-const http = require("http");
-const settingsManager = getSettingsManager();
 
 let localRefreshProcess = null;
 let localRefreshProgressInterval = null;

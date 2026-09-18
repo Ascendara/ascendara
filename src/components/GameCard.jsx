@@ -1,27 +1,8 @@
-import React, { useState, memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Gift,
-  Gamepad2,
-  Zap,
-  Loader,
-  ArrowUpFromLine,
-  ArrowDown,
-  Calendar,
-  Clock,
-  Check,
-  Info,
-  Download,
-  Wrench,
-  Puzzle,
-  Cloud,
-  Trophy,
-  Star,
-  ShieldCheck,
-  Heart,
-} from "lucide-react";
+import { Gift, Gamepad2, Zap, Loader, ArrowUpFromLine, Calendar, Clock, Check, Info, Download, Trophy, Star, ShieldCheck, Heart } from "lucide-react";
 import {
   TooltipProvider,
   Tooltip,
@@ -50,7 +31,11 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import verifiedGamesService from "@/services/verifiedGamesService";
 import { SEAMLESS_PROVIDERS, TORBOX_PROVIDERS, TORBOX_ELIGIBLE_SEAMLESS } from "@/config/providers";
 
-const GameCard = memo(function GameCard({ game, compact }) {
+const GameCard = memo(function GameCard(props) {
+  return props.game ? <GameCardContent {...props} /> : null;
+});
+
+function GameCardContent({ game, compact }) {
   const navigate = useNavigate();
   const [showAllTags, setShowAllTags] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -110,16 +95,8 @@ const GameCard = memo(function GameCard({ game, compact }) {
       observer.observe(cardRef.current);
     }
 
-    return () => {
-      if (cardRef.current) {
-        observer.unobserve(cardRef.current);
-      }
-    };
+    return () => observer.disconnect();
   }, []);
-
-  if (!game) {
-    return null;
-  }
 
   const gameCategories = Array.isArray(game.category) ? game.category : [];
 
@@ -128,11 +105,13 @@ const GameCard = memo(function GameCard({ game, compact }) {
   }, [gameCategories, showAllTags]);
 
   useEffect(() => {
+    let active = true;
+    isMounted.current = true;
     // Use cached installed games service to prevent IPC flooding
     installedGamesService
       .checkGameStatus(game.game, game.version)
       .then(({ isInstalled: installed, needsUpdate: update }) => {
-        if (isMounted.current) {
+        if (active) {
           setIsInstalled(installed);
           setNeedsUpdate(update);
         }
@@ -142,6 +121,7 @@ const GameCard = memo(function GameCard({ game, compact }) {
       });
 
     return () => {
+      active = false;
       isMounted.current = false;
     };
   }, [game.game, game.version]);
@@ -775,6 +755,6 @@ const GameCard = memo(function GameCard({ game, compact }) {
       </AlertDialog>
     </>
   );
-});
+}
 
 export default GameCard;

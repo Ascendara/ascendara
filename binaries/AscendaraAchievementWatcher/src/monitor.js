@@ -524,7 +524,7 @@ module.exports.getFolders = async userDir_file => {
 };
 
 module.exports.parse = async filePath => {
-  try {
+  {
     const filter = ["SteamAchievements", "Steam64", "Steam"];
 
     let local;
@@ -671,7 +671,5 @@ module.exports.parse = async filePath => {
     });
 
     return achievements;
-  } catch (err) {
-    throw err;
   }
 };

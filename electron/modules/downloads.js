@@ -6,10 +6,9 @@
 const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
-const crypto = require("crypto");
 const { spawn } = require("child_process");
-const { ipcMain, BrowserWindow, app } = require("electron");
-const { isDev, isWindows, TIMESTAMP_FILE, appDirectory, imageKey, getPythonPath } = require("./config");
+const { ipcMain, app } = require("electron");
+const { isDev, isWindows, TIMESTAMP_FILE, appDirectory, getPythonPath } = require("./config");
 const {
   sanitizeText,
   sanitizeGameName,
@@ -22,7 +21,6 @@ const { prepareDownloaderRuntime } = require("./downloaderRuntime");
 const steamgrid = require("./steamgrid");
 
 const downloadProcesses = new Map();
-const goFileProcesses = new Map();
 const retryDownloadProcesses = new Map();
 
 /**
@@ -1130,7 +1128,7 @@ function registerDownloadHandlers() {
 
       const verifyErrors = [];
       for (const filePath in filemap) {
-        const normalizedPath = filePath.replace(/[\/\\]/g, path.sep);
+        const normalizedPath = filePath.replace(/[/\\]/g, path.sep);
         const fullPath = path.join(gameDirectory, normalizedPath);
 
         const pathExists =

@@ -1,14 +1,9 @@
-import React from "react";
+
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Folder, FolderOpen, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import {
-  getFolderByName,
-  deleteFolder,
-  loadFolders,
-  saveFolders,
-} from "@/lib/folderManager";
+import { getFolderByName, deleteFolder, loadFolders } from "@/lib/folderManager";
 import { useLanguage } from "@/context/LanguageContext";
 import { useNavigate } from "react-router-dom";
 import {

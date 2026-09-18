@@ -1,43 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import {
-  requestCommunityCreation,
-  getUserCommunityRequests,
-  getApprovedCommunities,
-  getCommunity,
-  requestJoinCommunity,
-  getCommunityJoinRequests,
-  getCommunityMembers,
-  sendCommunityMessage,
-  getCommunityMessages,
-  subscribeToCommunityMessages,
-  checkCommunityMembership,
-  getUserCommunities,
-} from "@/services/firebaseService";
-import {
-  Users,
-  MessageCircle,
-  Plus,
-  Search,
-  Send,
-  Crown,
-  Shield,
-  UserPlus,
-  UserMinus,
-  Loader2,
-  ArrowLeft,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Gamepad2,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { requestCommunityCreation, getUserCommunityRequests, getApprovedCommunities, requestJoinCommunity, getCommunityJoinRequests, getCommunityMembers, sendCommunityMessage, getCommunityMessages, subscribeToCommunityMessages, checkCommunityMembership, getUserCommunities } from "@/services/firebaseService";
+import { Users, MessageCircle, Plus, Search, Send, Crown, Shield, UserPlus, Loader2, ArrowLeft, CheckCircle, XCircle, Clock, Gamepad2 } from "lucide-react";
+import "@/lib/utils";
 
 const CommunityHub = ({ user, userData }) => {
   const { t } = useTranslation();

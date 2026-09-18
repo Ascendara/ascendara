@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback, useRef, useEffect } from "react";
+import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { AspectRatio } from "./ui/aspect-ratio";
 import { Skeleton } from "./ui/skeleton";

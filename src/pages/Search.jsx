@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, memo, useCallback, useRef, useDeferredValue } from "react";
-import { toast } from "sonner";
+import { useState, useEffect, useMemo, memo, useCallback, useRef } from "react";
+import "sonner";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,39 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { useLanguage } from "@/context/LanguageContext";
-import { useSettings } from "@/context/SettingsContext";
+import "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import GameCard from "@/components/GameCard";
 import CategoryFilter from "@/components/CategoryFilter";
-import {
-  Search as SearchIcon,
-  SlidersHorizontal,
-  Gamepad2,
-  Gift,
-  InfoIcon,
-  ExternalLink,
-  RefreshCw,
-  Clock,
-  AlertTriangle,
-  X,
-  Calendar,
-  Database,
-  Sparkles,
-  Users,
-  TrendingUp,
-  HardDrive,
-  ShieldCheck,
-  Check,
-  Info,
-  ArrowUpFromLine,
-  Download,
-} from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Gamepad2, Gift, InfoIcon, ExternalLink, RefreshCw, Clock, AlertTriangle, X, Calendar, Database, Sparkles, HardDrive, ShieldCheck, Check, Info, ArrowUpFromLine, Download } from "lucide-react";
 import gameService from "@/services/gameService";
-import {
-  subscribeToStatus,
-  getCurrentStatus,
-  startStatusCheck,
-} from "@/services/serverStatus";
+import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,

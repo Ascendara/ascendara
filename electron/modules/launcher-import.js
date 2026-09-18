@@ -96,6 +96,7 @@ function saveImportedGame(candidate, settings, io = fs, installedCache) {
   }
   const data = readLibrary(settings.downloadDirectory, io);
   const gameName = String(candidate.game || "")
+// eslint-disable-next-line no-control-regex -- Reject control characters in external paths.
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
     .trim()
     .replace(/[. ]+$/, "");

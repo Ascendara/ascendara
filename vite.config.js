@@ -63,7 +63,7 @@ export default defineConfig({
       "/api/khinsider": {
         target: "https://downloads.khinsider.com",
         changeOrigin: true,
-        secure: false,
+        secure: true,
         rewrite: path => path.replace(/^\/api\/khinsider/, ""),
         configure: (proxy, _options) => {
           proxy.on("error", (err, _req, _res) => {

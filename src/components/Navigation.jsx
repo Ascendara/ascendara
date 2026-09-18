@@ -3,20 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
-import {
-  Home,
-  Search,
-  Library,
-  Settings2,
-  Download,
-  ChevronRight,
-  Package,
-  User,
-  ServerIcon,
-  ArrowBigDown,
-  CircleArrowDown,
-  AtSign,
-} from "lucide-react";
+import { Home, Search, Library, Settings2, ChevronRight, Package, User, ServerIcon, CircleArrowDown, AtSign } from "lucide-react";
 
 const Navigation = memo(({ items }) => {
   const { theme } = useTheme();

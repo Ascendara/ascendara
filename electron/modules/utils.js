@@ -30,7 +30,7 @@ function sanitizeText(text) {
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\//g, "-")
     .replace(/:/g, "-")
-    .replace(/[<>:"\/\\|?*]/g, "")
+    .replace(/[<>:"/\\|?*]/g, "")
     .trim();
 }
 

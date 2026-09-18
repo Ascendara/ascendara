@@ -1,3 +1,4 @@
+import SafeHtml from "@/components/SafeHtml";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -9,7 +10,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -38,45 +39,8 @@ import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import { addToQueue, hasActiveDownloads, getDownloadQueue } from "@/services/downloadQueueService";
 import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
 import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
-import {
-  BadgeCheckIcon,
-  CheckIcon,
-  CircleSlash,
-  CopyIcon,
-  ExternalLink,
-  InfoIcon,
-  Loader,
-  MessageSquareWarning,
-  TriangleAlert,
-  Cloud,
-  Puzzle,
-  History,
-  Zap,
-  RefreshCw,
-  AlertTriangle,
-  Star,
-  FolderIcon,
-  Apple,
-  Gamepad2,
-  Gift,
-  ArrowDownCircle,
-  Share,
-  ArrowUpFromLine,
-  X,
-  Eye,
-  FileQuestion,
-  Clock,
-  Check,
-  Smartphone,
-  ListEnd,
-  ShieldCheck,
-  Trophy,
-  Library,
-  Heart,
-  Trash2,
-  FolderSync,
-} from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import { BadgeCheckIcon, CheckIcon, CircleSlash, CopyIcon, ExternalLink, Loader, TriangleAlert, Cloud, Puzzle, History, Zap, RefreshCw, AlertTriangle, Star, FolderIcon, Apple, Gamepad2, Gift, ArrowDownCircle, Share, ArrowUpFromLine, FileQuestion, Clock, Check, Smartphone, ListEnd, ShieldCheck, Trophy, Library, Heart, Trash2, FolderSync } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
 import { toast } from "sonner";
@@ -1979,17 +1943,7 @@ export default function DownloadPage() {
     }
   };
 
-  if (!gameData) {
-    return (
-      <div className="container mx-auto max-w-7xl p-6">
-        <AlertDialog variant="destructive">
-          <AlertDialogDescription>
-            {t("download.toast.noGameData")}
-          </AlertDialogDescription>
-        </AlertDialog>
-      </div>
-    );
-  }
+  
 
   const downloadLinks = gameData?.download_links || {};
   const hasProviders = Object.keys(downloadLinks).length > 0;
@@ -2066,6 +2020,18 @@ export default function DownloadPage() {
 
   if (gameData && gameData.game) {
     gameData.game = sanitizeGameName(gameData.game);
+  }
+
+  if (!gameData) {
+    return (
+      <div className="container mx-auto max-w-7xl p-6">
+        <AlertDialog variant="destructive">
+          <AlertDialogDescription>
+            {t("download.toast.noGameData")}
+          </AlertDialogDescription>
+        </AlertDialog>
+      </div>
+    );
   }
 
   return (
@@ -3984,9 +3950,9 @@ export default function DownloadPage() {
                           {t("download.aboutGame")}
                         </h2>
                         {steamData.about_the_game ? (
-                          <div 
+                          <SafeHtml
                             className="steam-description leading-relaxed text-muted-foreground"
-                            dangerouslySetInnerHTML={{ __html: steamData.about_the_game }}
+                            html={steamData.about_the_game}
                           />
                         ) : (
                           <p className="leading-relaxed text-muted-foreground">

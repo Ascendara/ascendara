@@ -1,11 +1,5 @@
-import React, { useState, useEffect } from "react";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "./ui/alert-dialog";
+import { useState, useEffect } from "react";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
 import {
   AlertTriangle,

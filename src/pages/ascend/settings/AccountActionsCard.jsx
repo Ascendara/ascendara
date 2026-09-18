@@ -8,7 +8,7 @@ import {
   ChevronRight,
   Check,
   Trash2,
-  Infinity,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -171,7 +171,7 @@ export default function AccountActionsCard({
                         animate={{ rotate: 360 }}
                         transition={{
                           duration: 1,
-                          repeat: Infinity,
+                          repeat: InfinityIcon,
                           ease: "linear",
                         }}
                       >

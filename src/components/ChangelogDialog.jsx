@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   AlertDialog,
@@ -9,21 +9,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  Loader,
-  Plus,
-  Wrench,
-  TrendingUp,
-  Trash2,
-  Users,
-  Calendar,
-  ExternalLink,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import "@/components/ui/separator";
+import { Loader, Plus, Wrench, TrendingUp, Trash2, ExternalLink } from "lucide-react";
 
 const CHANGELOG_API_URL = "https://api.ascendara.app/json/changelog/v2";
 

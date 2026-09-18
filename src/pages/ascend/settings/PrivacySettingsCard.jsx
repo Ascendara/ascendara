@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Eye, LockIcon, MegaphoneOffIcon } from "lucide-react";
+import { Eye, LockIcon } from "lucide-react";
 
 export default function PrivacySettingsCard({ t, userData, updateData }) {
   return (
@@ -62,54 +62,7 @@ export default function PrivacySettingsCard({ t, userData, updateData }) {
           </div>
 
           {/* Hide Partner Ads - Only for active subscribers and verified users */}
-          {false && (
-            <div className="flex items-center justify-between border-t border-border/50 pt-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <MegaphoneOffIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {t("settings.hidePartnerAds") || "Hide Partner Ads"}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("settings.hidePartnerAdsDescription") ||
-                    "Hide partner advertisements in search results. Available for active Ascend subscribers."}
-                </p>
-              </div>
-              <div className="ml-4">
-                <Checkbox
-                  id="hidePartnerAds"
-                  checked={userData?.hidePartnerAds || false}
-                  onCheckedChange={async checked => {
-                    try {
-                      const result = await updateData({ hidePartnerAds: checked });
-                      if (result.success) {
-                        toast.success(
-                          checked
-                            ? t("ascend.settings.partnerAdsHidden") ||
-                                "Partner ads are now hidden"
-                            : t("ascend.settings.partnerAdsVisible") ||
-                                "Partner ads are now visible"
-                        );
-                      } else {
-                        toast.error(
-                          result.error ||
-                            t("ascend.settings.updateFailed") ||
-                            "Failed to update setting"
-                        );
-                      }
-                    } catch (e) {
-                      console.error("Failed to update partner ads setting:", e);
-                      toast.error(
-                        t("ascend.settings.updateFailed") || "Failed to update setting"
-                      );
-                    }
-                  }}
-                  className="h-5 w-5"
-                />
-              </div>
-            </div>
-          )}
+          
         </div>
       </div>
     </div>

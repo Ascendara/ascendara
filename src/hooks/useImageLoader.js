@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 
@@ -6,29 +6,22 @@ import steamGridImageService from "@/services/steamGridImageService";
 const loadingImages = new Map();
 
 const imageQueue = [];
-let isProcessingQueue = false;
 const MAX_CONCURRENT_LOADS = 6;
 let activeLoads = 0;
 
 function processImageQueue() {
-  if (isProcessingQueue) return;
-  isProcessingQueue = true;
-
   const processNext = () => {
     while (activeLoads < MAX_CONCURRENT_LOADS && imageQueue.length > 0) {
       const task = imageQueue.shift();
       if (task && task.mounted) {
         activeLoads++;
-        task.execute().finally(() => {
+        task.execute().catch(() => {}).finally(() => {
           activeLoads--;
           processNext();
         });
       }
     }
 
-    if (imageQueue.length === 0 && activeLoads === 0) {
-      isProcessingQueue = false;
-    }
   };
 
   processNext();
@@ -39,15 +32,16 @@ export function useImageLoader(
   imgID,
   options = { quality: "high", priority: "normal", enabled: true }
 ) {
+  options = { quality: "high", priority: "normal", enabled: true, ...options };
   const [state, setState] = useState({
     cachedImage: null,
     loading: false,
     error: null,
   });
-  const mountedRef = useRef(true);
-
   useEffect(() => {
-    mountedRef.current = true;
+    // Each effect owns its cancellation flag so an old request cannot update
+    // a card after it has switched to a different game.
+    let active = true;
 
     // SteamGrid fallback: when there's no imgID but a game name is supplied
     // (typically for custom Hydra sources), resolve a cover URL by name.
@@ -67,7 +61,7 @@ export function useImageLoader(
       steamGridImageService
         .getAssets(name)
         .then(assets => {
-          if (!mountedRef.current) return;
+          if (!active) return;
           const url = steamGridImageService.pickUrl(assets, slot);
           setState({
             cachedImage: url,
@@ -76,14 +70,14 @@ export function useImageLoader(
           });
         })
         .catch(err => {
-          if (!mountedRef.current) return;
+          if (!active) return;
           setState({
             cachedImage: null,
             loading: false,
             error: err?.message || "SteamGrid lookup failed",
           });
         });
-      return;
+      return () => { active = false; };
     }
 
     if (!imgID || !options.enabled) {
@@ -113,7 +107,7 @@ export function useImageLoader(
       loadingImages
         .get(loadingKey)
         .then(cached => {
-          if (mountedRef.current) {
+          if (active) {
             setState({
               cachedImage: cached,
               loading: false,
@@ -122,7 +116,7 @@ export function useImageLoader(
           }
         })
         .catch(error => {
-          if (mountedRef.current) {
+          if (active) {
             setState({
               cachedImage: null,
               loading: false,
@@ -130,7 +124,7 @@ export function useImageLoader(
             });
           }
         });
-      return;
+      return () => { active = false; };
     }
 
     // Set loading state immediately (non-blocking)
@@ -140,15 +134,15 @@ export function useImageLoader(
     const loadTask = {
       mounted: true,
       execute: async () => {
-        if (!mountedRef.current) return null;
+        if (!active) return null;
 
         try {
-          const loadPromise = imageCacheService.getImage(imgID, options);
+          const loadPromise = loadingImages.get(loadingKey) || imageCacheService.getImage(imgID, options);
           loadingImages.set(loadingKey, loadPromise);
 
           const cached = await loadPromise;
 
-          if (mountedRef.current) {
+          if (active) {
             setState({
               cachedImage: cached,
               loading: false,
@@ -157,7 +151,7 @@ export function useImageLoader(
           }
           return cached;
         } catch (error) {
-          if (mountedRef.current) {
+          if (active) {
             setState({
               cachedImage: null,
               loading: false,
@@ -182,7 +176,7 @@ export function useImageLoader(
     processImageQueue();
 
     return () => {
-      mountedRef.current = false;
+      active = false;
       loadTask.mounted = false;
     };
   }, [

@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useEffect, memo } from "react";
+import { useContext, useRef, useEffect, memo } from "react";
 import { SettingsContext } from "@/context/SettingsContext";
 
 const PageTransition = memo(({ children }) => {

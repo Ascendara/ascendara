@@ -1,4 +1,7 @@
 # Logs
+/.cache/
+/.cache-code-audit.json
+/.cache-dependency-audit.json
 logs
 *.log
 npm-debug.log*
@@ -16,6 +19,7 @@ dist-ssr
 package-lock.json
 
 # Build outputs
+/build/
 /binaries/*/build
 /binaries/*/target
 .build_venv
@@ -48,6 +52,8 @@ scripts/register_build.py
 # Specific files to ignore
 binaries/AscendaraNotificationHelper/src/debian/AscendaraNotificationHelper.py
 yarn.lock
+!/yarn.lock
+!/binaries/AscendaraAchievementWatcher/yarn.lock
 /src/pages/concept
 binaries/AscendaraDownloader/src/AscendaraDownloaderV1.py
 electron/appOrginal.js

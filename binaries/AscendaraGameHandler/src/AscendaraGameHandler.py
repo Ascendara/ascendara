@@ -326,12 +326,9 @@ def install_vcredist(prefix_path, env, umu_bin=None):
         logging.info(f"[VCREDIST] Downloading {filename}...")
         try:
             import urllib.request
-            # Disable SSL verification to work around PyInstaller
-            # bundling an older libcrypto that can't verify certificates
+            # Installers must be authenticated before they are executed.
             ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(url, context=ssl_ctx) as response:
+            with urllib.request.urlopen(url, context=ssl_ctx, timeout=60) as response:
                 with open(dest_path, 'wb') as f:
                     f.write(response.read())
             logging.info(f"[VCREDIST] Download complete: {filename}")

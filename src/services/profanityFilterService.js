@@ -18,7 +18,7 @@ function normalizeForComparison(text) {
     .replace(/[\u0300-\u036f]/g, "");
 
   normalized = normalized.replace(/[@]/g, "a");
-  normalized = normalized.replace(/[\$]/g, "s");
+  normalized = normalized.replace(/[$]/g, "s");
   normalized = normalized.replace(/[0]/g, "o");
   normalized = normalized.replace(/[1!|]/g, "i");
   normalized = normalized.replace(/[3]/g, "e");

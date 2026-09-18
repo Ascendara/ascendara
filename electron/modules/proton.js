@@ -6,7 +6,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
-const { exec, spawn } = require("child_process");
+const { exec, execFile } = require("child_process");
 const { ipcMain, BrowserWindow } = require("electron");
 const {
   isLinux,
@@ -429,8 +429,8 @@ async function downloadUmuProton(parentWindow) {
     fs.ensureDirSync(linuxRunnersDir);
 
     await new Promise((resolve, reject) => {
-      const proc = exec(
-        `tar -xzf "${tempPath}" -C "${linuxRunnersDir}"`,
+      const proc = execFile(
+        "tar", ["-xzf", tempPath, "-C", linuxRunnersDir],
         { maxBuffer: 10 * 1024 * 1024 },
         err => {
           if (err) reject(err);
@@ -522,7 +522,7 @@ async function downloadUmuLauncher(parentWindow) {
   const fs = require("fs-extra");
   const path = require("path");
   const os = require("os");
-  const { exec } = require("child_process");
+  const { execFile } = require("child_process");
 
   // Create progress window
   const progressWindow = new BrowserWindow({
@@ -626,7 +626,7 @@ async function downloadUmuLauncher(parentWindow) {
     await new Promise((resolve, reject) => {
       // Structure: tar -> dossier umu/ -> fichier umu-run
       // --strip-components=1 enlève le dossier "umu/"
-      exec(`tar -xf "${tmpTar}" -C "${linuxUmuDir}" --strip-components=1`, (err) => {
+      execFile("tar", ["-xf", tmpTar, "-C", linuxUmuDir, "--strip-components=1"], (err) => {
         if (err) reject(err); else resolve();
       });
     });
@@ -835,8 +835,8 @@ async function downloadProtonCachyOS(parentWindow) {
     const tarFlag = info.fileName.endsWith(".tar.xz") ? "-xJf" : "-xzf";
 
     await new Promise((resolve, reject) => {
-      const proc = exec(
-        `tar ${tarFlag} "${tempPath}" -C "${linuxRunnersDir}"`,
+      const proc = execFile(
+        "tar", [tarFlag, tempPath, "-C", linuxRunnersDir],
         { maxBuffer: 10 * 1024 * 1024 },
         err => err ? reject(err) : resolve()
       );
@@ -1120,8 +1120,8 @@ async function downloadProtonGE(parentWindow) {
     fs.ensureDirSync(linuxRunnersDir);
 
     await new Promise((resolve, reject) => {
-      const proc = exec(
-        `tar -xzf "${tempPath}" -C "${linuxRunnersDir}"`,
+      const proc = execFile(
+        "tar", ["-xzf", tempPath, "-C", linuxRunnersDir],
         { maxBuffer: 10 * 1024 * 1024 },
         err => {
           if (err) reject(err);

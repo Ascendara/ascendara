@@ -6,7 +6,7 @@ import {
 } from "@/services/retryGameDownloadService";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
@@ -18,50 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Loader,
-  StopCircle,
-  FolderOpen,
-  MoreVertical,
-  RefreshCcw,
-  Trash2,
-  AlertCircle,
-  AlertTriangle,
-  Download,
-  Clock,
-  Clock1,
-  Clock2,
-  Clock3,
-  Clock4,
-  Clock5,
-  Clock6,
-  Clock7,
-  Clock8,
-  Clock9,
-  Clock10,
-  Clock11,
-  Clock12,
-  ExternalLink,
-  CircleCheck,
-  Coffee,
-  RefreshCw,
-  Zap,
-  TrendingUp,
-  Activity,
-  HardDrive,
-  Pause,
-  Package,
-  CheckCircle2,
-  XCircle,
-  ArrowDownToLine,
-  Wifi,
-  Play,
-  FileText,
-  ScrollText,
-  ShieldAlert,
-  Copy,
-  FolderCog,
-} from "lucide-react";
+import { Loader, FolderOpen, MoreVertical, RefreshCcw, Trash2, AlertCircle, AlertTriangle, Clock, Clock1, Clock2, Clock3, Clock4, Clock5, Clock6, Clock7, Clock8, Clock9, Clock10, Clock11, Clock12, ExternalLink, CircleCheck, Coffee, RefreshCw, Zap, TrendingUp, Activity, Pause, Package, CheckCircle2, XCircle, ArrowDownToLine, Wifi, Play, FileText, ScrollText, ShieldAlert, Copy, FolderCog } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useSettings } from "@/context/SettingsContext";

@@ -1,6 +1,6 @@
-import React from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const BrokenVersionDialog = ({ onClose }) => {

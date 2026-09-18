@@ -69,6 +69,7 @@ function requestAscendaraService(rawUrl, options = {}) {
         timeout,
       },
       response => {
+        response.on("error", reject);
         const chunks = [];
         let totalBytes = 0;
 
@@ -135,6 +136,7 @@ function requestExternalResource(rawUrl, options = {}) {
         ...(timeout === undefined ? {} : { timeout }),
       },
       response => {
+        response.on("error", reject);
         let data = "";
 
         // Large source indexes are valid, so do not cap the response here.

@@ -28,7 +28,7 @@ import {
   BadgeDollarSign,
   ListOrdered,
   Puzzle,
-  Infinity,
+  Infinity as InfinityIcon,
   Smartphone,
 } from "lucide-react";
 
@@ -387,7 +387,7 @@ export default function SubscriptionSettingsCard({
                   desc: "Compete with the community",
                 },
                 {
-                  icon: Infinity,
+                  icon: InfinityIcon,
                   title: "Unlimited Downloads",
                   desc: "No download restrictions",
                 },
@@ -514,7 +514,7 @@ export default function SubscriptionSettingsCard({
                   desc: t("ascend.premium.nexusMods.description"),
                 },
                 {
-                  icon: Infinity,
+                  icon: InfinityIcon,
                   title: t("ascend.premium.unlimitedDownloads.title"),
                   desc: t("ascend.premium.unlimitedDownloads.description"),
                 },

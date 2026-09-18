@@ -8,6 +8,7 @@ const path = require("path");
 const { isDev } = require("./config");
 const { initializeDiscordRPC, destroyDiscordRPC } = require("./discord-rpc");
 const { getSettingsManager } = require("./settings");
+const { isAllowedAppNavigation, isAllowedAuthPopup, isSafeExternalUrl, registerTrustedWebContents } = require("./security");
 
 let mainWindowHidden = false;
 let isHandlingProtocolUrl = false;
@@ -43,7 +44,7 @@ function createWindow() {
     fullscreen: startInBigPicture,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload.js"),
-      nodeIntegration: true,
+      nodeIntegration: false,
       contextIsolation: true,
       // Disable sandbox for Linux compatibility
       sandbox: false,
@@ -83,7 +84,7 @@ function createWindow() {
   // This handles cases where the event might not fire properly on some Linux configurations
   if (process.platform === "linux") {
     setTimeout(() => {
-      if (!windowShown && !process.argv.includes("--hidden")) {
+      if (!mainWindow.isDestroyed() && !windowShown && !process.argv.includes("--hidden")) {
         console.log("ready-to-show timeout - forcing window show on Linux");
         mainWindow.show();
         mainWindowHidden = false;
@@ -99,6 +100,7 @@ function createWindow() {
     : "http://localhost:46859" + urlSuffix;
   
   console.log(`Loading window from: ${targetUrl}`);
+  registerTrustedWebContents(mainWindow.webContents, new URL(targetUrl).origin);
   mainWindow.loadURL(targetUrl);
 
   // Add load event listeners for debugging
@@ -115,7 +117,11 @@ function createWindow() {
   });
 
   // Handle load failures (e.g., local server not running)
-  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || errorCode === -3 || validatedURL?.startsWith("data:")) return;
+    const safeDescription = String(errorDescription).replace(/[&<>"']/g, char =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
+    );
     console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
     // Show a helpful error page instead of white screen
     mainWindow.loadURL(`data:text/html,
@@ -130,7 +136,7 @@ function createWindow() {
         </head>
         <body>
           <h1>Failed to Load Ascendara</h1>
-          <p>Error: ${errorDescription} (${errorCode})</p>
+          <p>Error: ${safeDescription} (${errorCode})</p>
           <p>This may be caused by:</p>
           <p>• Missing Visual C++ Redistributables - <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color: #3b82f6;">Download here</a></p>
           <p>• Antivirus blocking the app</p>
@@ -141,18 +147,22 @@ function createWindow() {
     `);
   });
 
+  const guardNavigation = (event, url) => {
+    if (!isAllowedAppNavigation(url)) event.preventDefault();
+  };
+  mainWindow.webContents.on("will-navigate", guardNavigation);
+  mainWindow.webContents.on("will-redirect", guardNavigation);
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Allow Firebase/Google auth popups
-    if (
-      url.includes("accounts.google.com") ||
-      url.includes("firebaseapp.com") ||
-      url.includes("googleapis.com")
-    ) {
-      return { action: "allow" };
+    if (isAllowedAuthPopup(url)) {
+      return { action: "allow", overrideBrowserWindowOptions: {
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, preload: "" },
+      } };
     }
     // Open other external links in system browser
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      require("electron").shell.openExternal(url);
+    if (isSafeExternalUrl(url)) {
+      require("electron").shell.openExternal(url).catch(error => console.warn("Unable to open link:", error.message));
     }
     return { action: "deny" };
   });
@@ -229,7 +239,7 @@ function showWindow() {
     mainWindow.focus();
     // Remove the always on top flag after focusing
     setTimeout(() => {
-      mainWindow.setAlwaysOnTop(false);
+      if (!mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(false);
     }, 100);
   } else {
     console.log("Creating new window from showWindow function");
@@ -432,6 +442,9 @@ function registerWindowHandlers() {
 
   // Get audio asset as base64 data URL
   ipcMain.handle("get-audio-asset", (_, filename) => {
+    if (typeof filename !== "string" || !/^sounds\/ascend[1-4]\.mp3$/.test(filename)) {
+      throw new Error("Unknown audio asset");
+    }
     const fs = require("fs-extra");
     let assetPath;
     if (!app.isPackaged) {

@@ -1,4 +1,4 @@
-import React from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
 import { Database, ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";

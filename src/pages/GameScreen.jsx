@@ -1,60 +1,9 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import SafeHtml from "@/components/SafeHtml";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ChevronLeft,
-  Heart,
-  Play,
-  FolderOpen,
-  Gamepad2,
-  Gift,
-  Tag,
-  PackageOpen,
-  Trash2,
-  Pencil,
-  Monitor,
-  StopCircle,
-  Loader,
-  FileCheck2,
-  Check,
-  FolderSync,
-  AlertTriangle,
-  Info,
-  Star,
-  Clock,
-  ExternalLink,
-  Settings2,
-  Download,
-  FileSearch,
-  Search,
-  Edit3,
-  ThumbsUp,
-  Copy,
-  Music2,
-  HeadphoneOff,
-  Trophy,
-  Award,
-  LetterText,
-  BookX,
-  LockIcon,
-  ImageUp,
-  ImageIcon,
-  Bolt,
-  Plus,
-  GripVertical,
-  X,
-  Puzzle,
-  ChevronDown,
-  ChevronUp,
-  Gem,
-  Cloud,
-  CloudOff,
-  Terminal,
-  RefreshCw,
-  ArrowRightLeft,
-  CheckCircle2,
-} from "lucide-react";
+import { ChevronLeft, Heart, Play, FolderOpen, Tag, PackageOpen, Trash2, Pencil, Monitor, StopCircle, Loader, FileCheck2, Check, FolderSync, AlertTriangle, Info, Star, Clock, ExternalLink, Settings2, Download, FileSearch, Search, Edit3, ThumbsUp, Copy, Music2, HeadphoneOff, Trophy, Award, BookX, LockIcon, ImageUp, ImageIcon, Bolt, Plus, GripVertical, X, Puzzle, ChevronDown, ChevronUp, Gem, Cloud, CloudOff, Terminal, RefreshCw, ArrowRightLeft, CheckCircle2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
@@ -97,7 +46,7 @@ import SteamNotRunningDialog from "@/components/SteamNotRunningDialog";
 import recentGamesService from "@/services/recentGamesService";
 import GamesBackupDialog from "@/components/GamesBackupDialog";
 import imageCacheService from "@/services/imageCacheService";
-import GameMetadata from "@/components/GameMetadata";
+import "@/components/GameMetadata";
 import steamService from "@/services/gameInfoService";
 import GameRate from "@/components/GameRate";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
@@ -3728,9 +3677,9 @@ export default function GameScreen() {
                           <h2 className="text-xl font-bold">{t("gameScreen.aboutGame")}</h2>
                         </div>
                         {steamData.about_the_game ? (
-                          <div 
+                          <SafeHtml
                             className="steam-description text-base leading-relaxed text-foreground/80"
-                            dangerouslySetInnerHTML={{ __html: steamData.about_the_game }}
+                            html={steamData.about_the_game}
                           />
                         ) : (
                           <p className="text-base leading-relaxed text-foreground/80">

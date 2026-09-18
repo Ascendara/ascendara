@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTour } from "@/context/TourContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ChevronLeft, Rocket, Volume2, VolumeX, Music } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import SafeHtml from "@/components/SafeHtml";
 import soundService from "@/services/soundService";
 
 const getSteps = t => [
@@ -96,7 +97,6 @@ function Tour({ onClose }) {
       soundService.stop();
     };
   }, []);
-  if (!hasMounted && isTourActive) return null;
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightPosition, setSpotlightPosition] = useState({
@@ -319,7 +319,7 @@ function Tour({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200]">
+    <div className="fixed inset-0 z-[200]" hidden={!hasMounted && isTourActive}>
       <div className="pointer-events-auto absolute inset-0 z-[201] bg-black/40" />
 
       {/* Spotlight */}
@@ -413,9 +413,9 @@ function Tour({ onClose }) {
           className={`max-w-md rounded-xl border border-border bg-background p-6 shadow-lg transition-shadow duration-500 ${getSoundGlow()}`}
         >
           <h2 className="mb-2 text-xl font-bold">{steps[currentStep].title}</h2>
-          <p
+          <SafeHtml
             className="pointer-events-auto mb-4 text-muted-foreground"
-            dangerouslySetInnerHTML={{ __html: steps[currentStep].content }}
+            html={steps[currentStep].content}
           />
 
           {/* Sound indicator for last 4 steps */}

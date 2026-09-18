@@ -1,6 +1,6 @@
-import { motion, AnimatePresence } from "framer-motion";
-import React from "react";
-import { Loader } from "lucide-react";
+import { motion } from "framer-motion";
+
+
 import { useLanguage } from "@/context/LanguageContext";
 
 const LaunchOverlay = ({

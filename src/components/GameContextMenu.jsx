@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Info, Clock, Check, Zap, TriangleAlert, MessageSquareText } from "lucide-react";

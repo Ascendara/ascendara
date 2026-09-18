@@ -33,11 +33,11 @@ function parse(buffer) {
 }
 
 function toString(buffer) {
-  return buffer.reverse().toString("hex");
+  return Buffer.from(buffer).reverse().toString("hex");
 }
 
 function toInt(buffer) {
-  return parseInt(buffer.reverse().toString("hex"), 16);
+  return parseInt(Buffer.from(buffer).reverse().toString("hex"), 16);
 }
 
 function bufferSplit(buffer, n) {

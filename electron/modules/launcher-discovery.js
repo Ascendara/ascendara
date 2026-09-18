@@ -188,6 +188,7 @@ function createLauncherDiscovery(options = {}) {
       typeof value === "string" &&
       value.trim().length > 0 &&
       value.length <= 300 &&
+// eslint-disable-next-line no-control-regex -- Reject control characters in external paths.
       !/[\x00-\x1f\x7f]/.test(value);
 
     function localPath(value) {
@@ -201,6 +202,7 @@ function createLauncherDiscovery(options = {}) {
       );
       if (
         !value ||
+// eslint-disable-next-line no-control-regex -- Reject control characters in external paths.
         /[\x00-\x1f\x7f]/.test(value) ||
         /^[\\/]{2}/.test(value) ||
         !path.isAbsolute(value)
@@ -317,6 +319,7 @@ function createLauncherDiscovery(options = {}) {
     }
 
     async function executable(root, value) {
+// eslint-disable-next-line no-control-regex -- Reject control characters in external paths.
       if (typeof value !== "string" || !value.trim() || /[\x00-\x1f\x7f]/.test(value))
         return null;
       value = value.trim().replace(/^"(.*)"$/, "$1");

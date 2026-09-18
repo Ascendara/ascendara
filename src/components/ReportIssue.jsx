@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   AlertDialog,
@@ -62,8 +62,8 @@ const ReportIssue = ({ isOpen, onClose }) => {
       return;
     }
 
-    const promise = new Promise(async (resolve, reject) => {
-      try {
+    const promise = (async () => {
+      {
         // Get a fresh token for each request to ensure timestamp validity
         const freshToken = await getToken();
 
@@ -81,7 +81,7 @@ const ReportIssue = ({ isOpen, onClose }) => {
         });
 
         if (response.ok) {
-          resolve();
+          return undefined;
         } else {
           // If token is expired or invalid, try once more with a new token
           if (response.status === 401) {
@@ -103,18 +103,16 @@ const ReportIssue = ({ isOpen, onClose }) => {
             );
 
             if (retryResponse.ok) {
-              resolve();
+              return undefined;
             } else {
-              reject(new Error("Failed to submit report after token refresh"));
+              throw new Error("Failed to submit report after token refresh");
             }
           } else {
-            reject(new Error("Failed to submit report"));
+            throw new Error("Failed to submit report");
           }
         }
-      } catch (error) {
-        reject(error);
       }
-    });
+    })();
 
     toast.promise(promise, {
       loading: t("common.reportDialog.submitting"),

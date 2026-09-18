@@ -29,7 +29,7 @@ let memoryCache = {
 // Hydra Library helpers
 // ---------------------------------------------------------------------------
 
-const HYDRA_VERSION_RE = /\(v[^)]+\)|\[v[^\]]+\]|\sv\d[\w.\-]*/i;
+const HYDRA_VERSION_RE = /\(v[^)]+\)|\[v[^\]]+\]|\sv\d[\w.-]*/i;
 const HYDRA_BUILD_RE = /Build\s*\d+/i;
 const HYDRA_NOISE_RE =
   /\s*(free\s+download|full\s+version|repack|pc\s+game|\+\s*all\s+dlcs?|\+\s*\d+\s+dlcs?)\s*/gi;
@@ -39,7 +39,7 @@ function extractHydraVersion(title) {
   if (!title) return null;
   const m = title.match(HYDRA_VERSION_RE);
   if (m) {
-    let raw = m[0].trim().replace(/^[(\[]|[)\]]$/g, "").trim();
+    let raw = m[0].trim().replace(/^[([]|[)\]]$/g, "").trim();
     if (raw.toLowerCase().startsWith("v")) raw = raw.slice(1);
     return raw.trim() || null;
   }

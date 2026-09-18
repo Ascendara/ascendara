@@ -104,7 +104,7 @@ function registerThemeHandlers() {
         "popoverForeground",
       ];
 
-      const hasAllKeys = requiredKeys.every(key => customColors.hasOwnProperty(key));
+      const hasAllKeys = requiredKeys.every(key => Object.hasOwn(customColors, key));
       if (!hasAllKeys) {
         return { success: false, error: "Theme file is missing required color values" };
       }
