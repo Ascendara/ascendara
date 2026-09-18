@@ -198,18 +198,21 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
     <Dialog open onOpenChange={open => !open && !busy && onClose()}>
       <DialogContent className={`${dialogStyle} max-w-2xl`}>
         <DialogHeader className="space-y-2 border-b border-border pb-4 pr-6 text-left">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <DialogTitle className="text-xl font-semibold leading-snug text-foreground">
               {t("retro.setup.title", { name: platform.name })}
             </DialogTitle>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
-                  variant="ghost"
-                  className="h-8 w-8 shrink-0 rounded-full p-0 text-muted-foreground"
+                  variant="outline"
+                  className="h-auto mb-3 min-h-10 gap-2 rounded-lg border-primary/30 bg-primary/10 px-3 py-2 text-primary shadow-sm hover:border-primary/60 hover:bg-primary/15 hover:text-primary"
                   aria-label={t("retro.setup.recommendedEmulator")}
                 >
-                  <Info className="h-4 w-4" />
+                  <Info className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <span className="whitespace-normal text-left text-sm font-medium">
+                    {t("retro.setup.recommendedEmulator")}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -583,9 +586,7 @@ function GameDetails({ game, platform, profile, running, onClose, onChanged, onS
             </p>
             {editing && (
               <div className="space-y-3 rounded-lg border p-4">
-                <p className="text-sm font-medium">
-                  {t("retro.gameDetails.matchTitle")}
-                </p>
+                <p className="text-sm font-medium">{t("retro.gameDetails.matchTitle")}</p>
                 <form
                   className="flex gap-2"
                   onSubmit={event => {
