@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import SafeHtml from "@/components/SafeHtml";
@@ -1263,7 +1263,38 @@ export default function GameScreen() {
   const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [isStartingUpdate, setIsStartingUpdate] = useState(false);
+  const pendingBrowserUpdate = useRef(null);
   const [importCatalogMatch, setImportCatalogMatch] = useState(null);
+
+  useEffect(() => {
+    if (!showUpdateDialog) return;
+
+    const handleInterceptedUpdate = async (_event, url) => {
+      if (!pendingBrowserUpdate.current || !url?.startsWith("ascendara://")) return;
+
+      const startUpdate = pendingBrowserUpdate.current;
+      pendingBrowserUpdate.current = null;
+      try {
+        const downloadUrl = decodeURIComponent(url.slice("ascendara://".length));
+        if (!["https:", "http:"].includes(new URL(downloadUrl).protocol)) {
+          throw new Error("Invalid intercepted update URL");
+        }
+        await startUpdate(downloadUrl);
+      } catch (error) {
+        console.error("[GameScreen] Error handling intercepted update:", error);
+        toast.error(t("gameScreen.updateFailed"));
+      }
+    };
+
+    window.electron.ipcRenderer.on("intercepted-download-url", handleInterceptedUpdate);
+    return () => {
+      pendingBrowserUpdate.current = null;
+      window.electron.ipcRenderer.removeListener(
+        "intercepted-download-url",
+        handleInterceptedUpdate
+      );
+    };
+  }, [showUpdateDialog, game?.game, game?.name, t]);
 
   // Logo state
   const [logoData, setLogoData] = useState(null);
@@ -5030,7 +5061,14 @@ export default function GameScreen() {
                   return;
                 }
 
-                if (!updateInfo?.autoUpdateSupported) {
+                const browserProviders = ["buzzheavier", "megadb"];
+                const downloadLinks = updateInfo?.downloadLinks || {};
+                const hasBrowserUpdate = browserProviders.some(provider =>
+                  Array.isArray(downloadLinks[provider]) &&
+                  downloadLinks[provider].some(link => typeof link === "string" && link)
+                );
+
+                if (!updateInfo?.autoUpdateSupported && !hasBrowserUpdate) {
                   // No seamless provider, navigate to download page
                   setShowUpdateDialog(false);
                   navigate("/download", {
@@ -5049,10 +5087,10 @@ export default function GameScreen() {
                 }
 
                 // Try seamless providers in priority order from central config
-                const seamlessProviders = SEAMLESS_PROVIDERS;
-                const downloadLinks = updateInfo?.downloadLinks || {};
+                const seamlessProviders = [...SEAMLESS_PROVIDERS, ...browserProviders];
 
                 let downloadUrl = null;
+                let downloadProvider = null;
                 for (const provider of seamlessProviders) {
                   const links = downloadLinks[provider];
                   if (Array.isArray(links) && links.length > 0) {
@@ -5061,6 +5099,7 @@ export default function GameScreen() {
                     );
                     if (validLink) {
                       downloadUrl = validLink.replace(/^(?:https?:)?\/\//, "https://");
+                      downloadProvider = provider;
                       console.log(
                         `[GameScreen] Found seamless link from ${provider}:`,
                         downloadUrl
@@ -5088,36 +5127,54 @@ export default function GameScreen() {
                   return;
                 }
 
-                // Start the seamless download directly
-                setIsStartingUpdate(true);
-                try {
-                  const gameName = game?.game || game?.name;
-                  const dir = await window.electron.getDownloadDirectory();
+                // Preserve update metadata when a browser provider returns its direct URL.
+                const startUpdate = async resolvedUrl => {
+                  setIsStartingUpdate(true);
+                  try {
+                    const gameName = game?.game || game?.name;
+                    const dir = await window.electron.getDownloadDirectory();
 
-                  console.log(`[GameScreen] Starting update download for ${gameName}`);
-                  await window.electron.downloadFile(
-                    downloadUrl,
-                    gameName,
-                    game?.online || false,
-                    game?.dlc || false,
-                    game?.isVr || false,
-                    true, // isUpdating
-                    updateInfo?.latestVersion || "",
-                    game?.imgID,
-                    game?.size || "",
-                    dir,
-                    game?.gameID || ""
-                  );
+                    console.log(`[GameScreen] Starting update download for ${gameName}`);
+                    await window.electron.downloadFile(
+                      resolvedUrl,
+                      gameName,
+                      game?.online || false,
+                      game?.dlc || false,
+                      game?.isVr || false,
+                      true, // isUpdating
+                      updateInfo?.latestVersion || "",
+                      game?.imgID,
+                      game?.size || "",
+                      dir,
+                      game?.gameID || ""
+                    );
 
-                  toast.success(t("gameScreen.updateStarted"));
-                  setShowUpdateDialog(false);
-                  navigate("/downloads");
-                } catch (error) {
-                  console.error("[GameScreen] Error starting update:", error);
-                  toast.error(t("gameScreen.updateFailed"));
-                } finally {
-                  setIsStartingUpdate(false);
+                    toast.success(t("gameScreen.updateStarted"));
+                    setShowUpdateDialog(false);
+                    navigate("/downloads");
+                  } catch (error) {
+                    console.error("[GameScreen] Error starting update:", error);
+                    toast.error(t("gameScreen.updateFailed"));
+                  } finally {
+                    setIsStartingUpdate(false);
+                  }
+                };
+
+                if (browserProviders.includes(downloadProvider)) {
+                  pendingBrowserUpdate.current = startUpdate;
+                  try {
+                    await window.electron.openURL(downloadUrl, {
+                      referrer: "https://steamrip.com/",
+                    });
+                  } catch (error) {
+                    pendingBrowserUpdate.current = null;
+                    console.error("[GameScreen] Error opening update provider:", error);
+                    toast.error(t("gameScreen.updateFailed"));
+                  }
+                  return;
                 }
+
+                await startUpdate(downloadUrl);
               }}
             >
               {isStartingUpdate ? (
