@@ -49,6 +49,7 @@ import { getDownloadQueue } from "@/services/downloadQueueService";
 
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 import NewFolderDialog from "@/components/NewFolderDialog";
+import MoveToFolderDialog from "@/components/MoveToFolderDialog";
 import FolderCard from "@/components/FolderCard";
 import EditCoverDialog from "@/components/EditCoverDialog";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -195,6 +196,7 @@ const Library = () => {
     };
   }, []);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [gameToMove, setGameToMove] = useState(null);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState(() => {
@@ -1044,6 +1046,23 @@ const Library = () => {
     }
   };
 
+  const handleMoveToFolder = (game, folderName) => {
+    const folder = loadFolders().find(folder => folder.game === folderName);
+    if (!folder) return;
+    const gameName = normalizeGameName(getGameDisplayName(game));
+    if (folder.items?.some(item => normalizeGameName(getGameDisplayName(item)) === gameName)) return;
+
+    const updatedFolders = addGameToFolder(game, folderName);
+    const updatedFolder = updatedFolders.find(folder => folder.game === folderName);
+    setFolders(updatedFolders);
+    setGames(prev => prev
+      .filter(item => item.isFolder || normalizeGameName(getGameDisplayName(item)) !== gameName)
+      .map(item => item.isFolder && item.game === folderName ? updatedFolder : item)
+    );
+    setGameToMove(null);
+    toast.success(t("library.moveToFolder.success", { game: getGameDisplayName(game), folder: folderName }));
+  };
+
   const handleCreateFolder = name => {
     // Create new folder using the folderManager library
     const newFolder = createFolder(name);
@@ -1413,6 +1432,14 @@ const Library = () => {
       onDragLeave={handleLibraryDragLeave}
       onDrop={handleLibraryDrop}
     >
+      {gameToMove && (
+        <MoveToFolderDialog
+          game={gameToMove}
+          folders={folders}
+          onMove={folderName => handleMoveToFolder(gameToMove, folderName)}
+          onClose={() => setGameToMove(null)}
+        />
+      )}
       {/* ── Left Sidebar ─────────────────────────────────────────── */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border/30 shadow-[1px_0_0_0_hsl(var(--border)/0.15)]">
 
@@ -1996,23 +2023,7 @@ const Library = () => {
                 {game.isFolder ? (
                   <DroppableFolderCard
                     folder={game}
-                    onDropGame={droppedGame => {
-                      addGameToFolder(droppedGame, game.game);
-                      const updatedFolders = loadFolders();
-                      const updatedFolder = updatedFolders.find(f => f.game === game.game);
-                      setFolders(updatedFolders);
-                      setGames(prevGames =>
-                        prevGames
-                          .map(g => {
-                            if (g.isFolder && g.game === game.game) return { ...updatedFolder };
-                            return g;
-                          })
-                          .filter(g =>
-                            (g.game || g.name) !== (droppedGame.game || droppedGame.name) ||
-                            (g.isFolder && g.game === game.game)
-                          )
-                      );
-                    }}
+                    onDropGame={droppedGame => handleMoveToFolder(droppedGame, game.game)}
                   >
                     <FolderCard
                       key={game.game + "-" + (game.items ? game.items.length : 0)}
@@ -2033,6 +2044,7 @@ const Library = () => {
                       onSelectCheckbox={() => handleSelectGame(game)}
                       updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
                       onRemoved={handleGameRemoved}
+                      onMoveToFolder={() => setGameToMove(game)}
                     />
                   </DraggableGameCard>
                 )}
@@ -2381,6 +2393,7 @@ const Library = () => {
                         } : undefined}
                         onUnfavorite={() => toggleFavorite(game.game || game.name)}
                         onRemoved={handleGameRemoved}
+                        onMoveToFolder={!game._isStub && !game._isDownloading ? () => setGameToMove(game) : undefined}
                       />
                     ))}
                   </div>
@@ -2716,7 +2729,7 @@ const STATUS_META = {
   backlog: { icon: Bookmark, color: "text-amber-400", bg: "bg-amber-500/90" },
 };
 
-const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, onPlay, onDownload, onUnfavorite, onRemoved }) => {
+const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, onPlay, onDownload, onUnfavorite, onRemoved, onMoveToFolder }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [imageData, setImageData] = useState(() => gameImageCache.get(game.game || game.name) ?? null);
@@ -2962,7 +2975,7 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, 
             <div className="flex items-center justify-center border-b border-border/50 px-3 py-3">
               <span className="text-sm font-semibold text-foreground">{game.game || game.name}</span>
             </div>
-            <div className="p-1.5">
+            <div className="max-h-[60vh] overflow-y-auto p-1.5">
               {!game._isStub && game.executable && (
                 <button
                   onClick={() => { setContextMenuOpen(false); onPlay(); }}
@@ -2974,6 +2987,20 @@ const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, 
                   <div className="flex-1">
                     <div className="font-medium text-foreground">{t("common.contextMenu.playGame")}</div>
                     <div className="text-xs text-muted-foreground">{t("common.contextMenu.playGameDescription")}</div>
+                  </div>
+                </button>
+              )}
+              {onMoveToFolder && (
+                <button
+                  onClick={() => { setContextMenuOpen(false); onMoveToFolder(); }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                    <FolderPlus className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-foreground">{t("library.moveToFolder.title")}</div>
+                    <div className="text-xs text-muted-foreground">{t("library.moveToFolder.menuDescription")}</div>
                   </div>
                 </button>
               )}
@@ -3212,6 +3239,7 @@ const InstalledGameCard = memo(
     onSelectCheckbox,
     updateInfo,
     onRemoved,
+    onMoveToFolder,
   }) => {
     const { t } = useLanguage();
     const { settings } = useSettings();
@@ -3884,6 +3912,18 @@ const InstalledGameCard = memo(
                         </div>
                       </button>
                     ) : null}
+                    <button
+                      onClick={() => { setContextMenuOpen(false); onMoveToFolder(); }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                        <FolderPlus className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">{t("library.moveToFolder.title")}</div>
+                        <div className="text-xs text-muted-foreground">{t("library.moveToFolder.menuDescription")}</div>
+                      </div>
+                    </button>
                     
                     <button
                       onClick={handleOpenDirectory}

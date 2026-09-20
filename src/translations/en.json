@@ -2120,6 +2120,15 @@
     "neverPlayed": "You haven't played this game yet",
     "neverPlayed2": "Never Played",
     "newBadge": "NEW",
+    "moveToFolder": {
+      "title": "Move to folder…",
+      "description": "Choose a folder for {{game}}.",
+      "menuDescription": "Organize this game into a library folder",
+      "search": "Search folders…",
+      "noMatches": "No folders match your search.",
+      "noFolders": "Create a folder using New Folder in your library, then move games here.",
+      "success": "Moved {{game}} to {{folder}}."
+    },
     "newFolder": {
       "create": "Create Folder",
       "desc": "Enter a name for the new folder",
