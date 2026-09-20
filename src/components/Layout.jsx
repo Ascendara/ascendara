@@ -20,25 +20,37 @@ const Layout = memo(() => {
   useNaturalDownloadScroll(isDownloadPage);
 
   useEffect(() => {
-    if (searchParams.get("tour") === "true") {
-      setShowTour(true);
-      return;
-    }
+    let shouldStartTour = searchParams.get("tour") === "true";
     // Post-welcome tour intent is persisted via sessionStorage so it survives
     // route redirects (e.g. default landing page) that would strip a query.
     try {
       if (sessionStorage.getItem("ascendara:startTour") === "1") {
         sessionStorage.removeItem("ascendara:startTour");
-        setShowTour(true);
+        shouldStartTour = true;
       }
     } catch (e) {
       // sessionStorage may be unavailable - ignore
     }
-  }, [searchParams]);
+    if (shouldStartTour) setShowTour(true);
+    if (searchParams.get("tour") === "true") {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tour");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleCloseTour = () => {
     setShowTour(false);
-    setSearchParams({});
+    try {
+      sessionStorage.removeItem("ascendara:startTour");
+    } catch (e) {
+      // sessionStorage may be unavailable - ignore
+    }
+    if (searchParams.has("tour")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tour");
+      setSearchParams(nextParams, { replace: true });
+    }
   };
 
   return (
@@ -52,7 +64,6 @@ const Layout = memo(() => {
         style={{ display: isSearchPage ? "block" : "none" }}
       >
         <Search scrollContainerRef={searchScrollRef} isVisible={isSearchPage} />
-        {showTour && isSearchPage && <Tour onClose={handleCloseTour} />}
       </main>
       {/* Other pages render normally via Outlet */}
       <main
@@ -62,9 +73,10 @@ const Layout = memo(() => {
         <PageTransition key={location.pathname}>
           <Outlet />
         </PageTransition>
-        {showTour && !isSearchPage && <Tour onClose={handleCloseTour} />}
       </main>
       <Navigation className="fixed bottom-0 left-0 right-0" />
+      {/* Keep one instance mounted while the tour navigates between pages. */}
+      {showTour && <Tour onClose={handleCloseTour} />}
     </div>
   );
 });

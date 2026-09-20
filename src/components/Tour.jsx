@@ -83,20 +83,24 @@ const getSteps = t => [
 ];
 
 function Tour({ onClose }) {
-  const { isTourActive, setTourActive } = useTour();
+  const { setTourActive } = useTour();
 
-  // Prevent double-mount: if already active, render nothing
-  const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
-    if (isTourActive) return;
     setTourActive(true);
-    setHasMounted(true);
     return () => {
       setTourActive(false);
       // Stop any playing sounds when tour unmounts
       soundService.stop();
     };
-  }, []);
+  }, [setTourActive]);
+
+  useEffect(() => {
+    const handleKeyDown = event => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightPosition, setSpotlightPosition] = useState({
@@ -319,7 +323,7 @@ function Tour({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200]" hidden={!hasMounted && isTourActive}>
+    <div className="fixed inset-0 z-[200]">
       <div className="pointer-events-auto absolute inset-0 z-[201] bg-black/40" />
 
       {/* Spotlight */}
@@ -454,6 +458,12 @@ function Tour({ onClose }) {
           )}
 
           <div className="flex items-center justify-between">
+            <button
+              onClick={onClose}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("welcome.skipTour")}
+            </button>
             <button
               onClick={prevStep}
               className={`flex items-center gap-1 ${currentStep === 0 ? "invisible" : ""}`}

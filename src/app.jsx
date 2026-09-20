@@ -1546,12 +1546,14 @@ const AppRoutes = () => {
     // `setShowWelcome(false)` and `navigate(...)` can trip one of the
     // redirect guards ("/welcome -> /" or default landing page) and strip
     // the search string before Home ever reads it.
-    if (withTour) {
-      try {
+    try {
+      if (withTour) {
         sessionStorage.setItem("ascendara:startTour", "1");
-      } catch (e) {
-        console.warn("Failed to persist tour intent:", e);
+      } else {
+        sessionStorage.removeItem("ascendara:startTour");
       }
+    } catch (e) {
+      console.warn("Failed to persist tour intent:", e);
     }
 
     navigate("/", { replace: true });
