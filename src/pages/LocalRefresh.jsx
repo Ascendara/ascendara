@@ -256,19 +256,16 @@ const LocalRefresh = () => {
             ? await window.electron.getDefaultLocalIndexPath()
             : null);
 
-        // Check if refresh is running
-        if (window.electron?.isLocalIndexRefreshing) {
-          const refreshing = await window.electron.isLocalIndexRefreshing();
-          if (refreshing) {
-            try {
-              const progress = await window.electron.getLocalRefreshProgress(resolvedIndexPath);
-              // Use lastSuccessfulTimestamp which persists across refresh attempts
-              if (progress?.lastSuccessfulTimestamp) {
-                setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
-              }
-            } catch (e) {
-              console.log("No progress file found for last refresh time");
+        // Read the saved timestamp even when no refresh is currently running.
+        if (resolvedIndexPath && window.electron?.getLocalRefreshProgress) {
+          try {
+            const progress = await window.electron.getLocalRefreshProgress(resolvedIndexPath);
+            // Use lastSuccessfulTimestamp which persists across refresh attempts
+            if (progress?.lastSuccessfulTimestamp) {
+              setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
             }
+          } catch (e) {
+            console.log("No progress file found for last refresh time");
           }
         }
 

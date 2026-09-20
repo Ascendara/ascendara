@@ -359,7 +359,12 @@ function Settings() {
     const loadRefreshStatus = async () => {
       try {
         const currentSettings = await window.electron.getSettings();
-        const indexPath = currentSettings?.localIndex;
+        if (currentSettings?.lastLocalIndexRefresh) {
+          setLastRefreshTime(new Date(currentSettings.lastLocalIndexRefresh));
+        }
+        const indexPath =
+          currentSettings?.localIndex ||
+          (await window.electron.getDefaultLocalIndexPath?.());
         if (indexPath) {
           // Check if refresh is currently running
           if (window.electron?.getLocalRefreshStatus) {
@@ -428,8 +433,13 @@ function Settings() {
       const handleComplete = async data => {
         setIsIndexRefreshing(false);
         setIndexRefreshProgress(null);
-        if (data.code === 0 && data.lastSuccessfulTimestamp) {
-          setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
+        if (data.code === 0) {
+          setLastRefreshTime(
+            data.lastSuccessfulTimestamp
+              ? new Date(data.lastSuccessfulTimestamp * 1000)
+              : new Date()
+          );
+          await loadRefreshStatus();
         }
       };
 
