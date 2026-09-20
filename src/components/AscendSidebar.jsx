@@ -1,7 +1,34 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Search, Users, MessageCircle, UserPlus, Settings, Bell, Sparkles, Circle, Moon, MinusCircle, EyeOff, ChevronUp, ChevronDown, Clock, CloudIcon, BadgeCheck, Crown, Hammer, BadgeDollarSign, Trophy, Rocket, Gamepad2, HardDrive, Megaphone, BarChart } from "lucide-react";
+import {
+  Home,
+  Search,
+  Users,
+  MessageCircle,
+  UserPlus,
+  Settings,
+  Bell,
+  Sparkles,
+  Circle,
+  Moon,
+  MinusCircle,
+  EyeOff,
+  ChevronUp,
+  ChevronDown,
+  Clock,
+  CloudIcon,
+  BadgeCheck,
+  Crown,
+  Hammer,
+  BadgeDollarSign,
+  Trophy,
+  Rocket,
+  Gamepad2,
+  HardDrive,
+  Megaphone,
+  BarChart,
+} from "lucide-react";
 import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
 import { toast } from "sonner";
 
@@ -168,8 +195,10 @@ const AscendSidebar = ({
   // Quick access icon button
   const QuickAccessButton = ({ item, isActive }) => (
     <motion.button
+      aria-label={item.label}
+      aria-current={isActive ? "page" : undefined}
       onClick={() => onSectionChange(item.id)}
-      className={`group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 ${
+      className={`group relative flex h-10 w-10 items-center justify-center rounded-xl outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
         isActive
           ? "bg-primary shadow-lg shadow-primary/25"
           : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -191,10 +220,12 @@ const AscendSidebar = ({
 
   const NavButton = ({ item, isActive }) => (
     <button
+      aria-label={item.label}
+      aria-current={isActive ? "page" : undefined}
       onClick={() => onSectionChange(item.id)}
-      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200 ${
+      className={`group relative flex w-full items-center gap-3 rounded-xl px-2 py-2.5 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary lg:px-3 ${
         isActive
-          ? "text-primary"
+          ? "bg-primary/10 text-primary"
           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
       }`}
     >
@@ -220,10 +251,10 @@ const AscendSidebar = ({
   const activeNavIndex = mainNavItems.findIndex(item => item.id === activeSection);
 
   return (
-    <div className="flex h-full w-16 shrink-0 flex-col overflow-hidden bg-background/60 backdrop-blur-xl lg:w-60">
+    <div className="flex h-full w-16 shrink-0 flex-col overflow-hidden border-r border-border/50 bg-card/30 pt-[60px] backdrop-blur-xl lg:w-60">
       {/* Quick Access Grid */}
       <div className="shrink-0 p-3 pb-2">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 justify-items-center gap-2 lg:grid-cols-4">
           {quickAccessItems.map(item => (
             <QuickAccessButton
               key={item.id}

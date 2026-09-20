@@ -1,9 +1,9 @@
+import SectionHeader from "./SectionHeader";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
   Sparkles,
-  Search,
   UserPlus,
   Check,
   X,
@@ -24,33 +24,22 @@ export default function RequestsSection({
 }) {
   return (
     <div className="mb-24 space-y-6">
-      {/* Header with gradient background */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-primary/10 p-6">
-        <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-amber-500/20 blur-3xl" />
-        <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-orange-500/20 blur-3xl" />
-        <div className="relative">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20 backdrop-blur-sm">
-                <UserPlus className="h-6 w-6 text-amber-500" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">{t("ascend.requests.title")}</h1>
-                <p className="text-sm text-muted-foreground">
-                  {t("ascend.friends.subtitle") || "Manage your friend requests"}
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={() => setActiveSection("search")}
-              className="gap-2 text-secondary"
-            >
-              <Search className="h-4 w-4" />
-              {t("ascend.friends.findFriends")}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <SectionHeader
+        icon={UserPlus}
+        title={t("ascend.requests.title")}
+        description={t("ascend.requests.subtitle", {
+          defaultValue: "Manage your friend requests",
+        })}
+        actions={
+          <Button
+            onClick={() => setActiveSection("search")}
+            className="gap-2 rounded-xl text-secondary"
+          >
+            <UserPlus className="h-4 w-4" />
+            {t("ascend.friends.addFriend")}
+          </Button>
+        }
+      />
 
       {/* Stats Overview */}
       <div className="grid grid-cols-2 gap-3">

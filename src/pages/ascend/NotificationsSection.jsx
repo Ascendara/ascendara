@@ -1,36 +1,18 @@
+import SectionHeader from "./SectionHeader";
 import { motion } from "framer-motion";
 import { Bell } from "lucide-react";
 
 export default function NotificationsSection({ t, loadingNotifications, notifications }) {
   return (
     <div className="mb-24 space-y-6">
-      {/* Hero Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500/20 via-indigo-500/10 to-violet-500/10 p-8"
-      >
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
-        <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+      <SectionHeader
+        icon={Bell}
+        title={t("ascend.notifications.title")}
+        description={t("ascend.notifications.subtitle", {
+          defaultValue: "Stay updated with important announcements and updates",
+        })}
+      />
 
-        <div className="relative">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-xl shadow-blue-500/30">
-              <Bell className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold">{t("ascend.notifications.title")}</h1>
-              <p className="mt-2 text-muted-foreground">
-                {t("ascend.notifications.subtitle") ||
-                  "Stay updated with important announcements and updates"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Notifications Content */}
       {loadingNotifications ? (
         <div className="flex flex-col items-center justify-center py-32">
           <div className="relative">

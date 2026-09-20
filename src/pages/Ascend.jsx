@@ -874,7 +874,7 @@ const Ascend = () => {
 
     return (
       <>
-        <div className="fixed inset-0 top-[60px] flex">
+        <div className="fixed inset-0 flex bg-background">
           {/* Sidebar */}
           <AscendSidebar
             activeSection={activeSection}
@@ -887,13 +887,15 @@ const Ascend = () => {
           />
 
           {/* Main content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div
+            className={`min-h-0 min-w-0 flex-1 bg-muted/10 px-4 pt-[calc(60px+1.5rem)] sm:px-6 lg:px-10 lg:pt-[calc(60px+2rem)] ${activeSection === "messages" ? "flex flex-col overflow-hidden pb-32" : "overflow-y-auto pb-6 lg:pb-8"}`}
+          >
             <motion.div
               key={activeSection}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className="mx-auto max-w-3xl"
+              className={`mx-auto w-full ${activeSection === "messages" ? "min-h-0 flex-1 max-w-6xl" : activeSection === "leaderboard" ? "max-w-6xl" : "max-w-4xl"}`}
             >
               {<Suspense fallback={<SectionLoading />}>{renderContent()}</Suspense>}
             </motion.div>

@@ -2736,7 +2736,7 @@ export const getConversations = async () => {
 };
 
 /**
- * Get messages for a conversation (only from the last 7 days)
+ * Get recent messages for a conversation, regardless of age
  * @param {string} conversationId - Conversation ID
  * @param {number} limitCount - Max messages to fetch
  * @returns {Promise<{messages: array, error: string|null}>}
@@ -2748,15 +2748,9 @@ export const getMessages = async (conversationId, limitCount = 100) => {
       return { messages: [], error: "No user logged in" };
     }
 
-    // Calculate 7 days ago
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoTimestamp = Timestamp.fromDate(sevenDaysAgo);
-
     const messagesRef = collection(db, "conversations", conversationId, "messages");
     const q = query(
       messagesRef,
-      where("createdAt", ">=", sevenDaysAgoTimestamp),
       orderBy("createdAt", "desc"),
       limit(limitCount)
     );
@@ -2775,87 +2769,6 @@ export const getMessages = async (conversationId, limitCount = 100) => {
   } catch (error) {
     console.error("Get messages error:", error);
     return { messages: [], error: error.message };
-  }
-};
-
-/**
- * Delete old messages (older than 7 days) from a conversation
- * @param {string} conversationId - Conversation ID
- * @returns {Promise<{success: boolean, deletedCount: number, error: string|null}>}
- */
-export const deleteOldMessages = async conversationId => {
-  try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      return { success: false, deletedCount: 0, error: "No user logged in" };
-    }
-
-    // Calculate 7 days ago
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoTimestamp = Timestamp.fromDate(sevenDaysAgo);
-
-    const messagesRef = collection(db, "conversations", conversationId, "messages");
-    const q = query(messagesRef, where("createdAt", "<", sevenDaysAgoTimestamp));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-      return { success: true, deletedCount: 0, error: null };
-    }
-
-    // Delete in batches of 500 (Firestore limit)
-    const batch = writeBatch(db);
-    let deletedCount = 0;
-
-    snapshot.docs.forEach(docSnap => {
-      batch.delete(docSnap.ref);
-      deletedCount++;
-    });
-
-    await batch.commit();
-    console.log(
-      `Deleted ${deletedCount} old messages from conversation ${conversationId}`
-    );
-
-    return { success: true, deletedCount, error: null };
-  } catch (error) {
-    console.error("Delete old messages error:", error);
-    return { success: false, deletedCount: 0, error: error.message };
-  }
-};
-
-/**
- * Clean up old messages from all user's conversations
- * @returns {Promise<{success: boolean, totalDeleted: number, error: string|null}>}
- */
-export const cleanupAllOldMessages = async () => {
-  try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      return { success: false, totalDeleted: 0, error: "No user logged in" };
-    }
-
-    // Get all conversations for the user
-    const conversationsRef = collection(db, "conversations");
-    const q = query(
-      conversationsRef,
-      where("participants", "array-contains", currentUser.uid)
-    );
-    const snapshot = await getDocs(q);
-
-    let totalDeleted = 0;
-
-    for (const docSnap of snapshot.docs) {
-      const result = await deleteOldMessages(docSnap.id);
-      if (result.success) {
-        totalDeleted += result.deletedCount;
-      }
-    }
-
-    return { success: true, totalDeleted, error: null };
-  } catch (error) {
-    console.error("Cleanup all old messages error:", error);
-    return { success: false, totalDeleted: 0, error: error.message };
   }
 };
 
@@ -3204,13 +3117,9 @@ export const subscribeToMessages = (conversationId, onUpdate, limitCount = 50) =
   const currentUser = auth.currentUser;
   if (!currentUser) return () => {};
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
   const messagesRef = collection(db, "conversations", conversationId, "messages");
   const q = query(
     messagesRef,
-    where("createdAt", ">=", Timestamp.fromDate(sevenDaysAgo)),
     orderBy("createdAt", "desc"),
     limit(limitCount)
   );
@@ -3321,13 +3230,9 @@ export const getMessagesPaginated = async (
       return { messages: [], lastDoc: null, hasMore: false, error: "No user logged in" };
     }
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
     const messagesRef = collection(db, "conversations", conversationId, "messages");
     let q = query(
       messagesRef,
-      where("createdAt", ">=", Timestamp.fromDate(sevenDaysAgo)),
       orderBy("createdAt", "desc"),
       limit(limitCount + 1) // Fetch one extra to check if there are more
     );

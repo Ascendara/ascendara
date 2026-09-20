@@ -415,7 +415,8 @@ export default function useAscendPage() {
     if (messagesEndRef.current) {
       // Use instant scroll when loading messages, smooth scroll for new messages
       const behavior = loadingMessages ? "instant" : "smooth";
-      messagesEndRef.current.scrollIntoView({ behavior });
+      const viewport = messagesEndRef.current.closest("[data-message-scroll]");
+      viewport?.scrollTo({ top: viewport.scrollHeight, behavior });
     }
   }, [messages, loadingMessages]);
 
@@ -1605,6 +1606,9 @@ export default function useAscendPage() {
   };
 
   const handleSelectConversation = async conversation => {
+    // The message listener only restarts when the conversation ID changes.
+    if (!conversation?.id || conversation.id === selectedConversation?.id) return;
+
     setSelectedConversation(conversation);
     setLoadingMessages(true);
     try {
@@ -1616,7 +1620,8 @@ export default function useAscendPage() {
     // Scroll to bottom after a short delay to ensure messages are rendered
     setTimeout(() => {
       if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: "instant" });
+        const viewport = messagesEndRef.current.closest("[data-message-scroll]");
+        viewport?.scrollTo({ top: viewport.scrollHeight, behavior: "instant" });
       }
     }, 100);
   };

@@ -1,3 +1,4 @@
+import SectionHeader from "./SectionHeader";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,22 +34,22 @@ export default function FriendsSection({
   );
   return (
     <div className="space-y-6">
-      {/* Header with title and add friend button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t("ascend.friends.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("ascend.friends.subtitle") || "Connect and play with your friends"}
-          </p>
-        </div>
-        <Button
-          onClick={() => setActiveSection("search")}
-          className="gap-2 text-secondary"
-        >
-          <UserPlus className="h-4 w-4" />
-          {t("ascend.friends.addFriend")}
-        </Button>
-      </div>
+      <SectionHeader
+        icon={Users}
+        title={t("ascend.friends.title")}
+        description={t("ascend.friends.subtitle", {
+          defaultValue: "Connect and play with your friends",
+        })}
+        actions={
+          <Button
+            onClick={() => setActiveSection("search")}
+            className="gap-2 rounded-xl text-secondary"
+          >
+            <UserPlus className="h-4 w-4" />
+            {t("ascend.friends.addFriend")}
+          </Button>
+        }
+      />
 
       {/* Stats Overview */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

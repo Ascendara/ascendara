@@ -1,3 +1,5 @@
+import { useState } from "react";
+import SectionHeader from "./SectionHeader";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,61 +31,69 @@ export default function SearchSection({
   getRelationshipStatus,
   handleSendRequest,
 }) {
+  const [submittedQuery, setSubmittedQuery] = useState(null);
   return (
     <div className="mb-20 space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 p-6">
-        <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-violet-500/20 blur-3xl" />
-        <div className="relative">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 backdrop-blur-sm">
-              <Search className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">{t("ascend.search.title")}</h1>
-              <p className="text-sm text-muted-foreground">
-                {t("ascend.search.subtitle") || "Find and connect with other players"}
-              </p>
-            </div>
+      <SectionHeader
+        icon={Search}
+        title={t("ascend.search.title")}
+        description={t("ascend.search.subtitle", {
+          defaultValue: "Find and connect with other players",
+        })}
+      >
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            if (isSearching || !searchQuery.trim()) return;
+            setSubmittedQuery(searchQuery.trim());
+            handleSearch();
+          }}
+          className="flex flex-wrap gap-3"
+        >
+          <div className="relative min-w-48 flex-1">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label={t("ascend.search.placeholder")}
+              placeholder={t("ascend.search.placeholder")}
+              className="h-12 rounded-xl border-border/50 bg-background/50 pl-12 text-base"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
           </div>
-
-          {/* Search Form */}
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              handleSearch();
-            }}
-            className="flex gap-3"
+          <Button
+            type="submit"
+            disabled={isSearching || !searchQuery.trim()}
+            className="h-12 rounded-xl px-6 text-secondary"
           >
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={t("ascend.search.placeholder")}
-                className="h-12 rounded-xl border-border/50 bg-background/50 pl-12 text-base"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={isSearching || !searchQuery.trim()}
-              className="h-12 rounded-xl px-6 text-secondary"
-            >
-              {isSearching ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  <Search className="mr-2 h-4 w-4" />
-                  {t("ascend.search.search")}
-                </>
-              )}
-            </Button>
-          </form>
-        </div>
-      </div>
+            {isSearching ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <Search className="mr-2 h-4 w-4" />
+                {t("ascend.search.search")}
+              </>
+            )}
+          </Button>
+        </form>
+      </SectionHeader>
 
       {/* Search Results */}
-      {searchResults.length > 0 ? (
+      {isSearching ? (
+        <div role="status" aria-label={t("ascend.search.search")} className="space-y-3">
+          {[0, 1, 2].map(index => (
+            <div
+              key={index}
+              className="flex animate-pulse items-center gap-4 rounded-2xl border border-border/50 bg-card/50 p-5 motion-reduce:animate-none"
+            >
+              <div className="h-12 w-12 rounded-xl bg-muted" />
+              <div className="flex-1 space-y-3">
+                <div className="h-4 w-1/3 rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted/60" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : searchResults.length > 0 ? (
         <div className="space-y-3">
           <p className="px-1 text-sm text-muted-foreground">
             {t("ascend.search.resultsCount", { count: searchResults.length }) ||
@@ -94,20 +104,17 @@ export default function SearchSection({
               key={result.uid}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 transition-all duration-300 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+              transition={{ delay: Math.min(index * 0.03, 0.2) }}
+              className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 transition-colors hover:border-primary/30 hover:bg-card focus-within:border-primary/40"
             >
               {/* Background glow on hover */}
               <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/5 opacity-0 blur-3xl transition-opacity group-hover:opacity-100" />
 
-              <div
-                onClick={() => handleViewProfile(result.uid)}
-                className="w-full cursor-pointer p-5 text-left"
-              >
-                <div className="relative flex items-start gap-4">
+              <div className="relative w-full p-5 text-left">
+                <div className="relative flex flex-wrap items-center gap-4">
                   {/* Avatar with status */}
                   <div className="relative shrink-0">
-                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 shadow-lg shadow-primary/20">
+                    <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 ring-1 ring-border/50">
                       {result.photoURL ? (
                         <img
                           src={result.photoURL}
@@ -135,10 +142,16 @@ export default function SearchSection({
                   </div>
 
                   {/* User Info */}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 basis-40">
                     <div className="mb-1 flex items-center gap-2">
-                      <h3 className="truncate text-lg font-semibold">
-                        {result.displayName}
+                      <h3 className="min-w-0 truncate text-base font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => handleViewProfile(result.uid)}
+                          className="text-left outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-primary"
+                        >
+                          {result.displayName}
+                        </button>
                       </h3>
                       {result.owner && (
                         <Crown className="h-5 w-5 shrink-0 text-yellow-500" />
@@ -170,7 +183,7 @@ export default function SearchSection({
                     )}
 
                     {/* Stats Row */}
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <div
                           className={`h-2 w-2 rounded-full ${
@@ -215,7 +228,7 @@ export default function SearchSection({
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="relative z-10 flex shrink-0 items-center gap-2">
                     {(() => {
                       const status = getRelationshipStatus(result.uid);
                       if (status === "friend") {
@@ -223,7 +236,7 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                            className="rounded-xl bg-background/50"
                             disabled
                           >
                             <UserCheck className="mr-2 h-4 w-4 text-green-500" />
@@ -235,7 +248,7 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                            className="rounded-xl bg-background/50"
                             disabled
                           >
                             <Clock className="mr-2 h-4 w-4 text-amber-500" />
@@ -247,7 +260,7 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                            className="rounded-xl bg-background/50"
                             disabled
                           >
                             <Inbox className="mr-2 h-4 w-4 text-blue-500" />
@@ -259,7 +272,7 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl opacity-0 transition-opacity group-hover:opacity-100"
+                            className="rounded-xl bg-background/50"
                             onClick={e => {
                               e.stopPropagation();
                               handleSendRequest(result.uid);
@@ -278,7 +291,7 @@ export default function SearchSection({
             </motion.div>
           ))}
         </div>
-      ) : searchQuery && !isSearching ? (
+      ) : submittedQuery !== null ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -298,7 +311,7 @@ export default function SearchSection({
           animate={{ opacity: 1, scale: 1 }}
           className="rounded-2xl border border-dashed border-border/50 bg-card/30 p-12 text-center"
         >
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/10 to-violet-500/10">
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
             <Users className="h-10 w-10 text-primary/50" />
           </div>
           <h3 className="mb-1 text-lg font-semibold">

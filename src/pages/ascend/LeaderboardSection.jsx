@@ -1,7 +1,7 @@
+import SectionHeader from "./SectionHeader";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
-  Loader2,
   CloudUpload,
   Zap,
   ChevronRight,
@@ -35,46 +35,28 @@ export default function LeaderboardSection({
     return `${hours}h`;
   };
   return (
-    <div className="mb-24 space-y-8">
-      {/* Hero Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-yellow-500/20 via-amber-500/10 to-orange-500/10 p-8"
-      >
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-yellow-500/20 blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-amber-500/20 blur-3xl" />
-        <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
-
-        <div className="relative flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-600 shadow-xl shadow-yellow-500/30">
-            <Trophy className="h-8 w-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">
-              {t("ascend.leaderboard.title") || "Leaderboard"}
-            </h1>
-            <p className="text-muted-foreground">
-              {t("ascend.leaderboard.subtitle") ||
-                "Top players in the Ascendara community"}
-            </p>
-          </div>
+    <div className="mb-12 space-y-6">
+      <SectionHeader
+        icon={Trophy}
+        title={t("ascend.leaderboard.title")}
+        description={t("ascend.leaderboard.subtitle", {
+          defaultValue: "Top players in the Ascendara community",
+        })}
+        actions={
           <Button
             variant="outline"
             size="sm"
             onClick={loadLeaderboard}
             disabled={loadingLeaderboard}
-            className="ml-auto gap-2"
+            className="gap-2 rounded-xl"
           >
-            {loadingLeaderboard ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {t("ascend.leaderboard.refresh") || "Refresh"}
+            <RefreshCw
+              className={`h-4 w-4 ${loadingLeaderboard ? "animate-spin" : ""}`}
+            />
+            {t("ascend.leaderboard.refresh", { defaultValue: "Refresh" })}
           </Button>
-        </div>
-      </motion.div>
+        }
+      />
 
       {loadingLeaderboard ? (
         <div className="flex flex-col items-center justify-center py-20">
@@ -112,258 +94,83 @@ export default function LeaderboardSection({
             </motion.div>
           )}
 
-          {/* Top 3 Podium */}
-          <div className="grid grid-cols-3 gap-4 pt-8">
-            {/* 2nd Place */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="flex flex-col items-center"
-            >
-              {leaderboardData.topThree[1] && (
-                <div
-                  onClick={() => handleViewProfile(leaderboardData.topThree[1].uid)}
-                  className="group relative mt-6 w-full cursor-pointer rounded-2xl border border-gray-400/30 bg-gradient-to-b from-gray-400/20 via-gray-400/10 to-transparent p-6 pt-8 transition-all hover:border-gray-400/50 hover:shadow-xl hover:shadow-gray-400/10"
-                >
-                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gray-400/10 blur-2xl transition-all group-hover:bg-gray-400/20" />
-
-                  {/* Rank Badge */}
-                  <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-gray-300 to-gray-500 text-lg font-bold text-white shadow-lg">
-                      2
-                    </div>
+          {/* Podium stays in rank order for keyboard and narrow layouts. */}
+          <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
+            {leaderboardData.topThree.map((player, index) => (
+              <button
+                key={player.uid}
+                type="button"
+                onClick={() => handleViewProfile(player.uid)}
+                className={`group relative min-w-0 overflow-hidden rounded-2xl border p-5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  index === 0
+                    ? "border-primary/30 bg-gradient-to-b from-primary/10 to-card/70 sm:order-2 sm:py-7"
+                    : index === 1
+                      ? "border-border/60 bg-card/60 hover:border-primary/30 sm:order-1"
+                      : "border-border/60 bg-card/60 hover:border-primary/30 sm:order-3"
+                }`}
+              >
+                <div className="mb-5 flex items-center justify-between">
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold tabular-nums ${index === 0 ? "bg-primary text-secondary" : "bg-muted text-muted-foreground"}`}
+                  >
+                    #{index + 1}
+                  </span>
+                  <Trophy
+                    className={`h-4 w-4 ${index === 0 ? "text-yellow-500" : index === 1 ? "text-slate-400" : "text-amber-600"}`}
+                  />
+                </div>
+                <div className="flex flex-col items-center text-center">
+                  <div
+                    className={`mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary ring-1 ring-border/50 ${index === 0 ? "sm:h-20 sm:w-20" : ""}`}
+                  >
+                    {player.photoURL ? (
+                      <img
+                        src={player.photoURL}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl font-semibold">
+                        {player.displayName?.[0]?.toUpperCase() || "U"}
+                      </span>
+                    )}
                   </div>
-
-                  <div className="relative flex flex-col items-center text-center">
-                    {/* Avatar */}
-                    <div className="relative mb-4">
-                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-gray-300 to-gray-500 shadow-lg ring-4 ring-gray-400/30">
-                        {leaderboardData.topThree[1].photoURL ? (
-                          <img
-                            src={leaderboardData.topThree[1].photoURL}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <span className="text-2xl font-bold text-white">
-                            {leaderboardData.topThree[1].displayName?.[0]?.toUpperCase() ||
-                              "U"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Name & Badges */}
-                    <div className="mb-2 flex items-center gap-1">
-                      <h3 className="truncate text-lg font-bold">
-                        {leaderboardData.topThree[1].displayName}
-                      </h3>
-                      {leaderboardData.topThree[1].owner && (
-                        <Crown className="h-4 w-4 text-yellow-500" />
-                      )}
-                      {leaderboardData.topThree[1].contributor && (
-                        <Hammer className="h-4 w-4 text-orange-500" />
-                      )}
-                      {leaderboardData.topThree[1].verified && (
-                        <BadgeCheck className="h-4 w-4 text-blue-500" />
-                      )}
-                    </div>
-
-                    {/* Stats */}
-                    <div className="mb-3 flex items-center gap-2 rounded-full bg-gray-400/10 px-3 py-1">
-                      <Star className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm font-semibold">
-                        Level {leaderboardData.topThree[1].level}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Zap className="h-3 w-3 text-yellow-500" />
-                        {leaderboardData.topThree[1].xp?.toLocaleString()} XP
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-violet-500" />
-                        {formatPlaytimeHours(leaderboardData.topThree[1].totalPlaytime)}
-                      </span>
-                    </div>
+                  <div className="flex w-full min-w-0 items-center justify-center gap-1.5">
+                    <h2 className="truncate text-base font-semibold transition-colors group-hover:text-primary">
+                      {player.displayName}
+                    </h2>
+                    {player.owner && (
+                      <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
+                    )}
+                    {player.contributor && (
+                      <Hammer className="h-4 w-4 shrink-0 text-orange-500" />
+                    )}
+                    {player.verified && (
+                      <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
+                    )}
+                  </div>
+                  <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                    <Star className="h-3 w-3" />
+                    {t("ascend.profile.level", { defaultValue: "Level" })} {player.level}
+                  </span>
+                  <p className="mt-5 text-2xl font-semibold tabular-nums tracking-tight">
+                    {(player.xp || 0).toLocaleString()}{" "}
+                    <span className="text-xs font-medium text-muted-foreground">XP</span>
+                  </p>
+                  <div className="mt-4 flex w-full flex-wrap items-center justify-center gap-3 border-t border-border/40 pt-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      {formatPlaytimeHours(player.totalPlaytime || 0)}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Gamepad2 className="h-3.5 w-3.5" />
+                      {player.totalGames || 0}
+                    </span>
                   </div>
                 </div>
-              )}
-            </motion.div>
-
-            {/* 1st Place - Center & Elevated */}
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.1 }}
-              className="flex flex-col items-center"
-            >
-              {leaderboardData.topThree[0] && (
-                <div
-                  onClick={() => handleViewProfile(leaderboardData.topThree[0].uid)}
-                  className="group relative mt-8 w-full cursor-pointer rounded-2xl border-2 border-yellow-500/50 bg-gradient-to-b from-yellow-500/30 via-amber-500/20 to-orange-500/10 p-6 pt-10 transition-all hover:border-yellow-500/70 hover:shadow-2xl hover:shadow-yellow-500/20"
-                >
-                  <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-yellow-500/20 blur-3xl transition-all group-hover:bg-yellow-500/30" />
-                  <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-amber-500/20 blur-2xl" />
-
-                  {/* Crown & Rank */}
-                  <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
-                    <div className="relative">
-                      <Crown className="absolute -top-4 left-1/2 h-6 w-6 -translate-x-1/2 text-yellow-500" />
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 text-xl font-bold text-white shadow-xl shadow-yellow-500/30">
-                        1
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="relative flex flex-col items-center text-center">
-                    {/* Avatar */}
-                    <div className="relative mb-4">
-                      <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 shadow-xl shadow-yellow-500/30 ring-4 ring-yellow-500/50">
-                        {leaderboardData.topThree[0].photoURL ? (
-                          <img
-                            src={leaderboardData.topThree[0].photoURL}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <span className="text-3xl font-bold text-white">
-                            {leaderboardData.topThree[0].displayName?.[0]?.toUpperCase() ||
-                              "U"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500 shadow-lg">
-                        <Trophy className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
-
-                    {/* Name & Badges */}
-                    <div className="mb-2 flex items-center gap-1">
-                      <h3 className="truncate text-xl font-bold">
-                        {leaderboardData.topThree[0].displayName}
-                      </h3>
-                      {leaderboardData.topThree[0].owner && (
-                        <Crown className="h-5 w-5 text-yellow-500" />
-                      )}
-                      {leaderboardData.topThree[0].contributor && (
-                        <Hammer className="h-5 w-5 text-orange-500" />
-                      )}
-                      {leaderboardData.topThree[0].verified && (
-                        <BadgeCheck className="h-5 w-5 text-blue-500" />
-                      )}
-                    </div>
-
-                    {/* Stats */}
-                    <div className="mb-3 flex items-center gap-2 rounded-full bg-yellow-500/20 px-4 py-1.5">
-                      <Star className="h-5 w-5 text-yellow-500" />
-                      <span className="font-bold text-yellow-600 dark:text-yellow-400">
-                        Level {leaderboardData.topThree[0].level}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap justify-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Zap className="h-4 w-4 text-yellow-500" />
-                        {leaderboardData.topThree[0].xp?.toLocaleString()} XP
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4 text-violet-500" />
-                        {formatPlaytimeHours(leaderboardData.topThree[0].totalPlaytime)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Gamepad2 className="h-4 w-4 text-emerald-500" />
-                        {leaderboardData.topThree[0].totalGames} games
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-
-            {/* 3rd Place */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex flex-col items-center"
-            >
-              {leaderboardData.topThree[2] && (
-                <div
-                  onClick={() => handleViewProfile(leaderboardData.topThree[2].uid)}
-                  className="group relative mt-6 w-full cursor-pointer rounded-2xl border border-amber-700/30 bg-gradient-to-b from-amber-700/20 via-amber-700/10 to-transparent p-6 pt-8 transition-all hover:border-amber-700/50 hover:shadow-xl hover:shadow-amber-700/10"
-                >
-                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-700/10 blur-2xl transition-all group-hover:bg-amber-700/20" />
-
-                  {/* Rank Badge */}
-                  <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-600 to-amber-800 text-lg font-bold text-white shadow-lg">
-                      3
-                    </div>
-                  </div>
-
-                  <div className="relative flex flex-col items-center text-center">
-                    {/* Avatar */}
-                    <div className="relative mb-4">
-                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600 to-amber-800 shadow-lg ring-4 ring-amber-700/30">
-                        {leaderboardData.topThree[2].photoURL ? (
-                          <img
-                            src={leaderboardData.topThree[2].photoURL}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <span className="text-2xl font-bold text-white">
-                            {leaderboardData.topThree[2].displayName?.[0]?.toUpperCase() ||
-                              "U"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Name & Badges */}
-                    <div className="mb-2 flex items-center gap-1">
-                      <h3 className="truncate text-lg font-bold">
-                        {leaderboardData.topThree[2].displayName}
-                      </h3>
-                      {leaderboardData.topThree[2].owner && (
-                        <Crown className="h-4 w-4 text-yellow-500" />
-                      )}
-                      {leaderboardData.topThree[2].contributor && (
-                        <Hammer className="h-4 w-4 text-orange-500" />
-                      )}
-                      {leaderboardData.topThree[2].verified && (
-                        <BadgeCheck className="h-4 w-4 text-blue-500" />
-                      )}
-                    </div>
-
-                    {/* Stats */}
-                    <div className="mb-3 flex items-center gap-2 rounded-full bg-amber-700/10 px-3 py-1">
-                      <Star className="h-4 w-4 text-amber-600" />
-                      <span className="text-sm font-semibold">
-                        Level {leaderboardData.topThree[2].level}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Zap className="h-3 w-3 text-yellow-500" />
-                        {leaderboardData.topThree[2].xp?.toLocaleString()} XP
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-violet-500" />
-                        {formatPlaytimeHours(leaderboardData.topThree[2].totalPlaytime)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </motion.div>
+              </button>
+            ))}
           </div>
 
           {/* Runner-ups List */}
@@ -378,15 +185,16 @@ export default function LeaderboardSection({
                 <Award className="h-5 w-5" />
                 Runner-ups
               </h2>
-              <div className="space-y-2">
+              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/50">
                 {leaderboardData.runnerUps.map((user, index) => (
-                  <motion.div
+                  <motion.button
+                    type="button"
                     key={user.uid}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 + index * 0.05 }}
+                    transition={{ delay: Math.min(index * 0.03, 0.2) }}
                     onClick={() => handleViewProfile(user.uid)}
-                    className="group flex cursor-pointer items-center gap-4 rounded-xl border border-border/50 bg-card/50 p-4 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg"
+                    className="group flex w-full items-center gap-3 border-b border-border/40 p-4 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:gap-4"
                   >
                     {/* Rank */}
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/50 font-bold text-muted-foreground">
@@ -448,7 +256,7 @@ export default function LeaderboardSection({
                     </div>
 
                     <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
-                  </motion.div>
+                  </motion.button>
                 ))}
               </div>
             </motion.div>
