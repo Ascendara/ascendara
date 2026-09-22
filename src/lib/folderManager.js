@@ -233,3 +233,13 @@ export const updateGameInFolders = (gameId, updatedProperties) => {
 
   return updatedFolders;
 };
+
+// Hiding a folder keeps its games in the folder and preserves all metadata.
+export const setFolderHidden = (folderName, hidden) => {
+  const folders = loadFolders().map(folder =>
+    folder.game === folderName ? { ...folder, hidden } : folder
+  );
+  saveFolders(folders);
+  window.dispatchEvent(new CustomEvent("ascendara:folders-updated"));
+  return folders;
+};

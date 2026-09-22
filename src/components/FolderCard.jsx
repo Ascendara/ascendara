@@ -17,41 +17,64 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
-const FolderCard = ({ name, onClick, className, refreshKey }) => {
+
+// Keep covers available synchronously when cards remount after navigation.
+const thumbnailCache = new Map();
+window.addEventListener("game-cover-updated", ({ detail }) => {
+  if (!detail?.gameName) return;
+  if (detail.dataUrl) thumbnailCache.set(detail.gameName, detail.dataUrl);
+  else thumbnailCache.delete(detail.gameName);
+});
+const getPreview = items => items.slice(0, 4).map(game => {
+  const id = game.game || game.name;
+  return { id, name: id, image: thumbnailCache.get(id) || null };
+});
+
+const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFolder }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
-  const [folderGames, setFolderGames] = useState([]);
-  const [gameThumbnails, setGameThumbnails] = useState([]);
+  const folder = suppliedFolder || getFolderByName(name);
+  const folderGames = folder?.items || [];
+  const previewKey = JSON.stringify(folderGames.slice(0, 4).map(game => game.game || game.name));
+  const [gameThumbnails, setGameThumbnails] = useState(() => getPreview(folderGames));
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
-    const folder = getFolderByName(name);
-    if (!folder?.items) return;
-
-    setFolderGames(folder.items);
-
-    // Load up to 4 portrait thumbnails via IPC (same as InstalledGameCard)
-    const loadThumbnails = async () => {
-      const results = [];
-      for (const game of folder.items.slice(0, 4)) {
-        const gameId = game.game || game.name;
-        try {
-          const base64 = await window.electron.getGameImage(gameId, "grid");
-          if (base64) {
-            results.push({ id: gameId, image: `data:image/jpeg;base64,${base64}`, name: gameId });
-          } else {
-            results.push({ id: gameId, image: null, name: gameId });
-          }
-        } catch {
-          results.push({ id: gameId, image: null, name: gameId });
+    let active = true;
+    const ids = JSON.parse(previewKey);
+    const refresh = async () => {
+      const results = await Promise.all(ids.map(async id => {
+        let image = thumbnailCache.get(id);
+        if (!image) {
+          try {
+            const base64 = await window.electron.getGameImage(id, "grid");
+            image = base64 ? `data:image/jpeg;base64,${base64}` : null;
+            if (image) thumbnailCache.set(id, image);
+          } catch { image = null; }
         }
-      }
-      setGameThumbnails(results);
+        return { id, name: id, image };
+      }));
+      if (active) setGameThumbnails(results);
     };
+    const onCoverUpdate = ({ detail }) => {
+      if (ids.includes(detail?.gameName)) refresh();
+    };
+    refresh();
+    window.addEventListener("game-cover-updated", onCoverUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("game-cover-updated", onCoverUpdate);
+    };
+  }, [previewKey, refreshKey]);
 
-    loadThumbnails();
-  }, [name, refreshKey]);
+  useEffect(() => {
+    const onRemoveRequested = ({ detail }) => {
+      if (detail?.folderName === name) setShowDeleteDialog(true);
+    };
+    window.addEventListener("ascendara:remove-folder-requested", onRemoveRequested);
+    return () => window.removeEventListener("ascendara:remove-folder-requested", onRemoveRequested);
+  }, [name]);
 
   const handleFolderClick = e => {
     e.stopPropagation();
@@ -67,6 +90,7 @@ const FolderCard = ({ name, onClick, className, refreshKey }) => {
   return (
     <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
       <Card
+        data-library-folder={name}
         className={cn(
           "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
           "hover:-translate-y-1 hover:shadow-xl hover:border-primary/30",

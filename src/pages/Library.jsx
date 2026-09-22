@@ -9,7 +9,7 @@ import "@/components/ui/switch";
 import "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
-import { Plus, FolderOpen, ExternalLink, User, HardDrive, Gamepad2, Gift, Search as SearchIcon, AlertTriangle, Heart, SquareLibrary, Tag, Loader, Import, CheckSquareIcon, ArrowUpAZ, ArrowDownAZ, ImageUp, FolderPlus, ChevronDown, Cloud, CloudDownload, CloudUpload, Clock, DollarSign, ArrowDown, Play, Trash2, Sparkles, MessageSquareText, TriangleAlert, Timer, HardDriveDownload, Star, SlidersHorizontal, GripVertical, Download, History, RotateCcw, CheckCircle2, PlayCircle, Bookmark } from "lucide-react";
+import { Plus, EyeOff, FolderOpen, ExternalLink, User, HardDrive, Gamepad2, Gift, Search as SearchIcon, AlertTriangle, Heart, SquareLibrary, Tag, Loader, Import, CheckSquareIcon, ArrowUpAZ, ArrowDownAZ, ImageUp, FolderPlus, ChevronDown, Cloud, CloudDownload, CloudUpload, Clock, DollarSign, ArrowDown, Play, Trash2, Sparkles, MessageSquareText, TriangleAlert, Timer, HardDriveDownload, Star, SlidersHorizontal, GripVertical, Download, History, RotateCcw, CheckCircle2, PlayCircle, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -58,6 +58,7 @@ import { loadFolders, createFolder, addGameToFolder, filterGamesNotInFolders, ge
 
 // Module-level cache so images survive page switches without re-fetching via IPC
 const gameImageCache = new Map();
+let libraryGamesCache = null;
 
 
 // Normalize every place that compares game names so casing, spaces, and
@@ -169,8 +170,10 @@ const Library = () => {
     }
   };
 
-  const [games, setGames] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [games, setGames] = useState(() => libraryGamesCache
+    ? [...loadFolders(), ...filterGamesNotInFolders(libraryGamesCache.filter(game => !game.isFolder))]
+    : []);
+  const [loading, setLoading] = useState(() => libraryGamesCache === null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
   const [isImportingGames, setIsImportingGames] = useState(false);
@@ -203,6 +206,8 @@ const Library = () => {
     const saved = localStorage.getItem("library-sortOrder");
     return saved || "asc";
   });
+  const [folderPlacement, setFolderPlacement] = useState(() => localStorage.getItem("library-folderPlacement") || "first");
+  useEffect(() => { safeSetItem("library-folderPlacement", folderPlacement); }, [folderPlacement]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [filters, setFilters] = useState({
     favorites: false,
@@ -267,12 +272,14 @@ const Library = () => {
   const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
   const [sidebarTabOrder, setSidebarTabOrder] = useState(() => {
     const saved = localStorage.getItem("library-tab-order");
-    return saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
+    const order = saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
+    if (!order.includes("hiddenFolders")) order.splice(Math.max(0, order.indexOf("all") + 1), 0, "hiddenFolders");
+    return order;
   });
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem("library-tab-order");
     const order = saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
-    return order[0] || "all";
+    return order.find(id => id !== "hiddenFolders" || loadFolders().some(folder => folder.hidden)) || "all";
   }); // "all" | "favoritesGallery" | "cloud" | "playLater" | "history"
   const dragTabRef = useRef(null);
   const dragOverTabRef = useRef(null);
@@ -462,6 +469,8 @@ const Library = () => {
   const filteredGames = gamesWithQueued
     .slice()
     .filter(game => {
+      if (game.isFolder && Boolean(game.hidden) !== (activeTab === "hiddenFolders")) return false;
+      if (activeTab === "hiddenFolders" && !game.isFolder) return false;
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = (game.game || game.name || "")
         .toLowerCase()
@@ -473,9 +482,9 @@ const Library = () => {
       return matchesSearch && matchesFavorites && matchesVr && matchesOnline;
     })
     .sort((a, b) => {
-      // Folders always first
-      if (a.isFolder && !b.isFolder) return -1;
-      if (!a.isFolder && b.isFolder) return 1;
+      if (Boolean(a.isFolder) !== Boolean(b.isFolder)) {
+        return (a.isFolder ? -1 : 1) * (folderPlacement === "last" ? -1 : 1);
+      }
       // Then favorites
       const aName = a.game || a.name || "";
       const bName = b.game || b.name || "";
@@ -488,7 +497,7 @@ const Library = () => {
       if (sortMode === "playtime") {
         const aTime = a.playTime || 0;
         const bTime = b.playTime || 0;
-        return bTime - aTime;
+        if (aTime !== bTime) return bTime - aTime;
       }
       // Alphabetical
       return sortOrder === "asc"
@@ -512,6 +521,12 @@ const Library = () => {
   // Listen for folder changes (e.g. folder deleted, games moved back)
   useEffect(() => {
     const handleFoldersUpdated = () => {
+      const updatedFolders = loadFolders();
+      setFolders(updatedFolders);
+      setGames(prev => [...updatedFolders, ...prev.filter(game => !game.isFolder)]);
+      if (!updatedFolders.some(folder => folder.hidden)) {
+        setActiveTab(tab => tab === "hiddenFolders" ? "all" : tab);
+      }
       loadGames();
     };
     window.addEventListener("ascendara:folders-updated", handleFoldersUpdated);
@@ -1164,7 +1179,8 @@ const Library = () => {
       setFolders(folders);
 
       // Combine games not in folders with folder items
-      setGames([...foldersAsGames, ...gamesNotInFolders]);
+      libraryGamesCache = [...foldersAsGames, ...gamesNotInFolders];
+      setGames(libraryGamesCache);
       setLoading(false);
     } catch (error) {
       console.error("Error loading games:", error);
@@ -1392,6 +1408,13 @@ const Library = () => {
       count: games.filter(g => !g.isFolder).length + getGamesInFolders().length,
     },
     {
+      id: "hiddenFolders",
+      label: t("library.hiddenFolders.title"),
+      icon: <EyeOff className="h-4 w-4" />,
+      count: folders.filter(folder => folder.hidden).length,
+      hidden: !folders.some(folder => folder.hidden),
+    },
+    {
       id: "favoritesGallery",
       label: t("library.favoritesGallery.title") || "Favorites",
       icon: <Heart className="h-4 w-4" />,
@@ -1587,7 +1610,13 @@ const Library = () => {
                 </div>
 
                 <button
-                  onClick={() => { tab.nav ? navigate(tab.nav) : setActiveTab(tab.id); }}
+                  onClick={() => {
+                    tab.nav ? navigate(tab.nav) : setActiveTab(tab.id);
+                    if (tab.id === "hiddenFolders") {
+                      setSearchQuery("");
+                      setFilters({ favorites: false, vrOnly: false, onlineGames: false });
+                    }
+                  }}
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all",
                     activeTab === tab.id
@@ -1620,7 +1649,7 @@ const Library = () => {
 
         {/* ── Actions ── */}
         <div className="space-y-0.5 px-2 pt-3">
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Manage</p>
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.manage")}</p>
 
           <TooltipProvider>
             <AlertDialog
@@ -1831,7 +1860,7 @@ const Library = () => {
               value={searchQuery}
               onChange={e => {
                 setSearchQuery(e.target.value);
-                if (e.target.value && activeTab !== "all") { setActiveTab("all"); }
+                if (e.target.value && activeTab !== "all" && activeTab !== "hiddenFolders") { setActiveTab("all"); }
               }}
               className="h-9 pl-9"
             />
@@ -1842,7 +1871,7 @@ const Library = () => {
               <DropdownMenuTrigger asChild>
                 {(() => {
                   const activeFilterCount = [filters.vrOnly, filters.onlineGames].filter(Boolean).length;
-                  const hasActiveFilters = activeFilterCount > 0 || sortMode !== "alpha" || groupBy !== "none";
+                  const hasActiveFilters = activeFilterCount > 0 || sortMode !== "alpha" || sortOrder !== "asc" || folderPlacement !== "first" || groupBy !== "none";
                   return (
                     <button
                       type="button"
@@ -1857,7 +1886,7 @@ const Library = () => {
                       <span>{t("search.filters") || "Filter"}</span>
                       {hasActiveFilters && (
                         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-secondary">
-                          {activeFilterCount + (sortMode !== "alpha" ? 1 : 0) + (groupBy !== "none" ? 1 : 0)}
+                          {activeFilterCount + (sortMode !== "alpha" || sortOrder !== "asc" ? 1 : 0) + (folderPlacement !== "first" ? 1 : 0) + (groupBy !== "none" ? 1 : 0)}
                         </span>
                       )}
                     </button>
@@ -1866,7 +1895,7 @@ const Library = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 p-1.5">
                 {/* Sort section */}
-                <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.sort.aToZ").replace("Sort ", "") === "A to Z" ? "Sort" : "Sort"}</p>
+                <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.sort.title")}</p>
                 {[
                   { label: t("library.sort.aToZ"), icon: <ArrowUpAZ className="h-4 w-4" />, active: sortMode === "alpha" && sortOrder === "asc", onClick: () => { setSortOrder("asc"); setSortMode("alpha"); } },
                   { label: t("library.sort.zToA"), icon: <ArrowDownAZ className="h-4 w-4" />, active: sortMode === "alpha" && sortOrder === "desc", onClick: () => { setSortOrder("desc"); setSortMode("alpha"); } },
@@ -1888,6 +1917,20 @@ const Library = () => {
                   </DropdownMenuItem>
                 ))}
 
+                <DropdownMenuSeparator className="my-1.5" />
+
+                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.sort.folderPlacement")}</p>
+                {["first", "last"].map(placement => (
+                  <DropdownMenuItem
+                    key={placement}
+                    onClick={() => setFolderPlacement(placement)}
+                    className={cn("cursor-pointer rounded-md px-2 py-1.5", folderPlacement === placement && "bg-primary/10 font-medium text-primary")}
+                  >
+                    <FolderOpen className="mr-2 h-4 w-4" />
+                    {t(placement === "first" ? "library.sort.foldersFirst" : "library.sort.foldersLast")}
+                    {folderPlacement === placement && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuSeparator className="my-1.5" />
 
                 {/* Group By section */}
@@ -1980,6 +2023,11 @@ const Library = () => {
           {/* ── Tab page header ── */}
           {activeTab !== "favoritesGallery" && (() => {
             const tabMeta = {
+              hiddenFolders: {
+                icon: <EyeOff className="h-5 w-5 text-primary" />,
+                title: t("library.hiddenFolders.title"),
+                subtitle: t("library.hiddenFolders.description"),
+              },
               all: {
                 icon: <SquareLibrary className="h-5 w-5 text-primary" />,
                 title: t("library.pageTitle") || "My Library",
@@ -2017,7 +2065,7 @@ const Library = () => {
           })()}
 
           {/* ── All Games / Favorites tab ── */}
-          {(activeTab === "all" || activeTab === "favorites") && (() => {
+          {(activeTab === "all" || activeTab === "favorites" || activeTab === "hiddenFolders") && (() => {
             const renderGameCard = game => (
               <div key={getLibraryCardKey(game)}>
                 {game.isFolder ? (
@@ -2081,7 +2129,7 @@ const Library = () => {
                           <div className="ml-1 flex-1 border-t border-border/30" />
                         </div>
                         <div className={gridClass}>
-                          {dirGames.sort((a, b) => (a.isFolder === b.isFolder ? 0 : a.isFolder ? -1 : 1)).map(renderGameCard)}
+                          {dirGames.map(renderGameCard)}
                         </div>
                       </div>
                     );
@@ -2102,7 +2150,6 @@ const Library = () => {
                 ) : (
                   <div className={gridClass}>
                     {tabGames
-                      .sort((a, b) => (a.isFolder === b.isFolder ? 0 : a.isFolder ? -1 : 1))
                       .map(renderGameCard)}
                   </div>
                 )}

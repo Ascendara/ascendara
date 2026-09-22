@@ -2240,7 +2240,24 @@
     "shortcutCreated": "Shortcut created for primary executable",
     "shortcutError": "Error creating shortcut. Maybe the executable path doesn't exist?",
     "size": "Size",
+    "manage": "Manage",
+    "folderMenu": {
+      "openDescription": "View the games in this folder.",
+      "hideDescription": "Keep this folder out of your library view.",
+      "restoreDescription": "Show this folder in your library again.",
+      "removeDescription": "Remove the folder and return its games to the library."
+    },
+    "hiddenFolders": {
+      "title": "Hidden Folders",
+      "description": "Your hidden folders. Right-click a folder to show it in your library again.",
+      "hide": "Hide This Folder",
+      "restore": "Show in Library"
+    },
     "sort": {
+      "title": "Sort By",
+      "folderPlacement": "Folder Placement",
+      "foldersFirst": "Folders First",
+      "foldersLast": "Folders Last",
       "aToZ": "Sort A to Z",
       "zToA": "Sort Z to A",
       "mostPlayed": "Most Played",

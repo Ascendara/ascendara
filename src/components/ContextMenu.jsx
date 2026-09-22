@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquareText, TriangleAlert, Sparkles } from "lucide-react";
+import { MessageSquareText, TriangleAlert, Sparkles, FolderOpen, EyeOff, Eye, Trash2 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useNavigate } from "react-router-dom";
+import { getFolderByName, setFolderHidden } from "@/lib/folderManager";
 import ReportIssue from "./ReportIssue";
 import "./ContextMenu.css";
 
@@ -10,20 +12,25 @@ const ContextMenu = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isReportOpen, setIsReportOpen] = useState(false);
   const menuRef = useRef(null);
+  const [targetFolder, setTargetFolder] = useState(null);
+  const navigate = useNavigate();
   const { t } = useLanguage();
 
   const handleContextMenu = e => {
+    if (e.defaultPrevented) return;
     e.preventDefault();
+    const folderCard = e.target.closest?.("[data-library-folder]");
+    setTargetFolder(folderCard ? getFolderByName(folderCard.dataset.libraryFolder) : null);
     const x = e.clientX;
     const y = e.clientY;
 
     // Ensure menu stays within viewport
-    const menuWidth = 200; // Approximate menu width
-    const menuHeight = 200; // Approximate menu height
+    const menuWidth = folderCard ? 320 : 240; // Approximate menu width
+    const menuHeight = folderCard ? 430 : 200; // Approximate menu height
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    let adjustedX = Math.min(x, viewportWidth - menuWidth);
+    let adjustedX = Math.max(8, Math.min(x, viewportWidth - menuWidth - 8));
     let adjustedY = y;
 
     // Check if menu would go off bottom of screen
@@ -56,28 +63,48 @@ const ContextMenu = () => {
   };
 
   useEffect(() => {
-    // Only attach listeners if we haven't already
-    if (!window.__contextMenuListenersAttached) {
-      document.addEventListener("contextmenu", handleContextMenu);
-      document.addEventListener("click", handleClickOutside);
-      document.addEventListener("keydown", e => {
-        if (e.key === "Escape") setIsVisible(false);
-      });
-      window.__contextMenuListenersAttached = true;
-    }
-
+    const handleEscape = e => {
+      if (e.key === "Escape") setIsVisible(false);
+    };
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("click", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
     return () => {
-      // Only remove listeners if we're the last instance
-      if (window.__contextMenuListenersAttached) {
-        document.removeEventListener("contextmenu", handleContextMenu);
-        document.removeEventListener("click", handleClickOutside);
-        document.removeEventListener("keydown", e => {
-          if (e.key === "Escape") setIsVisible(false);
-        });
-        window.__contextMenuListenersAttached = false;
-      }
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  // Clamp using the rendered size, including translated descriptions.
+  useLayoutEffect(() => {
+    if (!isVisible || !menuRef.current) return;
+    const menu = menuRef.current;
+    const x = Math.max(8, Math.min(position.x, window.innerWidth - menu.offsetWidth - 8));
+    const y = Math.max(8, Math.min(position.y, window.innerHeight - menu.offsetHeight - 8));
+    if (x !== position.x || y !== position.y) setPosition({ x, y });
+  }, [isVisible, targetFolder, position]);
+
+  const folderActions = targetFolder ? [
+    {
+      icon: FolderOpen,
+      label: "library.openFolder",
+      description: "library.folderMenu.openDescription",
+      run: () => navigate(`/folderview/${encodeURIComponent(targetFolder.game)}`),
+    },
+    {
+      icon: targetFolder.hidden ? Eye : EyeOff,
+      label: targetFolder.hidden ? "library.hiddenFolders.restore" : "library.hiddenFolders.hide",
+      description: targetFolder.hidden ? "library.folderMenu.restoreDescription" : "library.folderMenu.hideDescription",
+      run: () => setFolderHidden(targetFolder.game, !targetFolder.hidden),
+    },
+    {
+      icon: Trash2,
+      label: "library.removeFolder",
+      description: "library.folderMenu.removeDescription",
+      run: () => window.dispatchEvent(new CustomEvent("ascendara:remove-folder-requested", { detail: { folderName: targetFolder.game } })),
+    },
+  ] : [];
 
   return (
     <>
@@ -109,6 +136,9 @@ const ContextMenu = () => {
                 top: position.y,
                 left: position.x,
                 zIndex: 1001,
+                width: targetFolder ? "min(320px, calc(100vw - 16px))" : undefined,
+                maxHeight: "calc(100vh - 16px)",
+                overflowY: "auto",
               }}
             >
               {/* Glow effect */}
@@ -123,6 +153,23 @@ const ContextMenu = () => {
 
                 {/* Separator */}
                 <div className="context-menu-separator" />
+
+                {folderActions.map(({ icon: Icon, label, description, run }) => (
+                  <motion.button
+                    key={label}
+                    className="context-menu-item"
+                    whileHover={{ x: 2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => { setIsVisible(false); run(); }}
+                  >
+                    <div className="context-menu-item-icon"><Icon className="h-4 w-4" /></div>
+                    <div className="context-menu-item-content">
+                      <span className="context-menu-item-label">{t(label)}</span>
+                      <span className="context-menu-item-description">{t(description)}</span>
+                    </div>
+                  </motion.button>
+                ))}
+                {targetFolder && <div className="context-menu-separator" />}
 
                 {/* Menu Items */}
                 <motion.button
