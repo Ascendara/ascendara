@@ -1356,15 +1356,17 @@ const Welcome = ({ welcomeData, onComplete }) => {
             >
               <motion.div className="mb-12 text-center" variants={itemVariants}>
                 <Globe2 className="mx-auto mb-6 h-16 w-16 animate-pulse text-primary" />
-                <h1 className="mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-4xl font-bold text-transparent">
-                  <AnimatePresence mode="wait">
+                <h1 className="mb-4 grid min-h-[1.5em] items-center text-4xl font-bold text-foreground/80">
+                  <AnimatePresence initial={false}>
                     <motion.span
                       key={currentLangIndex}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
                       transition={{ duration: 0.5 }}
-                      className="mb-2 block text-4xl text-foreground/80"
+                      className="col-start-1 row-start-1 block leading-normal"
+                      lang={langPreferenceMessages[currentLangIndex].lang}
+                      dir="auto"
                     >
                       {langPreferenceMessages[currentLangIndex].text}
                     </motion.span>

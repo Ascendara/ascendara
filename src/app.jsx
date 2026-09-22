@@ -72,11 +72,25 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 // Keep the shell and home page ready at startup; load other screens on demand.
+function PageLoading() {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="flex min-h-screen w-full items-center justify-center bg-background text-primary"
+      role="status"
+    >
+      <RefreshCwIcon className="h-8 w-8 animate-spin" aria-hidden="true" />
+      <span className="sr-only">{t("common.loading", { defaultValue: "Loading..." })}</span>
+    </div>
+  );
+}
+
 function lazyPage(load) {
   const Page = React.lazy(load);
   return function LazyPage(props) {
     return (
-      <React.Suspense fallback={null}>
+      <React.Suspense fallback={<PageLoading />}>
         <Page {...props} />
       </React.Suspense>
     );
@@ -1816,7 +1830,7 @@ const AppRoutes = () => {
           zIndex: 9999,
         }}
       >
-        {iconData && (
+        {iconData ? (
           <motion.img
             src={iconData}
             alt="Loading"
@@ -1831,6 +1845,8 @@ const AppRoutes = () => {
               ease: "linear",
             }}
           />
+        ) : (
+          <PageLoading />
         )}
       </motion.div>
     );
@@ -1853,7 +1869,12 @@ const AppRoutes = () => {
 
   if (location.pathname === "/" && effectiveShowWelcome) {
     console.log("Redirecting from home to welcome");
-    return <Navigate to="/welcome" replace />;
+    return (
+      <>
+        <PageLoading />
+        <Navigate to="/welcome" replace />
+      </>
+    );
   }
 
   console.log("Rendering main routes with location:", location.pathname);
@@ -1862,20 +1883,29 @@ const AppRoutes = () => {
     <>
       <MenuBar />
       {effectiveShowWelcome ? (
-        <Routes>
-          <Route path="/extralanguages" element={<ExtraLanguages />} />
-          <Route path="/localrefresh" element={<LocalRefresh />} />
-          <Route
-            path="*"
-            element={
-              <Welcome
-                isNewInstall={isNewInstall}
-                welcomeData={welcomeData}
-                onComplete={handleWelcomeComplete}
+        <div className="min-h-screen bg-background text-foreground">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <Routes>
+              <Route path="/extralanguages" element={<ExtraLanguages />} />
+              <Route path="/localrefresh" element={<LocalRefresh />} />
+              <Route
+                path="*"
+                element={
+                  <Welcome
+                    isNewInstall={isNewInstall}
+                    welcomeData={welcomeData}
+                    onComplete={handleWelcomeComplete}
+                  />
+                }
               />
-            }
-          />
-        </Routes>
+            </Routes>
+          </motion.div>
+        </div>
       ) : (
         <Routes location={location} key={user?.uid || "logged-out"}>
           <Route path="bigpicture" element={<BigPicture />} />
