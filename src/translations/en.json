@@ -2,6 +2,14 @@
   "account": {
     "actions": "Account Actions",
     "almostThere": "Almost there!",
+    "auth": {
+      "eyebrow": "STEP UP. CONNECT. JOIN ASCEND.",
+      "intro": "Your saves, your friends, your next adventure. Bring it all together with Ascend.",
+      "loginAccent": "back.",
+      "loginHeadline": "Welcome",
+      "signupAccent": "Better together.",
+      "signupHeadline": "Good games."
+    },
     "chooseDisplayName": "Choose a display name for your account",
     "confirmEmail": {
       "confirm": "Yes, Create Account",
@@ -490,7 +498,7 @@
     "premium": {
       "autoUpdate": {
         "description": "Automatically check for game updates in the background. Get notified when updates are available and install them with a single click.",
-        "title": "Auto Game Update Checking"
+        "title": "Game Update Checking"
       },
       "chat": {
         "description": "Chat directly with your friends within Ascendara. Share game recommendations, coordinate play sessions, and stay connected with your gaming circle.",

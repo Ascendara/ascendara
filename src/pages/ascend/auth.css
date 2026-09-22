@@ -1,0 +1,210 @@
+.ascend-auth-headline {
+  font-size: clamp(2.8rem, 4.8vw, 4.2rem);
+  font-weight: 750;
+  line-height: 1.04;
+  letter-spacing: -0.065em;
+  overflow-wrap: anywhere;
+}
+
+.ascend-auth-script {
+  position: relative;
+  display: inline-block;
+  margin-top: 0.1em;
+  color: rgb(var(--color-primary));
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.98em;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.065em;
+}
+
+.ascend-auth-script svg {
+  display: block;
+  width: 90%;
+  height: 0.2em;
+  margin-top: 0.02em;
+  margin-left: 5%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  opacity: 0.6;
+}
+
+.ascend-auth-headline-login .ascend-auth-script {
+  margin-top: 0;
+}
+
+.ascend-auth-headline-login .ascend-auth-script svg {
+  position: absolute;
+  top: 100%;
+  left: 5%;
+  margin: 0;
+}
+
+.ascend-auth-form input:focus-visible,
+.ascend-auth button:focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 3px;
+}
+
+.ascend-auth-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgb(var(--color-border) / 0.6);
+  border-radius: 13px;
+  background: rgb(var(--color-muted) / 0.35);
+}
+
+.ascend-auth-mode {
+  position: relative;
+  isolation: isolate;
+  padding: 9px 12px;
+  border-radius: 9px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 180ms ease;
+}
+
+.ascend-auth-mode:hover,
+.ascend-auth-mode[aria-pressed="true"] {
+  color: rgb(var(--color-primary));
+}
+
+.ascend-auth-mode-indicator {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgb(var(--color-primary) / 0.18);
+  background: rgb(var(--color-background));
+  box-shadow: 0 2px 5px rgb(0 0 0 / 0.06);
+}
+
+.ascend-auth-mode:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.ascend-consent-check {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.ascend-consent-check input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ascend-consent-mark {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border: 1.5px solid rgb(var(--color-primary) / 0.35);
+  border-radius: 5px;
+  background: rgb(var(--color-card) / 0.6);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.ascend-consent-mark svg {
+  fill: none;
+  stroke: rgb(var(--color-secondary));
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  transition: stroke-dashoffset 200ms ease;
+}
+
+.ascend-consent-check input:checked + .ascend-consent-mark {
+  background: rgb(var(--color-primary));
+  border-color: rgb(var(--color-primary));
+  box-shadow: 0 2px 5px rgb(var(--color-primary) / 0.2);
+}
+
+.ascend-consent-check input:checked + .ascend-consent-mark svg {
+  stroke-dashoffset: 0;
+}
+
+.ascend-consent-check input:hover:not(:disabled) + .ascend-consent-mark {
+  border-color: rgb(var(--color-primary));
+  box-shadow: 0 0 0 3px rgb(var(--color-primary) / 0.1);
+}
+
+.ascend-consent-check input:active:not(:disabled) + .ascend-consent-mark {
+  transform: scale(0.9);
+}
+
+.ascend-consent-check input:focus-visible + .ascend-consent-mark {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 3px;
+}
+
+.ascend-consent-check input:disabled + .ascend-consent-mark {
+  opacity: 0.5;
+}
+
+.ascend-auth-form button[type="submit"] {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.ascend-auth-form button[type="submit"]:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(var(--color-primary) / 0.2);
+}
+
+.ascend-auth-form button[type="submit"]:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ascend-auth *,
+  .ascend-auth *::before,
+  .ascend-auth *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ascend-auth-headline {
+    font-size: clamp(2.8rem, 10vw, 4.5rem);
+  }
+}
+
+@media (min-width: 768px) and (max-height: 800px) {
+  .ascend-auth {
+    padding-top: 0.5rem;
+  }
+
+  .ascend-auth-headline {
+    font-size: clamp(2.6rem, 4.2vw, 3.5rem);
+  }
+
+  .ascend-auth-features {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+  }
+
+  .ascend-auth-form input:not([type="checkbox"]) {
+    height: 2.5rem;
+  }
+}
