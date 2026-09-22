@@ -68,8 +68,8 @@ Ascendara simplifies your game management experience by providing a seamless way
 
   <tr>
     <td width="50%" valign="top">
-      <h3>📱 Encrypted Remote Access</h3>
-      <p>Check download progress remotely with end-to-end encrypted communication.</p>
+      <h3>📱 Ascendara Companion</h3>
+      <p>Check download progress remotely with encrypted communication on your phone and other computers.</p>
     </td>
     <td width="50%" valign="top">
       <h3>🕹️ Big Picture Mode</h3>

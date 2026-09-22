@@ -62,7 +62,7 @@
       "downloadQueuesDesc": "Queue multiple downloads and manage them efficiently with priority controls.",
       "friends": "Friends",
       "leaderboard": "Leaderboards",
-      "mobileView": "Mobile View & Remote Access",
+      "mobileView": "Ascendara Companion",
       "mobileViewDesc": "View and manage your downloads remotely, and see what your friends are playing on Ascend from anywhere.",
       "moreComing": "And More Coming",
       "moreComingDesc": "New features are constantly being added to Ascend",
@@ -555,8 +555,8 @@
         "title": "Upcoming Updates Peek"
       },
       "webView": {
-        "description": "Easily monitor and manage your active downloads, and see what your Ascend friends are up to all on your mobile device.",
-        "title": "Remote Access"
+        "description": "Easily monitor and manage your active downloads, and see what your Ascend friends are up to all on your mobile device or another PC.",
+        "title": "Ascendara Companion"
       }
     },
     "profile": {
