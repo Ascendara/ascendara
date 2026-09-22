@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "@/components/ui/button";
 import {
   ChevronLeft,
@@ -141,8 +141,9 @@ const GameCard = React.memo(({ game, favorites, onPlay, onRemove, onToggleFavori
 const FolderView = () => {
   const { folderName } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage();
-  const [folderGames, setFolderGames] = useState([]);
+  const [folderGames, setFolderGames] = useState(() => getFolderByName(decodeURIComponent(folderName))?.items || []);
   const [favorites, setFavorites] = useState([]);
   const lastFolderNameRef = useRef(folderName);
   const lastFolderGamesRef = useRef([]);
@@ -347,6 +348,7 @@ const FolderView = () => {
         // Use the installed game data but preserve any folder-specific properties
         navigate("/gamescreen", {
           state: {
+            returnToFolder: location.pathname,
             gameData: {
               ...installedGame,
               // Preserve folder-specific properties if they exist
@@ -367,6 +369,7 @@ const FolderView = () => {
         // Use the custom game data but preserve any folder-specific properties
         navigate("/gamescreen", {
           state: {
+            returnToFolder: location.pathname,
             gameData: {
               ...customGame,
               isCustom: true,
@@ -386,6 +389,7 @@ const FolderView = () => {
     // Fallback to using the folder game data if we couldn't get the complete data
     navigate("/gamescreen", {
       state: {
+            returnToFolder: location.pathname,
         gameData: game,
       },
     });

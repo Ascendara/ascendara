@@ -1115,7 +1115,7 @@ export default function GameScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { gameData, libraryPage } = location.state || {};
+  const { gameData, libraryPage, returnToFolder } = location.state || {};
   const { settings } = useSettings();
   const { isAuthenticated, user } = useAuth();
   const [game, setGame] = useState(gameData || null);
@@ -1321,6 +1321,10 @@ export default function GameScreen() {
   // GO BACK!
 
   const BackLibrary = () => {
+    if (typeof returnToFolder === "string" && returnToFolder.startsWith("/folderview/")) {
+      navigate(returnToFolder, { replace: true });
+      return;
+    }
     const page = Number(libraryPage);
 
     if (Number.isInteger(page) && page >= 1) {
