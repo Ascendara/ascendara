@@ -8,6 +8,7 @@ import {
   MessageCircle,
   UserPlus,
   Settings,
+  Smartphone,
   Bell,
   Sparkles,
   Circle,
@@ -180,16 +181,21 @@ const AscendSidebar = ({
       label: t("ascend.nav.upcoming") || "Upcoming Update",
     },
     { id: "notifications", icon: Bell, label: t("ascend.nav.notifications"), badge: 0 },
+    { id: "companion", icon: Smartphone, label: t("ascend.nav.companion") },
     { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
   ];
 
   // Conditionally add Ad Stats for adUser
   if (userData?.adUser) {
-    mainNavItems.splice(mainNavItems.length - 2, 0, {
-      id: "adstats",
-      icon: BarChart,
-      label: t("ascend.nav.adStats") || "Ad Stats",
-    });
+    mainNavItems.splice(
+      mainNavItems.findIndex(item => item.id === "notifications"),
+      0,
+      {
+        id: "adstats",
+        icon: BarChart,
+        label: t("ascend.nav.adStats") || "Ad Stats",
+      }
+    );
   }
 
   // Quick access icon button

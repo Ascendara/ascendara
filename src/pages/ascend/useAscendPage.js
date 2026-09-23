@@ -2938,9 +2938,9 @@ export default function useAscendPage() {
     setDisconnectingDevice(null);
   };
 
-  // Load connected devices when settings section is opened
+  // Load connected devices when Companion is opened
   useEffect(() => {
-    if (activeSection === "settings" && user) {
+    if (activeSection === "companion" && user) {
       loadConnectedDevices();
     }
   }, [activeSection]);

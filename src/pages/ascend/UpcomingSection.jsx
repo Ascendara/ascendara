@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import SectionHeader from "./SectionHeader";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   Star,
   Calendar,
+  Rocket,
 } from "lucide-react";
 
 export default function UpcomingSection({
@@ -25,6 +27,11 @@ export default function UpcomingSection({
   const upcomingEntry = upcomingChangelog?.[0];
   return (
     <div className="mb-24 space-y-6">
+      <SectionHeader
+        icon={Rocket}
+        title={t("ascend.upcoming.pageTitle")}
+        description={t("ascend.upcoming.pageSubtitle")}
+      />
       {loadingUpcoming ? (
         <div className="flex flex-col items-center justify-center py-32">
           <div className="relative">

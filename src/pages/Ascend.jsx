@@ -27,6 +27,7 @@ const FriendsSection = lazy(() => import("./ascend/FriendsSection"));
 const RequestsSection = lazy(() => import("./ascend/RequestsSection"));
 const MessagesSection = lazy(() => import("./ascend/MessagesSection"));
 const NotificationsSection = lazy(() => import("./ascend/NotificationsSection"));
+const CompanionSection = lazy(() => import("./ascend/CompanionSection"));
 const SettingsSection = lazy(() => import("./ascend/SettingsSection"));
 const CloudLibrarySection = lazy(() => import("./ascend/CloudLibrarySection"));
 const LeaderboardSection = lazy(() => import("./ascend/LeaderboardSection"));
@@ -706,6 +707,26 @@ const Ascend = () => {
             />
           );
 
+        case "companion":
+          return (
+            <CompanionSection
+              t={t}
+              webappConnectionCode={webappConnectionCode}
+              handleGenerateWebappCode={handleGenerateWebappCode}
+              isGeneratingCode={isGeneratingCode}
+              webappCodeExpiry={webappCodeExpiry}
+              webappQRCode={webappQRCode}
+              handleCopyWebappCode={handleCopyWebappCode}
+              webappCodeCopied={webappCodeCopied}
+              handleCancelWebappConnection={handleCancelWebappConnection}
+              loadConnectedDevices={loadConnectedDevices}
+              loadingDevices={loadingDevices}
+              connectedDevices={connectedDevices}
+              handleDisconnectDevice={handleDisconnectDevice}
+              disconnectingDevice={disconnectingDevice}
+            />
+          );
+
         case "settings":
           return (
             <SettingsSection
@@ -733,19 +754,6 @@ const Ascend = () => {
               handleCancelEditProfile={handleCancelEditProfile}
               userData={userData}
               ascendAccess={ascendAccess}
-              webappConnectionCode={webappConnectionCode}
-              handleGenerateWebappCode={handleGenerateWebappCode}
-              isGeneratingCode={isGeneratingCode}
-              webappCodeExpiry={webappCodeExpiry}
-              webappQRCode={webappQRCode}
-              handleCopyWebappCode={handleCopyWebappCode}
-              webappCodeCopied={webappCodeCopied}
-              handleCancelWebappConnection={handleCancelWebappConnection}
-              loadConnectedDevices={loadConnectedDevices}
-              loadingDevices={loadingDevices}
-              connectedDevices={connectedDevices}
-              handleDisconnectDevice={handleDisconnectDevice}
-              disconnectingDevice={disconnectingDevice}
               updateData={updateData}
               isDev={isDev}
               devSubscriptionState={devSubscriptionState}

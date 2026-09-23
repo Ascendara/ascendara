@@ -1,10 +1,10 @@
 import ProfileSettingsCard from "./settings/ProfileSettingsCard";
 import DiscordVerificationCard from "./settings/DiscordVerificationCard";
-import WebappConnectionCard from "./settings/WebappConnectionCard";
 import PrivacySettingsCard from "./settings/PrivacySettingsCard";
 import SubscriptionSettingsCard from "./settings/SubscriptionSettingsCard";
 import SubscriptionSuccessDialog from "./settings/SubscriptionSuccessDialog";
 import AccountActionsCard from "./settings/AccountActionsCard";
+import SectionHeader from "./SectionHeader";
 import { Settings } from "lucide-react";
 export default function SettingsSection({
   t,
@@ -31,19 +31,6 @@ export default function SettingsSection({
   handleCancelEditProfile,
   userData,
   ascendAccess,
-  webappConnectionCode,
-  handleGenerateWebappCode,
-  isGeneratingCode,
-  webappCodeExpiry,
-  webappQRCode,
-  handleCopyWebappCode,
-  webappCodeCopied,
-  handleCancelWebappConnection,
-  loadConnectedDevices,
-  loadingDevices,
-  connectedDevices,
-  handleDisconnectDevice,
-  disconnectingDevice,
   updateData,
   isDev,
   devSubscriptionState,
@@ -68,21 +55,11 @@ export default function SettingsSection({
 }) {
   return (
     <div className="mb-40 space-y-6">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-violet-500/10 p-6">
-        <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
-        <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-violet-500/20 blur-3xl" />
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 backdrop-blur-sm">
-            <Settings className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">{t("ascend.settings.title")}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t("ascend.settings.subtitle")}
-            </p>
-          </div>
-        </div>
-      </div>
+      <SectionHeader
+        icon={Settings}
+        title={t("ascend.settings.title")}
+        description={t("ascend.settings.subtitle")}
+      />
 
       {/* Profile Card */}
       <ProfileSettingsCard
@@ -113,24 +90,6 @@ export default function SettingsSection({
 
       {/* Discord Verification Card */}
       <DiscordVerificationCard t={t} ascendAccess={ascendAccess} user={user} />
-
-      {/* Webapp Connection Card */}
-      <WebappConnectionCard
-        t={t}
-        webappConnectionCode={webappConnectionCode}
-        handleGenerateWebappCode={handleGenerateWebappCode}
-        isGeneratingCode={isGeneratingCode}
-        webappCodeExpiry={webappCodeExpiry}
-        webappQRCode={webappQRCode}
-        handleCopyWebappCode={handleCopyWebappCode}
-        webappCodeCopied={webappCodeCopied}
-        handleCancelWebappConnection={handleCancelWebappConnection}
-        loadConnectedDevices={loadConnectedDevices}
-        loadingDevices={loadingDevices}
-        connectedDevices={connectedDevices}
-        handleDisconnectDevice={handleDisconnectDevice}
-        disconnectingDevice={disconnectingDevice}
-      />
 
       {/* Privacy Settings Card */}
       <PrivacySettingsCard t={t} userData={userData} updateData={updateData} />
