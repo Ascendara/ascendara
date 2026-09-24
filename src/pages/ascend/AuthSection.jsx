@@ -25,6 +25,7 @@ import {
   Puzzle,
   Infinity as InfinityIcon,
   Smartphone,
+  Joystick,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -161,6 +162,7 @@ export default function AuthSection({
                   { icon: InfinityIcon, name: "unlimitedDownloads" },
                   { icon: Puzzle, name: "nexusMods" },
                   { icon: Zap, name: "trainers" },
+                  { icon: Joystick, name: "emulatorPresets" },
                 ].map(({ icon: Icon, name }) => (
                   <span
                     key={name}

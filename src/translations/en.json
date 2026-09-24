@@ -68,6 +68,8 @@
       "cloudSyncandBackupsDesc": "Sync your Ascendara profile and game saves to the cloud",
       "downloadQueues": "Download Queues",
       "downloadQueuesDesc": "Queue multiple downloads and manage them efficiently with priority controls.",
+      "emulatorPresets": "Emulator Presets",
+      "emulatorPresetsDesc": "Unlock an expanded library of emulator presets for dozens of additional systems, with download links and ready-to-use configurations.",
       "friends": "Friends",
       "leaderboard": "Leaderboards",
       "mobileView": "Ascendara Companion",
@@ -562,6 +564,10 @@
       "downloadQueue": {
         "description": "Queue multiple downloads and let Ascendara handle them automatically. Start downloads and come back when they're all ready.",
         "title": "Download Queue"
+      },
+      "emulatorPresets": {
+        "description": "Unlock an expanded library of emulator presets covering dozens of additional systems beyond the 12 that ship with Ascendara, complete with download links and ready-to-use configurations.",
+        "title": "Expanded Emulator Presets"
       },
       "experimentalBranch": {
         "description": "Easily switch to the experimental branch in Preferences to test brand new features before they're released. Be the first to try new functionality and help shape Ascendara's future.",
