@@ -223,6 +223,58 @@ const FolderView = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderName]);
 
+  // Folder items are saved snapshots; refresh playtime from the game records.
+  useEffect(() => {
+    let cancelled = false;
+    let requestId = 0;
+
+    const refreshPlaytime = async () => {
+      const currentRequest = ++requestId;
+      try {
+        const [installedGames, customGames] = await Promise.all([
+          window.electron.getGames(),
+          window.electron.getCustomGames(),
+        ]);
+        if (cancelled || currentRequest !== requestId) return;
+
+        const installedByName = new Map(
+          (Array.isArray(installedGames) ? installedGames : []).map(game => [
+            game.game || game.name, game,
+          ])
+        );
+        const customByName = new Map(
+          (Array.isArray(customGames) ? customGames : []).map(game => [
+            game.game || game.name, game,
+          ])
+        );
+        setFolderGames(previous => {
+          let changed = false;
+          const updated = previous.map(game => {
+            const name = game.game || game.name;
+            const current = game.isCustom || game.custom
+              ? customByName.get(name) || installedByName.get(name)
+              : installedByName.get(name) || customByName.get(name);
+            if (!current || current.playTime === game.playTime) return game;
+            changed = true;
+            return { ...game, playTime: current.playTime };
+          });
+          return changed ? updated : previous;
+        });
+      } catch (error) {
+        console.error("Error refreshing folder playtime:", error);
+      }
+    };
+
+    refreshPlaytime();
+    window.addEventListener("focus", refreshPlaytime);
+    window.electron.ipcRenderer.on("game-closed", refreshPlaytime);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshPlaytime);
+      window.electron.ipcRenderer.removeListener("game-closed", refreshPlaytime);
+    };
+  }, [folderName, location.key]);
+
   // Sort games to show favorites at the top
   useEffect(() => {
     // Only resort if we have games and either favorites changed or folder changed
