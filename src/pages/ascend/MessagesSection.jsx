@@ -28,14 +28,21 @@ function Avatar({ person }) {
     <div className="relative shrink-0">
       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-primary/10 text-sm font-semibold text-primary ring-1 ring-border/50">
         {person.photoURL ? (
-          <img
-            src={person.photoURL}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="h-full w-full object-cover"
-          />
+          <>
+            <img
+              src={person.photoURL}
+              alt=""
+              referrerPolicy="no-referrer"
+              onError={event => {
+                event.currentTarget.style.display = "none";
+                event.currentTarget.nextElementSibling?.classList.remove("hidden");
+              }}
+              className="h-full w-full object-cover"
+            />
+            <User className="hidden h-5 w-5 text-primary" aria-hidden="true" />
+          </>
         ) : (
-          person.displayName?.[0]?.toUpperCase() || "U"
+          <User className="h-5 w-5 text-primary" aria-hidden="true" />
         )}
       </div>
       <span

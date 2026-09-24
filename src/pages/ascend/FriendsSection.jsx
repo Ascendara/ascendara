@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Users,
+  User,
   Eye,
   EyeOff,
   Circle,
@@ -137,16 +138,29 @@ export default function FriendsSection({
                       >
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 ring-2 ring-green-500/30 transition-all group-hover:ring-green-500/50">
                           {friend.photoURL ? (
-                            <img
-                              src={friend.photoURL}
-                              alt={friend.displayName}
-                              className="h-full w-full rounded-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
+                            <>
+                              <img
+                                src={friend.photoURL}
+                                alt={friend.displayName}
+                                onError={event => {
+                                  event.currentTarget.style.display = "none";
+                                  event.currentTarget.nextElementSibling?.classList.remove(
+                                    "hidden"
+                                  );
+                                }}
+                                className="h-full w-full rounded-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                              <User
+                                className="hidden h-6 w-6 text-primary-foreground"
+                                aria-hidden="true"
+                              />
+                            </>
                           ) : (
-                            <span className="text-primary-foreground text-lg font-bold">
-                              {friend.displayName?.[0]?.toUpperCase() || "U"}
-                            </span>
+                            <User
+                              className="h-6 w-6 text-primary-foreground"
+                              aria-hidden="true"
+                            />
                           )}
                         </div>
                         <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-green-500" />
@@ -231,16 +245,29 @@ export default function FriendsSection({
                       >
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 ring-2 ring-yellow-500/30 transition-all group-hover:ring-yellow-500/50">
                           {friend.photoURL ? (
-                            <img
-                              src={friend.photoURL}
-                              alt={friend.displayName}
-                              className="h-full w-full rounded-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
+                            <>
+                              <img
+                                src={friend.photoURL}
+                                alt={friend.displayName}
+                                onError={event => {
+                                  event.currentTarget.style.display = "none";
+                                  event.currentTarget.nextElementSibling?.classList.remove(
+                                    "hidden"
+                                  );
+                                }}
+                                className="h-full w-full rounded-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                              <User
+                                className="hidden h-6 w-6 text-primary-foreground"
+                                aria-hidden="true"
+                              />
+                            </>
                           ) : (
-                            <span className="text-primary-foreground text-lg font-bold">
-                              {friend.displayName?.[0]?.toUpperCase() || "U"}
-                            </span>
+                            <User
+                              className="h-6 w-6 text-primary-foreground"
+                              aria-hidden="true"
+                            />
                           )}
                         </div>
                         <div
@@ -330,16 +357,29 @@ export default function FriendsSection({
                       >
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-muted to-muted/70 opacity-75 transition-all group-hover:opacity-100">
                           {friend.photoURL ? (
-                            <img
-                              src={friend.photoURL}
-                              alt={friend.displayName}
-                              className="h-full w-full rounded-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
+                            <>
+                              <img
+                                src={friend.photoURL}
+                                alt={friend.displayName}
+                                onError={event => {
+                                  event.currentTarget.style.display = "none";
+                                  event.currentTarget.nextElementSibling?.classList.remove(
+                                    "hidden"
+                                  );
+                                }}
+                                className="h-full w-full rounded-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                              <User
+                                className="hidden h-6 w-6 text-primary-foreground"
+                                aria-hidden="true"
+                              />
+                            </>
                           ) : (
-                            <span className="text-lg font-bold text-muted-foreground">
-                              {friend.displayName?.[0]?.toUpperCase() || "U"}
-                            </span>
+                            <User
+                              className="h-6 w-6 text-primary-foreground"
+                              aria-hidden="true"
+                            />
                           )}
                         </div>
                         <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-gray-500" />

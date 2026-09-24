@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Users,
+  User,
   Loader2,
   ChevronRight,
   Search,
@@ -116,16 +117,29 @@ export default function SearchSection({
                   <div className="relative shrink-0">
                     <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 ring-1 ring-border/50">
                       {result.photoURL ? (
-                        <img
-                          src={result.photoURL}
-                          alt={result.displayName}
-                          className="h-full w-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
+                        <>
+                          <img
+                            src={result.photoURL}
+                            alt={result.displayName}
+                            onError={event => {
+                              event.currentTarget.style.display = "none";
+                              event.currentTarget.nextElementSibling?.classList.remove(
+                                "hidden"
+                              );
+                            }}
+                            className="h-full w-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <User
+                            className="hidden h-6 w-6 text-primary-foreground"
+                            aria-hidden="true"
+                          />
+                        </>
                       ) : (
-                        <span className="text-primary-foreground text-xl font-bold">
-                          {result.displayName?.[0]?.toUpperCase() || "U"}
-                        </span>
+                        <User
+                          className="h-6 w-6 text-primary-foreground"
+                          aria-hidden="true"
+                        />
                       )}
                     </div>
                     <div
