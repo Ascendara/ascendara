@@ -881,7 +881,7 @@
     },
     "upcoming": {
       "pageTitle": "Upcoming Update",
-      "pageSubtitle": "See what\u2019s coming next to Ascendara.",
+      "pageSubtitle": "See what’s coming next to Ascendara.",
       "additions": "New Features",
       "fixes": "Bug Fixes",
       "improvements": "Improvements",
@@ -2216,7 +2216,7 @@
     "play": "Play",
     "playLater": {
       "addedOn": "Added",
-      "empty":"You haven't added any games here yet...",
+      "empty": "You haven't added any games here yet...",
       "badge": "Later",
       "download": "Download Now",
       "remove": "Remove from Play Later",
@@ -2348,7 +2348,7 @@
     "autoRefreshActiveSummary": "Refreshes every {{days}} days using {{method}}",
     "autoRefreshAscendInfo": "Sign in to Ascend to enable automatic index refreshing and keep your game library up to date effortlessly.",
     "autoRefreshCardDesc": "Keep your index up to date automatically",
-    "autoRefreshComplete": "Automatic Index Refresh Complete", 
+    "autoRefreshComplete": "Automatic Index Refresh Complete",
     "autoRefreshCompleteMessage": "Your game index has been automatically refreshed in the background. Reload to see the latest games.",
     "autoRefreshDescription": "Automatically refresh your index at regular intervals",
     "autoRefreshDisabled": "Automatic refresh disabled",
@@ -2676,7 +2676,19 @@
       "setupConsole": "Set up a console"
     },
     "errors": {
-      "retry": "Retry"
+      "retry": "Retry",
+      "signIn": "Sign in to use Retro cloud saves.",
+      "unknownConsole": "Unknown Retro console",
+      "cloudSubscription": "An active Ascend subscription is required for Retro cloud saves.",
+      "accountChanged": "Your account changed. Please try again.",
+      "restart": "Restart Ascendara to enable Retro.",
+      "requestFailed": "Retro request failed",
+      "expandedSubscription": "An active Ascend subscription is required for expanded emulator presets.",
+      "uploadFailed": "Cloud upload failed",
+      "downloadUnavailable": "Backup download unavailable",
+      "wrongConsole": "This backup belongs to a different console",
+      "downloadFailed": "Backup download failed ({{status}})",
+      "backupTooLarge": "Backup exceeds 256 MB"
     },
     "filters": {
       "allConsoles": "All consoles",
@@ -2730,7 +2742,12 @@
       "bytesDownloaded": "{{count}} MB downloaded",
       "filesChecked": "{{count}} files checked",
       "leaveMessage": ". You can leave this page while it finishes.",
-      "recordsProcessed": "{{count}} records processed"
+      "recordsProcessed": "{{count}} records processed",
+      "phases": {
+        "scanning": "Scanning",
+        "catalogue": "Processing catalogue",
+        "downloading catalogue": "Downloading catalogue"
+      }
     },
     "loading": "Loading Retro",
     "saves": {
@@ -2795,7 +2812,11 @@
       "saveSetup": "Save setup",
       "setupInstructions": "Set up BIOS or firmware, controllers, and graphics in your emulator before playing. ",
       "title": "{{name}} setup",
-      "visitWebsite": "Visit official website"
+      "visitWebsite": "Visit official website",
+      "browseFor": "Browse for {{label}}",
+      "clearPath": "Clear {{label}}",
+      "ascendPreset": "{{name}} ? Ascend",
+      "argumentsPlaceholder": "--fullscreen\n{{rom}}"
     },
     "tabs": {
       "catalogue": "Catalogue",
@@ -2809,6 +2830,222 @@
       "pointFolders": "Keep your game and save folders organized beforehand so scans and save backups work smoothly.",
       "pointFrontend": "Ascendara doesn't download or run the games itself — it launches everything through your own emulators.",
       "title": "Welcome to Retro"
+    },
+    "expanded": {
+      "title": "All emulators",
+      "description": "Explore more systems, standalone emulators and setup resources with Ascend.",
+      "checking": "Checking Ascend access?",
+      "locked": "Unlock the expanded emulator presets and setup resources with an active Ascend subscription.",
+      "explore": "Explore Ascend",
+      "signIn": "Sign in to Ascend",
+      "search": "Search emulators, consoles and resources",
+      "groups": "Filter by console family",
+      "all": "All",
+      "preset": "Launch preset",
+      "experimental": "Experimental ? guide only",
+      "resource": "Setup resource",
+      "download": "Downloads / project",
+      "openResource": "Open resource",
+      "noResults": "No emulators or resources match your search.",
+      "localNotice": "Install and configure the emulator first, then select its executable and game folders. Each console uses one emulator profile. The original consoles and custom emulator setup remain available without Ascend.",
+      "configure": "Set up",
+      "consoleFor": "Console for {{name}}"
+    },
+    "layout": {
+      "subtitle": "Your favorite consoles. Your games. One place to play.",
+      "games": "games in your library",
+      "systemsReady": "systems set up",
+      "ascendIncluded": "Expanded presets included with Ascend",
+      "findConsole": "Find a console",
+      "configured": "Set up",
+      "other": "Other systems",
+      "ascendOnly": "Available with Ascend",
+      "noConsoles": "No consoles to show. Try another search or view all systems.",
+      "promoTitle": "More ways to play with Ascend",
+      "promoDescription": "Bring Xbox, Dreamcast, Nintendo DS and more into your library, with extra emulator presets and cloud saves.",
+      "yourCollection": "Your collection",
+      "collectionHint": "Choose a console to manage its emulator, games and saves.",
+      "ready": "Your emulator is set up. Scan a folder to find more games.",
+      "setupHint": "Choose an emulator and a game folder to get started.",
+      "scan": "Scan games",
+      "saves": "Saves",
+      "moreSystems": "More consoles",
+      "moreSystemsHint": "Explore Xbox, Dreamcast, DS, 3DS, Wii U, Switch and more.",
+      "easySetup": "A simpler setup",
+      "easySetupHint": "Find emulator downloads, launch presets and configuration guides together.",
+      "cloudSaves": "Take your progress along",
+      "cloudSavesHint": "Back up your console saves with Ascend and restore them on another device."
+    },
+    "platformNames": {
+      "ps1": "PlayStation 1",
+      "ps2": "PlayStation 2",
+      "ps3": "PlayStation 3",
+      "psp": "PlayStation Portable",
+      "gamecube": "Nintendo GameCube",
+      "wii": "Nintendo Wii",
+      "nes": "Nintendo NES",
+      "snes": "Super Nintendo",
+      "n64": "Nintendo 64",
+      "gb": "Game Boy",
+      "gbc": "Game Boy Color",
+      "gba": "Game Boy Advance",
+      "xbox": "Xbox",
+      "xbox360": "Xbox 360",
+      "dreamcast": "Sega Dreamcast",
+      "naomi": "Sega Naomi / Naomi 2",
+      "atomiswave": "Atomiswave",
+      "genesis": "Sega Genesis / Mega Drive",
+      "segacd": "Sega CD",
+      "sega32x": "Sega 32X",
+      "saturn": "Sega Saturn",
+      "pcengine": "PC Engine / TurboGrafx-16",
+      "nds": "Nintendo DS / DSi",
+      "3ds": "Nintendo 3DS",
+      "wiiu": "Nintendo Wii U",
+      "switch": "Nintendo Switch"
+    },
+    "emulators": {
+      "xemu": {
+        "name": "xemu",
+        "notes": "Configure the required Xbox BIOS, boot ROM and hard disk image in xemu first. Use Xbox-format disc images."
+      },
+      "xenia": {
+        "name": "Xenia",
+        "notes": "Choose a build for your operating system. Configure graphics and fullscreen in Xenia."
+      },
+      "flycast": {
+        "name": "Flycast",
+        "notes": "Configure BIOS files, arcade ROM sets and fullscreen in Flycast. Keep each console's games in separate folders."
+      },
+      "gens": {
+        "name": "Gens",
+        "notes": "Legacy emulator. Configure Sega CD BIOS files and display settings in Gens."
+      },
+      "mednafen": {
+        "name": "Mednafen",
+        "notes": "Configure system BIOS files in Mednafen. Use CUE sheets for disc-based games."
+      },
+      "azahar": {
+        "name": "Azahar",
+        "notes": "Complete Azahar's initial setup. Use decrypted .cci or .cxi games; install CIA packages in the emulator."
+      },
+      "cemu": {
+        "name": "Cemu",
+        "notes": "Complete Cemu's setup and install updates or DLC there. Scan WUA images or extracted games containing an RPX."
+      },
+      "desmume": {
+        "name": "DeSmuME",
+        "notes": "Nintendo DS emulator. Configure controls and display settings in DeSmuME. Development downloads may require a GitHub account."
+      },
+      "dolphinxr": {
+        "name": "DolphinXR",
+        "notes": "GameCube and Wii in VR. Configure your headset and game-specific settings in DolphinXR first."
+      },
+      "eden": {
+        "name": "Eden",
+        "notes": "Complete Eden's setup with your console's keys and firmware. Install updates and DLC in the emulator."
+      },
+      "fceux": {
+        "name": "FCEUX",
+        "notes": "Standalone NES and Famicom Disk System emulator. Configure display and any required disk-system BIOS in FCEUX."
+      },
+      "melonds": {
+        "name": "melonDS",
+        "notes": "DS and DSi emulation. Configure console mode, firmware and any DSi NAND in melonDS before playing."
+      },
+      "fpps4": {
+        "name": "fpPS4",
+        "notes": "Experimental PS4 compatibility layer. Follow the project's setup instructions; no automatic launch preset is provided."
+      },
+      "kytyps5": {
+        "name": "KytyPS5",
+        "notes": "Experimental project with limited compatibility. Follow its project instructions; no automatic launch preset is provided."
+      },
+      "rpcsx": {
+        "name": "RPCSX",
+        "notes": "Experimental PS4/PS5 project. Follow the Linux installation guide; no automatic launch preset is provided."
+      },
+      "shadpkg": {
+        "name": "ShadPKG",
+        "notes": "Utility for working with PS4 PKG files. This is a supporting tool, not an emulator."
+      },
+      "ps3-firmware": {
+        "name": "PS3 system software",
+        "notes": "Official PlayStation system software download and update instructions for PS3 setup."
+      },
+      "xemu-setup": {
+        "name": "xemu required files",
+        "notes": "Setup guide for the boot ROM, BIOS and hard disk image required by xemu."
+      },
+      "azahar-setup": {
+        "name": "Azahar setup guide",
+        "notes": "Configuration guide for Nintendo 3DS emulation."
+      },
+      "cemu-setup": {
+        "name": "Cemu setup guide",
+        "notes": "Configuration guide for Wii U emulation."
+      },
+      "eden-setup": {
+        "name": "Eden setup guide",
+        "notes": "Configuration guide for Switch emulation."
+      },
+      "melonds-setup": {
+        "name": "melonDS setup guide",
+        "notes": "Configuration guide for Nintendo DS and DSi emulation."
+      },
+      "mednafen-setup": {
+        "name": "Mednafen documentation",
+        "notes": "System-specific setup, BIOS requirements, controls and configuration."
+      },
+      "duckstation": {
+        "name": "DuckStation"
+      },
+      "pcsx2": {
+        "name": "PCSX2"
+      },
+      "rpcs3": {
+        "name": "RPCS3"
+      },
+      "ppsspp": {
+        "name": "PPSSPP"
+      },
+      "dolphin": {
+        "name": "Dolphin"
+      },
+      "retroarch": {
+        "name": "RetroArch"
+      }
+    },
+    "families": {
+      "Sony": "Sony",
+      "Nintendo": "Nintendo",
+      "Microsoft": "Microsoft",
+      "Sega": "Sega",
+      "Other": "Other systems",
+      "Multi-system": "Multi-system"
+    },
+    "cloud": {
+      "label": "Ascend Retro cloud saves",
+      "title": "Ascend cloud saves",
+      "description": "Keep your {{name}} progress backed up and restore it on another device.",
+      "folderNotice": "Each backup contains the entire console save folder. Shared memory cards may contain saves for several games.",
+      "loading": "Loading cloud saves?",
+      "subscribedNotice": "Retro cloud saves are included with an active Ascend subscription.",
+      "signInNotice": "Sign in and get Ascend to back up your Retro saves to the cloud.",
+      "chooseFolderHint": "Select the save or memory card folder used by your emulator on this device before uploading or restoring.",
+      "chooseFolder": "Choose save folder",
+      "localFolder": "Local save folder:",
+      "closeEmulator": "Close the emulator before uploading or restoring saves.",
+      "uploaded": "{{name}} saves uploaded to Ascend",
+      "upload": "Back up to cloud",
+      "refresh": "Refresh",
+      "empty": "No cloud backups yet. Back up your saves to keep a copy in Ascend.",
+      "latest": "Latest ? ",
+      "savedBackup": "Saved backup",
+      "size": " ? {{size}} MB",
+      "restored": "Restored {{count}} save files. Your previous saves are in Recovery copies.",
+      "restore": "Restore",
+      "restoreNotice": "Restore asks before replacing local saves and keeps a recovery copy. These backups also appear in Ascend ? Cloud Backups."
     }
   },
   "search": {
@@ -3312,7 +3549,7 @@
     "qbitConfigDialog": {
       "currentConfig": "Current Configuration:",
       "host": "Host",
-      "port": "Port", 
+      "port": "Port",
       "username": "Username",
       "password": "Password",
       "stillCantConnect": {
@@ -3555,7 +3792,7 @@
     "localIndex": {
       "autoSetup": "Setting up your game index in the background...",
       "canContinue": "You can continue with setup while the index builds in the background",
-      "changeLaterHint": "You can switch sources anytime in Preferences \u2192 Your Game Index after the setup",
+      "changeLaterHint": "You can switch sources anytime in Preferences → Your Game Index after the setup",
       "default": "Default",
       "externalDesc": "Prefer a different catalog? Ascendara supports external and community-maintained sources you can switch to later from Settings.",
       "externalTitle": "External Sources",

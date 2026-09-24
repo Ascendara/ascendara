@@ -1,0 +1,480 @@
+{
+  "platforms": [
+    {
+      "id": "xbox",
+      "name": "Xbox",
+      "adapter": "xemu",
+      "catalogue": "Microsoft Xbox",
+      "extensions": [
+        "iso"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "xbox360",
+      "name": "Xbox 360",
+      "adapter": "xenia",
+      "catalogue": "Microsoft Xbox 360",
+      "extensions": [
+        "iso",
+        "xex"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "dreamcast",
+      "name": "Sega Dreamcast",
+      "adapter": "flycast",
+      "catalogue": "Sega Dreamcast",
+      "extensions": [
+        "gdi",
+        "chd",
+        "cdi",
+        "cue",
+        "m3u"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "naomi",
+      "name": "Sega Naomi / Naomi 2",
+      "adapter": "flycast",
+      "catalogue": "Sega Naomi",
+      "extensions": [
+        "zip",
+        "7z"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "atomiswave",
+      "name": "Atomiswave",
+      "adapter": "flycast",
+      "catalogue": "Sammy Atomiswave",
+      "extensions": [
+        "zip",
+        "7z"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "genesis",
+      "name": "Sega Genesis / Mega Drive",
+      "adapter": "gens",
+      "catalogue": "Sega Genesis",
+      "extensions": [
+        "md",
+        "gen",
+        "smd",
+        "bin",
+        "zip"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "segacd",
+      "name": "Sega CD",
+      "adapter": "gens",
+      "catalogue": "Sega CD",
+      "extensions": [
+        "cue",
+        "iso"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "sega32x",
+      "name": "Sega 32X",
+      "adapter": "gens",
+      "catalogue": "Sega 32X",
+      "extensions": [
+        "32x",
+        "bin",
+        "smd",
+        "zip"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "saturn",
+      "name": "Sega Saturn",
+      "adapter": "mednafen",
+      "catalogue": "Sega Saturn",
+      "extensions": [
+        "cue",
+        "ccd",
+        "m3u"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "pcengine",
+      "name": "PC Engine / TurboGrafx-16",
+      "adapter": "mednafen",
+      "catalogue": "NEC TurboGrafx-16",
+      "extensions": [
+        "pce",
+        "sgx",
+        "cue",
+        "ccd",
+        "m3u"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "nds",
+      "name": "Nintendo DS / DSi",
+      "adapter": "melonds",
+      "catalogue": "Nintendo DS",
+      "extensions": [
+        "nds",
+        "dsi"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "3ds",
+      "name": "Nintendo 3DS",
+      "adapter": "azahar",
+      "catalogue": "Nintendo 3DS",
+      "extensions": [
+        "cci",
+        "cxi"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "wiiu",
+      "name": "Nintendo Wii U",
+      "adapter": "cemu",
+      "catalogue": "Nintendo Wii U",
+      "extensions": [
+        "wua",
+        "rpx"
+      ],
+      "ascend": true
+    },
+    {
+      "id": "switch",
+      "name": "Nintendo Switch",
+      "adapter": "eden",
+      "catalogue": "Nintendo Switch",
+      "extensions": [
+        "nsp",
+        "xci",
+        "nro"
+      ],
+      "ascend": true
+    }
+  ],
+  "emulators": [
+    {
+      "id": "xemu",
+      "name": "xemu",
+      "group": "Microsoft",
+      "platforms": [
+        "xbox"
+      ],
+      "website": "https://xemu.app/docs/download/",
+      "args": [
+        "-dvd_path",
+        "{rom}"
+      ],
+      "fullscreen": [
+        "-full-screen"
+      ],
+      "nameKey": "retro.emulators.xemu.name",
+      "notesKey": "retro.emulators.xemu.notes"
+    },
+    {
+      "id": "xenia",
+      "name": "Xenia",
+      "group": "Microsoft",
+      "platforms": [
+        "xbox360"
+      ],
+      "website": "https://xenia.jp/download/",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": null,
+      "nameKey": "retro.emulators.xenia.name",
+      "notesKey": "retro.emulators.xenia.notes"
+    },
+    {
+      "id": "flycast",
+      "name": "Flycast",
+      "group": "Sega",
+      "platforms": [
+        "dreamcast",
+        "naomi",
+        "atomiswave"
+      ],
+      "website": "https://github.com/flyinghead/flycast/releases/",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": null,
+      "nameKey": "retro.emulators.flycast.name",
+      "notesKey": "retro.emulators.flycast.notes"
+    },
+    {
+      "id": "gens",
+      "name": "Gens",
+      "group": "Sega",
+      "platforms": [
+        "genesis",
+        "segacd",
+        "sega32x"
+      ],
+      "website": "https://www.emulator-zone.com/doc.php/genesis/gens.html",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": null,
+      "nameKey": "retro.emulators.gens.name",
+      "notesKey": "retro.emulators.gens.notes"
+    },
+    {
+      "id": "mednafen",
+      "name": "Mednafen",
+      "group": "Multi-system",
+      "platforms": [
+        "ps1",
+        "nes",
+        "snes",
+        "gb",
+        "gbc",
+        "gba",
+        "genesis",
+        "saturn",
+        "pcengine"
+      ],
+      "website": "https://mednafen.github.io/releases/",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": [
+        "-video.fs",
+        "1"
+      ],
+      "nameKey": "retro.emulators.mednafen.name",
+      "notesKey": "retro.emulators.mednafen.notes"
+    },
+    {
+      "id": "azahar",
+      "name": "Azahar",
+      "group": "Nintendo",
+      "platforms": [
+        "3ds"
+      ],
+      "website": "https://azahar-emu.org/pages/download/",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": [
+        "--fullscreen"
+      ],
+      "nameKey": "retro.emulators.azahar.name",
+      "notesKey": "retro.emulators.azahar.notes"
+    },
+    {
+      "id": "cemu",
+      "name": "Cemu",
+      "group": "Nintendo",
+      "platforms": [
+        "wiiu"
+      ],
+      "website": "https://github.com/cemu-project/Cemu/releases",
+      "args": [
+        "-g",
+        "{rom}"
+      ],
+      "fullscreen": [
+        "-f"
+      ],
+      "nameKey": "retro.emulators.cemu.name",
+      "notesKey": "retro.emulators.cemu.notes"
+    },
+    {
+      "id": "desmume",
+      "name": "DeSmuME",
+      "group": "Nintendo",
+      "platforms": [
+        "nds"
+      ],
+      "website": "https://github.com/TASEmulators/desmume/actions/workflows/build_win.yml",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": null,
+      "nameKey": "retro.emulators.desmume.name",
+      "notesKey": "retro.emulators.desmume.notes"
+    },
+    {
+      "id": "dolphinxr",
+      "name": "DolphinXR",
+      "group": "Nintendo",
+      "platforms": [
+        "gamecube",
+        "wii"
+      ],
+      "website": "https://github.com/iChris4/dolphinXR",
+      "args": [
+        "--batch",
+        "--exec",
+        "{rom}"
+      ],
+      "fullscreen": null,
+      "nameKey": "retro.emulators.dolphinxr.name",
+      "notesKey": "retro.emulators.dolphinxr.notes"
+    },
+    {
+      "id": "eden",
+      "name": "Eden",
+      "group": "Nintendo",
+      "platforms": [
+        "switch"
+      ],
+      "website": "https://eden-emu.dev/downloads/",
+      "args": [
+        "-g",
+        "{rom}"
+      ],
+      "fullscreen": [
+        "-f"
+      ],
+      "nameKey": "retro.emulators.eden.name",
+      "notesKey": "retro.emulators.eden.notes"
+    },
+    {
+      "id": "fceux",
+      "name": "FCEUX",
+      "group": "Nintendo",
+      "platforms": [
+        "nes"
+      ],
+      "website": "https://fceux.com/web/download.html",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": null,
+      "nameKey": "retro.emulators.fceux.name",
+      "notesKey": "retro.emulators.fceux.notes"
+    },
+    {
+      "id": "melonds",
+      "name": "melonDS",
+      "group": "Nintendo",
+      "platforms": [
+        "nds"
+      ],
+      "website": "https://github.com/melonDS-emu/melonDS/releases/",
+      "args": [
+        "{rom}"
+      ],
+      "fullscreen": null,
+      "nameKey": "retro.emulators.melonds.name",
+      "notesKey": "retro.emulators.melonds.notes"
+    },
+    {
+      "id": "fpps4",
+      "name": "fpPS4",
+      "group": "Sony",
+      "platforms": [],
+      "website": "https://github.com/red-prig/fpPS4/releases",
+      "args": null,
+      "fullscreen": null,
+      "nameKey": "retro.emulators.fpps4.name",
+      "notesKey": "retro.emulators.fpps4.notes"
+    },
+    {
+      "id": "kytyps5",
+      "name": "KytyPS5",
+      "group": "Sony",
+      "platforms": [],
+      "website": "https://github.com/KytyPS5/KytyPS5/releases/latest",
+      "args": null,
+      "fullscreen": null,
+      "nameKey": "retro.emulators.kytyps5.name",
+      "notesKey": "retro.emulators.kytyps5.notes"
+    },
+    {
+      "id": "rpcsx",
+      "name": "RPCSX",
+      "group": "Sony",
+      "platforms": [],
+      "website": "https://rpcsx.github.io/wiki/installation/",
+      "args": null,
+      "fullscreen": null,
+      "nameKey": "retro.emulators.rpcsx.name",
+      "notesKey": "retro.emulators.rpcsx.notes"
+    }
+  ],
+  "resources": [
+    {
+      "id": "shadpkg",
+      "name": "ShadPKG",
+      "group": "Sony",
+      "website": "https://github.com/seregonwar/ShadPKG",
+      "nameKey": "retro.emulators.shadpkg.name",
+      "notesKey": "retro.emulators.shadpkg.notes"
+    },
+    {
+      "id": "ps3-firmware",
+      "name": "PS3 system software",
+      "group": "Sony",
+      "website": "https://www.playstation.com/en-us/support/hardware/ps3/system-software/",
+      "nameKey": "retro.emulators.ps3-firmware.name",
+      "notesKey": "retro.emulators.ps3-firmware.notes"
+    },
+    {
+      "id": "xemu-setup",
+      "name": "xemu required files",
+      "group": "Microsoft",
+      "website": "https://xemu.app/docs/required-files/",
+      "nameKey": "retro.emulators.xemu-setup.name",
+      "notesKey": "retro.emulators.xemu-setup.notes"
+    },
+    {
+      "id": "azahar-setup",
+      "name": "Azahar setup guide",
+      "group": "Nintendo",
+      "website": "https://wiki.axekin.com/2026/04/27/azahar/",
+      "nameKey": "retro.emulators.azahar-setup.name",
+      "notesKey": "retro.emulators.azahar-setup.notes"
+    },
+    {
+      "id": "cemu-setup",
+      "name": "Cemu setup guide",
+      "group": "Nintendo",
+      "website": "https://wiki.axekin.com/2025/11/09/cemu/",
+      "nameKey": "retro.emulators.cemu-setup.name",
+      "notesKey": "retro.emulators.cemu-setup.notes"
+    },
+    {
+      "id": "eden-setup",
+      "name": "Eden setup guide",
+      "group": "Nintendo",
+      "website": "https://wiki.axekin.com/2025/11/09/Eden/",
+      "nameKey": "retro.emulators.eden-setup.name",
+      "notesKey": "retro.emulators.eden-setup.notes"
+    },
+    {
+      "id": "melonds-setup",
+      "name": "melonDS setup guide",
+      "group": "Nintendo",
+      "website": "https://wiki.axekin.com/2025/11/09/melonds/",
+      "nameKey": "retro.emulators.melonds-setup.name",
+      "notesKey": "retro.emulators.melonds-setup.notes"
+    },
+    {
+      "id": "mednafen-setup",
+      "name": "Mednafen documentation",
+      "group": "Multi-system",
+      "website": "https://mednafen.github.io/documentation/",
+      "nameKey": "retro.emulators.mednafen-setup.name",
+      "notesKey": "retro.emulators.mednafen-setup.notes"
+    }
+  ]
+}

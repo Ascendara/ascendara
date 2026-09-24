@@ -23,6 +23,8 @@ import {
   Plus,
   X,
   ExternalLink,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,10 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import RetroCloudSaves from "@/components/RetroCloudSaves";
+import RetroConsoles from "@/components/RetroConsoles";
+import RetroEmulators from "@/components/RetroEmulators";
+import useRetroAccess from "@/hooks/useRetroAccess";
+import expanded from "../../electron/modules/retro/expanded-catalogue.json";
 import {
   Select,
   SelectContent,
@@ -145,7 +151,7 @@ function PathField({ label, value, kind, onChange, help }) {
         />
         <Button
           variant="outline"
-          aria-label={`Browse for ${label}`}
+          aria-label={t("retro.setup.browseFor", { label })}
           onClick={async () => {
             try {
               const file = await retroCall("pick", kind);
@@ -160,7 +166,7 @@ function PathField({ label, value, kind, onChange, help }) {
         {value && (
           <Button
             variant="ghost"
-            aria-label={`Clear ${label}`}
+            aria-label={t("retro.setup.clearPath", { label })}
             onClick={() => onChange("")}
           >
             <X className="h-4 w-4" />
@@ -172,15 +178,31 @@ function PathField({ label, value, kind, onChange, help }) {
   );
 }
 
-function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
+function ConsoleSetup({
+  platform,
+  profile,
+  onClose,
+  onSaved,
+  taskBusy,
+  access,
+  initialAdapter,
+}) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(() => ({
     ...emptyProfile,
     adapter: platform.adapter,
     arguments: "",
     ...profile,
+    ...(initialAdapter ? { adapter: initialAdapter } : {}),
+    ...(initialAdapter && profile?.adapter !== initialAdapter
+      ? { executable: "", core: "" }
+      : {}),
   }));
   const [busy, setBusy] = useState(false);
+  const preset = expanded.emulators.find(entry => entry.id === draft.adapter);
+  const hasFullscreen = preset
+    ? !!preset.fullscreen
+    : !["rpcs3", "custom"].includes(draft.adapter);
   const set = (key, value) => setDraft(previous => ({ ...previous, [key]: value }));
   const save = async scan => {
     setBusy(true);
@@ -221,14 +243,16 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
                 align="start"
               >
                 <p className="font-medium">
-                  {t("retro.setup.recommended", { emulator: platform.emulator })}
+                  {t("retro.setup.recommended", {
+                    emulator: t(`retro.emulators.${preset?.id || platform.adapter}.name`),
+                  })}
                 </p>
                 <p className="text-muted-foreground">{t("retro.setup.anyEmulator")}</p>
                 <Button
                   variant="ghost"
                   className="h-auto px-0 text-primary"
                   onClick={() =>
-                    retroCall("website", platform.id).catch(error =>
+                    retroCall("website", platform.id, preset?.id).catch(error =>
                       toast.error(error.message)
                     )
                   }
@@ -250,6 +274,11 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
               : t("retro.setup.romInstructions")}
           </div>
           <div className="space-y-2">
+            {preset && (
+              <p className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+                {t(preset.notesKey)}
+              </p>
+            )}
             <p className="text-sm font-medium">{t("retro.setup.launchPresetLabel")}</p>
             <RetroSelect
               label={t("retro.setup.launchPreset")}
@@ -258,12 +287,20 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
               onValueChange={value => set("adapter", value)}
               options={[
                 { value: "custom", label: t("retro.setup.presetCustom") },
-                { value: "duckstation", label: "DuckStation" },
-                { value: "pcsx2", label: "PCSX2" },
-                { value: "rpcs3", label: "RPCS3" },
-                { value: "ppsspp", label: "PPSSPP" },
-                { value: "dolphin", label: "Dolphin" },
-                { value: "retroarch", label: "RetroArch" },
+                { value: "duckstation", label: t("retro.emulators.duckstation.name") },
+                { value: "pcsx2", label: t("retro.emulators.pcsx2.name") },
+                { value: "rpcs3", label: t("retro.emulators.rpcs3.name") },
+                { value: "ppsspp", label: t("retro.emulators.ppsspp.name") },
+                { value: "dolphin", label: t("retro.emulators.dolphin.name") },
+                { value: "retroarch", label: t("retro.emulators.retroarch.name") },
+                ...expanded.emulators
+                  .filter(
+                    entry =>
+                      entry.args &&
+                      entry.platforms.includes(platform.id) &&
+                      (access.allowed || entry.id === draft.adapter)
+                  )
+                  .map(entry => ({ value: entry.id, label: entry.name + " · Ascend" })),
               ]}
             />
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -287,7 +324,7 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
                 rows={4}
                 value={draft.arguments}
                 onChange={event => set("arguments", event.target.value)}
-                placeholder={"--fullscreen\n{rom}"}
+                placeholder={t("retro.setup.argumentsPlaceholder", { rom: "{rom}" })}
                 className="w-full rounded-lg border border-input bg-background p-3 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
               <p className="text-sm leading-relaxed text-muted-foreground">
@@ -356,7 +393,7 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
             onChange={value => set("saveFolder", value)}
             help={t("retro.setup.saveFolderHelp")}
           />
-          {!["rpcs3", "custom"].includes(draft.adapter) && (
+          {hasFullscreen && (
             <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-4">
               <Checkbox
                 checked={draft.fullscreen}
@@ -387,7 +424,7 @@ function ConsoleSetup({ platform, profile, onClose, onSaved, taskBusy }) {
               </button>
             </div>
           )}
-          {["rpcs3", "custom"].includes(draft.adapter) && (
+          {!hasFullscreen && (
             <p className="text-sm leading-relaxed text-muted-foreground">
               {t("retro.setup.fullscreenCustomHelp")}
             </p>
@@ -843,15 +880,30 @@ function SavesDialog({ platform, profile, onClose, onSetup, running }) {
 
 export default function Retro() {
   const navigate = useNavigate();
+  const access = useRetroAccess();
+  const [showEmulators, setShowEmulators] = useState(false);
+  const [setupAdapter, setSetupAdapter] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const [state, setState] = useState(null),
     [error, setError] = useState(null),
     [filter, setFilter] = useState("all"),
     [query, setQuery] = useState("");
-  const [setup, setSetup] = useState(null),
+  const [setup, setSetupId] = useState(null),
     [selected, setSelected] = useState(null),
     [savePlatform, setSavePlatform] = useState(null);
+  const setSetup = id => {
+    setSetupAdapter(null);
+    if (
+      id &&
+      expanded.platforms.some(platform => platform.id === id) &&
+      !access.allowed
+    ) {
+      setShowEmulators(true);
+      return;
+    }
+    setSetupId(id);
+  };
   const [mode, setMode] = useState("library"),
     [catalogueResults, setCatalogueResults] = useState([]),
     [favorites, setFavorites] = useState(false),
@@ -888,14 +940,32 @@ export default function Retro() {
     setLimit(60);
   }, [filter, query, favorites, review, sort]);
   useEffect(() => {
-    if (mode !== "catalogue" || !state) return;
+    if (access.allowed) return;
+    if (expanded.platforms.some(platform => platform.id === filter)) {
+      setFilter("all");
+      setMode("library");
+    }
+    if (
+      expanded.platforms.some(platform => platform.id === setup) ||
+      expanded.emulators.some(emulator => emulator.id === setupAdapter)
+    ) {
+      setSetupId(null);
+      setSetupAdapter(null);
+    }
+    if (expanded.platforms.some(platform => platform.id === savePlatform))
+      setSavePlatform(null);
+  }, [access.allowed, filter, setup, setupAdapter, savePlatform]);
+  useEffect(() => {
+    if (mode !== "catalogue") return;
+    if (!access.allowed && expanded.platforms.some(platform => platform.id === filter))
+      return;
     let cancelled = false;
     const timer = setTimeout(async () => {
       setSearchBusy(true);
       try {
         const results = await retroCall(
           "search",
-          filter === "all" ? state.platforms[0].id : filter,
+          filter === "all" ? "ps1" : filter,
           query
         );
         if (!cancelled) setCatalogueResults(results);
@@ -909,12 +979,14 @@ export default function Retro() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [mode, filter, query, state?.catalogue?.updatedAt]);
+  }, [mode, filter, query, state?.catalogue?.updatedAt, access.allowed]);
   const games = useMemo(
     () =>
       (state?.games || [])
         .filter(
           game =>
+            (!expanded.platforms.some(platform => platform.id === game.platform) ||
+              access.allowed) &&
             (filter === "all" || game.platform === filter) &&
             (!favorites || game.favorite) &&
             (!review || !game.metadataId) &&
@@ -927,7 +999,7 @@ export default function Retro() {
               ? (b.playTime || 0) - (a.playTime || 0)
               : a.title.localeCompare(b.title)
         ),
-    [state?.games, filter, query, favorites, review, sort]
+    [state?.games, filter, query, favorites, review, sort, access.allowed]
   );
   const perform = async callback => {
     try {
@@ -938,8 +1010,14 @@ export default function Retro() {
   };
   useEffect(() => {
     const consoleId = searchParams.get("saves");
+    if (access.loading) return;
     if (state?.platforms.some(platform => platform.id === consoleId)) {
-      setSavePlatform(consoleId);
+      if (
+        !access.allowed &&
+        expanded.platforms.some(platform => platform.id === consoleId)
+      )
+        setShowEmulators(true);
+      else setSavePlatform(consoleId);
       setSearchParams(
         previous => {
           const next = new URLSearchParams(previous);
@@ -949,7 +1027,7 @@ export default function Retro() {
         { replace: true }
       );
     }
-  }, [state?.platforms, searchParams, setSearchParams]);
+  }, [state?.platforms, searchParams, setSearchParams, access.allowed, access.loading]);
   if (error)
     return (
       <div className="mx-auto max-w-4xl p-8">
@@ -967,48 +1045,75 @@ export default function Retro() {
         <span className="sr-only">{t("retro.loading")}</span>
       </div>
     );
-  const platformFor = id => state.platforms.find(p => p.id === id);
-  const currentGame = state.games.find(game => game.id === selected);
+  const localizedPlatforms = state.platforms.map(platform => ({ ...platform, name: t(`retro.platformNames.${platform.id}`) }));
+  const platformFor = id => localizedPlatforms.find(p => p.id === id);
+  const availablePlatforms = localizedPlatforms.filter(
+    platform => !platform.ascend || access.allowed
+  );
+  const accessibleGames = state.games.filter(game =>
+    availablePlatforms.some(platform => platform.id === game.platform)
+  );
+  const activePlatform = availablePlatforms.find(platform => platform.id === filter);
+  const currentGame = accessibleGames.find(game => game.id === selected);
   return (
     <div className="mx-auto max-w-7xl space-y-7 px-2 py-8 md:px-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
-            onClick={() => navigate("/library")}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {t("common.library") || "Library"}
-          </Button>
-          <div className="mb-2 flex items-center gap-3">
-            <h1 className="text-3xl font-bold">{t("retro.title")}</h1>
+      <header className="space-y-5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 text-muted-foreground"
+          onClick={() => navigate("/library")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          {t("common.library")}
+        </Button>
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Gamepad2 className="h-6 w-6" />
+              </span>
+              <h1 className="text-3xl font-semibold tracking-tight">
+                {t("retro.title")}
+              </h1>
+            </div>
+            <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
+              {t("retro.layout.subtitle")}
+            </p>
           </div>
+          <Button
+            variant="outline"
+            className="gap-2 rounded-xl border-primary/25 text-primary"
+            onClick={() => setShowEmulators(true)}
+          >
+            <Sparkles className="h-4 w-4" />
+            {t("retro.expanded.title")}
+            <ArrowRight className="h-4 w-4" />
+          </Button>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            disabled={!!state.job}
-            onClick={() =>
-              perform(async () => {
-                const file = await retroCall("pick", "catalogue");
-                if (file) await retroCall("updateCatalogue", file);
-              })
-            }
-          >
-            {t("retro.actions.importMetadata")}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!!state.job}
-            onClick={() => perform(() => retroCall("updateCatalogue"))}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {state.catalogue.count
-              ? t("retro.actions.updateCatalogue")
-              : t("retro.actions.downloadCatalogue")}
-          </Button>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border pb-5 text-xs text-muted-foreground">
+          <span>
+            <strong className="mr-1.5 text-base font-medium tabular-nums text-foreground">
+              {accessibleGames.filter(game => !game.missing).length}
+            </strong>
+            {t("retro.layout.games")}
+          </span>
+          <span>
+            <strong className="mr-1.5 text-base font-medium tabular-nums text-foreground">
+              {
+                availablePlatforms.filter(
+                  platform => state.profiles[platform.id]?.executable
+                ).length
+              }
+            </strong>
+            {t("retro.layout.systemsReady")}
+          </span>
+          {access.allowed && (
+            <span className="inline-flex items-center gap-1.5 text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              {t("retro.layout.ascendIncluded")}
+            </span>
+          )}
         </div>
       </header>
       {state.job && (
@@ -1019,7 +1124,7 @@ export default function Retro() {
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
           <div className="text-sm">
             <p className="capitalize">
-              {state.job.phase}
+              {t(`retro.job.phases.${state.job.phase}`)}
               {state.job.platform ? ` · ${platformFor(state.job.platform)?.name}` : ""}
             </p>
             <p className="text-muted-foreground">
@@ -1037,298 +1142,342 @@ export default function Retro() {
           </div>
         </div>
       )}
-      <section
-        aria-label={t("retro.consoles.label")}
-        className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6"
-      >
-        {state.platforms.map(platform => {
-          const profile = state.profiles[platform.id];
-          const count = state.games.filter(
-            game => game.platform === platform.id && !game.missing
-          ).length;
-          return (
-            <div
-              key={platform.id}
-              className={`rounded-xl border-none p-3 transition-colors ${filter === platform.id ? "border-primary bg-primary/5" : "bg-card"}`}
-            >
-              <button
-                onClick={() => {
-                  setFilter(platform.id);
-                }}
-                className="w-full text-left"
-              >
-                <p className="font-medium">{platform.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t("retro.consoles.gamesCount", { count })}
+      <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <RetroConsoles
+          platforms={localizedPlatforms}
+          profiles={state.profiles}
+          games={accessibleGames}
+          selected={filter}
+          access={access}
+          onExplore={() => setShowEmulators(true)}
+          onSelect={id => {
+            setFilter(id);
+            if (id === "all") setMode("library");
+          }}
+        />
+        <section className="min-w-0 space-y-5">
+          {!access.loading && !access.allowed && (
+            <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-primary/15 bg-gradient-to-r from-primary/5 to-transparent p-5">
+              <Sparkles className="h-6 w-6 shrink-0 text-primary/80" />
+              <div className="min-w-[180px] flex-1 space-y-1">
+                <h2 className="text-sm font-semibold">{t("retro.layout.promoTitle")}</h2>
+                <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  {t("retro.layout.promoDescription")}
                 </p>
-              </button>
-              <div className="mt-3 flex gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  title={t("retro.consoles.setup", { name: platform.name })}
-                  aria-label={t("retro.consoles.setup", { name: platform.name })}
-                  onClick={() => setSetup(platform.id)}
-                >
-                  <Settings2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  title={t("retro.consoles.scan", { name: platform.name })}
-                  aria-label={t("retro.consoles.scan", { name: platform.name })}
-                  disabled={!!state.job || !profile?.romFolders?.length}
-                  onClick={() => perform(() => retroCall("scan", platform.id))}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  title={t("retro.consoles.saves", { name: platform.name })}
-                  aria-label={t("retro.consoles.saves", { name: platform.name })}
-                  onClick={() => setSavePlatform(platform.id)}
-                >
-                  <Cloud className="h-4 w-4" />
-                </Button>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 text-primary"
+                onClick={() => navigate("/ascend")}
+              >
+                {t(access.signedIn ? "retro.expanded.explore" : "retro.expanded.signIn")}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
-          );
-        })}
-      </section>
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant={mode === "library" ? "default" : "outline"}
-            className={mode === "library" ? "text-secondary" : undefined}
-            onClick={() => setMode("library")}
-          >
-            <Library className="mr-2 h-4 w-4" />
-            {t("retro.tabs.library")}
-          </Button>
-          <Button
-            variant={mode === "catalogue" ? "default" : "outline"}
-            className={mode === "catalogue" ? "text-secondary" : undefined}
-            onClick={() => {
-              setMode("catalogue");
-              if (filter === "all") setFilter("ps1");
-            }}
-          >
-            <BookOpen className="mr-2 h-4 w-4" />
-            {t("retro.tabs.catalogue")}
-          </Button>
-          <span className="ml-auto text-xs text-muted-foreground">
-            {t("retro.tabs.catalogueCount", {
-              count: state.catalogue.count.toLocaleString(),
-            })}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              aria-label={t("retro.search.label")}
-              placeholder={
-                mode === "catalogue"
-                  ? t("retro.search.cataloguePlaceholder")
-                  : t("retro.search.libraryPlaceholder")
-              }
-              className="h-10 rounded-lg bg-background pl-9"
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-            />
-          </div>
-          <RetroSelect
-            label={t("retro.filters.console")}
-            icon={Gamepad2}
-            className="w-full sm:w-[230px]"
-            value={filter}
-            onValueChange={setFilter}
-            options={[
-              ...(mode === "library"
-                ? [{ value: "all", label: t("retro.filters.allConsoles") }]
-                : []),
-              ...state.platforms.map(platform => ({
-                value: platform.id,
-                label: platform.name,
-              })),
-            ]}
-          />
-          {mode === "library" && (
-            <>
-              <RetroSelect
-                label={t("retro.filters.sort")}
-                icon={ArrowDownWideNarrow}
-                className="w-full sm:w-[200px]"
-                value={sort}
-                onValueChange={setSort}
-                options={[
-                  { value: "title", label: t("retro.filters.sortTitle") },
-                  { value: "recent", label: t("retro.filters.sortRecent") },
-                  { value: "playtime", label: t("retro.filters.sortPlaytime") },
-                ]}
-              />
-              <Button
-                variant={favorites ? "default" : "outline"}
-                className={favorites ? "text-secondary" : undefined}
-                onClick={() => setFavorites(!favorites)}
-                aria-pressed={favorites}
-              >
-                <Star className="mr-2 h-4 w-4" />
-                {t("retro.filters.favorites")}
-              </Button>
-              <Button
-                variant={review ? "default" : "outline"}
-                className={review ? "text-secondary" : undefined}
-                onClick={() => setReview(!review)}
-                aria-pressed={review}
-              >
-                {t("retro.filters.needsMatching")}
-              </Button>
-            </>
           )}
-        </div>
-        {mode === "library" ? (
-          <>
-            {!games.length ? (
-              <div className="rounded-xl border border-dashed px-6 py-16 text-center">
-                <Gamepad2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <h2 className="text-xl font-semibold">
-                  {state.games.length
-                    ? t("retro.empty.noMatch")
-                    : t("retro.empty.libraryTitle")}
-                </h2>
-                <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-                  {t("retro.empty.description")}
-                </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">
+                {activePlatform?.name || t("retro.layout.yourCollection")}
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {activePlatform
+                  ? state.profiles[filter]?.executable
+                    ? t("retro.layout.ready")
+                    : t("retro.layout.setupHint")
+                  : t("retro.layout.collectionHint")}
+              </p>
+            </div>
+            {activePlatform && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setSetup(filter)}>
+                  <Settings2 className="mr-2 h-3.5 w-3.5" />
+                  {t("retro.expanded.configure")}
+                </Button>
                 <Button
-                  className="mt-5 text-secondary"
-                  onClick={() => setSetup(filter === "all" ? "ps1" : filter)}
+                  variant="outline"
+                  size="sm"
+                  disabled={!!state.job || !state.profiles[filter]?.romFolders?.length}
+                  onClick={() => perform(() => retroCall("scan", filter))}
                 >
-                  {t("retro.empty.setupConsole")}
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                  {t("retro.layout.scan")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSavePlatform(filter)}
+                >
+                  <Cloud className="mr-2 h-3.5 w-3.5" />
+                  {t("retro.layout.saves")}
                 </Button>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
-                {games.slice(0, limit).map(game => (
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={mode === "library" ? "default" : "outline"}
+              className={mode === "library" ? "text-secondary" : undefined}
+              onClick={() => setMode("library")}
+            >
+              <Library className="mr-2 h-4 w-4" />
+              {t("retro.tabs.library")}
+            </Button>
+            <Button
+              variant={mode === "catalogue" ? "default" : "outline"}
+              className={mode === "catalogue" ? "text-secondary" : undefined}
+              onClick={() => {
+                setMode("catalogue");
+                if (filter === "all") setFilter("ps1");
+              }}
+            >
+              <BookOpen className="mr-2 h-4 w-4" />
+              {t("retro.tabs.catalogue")}
+            </Button>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {t("retro.tabs.catalogueCount", {
+                count: state.catalogue.count.toLocaleString(),
+              })}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                aria-label={t("retro.search.label")}
+                placeholder={
+                  mode === "catalogue"
+                    ? t("retro.search.cataloguePlaceholder")
+                    : t("retro.search.libraryPlaceholder")
+                }
+                className="h-10 rounded-lg bg-background pl-9"
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+              />
+            </div>
+            {mode === "library" && (
+              <>
+                <RetroSelect
+                  label={t("retro.filters.sort")}
+                  icon={ArrowDownWideNarrow}
+                  className="w-full sm:w-[200px]"
+                  value={sort}
+                  onValueChange={setSort}
+                  options={[
+                    { value: "title", label: t("retro.filters.sortTitle") },
+                    { value: "recent", label: t("retro.filters.sortRecent") },
+                    { value: "playtime", label: t("retro.filters.sortPlaytime") },
+                  ]}
+                />
+                <Button
+                  variant={favorites ? "default" : "outline"}
+                  className={favorites ? "text-secondary" : undefined}
+                  onClick={() => setFavorites(!favorites)}
+                  aria-pressed={favorites}
+                >
+                  <Star className="mr-2 h-4 w-4" />
+                  {t("retro.filters.favorites")}
+                </Button>
+                <Button
+                  variant={review ? "default" : "outline"}
+                  className={review ? "text-secondary" : undefined}
+                  onClick={() => setReview(!review)}
+                  aria-pressed={review}
+                >
+                  {t("retro.filters.needsMatching")}
+                </Button>
+              </>
+            )}
+          </div>
+          {mode === "library" ? (
+            <>
+              {!games.length ? (
+                <div className="rounded-xl border border-dashed px-6 py-16 text-center">
+                  <Gamepad2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                  <h2 className="text-xl font-semibold">
+                    {state.games.length
+                      ? t("retro.empty.noMatch")
+                      : t("retro.empty.libraryTitle")}
+                  </h2>
+                  <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+                    {t("retro.empty.description")}
+                  </p>
+                  <Button
+                    className="mt-5 text-secondary"
+                    onClick={() => setSetup(filter === "all" ? "ps1" : filter)}
+                  >
+                    {t("retro.empty.setupConsole")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+                  {games.slice(0, limit).map(game => (
+                    <article
+                      key={game.id}
+                      className="group overflow-hidden rounded-xl border bg-card"
+                    >
+                      <button
+                        className="block w-full text-left"
+                        onClick={() => setSelected(game.id)}
+                      >
+                        <Cover game={game} />
+                        <div className="p-3">
+                          <h3 className="line-clamp-2 text-sm font-semibold">
+                            {game.title}
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {platformFor(game.platform)?.name}
+                            {game.year ? ` · ${game.year}` : ""}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {game.missing
+                              ? t("retro.game.filesMissing")
+                              : state.running.includes(game.id)
+                                ? t("retro.game.running")
+                                : !game.metadataId
+                                  ? t("retro.game.needsMatching")
+                                  : game.files.length > 1
+                                    ? t("retro.game.discsCount", {
+                                        count: game.files.length,
+                                      })
+                                    : ""}
+                          </p>
+                        </div>
+                      </button>
+                      <div className="flex items-center justify-between px-2 pb-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={state.running.includes(game.id) || game.missing}
+                          onClick={() =>
+                            game.files.length > 1
+                              ? setSelected(game.id)
+                              : perform(() => retroCall("launch", game.id, 0))
+                          }
+                        >
+                          <Play className="mr-1 h-3 w-3" />
+                          {t("retro.game.play")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={
+                            game.favorite
+                              ? t("retro.game.unfavorite", { title: game.title })
+                              : t("retro.game.favorite", { title: game.title })
+                          }
+                          onClick={() =>
+                            perform(() =>
+                              retroCall("updateGame", game.id, {
+                                favorite: !game.favorite,
+                              })
+                            )
+                          }
+                        >
+                          <Star
+                            className={`h-4 w-4 ${game.favorite ? "fill-primary text-primary" : ""}`}
+                          />
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+              {games.length > limit && (
+                <Button variant="outline" onClick={() => setLimit(limit + 60)}>
+                  {t("retro.game.showMore", { count: games.length - limit })}
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {t("retro.catalogue.description")}
+                {!state.catalogue.count
+                  ? t("retro.catalogue.downloadPrompt")
+                  : t("retro.catalogue.searchPrompt")}
+              </p>
+              <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!!state.job}
+                  onClick={() => perform(() => retroCall("updateCatalogue"))}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {t(
+                    state.catalogue.count
+                      ? "retro.actions.updateCatalogue"
+                      : "retro.actions.downloadCatalogue"
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={!!state.job}
+                  onClick={() =>
+                    perform(async () => {
+                      const file = await retroCall("pick", "catalogue");
+                      if (file) await retroCall("updateCatalogue", file);
+                    })
+                  }
+                >
+                  {t("retro.actions.importMetadata")}
+                </Button>
+              </div>
+              {searchBusy && <Loader2 className="h-5 w-5 animate-spin" />}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+                {catalogueResults.map(game => (
                   <article
                     key={game.id}
-                    className="group overflow-hidden rounded-xl border bg-card"
+                    className="overflow-hidden rounded-xl border bg-card"
                   >
-                    <button
-                      className="block w-full text-left"
-                      onClick={() => setSelected(game.id)}
-                    >
-                      <Cover game={game} />
-                      <div className="p-3">
-                        <h3 className="line-clamp-2 text-sm font-semibold">
-                          {game.title}
-                        </h3>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {platformFor(game.platform)?.name}
-                          {game.year ? ` · ${game.year}` : ""}
+                    <Cover game={game} />
+                    <div className="space-y-1 p-3">
+                      <h3 className="text-sm font-semibold">{game.title}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {game.year} {game.genres}
+                      </p>
+                      {state.games.some(
+                        local =>
+                          local.metadataId === game.id && local.platform === game.platform
+                      ) && (
+                        <p className="text-xs text-primary">
+                          {t("retro.catalogue.inLibrary")}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {game.missing
-                            ? t("retro.game.filesMissing")
-                            : state.running.includes(game.id)
-                              ? t("retro.game.running")
-                              : !game.metadataId
-                                ? t("retro.game.needsMatching")
-                                : game.files.length > 1
-                                  ? t("retro.game.discsCount", {
-                                      count: game.files.length,
-                                    })
-                                  : ""}
-                        </p>
-                      </div>
-                    </button>
-                    <div className="flex items-center justify-between px-2 pb-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={state.running.includes(game.id) || game.missing}
-                        onClick={() =>
-                          game.files.length > 1
-                            ? setSelected(game.id)
-                            : perform(() => retroCall("launch", game.id, 0))
-                        }
-                      >
-                        <Play className="mr-1 h-3 w-3" />
-                        {t("retro.game.play")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label={
-                          game.favorite
-                            ? t("retro.game.unfavorite", { title: game.title })
-                            : t("retro.game.favorite", { title: game.title })
-                        }
-                        onClick={() =>
-                          perform(() =>
-                            retroCall("updateGame", game.id, { favorite: !game.favorite })
-                          )
-                        }
-                      >
-                        <Star
-                          className={`h-4 w-4 ${game.favorite ? "fill-primary text-primary" : ""}`}
-                        />
-                      </Button>
+                      )}
                     </div>
                   </article>
                 ))}
               </div>
-            )}
-            {games.length > limit && (
-              <Button variant="outline" onClick={() => setLimit(limit + 60)}>
-                {t("retro.game.showMore", { count: games.length - limit })}
-              </Button>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-muted-foreground">
-              {t("retro.catalogue.description")}
-              {!state.catalogue.count
-                ? t("retro.catalogue.downloadPrompt")
-                : t("retro.catalogue.searchPrompt")}
-            </p>
-            {searchBusy && <Loader2 className="h-5 w-5 animate-spin" />}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
-              {catalogueResults.map(game => (
-                <article
-                  key={game.id}
-                  className="overflow-hidden rounded-xl border bg-card"
-                >
-                  <Cover game={game} />
-                  <div className="space-y-1 p-3">
-                    <h3 className="text-sm font-semibold">{game.title}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {game.year} {game.genres}
-                    </p>
-                    {state.games.some(
-                      local =>
-                        local.metadataId === game.id && local.platform === game.platform
-                    ) && (
-                      <p className="text-xs text-primary">
-                        {t("retro.catalogue.inLibrary")}
-                      </p>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
-            {!searchBusy && query && !catalogueResults.length && (
-              <p className="py-6 text-center text-muted-foreground">
-                {t("retro.catalogue.noResults")}
-              </p>
-            )}
-          </>
-        )}
-      </section>
+              {!searchBusy && query && !catalogueResults.length && (
+                <p className="py-6 text-center text-muted-foreground">
+                  {t("retro.catalogue.noResults")}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      </div>
+      {showEmulators && (
+        <RetroEmulators
+          access={access}
+          platforms={localizedPlatforms}
+          busy={!!state.job}
+          onClose={() => setShowEmulators(false)}
+          onChoose={(id, adapter) => {
+            if (!access.allowed) return;
+            setSetupAdapter(adapter);
+            setSetupId(id);
+            setShowEmulators(false);
+          }}
+        />
+      )}
       {setup && (
         <ConsoleSetup
+          access={access}
+          initialAdapter={setupAdapter}
           key={setup}
           platform={platformFor(setup)}
           profile={state.profiles[setup]}

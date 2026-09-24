@@ -32,7 +32,7 @@ contextBridge.exposeInMainWorld("electron", {
     setCover: (id, file) => ipcRenderer.invoke("retro-cover", id, file),
     remove: id => ipcRenderer.invoke("retro-remove", id),
     reveal: id => ipcRenderer.invoke("retro-reveal", id),
-    website: id => ipcRenderer.invoke("retro-website", id),
+    website: (id, emulatorId) => ipcRenderer.invoke("retro-website", id, emulatorId),
     launch: (id, disc) => ipcRenderer.invoke("retro-launch", id, disc),
     backup: (id, cloud) => ipcRenderer.invoke("retro-backup", id, cloud),
     restore: (id, data) => ipcRenderer.invoke("retro-restore", id, data),

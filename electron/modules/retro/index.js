@@ -5,6 +5,7 @@ const { promisify } = require("util");
 const { Worker } = require("worker_threads");
 const { app, ipcMain, dialog, BrowserWindow, shell } = require("electron");
 const { platforms, launchArguments, resolveAdapter, customArguments } = require("./platforms");
+const expanded = require("./expanded-catalogue.json");
 const { scan, mergeScan, normalizeTitle, pathKey } = require("./scanner");
 const saves = require("./saves");
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../discord-rpc");
@@ -180,7 +181,12 @@ function registerRetroHandlers() {
     requireGame(id); state.games = state.games.filter(g => g.id !== id); persist(); emit();
   });
   handle("reveal", id => shell.showItemInFolder(requireGame(id).files[0]));
-  handle("website", id => shell.openExternal(requirePlatform(id).website));
+  handle("website", (id, emulatorId) => {
+    if (!emulatorId) return shell.openExternal(requirePlatform(id).website);
+    const entry = [...expanded.emulators, ...expanded.resources].find(item => item.id === emulatorId);
+    if (!entry) throw new Error("Unknown Retro resource");
+    return shell.openExternal(entry.website);
+  });
   handle("launch", async (id, discIndex = 0) => {
     const game = requireGame(id), profile = state.profiles[game.platform];
     if (!profile?.executable) throw new Error("Select an emulator in console setup first");

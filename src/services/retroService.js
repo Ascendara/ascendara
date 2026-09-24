@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import {
   uploadBackup,
   listBackups,
@@ -5,6 +6,8 @@ import {
   verifyAscendAccess,
   auth,
 } from "./firebaseService";
+
+import expanded from "../../electron/modules/retro/expanded-catalogue.json";
 
 const RETRO_BACKUP_PREFIX = "Ascendara Retro - ";
 const RETRO_PLATFORMS = new Set([
@@ -20,6 +23,7 @@ const RETRO_PLATFORMS = new Set([
   "gb",
   "gbc",
   "gba",
+  ...expanded.platforms.map(platform => platform.id),
 ]);
 
 export function retroBackupPlatform(gameName) {
@@ -37,24 +41,52 @@ export async function getRetroCloudAccess() {
 
 async function requireRetroCloudAccess(platform) {
   const uid = auth?.currentUser?.uid;
-  if (!uid) throw new Error("Sign in to use Retro cloud saves.");
-  if (!RETRO_PLATFORMS.has(platform)) throw new Error("Unknown Retro console");
+  if (!uid) throw new Error(i18n.t("retro.errors.signIn"));
+  if (!RETRO_PLATFORMS.has(platform)) throw new Error(i18n.t("retro.errors.unknownConsole"));
   if (!(await getRetroCloudAccess()))
-    throw new Error("An active Ascend subscription is required for Retro cloud saves.");
+    throw new Error(i18n.t("retro.errors.cloudSubscription"));
   assertAccount(uid);
   return uid;
 }
 
 function assertAccount(uid) {
   if (auth?.currentUser?.uid !== uid)
-    throw new Error("Your account changed. Please try again.");
+    throw new Error(i18n.t("retro.errors.accountChanged"));
 }
 
 export async function retroCall(method, ...args) {
   const api = window.electron?.retro;
-  if (!api?.[method]) throw new Error("Restart Ascendara to enable Retro.");
+  if (!api?.[method]) throw new Error(i18n.t("retro.errors.restart"));
+  const premiumPlatform = id => expanded.platforms.some(platform => platform.id === id);
+  let premiumLaunch = false;
+  if (method === "launch") {
+    const snapshot = await api.getState();
+    if (!snapshot?.success) throw new Error(snapshot?.error || i18n.t("retro.errors.requestFailed"));
+    const game = snapshot.data.games.find(game => game.id === args[0]);
+    premiumLaunch =
+      game &&
+      (premiumPlatform(game.platform) ||
+        expanded.emulators.some(
+          emulator => emulator.id === snapshot.data.profiles[game.platform]?.adapter
+        ));
+  }
+  if (
+    premiumLaunch ||
+    (["scan", "search", "website"].includes(method) && premiumPlatform(args[0])) ||
+    (method === "saveProfile" &&
+      (expanded.platforms.some(platform => platform.id === args[0]) ||
+        expanded.emulators.some(emulator => emulator.id === args[1]?.adapter))) ||
+    (method === "website" && args[1])
+  ) {
+    const uid = auth?.currentUser?.uid;
+    if (!uid || !(await getRetroCloudAccess()))
+      throw new Error(
+        i18n.t("retro.errors.expandedSubscription")
+      );
+    assertAccount(uid);
+  }
   const result = await api[method](...args);
-  if (!result?.success) throw new Error(result?.error || "Retro request failed");
+  if (!result?.success) throw new Error(result?.error || i18n.t("retro.errors.requestFailed"));
   return result.data;
 }
 
@@ -67,7 +99,7 @@ export async function uploadRetroBackup(platform) {
     `Ascendara Retro - ${platform}`,
     backup.name
   );
-  if (!result.success) throw new Error(result.error || "Cloud upload failed");
+  if (!result.success) throw new Error(result.error || i18n.t("retro.errors.uploadFailed"));
   return result;
 }
 
@@ -85,17 +117,17 @@ export async function restoreRetroCloudBackup(platform, backupId) {
   const uid = await requireRetroCloudAccess(platform);
   const result = await getBackupDownloadUrl(backupId);
   if (result.error || !result.downloadUrl)
-    throw new Error(result.error || "Backup download unavailable");
+    throw new Error(result.error || i18n.t("retro.errors.downloadUnavailable"));
   if (result.gameName !== `Ascendara Retro - ${platform}`)
-    throw new Error("This backup belongs to a different console");
+    throw new Error(i18n.t("retro.errors.wrongConsole"));
   assertAccount(uid);
   const response = await fetch(result.downloadUrl, {
     signal: AbortSignal.timeout(120000),
   });
-  if (!response.ok) throw new Error(`Backup download failed (${response.status})`);
+  if (!response.ok) throw new Error(i18n.t("retro.errors.downloadFailed", { status: response.status }));
   const limit = 256 * 1024 * 1024;
   if (Number(response.headers.get("content-length")) > limit)
-    throw new Error("Backup exceeds 256 MB");
+    throw new Error(i18n.t("retro.errors.backupTooLarge"));
   const reader = response.body.getReader(),
     chunks = [];
   let size = 0;
@@ -104,7 +136,7 @@ export async function restoreRetroCloudBackup(platform, backupId) {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > limit) throw new Error("Backup exceeds 256 MB");
+      if (size > limit) throw new Error(i18n.t("retro.errors.backupTooLarge"));
       chunks.push(value);
     }
   } finally {
