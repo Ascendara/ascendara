@@ -1733,7 +1733,7 @@ const LocalRefresh = () => {
   };
 
   return (
-    <div className={`${welcomeStep ? "mt-0 pt-10" : "mt-6"} min-h-screen bg-background`}>
+    <div className={`${welcomeStep ? "mt-0 pt-10" : "mt-6"} min-h-screen bg-background text-foreground`}>
       <div className="container mx-auto max-w-3xl px-4 py-8">
         {/* First-time Setup Banner */}
         {welcomeStep && (
@@ -1991,7 +1991,7 @@ const LocalRefresh = () => {
                 {/* Primary action bar */}
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                   {isRefreshing ? null : isUploading ? (
-                    <Button size="lg" disabled className="gap-2">
+                    <Button size="lg" disabled className="gap-2 text-secondary">
                       <Loader className="h-4 w-4 animate-spin" />
                       {t("localRefresh.sharing") || "Sharing..."}
                     </Button>

@@ -25,10 +25,10 @@ import { validateInput } from "@/services/profanityFilterService";
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 
 const executableToLabelMap = {
-  "dotNetFx40_Full_x86_x64.exe": t => ".NET Framework 4.0",
+  "dotNetFx40_Full_x86_x64.exe": t => ".NET Framework",
   "dxwebsetup.exe": t => "DirectX",
   "oalinst.exe": t => "OpenAL",
-  "VC_redist.x64.exe": t => "Visual C++ Redistributable",
+  "VC_redist.x64.exe": t => "Visual C++",
   "xnafx40_redist.msi": t => "XNA Framework",
 };
 
@@ -267,7 +267,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
     theme: "purple",
     threadCount: 4,
   });
-  const [currentLangIndex, setCurrentLangIndex] = useState(0);
+  const languagePromptRef = useRef(null);
   const [privacyLinkVisited, setPrivacyLinkVisited] = useState(false);
   const [termsLinkVisited, setTermsLinkVisited] = useState(false);
 
@@ -422,14 +422,56 @@ const Welcome = ({ welcomeData, onComplete }) => {
   );
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentLangIndex(prevIndex =>
-        prevIndex === langPreferenceMessages.length - 1 ? 0 : prevIndex + 1
-      );
-    }, 3000);
+    const prompt = languagePromptRef.current;
+    if (step !== "language" || !prompt) return;
 
-    return () => clearInterval(interval);
-  }, [langPreferenceMessages.length]);
+    let cancelled = false;
+    let timeout;
+    let animation;
+    let index = 0;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const showPhrase = () => {
+      prompt.textContent = langPreferenceMessages[index].text;
+      prompt.lang = langPreferenceMessages[index].lang;
+    };
+    const animatePhrase = async keyframes => {
+      const previous = animation;
+      animation = prompt.animate(keyframes, {
+        duration: reducedMotion ? 0 : 500,
+        easing: "ease-in-out",
+        fill: "forwards",
+      });
+      previous?.cancel();
+      await animation.finished;
+    };
+    const rotate = async () => {
+      try {
+        await animatePhrase([
+          { opacity: 1, transform: "translateY(0)" },
+          { opacity: 0, transform: "translateY(-20px)" },
+        ]);
+        if (cancelled) return;
+        index = (index + 1) % langPreferenceMessages.length;
+        showPhrase();
+        await animatePhrase([
+          { opacity: 0, transform: "translateY(20px)" },
+          { opacity: 1, transform: "translateY(0)" },
+        ]);
+        if (!cancelled) timeout = setTimeout(rotate, 3000);
+      } catch (error) {
+        // Cancelling the animation when leaving this step rejects finished.
+        if (!cancelled) console.error("Language prompt animation failed:", error);
+      }
+    };
+
+    showPhrase();
+    timeout = setTimeout(rotate, 3000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+      animation?.cancel();
+    };
+  }, [step, langPreferenceMessages]);
 
   useEffect(() => {
     if (welcomeData?.isV7Welcome !== undefined) {
@@ -439,7 +481,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
   useEffect(() => {
     const handleDependencyStatus = (event, { name, status }) => {
-      const label = executableToLabelMap[name](t);
+      const label = executableToLabelMap[name]?.(t);
       if (!label) return;
 
       console.log(`Received status for ${label}: ${status}`);
@@ -455,6 +497,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
         }));
       } else if (status === "finished") {
         console.log(`Finished installing: ${label}`);
+        setProgress(prev => Math.min(prev + 1, totalDependencies));
         setDependencyStatus(prevStatus => {
           const updatedStatus = {
             ...prevStatus,
@@ -524,6 +567,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
   };
 
   const handleInstallDependencies = async () => {
+    if (isInstalling) return;
+    setDependenciesInstalled(false);
     setIsInstalling(true);
     setProgress(0);
 
@@ -539,51 +584,20 @@ const Welcome = ({ welcomeData, onComplete }) => {
       return updatedStatus;
     });
 
-    // Listen for dependency installation status
-    const handleDependencyStatus = (event, { name, status }) => {
-      const label = executableToLabelMap[name](t);
-      if (!label) return;
-
-      if (status === "finished") {
-        // Increment progress and set checkmark when installation finishes
-        setProgress(prev => prev + 1);
-        setDependencyStatus(prevStatus => {
-          const updatedStatus = {
-            ...prevStatus,
-            [label]: {
-              installed: true,
-              icon: <CircleCheck className="h-5 w-5 text-green-500" />,
-            },
-          };
-
-          // Check if all dependencies are installed after updating the status
-          const allInstalled = Object.values(updatedStatus).every(dep => dep.installed);
-          if (allInstalled) {
-            setIsInstalling(false); // Stop installation
-            setStep("installationComplete"); // Move to the installation complete step
-          }
-
-          return updatedStatus;
-        });
-      } else if (status === "failed") {
-        // Handle error
-        setErrorMessage(`Failed to install ${label}. Please try again.`);
-        setShowErrorDialog(true);
-        setIsInstalling(false);
+    try {
+      const result = await window.electron.installDependencies();
+      if (!result?.success) {
+        throw new Error(result?.message || t("welcome.failedToInstallDependencies"));
       }
-    };
-
-    window.electron.ipcRenderer.on(
-      "dependency-installation-status",
-      handleDependencyStatus
-    );
-    await window.electron.installDependencies();
-    window.electron.ipcRenderer.off(
-      "dependency-installation-status",
-      handleDependencyStatus
-    );
-
-    setIsInstalling(false);
+      setDependenciesInstalled(true);
+      setStep("installationComplete");
+    } catch (error) {
+      console.error("Failed to install dependencies:", error);
+      setErrorMessage(t("welcome.failedToInstallDependencies"));
+      setShowErrorDialog(true);
+    } finally {
+      setIsInstalling(false);
+    }
   };
 
   const handleRestart = () => {
@@ -593,6 +607,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
   const handleSkip = () => {
     setShowErrorDialog(false);
+    setShowSkipAlert(true);
   };
 
   const handleSelectDirectory = async () => {
@@ -963,7 +978,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   if (welcomeData.isV7Welcome) {
     return (
       <div
-        className={`relative flex h-screen items-center justify-center overflow-hidden bg-background transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}
+        className={`relative flex h-screen items-center justify-center overflow-hidden bg-background text-foreground transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}
       >
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-background" />
         <div className="absolute left-0 top-0 h-32 w-full bg-gradient-to-b from-primary/10 to-transparent" />
@@ -1048,7 +1063,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
   return (
     <div
-      className={`transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}
+      className={`text-foreground transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}
     >
       <AlertDialog open={showDepsAlert} onOpenChange={setShowDepsAlert}>
         <AlertDialogContent>
@@ -1209,7 +1224,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               className="bg-primary text-secondary"
               onClick={handleRestart}
             >
-              {t("welcome.restart")}
+              {t("welcome.retryDependencies", "Try again")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1357,20 +1372,14 @@ const Welcome = ({ welcomeData, onComplete }) => {
               <motion.div className="mb-12 text-center" variants={itemVariants}>
                 <Globe2 className="mx-auto mb-6 h-16 w-16 animate-pulse text-primary" />
                 <h1 className="mb-4 grid min-h-[1.5em] items-center text-4xl font-bold text-foreground/80">
-                  <AnimatePresence initial={false}>
-                    <motion.span
-                      key={currentLangIndex}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.5 }}
-                      className="col-start-1 row-start-1 block leading-normal"
-                      lang={langPreferenceMessages[currentLangIndex].lang}
-                      dir="auto"
-                    >
-                      {langPreferenceMessages[currentLangIndex].text}
-                    </motion.span>
-                  </AnimatePresence>
+                  <span
+                    ref={languagePromptRef}
+                    className="col-start-1 row-start-1 block leading-normal"
+                    lang={langPreferenceMessages[0].lang}
+                    dir="auto"
+                  >
+                    {langPreferenceMessages[0].text}
+                  </span>
                 </h1>
               </motion.div>
 
@@ -2664,7 +2673,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       <Button
                         onClick={() => handleNext()}
                         size="lg"
-                        className="px-12 py-6 text-lg text-secondary"
+                        className={`px-12 py-6 text-lg ${runnersList.length > 0 ? "text-secondary" : "text-foreground"}`}
                         variant={runnersList.length > 0 ? "default" : "ghost"}
                       >
                         {runnersList.length > 0
@@ -2760,7 +2769,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     className="h-2"
                   />
                 </motion.div>
-              ) : indexComplete ? (
+              ) : (
                 <motion.div
                   className="flex flex-col items-center space-y-6"
                   variants={itemVariants}
@@ -2778,7 +2787,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     <Button
                       onClick={() => handleExit(true)}
                       size="lg"
-                      className="px-8 py-6"
+                      className="px-8 py-6 text-secondary"
                     >
                       <Rocket className="mr-2 h-5 w-5 text-secondary" />
                       <span className="text-secondary">
@@ -2793,46 +2802,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   >
                     {t("welcome.skipTheTour")}
                   </button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  className="flex flex-col items-center space-y-6"
-                  variants={itemVariants}
-                >
-                  <div className="flex justify-center space-x-4">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setShowDepsAlert(true)}
-                      className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
-                    >
-                      {t("welcome.installDependencies")}
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() =>
-                        navigate("/localrefresh", {
-                          state: {
-                            welcomeStep: step,
-                            indexRefreshStarted,
-                            indexComplete,
-                          },
-                        })
-                      }
-                      className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
-                    >
-                      <Database className="mr-2 h-5 w-5" />
-                      {t("welcome.localIndex.title")}
-                    </Button>
-                  </div>
-
-                  {isIndexRefreshing && (
-                    <p className="text-sm text-muted-foreground">
-                      {t("welcome.localIndex.stillRefreshing")}
-                    </p>
-                  )}
                 </motion.div>
               )}
             </motion.div>
@@ -2862,58 +2831,25 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 {t("welcome.allRequiredDependenciesHaveBeenInstalledDesc")}
               </motion.p>
 
-              {indexComplete ? (
-                <motion.div
-                  className="flex flex-col items-center space-y-4"
-                  variants={itemVariants}
+              <motion.div
+                className="flex flex-col items-center space-y-4"
+                variants={itemVariants}
+              >
+                <Button
+                  onClick={() => handleExit(true)}
+                  size="lg"
+                  className="px-8 py-6 text-secondary"
                 >
-                  <Button
-                    onClick={() => handleExit(true)}
-                    size="lg"
-                    className="px-8 py-6"
-                  >
-                    <Rocket className="mr-2 h-5 w-5" />
-                    {t("welcome.takeTour")}
-                  </Button>
-                  <button
-                    onClick={() => handleExit(false)}
-                    className="text-sm text-foreground/60 transition-colors hover:text-primary"
-                  >
-                    {t("welcome.skipTour")}
-                  </button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  className="flex flex-col items-center space-y-6"
-                  variants={itemVariants}
+                  <Rocket className="mr-2 h-5 w-5" />
+                  {t("welcome.takeTour")}
+                </Button>
+                <button
+                  onClick={() => handleExit(false)}
+                  className="text-sm text-foreground/60 transition-colors hover:text-primary"
                 >
-                  <div className="flex justify-center space-x-4">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() =>
-                        navigate("/localrefresh", {
-                          state: {
-                            welcomeStep: step,
-                            indexRefreshStarted,
-                            indexComplete,
-                          },
-                        })
-                      }
-                      className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
-                    >
-                      <Database className="mr-2 h-5 w-5" />
-                      {t("welcome.localIndex.title")}
-                    </Button>
-                  </div>
-
-                  {isIndexRefreshing && (
-                    <p className="text-sm text-muted-foreground">
-                      {t("welcome.localIndex.stillRefreshing")}
-                    </p>
-                  )}
-                </motion.div>
-              )}
+                  {t("welcome.skipTour")}
+                </button>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -2993,7 +2929,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   }
                   setIsDownloadingProtonCachy(false);
                 }}
-                className="gap-2"
+                className="gap-2 text-secondary"
               >
                 <Download className="h-4 w-4" />
                 {t("welcome.protonGEDialog.download")} ({protonCachyInfo.sizeFormatted})
@@ -3078,7 +3014,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   }
                   setIsDownloadingProtonGE(false);
                 }}
-                className="gap-2"
+                className="gap-2 text-secondary"
               >
                 <Download className="h-4 w-4" />
                 {t("welcome.protonGEDialog.download")} ({protonGEInfo.sizeFormatted})
