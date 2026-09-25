@@ -257,7 +257,7 @@ const VirtualKeyboard = ({
                       isSelected
                         ? isEnter
                           ? "scale-[1.02] bg-green-500 text-secondary shadow-[0_0_15px_rgba(34,197,94,0.6)]"
-                          : "scale-[1.02] bg-primary text-secondary shadow-[0_0_15px_hsl(var(--primary)/0.6)]"
+                          : "scale-[1.02] bg-primary text-secondary shadow-[0_0_15px_rgb(var(--color-primary)/0.6)]"
                         : isEnter
                           ? "bg-green-700 text-secondary"
                           : isDel

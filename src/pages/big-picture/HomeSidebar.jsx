@@ -56,7 +56,7 @@ const HomeSidebar = ({
 
           {/* Selection indicator bar */}
           {selectedIndex === idx && (
-            <div className="absolute -left-2 h-8 w-1 rounded-full bg-primary shadow-[0_0_15px_hsl(var(--primary)/0.8)]" />
+            <div className="absolute -left-2 h-8 w-1 rounded-full bg-primary shadow-[0_0_15px_rgb(var(--color-primary)/0.8)]" />
           )}
         </div>
       ))}

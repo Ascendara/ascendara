@@ -67,7 +67,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
       <div
         ref={cardRef}
         onClick={onClick}
-        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-muted transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-primary shadow-[0_0_30px_hsl(var(--primary)/0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
+        className={`relative flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-4 bg-muted transition-all duration-150 ease-out ${isGridMode ? "aspect-[2/3] w-full" : "aspect-[2/3] h-full"} ${isSelected ? "z-20 scale-105 border-primary shadow-[0_0_30px_rgb(var(--color-primary)/0.5)]" : "z-10 scale-100 border-transparent opacity-80"}`}
       >
         <Grid
           className={`mb-4 h-12 w-12 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
