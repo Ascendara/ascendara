@@ -8,6 +8,8 @@ const path = require("path");
 const os = require("os");
 const axios = require("axios");
 const { spawn } = require("child_process");
+const { pipeline } = require("stream/promises");
+const installUpdate = require("./install-update");
 const { ipcMain, BrowserWindow, app } = require("electron");
 const {
   appVersion,
@@ -37,7 +39,9 @@ let translationUpdateInProgress = false;
  */
 async function checkBrokenVersion() {
   try {
-    const response = await axios.get("https://api.ascendara.app/app/brokenversions", { timeout: 10000 });
+    const response = await axios.get("https://api.ascendara.app/app/brokenversions", {
+      timeout: 10000,
+    });
     const brokenVersions = response.data;
     isBrokenVersion = brokenVersions.includes(appVersion);
     console.log(
@@ -138,7 +142,7 @@ async function checkVersionAndUpdate() {
       `Version check [${currentBranch}]: Current=${currentVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
-      if (settings.autoUpdate && !updateDownloadInProgress) {
+      if (settings.autoUpdate && !updateDownloadInProgress && !updateDownloaded) {
         // Start background download
         downloadUpdatePromise = downloadUpdateInBackground();
       } else if (!settings.autoUpdate && !notificationShown) {
@@ -164,7 +168,7 @@ async function checkReferenceLanguage() {
     console.log("Language check already in progress, skipping...");
     return;
   }
-  
+
   languageCheckInProgress = true;
   try {
     let timestamp = {};
@@ -202,7 +206,7 @@ async function getNewLangKeys() {
     console.log("Translation update already in progress, skipping...");
     return;
   }
-  
+
   translationUpdateInProgress = true;
   try {
     // Ensure the languages directory exists in AppData Local
@@ -390,49 +394,34 @@ async function downloadUpdateInBackground() {
     }
     const mainWindow = BrowserWindow.getAllWindows()[0];
 
-    // Create write stream for downloading
-    const writer = fs.createWriteStream(installerPath);
+    const response = await axios({
+      url: updateUrl,
+      method: "GET",
+      responseType: "stream",
+      headers: {
+        ...headers,
+        "Accept-Encoding": "gzip, deflate, br",
+        Connection: "keep-alive",
+        "Cache-Control": "no-cache",
+      },
+      maxRedirects: 5,
+      timeout: 30000,
+    });
 
-    try {
-      const response = await axios({
-        url: updateUrl,
-        method: "GET",
-        responseType: "stream",
-        headers: {
-          ...headers,
-          "Accept-Encoding": "gzip, deflate, br",
-          Connection: "keep-alive",
-          "Cache-Control": "no-cache",
-        },
-        maxRedirects: 5,
-        timeout: 30000,
-      });
+    // Get total size from content-length header
+    const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+    let downloadedSize = 0;
 
-      // Get total size from content-length header
-      const totalSize = parseInt(response.headers["content-length"], 10) || 0;
-      let downloadedSize = 0;
+    // Track progress from the stream
+    response.data.on("data", chunk => {
+      downloadedSize += chunk.length;
+      if (totalSize > 0) {
+        const progress = Math.round((downloadedSize * 100) / totalSize);
+        mainWindow?.webContents.send("update-download-progress", progress);
+      }
+    });
 
-      // Track progress from the stream
-      response.data.on("data", chunk => {
-        downloadedSize += chunk.length;
-        if (totalSize > 0) {
-          const progress = Math.round((downloadedSize * 100) / totalSize);
-          mainWindow.webContents.send("update-download-progress", progress);
-        }
-      });
-
-      // Pipe the response data to file stream
-      response.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on("finish", resolve);
-        writer.on("error", reject);
-      });
-    } catch (error) {
-      writer.end();
-      console.error("Download failed:", error);
-      throw error;
-    }
+    await pipeline(response.data, fs.createWriteStream(installerPath));
 
     updateDownloaded = true;
     updateDownloadInProgress = false;
@@ -454,6 +443,10 @@ async function downloadUpdateInBackground() {
     BrowserWindow.getAllWindows().forEach(window => {
       window.webContents.send("update-error", error.message);
     });
+  } finally {
+    updateDownloadInProgress = false;
+    downloadUpdatePromise = null;
+    updateTimestampFile({ downloadingUpdate: false });
   }
 }
 
@@ -473,12 +466,6 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("download-update", async () => {
-    // On Linux, updates must be done manually via terminal
-    if (isLinux) {
-      console.log("Updates on Linux must be done manually via terminal");
-      return;
-    }
-
     if (isLatest) return;
     if (updateDownloaded) return; // Already downloaded
 
@@ -507,61 +494,28 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("update-ascendara", async () => {
-    // On Linux, updates must be done manually via terminal
-    // Users should run: curl -fsSL https://ascendara.app/update.sh | bash
-    if (isLinux) {
-      console.log("Updates on Linux must be done manually via terminal");
-      return;
-    }
-
-    if (isLatest) return;
-
-    // If not downloaded yet, download first
-    if (!updateDownloaded) {
-      try {
-        // If download is already in progress, wait for it
-        if (downloadUpdatePromise) {
-          await downloadUpdatePromise;
-        } else if (!updateDownloadInProgress) {
-          // Start download with proper timestamp tracking
-          updateTimestampFile({
-            downloadingUpdate: true,
-          });
-
+    try {
+      if (isLatest) throw new Error("No update is available.");
+      if (!updateDownloaded) {
+        if (!downloadUpdatePromise) {
           downloadUpdatePromise = downloadUpdateInBackground();
-          await downloadUpdatePromise;
-        } else {
-          console.log("Update download already in progress, waiting...");
-          return;
         }
-      } catch (error) {
-        console.error("Error during update download:", error);
-        updateTimestampFile({
-          downloadingUpdate: false,
-        });
-        return;
+        await downloadUpdatePromise;
       }
-    }
+      if (!updateDownloaded)
+        throw new Error("The update could not be downloaded. Please retry.");
 
-    // Install the update (Windows only)
-    if (updateDownloaded) {
-      const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-      const installerFileName = "AscendaraInstaller.exe";
-      const installerPath = path.join(tempDir, installerFileName);
-
-      if (!fs.existsSync(installerPath)) {
-        console.error("Installer not found at:", installerPath);
-        return;
-      }
-
-      // Windows: Run the installer executable
-      const installerProcess = spawn(installerPath, [], {
-        detached: true,
-        stdio: "ignore",
-      });
-
-      installerProcess.unref();
-      app.quit();
+      const installerPath = path.join(
+        os.tmpdir(),
+        "ascendarainstaller",
+        isWindows ? "AscendaraInstaller.exe" : "AscendaraInstaller.AppImage"
+      );
+      await installUpdate(installerPath, isLinux);
+      return { success: true };
+    } catch (error) {
+      console.error("Error installing update:", error);
+      updateTimestampFile({ isUpdating: false, downloadingUpdate: false });
+      return { success: false, error: error.message };
     }
   });
 
@@ -608,8 +562,6 @@ function registerUpdateHandlers() {
 
       const mainWindow = BrowserWindow.getAllWindows()[0];
 
-      const writer = fs.createWriteStream(installerPath);
-
       const response = await axios({
         url,
         method: "GET",
@@ -635,63 +587,9 @@ function registerUpdateHandlers() {
         }
       });
 
-      response.data.pipe(writer);
+      await pipeline(response.data, fs.createWriteStream(installerPath));
 
-      await new Promise((resolve, reject) => {
-        writer.on("finish", resolve);
-        writer.on("error", reject);
-      });
-
-      // On Linux, handle AppImage replacement via update script
-      if (isLinux) {
-        try {
-          fs.chmodSync(installerPath, 0o755);
-
-          const currentAppImagePath = process.env.APPIMAGE || process.execPath;
-
-          console.log("Branch switch - Current AppImage:", currentAppImagePath);
-          console.log("Branch switch - New AppImage:", installerPath);
-
-          // Create an update script that will run after the app quits
-          const updateScriptPath = path.join(tempDir, "branch_update.sh");
-          const updateScript = `#!/bin/bash
-while kill -0 ${process.pid} 2>/dev/null; do sleep 1; done
-sleep 2
-
-mv "${installerPath}" "${currentAppImagePath}"
-chmod +x "${currentAppImagePath}"
-rm -f "$0"
-"${currentAppImagePath}" &
-`;
-
-          fs.writeFileSync(updateScriptPath, updateScript);
-          fs.chmodSync(updateScriptPath, 0o755);
-
-          console.log("Branch switch update script created at:", updateScriptPath);
-
-          // Execute the update script in the background
-          spawn("sh", [updateScriptPath], {
-            detached: true,
-            stdio: "ignore",
-          }).unref();
-
-          app.quit();
-          return { success: true };
-        } catch (error) {
-          console.error("Failed to create branch switch update script:", error);
-          return { success: false, error: "Failed to create update script" };
-        }
-      }
-
-      // Windows: Run the installer executable
-      const installerProcess = spawn(installerPath, [], {
-        detached: true,
-        stdio: "ignore",
-      });
-
-      installerProcess.unref();
-
-      app.quit();
+      await installUpdate(installerPath, isLinux);
 
       return { success: true };
     } catch (error) {

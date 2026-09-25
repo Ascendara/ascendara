@@ -60,7 +60,16 @@ import Home from "./pages/Home";
 import i18n from "./i18n";
 import "./index.css";
 import "./styles/scrollbar.css";
-import { AlertTriangle, RefreshCwIcon, Clock, Gamepad2, X, Circle, Square, Triangle, Terminal, Copy } from "lucide-react";
+import {
+  AlertTriangle,
+  RefreshCwIcon,
+  Clock,
+  Gamepad2,
+  X,
+  Circle,
+  Square,
+  Triangle,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -81,7 +90,9 @@ function PageLoading() {
       role="status"
     >
       <RefreshCwIcon className="h-8 w-8 animate-spin" aria-hidden="true" />
-      <span className="sr-only">{t("common.loading", { defaultValue: "Loading..." })}</span>
+      <span className="sr-only">
+        {t("common.loading", { defaultValue: "Loading..." })}
+      </span>
     </div>
   );
 }
@@ -136,70 +147,6 @@ const BigPicture = lazyPage(pageLoaders.bigPicture);
 // Warm every page chunk in the background while the splash screen is up so
 // navigating between pages renders instantly instead of flashing a fallback.
 Object.values(pageLoaders).forEach(load => load().catch(() => {}));
-
-const LinuxUpdateDialog = ({ open, onOpenChange }) => {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-  const updateCommand = "curl -fsSL https://ascendara.app/update.sh | bash";
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(updateCommand);
-      setCopied(true);
-      toast.success(t("common.copied") || "Copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error("Failed to copy:", error);
-    }
-  };
-
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="border-border">
-        <AlertDialogHeader>
-          <div className="flex items-center gap-4">
-            <Terminal className="mb-2 h-10 w-10 text-primary" />
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("app.toasts.updateAvailable") || "Update Available"}
-            </AlertDialogTitle>
-          </div>
-          <AlertDialogDescription asChild>
-            <div className="space-y-4">
-              <div className="text-foreground">
-                {t("app.toasts.linuxUpdateMessage") ||
-                  "A new version of Ascendara is available. To update on Linux, please open your terminal and run the following command:"}
-              </div>
-              <div className="relative rounded-md bg-muted p-4">
-                <code className="break-all font-mono text-sm text-foreground">
-                  {updateCommand}
-                </code>
-                <button
-                  onClick={handleCopy}
-                  className="absolute right-2 top-2 rounded-md p-2 transition-colors hover:bg-background"
-                  title={t("common.copy") || "Copy"}
-                >
-                  <Copy
-                    className={`h-4 w-4 ${copied ? "text-green-500" : "text-muted-foreground"}`}
-                  />
-                </button>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {t("app.toasts.linuxUpdateNote") ||
-                  "This will download and install the latest version of Ascendara."}
-              </div>
-            </div>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <AlertDialogFooter>
-          <AlertDialogAction onClick={() => onOpenChange(false)}>
-            {t("common.close") || "Close"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-};
 
 // Check for trial expiration warning and show dialog
 const TrialWarningChecker = () => {
@@ -415,7 +362,12 @@ const AutomaticIndexRefresher = () => {
   useEffect(() => {
     const checkAndStartAutoRefresh = async () => {
       // Don't run if already started, not enabled, or user not authenticated
-      if (hasStartedRef.current || !settings?.autoRefreshEnabled || !isAuthenticated || !user?.uid) {
+      if (
+        hasStartedRef.current ||
+        !settings?.autoRefreshEnabled ||
+        !isAuthenticated ||
+        !user?.uid
+      ) {
         return;
       }
 
@@ -423,7 +375,9 @@ const AutomaticIndexRefresher = () => {
       try {
         const accessStatus = await verifyAscendAccess();
         if (!accessStatus.hasAccess) {
-          console.log("[AutoRefresh] User doesn't have Ascend access, disabling auto refresh");
+          console.log(
+            "[AutoRefresh] User doesn't have Ascend access, disabling auto refresh"
+          );
           return;
         }
       } catch (error) {
@@ -433,9 +387,10 @@ const AutomaticIndexRefresher = () => {
 
       // Check if refresh is needed based on interval
       try {
-        const localIndexPath = settings.localIndex || await window.electron.getDefaultLocalIndexPath();
+        const localIndexPath =
+          settings.localIndex || (await window.electron.getDefaultLocalIndexPath());
         const progress = await window.electron.getLocalRefreshProgress(localIndexPath);
-        
+
         if (!progress?.lastSuccessfulTimestamp) {
           console.log("[AutoRefresh] No previous refresh found, skipping auto refresh");
           return;
@@ -443,10 +398,14 @@ const AutomaticIndexRefresher = () => {
 
         const lastRefreshDate = new Date(progress.lastSuccessfulTimestamp * 1000);
         const now = new Date();
-        const daysSinceRefresh = Math.floor((now - lastRefreshDate) / (1000 * 60 * 60 * 24));
+        const daysSinceRefresh = Math.floor(
+          (now - lastRefreshDate) / (1000 * 60 * 60 * 24)
+        );
         const intervalDays = parseInt(settings.autoRefreshInterval || "7");
 
-        console.log(`[AutoRefresh] Days since last refresh: ${daysSinceRefresh}, interval: ${intervalDays}`);
+        console.log(
+          `[AutoRefresh] Days since last refresh: ${daysSinceRefresh}, interval: ${intervalDays}`
+        );
 
         if (daysSinceRefresh >= intervalDays) {
           console.log("[AutoRefresh] Starting automatic index refresh");
@@ -461,9 +420,15 @@ const AutomaticIndexRefresher = () => {
     // Delay initial check to let app initialize
     const timeout = setTimeout(checkAndStartAutoRefresh, 10000);
     return () => clearTimeout(timeout);
-  }, [settings?.autoRefreshEnabled, settings?.autoRefreshInterval, settings?.localIndex, isAuthenticated, user?.uid]);
+  }, [
+    settings?.autoRefreshEnabled,
+    settings?.autoRefreshInterval,
+    settings?.localIndex,
+    isAuthenticated,
+    user?.uid,
+  ]);
 
-  const startAutoRefresh = async (localIndexPath) => {
+  const startAutoRefresh = async localIndexPath => {
     setIsRefreshing(true);
     setRefreshProgress(0);
     setRefreshPhase("initializing");
@@ -502,7 +467,7 @@ const AutomaticIndexRefresher = () => {
 
   // Listen for refresh progress updates (both manual scrape and shared index)
   useEffect(() => {
-    const handleProgressUpdate = (data) => {
+    const handleProgressUpdate = data => {
       if (data.progress !== undefined) {
         setRefreshProgress(Math.min(Math.round(data.progress * 100), 100));
       }
@@ -531,7 +496,7 @@ const AutomaticIndexRefresher = () => {
     };
 
     // Shared index download progress
-    const handleSharedIndexProgress = (data) => {
+    const handleSharedIndexProgress = data => {
       if (data.progress !== undefined) {
         setRefreshProgress(Math.min(Math.round(data.progress), 100));
       }
@@ -571,10 +536,14 @@ const AutomaticIndexRefresher = () => {
   const handleRefreshApp = () => {
     setShowCompleteDialog(false);
     // Dispatch the same event that LocalRefresh sends
-    window.dispatchEvent(new CustomEvent("index-refreshed", {
-      detail: { timestamp: Date.now() }
-    }));
-    toast.success(t("localRefresh.refreshComplete") || "Index refreshed! Reloading data...");
+    window.dispatchEvent(
+      new CustomEvent("index-refreshed", {
+        detail: { timestamp: Date.now() },
+      })
+    );
+    toast.success(
+      t("localRefresh.refreshComplete") || "Index refreshed! Reloading data..."
+    );
   };
 
   return (
@@ -585,7 +554,8 @@ const AutomaticIndexRefresher = () => {
             <div className="flex items-center gap-4">
               <RefreshCwIcon className="mb-2 h-10 w-10 text-green-500" />
               <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                {t("localRefresh.autoRefreshComplete") || "Automatic Index Refresh Complete"}
+                {t("localRefresh.autoRefreshComplete") ||
+                  "Automatic Index Refresh Complete"}
               </AlertDialogTitle>
             </div>
             <AlertDialogDescription asChild>
@@ -851,15 +821,18 @@ const DiscordRPCTracker = () => {
 
   const scheduleIdle = () => {
     clearIdleTimer();
-    idleTimerRef.current = setTimeout(() => {
-      if (!window.electron?.switchRPC) return;
-      if (!settings?.rpcEnabled) return;
-      // Never fall back to "idle" while a game is running or the user is
-      // watching a download's progress.
-      if (isGamePlayingRef.current) return;
-      if (isDownloadPath(lastPathRef.current)) return;
-      window.electron.switchRPC("idle");
-    }, 2 * 60 * 1000);
+    idleTimerRef.current = setTimeout(
+      () => {
+        if (!window.electron?.switchRPC) return;
+        if (!settings?.rpcEnabled) return;
+        // Never fall back to "idle" while a game is running or the user is
+        // watching a download's progress.
+        if (isGamePlayingRef.current) return;
+        if (isDownloadPath(lastPathRef.current)) return;
+        window.electron.switchRPC("idle");
+      },
+      2 * 60 * 1000
+    );
   };
 
   useEffect(() => {
@@ -1282,7 +1255,6 @@ const AppRoutes = () => {
   const [showFirstIndexDialog, setShowFirstIndexDialog] = useState(false);
   const [showBranchWelcome, setShowBranchWelcome] = useState(false);
   const [appBranch, setAppBranch] = useState(null);
-  const [showLinuxUpdateDialog, setShowLinuxUpdateDialog] = useState(false);
   const location = useLocation();
   const hasChecked = useRef(false);
   const loadStartTime = useRef(Date.now());
@@ -1638,12 +1610,21 @@ const AppRoutes = () => {
 
   const handleInstallAndRestart = async () => {
     setIsInstalling(true);
-    // Set isUpdating timestamp first
-    await window.electron.setTimestampValue("isUpdating", true);
-    setTimeout(() => {
+    try {
+      await window.electron.setTimestampValue("isUpdating", true);
       setIsUpdating(true);
-      window.electron.updateAscendara();
-    }, 1000);
+      const result = await window.electron.updateAscendara();
+      if (!result?.success) {
+        throw new Error(
+          result?.error || "The update could not be installed. Please retry."
+        );
+      }
+    } catch (error) {
+      setIsUpdating(false);
+      setIsInstalling(false);
+      await window.electron.setTimestampValue("isUpdating", false);
+      toast.error(error.message);
+    }
   };
 
   useEffect(() => {
@@ -1700,7 +1681,6 @@ const AppRoutes = () => {
         const settings = await window.electron.getSettings();
         const isLatestVersion = await checkForUpdates();
         const branch = await window.electron.getBranch();
-        const isLinux = await window.electron.isOnLinux();
 
         if (
           !isLatestVersion &&
@@ -1709,13 +1689,6 @@ const AppRoutes = () => {
         ) {
           hasShownUpdateNotification.current = true;
 
-          // On Linux, show the custom dialog with terminal instructions
-          if (isLinux) {
-            setShowLinuxUpdateDialog(true);
-            return;
-          }
-
-          // Branch-specific messages for Windows
           let title, description;
           if (branch === "public-testing") {
             title = t("app.toasts.outOfDatePublicTesting");
@@ -1950,10 +1923,6 @@ const AppRoutes = () => {
         open={showChangelog}
         onOpenChange={setShowChangelog}
         currentVersion={__APP_VERSION__}
-      />
-      <LinuxUpdateDialog
-        open={showLinuxUpdateDialog}
-        onOpenChange={setShowLinuxUpdateDialog}
       />
     </>
   );
