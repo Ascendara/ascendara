@@ -17,7 +17,10 @@ function useInstalledGameDetails({
   controllerType,
   onChangeAssets,
   assetSearchOpen,
+  autoLaunch = false,
 }) {
+  const autoLaunchHandled = useRef(false);
+  const [launchChecksReady, setLaunchChecksReady] = useState(false);
   const navigate = useNavigate();
   const { settings } = useSettings();
   const [logoSrc, setLogoSrc] = useState(null);
@@ -118,7 +121,7 @@ function useInstalledGameDetails({
         setExecutableExists(false);
       }
     };
-    checkExecutable();
+
 
     // Check if trainer exists
     const checkTrainer = async () => {
@@ -129,7 +132,7 @@ function useInstalledGameDetails({
         setTrainerExists(false);
       }
     };
-    checkTrainer();
+    Promise.all([checkExecutable(), checkTrainer()]).catch(() => setExecutableExists(false)).finally(() => setLaunchChecksReady(true));
 
     // Fetch achievements
     const fetchAchievements = async () => {
@@ -445,6 +448,14 @@ function useInstalledGameDetails({
     setDirectoryBrowserPath(gamePath);
     setShowDirectoryBrowser(true);
   };
+
+  // Home Play uses the same launch flow, including warnings and executable selection.
+  useEffect(() => {
+    if (!autoLaunch || !launchChecksReady || !canInput || autoLaunchHandled.current) return;
+    autoLaunchHandled.current = true;
+    if (canLaunchGame) handlePlayGame();
+    else setShowBrowseExeWarning(true);
+  }, [autoLaunch, launchChecksReady, canInput, canLaunchGame, handlePlayGame]);
 
   // Handle delete game
   const handleDeleteGame = async () => {

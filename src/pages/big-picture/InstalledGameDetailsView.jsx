@@ -51,6 +51,7 @@ function InstalledGameDetailsView({
   controllerType,
   onChangeAssets,
   assetSearchOpen,
+  autoLaunch,
 }) {
   const {
     hasHeroImage,
@@ -123,6 +124,7 @@ function InstalledGameDetailsView({
     controllerType,
     onChangeAssets,
     assetSearchOpen,
+  autoLaunch,
   });
   return (
     <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-background text-primary">
