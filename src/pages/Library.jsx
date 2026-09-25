@@ -1451,6 +1451,16 @@ const Library = () => {
     }
   ].filter(tab => !tab.hidden);
 
+  // Subtle reminder to sync the library to the cloud if it's been a while.
+  // "A while" = 3+ days since the last sync (or never synced at all).
+  const daysSinceCloudSync = cloudLibraryLastSynced
+    ? Math.floor((Date.now() - new Date(cloudLibraryLastSynced).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showCloudSyncReminder =
+    ascendAccess.hasAccess &&
+    !loadingCloudGames &&
+    (daysSinceCloudSync === null || daysSinceCloudSync >= 3);
+
   return (
     <div
       className="fixed inset-0 top-[60px] flex overflow-hidden bg-background"
@@ -2067,6 +2077,40 @@ const Library = () => {
               </div>
             );
           })()}
+
+          {/* ── Cloud sync reminder ── */}
+          {activeTab === "all" && showCloudSyncReminder && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                  <CloudUpload className="h-4 w-4 text-amber-500" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {daysSinceCloudSync === null
+                    ? t("library.cloudSyncReminder.neverSynced") ||
+                      "You haven't synced your library to the cloud yet."
+                    : t("library.cloudSyncReminder.stale", { days: daysSinceCloudSync }) ||
+                      `You haven't synced your library in ${daysSinceCloudSync} days.`}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 shrink-0 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 hover:text-amber-600 dark:text-amber-400"
+                onClick={handleCloudSync}
+                disabled={isSyncingLibrary}
+              >
+                {isSyncingLibrary ? (
+                  <Loader className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CloudUpload className="h-3.5 w-3.5" />
+                )}
+                {isSyncingLibrary
+                  ? t("library.cloudSyncReminder.syncing") || "Syncing..."
+                  : t("library.cloudSyncReminder.syncNow") || "Sync Now"}
+              </Button>
+            </div>
+          )}
 
           {/* ── All Games / Favorites tab ── */}
           {(activeTab === "all" || activeTab === "favorites" || activeTab === "hiddenFolders") && (() => {

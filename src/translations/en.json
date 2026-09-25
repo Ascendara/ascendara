@@ -2045,6 +2045,12 @@
       "restored": "Cloud data restored! Your playtime and stats are back."
     },
     "cloudSync": "Cloud Sync",
+    "cloudSyncReminder": {
+      "neverSynced": "You haven't synced your library to the cloud yet.",
+      "stale": "You haven't synced your library in {{days}} days.",
+      "syncNow": "Sync Now",
+      "syncing": "Syncing..."
+    },
     "confirmDelete": "Woah!",
     "confirmRemoveFolderDesc": "Are you sure you want to remove this folder? All games inside will be moved back to your main library.",
     "confirmRemoveFolderTitle": "Remove Folder?",
