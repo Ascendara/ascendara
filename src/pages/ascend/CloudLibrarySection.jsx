@@ -81,10 +81,10 @@ export default function CloudLibrarySection({
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  {t("ascend.cloudLibrary.title") || "Cloud Library"}
+                  {t("ascend.cloudLibrary.title") || "Game Library"}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  {t("ascend.cloudLibrary.subtitle") || "Your games synced to the cloud"}
+                  {t("ascend.cloudLibrary.subtitle") || "Your synced games, playtime, and achievements. Save files are in Save Backups."}
                 </p>
               </div>
             </div>
@@ -96,12 +96,12 @@ export default function CloudLibrarySection({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               onClick={handleRestoreFromCloud}
               disabled={isRestoringFromCloud || isSyncingLibrary}
               variant="outline"
-              className="gap-2 shadow-lg"
+              className="shrink-0 gap-2 whitespace-nowrap shadow-lg"
               size="lg"
               title={
                 t("ascend.cloudLibrary.restoreTooltip") ||
@@ -120,7 +120,7 @@ export default function CloudLibrarySection({
             <Button
               onClick={handleSyncLibrary}
               disabled={isSyncingLibrary || isRestoringFromCloud}
-              className="gap-2 text-secondary shadow-lg"
+              className="shrink-0 gap-2 whitespace-nowrap text-secondary shadow-lg"
               size="lg"
             >
               {isSyncingLibrary ? (

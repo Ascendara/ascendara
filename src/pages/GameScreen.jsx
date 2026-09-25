@@ -3685,7 +3685,7 @@ export default function GameScreen() {
                       </div>
                     </CardContent>
                   </Card>
-                ) : game?.isCustom && (
+                ) : (
                   <Card className="border border-dashed border-border bg-muted/30">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">

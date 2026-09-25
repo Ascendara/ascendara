@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -27,7 +28,6 @@ import {
   RotateCcw,
   Save,
   Trash2,
-  X,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -35,8 +35,8 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { ScrollArea } from "./ui/scroll-area";
 import { Switch } from "./ui/switch";
+import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
-import { Separator } from "./ui/separator";
 import { Card, CardContent } from "./ui/card";
 import {
   listBackups as listCloudBackups,
@@ -64,7 +64,11 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
   const [loadBackupsError, setLoadBackupsError] = useState(null);
   const [selectedBackup, setSelectedBackup] = useState(null);
   const [isUploadingToCloud, setIsUploadingToCloud] = useState(false);
+  const [cloudBackupPromptOpen, setCloudBackupPromptOpen] = useState(false);
+  const [dontAskCloudBackupAgain, setDontAskCloudBackupAgain] = useState(false);
   const [restoringCloudBackup, setRestoringCloudBackup] = useState(null);
+  const [lastBackupInfo, setLastBackupInfo] = useState(null); // { timestamp, isLocal, isCloud }
+  const [isLoadingLastBackup, setIsLoadingLastBackup] = useState(false);
 
   // Custom save paths state
   const [customSavePaths, setCustomSavePaths] = useState([]);
@@ -90,6 +94,10 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       setSelectedButtonIndex(0);
       setSelectedBackupIndex(0);
       setPathsDirty(false);
+      setDontAskCloudBackupAgain(
+        localStorage.getItem(`cloudBackupPromptDismissed_${game.game || game.name}`) === "true"
+      );
+      loadLastBackupSummary();
 
       (async () => {
         try {
@@ -207,7 +215,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
     };
 
     const handleOptionsScreenInput = action => {
-      const buttonCount = 4; // Backup Now, Restore, View Backups, Close
+      const buttonCount = 3; // Back up, find a backup, close
 
       if (action === "DOWN") {
         setSelectedButtonIndex(prev => (prev + 1) % buttonCount);
@@ -215,12 +223,10 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         setSelectedButtonIndex(prev => (prev - 1 + buttonCount) % buttonCount);
       } else if (action === "CONFIRM") {
         if (selectedButtonIndex === 0) {
-          handleBackupGame(false);
+          handleBackupNow();
         } else if (selectedButtonIndex === 1) {
-          showRestoreConfirmation();
-        } else if (selectedButtonIndex === 2) {
           handleListBackups();
-        } else if (selectedButtonIndex === 3) {
+        } else if (selectedButtonIndex === 2) {
           onOpenChange(false);
         }
       } else if (action === "BACK") {
@@ -409,13 +415,14 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
 
       // Upload to cloud if requested and user is authenticated
       let cloudUploadSuccess = true;
-      if (uploadToCloud && user && autoCloudBackupEnabled) {
+      if (uploadToCloud && user) {
         cloudUploadSuccess = await handleUploadBackupToCloud(result);
       }
 
       // Mark entire operation as complete only if cloud upload succeeded (or wasn't attempted)
       if (cloudUploadSuccess) {
         setBackupSuccess(true);
+        loadLastBackupSummary();
       } else {
         setBackupFailed(true);
       }
@@ -425,6 +432,37 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       setIsBackingUp(false);
       toast.error(t("library.backups.backupFailed"));
     }
+  };
+
+  const handleBackupNow = () => {
+    if (
+      user &&
+      hasActiveSubscription(userData) &&
+      !autoCloudBackupEnabled &&
+      !dontAskCloudBackupAgain
+    ) {
+      setCloudBackupPromptOpen(true);
+      return;
+    }
+    handleBackupGame(autoCloudBackupEnabled);
+  };
+
+  const enableCloudBackupAndCreateBackup = () => {
+    setAutoCloudBackupEnabled(true);
+    localStorage.setItem(`cloudBackup_${game.game || game.name}`, "true");
+    setCloudBackupPromptOpen(false);
+    handleBackupGame(true);
+  };
+
+  const handleBackupLocallyOnly = () => {
+    if (dontAskCloudBackupAgain) {
+      localStorage.setItem(
+        `cloudBackupPromptDismissed_${game.game || game.name}`,
+        "true"
+      );
+    }
+    setCloudBackupPromptOpen(false);
+    handleBackupGame(false);
   };
 
   const handleUploadBackupToCloud = async () => {
@@ -759,6 +797,79 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
     }
   };
 
+  // Lightweight fetch of just the most recent backup, used to show a
+  // "Last backup" indicator on the options screen without loading the
+  // full backups list.
+  const loadLastBackupSummary = async () => {
+    setIsLoadingLastBackup(true);
+    try {
+      const gameName = game.game || game.name;
+      let newestLocal = null;
+      let newestCloud = null;
+
+      const result = await window.electron.ludusavi("list-backups", gameName);
+      if (result?.success) {
+        const data = result.data;
+        const resolvedKey = data?.games ? Object.keys(data.games)[0] : null;
+        const backups = resolvedKey ? data.games[resolvedKey]?.backups : null;
+        if (backups?.length) {
+          newestLocal = backups.reduce((latest, b) =>
+            !latest || new Date(b.when) > new Date(latest.when) ? b : latest
+          , null);
+        }
+      }
+
+      if (user && hasActiveSubscription(userData)) {
+        try {
+          const cloudResult = await listCloudBackups(gameName);
+          if (!cloudResult.error && cloudResult.backups?.length) {
+            newestCloud = cloudResult.backups.reduce((latest, b) =>
+              !latest || new Date(b.createdAt) > new Date(latest.createdAt) ? b : latest
+            , null);
+          }
+        } catch {
+          // Cloud lookup is best-effort for this summary
+        }
+      }
+
+      if (!newestLocal && !newestCloud) {
+        setLastBackupInfo(null);
+      } else {
+        const localTime = newestLocal ? new Date(newestLocal.when) : null;
+        const cloudTime = newestCloud ? new Date(newestCloud.createdAt) : null;
+        const timestamp =
+          localTime && cloudTime
+            ? (localTime > cloudTime ? localTime : cloudTime)
+            : localTime || cloudTime;
+        setLastBackupInfo({
+          timestamp,
+          isLocal: !!newestLocal,
+          isCloud: !!newestCloud,
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to load last backup summary:", e);
+      setLastBackupInfo(null);
+    } finally {
+      setIsLoadingLastBackup(false);
+    }
+  };
+
+  // Human-friendly relative time (e.g. "Just now", "3h ago", "Yesterday")
+  const getRelativeBackupTime = timestamp => {
+    if (!timestamp) return "";
+    const diffMs = Date.now() - new Date(timestamp).getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return t("library.backups.justNow") || "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return t("library.backups.yesterday") || "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return new Date(timestamp).toLocaleDateString();
+  };
+
   // Render helpers
   const renderCustomSavePathsSection = () => (
     <Card className="border-muted/40 transition-all hover:border-muted/60">
@@ -830,7 +941,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
             <div className="flex justify-end pt-1">
               <Button
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-8 gap-1.5 text-xs text-secondary"
                 onClick={handleSavePaths}
                 disabled={isSavingPaths}
               >
@@ -849,264 +960,119 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
   );
 
   const renderOptionsScreen = () => (
-    <div className="space-y-6 py-4">
-      {/* Main Action - Backup Now */}
-      <Card
-        className={`border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 transition-all ${bigPictureMode && selectedButtonIndex === 0 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/50 hover:shadow-lg"}`}
-      >
-        <CardContent className="p-6">
+    <div className="space-y-5 py-3">
+      <Card className="overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-background to-background">
+        <CardContent className="space-y-4 p-5 sm:p-6">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-lg font-semibold text-foreground">{game.game || game.name}</p>
+              {isLoadingLastBackup ? (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader className="h-3 w-3 animate-spin" />
+                  {t("library.backups.checkingLastBackup") || "Checking backups…"}
+                </span>
+              ) : lastBackupInfo ? (
+                <span className="flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-600 dark:text-green-400">
+                  <CircleCheck className="h-3 w-3" />
+                  {t("library.backups.lastBackup") || "Last backup"}: {getRelativeBackupTime(lastBackupInfo.timestamp)}
+                  {lastBackupInfo.isCloud && (
+                    <Cloud className="ml-0.5 h-3 w-3" title={t("library.backups.syncedToCloud") || "Synced to cloud"} />
+                  )}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="h-3 w-3" />
+                  {t("library.backups.noBackupsYet") || "No backups yet"}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("library.backups.transferIntro") || "Back up this game's saves here, then restore them on another PC using the same Ascend account."}
+            </p>
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-3">
+            {[
+              t("library.backups.transferStepOne") || "1. Back up on your first PC",
+              t("library.backups.transferStepTwo") || "2. Turn on cloud upload below",
+              t("library.backups.transferStepThree") || "3. Restore on your other PC",
+            ].map(step => (
+              <div key={step} className="rounded-lg border border-border/60 bg-background/70 px-3 py-2 text-foreground/80">{step}</div>
+            ))}
+          </div>
           <Button
-            className="flex h-14 w-full items-center justify-center gap-3 bg-gradient-to-r from-primary/90 to-primary text-lg font-semibold text-secondary hover:from-primary hover:to-primary/90"
-            onClick={
-              bigPictureMode ? undefined : () => handleBackupGame(autoCloudBackupEnabled)
-            }
-            disabled={isBackingUp || isUploadingToCloud}
+            className="h-12 w-full gap-2 text-base font-semibold text-secondary"
+            onClick={handleBackupNow}
+            disabled={isBackingUp || isUploadingToCloud || !settings.ludusavi.enabled}
           >
-            {autoCloudBackupEnabled && user ? (
-              <CloudUpload className="h-6 w-6" />
-            ) : (
-              <Save className="h-6 w-6" />
-            )}
-            <span>
-              {t("library.backups.backupNow", { game: game.game || game.name })}
-            </span>
+            {autoCloudBackupEnabled && user ? <CloudUpload className="h-5 w-5" /> : <Save className="h-5 w-5" />}
+            {t("library.backups.backupNow", { game: game.game || game.name })}
           </Button>
+          {!settings.ludusavi.enabled && (
+            <p className="text-xs text-muted-foreground">{t("gameScreen.backupSavesDisabledTooltip")}</p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Quick Actions - Simplified for BigPicture */}
-      {bigPictureMode ? (
-        <div className="space-y-4">
-          <Card
-            className={`border-muted/60 transition-all ${selectedButtonIndex === 1 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/40 hover:shadow-md"}`}
-          >
-            <CardContent className="p-5">
-              <Button
-                className="flex h-full w-full items-center justify-center gap-3 py-4"
-                variant="outline"
-                disabled={!settings.ludusavi.enabled}
-              >
-                <RotateCcw className="h-5 w-5 text-primary" />
-                <span className="text-base font-medium">
-                  {t("library.backups.restoreLatest")}
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card
-            className={`border-muted/60 transition-all ${selectedButtonIndex === 2 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/40 hover:shadow-md"}`}
-          >
-            <CardContent className="p-5">
-              <Button
-                className="flex h-full w-full items-center justify-center gap-3 py-4"
-                variant="outline"
-              >
-                <ListOrdered className="h-5 w-5 text-primary" />
-                <span className="text-base font-medium">
-                  {t("library.backups.listBackups")}
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card
-            className={`border-muted/60 transition-all ${selectedButtonIndex === 3 ? "scale-105 ring-4 ring-primary" : "hover:border-primary/40 hover:shadow-md"}`}
-          >
-            <CardContent className="p-5">
-              <Button
-                className="flex h-full w-full items-center justify-center gap-3 py-4"
-                variant="outline"
-              >
-                <X className="h-5 w-5 text-primary" />
-                <span className="text-base font-medium">{t("common.close")}</span>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
-            <CardContent className="p-5">
-              <Button
-                className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
-                variant="outline"
-                onClick={showRestoreConfirmation}
-                disabled={!settings.ludusavi.enabled}
-              >
-                <div className="rounded-full bg-primary/10 p-3">
-                  <RotateCcw className="h-6 w-6 text-primary" />
-                </div>
-                <span className="text-sm font-medium">
-                  {t("library.backups.restoreLatest")}
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
-            <CardContent className="p-5">
-              <Button
-                className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
-                variant="outline"
-                onClick={handleListBackups}
-              >
-                <div className="rounded-full bg-primary/10 p-3">
-                  <ListOrdered className="h-6 w-6 text-primary" />
-                </div>
-                <span className="text-sm font-medium">
-                  {t("library.backups.listBackups")}
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-muted/60 transition-all hover:border-primary/40 hover:shadow-md">
-            <CardContent className="p-5">
-              <Button
-                className="flex h-full w-full flex-col items-center justify-center gap-3 py-6"
-                variant="outline"
-                onClick={openBackupFolder}
-              >
-                <div className="rounded-full bg-primary/10 p-3">
-                  <FolderOpen className="h-6 w-6 text-primary" />
-                </div>
-                <span className="text-sm font-medium">
-                  {t("library.backups.openBackupFolder")}
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <Separator className="my-4" />
-
-      {/* Settings Section */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-foreground">
-          {t("library.backups.settings")}
-        </h3>
-
-        {/* Auto Backup toggle */}
-        <Card className="border-muted/40 transition-all hover:border-muted/60">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between space-x-4">
-              <div className="flex-1 space-y-1">
-                <Label
-                  htmlFor="autoBackup"
-                  className="flex items-center gap-2 text-base font-semibold"
-                >
-                  <div className="rounded-full bg-primary/10 p-1.5">
-                    <FolderSync className="h-4 w-4 text-primary" />
-                  </div>
-                  {t("library.backups.autoBackupOnGameClose")}
-                </Label>
-                <span className="block text-sm text-muted-foreground">
-                  {t("library.backups.autoBackupDesc")}
-                </span>
-              </div>
-              <Switch
-                id="autoBackup"
-                checked={autoBackupEnabled}
-                onCheckedChange={handleToggleAutoBackup}
-                className="data-[state=checked]:bg-primary"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Auto Cloud Backup toggle */}
-        <Card className="border-muted/40 transition-all hover:border-muted/60">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between space-x-4">
-              <div className="flex-1 space-y-1">
-                <Label
-                  htmlFor="autoCloudBackup"
-                  className="flex items-center gap-2 text-base font-semibold"
-                >
-                  <div className="rounded-full bg-primary/10 p-1.5">
-                    <Cloud className="h-4 w-4 text-primary" />
-                  </div>
-                  {t("library.backups.autoCloudBackup")}
-                  {user && hasActiveSubscription(userData) && (
-                    <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-secondary">
-                      {t("library.backups.autoCloudBackupActive")}
-                    </span>
-                  )}
-                </Label>
-                <span className="block text-sm text-muted-foreground">
-                  {user && hasActiveSubscription(userData)
-                    ? t("library.backups.autoCloudBackupDesc")
-                    : !user
-                      ? t("library.backups.autoCloudBackupSignInDesc")
-                      : t("library.backups.autoCloudBackupUpgradeDesc")}
-                </span>
-                {!user && (
-                  <Button
-                    variant="link"
-                    className="h-auto p-0 text-xs text-primary hover:text-primary/80"
-                    onClick={() => (window.location.hash = "#/ascend")}
-                  >
-                    {t("library.backups.autoCloudBackupLearnMore")}
-                  </Button>
-                )}
-                {user && !hasActiveSubscription(userData) && (
-                  <Button
-                    variant="link"
-                    className="h-auto p-0 text-xs text-primary hover:text-primary/80"
-                    onClick={() => (window.location.hash = "#/ascend")}
-                  >
-                    {t("library.backups.autoCloudBackupUpgrade")}
-                  </Button>
-                )}
-              </div>
-              <Switch
-                id="autoCloudBackup"
-                checked={autoCloudBackupEnabled}
-                onCheckedChange={checked => {
-                  if (!user) {
-                    toast.error(t("library.backups.signInToUseCloudBackups"), {
-                      description: t("library.backups.cloudBackupsRequireAccount"),
-                    });
-                    return;
-                  }
-                  if (!hasActiveSubscription(userData)) {
-                    toast.error(t("library.backups.cloudBackupsRequirePremium"), {
-                      description: t("library.backups.cloudBackupsUpgradePrompt"),
-                      action: {
-                        label: t("library.backups.cloudBackupsUpgradeAction"),
-                        onClick: () => (window.location.hash = "#/ascend"),
-                      },
-                    });
-                    return;
-                  }
-                  setAutoCloudBackupEnabled(checked);
-                  localStorage.setItem(
-                    `cloudBackup_${game.game || game.name}`,
-                    checked.toString()
-                  );
-                  toast.success(
-                    checked
-                      ? t("library.backups.cloudBackupsEnabledToast")
-                      : t("library.backups.cloudBackupsDisabledToast"),
-                    {
-                      description: checked
-                        ? t("library.backups.cloudBackupsEnabledDesc")
-                        : t("library.backups.cloudBackupsDisabledDesc"),
-                    }
-                  );
-                }}
-                disabled={!user || !hasActiveSubscription(userData)}
-                className="data-[state=checked]:bg-primary"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Custom save paths */}
-        {renderCustomSavePathsSection()}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button variant="outline" className="h-auto min-h-16 justify-start gap-3 whitespace-normal px-4 py-3 text-left" onClick={handleListBackups} disabled={!settings.ludusavi.enabled}>
+          <RotateCcw className="h-5 w-5 shrink-0 text-primary" />
+          <span><span className="block font-semibold">{t("library.backups.findRestore") || "Find a backup to restore"}</span><span className="block text-xs font-normal text-muted-foreground">{t("library.backups.findRestoreDesc") || "Choose a local or cloud save, including on a new PC."}</span></span>
+        </Button>
+        <Button variant="outline" className="h-auto min-h-16 justify-start gap-3 px-4 py-3 text-left" onClick={openBackupFolder}>
+          <FolderOpen className="h-5 w-5 shrink-0 text-primary" />
+          <span><span className="block font-semibold">{t("library.backups.openBackupFolder")}</span><span className="block text-xs font-normal text-muted-foreground">{t("library.backups.openFolderDesc") || "Browse save backups stored on this PC."}</span></span>
+        </Button>
       </div>
+
+      <Card className="border-muted/50">
+        <CardContent className="flex items-start justify-between gap-4 p-4">
+          <div className="space-y-1">
+            <Label htmlFor="autoCloudBackup" className="flex items-center gap-2 font-semibold">
+              <Cloud className="h-4 w-4 text-primary" />
+              {t("library.backups.alwaysBackupToCloud") || "Always back up to cloud"}
+              {user && hasActiveSubscription(userData) && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{t("library.backups.autoCloudBackupActive")}</span>}
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              {user && hasActiveSubscription(userData)
+                ? (t("library.backups.cloudUploadClarification") || "When enabled, Back up now saves locally and uploads that backup to your cloud account. Enable this on each PC you use.")
+                : !user ? t("library.backups.autoCloudBackupSignInDesc") : t("library.backups.autoCloudBackupUpgradeDesc")}
+            </p>
+            {(!user || !hasActiveSubscription(userData)) && <Button variant="link" className="h-auto p-0 text-xs" onClick={() => (window.location.hash = "#/ascend")}>{!user ? t("library.backups.autoCloudBackupLearnMore") : t("library.backups.autoCloudBackupUpgrade")}</Button>}
+          </div>
+          <Switch
+            id="autoCloudBackup"
+            checked={autoCloudBackupEnabled}
+            onCheckedChange={checked => {
+              if (!user || !hasActiveSubscription(userData)) {
+                toast.error(!user ? t("library.backups.signInToUseCloudBackups") : t("library.backups.cloudBackupsRequirePremium"), {
+                  description: !user ? t("library.backups.cloudBackupsRequireAccount") : t("library.backups.cloudBackupsUpgradePrompt"),
+                  action: !user ? undefined : { label: t("library.backups.cloudBackupsUpgradeAction"), onClick: () => (window.location.hash = "#/ascend") },
+                });
+                return;
+              }
+              setAutoCloudBackupEnabled(checked);
+              localStorage.setItem(`cloudBackup_${game.game || game.name}`, checked.toString());
+              toast.success(checked ? t("library.backups.cloudBackupsEnabledToast") : t("library.backups.cloudBackupsDisabledToast"), {
+                description: checked ? t("library.backups.cloudBackupsEnabledDesc") : t("library.backups.cloudBackupsDisabledDesc"),
+              });
+            }}
+            disabled={!user || !hasActiveSubscription(userData)}
+          />
+        </CardContent>
+      </Card>
+
+      <details className="group rounded-lg border border-border/60 bg-muted/10">
+        <summary className="cursor-pointer list-none px-4 py-3 font-medium text-foreground [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center justify-between">{t("library.backups.advancedSettings") || "Backup settings"}<span className="text-xs font-normal text-muted-foreground">{t("library.backups.advancedSettingsHint") || "Automatic backups and save location"}</span></span>
+        </summary>
+        <div className="space-y-3 border-t border-border/60 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div><Label htmlFor="autoBackup" className="font-semibold">{t("library.backups.autoBackupOnGameClose")}</Label><p className="mt-1 text-sm text-muted-foreground">{t("library.backups.autoBackupDesc")}</p></div>
+            <Switch id="autoBackup" checked={autoBackupEnabled} onCheckedChange={handleToggleAutoBackup} />
+          </div>
+          {renderCustomSavePathsSection()}
+        </div>
+      </details>
     </div>
   );
 
@@ -1687,7 +1653,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
           {backupFailed && !isBackingUp && (
             <Button
               className="bg-primary/90 text-secondary hover:bg-primary"
-              onClick={handleBackupGame}
+              onClick={handleBackupNow}
               disabled={isBackingUp}
             >
               {t("library.backups.tryAgain")}
@@ -1710,7 +1676,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         <>
           {restoreFailed && !isRestoring && (
             <Button
-              className="text-primary-foreground bg-primary/90 hover:bg-primary"
+              className="bg-primary/90 text-secondary hover:bg-primary"
               onClick={handleRestoreBackup}
               disabled={isRestoring}
             >
@@ -1766,6 +1732,39 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
           {renderFooterButtons()}
         </AlertDialogFooter>
       </AlertDialogContent>
+      <AlertDialog open={cloudBackupPromptOpen} onOpenChange={setCloudBackupPromptOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("library.backups.cloudBackupDisabledTitle") || "Cloud backup is turned off"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.backups.cloudBackupDisabledPrompt", { game: game.game || game.name }) || `Your ${game.game || game.name} backup will only be saved on this PC. Turn on cloud backup and upload it now?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-center gap-2 pt-1">
+            <Checkbox
+              id="dontAskCloudBackupAgain"
+              checked={dontAskCloudBackupAgain}
+              onCheckedChange={setDontAskCloudBackupAgain}
+            />
+            <Label
+              htmlFor="dontAskCloudBackupAgain"
+              className="cursor-pointer text-sm font-normal text-muted-foreground"
+              onClick={() => setDontAskCloudBackupAgain(prev => !prev)}
+            >
+              {t("library.backups.cloudBackupDontAskAgain") ||
+                "Don't ask again for this game — always back up locally"}
+            </Label>
+          </div>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={handleBackupLocallyOnly}>
+              {t("library.backups.backupLocallyOnly") || "Just back up locally"}
+            </Button>
+            <Button className="text-secondary" onClick={enableCloudBackupAndCreateBackup}>
+              {t("library.backups.enableAndBackup") || "Enable and back up"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AlertDialog>
   );
 };

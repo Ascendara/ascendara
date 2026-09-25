@@ -46,10 +46,10 @@ export default function CloudBackupsSection({
           </div>
           <div>
             <h1 className="text-2xl font-bold">
-              {t("ascend.cloudBackups.title") || "Cloud Backups"}
+              {t("ascend.cloudBackups.title") || "Save Backups"}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {t("ascend.cloudBackups.subtitle") || "Backup and restore your game saves"}
+              {t("ascend.cloudBackups.subtitle") || "Game save files stored with Ascend so you can restore them on another PC."}
             </p>
           </div>
         </div>
