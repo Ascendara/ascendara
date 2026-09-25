@@ -3034,7 +3034,7 @@ export default function GameScreen() {
 
                 {/* Secondary actions */}
                 <div className="text-secondary-foreground space-y-3">
-                  {settings.ludusavi.enabled && (
+                  {settings.ludusavi.enabled ? (
                     <Button
                       variant="outline"
                       className="w-full justify-start gap-2"
@@ -3043,6 +3043,21 @@ export default function GameScreen() {
                       <FolderSync className="h-4 w-4" />
                       {t("gameScreen.backupSaves")}
                     </Button>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start gap-2 opacity-50"
+                        disabled
+                      >
+                        <FolderSync className="h-4 w-4" />
+                        {t("gameScreen.backupSaves")}
+                      </Button>
+                      <div className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground">
+                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>{t("gameScreen.backupSavesDisabledTooltip")}</span>
+                      </div>
+                    </div>
                   )}
 
                   {!game.isCustom && (
