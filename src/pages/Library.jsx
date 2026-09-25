@@ -259,6 +259,7 @@ const Library = () => {
   const [deletedGames, setDeletedGames] = useState([]);
   const [restoringDeletedGame, setRestoringDeletedGame] = useState(null);
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
+  const [cloudLibraryLastSynced, setCloudLibraryLastSynced] = useState(null);
   const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
   const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
   const [libraryValueData, setLibraryValueData] = useState(() => {
@@ -813,12 +814,14 @@ const Library = () => {
     const loadCloudOnlyGames = async () => {
       if (!user) {
         setCloudOnlyGames([]);
+        setCloudLibraryLastSynced(null);
         return;
       }
 
       setLoadingCloudGames(true);
       try {
         const cloudResult = await getCloudLibrary();
+        setCloudLibraryLastSynced(cloudResult.data?.lastSynced || null);
         if (cloudResult.data?.games) {
           // Get local game names for comparison
           const installedGames = await window.electron.getGames();
@@ -1266,6 +1269,7 @@ const Library = () => {
       const result = await syncCloudLibrary(gamesWithAchievements);
       if (result.success) {
         toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
+        setCloudLibraryLastSynced(new Date().toISOString());
       } else {
         toast.error(
           result.error || t("ascend.cloudLibrary.syncFailed") || "Failed to sync library"
