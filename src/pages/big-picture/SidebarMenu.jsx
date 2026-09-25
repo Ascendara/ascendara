@@ -1,4 +1,4 @@
-import { Home, Grid, Library, Download, Settings, LogOut, Power } from "lucide-react";
+import { Home, Grid, Library, Download, Settings, LogOut, Power, Gamepad2, User } from "lucide-react";
 
 // Side menu
 const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick, buttons }) => {
@@ -15,15 +15,17 @@ const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick, buttons }) => {
       action: "quit_app",
       danger: true,
     },
+    { icon: Gamepad2, label: "Retro", action: "retro" },
+    { icon: User, label: "Profile", action: "profile" },
   ];
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-[10000] flex w-[350px] transform flex-col bg-card p-8 shadow-2xl transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+      className={`fixed inset-y-0 left-0 z-[10000] flex w-[min(420px,90vw)] overflow-y-auto transform flex-col bg-card p-8 shadow-2xl transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
     >
-      <h2 className="mb-10 border-b border-border pb-4 text-2xl font-light tracking-widest text-primary">
+      <h2 className="mb-4 border-b border-border pb-4 text-2xl font-light tracking-widest text-primary">
         {t("bigPicture.menu")}
       </h2>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
         {items.map((item, idx) => (
           <div
             key={idx}

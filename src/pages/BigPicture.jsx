@@ -1,3 +1,4 @@
+import { PageNavigationContext } from "./big-picture/PageHeader";
 import { Toaster, toast } from "sonner";
 import { Search, Coffee, ListEnd, X, Menu, Gamepad2 } from "lucide-react";
 import { removeFromQueue, addToQueue } from "@/services/downloadQueueService";
@@ -8,13 +9,18 @@ import { ExitDialog } from "./big-picture/ExitDialog";
 import { ExitBigPictureDialog } from "./big-picture/ExitBigPictureDialog";
 import { BigPictureSettingsDialog } from "./big-picture/BigPictureSettingsDialog";
 import { SidebarMenu } from "./big-picture/SidebarMenu";
-import { HomeSidebar } from "./big-picture/HomeSidebar";
-import { GameCard } from "./big-picture/GameCard";
-import { ActiveDownloadsBar } from "./big-picture/ActiveDownloadsBar";
+import { PowerSurface } from "./big-picture/PowerSurface";
+import { HomeDashboard } from "./big-picture/HomeDashboard";
+import { LibrarySurface } from "./big-picture/LibrarySurface";
+import { RetroSurface } from "./big-picture/RetroSurface";
+import { PreferencesSurface } from "./big-picture/PreferencesSurface";
+import "./big-picture/big-picture.css";
+import "./big-picture/design-system.css";
 import { StoreSearchBar } from "./big-picture/StoreSearchBar";
 import { StoreGameCard } from "./big-picture/StoreGameCard";
 import { FloatingContextMenu } from "./big-picture/FloatingContextMenu";
-import { BigPictureDownloadCard } from "./big-picture/BigPictureDownloadCard";
+import { BrowseSurface } from "./big-picture/BrowseSurface";
+import { DownloadsSurface } from "./big-picture/DownloadsSurface";
 import { GameDetailsView } from "./big-picture/GameDetailsView";
 import { InstalledGameDetailsView } from "./big-picture/InstalledGameDetailsView";
 import { KillDownloadDialog } from "./big-picture/KillDownloadDialog";
@@ -26,6 +32,12 @@ import "@/components/GamesBackupDialog";
 
 function BigPicture() {
   const {
+    selectedSort,
+    setSelectedSort,
+    refreshStore,
+    surfaceNavigation,
+    handleShowInstalledGameDetails,
+    refreshLibrary,
     showKillDialog,
     showProviderDialog,
     isKeyboardOpen,
@@ -237,348 +249,35 @@ function BigPicture() {
           } else if (idx === 3) {
             changeView("downloads");
           } else if (idx === 4) {
-            setShowControllerSettings(true);
+            changeView("preferences");
           } else if (idx === 5) {
             setShowExitBigPictureDialog(true);
           } else if (idx === 6) {
-            if (window.electron && window.electron.closeApp) {
-              window.electron.closeApp();
-            } else {
-              window.close();
-            }
+            changeView("power");
+          } else if (idx === 7) {
+            changeView("retro");
+          } else if (idx === 8) {
+            changeView("profile");
           }
+
         }}
       />
-
-      {view !== "details" && !installedGameView && (
-        <div
-          className={`absolute left-24 top-16 z-20 transition-all duration-200 ${isMenuOpen || isKeyboardOpen ? "opacity-50 blur-sm" : ""}`}
-        >
-          <h1 className="flex items-center gap-4 text-3xl font-light uppercase tracking-[0.2em] text-primary">
-            <span className="h-1 w-12 rounded-full bg-primary shadow-[0_0_15px_hsl(var(--primary)/0.8)]"></span>
-            {view === "library"
-              ? t("bigPicture.library")
-              : view === "store"
-                ? t("bigPicture.catalog")
-                : view === "downloads"
-                  ? t("bigPicture.downloads")
-                  : t("bigPicture.home")}
-          </h1>
-        </div>
-      )}
 
       <div
         className={`relative flex w-full flex-1 items-center pb-16 transition-all duration-200 ${isMenuOpen ? "scale-95 opacity-50 blur-sm" : ""}`}
       >
-        {view === "carousel" && (
-          <div
-            className={`absolute inset-0 flex w-full flex-1 items-center pb-16 transition-all duration-300 ease-out ${
-              isTransitioning
-                ? "opacity-0 translate-x-[-50px]"
-                : "opacity-100 translate-x-0"
-            }`}
-          >
-            {/* Home screen sidebar navigation */}
-            <HomeSidebar
-              selectedIndex={isHomeSidebarActive ? homeSidebarIndex : -1}
-              t={t}
-              onItemClick={idx => {
-                if (idx === 0) {
-                  changeView("carousel");
-                } else if (idx === 1) {
-                  changeView("library");
-                } else if (idx === 2) {
-                  changeView("store");
-                } else if (idx === 3) {
-                  changeView("downloads");
-                } else if (idx === 4) {
-                  // Exit Big Picture - always show exit confirmation dialog
-                  setShowExitBigPictureDialog(true);
-                }
-                setIsHomeSidebarActive(false);
-                setHomeSidebarIndex(-1);
-              }}
-              isVisible={!isKeyboardOpen && !isMenuOpen}
-              buttons={buttons}
-              controllerType={settings.controllerType || "xbox"}
-            />
+        <PageNavigationContext.Provider value={{view, changeView, search: () => setIsKeyboardOpen(true), downloadCount: downloadingGames.length + queuedDownloads.length}}>
+        {view === "power" && <PowerSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} onDesktop={() => navigate("/")} />}
+        {view === "carousel" && <HomeDashboard navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView && !showControllerSettings && !isKeyboardOpen && !showExitBigPictureDialog} search={() => setIsKeyboardOpen(true)} openMenu={() => setIsMenuOpen(true)} buttons={buttons} pause={handlePauseDownload} resume={handleResumeDownload} stopping={stoppingDownloads} resuming={resumingDownloads} playGame={game => handleShowInstalledGameDetails(game, true)} games={allGames} downloads={downloadingGames} queue={queuedDownloads} discover={filteredStoreGames} openGame={handleShowInstalledGameDetails} openStore={game => handleSelectStoreGame(game, 0)} changeView={changeView} openSettings={() => changeView("preferences")} />}
+        {view === "library" && <LibrarySurface navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView} games={allGames} openGame={handleShowInstalledGameDetails} refresh={refreshLibrary} onBack={() => changeView("carousel")} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
+        {view === "retro" && <RetroSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} />}
+        {["preferences", "profile"].includes(view) && <PreferencesSurface key={view} navigation={surfaceNavigation} active={!isMenuOpen && !showControllerSettings} profile={view === "profile"} onBack={() => changeView("carousel")} openController={() => setShowControllerSettings(true)} />}
 
-            <div
-              id="big-picture-scroll-container"
-              className="no-scrollbar flex h-[65vh] w-screen max-w-[100vw] items-center overflow-x-auto overflow-y-visible scroll-smooth px-24"
-            >
-              <div className="flex h-[42vh] items-center gap-4 pl-6 pt-12">
-                {carouselGames.map((game, index) => (
-                  <GameCard
-                    key={index}
-                    game={game}
-                    index={index}
-                    isSelected={index === carouselIndex && !isMenuOpen}
-                    onClick={() => setCarouselIndex(index)}
-                    isGridMode={false}
-                    t={t}
-                  />
-                ))}
-                <div className="w-[60vw] flex-shrink-0"></div>
-              </div>
-            </div>
-            {/* Show active downloads in carousel view */}
-            <ActiveDownloadsBar downloads={downloadingGames} t={t} />
-          </div>
-        )}
+        {view === "store" && <BrowseSurface navigation={surfaceNavigation} active={!isMenuOpen && !isKeyboardOpen} games={filteredStoreGames} loading={storeLoading} query={storeSearchQuery} search={() => setIsKeyboardOpen(true)} clearSearch={() => setStoreSearchQuery("")} sort={selectedSort} setSort={setSelectedSort} openGame={handleSelectStoreGame} onBack={() => changeView("carousel")} retry={refreshStore} />}
 
-        {view === "library" && (
-          <div
-            className={`absolute inset-0 no-scrollbar h-full w-full overflow-y-auto scroll-smooth px-24 pb-8 pt-32 transition-all duration-300 ease-out ${
-              isTransitioning
-                ? "opacity-0 translate-x-[50px]"
-                : "opacity-100 translate-x-0"
-            }`}
-          >
-            <div className="grid grid-cols-6 gap-6">
-              {allGames.map((game, index) => (
-                <GameCard
-                  key={index}
-                  game={game}
-                  index={index}
-                  isSelected={index === libraryIndex && !isMenuOpen}
-                  onClick={() => setLibraryIndex(index)}
-                  isGridMode={true}
-                  t={t}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        {view === "downloads" && <DownloadsSurface navigation={surfaceNavigation} active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog} downloads={downloadingGames} queue={queuedDownloads} torboxStates={torboxStates} stopping={stoppingDownloads} resuming={resumingDownloads} pause={handlePauseDownload} resume={handleResumeDownload} cancel={handleKillDownload} openFolder={handleOpenFolder} onBack={() => changeView("carousel")} browse={() => changeView("store")} t={t} buttons={buttons} />}
 
-        {view === "store" && (
-          <div
-            className={`absolute inset-0 no-scrollbar flex h-full w-full flex-col overflow-y-auto scroll-smooth px-24 pt-28 transition-all duration-300 ease-out ${
-              isTransitioning
-                ? "opacity-0 translate-x-[50px]"
-                : "opacity-100 translate-x-0"
-            }`}
-          >
-            <div className="mb-4 flex-shrink-0">
-              <StoreSearchBar
-                isSelected={isSearchBarSelected && !isMenuOpen && !isKeyboardOpen}
-                searchQuery={storeSearchQuery}
-                onClick={() => {
-                  setIsSearchBarSelected(true);
-                  setIsKeyboardOpen(true);
-                }}
-                t={t}
-                buttons={buttons}
-              />
-              {storeSearchQuery && (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {filteredStoreGames.length}{" "}
-                  {filteredStoreGames.length > 1
-                    ? t("bigPicture.resultsForPlural")
-                    : t("bigPicture.resultsFor")}{" "}
-                  "{storeSearchQuery}"
-                </p>
-              )}
-            </div>
-
-            {storeLoading ? (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  <p className="text-xl text-muted-foreground">
-                    {t("bigPicture.loadingCatalog")}
-                  </p>
-                </div>
-              </div>
-            ) : filteredStoreGames.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                  <Search className="h-16 w-16 text-primary" />
-                  <p className="text-xl text-muted-foreground">
-                    {storeSearchQuery
-                      ? t("bigPicture.noGameFound")
-                      : t("bigPicture.noGameAvailable")}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-6 gap-6 pb-4">
-                  {displayedStoreGames.map((game, index) => (
-                    <div
-                      key={game.imgID || `store-${index}`}
-                      data-store-card
-                      className={
-                        index === storeIndex && !isSearchBarSelected && !isMenuOpen
-                          ? "relative z-10"
-                          : undefined
-                      }
-                    >
-                      <StoreGameCard
-                        game={game}
-                        isSelected={
-                          index === storeIndex && !isSearchBarSelected && !isMenuOpen
-                        }
-                        onClick={() => handleSelectStoreGame(game, index)}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div ref={loaderRef} className="flex w-full justify-center py-10">
-                  {hasMore && (
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary"></div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Floating Context Menu - Shows after 1 second of selection */}
-            {contextMenuGame &&
-              contextMenuPosition &&
-              !isSearchBarSelected &&
-              !isMenuOpen && (
-                <FloatingContextMenu
-                  game={contextMenuGame}
-                  position={contextMenuPosition}
-                  t={t}
-                />
-              )}
-          </div>
-        )}
-
-        {view === "downloads" && (
-          <div
-            className={`absolute inset-0 no-scrollbar h-full w-full overflow-y-auto scroll-smooth px-24 pb-8 pt-32 transition-all duration-300 ease-out ${
-              isTransitioning
-                ? "opacity-0 translate-x-[50px]"
-                : "opacity-100 translate-x-0"
-            } ${downloadingGames.length === 0 ? "flex items-center justify-center" : ""}`}
-          >
-            {downloadingGames.length === 0 ? (
-              <div className="relative">
-                <div className="relative">
-                  {/* Glowing background effect */}
-                  <div className="absolute inset-0 -z-10 animate-pulse">
-                    <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl" />
-                  </div>
-
-                  <div className="flex flex-col items-center gap-8 text-center">
-                    {/* Coffee icon with animated steam */}
-                    <div className="relative">
-                      <div className="flex h-24 w-24 items-center justify-center rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 shadow-lg shadow-primary/20">
-                        <Coffee className="h-12 w-12 text-primary" />
-                      </div>
-                      {/* Animated steam effect */}
-                      <div className="absolute -top-2 left-1/2 flex -translate-x-1/2 gap-1">
-                        <div
-                          className="h-6 w-1 animate-pulse rounded-full bg-primary/30 blur-sm"
-                          style={{ animationDelay: "0s", animationDuration: "2s" }}
-                        />
-                        <div
-                          className="h-8 w-1 animate-pulse rounded-full bg-primary/40 blur-sm"
-                          style={{ animationDelay: "0.3s", animationDuration: "2.2s" }}
-                        />
-                        <div
-                          className="h-6 w-1 animate-pulse rounded-full bg-primary/30 blur-sm"
-                          style={{ animationDelay: "0.6s", animationDuration: "2s" }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Text content */}
-                    <div className="space-y-4">
-                      <h2 className="text-4xl font-light uppercase tracking-[0.2em] text-primary">
-                        {t("downloads.noDownloads")}
-                      </h2>
-                      <p className="mx-auto max-w-md text-base text-muted-foreground/80">
-                        {t("downloads.noDownloadsMessage")}
-                      </p>
-                    </div>
-
-                    {/* Decorative line with dots */}
-                    <div className="flex items-center gap-3">
-                      <div className="h-px w-16 bg-gradient-to-r from-transparent to-primary/30" />
-                      <div className="flex gap-2">
-                        <span className="h-2 w-2 rounded-full bg-primary/50 shadow-sm shadow-primary/50" />
-                        <span className="h-2 w-2 rounded-full bg-primary/70 shadow-md shadow-primary/70" />
-                        <span className="h-2 w-2 rounded-full bg-primary/50 shadow-sm shadow-primary/50" />
-                      </div>
-                      <div className="h-px w-16 bg-gradient-to-l from-transparent to-primary/30" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-8 pb-8">
-                {/* Active Downloads Section */}
-                <div>
-                  <h2 className="mb-4 text-2xl font-bold text-primary">
-                    {t("downloads.activeDownloads")}
-                  </h2>
-                  <div className="grid grid-cols-1 gap-6">
-                    {downloadingGames.map((game, index) => (
-                      <BigPictureDownloadCard
-                        key={game.game}
-                        game={game}
-                        isSelected={index === downloadsIndex && !isMenuOpen}
-                        torboxState={
-                          game.torboxWebdownloadId
-                            ? torboxStates[game.torboxWebdownloadId]
-                            : undefined
-                        }
-                        onPause={() => handlePauseDownload(game)}
-                        onResume={() => handleResumeDownload(game)}
-                        onKill={() => handleKillDownload(game)}
-                        onOpenFolder={() => handleOpenFolder(game)}
-                        isStopping={stoppingDownloads.has(game.game)}
-                        isResuming={resumingDownloads.has(game.game)}
-                        t={t}
-                        buttons={buttons}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Queued Downloads Section - Only show for Ascend users */}
-                {isAuthenticated && queuedDownloads.length > 0 && (
-                  <div className="mt-8">
-                    <div className="mb-4 flex items-center gap-3">
-                      <ListEnd className="h-6 w-6 text-primary" />
-                      <h2 className="text-2xl font-bold text-primary">
-                        {t("downloads.queuedDownloads")} ({queuedDownloads.length})
-                      </h2>
-                    </div>
-                    <div className="space-y-3">
-                      {queuedDownloads.map((item, index) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-4 rounded-xl border-2 border-border/50 bg-card/50 p-4 transition-all duration-200 hover:border-primary/30"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-lg font-bold text-primary">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-bold text-foreground">{item.gameName}</h3>
-                            <p className="text-sm text-muted-foreground">{item.size}</p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              removeFromQueue(item.id);
-                              toast.success(t("downloads.removedFromQueue"));
-                            }}
-                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-500 transition-all hover:bg-red-500/30"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        </PageNavigationContext.Provider>
 
         {view === "details" && selectedStoreGame && (
           <div
@@ -625,6 +324,7 @@ function BigPicture() {
           >
             <InstalledGameDetailsView
               game={selectedInstalledGame}
+              autoLaunch={selectedInstalledGame.bigPictureAutoLaunch}
               onBack={handleCloseInstalledGameDetails}
               t={t}
               controllerType={settings.controllerType || "xbox"}
@@ -734,9 +434,9 @@ function BigPicture() {
         />
       )}
 
-      {view !== "details" && !isKeyboardOpen && !installedGameView && (
+      {view !== "details" && view !== "carousel" && !isKeyboardOpen && !installedGameView && (
         <div
-          className={`fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-white/5 bg-card/90 px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
+          className={`bp-footer fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-white/5 bg-card/90 px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
         >
           <div
             className="flex cursor-pointer items-center gap-3 font-bold tracking-widest text-primary transition-colors hover:text-primary/80"

@@ -1,6 +1,6 @@
 import React from "react";
 import { FolderOpen, Trash2, Play, Pause, Loader } from "lucide-react";
-import { getGamepadInput } from "./gamepad";
+
 
 // --- BIG PICTURE DOWNLOAD CARD ---
 const BigPictureDownloadCard = ({
@@ -15,8 +15,9 @@ const BigPictureDownloadCard = ({
   isResuming,
   t,
   buttons,
+  focus,
 }) => {
-  const [selectedActionIndex, setSelectedActionIndex] = React.useState(0);
+
   const data = game.downloadingData || {};
   const progress = parseFloat(data.progressCompleted || 0);
   const speed = data.progressDownloadSpeeds || "0 KB/s";
@@ -81,30 +82,6 @@ const BigPictureDownloadCard = ({
   };
 
   const actions = getActions();
-
-  // Handle gamepad input for action selection
-  React.useEffect(() => {
-    if (!isSelected) {
-      setSelectedActionIndex(0);
-      return;
-    }
-
-    const handleGamepadInput = () => {
-      const input = getGamepadInput();
-      if (!input) return;
-
-      if (input.left && selectedActionIndex > 0) {
-        setSelectedActionIndex(p => p - 1);
-      } else if (input.right && selectedActionIndex < actions.length - 1) {
-        setSelectedActionIndex(p => p + 1);
-      } else if (input.a) {
-        actions[selectedActionIndex]?.action();
-      }
-    };
-
-    const interval = setInterval(handleGamepadInput, 150);
-    return () => clearInterval(interval);
-  }, [isSelected, selectedActionIndex, actions]);
 
   return (
     <div
@@ -237,15 +214,12 @@ const BigPictureDownloadCard = ({
       <div className="flex flex-wrap gap-2">
         {actions.map((action, idx) => (
           <button
+            {...focus?.(`download-${game.game}-${idx}`)}
             key={idx}
             onClick={action.action}
             disabled={isStopping || isResuming}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-              isSelected && idx === selectedActionIndex
-                ? action.danger
-                  ? "scale-105 bg-red-500 text-white shadow-lg"
-                  : "scale-105 bg-primary text-white shadow-lg"
-                : action.danger
+            className={`bp-action flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+              action.danger
                   ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
                   : "bg-primary/20 text-primary hover:bg-primary/30"
             } ${isStopping || isResuming ? "cursor-not-allowed opacity-50" : ""}`}

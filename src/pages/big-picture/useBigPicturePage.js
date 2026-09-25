@@ -25,6 +25,7 @@ function useBigPicturePage() {
   const { t } = useLanguage();
   const { settings, updateSetting } = useSettings();
   const { isAuthenticated, user } = useAuth();
+  const surfaceNavigation = useRef(null);
   const controllerType = settings.controllerType || "xbox";
   const buttons = getControllerButtons(controllerType);
   const [assetSearchOpen, setAssetSearchOpen] = useState(false);
@@ -68,13 +69,14 @@ function useBigPicturePage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowWelcomeAnimation(false);
-    }, 2000);
+    }, 450);
 
     return () => clearTimeout(timer);
   }, []);
   const [allGames, setAllGames] = useState([]);
   const [carouselGames, setCarouselGames] = useState([]);
   const [storeGames, setStoreGames] = useState([]);
+  const [storeRevision, setStoreRevision] = useState(0);
   const [storeLoading, setStoreLoading] = useState(false);
   const [selectedStoreGame, setSelectedStoreGame] = useState(null);
   const [view, setView] = useState("carousel");
@@ -492,13 +494,13 @@ function useBigPicturePage() {
   };
 
   // --- INSTALLED GAME DETAILS HANDLERS ---
-  const handleShowInstalledGameDetails = game => {
+  const handleShowInstalledGameDetails = (game, autoLaunch = false) => {
     if (isTransitioning) return;
 
     setIsTransitioning(true);
 
     setTimeout(() => {
-      setSelectedInstalledGame(game);
+      setSelectedInstalledGame({ ...game, bigPictureAutoLaunch: autoLaunch });
       setInstalledGameView(true);
 
       setTimeout(() => {
@@ -747,7 +749,7 @@ function useBigPicturePage() {
         } catch (e) {}
         let games = [...installed, ...custom];
 
-        setAllGames(games);
+
 
         // Get recently played games using the service (same logic as Home.jsx)
         const recentlyPlayed = recentGamesService.getRecentGames();
@@ -769,6 +771,8 @@ function useBigPicturePage() {
             isCustom: true,
           })),
         ];
+
+        setAllGames(actuallyInstalledGames);
 
         // Filter out games that are no longer installed and merge with full game details
         const recentGames = recentlyPlayed
@@ -809,7 +813,7 @@ function useBigPicturePage() {
           });
         }
         setCarouselGames(carousel);
-      } catch (error) {}
+      } catch (error) { toast.error("Unable to load library. Open Library and choose Refresh to retry."); }
     };
     fetchGames();
   }, [refreshTrigger]);
@@ -828,8 +832,8 @@ function useBigPicturePage() {
         setStoreLoading(false);
       }
     };
-    if (view === "store") fetchStore();
-  }, [view, storeGames.length]);
+    if (view === "store" || view === "carousel") fetchStore();
+  }, [view, storeGames.length, storeRevision]);
 
   useEffect(() => {
     if (isMenuOpen) {
@@ -848,6 +852,7 @@ function useBigPicturePage() {
 
   const handleConfirmSearch = useCallback(() => {
     setIsKeyboardOpen(false);
+    setView("store");
     setIsSearchBarSelected(false);
     if (filteredStoreGames.length > 0) setStoreIndex(0);
   }, [filteredStoreGames.length]);
@@ -933,7 +938,7 @@ function useBigPicturePage() {
       }
 
       if (isMenuOpen) {
-        if (action === "DOWN") setMenuIndex(p => Math.min(p + 1, 6));
+        if (action === "DOWN") setMenuIndex(p => Math.min(p + 1, 8));
         else if (action === "UP") setMenuIndex(p => Math.max(p - 1, 0));
         else if (action === "BACK" || action === "MENU") setIsMenuOpen(false);
         else if (action === "CONFIRM") {
@@ -948,18 +953,24 @@ function useBigPicturePage() {
           } else if (menuIndex === 3) {
             changeView("downloads");
           } else if (menuIndex === 4) {
-            setShowControllerSettings(true);
+            changeView("preferences");
           } else if (menuIndex === 5) {
             setShowExitBigPictureDialog(true);
           } else if (menuIndex === 6) {
-            // Close Ascendara completely (Force Quit)
-            if (window.electron && window.electron.closeWindow) {
-              window.electron.closeWindow(true);
-            } else {
-              window.close(); // Fallback if electron not available
-            }
+            changeView("power");
+          } else if (menuIndex === 7) {
+            changeView("retro");
+          } else if (menuIndex === 8) {
+            changeView("profile");
           }
         }
+        return;
+      }
+
+      if (["carousel", "library", "retro", "profile", "preferences", "power", "downloads", "store"].includes(view)) {
+        if (action === "MENU") setIsMenuOpen(true);
+        else if (action === "SEARCH") setIsKeyboardOpen(true);
+        else surfaceNavigation.current?.(action);
         return;
       }
 
@@ -1182,10 +1193,12 @@ function useBigPicturePage() {
         Tab: "MENU",
         m: "MENU",
         ContextMenu: "MENU",
+        " ": "SEARCH",
       };
 
       if (keyMap[e.key]) {
         lastNavTime.current = now;
+        e.preventDefault();
         handleNavigation(keyMap[e.key]);
       }
     };
@@ -1233,6 +1246,7 @@ function useBigPicturePage() {
           updateButtonState("a");
           updateButtonState("b");
           updateButtonState("menu");
+          updateButtonState("y");
           animationFrameId = requestAnimationFrame(loop);
           return;
         }
@@ -1273,6 +1287,7 @@ function useBigPicturePage() {
         checkActionButton("a", "CONFIRM");
         checkActionButton("b", "BACK");
         checkActionButton("menu", "MENU");
+        checkActionButton("y", "SEARCH");
       }
       animationFrameId = requestAnimationFrame(loop);
     };
@@ -1291,6 +1306,12 @@ function useBigPicturePage() {
   ]);
 
   return {
+    selectedSort,
+    setSelectedSort,
+    refreshStore: () => { setStoreGames([]); setStoreRevision(value => value + 1); },
+    surfaceNavigation,
+    handleShowInstalledGameDetails,
+    refreshLibrary: () => setRefreshTrigger(value => value + 1),
     showKillDialog,
     showProviderDialog,
     isKeyboardOpen,
