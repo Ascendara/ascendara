@@ -213,6 +213,98 @@ function collectAllCustomGames(settings) {
 }
 
 /**
+ * Run a ludusavi command and parse its --api JSON output.
+ * Resolves to `null` instead of rejecting when the process exits non-zero,
+ * since that's how ludusavi reports "no match found".
+ */
+function runLudusaviJson(ludusaviPath, args) {
+  return new Promise(resolve => {
+    let child;
+    try {
+      child = spawn(ludusaviPath, args);
+    } catch {
+      resolve(null);
+      return;
+    }
+
+    let stdout = "";
+    child.stdout.on("data", data => {
+      stdout += data.toString();
+    });
+    child.on("error", () => resolve(null));
+    child.on("close", () => {
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+}
+
+/**
+ * Minimum fuzzy-match confidence required before we trust a resolved title.
+ * Ludusavi's fuzzy matcher always returns its best guess, even for
+ * completely unrelated games, so a threshold is needed to avoid
+ * backing up/restoring the wrong game.
+ */
+const LUDUSAVI_FUZZY_MATCH_THRESHOLD = 0.9;
+
+/**
+ * Resolve a game name to the exact title Ludusavi's manifest expects.
+ *
+ * Many repack/scene sources strip punctuation from game titles (e.g.
+ * "Papers Please" instead of "Papers, Please"), which causes Ludusavi's
+ * exact-name lookup to fail with "not found" even though the game is
+ * supported. This tries, in order: the name as-is, a normalized lookup
+ * (ignores case/edition/year suffixes), then a fuzzy lookup restricted to
+ * high-confidence matches. Falls back to the original name if nothing
+ * matches, so the caller gets Ludusavi's normal "not found" error.
+ *
+ * @param {string} ludusaviPath
+ * @param {string} configDir
+ * @param {string} game
+ * @param {"backup"|"restore"} context
+ */
+async function resolveLudusaviGameName(ludusaviPath, configDir, game, context) {
+  if (!game) return game;
+
+  const contextFlag = context === "restore" ? "--restore" : "--backup";
+  const baseArgs = ["--config", configDir, "find", "--api", contextFlag];
+
+  // 1. Exact match (cheapest, and avoids any risk of a fuzzy mismatch).
+  const exact = await runLudusaviJson(ludusaviPath, [...baseArgs, game]);
+  const exactMatch = Object.keys(exact?.games || {})[0];
+  if (exactMatch) return exactMatch;
+
+  // 2. Normalized match (case/edition/year/symbol-insensitive).
+  const normalized = await runLudusaviJson(ludusaviPath, [
+    ...baseArgs,
+    "--normalized",
+    game,
+  ]);
+  const normalizedMatch = Object.keys(normalized?.games || {})[0];
+  if (normalizedMatch) return normalizedMatch;
+
+  // 3. Fuzzy match, only trusted above a high confidence threshold.
+  const fuzzy = await runLudusaviJson(ludusaviPath, [
+    ...baseArgs,
+    "--normalized",
+    "--fuzzy",
+    game,
+  ]);
+  const [fuzzyMatch, fuzzyInfo] = Object.entries(fuzzy?.games || {})[0] || [];
+  if (fuzzyMatch && (fuzzyInfo?.score || 0) >= LUDUSAVI_FUZZY_MATCH_THRESHOLD) {
+    console.log(
+      `[Ludusavi] Resolved "${game}" to "${fuzzyMatch}" (fuzzy match, score ${fuzzyInfo.score})`
+    );
+    return fuzzyMatch;
+  }
+
+  return game;
+}
+
+/**
  * Register Ludusavi IPC handlers
  */
 function registerLudusaviHandlers() {
@@ -254,6 +346,23 @@ function registerLudusaviHandlers() {
       let args = [];
       args.push("--config", ludusaviConfigDir);
 
+      // Ludusavi requires an exact title match. Many game sources strip
+      // punctuation (e.g. "Papers Please" vs. "Papers, Please"), so resolve
+      // to the manifest's canonical title before backup/restore/list, while
+      // keeping `game` (Ascendara's own name) for everything else below.
+      let resolvedGame = game;
+      if (game && (action === "backup" || action === "restore" || action === "list-backups")) {
+        resolvedGame = await resolveLudusaviGameName(
+          ludusaviPath,
+          ludusaviConfigDir,
+          game,
+          action === "restore" ? "restore" : "backup"
+        );
+        if (resolvedGame !== game) {
+          console.log(`[Ludusavi] Resolved game name "${game}" -> "${resolvedGame}"`);
+        }
+      }
+
       switch (action) {
         case "backup":
           if (ludusaviSettings.backupOptions?.skipManifestCheck) {
@@ -261,7 +370,7 @@ function registerLudusaviHandlers() {
           }
           args.push("backup");
 
-          if (game) args.push(game);
+          if (resolvedGame) args.push(resolvedGame);
           args.push("--force");
 
           if (ludusaviSettings.backupLocation) {
@@ -314,7 +423,7 @@ function registerLudusaviHandlers() {
 
         case "restore":
           args.push("restore");
-          if (game) args.push(game);
+          if (resolvedGame) args.push(resolvedGame);
           args.push("--force");
 
           if (backupName) {
@@ -334,7 +443,7 @@ function registerLudusaviHandlers() {
 
         case "list-backups":
           args.push("backups");
-          if (game) args.push(game);
+          if (resolvedGame) args.push(resolvedGame);
 
           if (ludusaviSettings.backupLocation) {
             args.push("--path", ludusaviSettings.backupLocation);
@@ -346,6 +455,8 @@ function registerLudusaviHandlers() {
         case "find-game":
           args.push("find");
           if (game) args.push(game);
+          args.push("--normalized");
+          args.push("--fuzzy");
           args.push("--multiple");
           args.push("--api");
           break;

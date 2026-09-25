@@ -22,9 +22,10 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
     // 1. Get latest LOCAL backup
     const listResult = await window.electron.ludusavi("list-backups", gameName);
     const gamesData = listResult?.data?.games;
-    const resolvedKey = gamesData && Object.keys(gamesData).find(k =>
-      k === gameName || k.toLowerCase().startsWith(gameName.toLowerCase())
-    );
+    // `list-backups` was called with this exact game, so `gamesData` only
+    // ever contains that one entry, keyed by Ludusavi's canonical title
+    // (which can differ from Ascendara's stored name, e.g. missing commas).
+    const resolvedKey = gamesData && Object.keys(gamesData)[0];
     const gameBackupFolder = resolvedKey
       ? gamesData[resolvedKey].backupPath
       : `${backupLocation}/${gameName}`;

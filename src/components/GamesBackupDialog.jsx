@@ -698,11 +698,12 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       const data = result.data;
       let gameBackups = [];
 
-      const resolvedKey = data?.games
-        ? Object.keys(data.games).find(k =>
-            k === gameName || k.toLowerCase().startsWith(gameName.toLowerCase())
-          )
-        : null;
+      // We asked Ludusavi for backups of this exact game, so `data.games`
+      // only ever contains that one entry — but its key is Ludusavi's
+      // canonical title (e.g. "Papers, Please"), which can differ from
+      // Ascendara's stored name (e.g. "Papers Please"), so match by name
+      // isn't reliable here.
+      const resolvedKey = data?.games ? Object.keys(data.games)[0] : null;
 
       if (resolvedKey && data.games[resolvedKey].backups) {
         gameBackups = data.games[resolvedKey].backups.map(backup => ({
