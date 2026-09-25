@@ -1,0 +1,407 @@
+.bp-surface {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 7rem clamp(1.5rem, 5vw, 6rem) 6rem;
+  color: rgb(var(--color-foreground));
+  font-size: clamp(18px, 1.3vw, 28px);
+}
+.bp-surface h2 {
+  font-size: clamp(24px, 2vw, 42px);
+  font-weight: 650;
+  margin-bottom: 1rem;
+}
+.bp-surface section {
+  margin-top: 2rem;
+}
+.bp-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.bp-action {
+  min-height: 3.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.65rem;
+  background: rgb(var(--color-muted));
+  border: 2px solid transparent;
+  text-align: left;
+}
+.bp-action:disabled {
+  opacity: 0.45;
+}
+.bp-action[data-selected="true"],
+.bp-game[data-selected="true"],
+.bp-action:focus-visible,
+.bp-game:focus-visible {
+  outline: 3px solid rgb(var(--color-primary));
+  outline-offset: 4px;
+  background: rgb(var(--color-primary) / 0.15);
+}
+.bp-row {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding: 0.5rem 0.5rem 1rem;
+}
+.bp-game {
+  min-width: 0;
+  text-align: left;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  width: 100%;
+}
+.bp-row .bp-game {
+  flex: 0 0 clamp(150px, 15vw, 290px);
+}
+.bp-game strong,
+.bp-game span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 0.4rem;
+}
+.bp-game span {
+  color: rgb(var(--color-muted-foreground));
+  font-size: 0.85em;
+}
+.bp-cover {
+  aspect-ratio: 3 / 4;
+  border-radius: 0.5rem;
+  background: rgb(var(--color-muted));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.bp-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bp-cover svg {
+  width: 35%;
+  height: 35%;
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+  padding: 0.5rem;
+}
+.bp-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2rem;
+  padding: clamp(1rem, 3vw, 3rem);
+  border-radius: 1rem;
+  background: linear-gradient(
+    120deg,
+    rgb(var(--color-primary) / 0.17),
+    rgb(var(--color-card))
+  );
+}
+.bp-hero h2 {
+  font-size: clamp(30px, 3vw, 64px);
+  margin-top: 0.75rem;
+}
+.bp-hero p,
+.bp-muted {
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-hero .bp-game {
+  width: clamp(130px, 14vw, 270px);
+}
+@media (max-height: 800px) {
+  .bp-surface {
+    padding-top: 6rem;
+  }
+  .bp-hero {
+    padding: 1rem;
+  }
+  .bp-cover {
+    aspect-ratio: 4 / 3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-surface *,
+  .bp-surface {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
+/* Home is an artwork-led, neutral canvas independent of the desktop light theme. */
+.bp-home {
+  --home-muted: rgb(var(--color-muted-foreground));
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+  padding: 0 clamp(20px, 3.4vw, 88px) 64px;
+  font-size: clamp(16px, 1.15vw, 26px);
+}
+.bp-home .bp-action {
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  min-height: 44px;
+  padding: 0.55em 0.8em;
+  font: inherit;
+}
+.bp-home-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: clamp(64px, 8vh, 100px);
+}
+.bp-home-tabs,
+.bp-home-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.bp-home-tabs [aria-current="page"] {
+  color: rgb(var(--color-primary));
+  box-shadow: inset 0 -3px rgb(var(--color-primary));
+  border-radius: 0;
+}
+.bp-home-tools svg {
+  width: 1.2em;
+  height: 1.2em;
+  flex-shrink: 0;
+}
+.bp-home-tools span {
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-count {
+  font-size: 0.8em;
+  background: rgb(var(--color-muted));
+  border-radius: 1em;
+  padding: 0.1em 0.5em;
+}
+.bp-home-hero {
+  height: 43vh;
+  min-height: 230px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgb(var(--color-muted));
+}
+.bp-home-art {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+  animation: bp-art-in 0.25s ease-out;
+}
+.bp-home-placeholder {
+  position: absolute;
+  right: 12%;
+  top: 12%;
+  width: 30%;
+  height: 76%;
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-home-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(8, 10, 14, 0.74), transparent 80%),
+    linear-gradient(0deg, rgba(8, 10, 14, 0.93), transparent 85%);
+}
+.bp-home-hero-content {
+  color: #fff;
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  bottom: 7%;
+}
+.bp-home-eyebrow,
+.bp-home-meta {
+  color: #c6cad3;
+  margin: 0;
+  font-size: 1em;
+}
+.bp-home-hero h1 {
+  font-size: clamp(28px, 2.7vw, 62px);
+  line-height: 1.1;
+  font-weight: 650;
+  margin: 0.3em 0;
+  max-width: 75%;
+  text-wrap: balance;
+}
+.bp-home-hero-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1em;
+}
+.bp-home .bp-home-play {
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-secondary));
+  padding-inline: 1.7em;
+  font-weight: 650;
+}
+.bp-home .bp-home-secondary {
+  background: rgba(12, 15, 20, 0.45);
+}
+.bp-home-section {
+  margin-top: 1rem !important;
+}
+.bp-home-section header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bp-home-section h2 {
+  font-size: 1.15em;
+  margin: 0;
+}
+.bp-home-section header .bp-action {
+  color: var(--home-muted);
+}
+.bp-home .bp-row {
+  gap: 1.15vw;
+  padding: 8px 6px 12px;
+  margin: 0 -6px;
+  scrollbar-width: none;
+}
+.bp-home .bp-row .bp-game {
+  flex-basis: calc((100% - 5 * 1.15vw) / 6);
+  padding: 0;
+  color: inherit;
+  transition: transform 0.15s ease;
+}
+.bp-home .bp-cover {
+  aspect-ratio: 16 / 10;
+  background: rgb(var(--color-card));
+}
+.bp-home .bp-cover svg {
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-home .bp-game strong {
+  font-weight: 500;
+  font-size: 0.95em;
+  margin-top: 0.5em;
+}
+.bp-home .bp-game[data-selected="true"] {
+  transform: translateY(-3px);
+}
+.bp-home .bp-action[data-selected="true"],
+.bp-home .bp-game[data-selected="true"],
+.bp-home .bp-action:focus-visible {
+  outline: 3px solid rgb(var(--color-primary));
+  outline-offset: 3px;
+}
+.bp-home-download {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgb(var(--color-card));
+  border-radius: 8px;
+  padding: 0.4em 0.7em;
+  margin-top: 1rem;
+  overflow: hidden;
+}
+.bp-home .bp-home-download-info {
+  flex: 1;
+  justify-content: flex-start;
+  min-width: 0;
+}
+.bp-home-download-info > span {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.bp-home-download strong {
+  font-weight: 500;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-home-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgb(var(--color-muted));
+}
+.bp-home-progress span {
+  display: block;
+  height: 100%;
+  background: rgb(var(--color-primary));
+}
+.bp-home-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1.8em;
+  padding: 0 3.4vw;
+  background: rgb(var(--color-card) / 0.97);
+  color: rgb(var(--color-muted-foreground));
+  font-size: clamp(14px, 1vw, 22px);
+}
+.bp-home-footer span {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+}
+.bp-home-footer kbd {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 0.35em;
+  padding: 0 0.3em;
+}
+@keyframes bp-art-in {
+  from {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 1000px) {
+  .bp-home-tools span {
+    display: none;
+  }
+  .bp-home-nav {
+    gap: 0.25rem;
+  }
+  .bp-home .bp-action {
+    padding-inline: 0.55em;
+  }
+  .bp-home .bp-row .bp-game {
+    flex-basis: calc((100% - 3 * 1.15vw) / 4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-home-art {
+    animation: none;
+  }
+  .bp-home .bp-game {
+    transition: none;
+  }
+}
