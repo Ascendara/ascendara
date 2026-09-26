@@ -47,6 +47,17 @@ const RecentGameCard = ({ game, onPlay }) => {
     // Add event listener for cover updates
     window.addEventListener("game-cover-updated", handleCoverUpdate);
 
+    // The cover/assets may not be downloaded to disk yet when this card first
+    // mounts (e.g. right after launching the game from Big Picture mode, where
+    // asset downloads happen in the background). Reload once they finish.
+    const unsubscribeAssetsUpdated = window.electron.onGameAssetsUpdated(
+      ({ game: updatedGame, success }) => {
+        if (updatedGame === gameId && success && isMounted) {
+          loadGameImage();
+        }
+      }
+    );
+
     // Initial load
     loadGameImage();
 
@@ -54,6 +65,7 @@ const RecentGameCard = ({ game, onPlay }) => {
       isMounted = false;
       // Clean up event listener
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
+      unsubscribeAssetsUpdated();
     };
   }, [game]);
 

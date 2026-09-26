@@ -237,20 +237,50 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
   const imageLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (imageLoadedRef.current) return;
+    let isMounted = true;
+    const gameId = game.game || game.name;
+
     const loadImage = async () => {
-      const gameId = game.game || game.name;
       // No localStorage caching - data URLs blow out the per-origin localStorage
       // quota; IPC reads from disk are fast and React state holds the result.
       try {
         const imageBase64 = await window.electron.getGameImage(gameId);
-        if (imageBase64) {
+        if (imageBase64 && isMounted) {
           imageLoadedRef.current = true;
           setImageData(`data:image/jpeg;base64,${imageBase64}`);
         }
       } catch (error) {}
     };
-    loadImage();
+
+    if (!imageLoadedRef.current) {
+      loadImage();
+    }
+
+    // The cover/assets may not be downloaded to disk yet when this card first
+    // mounts (e.g. right after launching the game from Big Picture mode, where
+    // asset downloads happen in the background). Reload once they finish.
+    const handleCoverUpdate = event => {
+      const { gameName, dataUrl } = event.detail || {};
+      if (gameName === gameId && dataUrl && isMounted) {
+        imageLoadedRef.current = true;
+        setImageData(dataUrl);
+      }
+    };
+    window.addEventListener("game-cover-updated", handleCoverUpdate);
+
+    const unsubscribeAssetsUpdated = window.electron.onGameAssetsUpdated(
+      ({ game: updatedGame, success }) => {
+        if (updatedGame === gameId && success && isMounted) {
+          loadImage();
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("game-cover-updated", handleCoverUpdate);
+      unsubscribeAssetsUpdated();
+    };
   }, [game.game, game.name]);
 
   // Update time display every minute
