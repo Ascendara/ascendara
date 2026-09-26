@@ -562,6 +562,7 @@ export default function DownloadPage() {
 
   // Use a ref to track the event handler and active status
   const urlHandlerRef = useRef(null);
+  const unsubscribeUrlHandlerRef = useRef(null);
   const isActive = useRef(false);
   const whereToDownloadRef = useRef(whereToDownload);
   const steamSectionRef = useRef(null);
@@ -1399,12 +1400,9 @@ export default function DownloadPage() {
     isActive.current = true;
 
     // Remove any existing listener first
-    if (urlHandlerRef.current) {
-      window.electron.ipcRenderer.removeListener(
-        "protocol-download-url",
-        urlHandlerRef.current
-      );
-      urlHandlerRef.current = null;
+    if (unsubscribeUrlHandlerRef.current) {
+      unsubscribeUrlHandlerRef.current();
+      unsubscribeUrlHandlerRef.current = null;
     }
 
     // Create new handler and store in ref
@@ -1447,20 +1445,20 @@ export default function DownloadPage() {
     };
 
     // Add the new listener
-    window.electron.ipcRenderer.on("protocol-download-url", urlHandlerRef.current);
+    unsubscribeUrlHandlerRef.current = window.electron.onProtocolDownloadUrl(
+      urlHandlerRef.current
+    );
 
     // Cleanup function
     return () => {
       // Mark component as inactive
       isActive.current = false;
 
-      if (urlHandlerRef.current) {
-        window.electron.ipcRenderer.removeListener(
-          "protocol-download-url",
-          urlHandlerRef.current
-        );
-        urlHandlerRef.current = null;
+      if (unsubscribeUrlHandlerRef.current) {
+        unsubscribeUrlHandlerRef.current();
+        unsubscribeUrlHandlerRef.current = null;
       }
+      urlHandlerRef.current = null;
       // Clear URL tracking on unmount
       setLastProcessedUrl(null);
       setIsProcessingUrl(false);
@@ -1512,10 +1510,10 @@ export default function DownloadPage() {
       }
     };
 
-    window.electron.ipcRenderer.on("intercepted-download-url", handler);
+    const unsubscribe = window.electron.onInterceptedDownloadUrl(handler);
     return () => {
       isMounted = false;
-      window.electron.ipcRenderer.removeListener("intercepted-download-url", handler);
+      unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

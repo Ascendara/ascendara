@@ -86,7 +86,7 @@ const RefreshIndexDialog = ({
 
     let cookieProcessed = false; // Local guard to prevent duplicate processing
 
-    const handleCookieReceived = async (event, data) => {
+    const handleCookieReceived = async data => {
       // Guard against duplicate events and already processed cookies
       if (cookieProcessed || !data?.cookie || hasStartedRefresh) return;
       cookieProcessed = true;
@@ -120,10 +120,10 @@ const RefreshIndexDialog = ({
     setIsListening(true);
     setCookieReceived(false);
 
-    if (window.electron?.ipcRenderer) {
-      window.electron.ipcRenderer.on("steamrip-cookie-received", handleCookieReceived);
+    if (window.electron?.onSteamripCookieReceived) {
+      const unsubscribe = window.electron.onSteamripCookieReceived(handleCookieReceived);
       return () => {
-        window.electron.ipcRenderer.off("steamrip-cookie-received", handleCookieReceived);
+        unsubscribe();
         setIsListening(false);
       };
     }

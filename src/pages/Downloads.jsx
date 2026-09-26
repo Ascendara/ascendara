@@ -1380,7 +1380,7 @@ const DownloadCard = ({
     }
     const fetchLog = async () => {
       try {
-        const content = await window.electron.ipcRenderer.invoke("get-download-log", 200);
+        const content = await window.electron.getDownloadLog(200);
         setLogContent(content);
       } catch (err) {
         setLogContent(`Error reading log: ${err.message}`);
@@ -1396,8 +1396,8 @@ const DownloadCard = ({
   useEffect(() => {
     const gameName = game?.game;
     if (!gameName) return;
-    window.electron.ipcRenderer
-      .invoke("get-game-image", gameName, "hero")
+    window.electron
+      .getGameImage(gameName, "hero")
       .then(b64 => { if (b64) setHeroImage(`data:image/jpeg;base64,${b64}`); })
       .catch(() => {});
   }, [game?.game]);

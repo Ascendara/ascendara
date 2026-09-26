@@ -132,7 +132,7 @@ function useInstalledGameDetails({
     }
 
     if (gameName) {
-      window.electron.ipcRenderer.invoke("ensure-game-assets", gameName);
+      window.electron.ensureGameAssets(gameName);
     }
 
     // Check if executable exists
@@ -180,11 +180,7 @@ function useInstalledGameDetails({
     const loadHero = async () => {
       try {
         console.log("[InstalledGameDetailsView] Loading hero image for:", gameName);
-        const base64 = await window.electron.ipcRenderer.invoke(
-          "get-game-image",
-          gameName,
-          "hero"
-        );
+        const base64 = await window.electron.getGameImage(gameName, "hero");
         if (isMounted && base64) {
           console.log("[InstalledGameDetailsView] Hero image loaded successfully");
           setImageSrc(`data:image/jpeg;base64,${base64}`);
@@ -236,11 +232,7 @@ function useInstalledGameDetails({
     let isMounted = true;
     const loadLogo = async () => {
       try {
-        const base64 = await window.electron.ipcRenderer.invoke(
-          "get-game-image",
-          gameName,
-          "logo"
-        );
+        const base64 = await window.electron.getGameImage(gameName, "logo");
 
         if (isMounted && base64) {
           setLogoSrc(`data:image/png;base64,${base64}`);

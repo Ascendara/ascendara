@@ -2575,9 +2575,7 @@ function Settings() {
                         size="sm"
                         disabled={isDownloaderRunning}
                         onClick={async () => {
-                          const path = await window.electron.ipcRenderer.invoke(
-                            "open-directory-dialog"
-                          );
+                          const path = await window.electron.openDirectoryDialog();
                           if (path) {
                             const newPaths = [
                               ...(settings.additionalDirectories || []),

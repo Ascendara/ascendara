@@ -143,17 +143,14 @@ const MenuBar = () => {
   }, [isLatest]);
 
   useEffect(() => {
-    const handleDownloadProgress = (event, progress) => {
+    const handleDownloadProgress = progress => {
       setDownloadProgress(progress);
     };
 
-    window.electron.ipcRenderer.on("update-download-progress", handleDownloadProgress);
+    const unsubscribe = window.electron.onUpdateDownloadProgress(handleDownloadProgress);
 
     return () => {
-      window.electron.ipcRenderer.removeListener(
-        "update-download-progress",
-        handleDownloadProgress
-      );
+      unsubscribe();
     };
   }, []);
 

@@ -267,11 +267,11 @@ const FolderView = () => {
 
     refreshPlaytime();
     window.addEventListener("focus", refreshPlaytime);
-    window.electron.ipcRenderer.on("game-closed", refreshPlaytime);
+    const unsubscribe = window.electron.onGameClosed(refreshPlaytime);
     return () => {
       cancelled = true;
       window.removeEventListener("focus", refreshPlaytime);
-      window.electron.ipcRenderer.removeListener("game-closed", refreshPlaytime);
+      unsubscribe();
     };
   }, [folderName, location.key]);
 

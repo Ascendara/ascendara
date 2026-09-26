@@ -641,14 +641,9 @@ const LocalRefresh = () => {
       window.electron.onLocalRefreshCookieNeeded?.(handleCookieNeeded);
 
       // Upload events
-      window.electron.ipcRenderer.on("local-refresh-uploading", handleUploading);
-      window.electron.ipcRenderer.on(
-        "local-refresh-upload-complete",
-        handleUploadComplete
-      );
-      window.electron.ipcRenderer.on("local-refresh-upload-error", (_, data) =>
-        handleUploadError(data)
-      );
+      window.electron.onLocalRefreshUploading(handleUploading);
+      window.electron.onLocalRefreshUploadComplete(handleUploadComplete);
+      window.electron.onLocalRefreshUploadError(handleUploadError);
 
       // Public index download events
       window.electron.onPublicIndexDownloadStarted?.(handlePublicDownloadStarted);
@@ -661,12 +656,9 @@ const LocalRefresh = () => {
         window.electron.offLocalRefreshComplete?.();
         window.electron.offLocalRefreshError?.();
         window.electron.offLocalRefreshCookieNeeded?.();
-        window.electron.ipcRenderer.off("local-refresh-uploading", handleUploading);
-        window.electron.ipcRenderer.off(
-          "local-refresh-upload-complete",
-          handleUploadComplete
-        );
-        window.electron.ipcRenderer.off("local-refresh-upload-error", handleUploadError);
+        window.electron.offLocalRefreshUploading?.();
+        window.electron.offLocalRefreshUploadComplete?.();
+        window.electron.offLocalRefreshUploadError?.();
         window.electron.offPublicIndexDownloadStarted?.();
         window.electron.offPublicIndexDownloadComplete?.();
         window.electron.offPublicIndexDownloadError?.();

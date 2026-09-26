@@ -677,10 +677,10 @@ const ControllerDetectionPrompt = () => {
       }
     };
 
-    window.electron?.ipcRenderer?.on("game-launch-success", handleGameLaunch);
+    const unsubscribe = window.electron?.onGameLaunchSuccess?.(handleGameLaunch);
 
     return () => {
-      window.electron?.ipcRenderer?.off("game-launch-success", handleGameLaunch);
+      unsubscribe?.();
     };
   }, [showPrompt]);
 
@@ -876,12 +876,12 @@ const DiscordRPCTracker = () => {
       }
     };
 
-    window.electron?.ipcRenderer?.on("game-launch-success", handleGameLaunch);
-    window.electron?.ipcRenderer?.on("game-closed", handleGameClosed);
+    const unsubLaunch = window.electron?.onGameLaunchSuccess?.(handleGameLaunch);
+    const unsubClosed = window.electron?.onGameClosed?.(handleGameClosed);
 
     return () => {
-      window.electron?.ipcRenderer?.off("game-launch-success", handleGameLaunch);
-      window.electron?.ipcRenderer?.off("game-closed", handleGameClosed);
+      unsubLaunch?.();
+      unsubClosed?.();
     };
   }, [settings?.rpcEnabled]);
 
@@ -1022,12 +1022,12 @@ const UserActivityTracker = React.memo(() => {
     };
 
     // Listen for game events from Electron
-    window.electron?.ipcRenderer?.on("game-launch-success", handleGameLaunch);
-    window.electron?.ipcRenderer?.on("game-closed", handleGameClosed);
+    const unsubLaunch = window.electron?.onGameLaunchSuccess?.(handleGameLaunch);
+    const unsubClosed = window.electron?.onGameClosed?.(handleGameClosed);
 
     return () => {
-      window.electron?.ipcRenderer?.off("game-launch-success", handleGameLaunch);
-      window.electron?.ipcRenderer?.off("game-closed", handleGameClosed);
+      unsubLaunch?.();
+      unsubClosed?.();
     };
   }, [user?.uid, settings, userData]);
 
@@ -1261,6 +1261,7 @@ const AppRoutes = () => {
   const hasShownUpdateNotification = useRef(false);
   const hasShownUpdateReadyNotification = useRef(false);
   const protocolHandlerRef = useRef(null);
+  const unsubscribeProtocolRef = useRef(null);
 
   useEffect(() => {
     const loadIconPath = async () => {
@@ -1398,8 +1399,10 @@ const AppRoutes = () => {
         // Store the handler in the ref so we can access it in cleanup
         protocolHandlerRef.current = handleGameProtocol;
 
-        // Register the protocol listener using the ipcRenderer from preload
-        window.electron.ipcRenderer.on("protocol-game-url", protocolHandlerRef.current);
+        // Register the protocol listener using the named preload API
+        unsubscribeProtocolRef.current = window.electron.onProtocolGameUrl(
+          protocolHandlerRef.current
+        );
 
         // Check if we're forcing a loading screen from settings
         const forceLoading = localStorage.getItem("forceLoading");
@@ -1501,11 +1504,9 @@ const AppRoutes = () => {
       setIsLoading(false);
       setIsUpdating(false);
       setIsInstalling(false);
-      if (protocolHandlerRef.current) {
-        window.electron.ipcRenderer.removeListener(
-          "protocol-game-url",
-          protocolHandlerRef.current
-        );
+      if (unsubscribeProtocolRef.current) {
+        unsubscribeProtocolRef.current();
+        unsubscribeProtocolRef.current = null;
       }
     };
   }, []);

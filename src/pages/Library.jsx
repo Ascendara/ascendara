@@ -889,7 +889,7 @@ const Library = () => {
                     if (gameData?.imgID) imageId = gameData.imgID;
 
                     const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
-                    const imageData = await window.electron.ipcRenderer.readFile(localImagePath, "base64");
+                    const imageData = await window.electron.readLocalFile(localImagePath, "base64");
                     images[game.name] = `data:image/jpeg;base64,${imageData}`;
                     imageLoaded = true;
                   } catch (localError) {
@@ -3545,11 +3545,7 @@ const InstalledGameCard = memo(
 
       const loadLogo = async () => {
         try {
-          const logoBase64 = await window.electron.ipcRenderer.invoke(
-            "get-game-image",
-            gameId,
-            "logo"
-          );
+          const logoBase64 = await window.electron.getGameImage(gameId, "logo");
           if (logoBase64 && isMounted) {
             setLogoData(`data:image/png;base64,${logoBase64}`);
           } else {
@@ -3864,7 +3860,7 @@ const InstalledGameCard = memo(
                       } else {
                         // Try to load from local file
                         const localImagePath = `${settings.localIndex}/imgs/${coverSearch.selectedCover.gameID}.jpg`;
-                        const imageData = await window.electron.ipcRenderer.readFile(
+                        const imageData = await window.electron.readLocalFile(
                           localImagePath,
                           "base64"
                         );

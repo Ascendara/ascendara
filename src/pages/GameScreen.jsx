@@ -1286,13 +1286,10 @@ export default function GameScreen() {
       }
     };
 
-    window.electron.ipcRenderer.on("intercepted-download-url", handleInterceptedUpdate);
+    const unsubscribe = window.electron.onInterceptedDownloadUrl(handleInterceptedUpdate);
     return () => {
       pendingBrowserUpdate.current = null;
-      window.electron.ipcRenderer.removeListener(
-        "intercepted-download-url",
-        handleInterceptedUpdate
-      );
+      unsubscribe();
     };
   }, [showUpdateDialog, game?.game, game?.name, t]);
 
@@ -1462,7 +1459,7 @@ export default function GameScreen() {
         // Trigger the download of missing assets
         const gameName = game.game || game.name;
         if (gameName) {
-          window.electron.ipcRenderer.invoke("ensure-game-assets", gameName);
+          window.electron.ensureGameAssets(gameName);
         }
 
         // Check games.json for a _isDeleted stub matching this game and prompt to restore
@@ -1626,7 +1623,7 @@ export default function GameScreen() {
         );
         // Reload the game image with cache busting
         const gameId = game.game || game.name;
-        window.electron.ipcRenderer.invoke("get-game-image", gameId, "grid").then(imageBase64 => {
+        window.electron.getGameImage(gameId, "grid").then(imageBase64 => {
           if (imageBase64) {
             const timestamp = new Date().getTime();
             setImageData(`data:image/jpeg;base64,${imageBase64}?t=${timestamp}`);
@@ -1646,11 +1643,7 @@ export default function GameScreen() {
         // Fetch the new grid image (no localStorage caching - data URLs blow
         // out the per-origin localStorage quota; IPC reads from disk are fast)
         try {
-          const gridBase64 = await window.electron.ipcRenderer.invoke(
-            "get-game-image",
-            gameId,
-            "grid"
-          );
+          const gridBase64 = await window.electron.getGameImage(gameId, "grid");
           if (gridBase64) {
             const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
             setImageData(dataUrl);
@@ -1661,11 +1654,7 @@ export default function GameScreen() {
 
         // Also reload the logo image
         try {
-          const logoBase64 = await window.electron.ipcRenderer.invoke(
-            "get-game-image",
-            gameId,
-            "logo"
-          );
+          const logoBase64 = await window.electron.getGameImage(gameId, "logo");
           if (logoBase64) {
             setLogoData(`data:image/png;base64,${logoBase64}`);
           }
@@ -1715,25 +1704,18 @@ export default function GameScreen() {
       }
     };
 
-    window.electron.ipcRenderer.on("game-launch-error", handleGameLaunchError);
-    window.electron.ipcRenderer.on("cover-image-updated", handleCoverImageUpdated);
-    window.electron.ipcRenderer.on("game-assets-updated", handleGameAssetsUpdated);
-    window.electron.ipcRenderer.on("game-closed", handleGameClosed);
+    const unsubLaunchError = window.electron.onGameLaunchError(handleGameLaunchError);
+    const unsubCoverUpdated = window.electron.onCoverImageUpdated(handleCoverImageUpdated);
+    const unsubAssetsUpdated = window.electron.onGameAssetsUpdated(data =>
+      handleGameAssetsUpdated(null, data)
+    );
+    const unsubGameClosed = window.electron.onGameClosed(handleGameClosed);
 
     return () => {
-      window.electron.ipcRenderer.removeListener(
-        "game-launch-error",
-        handleGameLaunchError
-      );
-      window.electron.ipcRenderer.removeListener(
-        "cover-image-updated",
-        handleCoverImageUpdated
-      );
-      window.electron.ipcRenderer.removeListener(
-        "game-assets-updated",
-        handleGameAssetsUpdated
-      );
-      window.electron.ipcRenderer.removeListener("game-closed", handleGameClosed);
+      unsubLaunchError();
+      unsubCoverUpdated();
+      unsubAssetsUpdated();
+      unsubGameClosed();
     };
   }, [isInitialized, setShowRateDialog, game]); // Add required dependencies
 
@@ -1773,11 +1755,7 @@ export default function GameScreen() {
 
     const loadLogo = async () => {
       try {
-        const logoBase64 = await window.electron.ipcRenderer.invoke(
-          "get-game-image",
-          gameId,
-          "logo"
-        );
+        const logoBase64 = await window.electron.getGameImage(gameId, "logo");
         if (logoBase64) {
           setLogoData(`data:image/png;base64,${logoBase64}`);
         } else {
@@ -1846,11 +1824,7 @@ export default function GameScreen() {
     const loadGameImage = async () => {
       // 1. Try fetching Grid image from backend first (Priority)
       try {
-        const gridBase64 = await window.electron.ipcRenderer.invoke(
-          "get-game-image",
-          gameId,
-          "grid"
-        );
+        const gridBase64 = await window.electron.getGameImage(gameId, "grid");
 
         if (gridBase64 && isMounted) {
           const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
@@ -1914,11 +1888,7 @@ export default function GameScreen() {
       const gameId = game.game || game.name;
       const loadHeroImage = async () => {
         try {
-          const heroBase64 = await window.electron.ipcRenderer.invoke(
-            "get-game-image",
-            gameId,
-            "hero"
-          );
+          const heroBase64 = await window.electron.getGameImage(gameId, "hero");
           if (heroBase64) {
             setHeroImageData(`data:image/jpeg;base64,${heroBase64}`);
           }

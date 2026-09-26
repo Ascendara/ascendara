@@ -37,11 +37,7 @@ const GameCard = ({ game, index, isSelected, onClick, isGridMode, t }) => {
       const imageType = isHero ? "header" : "grid";
 
       try {
-        const base64 = await window.electron.ipcRenderer.invoke(
-          "get-game-image",
-          gameName,
-          imageType
-        );
+        const base64 = await window.electron.getGameImage(gameName, imageType);
 
         if (isMounted) {
           if (base64) {

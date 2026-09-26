@@ -25,12 +25,12 @@ function getAppVersion() {
   return typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : null;
 }
 
-function invokeRecovery(channel, ...args) {
-  const invoke = window.electron?.ipcRenderer?.invoke;
-  if (typeof invoke !== "function") {
+function getRecoveryApi() {
+  const recovery = window.electron?.recovery;
+  if (!recovery) {
     throw new Error("Ascendara recovery IPC is unavailable in this build");
   }
-  return invoke(channel, ...args);
+  return recovery;
 }
 
 export function isSafeUiModeEnabled() {
@@ -78,17 +78,17 @@ export function clearTransientUiState() {
 }
 
 export async function createSettingsRecoveryPoint(reason = "manual") {
-  return invokeRecovery("create-settings-recovery-point", reason, getAppVersion());
+  return getRecoveryApi().createRecoveryPoint(reason, getAppVersion());
 }
 
 export async function listSettingsRecoveryPoints() {
-  const points = await invokeRecovery("list-settings-recovery-points");
+  const points = await getRecoveryApi().listRecoveryPoints();
   return Array.isArray(points) ? points : [];
 }
 
 export async function restoreSettingsRecoveryPoint(id) {
   if (!id) throw new Error("A recovery point is required");
-  return invokeRecovery("restore-settings-recovery-point", id);
+  return getRecoveryApi().restoreRecoveryPoint(id);
 }
 
 export async function restoreLatestSettingsRecoveryPoint() {
@@ -100,13 +100,13 @@ export async function restoreLatestSettingsRecoveryPoint() {
 }
 
 export async function listOfficialRollbackVersions() {
-  const releases = await invokeRecovery("list-official-rollback-versions");
+  const releases = await getRecoveryApi().listOfficialRollbackVersions();
   return Array.isArray(releases) ? releases : [];
 }
 
 export async function rollbackAscendaraVersion(version) {
   if (!version) throw new Error("A rollback version is required");
-  return invokeRecovery("rollback-ascendara-version", version);
+  return getRecoveryApi().rollbackAscendaraVersion(version);
 }
 
 export function initializeRecoveryMode() {

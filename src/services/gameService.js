@@ -423,7 +423,7 @@ const gameService = {
     try {
       console.log("[GameService] Loading local index from:", localIndexPath);
       const filePath = `${localIndexPath}/ascendara_games.json`;
-      const fileContent = await window.electron.ipcRenderer.readFile(filePath);
+      const fileContent = await window.electron.readLocalFile(filePath);
       const data = JSON.parse(fileContent);
 
       // Sanitize game titles

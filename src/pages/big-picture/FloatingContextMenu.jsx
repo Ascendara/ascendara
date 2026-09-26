@@ -22,11 +22,7 @@ const FloatingContextMenu = ({ game, position, t }) => {
     const loadLogo = async () => {
       try {
         // Try to load logo
-        const logoBase64 = await window.electron.ipcRenderer.invoke(
-          "get-game-image",
-          gameName,
-          "logo"
-        );
+        const logoBase64 = await window.electron.getGameImage(gameName, "logo");
         if (isMounted && logoBase64) {
           setLogoSrc(`data:image/png;base64,${logoBase64}`);
         }

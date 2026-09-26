@@ -204,15 +204,11 @@ const SidecarAndDependencies = () => {
         }));
       }
     };
-    window.electron.ipcRenderer.on(
-      "dependency-installation-status",
+    const unsubscribe = window.electron.onDependencyInstallationStatus(
       handleDependencyStatus
     );
     return () => {
-      window.electron.ipcRenderer.off(
-        "dependency-installation-status",
-        handleDependencyStatus
-      );
+      unsubscribe();
     };
   }, [t]);
 

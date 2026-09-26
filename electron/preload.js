@@ -254,6 +254,24 @@ contextBridge.exposeInMainWorld("electron", {
   offLocalRefreshError: () => preloadIpc.removeAllListeners("local-refresh-error"),
   offLocalRefreshCookieNeeded: () =>
     preloadIpc.removeAllListeners("local-refresh-cookie-needed"),
+  onLocalRefreshUploading: callback =>
+    preloadIpc.subscribe("local-refresh-uploading", callback, {
+      selectArgs: () => [],
+    }),
+  onLocalRefreshUploadComplete: callback =>
+    preloadIpc.subscribe("local-refresh-upload-complete", callback, {
+      selectArgs: () => [],
+    }),
+  onLocalRefreshUploadError: callback =>
+    preloadIpc.subscribe("local-refresh-upload-error", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  offLocalRefreshUploading: () =>
+    preloadIpc.removeAllListeners("local-refresh-uploading"),
+  offLocalRefreshUploadComplete: () =>
+    preloadIpc.removeAllListeners("local-refresh-upload-complete"),
+  offLocalRefreshUploadError: () =>
+    preloadIpc.removeAllListeners("local-refresh-upload-error"),
   downloadSharedIndex: outputPath =>
     ipcRenderer.invoke("download-shared-index", outputPath),
   getPublicIndexDownloadStatus: () =>
@@ -321,6 +339,12 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("update-game-cover", gameName, imgID, imageData),
   getGameImage: (game, type) => ipcRenderer.invoke("get-game-image", game, type),
   onGameAssetsUpdated: callback => preloadIpc.subscribe("game-assets-updated", callback),
+  onCoverImageUpdated: callback =>
+    preloadIpc.subscribe("cover-image-updated", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  ensureGameAssets: gameName => ipcRenderer.invoke("ensure-game-assets", gameName),
   repairGameImage: game => ipcRenderer.invoke("repair-game-image", game),
   getLocalImageUrl: imagePath => ipcRenderer.invoke("get-local-image-url", imagePath),
   saveGameAsset: (gameName, filename, dataUrl) =>
@@ -394,6 +418,40 @@ contextBridge.exposeInMainWorld("electron", {
   isGameRunning: game => ipcRenderer.invoke("is-game-running", game),
   startSteam: () => ipcRenderer.invoke("start-steam"),
   isSteamRunning: () => ipcRenderer.invoke("is-steam-running"),
+  onGameLaunchSuccess: callback =>
+    preloadIpc.subscribe("game-launch-success", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  onGameLaunchError: callback =>
+    preloadIpc.subscribe("game-launch-error", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  onGameClosed: callback =>
+    preloadIpc.subscribe("game-closed", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+
+  //===========================================================================
+  // PROTOCOL & DEEP LINKS
+  //===========================================================================
+  onProtocolGameUrl: callback =>
+    preloadIpc.subscribe("protocol-game-url", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  onProtocolDownloadUrl: callback =>
+    preloadIpc.subscribe("protocol-download-url", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  onInterceptedDownloadUrl: callback =>
+    preloadIpc.subscribe("intercepted-download-url", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
 
   //===========================================================================
   // DOWNLOADS
@@ -446,6 +504,7 @@ contextBridge.exposeInMainWorld("electron", {
   isDownloaderRunning: () => ipcRenderer.invoke("is-downloader-running"),
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
   getDownloads: () => ipcRenderer.invoke("get-downloads"),
+  getDownloadLog: lines => ipcRenderer.invoke("get-download-log", lines),
 
   // Download Events
   onDownloadProgress: callback =>
@@ -506,6 +565,11 @@ contextBridge.exposeInMainWorld("electron", {
   openReqPath: game => ipcRenderer.invoke("required-libraries", game),
   folderExclusion: boolean => ipcRenderer.invoke("folder-exclusion", boolean),
   isWatchdogRunning: () => ipcRenderer.invoke("is-watchdog-running"),
+  onDependencyInstallationStatus: callback =>
+    preloadIpc.subscribe("dependency-installation-status", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
 
   //===========================================================================
   // UPDATES
@@ -603,6 +667,40 @@ contextBridge.exposeInMainWorld("electron", {
   uploadProfileImage: imageBase64 =>
     ipcRenderer.invoke("upload-profile-image", imageBase64),
   getProfileImage: () => ipcRenderer.invoke("get-profile-image"),
+
+  //===========================================================================
+  // ASCEND CHECKOUT
+  //===========================================================================
+  onCheckoutSuccess: callback =>
+    preloadIpc.subscribe("checkout-success", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  onCheckoutCanceled: callback =>
+    preloadIpc.subscribe("checkout-canceled", callback, {
+      selectArgs: () => [],
+    }),
+
+  //===========================================================================
+  // SETTINGS RECOVERY & ROLLBACK
+  //===========================================================================
+  recovery: {
+    createRecoveryPoint: (reason, appVersion) =>
+      ipcRenderer.invoke("create-settings-recovery-point", reason, appVersion),
+    listRecoveryPoints: () => ipcRenderer.invoke("list-settings-recovery-points"),
+    restoreRecoveryPoint: id =>
+      ipcRenderer.invoke("restore-settings-recovery-point", id),
+    listOfficialRollbackVersions: () =>
+      ipcRenderer.invoke("list-official-rollback-versions"),
+    rollbackAscendaraVersion: version =>
+      ipcRenderer.invoke("rollback-ascendara-version", version),
+  },
+
+  //===========================================================================
+  // LOCAL FILE ACCESS
+  //===========================================================================
+  readLocalFile: (filePath, encoding) =>
+    ipcRenderer.invoke("read-local-file", filePath, encoding),
 
   //===========================================================================
   // QR CODE GENERATION

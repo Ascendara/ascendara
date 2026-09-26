@@ -2340,9 +2340,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
   // Listen for checkout protocol callbacks
   useEffect(() => {
-    if (!window.electron?.ipcRenderer) return;
+    if (!window.electron?.onCheckoutSuccess) return;
 
-    const onCheckoutSuccess = (event, data) => {
+    const onCheckoutSuccess = data => {
       console.log("Checkout success received:", data);
       if (data?.sessionId) {
         handleCheckoutSuccess(data.sessionId);
@@ -2354,12 +2354,12 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       handleCheckoutCanceled();
     };
 
-    window.electron.ipcRenderer.on("checkout-success", onCheckoutSuccess);
-    window.electron.ipcRenderer.on("checkout-canceled", onCheckoutCanceled);
+    const unsubSuccess = window.electron.onCheckoutSuccess(onCheckoutSuccess);
+    const unsubCanceled = window.electron.onCheckoutCanceled(onCheckoutCanceled);
 
     return () => {
-      window.electron.ipcRenderer.removeListener("checkout-success", onCheckoutSuccess);
-      window.electron.ipcRenderer.removeListener("checkout-canceled", onCheckoutCanceled);
+      unsubSuccess();
+      unsubCanceled();
     };
   }, [user?.uid]);
 
