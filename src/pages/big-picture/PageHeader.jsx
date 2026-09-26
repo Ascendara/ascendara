@@ -26,11 +26,11 @@ export const pageFocusIds = [
   "page-preferences",
 ];
 
-export function PageNavigation({ focus, fallback }) {
+export function PageNavigation({ focus = () => ({}), fallback }) {
   const context = useContext(PageNavigationContext);
   const navigation = context || fallback;
   const { user, userData } = useAuth();
-  if (!navigation) return null;
+  if (!navigation || navigation.hideChrome) return null;
   return (
     <nav className="bp-navigation" aria-label="Big Picture pages">
       <div className="bp-navigation-tabs">
@@ -87,11 +87,25 @@ export function PageNavigation({ focus, fallback }) {
   );
 }
 
-export function PageHeader({ title, description }) {
+export function PageFooter({ fallback }) {
+  const context = useContext(PageNavigationContext);
+  const navigation = context || fallback;
+  const buttons = navigation?.buttons;
+  if (!buttons || navigation.hideChrome) return null;
   return (
-    <header className="bp-page-heading">
-      <h1>{title}</h1>
-      {description && <p>{description}</p>}
-    </header>
+    <footer className="bp-home-footer">
+      <span>
+        <kbd>{buttons.confirm}</kbd>Select
+      </span>
+      <span>
+        <kbd>{buttons.cancel}</kbd>Back
+      </span>
+      <span>
+        <kbd>{buttons.space}</kbd>Search
+      </span>
+      <span>
+        <kbd>{buttons.menu}</kbd>Menu
+      </span>
+    </footer>
   );
 }

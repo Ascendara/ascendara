@@ -13,7 +13,13 @@ export function useSurface(
 ) {
   const pageNavigation = useContext(PageNavigationContext);
   if (pageNavigation && initialFocus !== "hero") rows = [pageFocusIds, ...rows];
-  const defaultFocus = initialFocus ?? (pageNavigation ? `page-${pageNavigation.view}` : null);
+  const firstSurfaceFocus = rows
+    .flat()
+    .find((id) => id && !pageFocusIds.includes(id));
+  const defaultFocus =
+    initialFocus ??
+    firstSurfaceFocus ??
+    (pageNavigation ? `page-${pageNavigation.view}` : null);
   const [selected, setSelected] = useState(defaultFocus);
   const root = useRef(null);
   const ids = rows.flat();

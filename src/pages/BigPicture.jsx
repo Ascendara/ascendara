@@ -1,6 +1,6 @@
 import { PageNavigationContext } from "./big-picture/PageHeader";
 import { Toaster, toast } from "sonner";
-import { Search, Coffee, ListEnd, X, Menu, Gamepad2 } from "lucide-react";
+import { Search, Coffee, ListEnd, X, Gamepad2 } from "lucide-react";
 import { removeFromQueue, addToQueue } from "@/services/downloadQueueService";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import { useBigPicturePage } from "./big-picture/useBigPicturePage";
@@ -26,7 +26,6 @@ import { InstalledGameDetailsView } from "./big-picture/InstalledGameDetailsView
 import { KillDownloadDialog } from "./big-picture/KillDownloadDialog";
 import { ProviderSelectionDialog } from "./big-picture/ProviderSelectionDialog";
 import { QueuePromptDialog } from "./big-picture/QueuePromptDialog";
-import { getButtonWidthClass, getButtonBadgeClass } from "./big-picture/controller";
 import "@/components/ui/input";
 import "@/components/GamesBackupDialog";
 
@@ -79,7 +78,6 @@ function BigPicture() {
     allGames,
     libraryIndex,
     setLibraryIndex,
-    isSearchBarSelected,
     setIsSearchBarSelected,
     filteredStoreGames,
     storeLoading,
@@ -239,7 +237,7 @@ function BigPicture() {
         buttons={buttons}
         onItemClick={idx => {
           setIsMenuOpen(false);
-          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=DOWNLOADS, 4=SETTINGS, 5=EXIT BIG PICTURE, 6=CLOSE ASCENDARA
+          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=DOWNLOADS, 4=SETTINGS, 5=RETRO, 6=PROFILE, 7=EXIT BIG PICTURE, 8=CLOSE ASCENDARA
           if (idx === 0) {
             changeView("carousel");
           } else if (idx === 1) {
@@ -251,13 +249,13 @@ function BigPicture() {
           } else if (idx === 4) {
             changeView("preferences");
           } else if (idx === 5) {
-            setShowExitBigPictureDialog(true);
-          } else if (idx === 6) {
-            changeView("power");
-          } else if (idx === 7) {
             changeView("retro");
-          } else if (idx === 8) {
+          } else if (idx === 6) {
             changeView("profile");
+          } else if (idx === 7) {
+            setShowExitBigPictureDialog(true);
+          } else if (idx === 8) {
+            changeView("power");
           }
 
         }}
@@ -266,9 +264,9 @@ function BigPicture() {
       <div
         className={`relative flex w-full flex-1 items-center pb-16 transition-all duration-200 ${isMenuOpen ? "scale-95 opacity-50 blur-sm" : ""}`}
       >
-        <PageNavigationContext.Provider value={{view, changeView, search: () => setIsKeyboardOpen(true), downloadCount: downloadingGames.length + queuedDownloads.length}}>
+        <PageNavigationContext.Provider value={{view, changeView, search: () => setIsKeyboardOpen(true), downloadCount: downloadingGames.length + queuedDownloads.length, buttons, hideChrome: installedGameView}}>
         {view === "power" && <PowerSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} onDesktop={() => navigate("/")} />}
-        {view === "carousel" && <HomeDashboard navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView && !showControllerSettings && !isKeyboardOpen && !showExitBigPictureDialog} search={() => setIsKeyboardOpen(true)} openMenu={() => setIsMenuOpen(true)} buttons={buttons} pause={handlePauseDownload} resume={handleResumeDownload} stopping={stoppingDownloads} resuming={resumingDownloads} playGame={game => handleShowInstalledGameDetails(game, true)} games={allGames} downloads={downloadingGames} queue={queuedDownloads} discover={filteredStoreGames} openGame={handleShowInstalledGameDetails} openStore={game => handleSelectStoreGame(game, 0)} changeView={changeView} openSettings={() => changeView("preferences")} />}
+        {view === "carousel" && <HomeDashboard navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView && !showControllerSettings && !isKeyboardOpen && !showExitBigPictureDialog} search={() => setIsKeyboardOpen(true)} openMenu={() => setIsMenuOpen(true)} pause={handlePauseDownload} resume={handleResumeDownload} stopping={stoppingDownloads} resuming={resumingDownloads} playGame={game => handleShowInstalledGameDetails(game, true)} games={allGames} downloads={downloadingGames} queue={queuedDownloads} discover={filteredStoreGames} openGame={handleShowInstalledGameDetails} openStore={game => handleSelectStoreGame(game, 0)} changeView={changeView} openSettings={() => changeView("preferences")} />}
         {view === "library" && <LibrarySurface navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView} games={allGames} openGame={handleShowInstalledGameDetails} refresh={refreshLibrary} onBack={() => changeView("carousel")} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
         {view === "retro" && <RetroSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} />}
         {["preferences", "profile"].includes(view) && <PreferencesSurface key={view} navigation={surfaceNavigation} active={!isMenuOpen && !showControllerSettings} profile={view === "profile"} onBack={() => changeView("carousel")} openController={() => setShowControllerSettings(true)} />}
@@ -432,45 +430,6 @@ function BigPicture() {
           controllerType={settings.controllerType || "xbox"}
           isAuthenticated={isAuthenticated}
         />
-      )}
-
-      {view !== "details" && view !== "carousel" && !isKeyboardOpen && !installedGameView && (
-        <div
-          className={`bp-footer fixed bottom-0 left-0 right-0 z-[100] flex h-16 items-center justify-between border-t border-white/5 bg-card/90 px-16 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] transition-all duration-200 ${isMenuOpen ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"}`}
-        >
-          <div
-            className="flex cursor-pointer items-center gap-3 font-bold tracking-widest text-primary transition-colors hover:text-primary/80"
-            onClick={() => setIsMenuOpen(true)}
-          >
-            <Menu className="h-6 w-6" />
-            <span>{t("bigPicture.menu")}</span>
-            <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-              {buttons.menu}
-            </span>
-          </div>
-          <div className="flex gap-12 text-sm font-bold tracking-widest text-primary">
-            <div className="flex items-center gap-3">
-              <span
-                className={`flex h-8 ${getButtonWidthClass(buttons.confirm, "w-8")} items-center justify-center ${getButtonBadgeClass(controllerType)} bg-primary text-xs font-black text-secondary shadow-lg`}
-              >
-                {buttons.confirm}
-              </span>
-              {view === "store" && isSearchBarSelected
-                ? t("bigPicture.search")
-                : view === "store"
-                  ? t("bigPicture.select")
-                  : t("bigPicture.play")}
-            </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`flex h-8 ${getButtonWidthClass(buttons.cancel, "w-8")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-xs font-black text-muted-foreground`}
-              >
-                {buttons.cancel}
-              </span>
-              {view === "carousel" ? t("bigPicture.exit") : t("bigPicture.back")}
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Game Asset Search Dialog */}

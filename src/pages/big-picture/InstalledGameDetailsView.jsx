@@ -41,8 +41,8 @@ import { Button } from "@/components/ui/button";
 import { AnimatePresence } from "framer-motion";
 import LaunchOverlay from "@/components/LaunchOverlay";
 import { useInstalledGameDetails } from "./useInstalledGameDetails";
-import { getButtonWidthClass, getButtonBadgeClass } from "./controller";
 import { ExecutableManagerDialog } from "./ExecutableManagerDialog";
+import { DetailBackButton } from "./DetailBackButton";
 
 function InstalledGameDetailsView({
   game,
@@ -101,6 +101,8 @@ function InstalledGameDetailsView({
     buttons,
     handleInput,
     backupDialogOpen,
+    setDialogButtonIndex,
+    handleBackupAction,
     dialogButtonIndex,
     showVrWarning,
     setShowVrWarning,
@@ -128,6 +130,7 @@ function InstalledGameDetailsView({
   });
   return (
     <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-background text-primary">
+      <DetailBackButton onBack={() => handleInput("BACK")} controllerType={controllerType} t={t} />
       {hasHeroImage ? (
         // New layout: Full-screen hero background
         <>
@@ -343,14 +346,14 @@ function InstalledGameDetailsView({
               </div>
             )}
 
-            <div className="flex gap-4">
+            <div className="flex flex-wrap items-center gap-6">
               {canLaunchGame ? (
                 <button
                   onClick={handlePlayGame}
                   disabled={isLaunching || isRunning}
                   className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 ${
                     selectedButton === "play"
-                      ? "scale-110 bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
+                      ? "bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
                       : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-primary hover:text-secondary"
                   }`}
                 >
@@ -376,7 +379,7 @@ function InstalledGameDetailsView({
                   onClick={() => setShowBrowseExeWarning(true)}
                   className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
                     selectedButton === "play"
-                      ? "scale-110 bg-yellow-500 text-secondary shadow-yellow-500/50 ring-4 ring-yellow-500/50"
+                      ? "bg-yellow-500 text-secondary shadow-yellow-500/50 ring-4 ring-yellow-500/50"
                       : "bg-yellow-500/80 text-secondary shadow-black/30 hover:scale-105 hover:bg-yellow-500"
                   }`}
                 >
@@ -419,6 +422,20 @@ function InstalledGameDetailsView({
                 }`}
               >
                 <ImageIcon className="h-6 w-6" />
+              </button>
+              <button
+                onClick={() => {
+                  setDialogButtonIndex(0);
+                  setBackupDialogOpen(true);
+                }}
+                className={`flex items-center gap-3 rounded-2xl border-2 px-6 py-5 text-base font-medium backdrop-blur-sm transition-colors ${
+                  selectedButton === "backups"
+                    ? "border-primary bg-primary/30 text-white ring-4 ring-primary/50"
+                    : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                <FolderSync className="h-6 w-6" />
+                <span>{t("gameScreen.backupSaves")}</span>
               </button>
             </div>
           </div>
@@ -494,22 +511,6 @@ function InstalledGameDetailsView({
             <div className="space-y-3">
               <button
                 onClick={() => {
-                  setBackupDialogOpen(true);
-                  setShowManagementMenu(false);
-                }}
-                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 0
-                    ? "bg-primary text-secondary shadow-lg"
-                    : "bg-muted hover:bg-muted/80"
-                }`}
-              >
-                <FolderSync className="h-6 w-6" />
-                <span className="text-lg font-semibold">
-                  {t("gameScreen.backupSaves")}
-                </span>
-              </button>
-              <button
-                onClick={() => {
                   window.electron.createGameShortcut(game).then(success => {
                     if (success) toast.success(t("library.shortcutCreated"));
                     else toast.error(t("library.shortcutError"));
@@ -517,7 +518,7 @@ function InstalledGameDetailsView({
                   setShowManagementMenu(false);
                 }}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 1
+                  selectedMenuItem === 0
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -533,7 +534,7 @@ function InstalledGameDetailsView({
                   setShowManagementMenu(false);
                 }}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 2
+                  selectedMenuItem === 1
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -558,7 +559,7 @@ function InstalledGameDetailsView({
                   setShowManagementMenu(false);
                 }}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 3
+                  selectedMenuItem === 2
                     ? "bg-red-500 text-white shadow-lg"
                     : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                 }`}
@@ -759,41 +760,6 @@ function InstalledGameDetailsView({
         />
       )}
 
-      {/* Footer Controls */}
-      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
-        {!showMedia && !isLaunching && !isRunning && (
-          <div className="flex items-center gap-3">
-            <span
-              className={`flex h-10 ${getButtonWidthClass(buttons.confirm, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} bg-primary text-sm font-black text-secondary shadow-lg`}
-            >
-              {buttons.confirm}
-            </span>
-            {t("bigPicture.play")}
-          </div>
-        )}
-        {!showMedia && (
-          <div className="flex items-center gap-3">
-            <span
-              className={`flex h-10 ${getButtonWidthClass(buttons.delete, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-sm font-black text-muted-foreground`}
-            >
-              {buttons.delete}
-            </span>
-            {t("bigPicture.openFolder")}
-          </div>
-        )}
-        <div
-          className="flex cursor-pointer items-center gap-3 transition-colors hover:text-primary/80"
-          onClick={() => handleInput("BACK")}
-        >
-          <span
-            className={`flex h-10 ${getButtonWidthClass(buttons.cancel, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-sm text-muted-foreground`}
-          >
-            {buttons.cancel}
-          </span>{" "}
-          {showMedia ? t("bigPicture.upBack") : t("bigPicture.back")}
-        </div>
-      </div>
-
       {/* Warning and Management Dialogs */}
       {/* Simplified Backup Dialog for BigPicture */}
       <AlertDialog open={backupDialogOpen} onOpenChange={setBackupDialogOpen}>
@@ -810,6 +776,7 @@ function InstalledGameDetailsView({
           </AlertDialogHeader>
           <div className="space-y-4 py-4">
             <button
+              onClick={() => handleBackupAction(0)}
               className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
                 dialogButtonIndex === 0
                   ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
@@ -822,6 +789,7 @@ function InstalledGameDetailsView({
               </span>
             </button>
             <button
+              onClick={() => handleBackupAction(1)}
               className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
                 dialogButtonIndex === 1
                   ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
@@ -834,6 +802,7 @@ function InstalledGameDetailsView({
               </span>
             </button>
             <button
+              onClick={() => handleBackupAction(2)}
               className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
                 dialogButtonIndex === 2
                   ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"

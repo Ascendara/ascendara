@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { PageHeader, PageNavigation } from "./PageHeader";
+import { PageNavigation, PageFooter } from "./PageHeader";
 
 // One safe-area and content layout for every collection/settings surface.
 export const BigPictureShell = forwardRef(function BigPictureShell(
@@ -21,10 +21,8 @@ export const BigPictureShell = forwardRef(function BigPictureShell(
       aria-label={title}
     >
       <PageNavigation focus={focus} fallback={navigation} />
-      {!cinematic && (
-        <PageHeader title={title} description={description} focus={focus} />
-      )}
       {children}
+      <PageFooter fallback={navigation} />
     </main>
   );
 });

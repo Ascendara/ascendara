@@ -8,6 +8,8 @@ const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick, buttons }) => {
     { icon: Library, label: t("bigPicture.catalog"), action: "catalog" },
     { icon: Download, label: t("bigPicture.downloads"), action: "downloads" },
     { icon: Settings, label: t("bigPicture.settings"), action: "settings" },
+    { icon: Gamepad2, label: t("bigPicture.retro"), action: "retro" },
+    { icon: User, label: t("bigPicture.profile"), action: "profile" },
     { icon: LogOut, label: t("bigPicture.exitBigPicture"), action: "exit_bp" },
     {
       icon: Power,
@@ -15,8 +17,6 @@ const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick, buttons }) => {
       action: "quit_app",
       danger: true,
     },
-    { icon: Gamepad2, label: "Retro", action: "retro" },
-    { icon: User, label: "Profile", action: "profile" },
   ];
   return (
     <div

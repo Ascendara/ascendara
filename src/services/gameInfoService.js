@@ -230,9 +230,15 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
 
     console.log("Steam detail response:", data);
 
-    if (data[appId]?.success && data[appId]?.data) {
-      return data[appId].data;
-    }
+    // The proxy can return a stale outer key. Trust the payload's identity,
+    // never an unrelated game's data just because its envelope key matches.
+    const entries = data && typeof data === "object" ? Object.values(data) : [];
+    const match = entries.find(entry =>
+      entry?.success &&
+      entry.data &&
+      String(entry.data.steam_appid) === String(appId)
+    );
+    if (match) return match.data;
 
     return null;
   } catch (error) {
@@ -571,7 +577,7 @@ const formatSteamData = steamData => {
   }
 
   // Get clean description - prefer short_description for summary, about_the_game for detailed
-  const shortDescription = steamData.short_description || "";
+  const shortDescription = stripHtmlTags(steamData.short_description || "");
   const aboutTheGame = steamData.about_the_game
     ? stripHtmlTags(steamData.about_the_game)
     : "";

@@ -258,6 +258,7 @@ function useInstalledGameDetails({
     let isMounted = true;
     const fetchGameData = async () => {
       console.log("[InstalledGameDetailsView] Fetching Steam data for:", gameName);
+      setSteamData(null);
       setLoadingMedia(true);
       try {
         const data = await steamService.getGameDetails(gameName);
@@ -508,6 +509,21 @@ function useInstalledGameDetails({
     }
   };
 
+  const handleBackupAction = useCallback(async index => {
+    setBackupDialogOpen(false);
+    setDialogButtonIndex(0);
+    if (index === 2) return;
+    const operation = index === 0 ? "backup" : "restore";
+    try {
+      const result = await window.electron.ludusavi(operation, gameName);
+      toast[result?.success ? "success" : "error"](
+        t(`library.backups.${operation}${result?.success ? "Success" : "Failed"}`)
+      );
+    } catch {
+      toast.error(t(`library.backups.${operation}Failed`));
+    }
+  }, [gameName, t]);
+
   const handleInput = useCallback(
     action => {
       if (!canInput) return;
@@ -641,33 +657,7 @@ function useInstalledGameDetails({
         } else if (action === "DOWN") {
           setDialogButtonIndex(prev => Math.min(2, prev + 1));
         } else if (action === "CONFIRM") {
-          if (dialogButtonIndex === 0) {
-            // Backup Now
-            setBackupDialogOpen(false);
-            setDialogButtonIndex(0);
-            window.electron.ludusavi("backup", gameName).then(result => {
-              if (result?.success) {
-                toast.success(t("library.backups.backupSuccess"));
-              } else {
-                toast.error(t("library.backups.backupFailed"));
-              }
-            });
-          } else if (dialogButtonIndex === 1) {
-            // Restore Latest
-            setBackupDialogOpen(false);
-            setDialogButtonIndex(0);
-            window.electron.ludusavi("restore", gameName).then(result => {
-              if (result?.success) {
-                toast.success(t("library.backups.restoreSuccess"));
-              } else {
-                toast.error(t("library.backups.restoreFailed"));
-              }
-            });
-          } else if (dialogButtonIndex === 2) {
-            // Close
-            setBackupDialogOpen(false);
-            setDialogButtonIndex(0);
-          }
+          handleBackupAction(dialogButtonIndex);
         } else if (action === "BACK") {
           setBackupDialogOpen(false);
           setDialogButtonIndex(0);
@@ -678,10 +668,10 @@ function useInstalledGameDetails({
       // Management menu navigation
       if (showManagementMenu) {
         if (action === "DOWN") {
-          const menuItemCount = 4; // Backup, Shortcut, Executable, Delete
+          const menuItemCount = 3; // Shortcut, Executable, Delete
           setSelectedMenuItem(prev => (prev + 1) % menuItemCount);
         } else if (action === "UP") {
-          const menuItemCount = 4;
+          const menuItemCount = 3;
           setSelectedMenuItem(prev => (prev - 1 + menuItemCount) % menuItemCount);
         } else if (action === "CONFIRM") {
           // Execute selected menu item
@@ -690,18 +680,15 @@ function useInstalledGameDetails({
           setDialogButtonIndex(0);
 
           if (selectedMenuItem === 0) {
-            console.log("[GAME DETAILS] Opening backup dialog");
-            setBackupDialogOpen(true);
-          } else if (selectedMenuItem === 1) {
             console.log("[GAME DETAILS] Creating shortcut");
             window.electron.createGameShortcut(game).then(success => {
               if (success) toast.success(t("library.shortcutCreated"));
               else toast.error(t("library.shortcutError"));
             });
-          } else if (selectedMenuItem === 2) {
+          } else if (selectedMenuItem === 1) {
             console.log("[GAME DETAILS] Opening executable manager");
             setShowExecutableManager(true);
-          } else if (selectedMenuItem === 3) {
+          } else if (selectedMenuItem === 2) {
             console.log("[GAME DETAILS] Opening delete dialog");
             if (game.isCustom) {
               handleDeleteGame();
@@ -768,6 +755,7 @@ function useInstalledGameDetails({
           if (selectedButton === "folder") setSelectedButton("play");
           else if (selectedButton === "manage") setSelectedButton("folder");
           else if (selectedButton === "assets") setSelectedButton("manage");
+          else if (selectedButton === "backups") setSelectedButton("assets");
         }
       } else if (action === "RIGHT") {
         if (achievementsToggleFocused) {
@@ -778,6 +766,7 @@ function useInstalledGameDetails({
           if (selectedButton === "play") setSelectedButton("folder");
           else if (selectedButton === "folder") setSelectedButton("manage");
           else if (selectedButton === "manage") setSelectedButton("assets");
+          else if (selectedButton === "assets") setSelectedButton("backups");
         }
       } else if (action === "BACK" || action === "MENU") {
         if (achievementsToggleFocused) {
@@ -816,6 +805,9 @@ function useInstalledGameDetails({
             setSelectedMenuItem(0);
           } else if (selectedButton === "assets") {
             onChangeAssets?.();
+          } else if (selectedButton === "backups") {
+            setDialogButtonIndex(0);
+            setBackupDialogOpen(true);
           }
         }
       } else if (action === "X") {
@@ -836,6 +828,9 @@ function useInstalledGameDetails({
     [
       showMedia,
       showManagementMenu,
+      backupDialogOpen,
+      dialogButtonIndex,
+      handleBackupAction,
       selectedMenuItem,
       onBack,
       isLaunching,
@@ -967,6 +962,10 @@ function useInstalledGameDetails({
   const gameDescription = (
     steamData?.summary ||
     steamData?.short_description ||
+    steamData?.description ||
+    steamData?.full_description ||
+    game.description ||
+    game.desc ||
     ""
   )?.replace(/<[^>]*>/g, "");
 
@@ -1033,6 +1032,8 @@ function useInstalledGameDetails({
     buttons,
     handleInput,
     backupDialogOpen,
+    setDialogButtonIndex,
+    handleBackupAction,
     dialogButtonIndex,
     showVrWarning,
     setShowVrWarning,

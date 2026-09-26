@@ -104,18 +104,15 @@ export function PreferencesSurface({
   const selected = categories.find((item) => item.name === category);
   const options = selected.options;
   const rows = profile
-    ? [["back"]]
-    : [
-        ...Array.from(
-          { length: Math.max(categories.length, options.length) },
-          (_, i) =>
-            [
-              categories[i] && `category-${categories[i].name}`,
-              options[i]?.[0],
-            ].filter(Boolean),
-        ),
-        ["back"],
-      ];
+    ? []
+    : Array.from(
+        { length: Math.max(categories.length, options.length) },
+        (_, i) =>
+          [
+            categories[i] && `category-${categories[i].name}`,
+            options[i]?.[0],
+          ].filter(Boolean),
+      );
   const { root, focus } = useSurface(navigation, rows, onBack, active);
   const enabled = (key) =>
     key === "startup"
@@ -269,11 +266,6 @@ export function PreferencesSurface({
           </div>
         </div>
       )}
-      <div className="bp-page-bottom">
-        <SurfaceButton {...focus("back")} onClick={onBack}>
-          Back to Home
-        </SurfaceButton>
-      </div>
     </BigPictureShell>
   );
 }

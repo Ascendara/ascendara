@@ -26,7 +26,6 @@ export function HomeDashboard({
   changeView,
   search,
   openMenu,
-  buttons,
   pause,
   resume,
   stopping,
@@ -287,20 +286,6 @@ export function HomeDashboard({
           </div>
         </section>
       ))}
-      <footer className="bp-home-footer">
-        <span>
-          <kbd>{buttons.confirm}</kbd>Select
-        </span>
-        <span>
-          <kbd>{buttons.cancel}</kbd>Back
-        </span>
-        <span>
-          <kbd>{buttons.space}</kbd>Search
-        </span>
-        <span>
-          <kbd>{buttons.menu}</kbd>Menu
-        </span>
-      </footer>
     </BigPictureShell>
   );
 }

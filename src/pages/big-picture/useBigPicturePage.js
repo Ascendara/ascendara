@@ -943,7 +943,7 @@ function useBigPicturePage() {
         else if (action === "BACK" || action === "MENU") setIsMenuOpen(false);
         else if (action === "CONFIRM") {
           setIsMenuOpen(false);
-          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=DOWNLOADS, 4=SETTINGS, 5=EXIT BIG PICTURE, 6=CLOSE ASCENDARA
+          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=DOWNLOADS, 4=SETTINGS, 5=RETRO, 6=PROFILE, 7=EXIT BIG PICTURE, 8=CLOSE ASCENDARA
           if (menuIndex === 0) {
             changeView("carousel");
           } else if (menuIndex === 1) {
@@ -955,13 +955,13 @@ function useBigPicturePage() {
           } else if (menuIndex === 4) {
             changeView("preferences");
           } else if (menuIndex === 5) {
-            setShowExitBigPictureDialog(true);
-          } else if (menuIndex === 6) {
-            changeView("power");
-          } else if (menuIndex === 7) {
             changeView("retro");
-          } else if (menuIndex === 8) {
+          } else if (menuIndex === 6) {
             changeView("profile");
+          } else if (menuIndex === 7) {
+            setShowExitBigPictureDialog(true);
+          } else if (menuIndex === 8) {
+            changeView("power");
           }
         }
         return;

@@ -24,10 +24,9 @@ import {
 import { checkSeamlessAvailable } from "./utils";
 import {
   getControllerButtons,
-  getButtonWidthClass,
-  getButtonBadgeClass,
 } from "./controller";
 import { getGamepadInput } from "./gamepad";
+import { DetailBackButton } from "./DetailBackButton";
 
 // --- GAME DETAILS & STORE COMPONENTS ---
 const GameDetailsView = ({
@@ -100,6 +99,7 @@ const GameDetailsView = ({
       const gameName = game.game || game.name;
       if (!gameName) return;
       console.log("[GameDetailsView] Fetching Steam data for:", gameName);
+      setSteamData(null);
       setLoadingMedia(true);
       try {
         const data = await steamService.getGameDetails(gameName);
@@ -411,6 +411,7 @@ const GameDetailsView = ({
 
   return (
     <div className="fixed inset-0 z-[10000] flex flex-col overflow-hidden bg-background text-primary">
+      <DetailBackButton onBack={() => handleInput("BACK")} controllerType={controllerType} t={t} />
       <div
         className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
         style={{
@@ -625,6 +626,8 @@ const GameDetailsView = ({
                   steamData?.short_description ||
                   steamData?.about_the_game ||
                   steamData?.detailed_description ||
+                  steamData?.full_description ||
+                  game.description ||
                   game.desc ||
                   t("bigPicture.failedToFetchDescription")
                 ).replace(/<[^>]*>/g, "")}
@@ -774,30 +777,6 @@ const GameDetailsView = ({
         </div>
       </div>
 
-      {/* Footer Controls */}
-      <div className="fixed bottom-12 right-16 z-50 flex gap-10 text-sm font-bold tracking-widest text-primary">
-        {!showMedia && (
-          <div className="flex items-center gap-3">
-            <span
-              className={`flex h-10 ${getButtonWidthClass(buttons.confirm, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} bg-primary text-sm font-black text-secondary shadow-lg`}
-            >
-              {buttons.confirm}
-            </span>{" "}
-            {t("bigPicture.download")}
-          </div>
-        )}
-        <div
-          className="flex cursor-pointer items-center gap-3 transition-colors hover:text-primary/80"
-          onClick={() => handleInput("BACK")}
-        >
-          <span
-            className={`flex h-10 ${getButtonWidthClass(buttons.cancel, "w-10")} items-center justify-center ${getButtonBadgeClass(controllerType)} border border-border bg-muted text-sm text-muted-foreground`}
-          >
-            {buttons.cancel}
-          </span>{" "}
-          {showMedia ? t("bigPicture.upBack") : t("bigPicture.back")}
-        </div>
-      </div>
     </div>
   );
 };
