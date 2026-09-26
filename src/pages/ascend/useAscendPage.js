@@ -1313,7 +1313,37 @@ export default function useAscendPage() {
       const result = await deleteCloudGame(gameName);
       if (result.success) {
         toast.success(t("ascend.cloudLibrary.gameDeleted") || "Game removed from cloud");
-        await loadCloudLibrary();
+
+        // Optimistically update local state instead of re-fetching the whole
+        // library (which re-downloads every game image sequentially and made
+        // deleting a single game feel like a full page reload).
+        setCloudLibrary(prev => {
+          if (!prev?.games) return prev;
+          const updatedGames = prev.games.filter(g => g.name !== gameName);
+          const gamesWithAchievements = updatedGames.filter(g => g.achievementStats);
+          const totalAchievements = gamesWithAchievements.reduce(
+            (acc, g) => acc + (g.achievementStats?.total || 0),
+            0
+          );
+          const unlockedAchievements = gamesWithAchievements.reduce(
+            (acc, g) => acc + (g.achievementStats?.unlocked || 0),
+            0
+          );
+          return {
+            ...prev,
+            games: updatedGames,
+            totalGames: updatedGames.length,
+            totalPlaytime: updatedGames.reduce((acc, g) => acc + (g.playTime || 0), 0),
+            totalAchievements,
+            unlockedAchievements,
+            gamesWithAchievements: gamesWithAchievements.length,
+          };
+        });
+        setCloudLibraryImages(prev => {
+          const next = { ...prev };
+          delete next[gameName];
+          return next;
+        });
         setExpandedGame(null);
         setGameAchievements(null);
       } else {
