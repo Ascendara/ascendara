@@ -326,8 +326,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
     threadCount: 4,
   });
   const languagePromptRef = useRef(null);
-  const [privacyLinkVisited, setPrivacyLinkVisited] = useState(false);
-  const [termsLinkVisited, setTermsLinkVisited] = useState(false);
 
   const features = useMemo(
     () => [
@@ -1333,32 +1331,21 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 <div>
                   <div
                     className="flex cursor-pointer items-center space-x-3 rounded-lg p-4 transition-colors hover:bg-card/50"
-                    onClick={e => {
-                      if (e.target.closest("button")) return;
-                      if (!termsLinkVisited) {
-                        window.electron.openURL("https://ascendara.app/terms");
-                        setTermsLinkVisited(true);
-                        return;
-                      }
-                      setTermsChecked(!termsChecked);
-                    }}
+                    onClick={() => setTermsChecked(checked => !checked)}
                   >
                     <Checkbox
                       id="terms"
                       checked={termsChecked}
-                      disabled={!termsLinkVisited}
+                      onClick={event => event.stopPropagation()}
                       onCheckedChange={setTermsChecked}
                       className="data-[state=checked]:text-primary-foreground data-[state=checked]:bg-primary"
                     />
                     <div className="text-base">
-                      <Label htmlFor="terms" className="inline cursor-pointer">
-                        {t("welcome.iHaveReadAndAgreeTo")}{" "}
-                      </Label>
+                      <span className="inline">{t("welcome.iHaveReadAndAgreeTo")} </span>
                       <button
                         type="button"
                         onClick={e => {
-                          e.preventDefault();
-                          setTermsLinkVisited(true);
+                          e.stopPropagation();
                           window.electron.openURL("https://ascendara.app/terms");
                         }}
                         className="inline text-primary hover:underline"
@@ -1370,32 +1357,21 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
                   <div
                     className="flex cursor-pointer items-center space-x-3 rounded-lg p-4 transition-colors hover:bg-card/50"
-                    onClick={e => {
-                      if (e.target.closest("button")) return;
-                      if (!privacyLinkVisited) {
-                        window.electron.openURL("https://ascendara.app/privacy");
-                        setPrivacyLinkVisited(true);
-                        return;
-                      }
-                      setPrivacyChecked(!privacyChecked);
-                    }}
+                    onClick={() => setPrivacyChecked(checked => !checked)}
                   >
                     <Checkbox
                       id="privacy"
                       checked={privacyChecked}
-                      disabled={!privacyLinkVisited}
+                      onClick={event => event.stopPropagation()}
                       onCheckedChange={setPrivacyChecked}
                       className="data-[state=checked]:text-primary-foreground data-[state=checked]:bg-primary"
                     />
                     <div className="text-base">
-                      <Label htmlFor="privacy" className="inline cursor-pointer">
-                        {t("welcome.iHaveReadAndAgreeTo")}{" "}
-                      </Label>
+                      <span className="inline">{t("welcome.iHaveReadAndAgreeTo")} </span>
                       <button
                         type="button"
                         onClick={e => {
-                          e.preventDefault();
-                          setPrivacyLinkVisited(true);
+                          e.stopPropagation();
                           window.electron.openURL("https://ascendara.app/privacy");
                         }}
                         className="inline text-primary hover:underline"
