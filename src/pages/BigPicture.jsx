@@ -425,67 +425,13 @@ function BigPicture() {
 
       {/* Welcome Animation Overlay */}
       {showWelcomeAnimation && (
-        <div
-          className="fixed inset-0 z-[99999] flex items-center justify-center bg-background"
-          style={{
-            animation: "fadeOut 0.5s ease-out 1.5s forwards",
-          }}
-        >
-          <style>{`
-            @keyframes fadeOut {
-              to {
-                opacity: 0;
-                pointer-events: none;
-              }
-            }
-            @keyframes slideUp {
-              from {
-                opacity: 0;
-                transform: translateY(30px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-            @keyframes scaleIn {
-              from {
-                opacity: 0;
-                transform: scale(0.8);
-              }
-              to {
-                opacity: 1;
-                transform: scale(1);
-              }
-            }
-            @keyframes glow {
-              0%, 100% {
-                box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
-              }
-              50% {
-                box-shadow: 0 0 40px rgba(59, 130, 246, 0.8);
-              }
-            }
-          `}</style>
-
-          <div className="flex flex-col items-center gap-8">
-            {/* Logo/Icon with scale animation */}
-            <div
-              className="flex h-32 w-32 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-primary/30"
-              style={{
-                animation: "scaleIn 0.6s ease-out, glow 2s ease-in-out infinite",
-              }}
-            >
+        <div className="bp-intro fixed inset-0 z-[99999] flex items-center justify-center bg-background">
+          <div className="bp-intro-content flex flex-col items-center text-center">
+            <div className="bp-intro-icon flex h-32 w-32 items-center justify-center rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/20 to-primary/5">
               <Gamepad2 className="h-16 w-16 text-primary" />
             </div>
 
-            {/* Welcome text with slide up animation */}
-            <div
-              className="flex flex-col items-center gap-4"
-              style={{
-                animation: "slideUp 0.6s ease-out 0.2s both",
-              }}
-            >
+            <div className="bp-intro-heading flex flex-col items-center gap-4">
               <h1 className="text-6xl font-light uppercase tracking-[0.3em] text-primary">
                 {t("bigPicture.welcome") || "Welcome"}
               </h1>
@@ -498,31 +444,8 @@ function BigPicture() {
               </div>
             </div>
 
-            {/* Loading indicator */}
-            <div
-              className="flex gap-2"
-              style={{
-                animation: "slideUp 0.6s ease-out 0.4s both",
-              }}
-            >
-              <span
-                className="h-2 w-2 rounded-full bg-primary/70"
-                style={{
-                  animation: "pulse 1.5s ease-in-out infinite",
-                }}
-              />
-              <span
-                className="h-2 w-2 rounded-full bg-primary/70"
-                style={{
-                  animation: "pulse 1.5s ease-in-out 0.2s infinite",
-                }}
-              />
-              <span
-                className="h-2 w-2 rounded-full bg-primary/70"
-                style={{
-                  animation: "pulse 1.5s ease-in-out 0.4s infinite",
-                }}
-              />
+            <div className="bp-intro-progress" aria-hidden="true">
+              <span />
             </div>
           </div>
         </div>

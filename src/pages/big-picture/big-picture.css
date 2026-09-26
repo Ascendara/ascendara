@@ -1,3 +1,99 @@
+.bp-intro {
+  background:
+    radial-gradient(circle at 50% 43%, rgb(var(--color-primary) / 0.15), transparent 38%),
+    rgb(var(--color-background));
+  animation: bp-intro-out 600ms ease-in-out 2100ms forwards;
+}
+
+.bp-intro-content {
+  gap: clamp(1.5rem, 4vh, 2.5rem);
+  padding: 2rem;
+}
+
+.bp-intro-icon {
+  box-shadow: 0 0 70px rgb(var(--color-primary) / 0.15);
+  animation: bp-intro-icon-in 900ms cubic-bezier(0.18, 0.8, 0.25, 1) both;
+}
+
+.bp-intro-heading {
+  animation: bp-intro-rise 800ms cubic-bezier(0.18, 0.8, 0.25, 1) 250ms both;
+}
+
+.bp-intro-heading h1 {
+  font-size: clamp(2.25rem, 5vw, 3.75rem);
+}
+
+.bp-intro-heading p {
+  font-size: clamp(0.8rem, 1.5vw, 1.25rem);
+}
+
+.bp-intro-progress {
+  width: min(15rem, 60vw);
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(var(--color-primary) / 0.18);
+  animation: bp-intro-rise 700ms ease-out 500ms both;
+}
+
+.bp-intro-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgb(var(--color-primary));
+  box-shadow: 0 0 12px rgb(var(--color-primary) / 0.7);
+  transform-origin: left;
+  animation: bp-intro-progress 1700ms cubic-bezier(0.22, 0.7, 0.25, 1) 450ms both;
+}
+
+@keyframes bp-intro-icon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bp-intro-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bp-intro-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes bp-intro-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-intro,
+  .bp-intro-icon,
+  .bp-intro-heading,
+  .bp-intro-progress,
+  .bp-intro-progress span {
+    animation: none;
+  }
+}
+
 .bp-surface {
   position: absolute;
   inset: 0;

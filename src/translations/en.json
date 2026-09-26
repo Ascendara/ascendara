@@ -1909,6 +1909,7 @@
       "restoreButton": "Restore Save Data",
       "restoreFailed": "Restore failed",
       "restoreLatest": "Restore Latest Backup",
+      "restoreFromCloud": "Restore from cloud",
       "restoreResult": "Restore Result",
       "restoreSpecificWarningDesc": "You are about to restore save data for {{game}} from the backup created on {{backup}}.",
       "restoreSuccess": "Restore successful",

@@ -69,9 +69,10 @@ function useBigPicturePage() {
 
   // Welcome animation effect
   useEffect(() => {
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     const timer = setTimeout(() => {
       setShowWelcomeAnimation(false);
-    }, 450);
+    }, reducedMotion ? 300 : 2700);
 
     return () => clearTimeout(timer);
   }, []);

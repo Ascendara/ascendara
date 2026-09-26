@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect, useCallback } from "react";
 import steamService from "@/services/gameInfoService";
 import { toast } from "sonner";
@@ -9,6 +10,9 @@ import recentGamesService from "@/services/recentGamesService";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
 import { getControllerButtons } from "./controller";
 import { getGamepadInput } from "./gamepad";
+import { hasActiveSubscription, uploadBackupToCloud } from "@/services/cloudBackupService";
+import { listBackups as listCloudBackups } from "@/services/firebaseService";
+import { restoreCloudSave } from "@/services/restoreCloudSave";
 
 function useInstalledGameDetails({
   game,
@@ -23,6 +27,7 @@ function useInstalledGameDetails({
   const [launchChecksReady, setLaunchChecksReady] = useState(false);
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const { user, userData } = useAuth();
   const [logoSrc, setLogoSrc] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
   const [gridSrc, setGridSrc] = useState(null);
@@ -68,6 +73,24 @@ function useInstalledGameDetails({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
   const [backupDialogOpen, setBackupDialogOpen] = useState(false);
+  const [backupScreen, setBackupScreen] = useState("options");
+  const [cloudBackups, setCloudBackups] = useState([]);
+  const [cloudBackupLoading, setCloudBackupLoading] = useState(false);
+  const [cloudBackupError, setCloudBackupError] = useState(null);
+  const [selectedCloudBackup, setSelectedCloudBackup] = useState(null);
+  const [cloudRestoreBusy, setCloudRestoreBusy] = useState(false);
+  const [autoCloudBackupEnabled, setAutoCloudBackupEnabled] = useState(
+    () => localStorage.getItem(`cloudBackup_${gameName}`) === "true"
+  );
+  const cloudAvailable = !!user && hasActiveSubscription(userData);
+  const isSignedIn = !!user;
+  useEffect(() => {
+    if (backupDialogOpen) {
+      setBackupScreen("options");
+      setDialogButtonIndex(0);
+      setAutoCloudBackupEnabled(localStorage.getItem(`cloudBackup_${gameName}`) === "true");
+    }
+  }, [backupDialogOpen, gameName]);
   const [showBrowseExeWarning, setShowBrowseExeWarning] = useState(false);
   const [dialogButtonIndex, setDialogButtonIndex] = useState(0);
 
@@ -510,19 +533,88 @@ function useInstalledGameDetails({
   };
 
   const handleBackupAction = useCallback(async index => {
+    if (backupScreen === "cloudList") {
+      if (index === cloudBackups.length) {
+        setBackupScreen("options");
+        setDialogButtonIndex(2);
+      } else {
+        setSelectedCloudBackup(cloudBackups[index]);
+        setBackupScreen("cloudConfirm");
+        setDialogButtonIndex(1);
+      }
+      return;
+    }
+    if (backupScreen === "cloudConfirm") {
+      if (index === 1) {
+        setBackupScreen("cloudList");
+        setDialogButtonIndex(0);
+        return;
+      }
+      if (cloudRestoreBusy || !selectedCloudBackup) return;
+      setCloudRestoreBusy(true);
+      try {
+        await restoreCloudSave(selectedCloudBackup, settings);
+        toast.success(t("library.backups.restoreSuccess"));
+        setBackupDialogOpen(false);
+        setBackupScreen("options");
+      } catch (error) {
+        toast.error(error.message || t("library.backups.restoreFailed"));
+      } finally {
+        setCloudRestoreBusy(false);
+      }
+      return;
+    }
+    if (index === 2) {
+      if (!cloudAvailable) {
+        setBackupDialogOpen(false);
+        navigate("/ascend");
+        return;
+      }
+      setBackupScreen("cloudList");
+      setDialogButtonIndex(0);
+      setCloudBackupLoading(true);
+      setCloudBackupError(null);
+      try {
+        const result = await listCloudBackups(gameName);
+        if (result.error) throw new Error(result.error);
+        setCloudBackups((Array.isArray(result.backups) ? result.backups : [])
+          .map(backup => ({ ...backup, gameName: backup.gameName || gameName }))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      } catch (error) {
+        setCloudBackupError(error.message || t("library.backups.loadBackupsFailed"));
+      } finally {
+        setCloudBackupLoading(false);
+      }
+      return;
+    }
+    if (index === 3 && cloudAvailable) {
+      const enabled = !autoCloudBackupEnabled;
+      localStorage.setItem(`cloudBackup_${gameName}`, String(enabled));
+      setAutoCloudBackupEnabled(enabled);
+      toast.success(t(enabled ? "library.backups.cloudBackupsEnabledToast" : "library.backups.cloudBackupsDisabledToast"));
+      return;
+    }
+    if (index > 1) {
+      setBackupDialogOpen(false);
+      setDialogButtonIndex(0);
+      return;
+    }
     setBackupDialogOpen(false);
     setDialogButtonIndex(0);
-    if (index === 2) return;
     const operation = index === 0 ? "backup" : "restore";
     try {
       const result = await window.electron.ludusavi(operation, gameName);
       toast[result?.success ? "success" : "error"](
         t(`library.backups.${operation}${result?.success ? "Success" : "Failed"}`)
       );
+      if (result?.success && operation === "backup" && autoCloudBackupEnabled && cloudAvailable) {
+        const cloudResult = await uploadBackupToCloud(gameName, settings, user, userData);
+        if (!cloudResult.success) toast.error(cloudResult.error || t("library.backups.backupFailed"));
+      }
     } catch {
       toast.error(t(`library.backups.${operation}Failed`));
     }
-  }, [gameName, t]);
+  }, [autoCloudBackupEnabled, backupScreen, cloudAvailable, cloudBackups, cloudRestoreBusy, gameName, navigate, selectedCloudBackup, settings, t, user, userData]);
 
   const handleInput = useCallback(
     action => {
@@ -650,16 +742,28 @@ function useInstalledGameDetails({
         return;
       }
 
-      // Backup dialog navigation (simplified for BigPicture)
+      // Backup dialog navigation
       if (backupDialogOpen) {
+        if (cloudRestoreBusy) return;
+        const lastIndex = backupScreen === "cloudConfirm"
+          ? 1
+          : backupScreen === "cloudList"
+            ? cloudBackups.length
+            : cloudAvailable ? 4 : 3;
         if (action === "UP") {
           setDialogButtonIndex(prev => Math.max(0, prev - 1));
         } else if (action === "DOWN") {
-          setDialogButtonIndex(prev => Math.min(2, prev + 1));
+          setDialogButtonIndex(prev => Math.min(lastIndex, prev + 1));
         } else if (action === "CONFIRM") {
-          handleBackupAction(dialogButtonIndex);
+          if (!cloudBackupLoading && !cloudRestoreBusy) handleBackupAction(dialogButtonIndex);
         } else if (action === "BACK") {
-          setBackupDialogOpen(false);
+          if (backupScreen === "cloudConfirm") {
+            setBackupScreen("cloudList");
+          } else if (backupScreen === "cloudList") {
+            setBackupScreen("options");
+          } else {
+            setBackupDialogOpen(false);
+          }
           setDialogButtonIndex(0);
         }
         return;
@@ -829,6 +933,11 @@ function useInstalledGameDetails({
       showMedia,
       showManagementMenu,
       backupDialogOpen,
+      backupScreen,
+      cloudBackups.length,
+      cloudAvailable,
+      cloudBackupLoading,
+      cloudRestoreBusy,
       dialogButtonIndex,
       handleBackupAction,
       selectedMenuItem,
@@ -852,22 +961,6 @@ function useInstalledGameDetails({
       trainerExists,
     ]
   );
-
-  // Force close backup dialog with Escape key (backup dialog has its own complex navigation)
-  useEffect(() => {
-    const handleEscapeKey = e => {
-      if (e.key === "Escape" && backupDialogOpen) {
-        e.preventDefault();
-        e.stopPropagation();
-        setBackupDialogOpen(false);
-      }
-    };
-    if (backupDialogOpen) {
-      window.addEventListener("keydown", handleEscapeKey, { capture: true });
-      return () =>
-        window.removeEventListener("keydown", handleEscapeKey, { capture: true });
-    }
-  }, [backupDialogOpen]);
 
   // Keyboard Listener
   useEffect(() => {
@@ -1032,6 +1125,15 @@ function useInstalledGameDetails({
     buttons,
     handleInput,
     backupDialogOpen,
+    backupScreen,
+    cloudBackups,
+    cloudBackupLoading,
+    cloudBackupError,
+    selectedCloudBackup,
+    cloudRestoreBusy,
+    autoCloudBackupEnabled,
+    cloudAvailable,
+    isSignedIn,
     setDialogButtonIndex,
     handleBackupAction,
     dialogButtonIndex,

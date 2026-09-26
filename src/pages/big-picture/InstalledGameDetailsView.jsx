@@ -24,6 +24,8 @@ import {
   ChevronRight,
   Save,
   RotateCcw,
+  Cloud,
+  CloudUpload,
   X,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -101,6 +103,15 @@ function InstalledGameDetailsView({
     buttons,
     handleInput,
     backupDialogOpen,
+    backupScreen,
+    cloudBackups,
+    cloudBackupLoading,
+    cloudBackupError,
+    selectedCloudBackup,
+    cloudRestoreBusy,
+    autoCloudBackupEnabled,
+    cloudAvailable,
+    isSignedIn,
     setDialogButtonIndex,
     handleBackupAction,
     dialogButtonIndex,
@@ -761,57 +772,83 @@ function InstalledGameDetailsView({
       )}
 
       {/* Warning and Management Dialogs */}
-      {/* Simplified Backup Dialog for BigPicture */}
-      <AlertDialog open={backupDialogOpen} onOpenChange={setBackupDialogOpen}>
-        <AlertDialogContent>
+      {/* Save backups and cloud restore */}
+      <AlertDialog open={backupDialogOpen} onOpenChange={open => {
+        if (!cloudRestoreBusy && (open || backupScreen === "options")) setBackupDialogOpen(open);
+      }}>
+        <AlertDialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <FolderSync className="h-5 w-5 text-primary" />
-              {t("gameScreen.backupSaves")}
+              {backupScreen === "cloudList" ? t("library.backups.backupsList") : t("gameScreen.backupSaves")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("library.backups.bigPictureMessage") ||
-                "Use UP/DOWN to navigate, A to select, B to cancel"}
+              {backupScreen === "cloudConfirm"
+                ? t("library.backups.confirmSpecificRestore")
+                : t("library.backups.bigPictureMessage")}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-4 py-4">
-            <button
-              onClick={() => handleBackupAction(0)}
-              className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
-                dialogButtonIndex === 0
-                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
-                  : "bg-muted hover:bg-muted/80"
-              }`}
-            >
-              <Save className="h-6 w-6" />
-              <span className="text-lg font-semibold">
-                {t("library.backups.backupNow", { game: gameName })}
-              </span>
-            </button>
-            <button
-              onClick={() => handleBackupAction(1)}
-              className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
-                dialogButtonIndex === 1
-                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
-                  : "bg-muted hover:bg-muted/80"
-              }`}
-            >
-              <RotateCcw className="h-6 w-6" />
-              <span className="text-lg font-semibold">
-                {t("library.backups.restoreLatest")}
-              </span>
-            </button>
-            <button
-              onClick={() => handleBackupAction(2)}
-              className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${
-                dialogButtonIndex === 2
-                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
-                  : "bg-muted hover:bg-muted/80"
-              }`}
-            >
-              <X className="h-6 w-6" />
-              <span className="text-lg font-semibold">{t("common.close")}</span>
-            </button>
+          <div className="space-y-3 py-4">
+            {backupScreen === "options" && (
+              <>
+                {!cloudAvailable && (
+                  <p className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
+                    <Cloud className="mr-2 inline h-5 w-5 text-primary" />
+                    {t(isSignedIn ? "library.backups.autoCloudBackupUpgradeDesc" : "library.backups.autoCloudBackupSignInDesc")}
+                  </p>
+                )}
+                {[
+                  { icon: Save, label: t("library.backups.backupNow", { game: gameName }) },
+                  { icon: RotateCcw, label: t("library.backups.restoreLatest") },
+                  { icon: Cloud, label: cloudAvailable ? t("library.backups.restoreFromCloud") : t(isSignedIn ? "library.backups.autoCloudBackupUpgrade" : "library.backups.autoCloudBackupLearnMore") },
+                  ...(cloudAvailable ? [{ icon: CloudUpload, label: t("library.backups.alwaysBackupToCloud"), detail: autoCloudBackupEnabled ? "On" : "Off" }] : []),
+                  { icon: X, label: t("common.close") },
+                ].map(({ icon: Icon, label, detail }, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleBackupAction(index)}
+                    aria-pressed={cloudAvailable && index === 3 ? autoCloudBackupEnabled : undefined}
+                    className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all duration-200 ${dialogButtonIndex === index ? "bg-primary text-secondary ring-4 ring-primary/50" : "bg-muted hover:bg-muted/80"}`}
+                  >
+                    <Icon className="h-6 w-6 shrink-0" />
+                    <span className="flex-1 text-lg font-semibold">{label}</span>
+                    {detail && <span className="text-sm font-semibold">{detail}</span>}
+                  </button>
+                ))}
+              </>
+            )}
+            {backupScreen === "cloudList" && (
+              <>
+                {cloudBackupLoading && <p className="py-4 text-center text-muted-foreground">{t("library.backups.loadingBackups")}</p>}
+                {cloudBackupError && <p className="py-4 text-center text-destructive">{cloudBackupError}</p>}
+                {!cloudBackupLoading && !cloudBackupError && cloudBackups.length === 0 && <p className="py-4 text-center text-muted-foreground">{t("library.backups.noBackupsFound")}</p>}
+                {cloudBackups.map((backup, index) => (
+                  <button
+                    key={backup.backupId}
+                    onClick={() => handleBackupAction(index)}
+                    className={`flex w-full items-center gap-4 rounded-xl p-4 text-left ${dialogButtonIndex === index ? "bg-primary text-secondary ring-4 ring-primary/50" : "bg-muted hover:bg-muted/80"}`}
+                  >
+                    <Cloud className="h-6 w-6 shrink-0" />
+                    <span className="flex-1 truncate text-lg font-semibold">{backup.backupName}</span>
+                    <span className="text-sm">{new Date(backup.createdAt).toLocaleDateString()}</span>
+                  </button>
+                ))}
+                <button onClick={() => handleBackupAction(cloudBackups.length)} className={`flex w-full items-center gap-4 rounded-xl p-4 text-left ${dialogButtonIndex === cloudBackups.length ? "bg-primary text-secondary ring-4 ring-primary/50" : "bg-muted hover:bg-muted/80"}`}>
+                  <ChevronLeft className="h-6 w-6" />{t("common.back")}
+                </button>
+              </>
+            )}
+            {backupScreen === "cloudConfirm" && (
+              <>
+                <p className="rounded-xl bg-muted p-4 text-sm">{t("library.backups.restoreSpecificWarningDesc", { game: gameName, backup: new Date(selectedCloudBackup?.createdAt).toLocaleString() })} {t("library.backups.restoreWarningOverwrite")}</p>
+                <button disabled={cloudRestoreBusy} onClick={() => handleBackupAction(0)} className={`flex w-full items-center gap-4 rounded-xl p-4 text-left ${dialogButtonIndex === 0 ? "bg-primary text-secondary ring-4 ring-primary/50" : "bg-muted hover:bg-muted/80"}`}>
+                  {cloudRestoreBusy ? <Loader className="h-6 w-6 animate-spin" /> : <RotateCcw className="h-6 w-6" />}{t("library.backups.restoreButton")}
+                </button>
+                <button disabled={cloudRestoreBusy} onClick={() => handleBackupAction(1)} className={`flex w-full items-center gap-4 rounded-xl p-4 text-left ${dialogButtonIndex === 1 ? "bg-primary text-secondary ring-4 ring-primary/50" : "bg-muted hover:bg-muted/80"}`}>
+                  <X className="h-6 w-6" />{t("common.cancel")}
+                </button>
+              </>
+            )}
           </div>
         </AlertDialogContent>
       </AlertDialog>
