@@ -12,13 +12,65 @@ const execAsync = promisify(exec);
 let rpc = null;
 let rpcIsConnected = false;
 let rpcConnectionAttempts = 0;
-const MAX_RPC_ATTEMPTS = 3;
-let currentlyPlayingGame = null;
 // Keep separate sessions so closing a Retro emulator cannot clear a PC game's
 // presence, or another Retro game that is still running.
 const playingSessions = new Map();
-let activityRevision = 0;
 let retryTimeout = null;
+let playingRefresh = null;
+let connecting = false;
+let connectionGeneration = 0;
+let activityQueue = Promise.resolve();
+let desiredState = "default";
+
+const PLAYING_REFRESH_MS = 20000;
+
+function scheduleRetry(delay) {
+  if (retryTimeout) clearTimeout(retryTimeout);
+  retryTimeout = setTimeout(() => {
+    retryTimeout = null;
+    initializeDiscordRPC();
+  }, delay);
+  retryTimeout.unref?.();
+}
+
+function syncPlayingRefresh() {
+  if (playingSessions.size && !playingRefresh) {
+    playingRefresh = setInterval(publishPlayingActivity, PLAYING_REFRESH_MS);
+    playingRefresh.unref?.();
+  } else if (!playingSessions.size && playingRefresh) {
+    clearInterval(playingRefresh);
+    playingRefresh = null;
+  }
+}
+
+function publishActivity() {
+  if (!rpc || !rpcIsConnected) return;
+  const client = rpc;
+  // Serialize writes: a pending browsing update must never land after a game starts.
+  activityQueue = activityQueue.catch(() => {}).then(() => {
+    if (client !== rpc || !rpcIsConnected) return;
+    const session = [...playingSessions.values()].at(-1);
+    const activity = session
+      ? {
+          details: "Playing a Game",
+          state: session.name,
+          startTimestamp: session.startedAt,
+          largeImageKey: "ascendara",
+          largeImageText: "Ascendara",
+          buttons: [{ label: "Play on Ascendara", url: "https://ascendara.app/" }],
+        }
+      : {
+          state: desiredState === "downloading"
+            ? "Watching download progress..."
+            : desiredState === "idle" ? "Idling..." : "Searching for games...",
+          largeImageKey: "ascendara",
+          largeImageText: "Ascendara",
+        };
+    return client.setActivity(activity);
+  }).catch(error => {
+    console.warn("Failed to update Discord RPC activity:", error);
+  });
+}
 
 /**
  * Check if Discord is running
@@ -26,8 +78,8 @@ let retryTimeout = null;
 async function isDiscordRunning() {
   try {
     if (process.platform === "win32") {
-      const { stdout } = await execAsync('tasklist /FI "IMAGENAME eq Discord.exe" /FO CSV /NH');
-      return stdout.toLowerCase().includes("discord.exe");
+      const { stdout } = await execAsync('tasklist /FO CSV /NH');
+      return /"discord(?:canary|ptb|development)?\.exe"/i.test(stdout);
     } else if (process.platform === "darwin") {
       const { stdout } = await execAsync('pgrep -x Discord || pgrep -x "Discord Canary" || pgrep -x "Discord PTB"');
       return stdout.trim().length > 0;
@@ -44,41 +96,31 @@ async function isDiscordRunning() {
  * Destroy the Discord RPC connection
  */
 function destroyDiscordRPC() {
-  // Clear any pending retry
+  ++connectionGeneration;
+  connecting = false;
+  rpcConnectionAttempts = 0;
   if (retryTimeout) {
     clearTimeout(retryTimeout);
     retryTimeout = null;
   }
-  
-  if (rpc) {
-    try {
-      // Remove event listeners to prevent callbacks after destroy
-      rpc.removeAllListeners();
-      
-      if (rpc.transport && rpc.transport.socket) {
-        rpc.destroy().catch(() => {
-          // Ignore destroy errors
-        });
-      }
-    } catch (error) {
-      // Ignore any errors during cleanup
-    } finally {
-      rpc = null;
-      rpcIsConnected = false;
-    }
-    console.log("Discord RPC has been destroyed");
+  if (playingRefresh) {
+    clearInterval(playingRefresh);
+    playingRefresh = null;
   }
+  const client = rpc;
+  rpc = null;
+  rpcIsConnected = false;
+  activityQueue = Promise.resolve();
+  if (!client) return;
+  client.removeAllListeners();
+  Promise.resolve(client.destroy()).catch(() => {});
+  console.log("Discord RPC has been destroyed");
 }
 
 /**
  * Initialize Discord RPC connection
  */
 async function initializeDiscordRPC() {
-  if (rpcConnectionAttempts >= MAX_RPC_ATTEMPTS) {
-    console.log("Maximum Discord RPC connection attempts reached. Stopping retries.");
-    return;
-  }
-
   if (isDev) {
     console.log("Discord RPC is disabled in development mode");
     return;
@@ -92,96 +134,64 @@ async function initializeDiscordRPC() {
     return;
   }
 
-  // Check if Discord is running first
-  const discordRunning = await isDiscordRunning();
+  if (connecting || rpcIsConnected) return;
+  connecting = true;
+  const generation = connectionGeneration;
+  if (retryTimeout) {
+    clearTimeout(retryTimeout);
+    retryTimeout = null;
+  }
+
+  let discordRunning;
+  try {
+    discordRunning = await isDiscordRunning();
+  } catch (error) {
+    console.warn("Discord process check failed:", error);
+    discordRunning = false;
+  }
+  if (generation !== connectionGeneration) return;
   if (!discordRunning) {
-    console.log("Discord is not running, skipping RPC connection");
-    // Try again in 30 seconds to see if Discord was started
-    if (rpcConnectionAttempts < MAX_RPC_ATTEMPTS) {
-      rpcConnectionAttempts++;
-      console.log(`Discord RPC connection attempt ${rpcConnectionAttempts}/${MAX_RPC_ATTEMPTS} - Discord not running, retrying in 30s`);
-      retryTimeout = setTimeout(initializeDiscordRPC, 30000);
-    }
+    connecting = false;
+    scheduleRetry(30000);
     return;
   }
 
-  // Ensure any existing client is cleaned up
-  destroyDiscordRPC();
+  let client;
+  try {
+    client = new Client({ transport: "ipc" });
+  } catch (error) {
+    connecting = false;
+    scheduleRetry(30000);
+    console.warn("Discord RPC client could not start:", error);
+    return;
+  }
+  rpc = client;
+  const failed = error => {
+    if (client !== rpc || generation !== connectionGeneration) return;
+    console.warn("Discord RPC connection lost:", error?.message || error);
+    client.removeAllListeners();
+    rpc = null;
+    rpcIsConnected = false;
+    connecting = false;
+    activityQueue = Promise.resolve();
+    Promise.resolve(client.destroy()).catch(() => {});
+    const delay = Math.min(2000 * 2 ** rpcConnectionAttempts++, 30000);
+    scheduleRetry(delay);
+  };
 
-  // Small delay to ensure Discord IPC is ready
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  rpc = new Client({ transport: "ipc" });
-  let errorHandled = false;
-
-  rpc.on("ready", () => {
-    // Reset connection attempts on successful connection
+  client.on("ready", () => {
+    if (client !== rpc || generation !== connectionGeneration) return;
     rpcConnectionAttempts = 0;
     rpcIsConnected = true;
-    errorHandled = false;
+    connecting = false;
+    activityQueue = Promise.resolve();
     console.log("Discord RPC is ready");
-
-    // Restore playing state if a game is running, otherwise show library state
-    if (currentlyPlayingGame) {
-      publishPlayingActivity();
-    } else {
-      rpc
-        .setActivity({
-          state: "Searching for games...",
-          largeImageKey: "ascendara",
-          largeImageText: "Ascendara",
-        })
-        .catch(() => {
-          // Ignore activity setting errors
-        });
-    }
+    syncPlayingRefresh();
+    publishActivity();
   });
-
-  rpc.on("error", error => {
-    // Prevent double-handling errors
-    if (errorHandled) return;
-    errorHandled = true;
-    
-    // Log full error details
-    const errorDetails = error?.message || error?.code || JSON.stringify(error) || "Unknown error";
-    console.error("Discord RPC error:", errorDetails);
-    
-    rpcIsConnected = false;
-    rpcConnectionAttempts++;
-
-    if (rpcConnectionAttempts < MAX_RPC_ATTEMPTS) {
-      const backoffDelay = Math.min(2000 * Math.pow(2, rpcConnectionAttempts - 1), 10000);
-      console.log(
-        `Discord RPC connection attempt ${rpcConnectionAttempts}/${MAX_RPC_ATTEMPTS}, retrying in ${backoffDelay}ms`
-      );
-      retryTimeout = setTimeout(initializeDiscordRPC, backoffDelay);
-    } else {
-      console.log("Maximum Discord RPC connection attempts reached. Stopping retries.");
-    }
-  });
-
-  rpc.login({ clientId }).catch(error => {
-    // Prevent double-handling if error event already fired
-    if (errorHandled) return;
-    errorHandled = true;
-    
-    // Log full error details
-    const errorDetails = error?.message || error?.code || JSON.stringify(error) || "Unknown error";
-    console.error("Discord RPC login error:", errorDetails);
-    
-    rpcIsConnected = false;
-    rpcConnectionAttempts++;
-
-    if (rpcConnectionAttempts < MAX_RPC_ATTEMPTS) {
-      const backoffDelay = Math.min(2000 * Math.pow(2, rpcConnectionAttempts - 1), 10000);
-      console.log(
-        `Discord RPC connection attempt ${rpcConnectionAttempts}/${MAX_RPC_ATTEMPTS}, retrying in ${backoffDelay}ms`
-      );
-      retryTimeout = setTimeout(initializeDiscordRPC, backoffDelay);
-    } else {
-      console.log("Maximum Discord RPC connection attempts reached. Stopping retries.");
-    }
-  });
+  client.on("error", failed);
+  client.on("disconnected", failed);
+  client.login({ clientId }).catch(failed);
 }
 
 /**
@@ -189,37 +199,8 @@ async function initializeDiscordRPC() {
  */
 function updateDiscordRPCToLibrary(sessionId = "pc") {
   playingSessions.delete(sessionId);
-  const revision = ++activityRevision;
-  if (playingSessions.size) {
-    publishPlayingActivity();
-    return;
-  }
-  currentlyPlayingGame = null;
-  if (!rpc || !rpcIsConnected) return;
-
-  // First disconnect any existing activity
-  const client = rpc;
-  client
-    .clearActivity()
-    .then(() => {
-      // Wait a bit longer to ensure clean state
-      setTimeout(() => {
-        if (revision !== activityRevision || currentlyPlayingGame || client !== rpc || !rpcIsConnected) return;
-        // Then set new activity
-        rpc
-          .setActivity({
-            state: "Searching for games...",
-            largeImageKey: "ascendara",
-            largeImageText: "Ascendara",
-          })
-          .catch(err => {
-            console.log("Failed to set Discord RPC library activity:", err);
-          });
-      }, 500);
-    })
-    .catch(error => {
-      console.error("Error updating Discord RPC:", error);
-    });
+  syncPlayingRefresh();
+  publishActivity();
 }
 
 /**
@@ -229,33 +210,13 @@ function updateDiscordRPCToLibrary(sessionId = "pc") {
 function setPlayingActivity(gameName, sessionId = "pc") {
   playingSessions.delete(sessionId);
   playingSessions.set(sessionId, { name: gameName, startedAt: new Date() });
-  ++activityRevision;
+  syncPlayingRefresh();
+  if (!rpc && !connecting) initializeDiscordRPC();
   publishPlayingActivity();
 }
 
 function publishPlayingActivity() {
-  const session = [...playingSessions.values()].at(-1);
-  currentlyPlayingGame = session?.name || null;
-  if (!session) return;
-  if (!rpc || !rpcIsConnected) return;
-
-  rpc
-    .setActivity({
-      details: "Playing a Game",
-      state: session.name,
-      startTimestamp: session.startedAt,
-      largeImageKey: "ascendara",
-      largeImageText: "Ascendara",
-      buttons: [
-        {
-          label: "Play on Ascendara",
-          url: "https://ascendara.app/",
-        },
-      ],
-    })
-    .catch(err => {
-      console.log("Failed to set Discord RPC playing activity:", err);
-    });
+  if (playingSessions.size) publishActivity();
 }
 
 /**
@@ -263,55 +224,9 @@ function publishPlayingActivity() {
  * @param {string} state - State to set ("default", "downloading")
  */
 function setRPCState(state) {
-  if (isDev) {
-    return;
-  }
-  if (!rpc || !rpcIsConnected) {
-    console.log("Discord RPC not connected, skipping activity update");
-    return;
-  }
-  // Never let generic UI states (idle/default/downloading) override the
-  // "Playing a Game" activity while a game is actually running.
-  if (currentlyPlayingGame) {
-    console.log("Discord RPC: a game is currently playing, ignoring state change to", state);
-    return;
-  }
-
-  try {
-    if (state === "default") {
-      rpc
-        .setActivity({
-          state: "Searching for games...",
-          largeImageKey: "ascendara",
-          largeImageText: "Ascendara",
-        })
-        .catch(err => {
-          console.log("Failed to set Discord RPC activity:", err);
-        });
-    } else if (state === "downloading") {
-      rpc
-        .setActivity({
-          state: "Watching download progress...",
-          largeImageKey: "ascendara",
-          largeImageText: "Ascendara",
-        })
-        .catch(err => {
-          console.log("Failed to set Discord RPC activity:", err);
-        });
-    } else if (state === "idle") {
-      rpc
-        .setActivity({
-          state: "Idling...",
-          largeImageKey: "ascendara",
-          largeImageText: "Ascendara",
-        })
-        .catch(err => {
-          console.log("Failed to set Discord RPC activity:", err);
-        });
-    }
-  } catch (err) {
-    console.log("Failed to update Discord RPC activity:", err);
-  }
+  if (!["default", "downloading", "idle"].includes(state)) return;
+  desiredState = state;
+  if (!playingSessions.size) publishActivity();
 }
 
 /**

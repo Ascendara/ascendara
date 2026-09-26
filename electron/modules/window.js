@@ -6,7 +6,7 @@
 const { BrowserWindow, screen, ipcMain, dialog, app } = require("electron");
 const path = require("path");
 const { isDev } = require("./config");
-const { initializeDiscordRPC, destroyDiscordRPC } = require("./discord-rpc");
+const { initializeDiscordRPC } = require("./discord-rpc");
 const { getSettingsManager } = require("./settings");
 const { isAllowedAppNavigation, isAllowedAuthPopup, isSafeExternalUrl, registerTrustedWebContents } = require("./security");
 
@@ -379,7 +379,6 @@ function registerWindowHandlers() {
       } else {
         // Default behavior
         mainWindowHidden = true;
-        destroyDiscordRPC();
         win.hide();
         console.log("Window hidden to tray");
       }

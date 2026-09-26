@@ -690,14 +690,30 @@ function registerGameHandlers() {
 
         runGameProcesses.set(game, runGame);
 
+        runGame.once("spawn", () => {
+          setPlayingActivity(game, `pc:${game}`);
+        });
+
         runGame.on("error", error => {
           console.error(`Failed to start game ${game}:`, error);
           event.sender.send("game-launch-error", { game, error: error.message });
           runGameProcesses.delete(game);
+          updateDiscordRPCToLibrary(`pc:${game}`);
           showWindow();
         });
 
+        runGame.on("exit", code => {
+          console.log(`Game ${game} exited with code ${code}`);
+          runGameProcesses.delete(game);
+          if (settings.hideOnGameLaunch !== false) {
+            showWindow();
+          }
+          updateDiscordRPCToLibrary(`pc:${game}`);
+          event.sender.send("game-closed", { game });
+        });
+
         await new Promise(resolve => setTimeout(resolve, 500));
+        if (!runGameProcesses.has(game)) return false;
         event.sender.send("game-launch-success", { game });
 
         if (settings.hideOnGameLaunch !== false) {
@@ -722,19 +738,6 @@ function registerGameHandlers() {
             .catch(err => console.error(`Failed to fetch assets for ${game}:`, err));
         }
 
-        // Update Discord RPC
-        setPlayingActivity(game, `pc:${game}`);
-
-        runGame.on("exit", code => {
-          console.log(`Game ${game} exited with code ${code}`);
-          runGameProcesses.delete(game);
-          if (settings.hideOnGameLaunch !== false) {
-            showWindow();
-          }
-          updateDiscordRPCToLibrary(`pc:${game}`);
-          event.sender.send("game-closed", { game });
-        });
-
         return true;
       } catch (error) {
         console.error("Error launching game:", error);
@@ -749,7 +752,6 @@ function registerGameHandlers() {
     const runGame = runGameProcesses.get(game);
     if (runGame) {
       runGame.kill();
-      updateDiscordRPCToLibrary(`pc:${game}`);
     }
   });
 
@@ -1599,8 +1601,13 @@ function registerGameHandlers() {
 
       let hasError = false;
 
+      gameProcess.once("spawn", () => {
+        setPlayingActivity(game, `pc:${game}`);
+      });
+
       gameProcess.on("error", async error => {
         hasError = true;
+        updateDiscordRPCToLibrary(`pc:${game}`);
         await dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
           type: "error",
           title: "Game Launch Error",
@@ -1610,17 +1617,18 @@ function registerGameHandlers() {
         console.error("Game process error:", error);
       });
 
+      gameProcess.on("close", code => {
+        showWindow();
+        updateDiscordRPCToLibrary(`pc:${game}`);
+        if (code !== 0) {
+          console.log(`Game process exited with code ${code}`);
+        }
+      });
+
       await new Promise(resolve => setTimeout(resolve, 500));
 
       if (!hasError) {
         hideWindow();
-
-        gameProcess.on("close", code => {
-          showWindow();
-          if (code !== 0) {
-            console.log(`Game process exited with code ${code}`);
-          }
-        });
       }
 
       return true;
