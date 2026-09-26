@@ -344,6 +344,8 @@ contextBridge.exposeInMainWorld("electron", {
 
   // Game Shortcuts & Executables
   createGameShortcut: game => ipcRenderer.invoke("create-game-shortcut", game),
+  createStartMenuShortcut: game =>
+    ipcRenderer.invoke("create-start-menu-shortcut", game),
   modifyGameExecutable: (game, executable) =>
     ipcRenderer.invoke("modify-game-executable", game, executable),
   getGameExecutables: (game, isCustom) =>

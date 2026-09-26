@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import SafeHtml from "@/components/SafeHtml";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Heart, Play, FolderOpen, Tag, PackageOpen, Trash2, Pencil, Monitor, StopCircle, Loader, FileCheck2, Check, FolderSync, AlertTriangle, Info, Star, Clock, ExternalLink, Settings2, Download, FileSearch, Search, Edit3, ThumbsUp, Copy, Music2, HeadphoneOff, Trophy, Award, BookX, LockIcon, ImageUp, ImageIcon, Bolt, Plus, GripVertical, X, Puzzle, ChevronDown, ChevronUp, Gem, Cloud, CloudOff, Terminal, RefreshCw, ArrowRightLeft, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Heart, Play, FolderOpen, Tag, PackageOpen, Trash2, Pencil, Monitor, StopCircle, Loader, FileCheck2, Check, FolderSync, AlertTriangle, Info, Star, Clock, ExternalLink, Settings2, Download, FileSearch, Search, Edit3, ThumbsUp, Copy, Music2, HeadphoneOff, Trophy, Award, BookX, LockIcon, ImageUp, ImageIcon, Bolt, Plus, GripVertical, X, Puzzle, ChevronDown, ChevronUp, Gem, Cloud, CloudOff, Terminal, RefreshCw, ArrowRightLeft, CheckCircle2, LayoutGrid } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
@@ -3101,6 +3101,22 @@ export default function GameScreen() {
                   >
                     <Monitor className="h-4 w-4" />
                     {t("library.createShortcut")}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={async () => {
+                      const success = await window.electron.createStartMenuShortcut(game);
+                      if (success) {
+                        toast.success(t("library.startMenuShortcutCreated"));
+                      } else {
+                        toast.error(t("library.startMenuShortcutError"));
+                      }
+                    }}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    {t("library.createStartMenuShortcut")}
                   </Button>
 
                   <Button

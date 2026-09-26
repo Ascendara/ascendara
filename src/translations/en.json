@@ -1982,6 +1982,7 @@
     "confirmRemoveFolderTitle": "Remove Folder?",
     "coverSearchError": "Error searching for image",
     "createShortcut": "Create Desktop Shortcut",
+    "createStartMenuShortcut": "Add to Start Menu",
     "delete": "Delete",
     "deleteConfirmMessage": "Are you sure you want to delete {{game}} from your library? This will remove the game from your Ascendara library and delete all associated files. This action cannot be undone.",
     "deleteFolder": "Remove Folder",
@@ -2342,6 +2343,8 @@
     "shortcutCreated": "Shortcut created for primary executable",
     "shortcutError": "Error creating shortcut. Maybe the executable path doesn't exist?",
     "size": "Size",
+    "startMenuShortcutCreated": "Added shortcut to Start Menu",
+    "startMenuShortcutError": "Error adding shortcut to Start Menu. Maybe the executable path doesn't exist?",
     "sort": {
       "aToZ": "Sort A to Z",
       "addedGames": "Added Games",

@@ -87,66 +87,93 @@ async function validateGameExecutable(gameData) {
 }
 
 /**
+ * Create a .lnk shortcut for the game in the given directory
+ */
+async function createShortcutInDirectory(game, shortcutDir) {
+  const shortcutPath = path.join(shortcutDir, `${game.game || game.name}.lnk`);
+
+  const exePath = game.executable;
+  const isCustom = !!game.custom;
+
+  if (!exePath || !fs.existsSync(exePath)) {
+    throw new Error(`Game executable not found: ${exePath}`);
+  }
+
+  const handlerPath = path.join(appDirectory, "/resources/AscendaraGameHandler.exe");
+
+  if (!fs.existsSync(handlerPath)) {
+    throw new Error(`Game handler not found at: ${handlerPath}`);
+  }
+
+  fs.ensureDirSync(shortcutDir);
+
+  const psScript = `
+    $WScriptShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WScriptShell.CreateShortcut("${shortcutPath}")
+    $Shortcut.TargetPath = "${handlerPath}"
+    $Shortcut.Arguments = '"${exePath}" ${isCustom ? 1 : 0} "--shortcut"'
+    $Shortcut.WorkingDirectory = "${path.dirname(handlerPath)}"
+    ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = "${exePath},0"` : ''}
+    $Shortcut.Save()
+  `;
+
+  const psPath = path.join(os.tmpdir(), `createShortcut-${Date.now()}.ps1`);
+  fs.writeFileSync(psPath, psScript);
+
+  await new Promise((resolve, reject) => {
+    const process = spawn(
+      "powershell.exe",
+      ["-ExecutionPolicy", "Bypass", "-File", psPath],
+      {
+        windowsHide: true,
+      }
+    );
+
+    process.on("error", reject);
+    process.on("exit", code => {
+      fs.unlinkSync(psPath);
+      if (code === 0) resolve();
+      else reject(new Error(`Process exited with code ${code}`));
+    });
+  });
+}
+
+/**
  * Create game shortcut on desktop
  */
 async function createGameShortcut(game) {
   try {
-    console.log("Creating shortcut for game:", game);
-    const shortcutPath = path.join(
-      os.homedir(),
-      "Desktop",
-      `${game.game || game.name}.lnk`
-    );
-
-    const exePath = game.executable;
-    const gameName = game.game || game.name;
-    const isCustom = !!game.custom;
-
-    if (!exePath || !fs.existsSync(exePath)) {
-      throw new Error(`Game executable not found: ${exePath}`);
-    }
-
-    const handlerPath = path.join(appDirectory, "/resources/AscendaraGameHandler.exe");
-
-    if (!fs.existsSync(handlerPath)) {
-      throw new Error(`Game handler not found at: ${handlerPath}`);
-    }
-
-    const psScript = `
-      $WScriptShell = New-Object -ComObject WScript.Shell
-      $Shortcut = $WScriptShell.CreateShortcut("${shortcutPath}")
-      $Shortcut.TargetPath = "${handlerPath}"
-      $Shortcut.Arguments = '"${exePath}" ${isCustom ? 1 : 0} "--shortcut"'
-      $Shortcut.WorkingDirectory = "${path.dirname(handlerPath)}"
-      ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = "${exePath},0"` : ''}
-      $Shortcut.Save()
-    `;
-
-    const psPath = path.join(os.tmpdir(), "createShortcut.ps1");
-    fs.writeFileSync(psPath, psScript);
-
-    await new Promise((resolve, reject) => {
-      const process = spawn(
-        "powershell.exe",
-        ["-ExecutionPolicy", "Bypass", "-File", psPath],
-        {
-          windowsHide: true,
-        }
-      );
-
-      process.on("error", reject);
-      process.on("exit", code => {
-        fs.unlinkSync(psPath);
-        if (code === 0) resolve();
-        else reject(new Error(`Process exited with code ${code}`));
-      });
-    });
-
+    console.log("Creating desktop shortcut for game:", game);
+    await createShortcutInDirectory(game, path.join(os.homedir(), "Desktop"));
     return true;
   } catch (error) {
     console.error("Error creating shortcut:", error);
     return false;
   }
+}
+
+/**
+ * Create a shortcut for the game in the current user's Start Menu
+ */
+async function createStartMenuShortcut(game) {
+  try {
+    console.log("Creating start menu shortcut for game:", game);
+    await createShortcutInDirectory(game, getStartMenuProgramsDirectory());
+    return true;
+  } catch (error) {
+    console.error("Error creating start menu shortcut:", error);
+    return false;
+  }
+}
+
+/**
+ * Resolve the current user's Start Menu Programs directory
+ */
+function getStartMenuProgramsDirectory() {
+  return (
+    process.env.APPDATA &&
+    path.join(process.env.APPDATA, "Microsoft", "Windows", "Start Menu", "Programs")
+  ) || path.join(os.homedir(), "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs");
 }
 
 /**
@@ -164,6 +191,25 @@ function deleteGameShortcut(gameName) {
     return false;
   } catch (error) {
     console.error("Error deleting shortcut:", error);
+    return false;
+  }
+}
+
+/**
+ * Delete the start menu shortcut created by Ascendara for a game, if it exists
+ */
+function deleteStartMenuShortcut(gameName) {
+  try {
+    if (!gameName) return false;
+    const shortcutPath = path.join(getStartMenuProgramsDirectory(), `${gameName}.lnk`);
+    if (fs.existsSync(shortcutPath)) {
+      fs.unlinkSync(shortcutPath);
+      console.log(`Deleted start menu shortcut for game: ${gameName}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Error deleting start menu shortcut:", error);
     return false;
   }
 }
@@ -949,6 +995,7 @@ function registerGameHandlers() {
 
       if (isWindows) {
         deleteGameShortcut(game);
+        deleteStartMenuShortcut(game);
       }
 
       for (const directory of allDirectories) {
@@ -987,6 +1034,7 @@ function registerGameHandlers() {
 
         if (isWindows) {
           deleteGameShortcut(game);
+          deleteStartMenuShortcut(game);
         }
 
         const possibleExtensions = [".jpg", ".jpeg", ".png"];
@@ -1319,6 +1367,14 @@ function registerGameHandlers() {
   ipcMain.handle("create-game-shortcut", async (_, game) => {
     if (isWindows) {
       return await createGameShortcut(game);
+    }
+    return false;
+  });
+
+  // Create start menu shortcut handler
+  ipcMain.handle("create-start-menu-shortcut", async (_, game) => {
+    if (isWindows) {
+      return await createStartMenuShortcut(game);
     }
     return false;
   });
@@ -1728,5 +1784,6 @@ function registerGameHandlers() {
 module.exports = {
   registerGameHandlers,
   createGameShortcut,
+  createStartMenuShortcut,
   validateGameExecutable,
 };
