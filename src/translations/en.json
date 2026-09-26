@@ -1945,6 +1945,12 @@
     "cloudOnly": {
       "badge": "Cloud",
       "customBadge": "Custom",
+      "delete": "Remove from Cloud",
+      "deleteConfirmDescription": "This will permanently remove \"{{game}}\" and its saved playtime from your cloud library. This cannot be undone.",
+      "deleteConfirmTitle": "Remove from Cloud Library?",
+      "deleteFailed": "Failed to remove game from cloud",
+      "deleted": "Removed from cloud library",
+      "deleting": "Removing...",
       "empty": "No cloud games found",
       "noFilesFound": "No local files found for this game. Click \"Download & Restore\" to install it and recover your cloud playtime.",
       "noFilesFoundCustom": "No local files found for this custom game. Click \"Add & Restore\" to re-add it and recover your cloud playtime.",

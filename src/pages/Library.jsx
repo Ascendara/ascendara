@@ -43,6 +43,7 @@ import {
   syncGameAchievements,
   verifyAscendAccess,
   getFriendsList,
+  deleteCloudGame,
 } from "@/services/firebaseService";
 import { calculateLibraryValue } from "@/services/cheapsharkService";
 import { getDownloadQueue } from "@/services/downloadQueueService";
@@ -252,6 +253,7 @@ const Library = () => {
   const [cloudOnlyGames, setCloudOnlyGames] = useState([]);
   const [loadingCloudGames, setLoadingCloudGames] = useState(false);
   const [restoringGame, setRestoringGame] = useState(null);
+  const [deletingCloudGame, setDeletingCloudGame] = useState(null);
   const [cloudGameImages, setCloudGameImages] = useState({});
   // Play Later games state
   const [playLaterGames, setPlayLaterGames] = useState([]);
@@ -282,6 +284,16 @@ const Library = () => {
     const order = saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
     return order.find(id => id !== "hiddenFolders" || loadFolders().some(folder => folder.hidden)) || "all";
   }); // "all" | "favoritesGallery" | "cloud" | "playLater" | "history"
+
+  // Multiselect is only supported on the "All Games" tab, so leaving it
+  // should clear any in-progress selection instead of leaving it stuck on.
+  useEffect(() => {
+    if (activeTab !== "all" && selectionMode) {
+      setSelectionMode(false);
+      setSelectedGames([]);
+    }
+  }, [activeTab]);
+
   const dragTabRef = useRef(null);
   const dragOverTabRef = useRef(null);
   const [groupBy, setGroupBy] = useState(() => localStorage.getItem("library-groupBy") || "none"); // "none" | "directory"
@@ -986,6 +998,25 @@ const Library = () => {
       toast.error(t("library.cloudRestore.error"));
     }
     setRestoringGame(null);
+  };
+
+  // Permanently remove a cloud-only game's record from the cloud library
+  const handleDeleteFromCloud = async cloudGame => {
+    const gameName = cloudGame.name || cloudGame.game;
+    setDeletingCloudGame(gameName);
+    try {
+      const result = await deleteCloudGame(gameName);
+      if (result.success) {
+        setCloudOnlyGames(prev => prev.filter(g => (g.name || g.game) !== gameName));
+        toast.success(t("library.cloudOnly.deleted") || "Removed from cloud library");
+      } else {
+        toast.error(result.error || t("library.cloudOnly.deleteFailed") || "Failed to remove game from cloud");
+      }
+    } catch (error) {
+      console.error("Error deleting cloud game:", error);
+      toast.error(t("library.cloudOnly.deleteFailed") || "Failed to remove game from cloud");
+    }
+    setDeletingCloudGame(null);
   };
 
   // Check for pending cloud restores when games are loaded
@@ -1999,21 +2030,23 @@ const Library = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className={cn("rounded-md p-2 hover:bg-secondary/50", selectionMode && "bg-primary/10 text-primary")}
-                  type="button"
-                  onClick={() => { setSelectionMode(prev => !prev); setSelectedGames([]); }}
-                >
-                  <CheckSquareIcon className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="text-secondary">{t("library.multiselect")}</TooltipContent>
-            </Tooltip>
+            {activeTab === "all" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={cn("rounded-md p-2 hover:bg-secondary/50", selectionMode && "bg-primary/10 text-primary")}
+                    type="button"
+                    onClick={() => { setSelectionMode(prev => !prev); setSelectedGames([]); }}
+                  >
+                    <CheckSquareIcon className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="text-secondary">{t("library.multiselect")}</TooltipContent>
+              </Tooltip>
+            )}
           </TooltipProvider>
 
-          {selectionMode && (
+          {activeTab === "all" && selectionMode && (
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-primary">
                 {t("library.tools.selected", { count: selectedGames.length })}
@@ -2226,6 +2259,8 @@ const Library = () => {
                       imageData={cloudGameImages[game.name]}
                       onRestore={() => handleRestoreFromCloud(game)}
                       isRestoring={restoringGame === game.name}
+                      onDelete={() => handleDeleteFromCloud(game)}
+                      isDeleting={deletingCloudGame === game.name}
                     />
                   ))}
                 </div>
@@ -4246,8 +4281,9 @@ const InstalledGameCard = memo(
 InstalledGameCard.displayName = "InstalledGameCard";
 
 // Cloud-only game card with gray animation effect
-const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => {
+const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring, onDelete, isDeleting }) => {
   const { t } = useLanguage();
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const formatPlaytime = seconds => {
     if (!seconds || seconds < 60) return t("library.neverPlayed");
@@ -4265,7 +4301,7 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
   // Add & Restore button instead. The button's own onClick is stopped from
   // bubbling so it still works normally.
   const handleCardClick = () => {
-    if (isRestoring) return;
+    if (isRestoring || isDeleting) return;
     toast.warning(
       isCustomGame
         ? t("library.cloudOnly.noFilesFoundCustom") ||
@@ -4276,6 +4312,7 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
   };
 
   return (
+    <>
     <Card
       onClick={handleCardClick}
       role="button"
@@ -4335,6 +4372,22 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
               ? t("library.cloudOnly.customBadge")
               : t("library.cloudOnly.badge")}
           </span>
+          {/* Remove from cloud button */}
+          <button
+            onClick={e => {
+              e.stopPropagation();
+              setIsConfirmDeleteOpen(true);
+            }}
+            disabled={isDeleting}
+            className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/70 group-hover:opacity-100 disabled:opacity-100"
+            title={t("library.cloudOnly.delete") || "Remove from Cloud"}
+          >
+            {isDeleting ? (
+              <Loader className="h-3 w-3 animate-spin" />
+            ) : (
+              <Trash2 className="h-3 w-3" />
+            )}
+          </button>
         </div>
       </CardContent>
       <CardFooter className="flex flex-col items-start gap-1.5 px-3 py-2">
@@ -4382,6 +4435,32 @@ const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring }) => 
         </Button>
       </CardFooter>
     </Card>
+
+    <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-xl font-bold text-foreground">
+            {t("library.cloudOnly.deleteConfirmTitle") || "Remove from Cloud Library?"}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            {t("library.cloudOnly.deleteConfirmDescription", { game: game.name }) ||
+              `This will permanently remove "${game.name}" and its saved playtime from your cloud library. This cannot be undone.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setIsConfirmDeleteOpen(false);
+              onDelete?.();
+            }}
+          >
+            {t("library.cloudOnly.delete") || "Remove from Cloud"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 });
 
