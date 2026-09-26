@@ -1,3 +1,97 @@
+.bp-cloud-heading {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin: 1rem 0;
+}
+.bp-cloud-heading > svg {
+  width: 3rem;
+  height: 3rem;
+  color: rgb(var(--color-primary));
+}
+.bp-cloud-heading h1 {
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+}
+.bp-cloud .bp-panel {
+  margin-block: 1rem;
+}
+.bp-cloud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  margin-block: 0.75rem;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 1rem;
+  background: rgb(var(--color-card) / 0.6);
+}
+.bp-cloud-row > div:first-child {
+  min-width: 0;
+}
+.bp-cloud-row h3,
+.bp-cloud-row p,
+.bp-cloud-row > span {
+  overflow-wrap: anywhere;
+}
+.bp-cloud-row h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.bp-cloud-row p,
+.bp-cloud-row small {
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-cloud .bp-actions {
+  flex-wrap: wrap;
+}
+.bp-cloud-achievements p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+.bp-cloud-achievements [data-selected="true"] {
+  outline: 2px solid rgb(var(--color-primary));
+}
+.bp-cloud-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 3rem;
+  background: rgb(var(--color-background) / 0.94);
+}
+.bp-cloud-modal .bp-panel {
+  width: min(760px, 100%);
+  padding: 2.5rem;
+}
+.bp-cloud-modal h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+.bp-cloud-modal p {
+  margin-bottom: 2rem;
+  font-size: 1.15rem;
+}
+.bp-cloud-progress {
+  position: fixed;
+  bottom: 5rem;
+  right: 3rem;
+  z-index: 110;
+  padding: 1rem 2rem;
+  border-radius: 1rem;
+  background: rgb(var(--color-card));
+}
+@media (max-width: 1100px) {
+  .bp-cloud-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 /* Big Picture surfaces consume the same RGB tokens as ThemeContext and Tailwind.
    Keep active-page/selected states separate from the controller focus outline. */
 .bp-navigation {

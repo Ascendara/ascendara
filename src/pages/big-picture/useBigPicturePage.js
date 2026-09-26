@@ -19,6 +19,7 @@ import { getControllerButtons } from "./controller";
 import { createFuzzyMatcher } from "./utils";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { getGamepadInput } from "./gamepad";
+import { sidebarItems } from "./SidebarMenu";
 
 function useBigPicturePage() {
   useHideCursorOnGamepad();
@@ -26,6 +27,7 @@ function useBigPicturePage() {
   const { settings, updateSetting } = useSettings();
   const { isAuthenticated, user } = useAuth();
   const surfaceNavigation = useRef(null);
+  const surfaceInputLock = useRef(false);
   const controllerType = settings.controllerType || "xbox";
   const buttons = getControllerButtons(controllerType);
   const [assetSearchOpen, setAssetSearchOpen] = useState(false);
@@ -837,10 +839,7 @@ function useBigPicturePage() {
 
   useEffect(() => {
     if (isMenuOpen) {
-      if (view === "carousel") setMenuIndex(0);
-      else if (view === "library") setMenuIndex(1);
-      else if (view === "store") setMenuIndex(2);
-      else if (view === "downloads") setMenuIndex(3);
+      setMenuIndex(0);
     }
   }, [isMenuOpen, view]);
 
@@ -876,6 +875,14 @@ function useBigPicturePage() {
     },
     [isTransitioning]
   );
+
+  const handleMenuAction = useCallback(action => {
+    setIsMenuOpen(false);
+    if (action === "controller") setShowControllerSettings(true);
+    else if (action === "refresh") setRefreshTrigger(value => value + 1);
+    else if (action === "exit_bp") setShowExitBigPictureDialog(true);
+    else if (action === "quit_app") changeView("power");
+  }, [changeView]);
 
   // --- MAIN NAVIGATION LOGIC (SHARED BETWEEN KEYBOARD & GAMEPAD) ---
   const handleNavigation = useCallback(
@@ -937,37 +944,20 @@ function useBigPicturePage() {
         return;
       }
 
-      if (isMenuOpen) {
-        if (action === "DOWN") setMenuIndex(p => Math.min(p + 1, 8));
-        else if (action === "UP") setMenuIndex(p => Math.max(p - 1, 0));
-        else if (action === "BACK" || action === "MENU") setIsMenuOpen(false);
-        else if (action === "CONFIRM") {
-          setIsMenuOpen(false);
-          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=DOWNLOADS, 4=SETTINGS, 5=RETRO, 6=PROFILE, 7=EXIT BIG PICTURE, 8=CLOSE ASCENDARA
-          if (menuIndex === 0) {
-            changeView("carousel");
-          } else if (menuIndex === 1) {
-            changeView("library");
-          } else if (menuIndex === 2) {
-            changeView("store");
-          } else if (menuIndex === 3) {
-            changeView("downloads");
-          } else if (menuIndex === 4) {
-            changeView("preferences");
-          } else if (menuIndex === 5) {
-            changeView("retro");
-          } else if (menuIndex === 6) {
-            changeView("profile");
-          } else if (menuIndex === 7) {
-            setShowExitBigPictureDialog(true);
-          } else if (menuIndex === 8) {
-            changeView("power");
-          }
-        }
+      if (view === "cloud" && surfaceInputLock.current) {
+        surfaceNavigation.current?.(action);
         return;
       }
 
-      if (["carousel", "library", "retro", "profile", "preferences", "power", "downloads", "store"].includes(view)) {
+      if (isMenuOpen) {
+        if (action === "DOWN") setMenuIndex(p => Math.min(p + 1, sidebarItems.length - 1));
+        else if (action === "UP") setMenuIndex(p => Math.max(p - 1, 0));
+        else if (action === "BACK" || action === "MENU") setIsMenuOpen(false);
+        else if (action === "CONFIRM") handleMenuAction(sidebarItems[menuIndex]?.action);
+        return;
+      }
+
+      if (["carousel", "library", "retro", "cloud", "profile", "preferences", "power", "downloads", "store"].includes(view)) {
         if (action === "MENU") setIsMenuOpen(true);
         else if (action === "SEARCH") setIsKeyboardOpen(true);
         else surfaceNavigation.current?.(action);
@@ -1135,6 +1125,7 @@ function useBigPicturePage() {
       }
     },
     [
+      handleMenuAction,
       isKeyboardOpen,
       isMenuOpen,
       installedGameView,
@@ -1310,6 +1301,8 @@ function useBigPicturePage() {
     setSelectedSort,
     refreshStore: () => { setStoreGames([]); setStoreRevision(value => value + 1); },
     surfaceNavigation,
+    surfaceInputLock,
+    handleMenuAction,
     handleShowInstalledGameDetails,
     refreshLibrary: () => setRefreshTrigger(value => value + 1),
     showKillDialog,
@@ -1336,6 +1329,7 @@ function useBigPicturePage() {
     setKeyboardLayout,
     isMenuOpen,
     menuIndex,
+    setMenuIndex,
     buttons,
     setIsMenuOpen,
     changeView,

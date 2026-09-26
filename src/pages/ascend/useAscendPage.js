@@ -53,7 +53,7 @@ import {
   cleanupMessageListeners,
 } from "@/services/firebaseService";
 
-export default function useAscendPage() {
+export default function useAscendPage({ cloudOnly = false } = {}) {
   const navigate = useNavigate();
   const { settings } = useSettings();
   const { t } = useTranslation();
@@ -179,6 +179,7 @@ export default function useAscendPage() {
 
   // Cloud Library state
   const [cloudLibrary, setCloudLibrary] = useState(null);
+  const [cloudLibraryError, setCloudLibraryError] = useState("");
   const [loadingCloudLibrary, setLoadingCloudLibrary] = useState(true);
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
   const [isRestoringFromCloud, setIsRestoringFromCloud] = useState(false);
@@ -294,13 +295,13 @@ export default function useAscendPage() {
   useEffect(() => {
     if (user?.uid && !showDisplayNamePrompt) {
       verifyAccess();
-      loadFriendsData();
-      loadRequestsData();
+      if (!cloudOnly) loadFriendsData();
+      if (!cloudOnly) loadRequestsData();
       // Note: User status is loaded by AscendSidebar and synced via onStatusChange prop
       loadProfileStats();
       loadLocalStats();
       loadCloudLibrary();
-      loadNotifications();
+      if (!cloudOnly) loadNotifications();
     }
   }, [user?.uid, showDisplayNamePrompt]);
 
@@ -327,7 +328,7 @@ export default function useAscendPage() {
 
   // Set up real-time listener for friends list
   useEffect(() => {
-    if (!user?.uid) return;
+    if (cloudOnly || !user?.uid) return;
 
     const unsubscribe = subscribeToFriendsList(friends => {
       setFriends(friends);
@@ -341,7 +342,7 @@ export default function useAscendPage() {
 
   // Set up real-time listener for incoming friend requests
   useEffect(() => {
-    if (!user?.uid) return;
+    if (cloudOnly || !user?.uid) return;
 
     const unsubscribe = subscribeToIncomingRequests(requests => {
       setIncomingRequests(requests);
@@ -354,7 +355,7 @@ export default function useAscendPage() {
 
   // Set up real-time listener for outgoing friend requests
   useEffect(() => {
-    if (!user?.uid) return;
+    if (cloudOnly || !user?.uid) return;
 
     const unsubscribe = subscribeToOutgoingRequests(requests => {
       setOutgoingRequests(requests);
@@ -368,7 +369,7 @@ export default function useAscendPage() {
 
   // Set up real-time listener for conversations
   useEffect(() => {
-    if (!user?.uid) return;
+    if (cloudOnly || !user?.uid) return;
 
     const unsubscribe = subscribeToConversations(conversations => {
       setConversations(conversations);
@@ -423,7 +424,7 @@ export default function useAscendPage() {
   // Cleanup all message listeners on unmount
   useEffect(() => {
     return () => {
-      cleanupMessageListeners();
+      if (!cloudOnly) cleanupMessageListeners();
     };
   }, []);
 
@@ -713,7 +714,7 @@ export default function useAscendPage() {
       setAscendAccess({ ...result, verified: true });
 
       // If trial is expired or user has no access, disconnect all remote access sessions
-      if (!result.hasAccess && !result.isSubscribed && !result.isVerified) {
+      if (!cloudOnly && !result.hasAccess && !result.isSubscribed && !result.isVerified) {
         console.log("[Ascend] Trial expired - disconnecting all remote access sessions");
         try {
           // Load connected devices
@@ -761,7 +762,7 @@ export default function useAscendPage() {
       console.error("Failed to verify Ascend access:", e);
       // Default to allowing access on error (fail open for better UX)
       setAscendAccess({
-        hasAccess: true,
+        hasAccess: !cloudOnly,
         daysRemaining: 7,
         isSubscribed: false,
         isVerified: false,
@@ -886,6 +887,7 @@ export default function useAscendPage() {
   // Cloud Library functions
   const loadCloudLibrary = async () => {
     setLoadingCloudLibrary(true);
+    setCloudLibraryError("");
     try {
       // Load both cloud data and local games
       const [cloudResult, games, customGames] = await Promise.all([
@@ -897,6 +899,7 @@ export default function useAscendPage() {
       if (cloudResult.data) {
         setCloudLibrary(cloudResult.data);
       }
+      if (cloudOnly && cloudResult.error) throw new Error(cloudResult.error);
 
       // Combine local games
       const allLocalGames = [
@@ -961,6 +964,8 @@ export default function useAscendPage() {
       setCloudLibraryImages(images);
     } catch (e) {
       console.error("Failed to load cloud library:", e);
+      setCloudLibraryError(e.message || "Failed to load cloud library");
+      if (cloudOnly) toast.error(e.message || "Failed to load cloud library");
     }
     setLoadingCloudLibrary(false);
   };
@@ -3108,6 +3113,10 @@ export default function useAscendPage() {
     setDeleteHoldProgress,
     getFilteredLibraryGames,
     cloudLibrary,
+    cloudLibraryError,
+    loadCloudLibrary,
+    verifyAccess,
+    verifyingAccess,
     handleRestoreFromCloud,
     isRestoringFromCloud,
     isSyncingLibrary,

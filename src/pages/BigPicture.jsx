@@ -13,6 +13,7 @@ import { PowerSurface } from "./big-picture/PowerSurface";
 import { HomeDashboard } from "./big-picture/HomeDashboard";
 import { LibrarySurface } from "./big-picture/LibrarySurface";
 import { RetroSurface } from "./big-picture/RetroSurface";
+import { CloudSurface } from "./big-picture/CloudSurface";
 import { PreferencesSurface } from "./big-picture/PreferencesSurface";
 import "./big-picture/big-picture.css";
 import "./big-picture/design-system.css";
@@ -35,6 +36,8 @@ function BigPicture() {
     setSelectedSort,
     refreshStore,
     surfaceNavigation,
+    surfaceInputLock,
+    handleMenuAction,
     handleShowInstalledGameDetails,
     refreshLibrary,
     showKillDialog,
@@ -61,6 +64,7 @@ function BigPicture() {
     setKeyboardLayout,
     isMenuOpen,
     menuIndex,
+    setMenuIndex,
     buttons,
     setIsMenuOpen,
     changeView,
@@ -233,32 +237,10 @@ function BigPicture() {
       <SidebarMenu
         isOpen={isMenuOpen}
         selectedIndex={menuIndex}
+        onSelectIndex={setMenuIndex}
         t={t}
         buttons={buttons}
-        onItemClick={idx => {
-          setIsMenuOpen(false);
-          // Menu items: 0=HOME, 1=LIBRARY, 2=CATALOG, 3=DOWNLOADS, 4=SETTINGS, 5=RETRO, 6=PROFILE, 7=EXIT BIG PICTURE, 8=CLOSE ASCENDARA
-          if (idx === 0) {
-            changeView("carousel");
-          } else if (idx === 1) {
-            changeView("library");
-          } else if (idx === 2) {
-            changeView("store");
-          } else if (idx === 3) {
-            changeView("downloads");
-          } else if (idx === 4) {
-            changeView("preferences");
-          } else if (idx === 5) {
-            changeView("retro");
-          } else if (idx === 6) {
-            changeView("profile");
-          } else if (idx === 7) {
-            setShowExitBigPictureDialog(true);
-          } else if (idx === 8) {
-            changeView("power");
-          }
-
-        }}
+        onItemClick={handleMenuAction}
       />
 
       <div
@@ -269,6 +251,7 @@ function BigPicture() {
         {view === "carousel" && <HomeDashboard navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView && !showControllerSettings && !isKeyboardOpen && !showExitBigPictureDialog} search={() => setIsKeyboardOpen(true)} openMenu={() => setIsMenuOpen(true)} pause={handlePauseDownload} resume={handleResumeDownload} stopping={stoppingDownloads} resuming={resumingDownloads} playGame={game => handleShowInstalledGameDetails(game, true)} games={allGames} downloads={downloadingGames} queue={queuedDownloads} discover={filteredStoreGames} openGame={handleShowInstalledGameDetails} openStore={game => handleSelectStoreGame(game, 0)} changeView={changeView} openSettings={() => changeView("preferences")} />}
         {view === "library" && <LibrarySurface navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView} games={allGames} openGame={handleShowInstalledGameDetails} refresh={refreshLibrary} onBack={() => changeView("carousel")} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
         {view === "retro" && <RetroSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} />}
+        {view === "cloud" && <CloudSurface navigation={surfaceNavigation} inputLock={surfaceInputLock} active={!isMenuOpen && !isKeyboardOpen && !showExitBigPictureDialog && !showControllerSettings} games={allGames} refreshLibrary={refreshLibrary} onBack={() => changeView("carousel")} onAccount={() => navigate("/ascend")} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
         {["preferences", "profile"].includes(view) && <PreferencesSurface key={view} navigation={surfaceNavigation} active={!isMenuOpen && !showControllerSettings} profile={view === "profile"} onBack={() => changeView("carousel")} openController={() => setShowControllerSettings(true)} />}
 
         {view === "store" && <BrowseSurface navigation={surfaceNavigation} active={!isMenuOpen && !isKeyboardOpen} games={filteredStoreGames} loading={storeLoading} query={storeSearchQuery} search={() => setIsKeyboardOpen(true)} clearSearch={() => setStoreSearchQuery("")} sort={selectedSort} setSort={setSelectedSort} openGame={handleSelectStoreGame} onBack={() => changeView("carousel")} retry={refreshStore} />}

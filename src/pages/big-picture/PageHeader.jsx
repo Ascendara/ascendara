@@ -8,6 +8,7 @@ import {
   UserRound,
   Settings,
   Search,
+  Cloud,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -18,6 +19,7 @@ export const pageLinks = [
   ["store", "Browse", Compass],
   ["downloads", "Downloads", Download],
   ["retro", "Retro", Gamepad2],
+  ["cloud", "Cloud", Cloud],
 ];
 export const pageFocusIds = [
   ...pageLinks.map(([id]) => `page-${id}`),
