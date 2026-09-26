@@ -206,14 +206,14 @@ const VirtualKeyboard = ({
         </div>
 
         <div className="mx-auto mb-2 flex max-w-5xl justify-end gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-          <span>
-            <span className="mr-1 rounded-sm bg-primary px-1 text-secondary">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-primary px-1 leading-none text-secondary">
               {buttons.delete}
             </span>
             {t("bigPicture.del")}
           </span>
-          <span>
-            <span className="mr-1 rounded-sm bg-primary px-1 text-secondary">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-primary px-1 leading-none text-secondary">
               {buttons.space}
             </span>
             {t("bigPicture.space")}
