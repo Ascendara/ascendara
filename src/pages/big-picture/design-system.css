@@ -656,6 +656,12 @@
 .bp-retro-console-card .bp-action:last-child:hover {
   color: rgb(var(--color-primary));
 }
+.bp-retro-more-consoles {
+  margin: 0.9rem 0 0;
+}
+.bp-retro-more-consoles + .bp-retro-section-title {
+  margin-top: 1.6rem;
+}
 .bp-retro .bp-grid .bp-cover {
   aspect-ratio: 3 / 4;
 }

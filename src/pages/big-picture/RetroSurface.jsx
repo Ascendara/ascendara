@@ -258,7 +258,7 @@ export function RetroSurface({ navigation, active, onBack }) {
               </div>;
             })}
           </div>
-          {platforms.length > 12 && <SurfaceButton {...focus("more-consoles")} onClick={() => setShowAllConsoles(!showAllConsoles)}>
+          {platforms.length > 12 && <SurfaceButton className="bp-retro-more-consoles" {...focus("more-consoles")} onClick={() => setShowAllConsoles(!showAllConsoles)}>
             {showAllConsoles ? "Show fewer consoles" : "Show all " + platforms.length + " consoles"}
           </SurfaceButton>}
           <div className="bp-retro-section-title">
