@@ -195,7 +195,14 @@ function registerRetroHandlers() {
     busyProfiles.add(game.platform);
     try {
       await validateFile(profile.executable, "Emulator executable");
-      await validateFile(game.files[discIndex], "Game file");
+      try {
+        await validateFile(game.files[discIndex], "Game file");
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        game.missing = true;
+        persist(); emit();
+        throw new Error("This game's ROM file is missing. Restore it or update the console's ROM folder and rescan.");
+      }
       if (resolveAdapter(game.platform, profile) === "retroarch") await validateFile(profile.core, "RetroArch core");
       for (const file of game.dependencies || []) await validateFile(file, "Referenced disc or track");
       await checkExternalProcess(profile.executable);
