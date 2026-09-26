@@ -31,7 +31,6 @@ const CompanionSection = lazy(() => import("./ascend/CompanionSection"));
 const SettingsSection = lazy(() => import("./ascend/SettingsSection"));
 const CloudLibrarySection = lazy(() => import("./ascend/CloudLibrarySection"));
 const LeaderboardSection = lazy(() => import("./ascend/LeaderboardSection"));
-const AdStatsSection = lazy(() => import("./ascend/AdStatsSection"));
 const UpcomingSection = lazy(() => import("./ascend/UpcomingSection"));
 const UserProfileSection = lazy(() => import("./ascend/UserProfileSection"));
 const CloudBackupsSection = lazy(() => import("./ascend/CloudBackupsSection"));
@@ -819,9 +818,6 @@ const Ascend = () => {
               setActiveSection={setActiveSection}
             />
           );
-
-        case "adstats":
-          return <AdStatsSection user={user} />;
 
         case "upcoming":
           // Load upcoming changelog when section is accessed
