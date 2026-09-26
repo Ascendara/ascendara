@@ -6,7 +6,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
-const { exec, execFile } = require("child_process");
+const { execFile } = require("child_process");
 const { ipcMain, BrowserWindow } = require("electron");
 const {
   isLinux,
@@ -181,23 +181,8 @@ async function detectInstalledProtons() {
  * Detect if system Wine is available as fallback
  */
 async function detectSystemWine() {
-  return new Promise(resolve => {
-    exec("which wine", (err, stdout) => {
-      if (err || !stdout.trim()) {
-        resolve(null);
-      } else {
-        // Get Wine version
-        exec("wine --version", (verErr, verOut) => {
-          resolve({
-            name: "System Wine",
-            path: stdout.trim(),
-            version: verErr ? "Unknown" : verOut.trim(),
-            source: "system",
-          });
-        });
-      }
-    });
-  });
+  const { findWine } = require("./wine-setup");
+  return findWine();
 }
 
 /**
@@ -328,7 +313,7 @@ async function downloadUmuProton(parentWindow) {
     },
   });
 
-  progressWindow.loadURL(
+  await progressWindow.loadURL(
     "data:text/html;charset=utf-8," +
       encodeURIComponent(`<!DOCTYPE html><html><head><style>
         * { margin: 0; box-sizing: border-box; }
@@ -363,10 +348,12 @@ async function downloadUmuProton(parentWindow) {
   );
 
   const updateStatus = msg =>
+    !progressWindow.isDestroyed() &&
     progressWindow.webContents.executeJavaScript(
       `document.querySelector('.status').textContent=${JSON.stringify(msg)};`
     );
   const updateProgress = pct =>
+    !progressWindow.isDestroyed() &&
     progressWindow.webContents.executeJavaScript(
       `document.getElementById('prog').style.width='${pct}%';document.getElementById('pct').textContent='${Math.round(pct)}%';`
     );
@@ -430,7 +417,8 @@ async function downloadUmuProton(parentWindow) {
 
     await new Promise((resolve, reject) => {
       const proc = execFile(
-        "tar", ["-xzf", tempPath, "-C", linuxRunnersDir],
+        "tar",
+        ["-xzf", tempPath, "-C", linuxRunnersDir],
         { maxBuffer: 10 * 1024 * 1024 },
         err => {
           if (err) reject(err);
@@ -489,7 +477,9 @@ async function downloadUmuProton(parentWindow) {
     // 8. Remove old UMU-Proton versions
     const removedVersions = await removeOldUmuProton(installedName);
     if (removedVersions.length > 0) {
-      console.log(`[Proton] Cleaned up old UMU-Proton versions: ${removedVersions.join(", ")}`);
+      console.log(
+        `[Proton] Cleaned up old UMU-Proton versions: ${removedVersions.join(", ")}`
+      );
     }
 
     updateStatus(`${installedName} installed successfully!`);
@@ -536,7 +526,7 @@ async function downloadUmuLauncher(parentWindow) {
     webPreferences: { nodeIntegration: true, contextIsolation: false },
   });
 
-  progressWindow.loadURL(
+  await progressWindow.loadURL(
     "data:text/html;charset=utf-8," +
       encodeURIComponent(`<!DOCTYPE html><html><head><style>
         * { margin: 0; box-sizing: border-box; }
@@ -570,23 +560,37 @@ async function downloadUmuLauncher(parentWindow) {
       </body></html>`)
   );
 
-  const updateStatus = m => !progressWindow.isDestroyed() && progressWindow.webContents.executeJavaScript(`document.querySelector('.status').textContent=${JSON.stringify(m)}`);
-  const updateProgress = p => !progressWindow.isDestroyed() && progressWindow.webContents.executeJavaScript(`document.getElementById('prog').style.width='${p}%'`);
+  const updateStatus = m =>
+    !progressWindow.isDestroyed() &&
+    progressWindow.webContents.executeJavaScript(
+      `document.querySelector('.status').textContent=${JSON.stringify(m)}`
+    );
+  const updateProgress = p =>
+    !progressWindow.isDestroyed() &&
+    progressWindow.webContents.executeJavaScript(
+      `document.getElementById('prog').style.width='${p}%'`
+    );
 
+  let tempDir;
   try {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ascendara-umu-"));
     updateStatus("Fetching latest UMU release...");
-    
+
     // 1. Get release info
-    const res = await fetch("https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases/latest", {
-      headers: { "User-Agent": "Ascendara-Launcher" }
-    });
+    const res = await fetch(
+      "https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases/latest",
+      {
+        headers: { "User-Agent": "Ascendara-Launcher" },
+      }
+    );
+    if (!res.ok) throw new Error(`GitHub API error ${res.status}`);
     const release = await res.json();
     const version = release.tag_name;
     const asset = release.assets.find(a => a.name.endsWith("-zipapp.tar"));
 
     if (!asset) throw new Error("UMU Launcher zipapp asset not found");
 
-   // Verify version
+    // Verify version
     const versionFile = path.join(linuxUmuDir, "version");
     if (fs.existsSync(linuxUmuBin) && fs.existsSync(versionFile)) {
       if (fs.readFileSync(versionFile, "utf8").trim() === version) {
@@ -598,41 +602,62 @@ async function downloadUmuLauncher(parentWindow) {
     // 2. Download
     updateStatus(`Downloading UMU v${version}...`);
     const downloadRes = await fetch(asset.browser_download_url);
-    const totalSize = parseInt(downloadRes.headers.get("content-length"));
+    if (!downloadRes.ok) throw new Error(`Download failed: ${downloadRes.status}`);
+    const totalSize = Number(downloadRes.headers.get("content-length")) || asset.size;
 
     const reader = downloadRes.body.getReader();
-    
-    const tmpTar = path.join(os.tmpdir(), "umu-launcher.tar");
-    const writer = fs.createWriteStream(tmpTar);
 
+    const tmpTar = path.join(tempDir, "umu-launcher.tar");
+    const { pipeline } = require("stream/promises");
+    const { Readable } = require("stream");
     let downloaded = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      writer.write(value);
-      downloaded += value.length;
-      updateProgress((downloaded / totalSize) * 80); // 80% max pour le DL
-    }
-    writer.end();
+    await pipeline(
+      Readable.from(
+        (async function* () {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            downloaded += value.length;
+            if (totalSize) updateProgress(Math.min(80, (downloaded / totalSize) * 80));
+            yield value;
+          }
+        })()
+      ),
+      fs.createWriteStream(tmpTar)
+    );
 
     // 3. Extract and cleanup
     updateStatus("Extracting UMU...");
     updateProgress(90);
     fs.ensureDirSync(linuxUmuDir);
 
-    if (fs.existsSync(linuxUmuBin)) fs.removeSync(linuxUmuBin);
+    const stagingDir = path.join(tempDir, "unpacked");
+    await fs.ensureDir(stagingDir);
 
     await new Promise((resolve, reject) => {
       // Structure: tar -> dossier umu/ -> fichier umu-run
       // --strip-components=1 enlève le dossier "umu/"
-      execFile("tar", ["-xf", tmpTar, "-C", linuxUmuDir, "--strip-components=1"], (err) => {
-        if (err) reject(err); else resolve();
+      execFile("tar", ["-xf", tmpTar, "-C", stagingDir, "--strip-components=1"], err => {
+        if (err) reject(err);
+        else resolve();
       });
     });
 
     // 4. Finalization
-    fs.chmodSync(linuxUmuBin, 0o755);
+    const stagedBin = path.join(stagingDir, "umu-run");
+    await fs.chmod(stagedBin, 0o755);
+    await new Promise((resolve, reject) => {
+      execFile(stagedBin, ["--version"], { timeout: 30000 }, error => {
+        if (error)
+          reject(
+            new Error(
+              "UMU could not run. Check Python and runtime dependencies: " + error.message
+            )
+          );
+        else resolve();
+      });
+    });
+    await fs.copy(stagingDir, linuxUmuDir, { overwrite: true });
     fs.writeFileSync(versionFile, version, "utf8");
     fs.removeSync(tmpTar);
 
@@ -648,6 +673,8 @@ async function downloadUmuLauncher(parentWindow) {
       progressWindow.close();
     }
     return { success: false, error: err.message };
+  } finally {
+    if (tempDir) await fs.remove(tempDir);
   }
 }
 
@@ -666,11 +693,13 @@ async function getProtonCachyOSInfo() {
 
     const tarAsset = release.assets.find(a => {
       const n = a.name;
-      return (n.endsWith(".tar.xz") || n.endsWith(".tar.gz"))
-        && n.includes("x86_64")
-        && !n.includes("x86_64_v3")
-        && !n.includes("arm64")
-        && !n.includes("sha512sum");
+      return (
+        (n.endsWith(".tar.xz") || n.endsWith(".tar.gz")) &&
+        n.includes("x86_64") &&
+        !n.includes("x86_64_v3") &&
+        !n.includes("arm64") &&
+        !n.includes("sha512sum")
+      );
     });
     if (!tarAsset) throw new Error("No tarball found in latest proton-cachyos release");
 
@@ -732,7 +761,11 @@ async function removeOldProtonCachyOS(keepVersion) {
   try {
     const dirs = await fs.readdir(linuxRunnersDir, { withFileTypes: true });
     for (const d of dirs) {
-      if (d.isDirectory() && d.name.toLowerCase().includes("cachyos") && d.name !== keepVersion) {
+      if (
+        d.isDirectory() &&
+        d.name.toLowerCase().includes("cachyos") &&
+        d.name !== keepVersion
+      ) {
         await fs.remove(path.join(linuxRunnersDir, d.name));
         removed.push(d.name);
       }
@@ -747,12 +780,17 @@ async function downloadProtonCachyOS(parentWindow) {
   if (!isLinux) return { success: false, message: "Only available on Linux" };
 
   const progressWindow = new BrowserWindow({
-    width: 520, height: 280, parent: parentWindow || undefined,
-    modal: !!parentWindow, frame: false, transparent: true, resizable: false,
+    width: 520,
+    height: 280,
+    parent: parentWindow || undefined,
+    modal: !!parentWindow,
+    frame: false,
+    transparent: true,
+    resizable: false,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
   });
 
-  progressWindow.loadURL(
+  await progressWindow.loadURL(
     "data:text/html;charset=utf-8," +
       encodeURIComponent(`<!DOCTYPE html><html><head><style>
         * { margin: 0; box-sizing: border-box; }
@@ -779,10 +817,12 @@ async function downloadProtonCachyOS(parentWindow) {
   );
 
   const updateStatus = msg =>
+    !progressWindow.isDestroyed() &&
     progressWindow.webContents.executeJavaScript(
       `document.querySelector('.status').textContent=${JSON.stringify(msg)};`
     );
   const updateProgress = pct =>
+    !progressWindow.isDestroyed() &&
     progressWindow.webContents.executeJavaScript(
       `document.getElementById('prog').style.width='${pct}%';document.getElementById('pct').textContent='${Math.round(pct)}%';`
     );
@@ -799,7 +839,12 @@ async function downloadProtonCachyOS(parentWindow) {
       updateProgress(100);
       await new Promise(r => setTimeout(r, 2000));
       progressWindow.close();
-      return { success: true, message: "Already installed", path: info.installPath, name: info.name };
+      return {
+        success: true,
+        message: "Already installed",
+        path: info.installPath,
+        name: info.name,
+      };
     }
 
     updateStatus(`Downloading ${info.fileName} (${info.sizeFormatted})...`);
@@ -821,7 +866,9 @@ async function downloadProtonCachyOS(parentWindow) {
       downloaded += value.length;
       const pct = 10 + (downloaded / totalSize) * 60;
       updateProgress(pct);
-      updateStatus(`Downloading... ${(downloaded / 1024 / 1024).toFixed(1)} / ${(totalSize / 1024 / 1024).toFixed(1)} MB`);
+      updateStatus(
+        `Downloading... ${(downloaded / 1024 / 1024).toFixed(1)} / ${(totalSize / 1024 / 1024).toFixed(1)} MB`
+      );
     }
 
     const buffer = Buffer.concat(chunks);
@@ -836,9 +883,10 @@ async function downloadProtonCachyOS(parentWindow) {
 
     await new Promise((resolve, reject) => {
       const proc = execFile(
-        "tar", [tarFlag, tempPath, "-C", linuxRunnersDir],
+        "tar",
+        [tarFlag, tempPath, "-C", linuxRunnersDir],
         { maxBuffer: 10 * 1024 * 1024 },
-        err => err ? reject(err) : resolve()
+        err => (err ? reject(err) : resolve())
       );
       proc.stderr.on("data", data => {
         updateStatus(`Extracting: ${data.toString().trim().substring(0, 60)}`);
@@ -873,14 +921,19 @@ async function downloadProtonCachyOS(parentWindow) {
 
     if (currentSettings.linuxRunner && currentSettings.linuxRunner !== "auto") {
       const currentRunnerName = path.basename(currentSettings.linuxRunner);
-      if (currentRunnerName.toLowerCase().includes("cachyos") && currentRunnerName !== installedName) {
+      if (
+        currentRunnerName.toLowerCase().includes("cachyos") &&
+        currentRunnerName !== installedName
+      ) {
         settingsManager.updateSetting("linuxRunner", installedPath);
       }
     }
 
     const removedVersions = await removeOldProtonCachyOS(installedName);
     if (removedVersions.length > 0) {
-      console.log(`[Proton] Cleaned up old CachyOS versions: ${removedVersions.join(", ")}`);
+      console.log(
+        `[Proton] Cleaned up old CachyOS versions: ${removedVersions.join(", ")}`
+      );
     }
 
     updateStatus(`${installedName} installed successfully!`);
@@ -888,7 +941,12 @@ async function downloadProtonCachyOS(parentWindow) {
     await new Promise(r => setTimeout(r, 2000));
     progressWindow.close();
 
-    return { success: true, message: `${installedName} installed`, path: installedPath, name: installedName };
+    return {
+      success: true,
+      message: `${installedName} installed`,
+      path: installedPath,
+      name: installedName,
+    };
   } catch (err) {
     console.error("[Proton] CachyOS download failed:", err);
     updateStatus(`Error: ${err.message}`);
@@ -1020,7 +1078,7 @@ async function downloadProtonGE(parentWindow) {
     },
   });
 
-  progressWindow.loadURL(
+  await progressWindow.loadURL(
     "data:text/html;charset=utf-8," +
       encodeURIComponent(`<!DOCTYPE html><html><head><style>
         * { margin: 0; box-sizing: border-box; }
@@ -1055,10 +1113,12 @@ async function downloadProtonGE(parentWindow) {
   );
 
   const updateStatus = msg =>
+    !progressWindow.isDestroyed() &&
     progressWindow.webContents.executeJavaScript(
       `document.querySelector('.status').textContent=${JSON.stringify(msg)};`
     );
   const updateProgress = pct =>
+    !progressWindow.isDestroyed() &&
     progressWindow.webContents.executeJavaScript(
       `document.getElementById('prog').style.width='${pct}%';document.getElementById('pct').textContent='${Math.round(pct)}%';`
     );
@@ -1121,7 +1181,8 @@ async function downloadProtonGE(parentWindow) {
 
     await new Promise((resolve, reject) => {
       const proc = execFile(
-        "tar", ["-xzf", tempPath, "-C", linuxRunnersDir],
+        "tar",
+        ["-xzf", tempPath, "-C", linuxRunnersDir],
         { maxBuffer: 10 * 1024 * 1024 },
         err => {
           if (err) reject(err);
@@ -1344,7 +1405,9 @@ async function buildLaunchConfig(gameName, exePath, gameRunnerOverride, umuId, s
   // Fallback : umu-run not installed
   const runner = await resolveRunner(gameRunnerOverride);
   if (!runner) {
-    return { error: "No compatible runner found. Please install UMU-Launcher or Proton-GE." };
+    return {
+      error: "No compatible runner found. Please install UMU-Launcher or Proton-GE.",
+    };
   }
 
   if (runner.type === "proton") {
@@ -1382,12 +1445,12 @@ function registerProtonHandlers() {
   if (!isLinux) return;
 
   ipcMain.handle("is-umu-installed", () => isUmuInstalled());
-  
+
   ipcMain.handle("get-umu-proton-info", async () => {
     return await getUmuProtonInfo();
   });
 
-  ipcMain.handle("download-umu-launcher", async (event) => {
+  ipcMain.handle("download-umu-launcher", async event => {
     const win = BrowserWindow.fromWebContents(event.sender);
     return await downloadUmuLauncher(win);
   });
@@ -1484,9 +1547,6 @@ function registerProtonHandlers() {
   });
 
   // Get all available runners
-  ipcMain.handle("get-runners", async () => {
-    return await getAllRunners();
-  });
 
   // Detect Proton installations (replaces the one in system.js)
   ipcMain.handle("detect-proton", async () => {
@@ -1548,10 +1608,15 @@ function registerProtonHandlers() {
   });
 }
 
+function registerRunnerHandlers() {
+  ipcMain.handle("get-runners", () => getAllRunners());
+}
+
 // Exports
 
 module.exports = {
   registerProtonHandlers,
+  registerRunnerHandlers,
   ensureLinuxDirectories,
   detectInstalledProtons,
   detectSystemWine,

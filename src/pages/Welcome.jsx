@@ -4,7 +4,48 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Rocket, Shield, Download, PuzzleIcon, PackageOpen, Palette, Zap, Layout, CircleCheck, Loader, XCircle, Globe2, ExternalLink, ArrowRight, PlusCircle, SquareArrowRight, FolderDownIcon, Unplug, Wine, Database, AlertTriangle, Sparkles, BellRing, Crown, Info, Gamepad2, ArrowRightLeft, Users, Smartphone, MessageCircle, User, CloudIcon, CloudUpload, Trophy, RefreshCw, Eye, Puzzle, Infinity as InfinityIcon, ListOrdered, Sparkle } from "lucide-react";
+import {
+  Rocket,
+  Shield,
+  Download,
+  PuzzleIcon,
+  PackageOpen,
+  Palette,
+  Zap,
+  Layout,
+  CircleCheck,
+  Loader,
+  XCircle,
+  Globe2,
+  ExternalLink,
+  ArrowRight,
+  PlusCircle,
+  SquareArrowRight,
+  FolderDownIcon,
+  Unplug,
+  Wine,
+  Database,
+  AlertTriangle,
+  Sparkles,
+  BellRing,
+  Crown,
+  Info,
+  Gamepad2,
+  ArrowRightLeft,
+  Users,
+  Smartphone,
+  MessageCircle,
+  User,
+  CloudIcon,
+  CloudUpload,
+  Trophy,
+  RefreshCw,
+  Eye,
+  Puzzle,
+  Infinity as InfinityIcon,
+  ListOrdered,
+  Sparkle,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -202,8 +243,25 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [isDownloadingProtonGE, setIsDownloadingProtonGE] = useState(false);
   const [showProtonGEConfirm, setShowProtonGEConfirm] = useState(false);
   const [runnersList, setRunnersList] = useState([]);
-  const cachyOsInstalled = runnersList.some(r => r.name.toLowerCase().includes("cachyos"));
+  const cachyOsInstalled = runnersList.some(r =>
+    r.name.toLowerCase().includes("cachyos")
+  );
   const [isOnLinux, setIsOnLinux] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const [installingWine, setInstallingWine] = useState(false);
+  const installWine = async () => {
+    setInstallingWine(true);
+    setSetupError("");
+    try {
+      const result = await window.electron.installWine();
+      if (!result.success) throw new Error(result.message || result.error);
+      setRunnersList(await window.electron.getRunners());
+    } catch (error) {
+      setSetupError(error.message);
+    } finally {
+      setInstallingWine(false);
+    }
+  };
   const [protonDetected, setProtonDetected] = useState(false);
   const [protonInstalled, setProtonInstalled] = useState(false);
   const [umuInstalled, setUmuInstalled] = useState(false);
@@ -747,8 +805,12 @@ const Welcome = ({ welcomeData, onComplete }) => {
       const isWindows = await window.electron.isOnWindows();
       setIsOnWindows(isWindows);
 
-      const isLinux = !isWindows && navigator.userAgent.toLowerCase().includes("linux");
+      const isLinux = window.electron.getPlatform() === "linux";
       setIsOnLinux(isLinux);
+
+      if (!isWindows) {
+        setRunnersList(await window.electron.getRunners());
+      }
 
       if (isLinux) {
         // 1. Get runners
@@ -762,6 +824,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
         // 2. Fetch Proton-GE info (for size display)
         try {
           const info = await window.electron.getProtonGEInfo();
+          if (!info.success) throw new Error(info.error || info.message);
           if (info.success) {
             setProtonGEInfo(info);
           }
@@ -780,7 +843,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
         }
       }
     };
-    checkPlatform();
+    checkPlatform().catch(error => setSetupError(error.message));
   }, []);
 
   // Check if user has ever completed a local index refresh (e.g., from a previous session)
@@ -878,9 +941,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
         console.error("[Welcome] Failed to persist index flags:", e);
       }
       try {
-        const imageCacheService = (
-          await import("@/services/imageCacheService")
-        ).default;
+        const imageCacheService = (await import("@/services/imageCacheService")).default;
         const gameService = (await import("@/services/gameService")).default;
         imageCacheService.invalidateSettingsCache?.();
         await imageCacheService.clearCache?.(true);
@@ -909,8 +970,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
       try {
         // Skip if the user already has an index from a previous session
         if (window.electron?.getTimestampValue) {
-          const hasIndexed =
-            await window.electron.getTimestampValue("hasIndexBefore");
+          const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
           if (hasIndexed === true) {
             autoIndexStartedRef.current = true;
             if (isMounted) {
@@ -1126,7 +1186,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               <div className="rounded-lg bg-yellow-500/15 p-2">
                 <AlertTriangle className="h-6 w-6 text-yellow-500" />
               </div>
-              <AlertDialogTitle className="text-2xl mt-2 font-bold text-foreground">
+              <AlertDialogTitle className="mt-2 text-2xl font-bold text-foreground">
                 {t("welcome.manualUpdateConfirm.title")}
               </AlertDialogTitle>
             </div>
@@ -1450,11 +1510,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 </p>
               </motion.div>
 
-              <motion.div 
-                className="mb-6 max-w-2xl w-full"
-                variants={itemVariants}
-              >
-                <div className="rounded-lg bg-card/30 p-6 space-y-3">
+              <motion.div className="mb-6 w-full max-w-2xl" variants={itemVariants}>
+                <div className="space-y-3 rounded-lg bg-card/30 p-6">
                   <div className="flex items-start space-x-3 text-left">
                     <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
                     <p className="text-md">{t("welcome.noticeAppIsFree.point1")}</p>
@@ -1473,25 +1530,27 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   </div>
                 </div>
 
-                <motion.div 
-                  className="mt-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 p-6"
+                <motion.div
+                  className="mt-4 rounded-lg border border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-blue-500/10 p-6"
                   variants={itemVariants}
                 >
                   <div className="flex items-center justify-between">
                     <div className="text-left">
-                      <h4 className="text-lg font-semibold text-purple-500 mb-2">
+                      <h4 className="mb-2 text-lg font-semibold text-purple-500">
                         {t("welcome.noticeAppIsFree.ascendTitle")}
                       </h4>
-                      <p className="text-sm text-muted-foreground mb-3">
+                      <p className="mb-3 text-sm text-muted-foreground">
                         {t("welcome.noticeAppIsFree.ascendDescription")}
                       </p>
-                      <a 
-                        href="https://ascendara.app/ascend" 
-                        target="_blank" 
+                      <a
+                        href="https://ascendara.app/ascend"
+                        target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-2 text-purple-500 hover:text-purple-400 transition-colors"
+                        className="inline-flex items-center space-x-2 text-purple-500 transition-colors hover:text-purple-400"
                       >
-                        <span className="text-sm font-medium">{t("welcome.noticeAppIsFree.learnMore")}</span>
+                        <span className="text-sm font-medium">
+                          {t("welcome.noticeAppIsFree.learnMore")}
+                        </span>
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     </div>
@@ -1507,7 +1566,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)",
                     }}
                   >
-                    <div className="animate-marquee-vertical flex flex-col group-hover:[animation-play-state:paused]">
+                    <div className="flex animate-marquee-vertical flex-col group-hover:[animation-play-state:paused]">
                       {[...ascendPremiumFeatures, ...ascendPremiumFeatures].map(
                         (feature, index) => (
                           <div
@@ -2304,6 +2363,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
               animate="visible"
               exit="exit"
             >
+              {!dependenciesInstalled && setupError && (
+                <p role="alert" className="text-destructive mb-4">
+                  {setupError}
+                </p>
+              )}
               {!dependenciesInstalled ? (
                 <>
                   <motion.div
@@ -2323,10 +2387,18 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </p>
                     <div className="flex justify-center space-x-4">
                       <Button
+                        disabled={isInstalling}
                         onClick={async () => {
-                          const result = await window.electron.installPython();
-                          if (result.success) {
+                          setIsInstalling(true);
+                          setSetupError("");
+                          try {
+                            const result = await window.electron.installPython();
+                            if (!result.success) throw new Error(result.message);
                             setDependenciesInstalled(true);
+                          } catch (error) {
+                            setSetupError(error.message);
+                          } finally {
+                            setIsInstalling(false);
                           }
                         }}
                         size="lg"
@@ -2366,319 +2438,496 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     className="mb-12 w-full max-w-4xl space-y-6"
                     variants={itemVariants}
                   >
-                    {/* Status Banner */}
-                    {(() => {
-                      const hasProton = runnersList.some(r => r.type === "proton" || r.name.toLowerCase().includes("proton"));
-                      const hasOptimizedProton = runnersList.some(r => {
-                        const n = r.name.toLowerCase();
-                        return n.includes("cachyos") || n.includes("ge-proton") || n.includes("proton-ge");
-                      });
-                      const onlySteamProton = hasProton && !hasOptimizedProton;
-                      const bothInstalled = hasOptimizedProton && umuInstalled;
-                      const partialOptimal = onlySteamProton && umuInstalled;
-                      const noneInstalled = !hasProton && !umuInstalled;
+                    {setupError && (
+                      <p
+                        role="alert"
+                        className="border-destructive text-destructive rounded-lg border p-3"
+                      >
+                        {setupError}
+                      </p>
+                    )}
+                    {!isOnLinux ? (
+                      <div className="space-y-4 rounded-xl border bg-card p-6">
+                        <h3 className="text-xl font-semibold">
+                          {t("welcome.macWineTitle")}
+                        </h3>
+                        <p>{t("welcome.macWineDescription")}</p>
+                        <p>{t("welcome.macWineHomebrewSetup")}</p>
+                        {runnersList.map(runner => (
+                          <p key={runner.path}>
+                            {runner.name}: {runner.version}
+                          </p>
+                        ))}
+                        <div className="flex flex-wrap justify-center gap-3">
+                          <Button
+                            className="text-secondary"
+                            disabled={installingWine}
+                            onClick={installWine}
+                          >
+                            {installingWine
+                              ? t("common.installing")
+                              : t("welcome.installWine")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => window.electron.openURL("https://brew.sh")}
+                          >
+                            {t("welcome.homebrewInstructions")}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Status Banner */}
+                        {(() => {
+                          const hasProton = runnersList.some(
+                            r =>
+                              r.type === "proton" ||
+                              r.name.toLowerCase().includes("proton")
+                          );
+                          const hasOptimizedProton = runnersList.some(r => {
+                            const n = r.name.toLowerCase();
+                            return (
+                              n.includes("cachyos") ||
+                              n.includes("ge-proton") ||
+                              n.includes("proton-ge")
+                            );
+                          });
+                          const onlySteamProton = hasProton && !hasOptimizedProton;
+                          const bothInstalled = hasOptimizedProton && umuInstalled;
+                          const partialOptimal = onlySteamProton && umuInstalled;
+                          const noneInstalled = !hasProton && !umuInstalled;
 
-                      return (
-                        <div className={`flex gap-4 rounded-xl border p-5 text-left ${
-                          bothInstalled ? "border-green-500/40 bg-green-500/10"
-                          : noneInstalled ? "border-red-500/30 bg-red-500/10"
-                          : partialOptimal ? "border-blue-500/30 bg-blue-500/10"
-                          : "border-yellow-500/30 bg-yellow-500/10"
-                        }`}>
-                          {bothInstalled
-                            ? <CircleCheck className="mt-1 h-7 w-7 shrink-0 text-green-500" />
-                            : noneInstalled
-                              ? <XCircle className="mt-1 h-7 w-7 shrink-0 text-red-500" />
-                              : partialOptimal
-                                ? <Info className="mt-1 h-7 w-7 shrink-0 text-blue-500" />
-                                : <AlertTriangle className="mt-1 h-7 w-7 shrink-0 text-yellow-500" />}
+                          return (
+                            <div
+                              className={`flex gap-4 rounded-xl border p-5 text-left ${
+                                bothInstalled
+                                  ? "border-green-500/40 bg-green-500/10"
+                                  : noneInstalled
+                                    ? "border-red-500/30 bg-red-500/10"
+                                    : partialOptimal
+                                      ? "border-blue-500/30 bg-blue-500/10"
+                                      : "border-yellow-500/30 bg-yellow-500/10"
+                              }`}
+                            >
+                              {bothInstalled ? (
+                                <CircleCheck className="mt-1 h-7 w-7 shrink-0 text-green-500" />
+                              ) : noneInstalled ? (
+                                <XCircle className="mt-1 h-7 w-7 shrink-0 text-red-500" />
+                              ) : partialOptimal ? (
+                                <Info className="mt-1 h-7 w-7 shrink-0 text-blue-500" />
+                              ) : (
+                                <AlertTriangle className="mt-1 h-7 w-7 shrink-0 text-yellow-500" />
+                              )}
 
-                          <div className="space-y-1">
-                            <h3 className={`text-lg font-bold ${
-                              bothInstalled ? "text-green-500"
-                              : noneInstalled ? "text-red-500"
-                              : partialOptimal ? "text-blue-500"
-                              : "text-yellow-500"
-                            }`}>
-                              {bothInstalled
-                                ? t("welcome.bothInstalled")
-                                : noneInstalled
-                                  ? t("welcome.noRunnersTitle")
-                                  : partialOptimal
-                                    ? t("welcome.steamProtonDetected")
-                                    : hasProton
-                                      ? t("welcome.partialSetupProton")
-                                      : t("welcome.partialSetupUmu")}
-                            </h3>
+                              <div className="space-y-1">
+                                <h3
+                                  className={`text-lg font-bold ${
+                                    bothInstalled
+                                      ? "text-green-500"
+                                      : noneInstalled
+                                        ? "text-red-500"
+                                        : partialOptimal
+                                          ? "text-blue-500"
+                                          : "text-yellow-500"
+                                  }`}
+                                >
+                                  {bothInstalled
+                                    ? t("welcome.bothInstalled")
+                                    : noneInstalled
+                                      ? t("welcome.noRunnersTitle")
+                                      : partialOptimal
+                                        ? t("welcome.steamProtonDetected")
+                                        : hasProton
+                                          ? t("welcome.partialSetupProton")
+                                          : t("welcome.partialSetupUmu")}
+                                </h3>
 
-                            {runnersList.length > 0 && (
-                              <div className="rounded-lg border border-border/50 bg-background/40 p-2 font-mono text-sm">
-                                {runnersList.map(r => (
-                                  <div key={r.path} className="flex items-center justify-between opacity-90">
-                                    <span className="font-semibold">{r.name}</span>
-                                    <span className="ml-4 truncate text-xs opacity-60">{r.path}</span>
-                                  </div>
-                                ))}
-                                {umuInstalled && (
-                                  <div className="flex items-center gap-2 mt-1 opacity-90">
-                                    <span className="font-semibold text-green-600">UMU Launcher</span>
-                                    <span className="text-xs text-green-600 opacity-80">{t("welcome.installed")}</span>
+                                {runnersList.length > 0 && (
+                                  <div className="rounded-lg border border-border/50 bg-background/40 p-2 font-mono text-sm">
+                                    {runnersList.map(r => (
+                                      <div
+                                        key={r.path}
+                                        className="flex items-center justify-between opacity-90"
+                                      >
+                                        <span className="font-semibold">{r.name}</span>
+                                        <span className="ml-4 truncate text-xs opacity-60">
+                                          {r.path}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {umuInstalled && (
+                                      <div className="mt-1 flex items-center gap-2 opacity-90">
+                                        <span className="font-semibold text-green-600">
+                                          UMU Launcher
+                                        </span>
+                                        <span className="text-xs text-green-600 opacity-80">
+                                          {t("welcome.installed")}
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* ── Recommended ── */}
-                    <div className="rounded-xl border-2 border-green-500/50 bg-green-500/5 p-5 space-y-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CircleCheck className="h-5 w-5 text-green-500" />
-                        <span className="font-bold text-green-600 dark:text-green-400 text-lg">
-                          {t("welcome.recommendedSetup")}
-                        </span>
-                        <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
-                          {t("welcome.bestCompatibility")}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {t("welcome.recommendedSetupInfo")}
-                      </p>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {/* UMU Launcher */}
-                        <div className={`flex flex-col justify-between rounded-xl border-2 p-4 ${umuInstalled ? "border-green-500 bg-green-500/10" : "border-green-500/50 bg-card"}`}>
-                          <div>
-                            <div className="mb-1 flex items-center gap-2">
-                              {umuInstalled
-                                ? <CircleCheck className="h-5 w-5 text-green-500" />
-                                : <Download className="h-5 w-5 text-green-500" />}
-                              <span className="font-bold text-foreground">UMU Launcher</span>
-                              {umuInstalled && (
-                                <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-xs font-semibold text-green-600">Installed</span>
-                              )}
                             </div>
-                            <p className="mb-3 text-xs text-muted-foreground">
-                              {t("welcome.umuLauncherDesc")}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            disabled={umuInstalled || isDownloadingUmuLauncher}
-                            className="w-full text-secondary"
-                            onClick={async () => {
-                              setIsDownloadingUmuLauncher(true);
-                              try {
-                                const result = await window.electron.downloadUmuLauncher();
-                                if (result.success) setUmuInstalled(true);
-                              } catch (e) { console.error(e); }
-                              setIsDownloadingUmuLauncher(false);
-                            }}
-                          >
-                            {isDownloadingUmuLauncher ? (
-                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> {t("common.installing")}</>
-                            ) : umuInstalled ? (
-                              <><CircleCheck className="mr-2 h-4 w-4" /> {t("common.installed")}</>
-                            ) : (
-                              <><Download className="mr-2 h-4 w-4" /> {t("welcome.installRecommended")}</>
-                            )}
-                          </Button>
-                        </div>
+                          );
+                        })()}
 
-                        {/* Proton CachyOS */}
-                        <div className="flex flex-col justify-between rounded-xl border-2 border-primary bg-primary/5 p-4 shadow-md">
-                          <div>
-                            <div className="mb-1 flex items-center gap-2">
-                              <Rocket className="h-5 w-5 text-primary" />
-                              <span className="font-bold text-primary">Proton CachyOS</span>
-                            </div>
-                            <p className="mb-3 text-xs text-muted-foreground">
-                              {t("welcome.protonDesc")}
-                              {protonCachyInfo?.sizeFormatted && (
-                                <span className="mt-1 block font-mono text-xs opacity-75">
-                                  {t("welcome.protonSize")} {protonCachyInfo.sizeFormatted}
-                                </span>
-                              )}
-                            </p>
+                        {/* ── Recommended ── */}
+                        <div className="space-y-4 rounded-xl border-2 border-green-500/50 bg-green-500/5 p-5">
+                          <div className="mb-1 flex items-center gap-2">
+                            <CircleCheck className="h-5 w-5 text-green-500" />
+                            <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                              {t("welcome.recommendedSetup")}
+                            </span>
+                            <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
+                              {t("welcome.bestCompatibility")}
+                            </span>
                           </div>
-                          <Button
-                            size="sm"
-                            disabled={cachyOsInstalled || isDownloadingProtonCachy}
-                            className="w-full text-secondary"
-                            onClick={async () => {
-                              if (!protonCachyInfo) {
-                                setIsDownloadingProtonCachy(true);
-                                try {
-                                  const info = await window.electron.getProtonCachyOSInfo();
-                                  if (info.success) {
-                                    setProtonCachyInfo(info);
+                          <p className="text-sm text-muted-foreground">
+                            {t("welcome.recommendedSetupInfo")}
+                          </p>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {/* UMU Launcher */}
+                            <div
+                              className={`flex flex-col justify-between rounded-xl border-2 p-4 ${umuInstalled ? "border-green-500 bg-green-500/10" : "border-green-500/50 bg-card"}`}
+                            >
+                              <div>
+                                <div className="mb-1 flex items-center gap-2">
+                                  {umuInstalled ? (
+                                    <CircleCheck className="h-5 w-5 text-green-500" />
+                                  ) : (
+                                    <Download className="h-5 w-5 text-green-500" />
+                                  )}
+                                  <span className="font-bold text-foreground">
+                                    UMU Launcher
+                                  </span>
+                                  {umuInstalled && (
+                                    <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-xs font-semibold text-green-600">
+                                      Installed
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mb-3 text-xs text-muted-foreground">
+                                  {t("welcome.umuLauncherDesc")}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                disabled={umuInstalled || isDownloadingUmuLauncher}
+                                className="w-full text-secondary"
+                                onClick={async () => {
+                                  setIsDownloadingUmuLauncher(true);
+                                  try {
+                                    const result =
+                                      await window.electron.downloadUmuLauncher();
+                                    if (!result.success)
+                                      throw new Error(result.message || result.error);
+                                    setUmuInstalled(
+                                      await window.electron.isUmuInstalled()
+                                    );
+                                  } catch (e) {
+                                    setSetupError(e.message);
+                                  }
+                                  setIsDownloadingUmuLauncher(false);
+                                }}
+                              >
+                                {isDownloadingUmuLauncher ? (
+                                  <>
+                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                    {t("common.installing")}
+                                  </>
+                                ) : umuInstalled ? (
+                                  <>
+                                    <CircleCheck className="mr-2 h-4 w-4" />{" "}
+                                    {t("common.installed")}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />{" "}
+                                    {t("welcome.installRecommended")}
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+
+                            {/* Proton CachyOS */}
+                            <div className="flex flex-col justify-between rounded-xl border-2 border-primary bg-primary/5 p-4 shadow-md">
+                              <div>
+                                <div className="mb-1 flex items-center gap-2">
+                                  <Rocket className="h-5 w-5 text-primary" />
+                                  <span className="font-bold text-primary">
+                                    Proton CachyOS
+                                  </span>
+                                </div>
+                                <p className="mb-3 text-xs text-muted-foreground">
+                                  {t("welcome.protonDesc")}
+                                  {protonCachyInfo?.sizeFormatted && (
+                                    <span className="mt-1 block font-mono text-xs opacity-75">
+                                      {t("welcome.protonSize")}{" "}
+                                      {protonCachyInfo.sizeFormatted}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                disabled={cachyOsInstalled || isDownloadingProtonCachy}
+                                className="w-full text-secondary"
+                                onClick={async () => {
+                                  if (!protonCachyInfo) {
+                                    setIsDownloadingProtonCachy(true);
+                                    try {
+                                      const info =
+                                        await window.electron.getProtonCachyOSInfo();
+                                      if (!info.success)
+                                        throw new Error(info.error || info.message);
+                                      if (info.success) {
+                                        setProtonCachyInfo(info);
+                                        setShowProtonCachyConfirm(true);
+                                      }
+                                    } catch (e) {
+                                      setSetupError(e.message);
+                                    }
+                                    setIsDownloadingProtonCachy(false);
+                                  } else {
                                     setShowProtonCachyConfirm(true);
                                   }
-                                } catch (e) { console.error(e); }
-                                setIsDownloadingProtonCachy(false);
-                              } else {
-                                setShowProtonCachyConfirm(true);
-                              }
-                            }}
-                          >
-                            {isDownloadingProtonCachy ? (
-                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> {t("welcome.protonChecking")}</>
-                            ) : cachyOsInstalled ? (
-                              <><CircleCheck className="mr-2 h-4 w-4" /> {t("common.installed")}</>
-                            ) : (
-                              <><Download className="mr-2 h-4 w-4" /> {t("welcome.protonInstallCachy")}</>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Alternative (Wine / UMU-Proton) */}
-                    <details className="rounded-xl border border-border bg-card/30 p-4">
-                      <summary className="cursor-pointer text-sm font-medium text-muted-foreground select-none">
-                        {t("welcome.alternatives")}
-                      </summary>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        {/* Proton-GE */}
-                        <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
-                          <div>
-                            <div className="mb-1 flex items-center gap-2">
-                              <Rocket className="h-5 w-5 text-muted-foreground" />
-                              <span className="font-bold text-muted-foreground">Proton-GE</span>
+                                }}
+                              >
+                                {isDownloadingProtonCachy ? (
+                                  <>
+                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                    {t("welcome.protonChecking")}
+                                  </>
+                                ) : cachyOsInstalled ? (
+                                  <>
+                                    <CircleCheck className="mr-2 h-4 w-4" />{" "}
+                                    {t("common.installed")}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />{" "}
+                                    {t("welcome.protonInstallCachy")}
+                                  </>
+                                )}
+                              </Button>
                             </div>
-                            <p className="mb-3 text-xs text-muted-foreground">
-                              {t("welcome.protonGEAltDesc")}
-                              {protonGEInfo?.sizeFormatted && (
-                                <span className="mt-1 block font-mono text-xs opacity-75">
-                                  {t("welcome.protonSize")} {protonGEInfo.sizeFormatted}
-                                </span>
-                              )}
-                            </p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isDownloadingProtonGE}
-                            className="w-full text-muted-foreground"
-                            onClick={async () => {
-                              if (!protonGEInfo) {
-                                setIsDownloadingProtonGE(true);
-                                try {
-                                  const info = await window.electron.getProtonGEInfo();
-                                  if (info.success) {
-                                    if (info.alreadyInstalled) {
+                        </div>
+
+                        {/* Alternative (Wine / UMU-Proton) */}
+                        <details className="rounded-xl border border-border bg-card/30 p-4">
+                          <summary className="cursor-pointer select-none text-sm font-medium text-muted-foreground">
+                            {t("welcome.alternatives")}
+                          </summary>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                            {/* Proton-GE */}
+                            <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
+                              <div>
+                                <div className="mb-1 flex items-center gap-2">
+                                  <Rocket className="h-5 w-5 text-muted-foreground" />
+                                  <span className="font-bold text-muted-foreground">
+                                    Proton-GE
+                                  </span>
+                                </div>
+                                <p className="mb-3 text-xs text-muted-foreground">
+                                  {t("welcome.protonGEAltDesc")}
+                                  {protonGEInfo?.sizeFormatted && (
+                                    <span className="mt-1 block font-mono text-xs opacity-75">
+                                      {t("welcome.protonSize")}{" "}
+                                      {protonGEInfo.sizeFormatted}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isDownloadingProtonGE}
+                                className="w-full text-muted-foreground"
+                                onClick={async () => {
+                                  if (!protonGEInfo) {
+                                    setIsDownloadingProtonGE(true);
+                                    try {
+                                      const info =
+                                        await window.electron.getProtonGEInfo();
+                                      if (!info.success)
+                                        throw new Error(info.error || info.message);
+                                      if (info.success) {
+                                        if (info.alreadyInstalled) {
+                                          const updated =
+                                            await window.electron.getRunners();
+                                          setRunnersList(updated);
+                                        } else {
+                                          setProtonGEInfo(info);
+                                          setShowProtonGEConfirm(true);
+                                        }
+                                      }
+                                    } catch (e) {
+                                      setSetupError(e.message);
+                                    }
+                                    setIsDownloadingProtonGE(false);
+                                  } else {
+                                    setShowProtonGEConfirm(true);
+                                  }
+                                }}
+                              >
+                                {isDownloadingProtonGE ? (
+                                  <>
+                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                    {t("welcome.protonChecking")}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />{" "}
+                                    {t("common.install")}
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+
+                            {/* Wine */}
+                            <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
+                              <div>
+                                <div className="mb-1 flex items-center gap-2">
+                                  <Wine className="h-5 w-5 text-muted-foreground" />
+                                  <span className="font-bold text-muted-foreground">
+                                    {t("welcome.systemWine")}
+                                  </span>
+                                </div>
+                                <p className="mb-3 text-xs text-muted-foreground">
+                                  {t("welcome.systemWineDesc")}
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-muted-foreground"
+                                disabled={installingWine}
+                                onClick={installWine}
+                              >
+                                <FolderDownIcon className="mr-2 h-4 w-4" />{" "}
+                                {t("welcome.installWine")}
+                              </Button>
+                            </div>
+
+                            {/* UMU Proton */}
+                            <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4 opacity-80">
+                              <div>
+                                <div className="mb-1 flex items-center gap-2">
+                                  <Rocket className="h-5 w-5 text-muted-foreground" />
+                                  <span className="font-bold text-muted-foreground">
+                                    UMU-Proton
+                                  </span>
+                                </div>
+                                <p className="mb-3 text-xs text-muted-foreground">
+                                  {t("welcome.umuProtonDesc")}
+                                  {umuProtonInfo?.sizeFormatted && (
+                                    <span className="mt-1 block font-mono text-xs opacity-75">
+                                      {t("welcome.latest")}: {umuProtonInfo.name} ·{" "}
+                                      {umuProtonInfo.sizeFormatted}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isDownloadingUmuProton}
+                                className="w-full text-muted-foreground"
+                                onClick={async () => {
+                                  setIsDownloadingUmuProton(true);
+                                  try {
+                                    const result =
+                                      await window.electron.downloadUmuProton();
+                                    if (!result.success)
+                                      throw new Error(result.message || result.error);
+                                    if (result.success) {
                                       const updated = await window.electron.getRunners();
                                       setRunnersList(updated);
-                                    } else {
-                                      setProtonGEInfo(info);
-                                      setShowProtonGEConfirm(true);
+                                      await window.electron.updateSetting(
+                                        "linuxRunner",
+                                        result.path
+                                      );
+                                      const info =
+                                        await window.electron.getUmuProtonInfo();
+                                      if (info?.success) setUmuProtonInfo(info);
                                     }
+                                  } catch (e) {
+                                    setSetupError(e.message);
                                   }
-                                } catch (e) { console.error(e); }
-                                setIsDownloadingProtonGE(false);
-                              } else {
-                                setShowProtonGEConfirm(true);
-                              }
-                            }}
-                          >
-                            {isDownloadingProtonGE ? (
-                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> {t("welcome.protonChecking")}</>
-                            ) : (
-                              <><Download className="mr-2 h-4 w-4" /> {t("common.install")}</>
-                            )}
-                          </Button>
-                        </div>
-
-                        {/* Wine */}
-                        <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
-                          <div>
-                            <div className="mb-1 flex items-center gap-2">
-                              <Wine className="h-5 w-5 text-muted-foreground" />
-                              <span className="font-bold text-muted-foreground">{t("welcome.systemWine")}</span>
+                                  setIsDownloadingUmuProton(false);
+                                }}
+                              >
+                                {isDownloadingUmuProton ? (
+                                  <>
+                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                    {t("common.installing")}
+                                  </>
+                                ) : umuProtonInfo?.alreadyInstalled ? (
+                                  <>
+                                    <CircleCheck className="mr-2 h-4 w-4" />{" "}
+                                    {t("common.installed")}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />{" "}
+                                    {t("common.install")}
+                                  </>
+                                )}
+                              </Button>
                             </div>
-                            <p className="mb-3 text-xs text-muted-foreground">
-                              {t("welcome.systemWineDesc")}
+                          </div>
+                        </details>
+
+                        {!umuInstalled && runnersList.length > 0 && (
+                          <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-left">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
+                            <p className="text-xs text-yellow-600">
+                              {t("welcome.umuLauncherNotInstalled")}
                             </p>
                           </div>
-                          <Button variant="outline" size="sm" className="w-full text-muted-foreground"
-                            onClick={async () => {
-                              const result = await window.electron.installWine();
-                              if (result.success) {
-                                const updated = await window.electron.getRunners();
-                                setRunnersList(updated);
-                              }
-                            }}
-                          >
-                            <FolderDownIcon className="mr-2 h-4 w-4" /> {t("welcome.installWine")}
-                          </Button>
-                        </div>
-
-                        {/* UMU Proton */}
-                        <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4 opacity-80">
-                          <div>
-                            <div className="mb-1 flex items-center gap-2">
-                              <Rocket className="h-5 w-5 text-muted-foreground" />
-                              <span className="font-bold text-muted-foreground">UMU-Proton</span>
-                            </div>
-                            <p className="mb-3 text-xs text-muted-foreground">
-                              {t("welcome.umuProtonDesc")}
-                              {umuProtonInfo?.sizeFormatted && (
-                                <span className="mt-1 block font-mono text-xs opacity-75">
-                                  {t("welcome.latest")}: {umuProtonInfo.name} · {umuProtonInfo.sizeFormatted}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" disabled={isDownloadingUmuProton} className="w-full text-muted-foreground"
-                            onClick={async () => {
-                              setIsDownloadingUmuProton(true);
-                              try {
-                                const result = await window.electron.downloadUmuProton();
-                                if (result.success) {
-                                  const updated = await window.electron.getRunners();
-                                  setRunnersList(updated);
-                                  await window.electron.updateSetting("linuxRunner", result.path);
-                                  const info = await window.electron.getUmuProtonInfo();
-                                  if (info?.success) setUmuProtonInfo(info);
-                                }
-                              } catch (e) { console.error(e); }
-                              setIsDownloadingUmuProton(false);
-                            }}
-                          >
-                            {isDownloadingUmuProton ? (
-                              <><Loader className="mr-2 h-4 w-4 animate-spin" /> {t("common.installing")}</>
-                            ) : umuProtonInfo?.alreadyInstalled ? (
-                              <><CircleCheck className="mr-2 h-4 w-4" /> {t("common.installed")}</>
-                            ) : (
-                              <><Download className="mr-2 h-4 w-4" /> {t("common.install")}</>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </details>
-
-                    {!umuInstalled && runnersList.length > 0 && (
-                      <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-left">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
-                        <p className="text-xs text-yellow-600">
-                          {t("welcome.umuLauncherNotInstalled")}
-                        </p>
-                      </div>
+                        )}
+                      </>
                     )}
 
                     {/* Navigation Buttons */}
-                    <div className="flex justify-center pt-4">
+                    <div className="flex justify-center gap-3 pt-4">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={async () => {
+                          try {
+                            const runners = await window.electron.getRunners();
+                            setRunnersList(runners);
+                            const hasUmu =
+                              isOnLinux && (await window.electron.isUmuInstalled());
+                            setUmuInstalled(hasUmu);
+                            setSetupError(
+                              runners.length || hasUmu
+                                ? ""
+                                : t("welcome.noCompatibilityToolsFound")
+                            );
+                          } catch (error) {
+                            setSetupError(error.message);
+                          }
+                        }}
+                      >
+                        {t("welcome.checkAgain")}
+                      </Button>
                       <Button
                         onClick={() => handleNext()}
                         size="lg"
-                        className={`px-12 py-6 text-lg ${runnersList.length > 0 ? "text-secondary" : "text-foreground"}`}
-                        variant={runnersList.length > 0 ? "default" : "ghost"}
+                        className={`px-12 py-6 text-lg ${runnersList.length > 0 || umuInstalled ? "text-secondary" : "text-foreground"}`}
+                        variant={
+                          runnersList.length > 0 || umuInstalled ? "default" : "ghost"
+                        }
                       >
-                        {runnersList.length > 0
-                          ? t("welcome.continue") || "Continue"
-                          : t("welcome.skip") || "Skip for now"}
+                        {runnersList.length > 0 || umuInstalled
+                          ? t("welcome.continue")
+                          : t("welcome.skip")}
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Button>
                     </div>
@@ -2890,7 +3139,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
               </p>
               <p>
                 {t("welcome.protonGEDialog.size")}{" "}
-                <strong className="text-foreground">{protonCachyInfo.sizeFormatted}</strong>{" "}
+                <strong className="text-foreground">
+                  {protonCachyInfo.sizeFormatted}
+                </strong>{" "}
                 (
                 {t("welcome.protonGEDialog.sizeAfterExtraction", {
                   size: (protonCachyInfo.size / (1024 * 1024 * 1024)).toFixed(1),
@@ -2918,6 +3169,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   setIsDownloadingProtonCachy(true);
                   try {
                     const result = await window.electron.downloadProtonCachyOS();
+                    if (!result.success) throw new Error(result.message || result.error);
                     if (result.success) {
                       const updated = await window.electron.getRunners();
                       setRunnersList(updated);
@@ -2925,7 +3177,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       await window.electron.updateSetting("linuxRunner", result.path);
                     }
                   } catch (e) {
-                    console.error("Failed to download Proton-CachyOS:", e);
+                    setSetupError(e.message);
                   }
                   setIsDownloadingProtonCachy(false);
                 }}
@@ -3003,6 +3255,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   setIsDownloadingProtonGE(true);
                   try {
                     const result = await window.electron.downloadProtonGE();
+                    if (!result.success) throw new Error(result.message || result.error);
                     if (result.success) {
                       const updated = await window.electron.getRunners();
                       setRunnersList(updated);
@@ -3010,7 +3263,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       await window.electron.updateSetting("linuxRunner", result.path);
                     }
                   } catch (e) {
-                    console.error("Failed to download Proton-GE:", e);
+                    setSetupError(e.message);
                   }
                   setIsDownloadingProtonGE(false);
                 }}

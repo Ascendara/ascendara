@@ -12,13 +12,21 @@
 
 require("dotenv").config();
 
+// Finder-launched apps do not inherit Homebrew paths. Child game processes need Wine too.
+if (process.platform !== "win32") {
+  process.env.PATH = require("./modules/wine-setup").runtimePath();
+}
+
 const { app, BrowserWindow, Tray, Menu, nativeImage, powerMonitor } = require("electron");
 const http = require("http");
 const { proxyLocalRequest } = require("./modules/local-api-proxy");
 const path = require("path");
 const fs = require("fs-extra");
 const { isLinux } = require("./modules/config");
-const { isAllowedLocalRequest, resolvePublicFile } = require("./modules/local-server-security");
+const {
+  isAllowedLocalRequest,
+  resolvePublicFile,
+} = require("./modules/local-server-security");
 
 // Disable sandbox for Linux compatibility (must be set before app ready)
 if (process.platform === "linux") {
@@ -77,8 +85,12 @@ function launchCrashReporter(errorType, errorMessage) {
   if (isDev) {
     crashReporterPath =
       process.platform === "win32"
-        ? path.join("./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe")
-        : path.join("./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter");
+        ? path.join(
+            "./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe"
+          )
+        : path.join(
+            "./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter"
+          );
   } else {
     crashReporterPath =
       process.platform === "win32"
@@ -271,13 +283,17 @@ function registerCriticalHandlers() {
   games.registerGameHandlers();
   require("./modules/retro").registerRetroHandlers();
   system.registerSystemHandlers();
+  require("./modules/proton").registerRunnerHandlers();
   if (isLinux) {
     const { registerProtonHandlers } = require("./modules/proton");
     registerProtonHandlers();
 
-    const { registerUmuDatabaseHandlers, refreshUmuDatabase } = require("./modules/umu-database");
+    const {
+      registerUmuDatabaseHandlers,
+      refreshUmuDatabase,
+    } = require("./modules/umu-database");
     registerUmuDatabaseHandlers();
-    
+
     refreshUmuDatabase().catch(e =>
       console.warn("[UMU-DB] Background refresh failed:", e.message)
     );

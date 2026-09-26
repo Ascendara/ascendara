@@ -455,13 +455,19 @@ function registerSystemHandlers() {
           }
         );
       });
-    const normalize = value => path.resolve(value).replace(/[\\/]+$/, "").toLowerCase();
+    const normalize = value =>
+      path
+        .resolve(value)
+        .replace(/[\\/]+$/, "")
+        .toLowerCase();
     try {
       await runPowerShell(["-Command", "Get-MpPreference | Out-Null"]);
       const settings = settingsManager.getSettings();
       const directories = [
         settings.downloadDirectory,
-        ...(Array.isArray(settings.additionalDirectories) ? settings.additionalDirectories : []),
+        ...(Array.isArray(settings.additionalDirectories)
+          ? settings.additionalDirectories
+          : []),
       ].filter(Boolean);
       if (directories.length === 0) {
         return { success: false, error: "No directories configured for exclusion." };
@@ -469,7 +475,9 @@ function registerSystemHandlers() {
 
       const commandType = enabled ? "Add-MpPreference" : "Remove-MpPreference";
       const elevatedCommand = directories
-        .map(directory => `${commandType} -ExclusionPath '${directory.replace(/'/g, "''")}'`)
+        .map(
+          directory => `${commandType} -ExclusionPath '${directory.replace(/'/g, "''")}'`
+        )
         .join("; ");
       const encodedCommand = Buffer.from(elevatedCommand, "utf16le").toString("base64");
       const launcher = `Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encodedCommand}'`;
@@ -486,7 +494,9 @@ function registerSystemHandlers() {
           .filter(Boolean)
           .map(normalize)
       );
-      const confirmed = directories.every(directory => exclusions.has(normalize(directory)));
+      const confirmed = directories.every(directory =>
+        exclusions.has(normalize(directory))
+      );
       if (confirmed !== enabled) {
         return {
           success: false,
@@ -722,7 +732,7 @@ function registerSystemHandlers() {
       },
     });
 
-    installWindow.loadURL(
+    await installWindow.loadURL(
       "data:text/html;charset=utf-8," +
         encodeURIComponent(`
       <!DOCTYPE html><html><head><style>
@@ -742,11 +752,13 @@ function registerSystemHandlers() {
     );
 
     const updateStatus = msg =>
+      !installWindow.isDestroyed() &&
       installWindow.webContents.executeJavaScript(
         `document.querySelector('.status').textContent = ${JSON.stringify(msg)};`
       );
 
     const updateProgress = percent =>
+      !installWindow.isDestroyed() &&
       installWindow.webContents.executeJavaScript(
         `document.querySelector('.progress').style.width = '${percent}%';`
       );
@@ -764,73 +776,76 @@ function registerSystemHandlers() {
           proc.stderr.on("data", data => onProgress?.(data.toString().trim()));
         });
 
+      const {
+        findCommand,
+        findWine,
+        linuxWineCommand,
+        runtimePath,
+      } = require("./wine-setup");
+      process.env.PATH = runtimePath();
       if (process.platform === "darwin") {
-        updateStatus("Checking for Homebrew...");
-        updateProgress(5);
-        const hasBrew = await new Promise(resolve =>
-          exec("which brew", err => resolve(!err))
-        );
-        if (!hasBrew) {
-          updateStatus("Installing Homebrew...");
-          await runCommand(
-            '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
-            updateStatus,
-            5,
-            10
+        const brew = findCommand("brew");
+        if (!brew) {
+          throw new Error(
+            "Install Homebrew from https://brew.sh in Terminal, then retry Wine setup. Homebrew installation requires an interactive terminal."
           );
         }
-
-        updateStatus("Installing Wine and Winetricks...");
-        await runCommand(
-          "brew install --cask --no-quarantine wine-stable && brew install winetricks",
-          updateStatus,
-          10,
-          30
+        updateStatus(
+          "Installing Wine. If a password is required, complete setup in Terminal."
         );
-
-        updateStatus("Checking for Vulkan (MoltenVK)...");
-        const hasVulkan = await new Promise(resolve =>
-          exec("which vulkaninfo", err => resolve(!err))
-        );
-        if (!hasVulkan) {
-          updateStatus("Installing Vulkan tools...");
-          await runCommand("brew install vulkan-tools", updateStatus, 30, 40);
-        }
-
-        updateStatus("Verifying Vulkan...");
-        await new Promise(resolve =>
-          exec("vulkaninfo | grep 'Vulkan Instance Version'", (err, stdout) => {
-            updateStatus(
-              err
-                ? "Vulkan not detected. DXVK may not work."
-                : "Vulkan detected: " + stdout.trim()
-            );
-            setTimeout(resolve, 2000);
-          })
-        );
+        await new Promise((resolve, reject) => {
+          execFile(
+            brew,
+            ["install", "--cask", "wine-stable"],
+            { env: { ...process.env, NONINTERACTIVE: "1" }, timeout: 20 * 60 * 1000 },
+            error =>
+              error
+                ? reject(
+                    new Error(
+                      "Wine setup failed. Run 'brew install --cask wine-stable' in Terminal, then check again. " +
+                        error.message
+                    )
+                  )
+                : resolve()
+          );
+        });
       } else if (process.platform === "linux") {
-        updateStatus("Installing Wine & Winetricks...");
+        updateStatus(
+          "Installing Wine and Winetricks. Approve the system authentication prompt."
+        );
         await runCommand(
-          "pkexec sh -c 'dpkg --add-architecture i386 && apt-get update && apt-get install -y wine64 wine32 winetricks'",
+          "pkexec sh -c '" + linuxWineCommand() + "'",
           updateStatus,
           5,
-          30
+          90
+        );
+      } else {
+        throw new Error("Wine setup is supported on macOS and Linux.");
+      }
+      if (!(await findWine())) {
+        throw new Error(
+          "Wine was installed but could not run. On Apple Silicon, install Rosetta 2, then check again. Otherwise verify 'wine --version' in Terminal."
         );
       }
 
       updateProgress(100);
       updateStatus("Installation complete!");
-      setTimeout(() => installWindow.close(), 2500);
+      setTimeout(() => {
+        if (!installWindow.isDestroyed()) installWindow.close();
+      }, 2500);
       return { success: true, message: "Wine and dependencies installed successfully" };
     } catch (err) {
       updateStatus("Installation failed: " + err.message);
-      setTimeout(() => installWindow.close(), 3000);
+      setTimeout(() => {
+        if (!installWindow.isDestroyed()) installWindow.close();
+      }, 3000);
       return { success: false, message: err.message };
     }
   });
 
   // Install Python (macOS/Linux only)
   ipcMain.handle("install-python", async () => {
+    let installWindow;
     if (process.platform === "win32") {
       return {
         success: false,
@@ -839,30 +854,25 @@ function registerSystemHandlers() {
     }
 
     try {
-      const resourcePath = path.join(process.resourcesPath || app.getAppPath());
+      // Source builds may not include compiled optional helpers. Packaged resources
+      // already live at resourcesPath (there is no nested resources directory).
+      const helpers = [
+        ["AscendaraCrashReporter", "target/release/AscendaraCrashReporter"],
+        ["AscendaraDownloader", "src/AscendaraDownloader.py"],
+        ["AscendaraGameHandler", "src/AscendaraGameHandler.py"],
+        ["AscendaraLanguageTranslation", "src/AscendaraLanguageTranslation.py"],
+        ["AscendaraLocalRefresh", "src/AscendaraLocalRefresh.py"],
+        ["AscendaraTorrentHandler", "src/AscendaraTorrentHandler.py"],
+        ["AscendaraAchievementWatcher", "dist/AscendaraAchievementWatcher"],
+      ];
+      for (const [name, source] of helpers) {
+        const helper = isDev
+          ? path.join(app.getAppPath(), "binaries", name, source)
+          : path.join(process.resourcesPath, name);
+        if (fs.existsSync(helper)) await fs.chmod(helper, 0o755);
+      }
 
-      await new Promise((resolve, reject) => {
-        const chmodCommand = [
-          `chmod +x "${isDev ? "./binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter" : path.join(resourcePath, "resources/AscendaraCrashReporter")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraDownloader/src/AscendaraDownloader.py" : path.join(resourcePath, "resources/AscendaraDownloader")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraGameHandler/src/AscendaraGameHandler.py" : path.join(resourcePath, "resources/AscendaraGameHandler")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py" : path.join(resourcePath, "resources/AscendaraLanguageTranslation")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh.py" : path.join(resourcePath, "resources/AscendaraLocalRefresh")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py" : path.join(resourcePath, "resources/AscendaraTorrentHandler")}"`,
-          `chmod +x "${isDev ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher" : path.join(resourcePath, "resources/AscendaraAchievementWatcher")}"`,
-        ].join(" && ");
-
-        exec(chmodCommand, error => {
-          if (error) {
-            console.error("Error making Python files executable:", error);
-            reject(error);
-          } else {
-            resolve();
-          }
-        });
-      });
-
-      const installWindow = new BrowserWindow({
+      installWindow = new BrowserWindow({
         width: 500,
         height: 300,
         frame: false,
@@ -895,26 +905,50 @@ function registerSystemHandlers() {
         </html>
       `;
 
-      installWindow.loadURL(
+      await installWindow.loadURL(
         `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`
       );
 
       const updateStatus = message => {
-        installWindow.webContents.executeJavaScript(`
+        !installWindow.isDestroyed() &&
+          installWindow.webContents.executeJavaScript(`
           document.querySelector('.status').textContent = ${JSON.stringify(message)};
         `);
       };
 
       const updateProgress = percent => {
-        installWindow.webContents.executeJavaScript(`
+        !installWindow.isDestroyed() &&
+          installWindow.webContents.executeJavaScript(`
           document.querySelector('.progress').style.width = '${percent}%';
         `);
       };
 
-      const command =
-        process.platform === "darwin"
-          ? "brew install python"
-          : "pkexec apt-get install -y python3 python3-pip python3-venv unrar";
+      const { findCommand, runtimePath } = require("./wine-setup");
+      process.env.PATH = runtimePath();
+      let command;
+      if (process.platform === "darwin") {
+        if (!findCommand("brew"))
+          throw new Error(
+            "Install Homebrew from https://brew.sh in Terminal, then retry Python setup."
+          );
+        command = "NONINTERACTIVE=1 brew install python";
+      } else if (!findCommand("pkexec")) {
+        throw new Error(
+          "Install Python 3, pip and venv using your distribution's software manager. Automatic setup requires pkexec."
+        );
+      } else if (findCommand("apt-get")) {
+        command = "pkexec apt-get install -y python3 python3-pip python3-venv";
+      } else if (findCommand("dnf")) {
+        command = "pkexec dnf install -y python3 python3-pip";
+      } else if (findCommand("pacman")) {
+        command = "pkexec pacman -S --needed --noconfirm python python-pip";
+      } else if (findCommand("zypper")) {
+        command = "pkexec zypper --non-interactive install python3 python3-pip";
+      } else {
+        throw new Error(
+          "Install Python 3, pip and venv using your distribution's software manager."
+        );
+      }
 
       await new Promise((resolve, reject) => {
         const proc = exec(command, error => {
@@ -1004,6 +1038,7 @@ function registerSystemHandlers() {
 
       return { success: true, message: "Python installed successfully" };
     } catch (error) {
+      if (installWindow && !installWindow.isDestroyed()) installWindow.close();
       console.error("An error occurred during Python installation:", error);
       return { success: false, message: error.message };
     }
