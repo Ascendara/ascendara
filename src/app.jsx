@@ -1676,6 +1676,27 @@ const AppRoutes = () => {
   useEffect(() => {
     if (showWelcome) return;
     let isSubscribed = true;
+    let updateRequested = false;
+
+    const requestUpdate = async () => {
+      if (updateRequested) return;
+      updateRequested = true;
+      toast.dismiss("update-available");
+      try {
+        if (await window.electron.isUpdateDownloaded()) {
+          // A manual request must be able to reopen a dismissed install prompt.
+          hasShownUpdateReadyNotification.current = false;
+          await updateReadyHandler();
+        } else {
+          await window.electron.downloadUpdate();
+        }
+      } catch (error) {
+        console.error("Failed to request app update:", error);
+        toast.error(t("app.toasts.updateFailed"));
+      } finally {
+        updateRequested = false;
+      }
+    };
 
     const checkVersionAndSetupUpdates = async () => {
       try {
@@ -1706,18 +1727,7 @@ const AppRoutes = () => {
             description: description,
             action: {
               label: t("app.toasts.updateNow"),
-              onClick: async () => {
-                toast.dismiss("update-available");
-                // Start the download - update-ready event will fire when complete
-                const isDownloaded = await window.electron.isUpdateDownloaded();
-                if (!isDownloaded) {
-                  // Trigger download only - update-ready event will show install prompt
-                  window.electron.downloadUpdate();
-                } else {
-                  // Already downloaded, show install prompt
-                  updateReadyHandler();
-                }
-              },
+              onClick: requestUpdate,
             },
             duration: 10000,
             id: "update-available",
@@ -1769,10 +1779,12 @@ const AppRoutes = () => {
     });
 
     window.electron.onUpdateReady(updateReadyHandler);
+    window.addEventListener("request-app-update", requestUpdate);
 
     return () => {
       isSubscribed = false;
       window.electron.removeUpdateReadyListener(updateReadyHandler);
+      window.removeEventListener("request-app-update", requestUpdate);
     };
   }, [showWelcome]);
 

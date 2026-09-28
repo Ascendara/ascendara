@@ -466,6 +466,16 @@ const MenuBar = () => {
               <AlertTriangle className="h-3 w-3" />
               {t("app.outdated")}
             </span>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("request-app-update"))}
+              className="rounded border border-yellow-500/20 bg-yellow-500/10 p-1 text-yellow-500 transition-colors hover:bg-yellow-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500"
+              style={{ WebkitAppRegion: "no-drag" }}
+              title={t("app.toasts.updateNow")}
+              aria-label={t("app.toasts.updateNow")}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+            </button>
           </div>
         )}
         <div className="flex-1" />

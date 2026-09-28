@@ -236,6 +236,7 @@
       "outOfDatePublicTesting": "Public Testing Version Out of Date",
       "outOfDatePublicTestingDesc": "A newer public testing version is available. Click to download and install.",
       "updateAvailable": "Update Available",
+      "updateFailed": "Failed to start update download. Please try again.",
       "updateNow": "Update Now",
       "updateReady": "Ascendara is ready to update",
       "updateReadyDesc": "Ascendara downloaded the update and is ready to install and restart now",
