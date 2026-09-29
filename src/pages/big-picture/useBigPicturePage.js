@@ -32,9 +32,21 @@ function useBigPicturePage() {
   const buttons = getControllerButtons(controllerType);
   const [assetSearchOpen, setAssetSearchOpen] = useState(false);
   const [assetSearchGame, setAssetSearchGame] = useState(null);
-  // Enter full-screen on mount, quit on unmount
+  // Enter full-screen on mount, quit on unmount.
+  // Fullscreen is driven through the "set-fullscreen" IPC call (which sets
+  // the native BrowserWindow state directly) rather than relying solely on
+  // the DOM Fullscreen API. The DOM API requires a user gesture and can
+  // silently fail (e.g. when triggered from a gamepad poll loop or on
+  // unmount), leaving the window stuck in native fullscreen after leaving
+  // Big Picture. Calling window.electron.setFullscreen explicitly guarantees
+  // the window state is always synced on the way in and out.
   useEffect(() => {
     const enterFullScreen = async () => {
+      try {
+        await window.electron?.setFullscreen?.(true);
+      } catch (err) {
+        // Silently ignore fullscreen errors
+      }
       try {
         if (!document.fullscreenElement) {
           await document.documentElement.requestFullscreen();
@@ -48,6 +60,7 @@ function useBigPicturePage() {
 
     // Prevent Escape key from exiting fullscreen
     const preventEscapeFullscreen = e => {
+      if (e.bigPictureIndexEscape) return;
       if (e.key === "Escape" && document.fullscreenElement) {
         e.preventDefault();
         e.stopPropagation();
@@ -64,6 +77,9 @@ function useBigPicturePage() {
           .exitFullscreen()
           .catch(err => console.error("Error exiting fullscreen:", err));
       }
+      window.electron
+        ?.setFullscreen?.(false)
+        ?.catch(err => console.error("Error exiting native fullscreen:", err));
     };
   }, []);
 
@@ -945,7 +961,7 @@ function useBigPicturePage() {
         return;
       }
 
-      if (view === "cloud" && surfaceInputLock.current) {
+      if (view === "indexes" || (view === "cloud" && surfaceInputLock.current)) {
         surfaceNavigation.current?.(action);
         return;
       }
@@ -1159,6 +1175,8 @@ function useBigPicturePage() {
   // Keyboard Event Listener
   useEffect(() => {
     const handleKeyDown = e => {
+      // The embedded index manager handles native form and dialog keyboard input.
+      if (view === "indexes") return;
       // Block navigation when any dialog is open or just closed
       if (
         showExitDialog ||
@@ -1204,6 +1222,7 @@ function useBigPicturePage() {
     showKillDialog,
     showProviderDialog,
     isKeyboardOpen,
+    view,
   ]);
 
   // GAMEPAD POLLING LOOP for Main Navigation

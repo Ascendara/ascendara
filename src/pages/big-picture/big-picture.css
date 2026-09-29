@@ -347,28 +347,47 @@
   flex-basis: calc((100% - 5 * 1.15vw) / 6);
   padding: 0;
   color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
   transition: transform 0.15s ease;
 }
 .bp-home .bp-cover {
   aspect-ratio: 16 / 10;
+  border-radius: 12px;
   background: rgb(var(--color-card));
+  transition: box-shadow 0.2s ease;
+}
+.bp-home .bp-cover img {
+  transition: transform 0.3s ease;
 }
 .bp-home .bp-cover svg {
   color: rgb(var(--color-muted-foreground));
 }
+.bp-home .bp-game:hover .bp-cover,
+.bp-home .bp-game[data-selected="true"] .bp-cover {
+  box-shadow: 0 14px 28px rgb(0 0 0 / 0.28);
+}
+.bp-home .bp-game:hover .bp-cover img,
+.bp-home .bp-game[data-selected="true"] .bp-cover img {
+  transform: scale(1.06);
+}
 .bp-home .bp-game strong {
-  font-weight: 500;
+  font-weight: 550;
   font-size: 0.95em;
-  margin-top: 0.5em;
+  letter-spacing: -0.01em;
+  margin-top: 0.6em;
 }
 .bp-home .bp-game[data-selected="true"] {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
 }
 .bp-home .bp-action[data-selected="true"],
 .bp-home .bp-game[data-selected="true"],
 .bp-home .bp-action:focus-visible {
   outline: 3px solid rgb(var(--color-primary));
   outline-offset: 3px;
+  border-radius: 12px;
 }
 .bp-home-download {
   position: relative;

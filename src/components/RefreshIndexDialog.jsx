@@ -335,14 +335,15 @@ const RefreshIndexDialog = ({
               <AlertDialogDescription asChild>
                 <div className="space-y-3 text-sm text-muted-foreground">
                   <p>{t("refreshDialog.step2Description")}</p>
-                  <span
+                  <button
+                    type="button"
                     className="block cursor-pointer text-xs text-muted-foreground hover:underline"
                     onClick={() =>
                       window.electron.openURL("https://ascendara.app/extension")
                     }
                   >
                     {t("download.downloadOptions.getExtension")}
-                  </span>
+                  </button>
                   <div className="grid gap-3">
                     <Button
                       variant="outline"
@@ -566,14 +567,15 @@ const RefreshIndexDialog = ({
                       </li>
                     </ol>
                   </div>
-                  <span
+                  <button
+                    type="button"
                     className="block cursor-pointer text-xs text-muted-foreground hover:underline"
                     onClick={() =>
                       window.electron.openURL("https://ascendara.app/extension")
                     }
                   >
                     {t("refreshDialog.orJustGetExtension")}
-                  </span>
+                  </button>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>

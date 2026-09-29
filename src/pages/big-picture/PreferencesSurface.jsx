@@ -22,6 +22,7 @@ const categories = [
     icon: Bell,
     description: "Everyday app behavior",
     options: [
+      ["indexes", "Game indexes", "Refresh local and cloud indexes, manage sources and automatic updates."],
       [
         "notifications",
         "Notifications",
@@ -96,6 +97,7 @@ export function PreferencesSurface({
   active,
   onBack,
   openController,
+  openIndexes,
   profile = false,
 }) {
   const { settings, updateSetting } = useSettings();
@@ -119,7 +121,9 @@ export function PreferencesSurface({
       ? settings.defaultOpenPage === "bigpicture"
       : !!settings[key];
   const toggle = (key) =>
-    key === "controller"
+    key === "indexes"
+      ? openIndexes()
+      : key === "controller"
       ? openController()
       : key === "startup"
         ? updateSetting("defaultOpenPage", enabled(key) ? "home" : "bigpicture")
@@ -214,7 +218,7 @@ export function PreferencesSurface({
                   className="bp-setting-row"
                   key={key}
                   {...focus(key)}
-                  {...(key !== "controller"
+                  {...(!["controller", "indexes"].includes(key)
                     ? { role: "switch", "aria-checked": enabled(key) }
                     : {})}
                   onClick={() => toggle(key)}
@@ -223,7 +227,7 @@ export function PreferencesSurface({
                     <strong>{label}</strong>
                     <small>{description}</small>
                   </span>
-                  {key === "controller" ? (
+                  {["controller", "indexes"].includes(key) ? (
                     <ChevronRight />
                   ) : (
                     <span

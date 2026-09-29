@@ -54,7 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const LocalRefresh = () => {
+const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1572,8 +1572,8 @@ const LocalRefresh = () => {
   };
 
   
-  const handleRenameList = async (list) => {
-    const newName = prompt(
+  const handleRenameList = async (list, suppliedName) => {
+    const newName = suppliedName ?? prompt(
       t("localRefresh.enterNewName") || "Enter new name for this list:",
       list.name
     );
@@ -1601,8 +1601,8 @@ const LocalRefresh = () => {
     }
   };
 
-  const handleDeleteList = async (list) => {
-    const confirmed = confirm(
+  const handleDeleteList = async (list, alreadyConfirmed = false) => {
+    const confirmed = alreadyConfirmed || confirm(
       (t("localRefresh.confirmDeleteList") || "Are you sure you want to delete this list?") +
       ` "${list.name}"`
     );
@@ -1709,6 +1709,10 @@ const LocalRefresh = () => {
 
   // Handle back navigation
   const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
     if (welcomeStep) {
       const stillRefreshing = isRefreshing || indexRefreshStartedFromWelcome;
       const isComplete = refreshStatus === "completed";
@@ -1725,8 +1729,25 @@ const LocalRefresh = () => {
   };
 
   return (
-    <div className={`${welcomeStep ? "mt-0 pt-10" : "mt-6"} min-h-screen bg-background text-foreground`}>
-      <div className="container mx-auto max-w-3xl px-4 py-8">
+    <div className={`${embedded ? "" : welcomeStep ? "mt-0 pt-10" : "mt-6"} ${embedded ? "" : "min-h-screen"} bg-background text-foreground`}>
+      <div className={renderManager ? "bp-index-workflow" : "container mx-auto max-w-3xl px-4 py-8"}>
+        {renderManager ? renderManager({
+          isRefreshing, progress, currentStep, totalGames, processedGames, errors,
+          lastRefreshTime, refreshStatus, localIndexPath, hasIndexBefore,
+          apiAvailable, checkingApi, indexInfo, downloadingIndex, indexDownloadProgress,
+          isUploading, uploadError, customSourcesMode, customSource,
+          customSourceGameCount, customSourceLastSynced, sourceBucketUrl,
+          sourceBucketUrlDraft, setSourceBucketUrlDraft, isSyncingCustomSource,
+          customSourcesLibrary, customLists, activeCustomList,
+          autoRefreshEnabled, setAutoRefreshEnabled, autoRefreshInterval, setAutoRefreshInterval,
+          autoRefreshMethod, setAutoRefreshMethod, isAuthenticated, settings, updateSetting,
+          workerCount, setWorkerCount, fetchPageCount, setFetchPageCount,
+          newBlacklistId, setNewBlacklistId, formatLastRefreshTime,
+          handleOpenRefreshDialog, setShowStopDialog, handleChangeLocation,
+          handleToggleCustomSourcesMode, handleSaveSourceBucketUrl, handleOpenSourceBrowser,
+          handleSwitchToSavedSource, removeLibraryEntry, handleSyncCustomSource,
+          setShowJsonImportDialog, handleSwitchToList, handleRenameList, handleDeleteList,
+        }) : <>
         {/* First-time Setup Banner */}
         {welcomeStep && (
           <motion.div
@@ -3029,6 +3050,8 @@ const LocalRefresh = () => {
               </AccordionItem>
             </Accordion>
         </div>
+
+        </>}
 
         {/* Stop Confirmation Dialog */}
         <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>
