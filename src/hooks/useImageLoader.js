@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 
@@ -33,6 +33,10 @@ export function useImageLoader(
   options = { quality: "high", priority: "normal", enabled: true }
 ) {
   options = { quality: "high", priority: "normal", enabled: true, ...options };
+  const revision = useSyncExternalStore(
+    imageCacheService.subscribe,
+    imageCacheService.getRevision
+  );
   const [state, setState] = useState({
     cachedImage: null,
     loading: false,
@@ -101,7 +105,7 @@ export function useImageLoader(
     }
 
     // Check if this image is already being loaded
-    const loadingKey = `${imgID}-${options.quality}`;
+    const loadingKey = `${revision}-${imgID}-${options.quality}`;
     if (loadingImages.has(loadingKey)) {
       setState(prev => ({ ...prev, loading: true }));
       loadingImages
@@ -180,6 +184,7 @@ export function useImageLoader(
       loadTask.mounted = false;
     };
   }, [
+    revision,
     imgID,
     options.enabled,
     options.quality,

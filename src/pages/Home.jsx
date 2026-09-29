@@ -38,6 +38,7 @@ let carouselGamesCache = null;
 // invalidate the cache on mount when the user toggled custom/official mode
 // (or switched custom source) while Home was unmounted.
 let gamesCacheSourceKey = null;
+let gamesCacheRevision = -1;
 
 const computeSourceKey = settings => {
   if (!settings) return "none";
@@ -611,7 +612,8 @@ const Home = memo(() => {
         try {
           const currentSettings = await window.electron.getSettings();
           const currentKey = computeSourceKey(currentSettings);
-          if (gamesCacheSourceKey && gamesCacheSourceKey !== currentKey) {
+          if (gamesCacheRevision !== imageCacheService.getRevision() ||
+              (gamesCacheSourceKey && gamesCacheSourceKey !== currentKey)) {
             console.log(
               "[Home] Active source changed, invalidating cache",
               gamesCacheSourceKey,
@@ -624,6 +626,7 @@ const Home = memo(() => {
             forceRefresh = true;
           }
           gamesCacheSourceKey = currentKey;
+          gamesCacheRevision = imageCacheService.getRevision();
         } catch (e) {
           console.warn("[Home] Failed to check source key:", e);
         }
@@ -723,6 +726,7 @@ const Home = memo(() => {
   useEffect(() => {
     if (!carouselGames.length) return;
 
+    let active = true;
     const loadCarouselImages = async () => {
       const totalSlides = carouselGames.length;
       // Load current slide + next 3 slides (for the "Up Next" sidebar and preloading)
@@ -734,6 +738,7 @@ const Home = memo(() => {
       ];
 
       for (const slideIndex of slidesToLoad) {
+        if (!active) return;
         const game = carouselGames[slideIndex];
         const key = carouselCoverKey(game);
         if (!key || carouselImages[key]) continue;
@@ -746,7 +751,7 @@ const Home = memo(() => {
             const assets = await steamGridImageService.getAssets(game.game);
             imageUrl = steamGridImageService.pickUrl(assets, "hero");
           }
-          if (imageUrl) {
+          if (active && imageUrl) {
             setCarouselImages(prev => ({ ...prev, [key]: imageUrl }));
           }
         } catch (error) {
@@ -756,14 +761,17 @@ const Home = memo(() => {
     };
 
     loadCarouselImages();
-  }, [carouselGames.length, currentSlide, imageRefreshKey]);
+    return () => { active = false; };
+  }, [carouselGames, currentSlide, imageRefreshKey]);
 
   // Initial load - preload all carousel images for smooth transitions
   useEffect(() => {
     if (!carouselGames.length) return;
 
+    let active = true;
     const preloadAllCarouselImages = async () => {
       for (const game of carouselGames) {
+        if (!active) return;
         const key = carouselCoverKey(game);
         if (!key || carouselImages[key]) continue;
 
@@ -775,7 +783,7 @@ const Home = memo(() => {
             const assets = await steamGridImageService.getAssets(game.game);
             imageUrl = steamGridImageService.pickUrl(assets, "hero");
           }
-          if (imageUrl) {
+          if (active && imageUrl) {
             setCarouselImages(prev => ({ ...prev, [key]: imageUrl }));
           }
         } catch (error) {
@@ -786,8 +794,11 @@ const Home = memo(() => {
 
     // Delay preloading to not block initial render
     const timer = setTimeout(preloadAllCarouselImages, 1000);
-    return () => clearTimeout(timer);
-  }, [carouselGames.length, imageRefreshKey]);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [carouselGames, imageRefreshKey]);
 
   useEffect(() => {
     const updateRecentGames = async () => {

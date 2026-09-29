@@ -42,6 +42,18 @@ class ImageCacheService {
     this._settingsCacheTime = 0;
     this._settingsCacheDuration = 30000; // 30 seconds - longer cache for settings
     this._settingsLoadPromise = null;
+    this.revision = 0;
+    this.listeners = new Set();
+    window.addEventListener("index-refreshed", () => {
+      this.revision++;
+      this.invalidateSettingsCache();
+      this._settingsLoadPromise = null;
+      this.memoryCache.clear();
+      this.memoryCacheOrder = [];
+      this.activeRequests.clear();
+      this.rateLimitUntil = 0;
+      for (const listener of this.listeners) listener();
+    });
 
     // Initialize settings eagerly (non-blocking)
     this._preloadSettings();
@@ -55,15 +67,18 @@ class ImageCacheService {
    */
   _preloadSettings() {
     if (!this._settingsLoadPromise) {
+      const revision = this.revision;
       this._settingsLoadPromise = window.electron
         .getSettings()
         .then(settings => {
+          if (revision !== this.revision) return this._getSettings();
           this._settingsCache = settings;
           this._settingsCacheTime = Date.now();
           this._settingsLoadPromise = null;
           return settings;
         })
         .catch(err => {
+          if (revision !== this.revision) return this._getSettings();
           console.warn("[ImageCache] Failed to preload settings:", err);
           this._settingsLoadPromise = null;
           return null;
@@ -120,6 +135,13 @@ class ImageCacheService {
     this._settingsCache = null;
     this._settingsCacheTime = 0;
   }
+
+  subscribe = listener => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  getRevision = () => this.revision;
 
   async initializeDB() {
     if (this.initRetries >= this.maxInitRetries) {
@@ -233,15 +255,19 @@ class ImageCacheService {
       return this.activeRequests.get(imgID);
     }
 
+    const revision = this.revision;
     const loadPromise = this._resolveImage(imgID, options);
     this.activeRequests.set(imgID, loadPromise);
 
     try {
       const result = await loadPromise;
-      if (result) this._setMemoryCache(imgID, result);
+      if (revision !== this.revision) return null;
+      if (result) this._setMemoryCache(imgID, result, options.quality);
       return result;
     } finally {
-      this.activeRequests.delete(imgID);
+      if (this.activeRequests.get(imgID) === loadPromise) {
+        this.activeRequests.delete(imgID);
+      }
     }
   }
 
@@ -273,7 +299,6 @@ class ImageCacheService {
         const cachedImage = await this.getFromIndexedDB(imgID);
         if (cachedImage) {
           const url = URL.createObjectURL(cachedImage);
-          this._setMemoryCache(imgID, url);
           return url;
         }
       } catch (error) {
@@ -295,7 +320,6 @@ class ImageCacheService {
     const localImagePath = `${localIndexPath}/imgs/${imgID}.jpg`;
     const localImageUrl = await window.electron.getLocalImageUrl(localImagePath);
     if (localImageUrl) {
-      this._setMemoryCache(imgID, localImageUrl, "high");
       return localImageUrl;
     }
     return null;
@@ -340,6 +364,8 @@ class ImageCacheService {
   ) {
     if (!imgID) return null;
 
+    const revision = this.revision;
+
     // Circuit breaker: if we recently hit a 429, short-circuit instead of
     // piling on more requests that will also fail.
     if (this.rateLimitUntil && Date.now() < this.rateLimitUntil) {
@@ -363,6 +389,7 @@ class ImageCacheService {
         timestamp,
         signature
       );
+      if (revision !== this.revision) return null;
 
       if (result.error) {
         if (result.status === 429) {
@@ -393,6 +420,7 @@ class ImageCacheService {
       const url = result.dataUrl;
 
       // Cache the result with correct quality
+      if (revision !== this.revision) return null;
       this._setMemoryCache(imgID, url, options.quality);
 
       // For IndexedDB, we need to convert data URL to blob
@@ -400,6 +428,7 @@ class ImageCacheService {
         try {
           const response = await fetch(url);
           const blob = await response.blob();
+          if (revision !== this.revision) return null;
           this.saveToIndexedDB(imgID, blob).catch(error => {
             console.warn(
               `[ImageCache] Failed to save image ${imgID} to IndexedDB:`,
@@ -415,8 +444,10 @@ class ImageCacheService {
       if (this.recent404Count > 0) this.recent404Count = 0;
       return url;
     } catch (error) {
+      if (revision !== this.revision) return null;
       if (retryCount < this.maxRetries) {
         await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+        if (revision !== this.revision) return null;
         return this._loadFromAPI(imgID, settings, options, retryCount + 1);
       }
       throw error;
