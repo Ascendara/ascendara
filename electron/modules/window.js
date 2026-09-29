@@ -355,6 +355,21 @@ function registerWindowHandlers() {
     return win ? win.isFullScreen() : false;
   });
 
+  // Explicitly set the native fullscreen state. Uses getMainWindow() (not
+  // getFocusedWindow()) so this reliably works even if the window has lost
+  // focus (e.g. when a dialog closed or the OS fullscreen transition itself
+  // caused a focus change) - callers like Big Picture mode depend on this to
+  // guarantee the window actually leaves fullscreen instead of relying solely
+  // on the DOM Fullscreen API, which can silently fail to sync.
+  ipcMain.handle("set-fullscreen", (_, value) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.setFullScreen(!!value);
+      return win.isFullScreen();
+    }
+    return false;
+  });
+
   // Close the window
   ipcMain.handle("close-window", async (_, forceQuit = false) => {
     const win = BrowserWindow.getFocusedWindow();
