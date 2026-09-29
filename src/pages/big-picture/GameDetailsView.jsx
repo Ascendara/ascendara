@@ -25,7 +25,7 @@ import { checkSeamlessAvailable } from "./utils";
 import {
   getControllerButtons,
 } from "./controller";
-import { getGamepadInput } from "./gamepad";
+import { useControllerInput } from "./useControllerInput";
 import { DetailBackButton } from "./DetailBackButton";
 
 // --- GAME DETAILS & STORE COMPONENTS ---
@@ -59,8 +59,6 @@ const GameDetailsView = ({
     ? seamlessProviders.filter(provider => game.download_links?.[provider])
     : [];
 
-  const [canInput, setCanInput] = useState(false);
-  const lastInputTime = useRef(0);
   const descriptionRef = useRef(null);
   const screenshotsRef = useRef(null);
 
@@ -84,13 +82,7 @@ const GameDetailsView = ({
 
   const bgImage = playLaterImage || cachedImage || game.cover || game.image;
 
-  // Input delay on opening
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCanInput(true);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, []);
+
 
   // Fetch Data
   useEffect(() => {
@@ -233,7 +225,7 @@ const GameDetailsView = ({
 
   const handleInput = useCallback(
     action => {
-      if (!canInput || dialogOpen) return;
+      if (dialogOpen) return;
 
       if (action === "DOWN") {
         if (focusedSection === "button") {
@@ -331,7 +323,6 @@ const GameDetailsView = ({
       onDownload,
       onShowProviderDialog,
       game,
-      canInput,
       dialogOpen,
       focusedSection,
       steamData,
@@ -367,45 +358,10 @@ const GameDetailsView = ({
   }, [handleInput]);
 
   // Gamepad Polling
-  useEffect(() => {
-    let rAF;
-    const loop = () => {
-      // Block input when dialog is open
-      if (dialogOpen) {
-        rAF = requestAnimationFrame(loop);
-        return;
-      }
-
-      const gp = getGamepadInput();
-      if (gp && canInput) {
-        const now = Date.now();
-        if (now - lastInputTime.current > 150) {
-          if (gp.down) {
-            handleInput("DOWN");
-            lastInputTime.current = now;
-          } else if (gp.up) {
-            handleInput("UP");
-            lastInputTime.current = now;
-          } else if (gp.left) {
-            handleInput("LEFT");
-            lastInputTime.current = now;
-          } else if (gp.right) {
-            handleInput("RIGHT");
-            lastInputTime.current = now;
-          } else if (gp.b) {
-            handleInput("BACK");
-            lastInputTime.current = now;
-          } else if (gp.a) {
-            handleInput("CONFIRM");
-            lastInputTime.current = now;
-          }
-        }
-      }
-      rAF = requestAnimationFrame(loop);
-    };
-    loop();
-    return () => cancelAnimationFrame(rAF);
-  }, [handleInput, canInput, dialogOpen]);
+  useControllerInput(action => {
+    if (action === "MENU") onBack();
+    else handleInput(action);
+  }, { priority: 5, blocked: dialogOpen });
 
   const hasScreenshots = steamData?.screenshots && steamData.screenshots.length > 0;
 

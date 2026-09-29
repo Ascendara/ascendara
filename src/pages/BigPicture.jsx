@@ -38,6 +38,7 @@ function BigPicture() {
     refreshStore,
     surfaceNavigation,
     surfaceInputLock,
+    pageFocusRequest,
     handleMenuAction,
     handleShowInstalledGameDetails,
     refreshLibrary,
@@ -252,7 +253,7 @@ function BigPicture() {
       <div
         className={`relative flex w-full flex-1 items-center pb-16 transition-all duration-200 ${isMenuOpen ? "scale-95 opacity-50 blur-sm" : ""}`}
       >
-        <PageNavigationContext.Provider value={{view, changeView, search: () => setIsKeyboardOpen(true), downloadCount: downloadingGames.length + queuedDownloads.length, buttons, hideChrome: installedGameView}}>
+        <PageNavigationContext.Provider value={{view, changeView, pageFocusRequest, search: () => setIsKeyboardOpen(true), downloadCount: downloadingGames.length + queuedDownloads.length, buttons, hideChrome: installedGameView}}>
         {view === "indexes" && <IndexSurface navigation={surfaceNavigation} onBack={() => { refreshStore(); changeView("store"); }} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
         {view === "power" && <PowerSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} onDesktop={() => navigate("/")} />}
         {view === "carousel" && <HomeDashboard navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView && !showControllerSettings && !isKeyboardOpen && !showExitBigPictureDialog} search={() => setIsKeyboardOpen(true)} openMenu={() => setIsMenuOpen(true)} pause={handlePauseDownload} resume={handleResumeDownload} stopping={stoppingDownloads} resuming={resumingDownloads} playGame={game => handleShowInstalledGameDetails(game, true)} games={allGames} downloads={downloadingGames} queue={queuedDownloads} discover={filteredStoreGames} openGame={handleShowInstalledGameDetails} openStore={game => handleSelectStoreGame(game, 0)} changeView={changeView} openSettings={() => changeView("preferences")} />}

@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Trash2, Loader, X } from "lucide-react";
 import { getControllerButtons, getButtonBadgeClass } from "./controller";
-import { getGamepadInput } from "./gamepad";
+import { useControllerInput } from "./useControllerInput";
 
 // Kill Download Confirmation Dialog
 const KillDownloadDialog = ({
@@ -14,21 +14,17 @@ const KillDownloadDialog = ({
   isLoading = false,
 }) => {
   const [selectedButton, setSelectedButton] = useState(0);
-  const [canInput, setCanInput] = useState(false);
-  const lastInputTime = useRef(0);
   const buttons = getControllerButtons(controllerType);
 
   useEffect(() => {
     if (isOpen) {
       setSelectedButton(0);
-      const timer = setTimeout(() => setCanInput(true), 200);
-      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
   const handleInput = useCallback(
     action => {
-      if (!canInput || isLoading) return;
+      if (isLoading) return;
 
       if (action === "LEFT") setSelectedButton(0);
       else if (action === "RIGHT") setSelectedButton(1);
@@ -37,13 +33,14 @@ const KillDownloadDialog = ({
         else onClose();
       } else if (action === "BACK") onClose();
     },
-    [canInput, isLoading, selectedButton, onConfirm, onClose]
+    [isLoading, selectedButton, onConfirm, onClose]
   );
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = e => {
+      if (e.repeat && !e.key.startsWith("Arrow")) return;
       e.preventDefault();
       e.stopPropagation();
       const keyMap = {
@@ -59,36 +56,9 @@ const KillDownloadDialog = ({
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [handleInput, isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let animationFrameId;
-    const loop = () => {
-      const gp = getGamepadInput();
-      if (gp && canInput) {
-        const now = Date.now();
-        if (now - lastInputTime.current > 200) {
-          if (gp.left) {
-            handleInput("LEFT");
-            lastInputTime.current = now;
-          } else if (gp.right) {
-            handleInput("RIGHT");
-            lastInputTime.current = now;
-          } else if (gp.a) {
-            handleInput("CONFIRM");
-            lastInputTime.current = now;
-          } else if (gp.b) {
-            handleInput("BACK");
-            lastInputTime.current = now;
-          }
-        }
-      }
-      animationFrameId = requestAnimationFrame(loop);
-    };
-
-    loop();
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [handleInput, canInput, isOpen]);
+  useControllerInput(handleInput, {
+    priority: 30, enabled: isOpen, blocked: isLoading,
+  });
 
   if (!isOpen) return null;
 

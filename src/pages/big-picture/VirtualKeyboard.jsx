@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, X, Delete } from "lucide-react";
 import { getControllerButtons } from "./controller";
 import { KEYBOARD_LAYOUTS } from "./keyboardLayouts";
-import { getGamepadInput } from "./gamepad";
+import { useControllerInput } from "./useControllerInput";
 
 // Virtual keyboard
 const VirtualKeyboard = ({
@@ -20,19 +20,11 @@ const VirtualKeyboard = ({
   const [selectedCol, setSelectedCol] = useState(0);
   const [inSuggestions, setInSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [canInput, setCanInput] = useState(false);
-  const lastInputTime = useRef(0);
   const buttons = getControllerButtons(controllerType);
 
   const gridLayout = KEYBOARD_LAYOUTS[layout] || KEYBOARD_LAYOUTS.qwerty;
 
-  // Prevent input for the first 300ms to avoid the opening "A" press being registered
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCanInput(true);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, []);
+
 
   const getKeyAt = (rowIndex, colIndex) => {
     if (!gridLayout[rowIndex]) return null;
@@ -43,7 +35,6 @@ const VirtualKeyboard = ({
 
   const handleInput = useCallback(
     action => {
-      if (!canInput) return;
 
       if (inSuggestions) {
         if (action === "RIGHT")
@@ -104,7 +95,6 @@ const VirtualKeyboard = ({
       gridLayout,
       value,
       onClose,
-      canInput,
     ]
   );
 
@@ -126,56 +116,18 @@ const VirtualKeyboard = ({
 
       if (keyMap[e.key]) handleInput(keyMap[e.key]);
       else if (e.key.length === 1 && /[a-zA-Z0-9 ]/.test(e.key)) {
-        if (canInput) onChange(value + e.key);
+        onChange(value + e.key);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleInput, onChange, value, canInput]);
+  }, [handleInput, onChange, value]);
 
   // Gamepad Polling for Virtual Keyboard
-  useEffect(() => {
-    let animationFrameId;
-
-    const loop = () => {
-      const gp = getGamepadInput();
-      if (gp && canInput) {
-        const now = Date.now();
-        if (now - lastInputTime.current > 200) {
-          if (gp.up) {
-            handleInput("UP");
-            lastInputTime.current = now;
-          } else if (gp.down) {
-            handleInput("DOWN");
-            lastInputTime.current = now;
-          } else if (gp.left) {
-            handleInput("LEFT");
-            lastInputTime.current = now;
-          } else if (gp.right) {
-            handleInput("RIGHT");
-            lastInputTime.current = now;
-          } else if (gp.a) {
-            handleInput("A");
-            lastInputTime.current = now;
-          } else if (gp.b) {
-            handleInput("BACK");
-            lastInputTime.current = now;
-          } else if (gp.x) {
-            handleInput("X");
-            lastInputTime.current = now;
-          } else if (gp.y) {
-            handleInput("Y");
-            lastInputTime.current = now;
-          }
-        }
-      }
-      animationFrameId = requestAnimationFrame(loop);
-    };
-
-    loop();
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [handleInput, canInput]);
+  useControllerInput(action => handleInput(
+    action === "CONFIRM" ? "A" : action === "SEARCH" ? "Y" : action
+  ), { priority: 20 });
 
   const handleKeyAction = key => {
     if (key === "SPACE") onChange(value + " ");

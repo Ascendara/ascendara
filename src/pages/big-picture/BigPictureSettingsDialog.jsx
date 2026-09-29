@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Gamepad2, KeyboardIcon, SearchIcon, Settings, Check } from "lucide-react";
 import { getControllerButtons, getButtonBadgeClass } from "./controller";
-import { getGamepadInput } from "./gamepad";
+import { useControllerInput } from "./useControllerInput";
 
 // Big Picture Settings Dialog
 const BigPictureSettingsDialog = ({
@@ -15,8 +15,6 @@ const BigPictureSettingsDialog = ({
   controllerType,
 }) => {
   const [selectedOption, setSelectedOption] = useState(0);
-  const [canInput, setCanInput] = useState(false);
-  const lastInputTime = useRef(0);
   const buttons = getControllerButtons(controllerType);
 
   const settingsOptions = [
@@ -70,14 +68,11 @@ const BigPictureSettingsDialog = ({
         opt => opt.type === "controller" && opt.value === currentType
       );
       setSelectedOption(currentControllerIndex >= 0 ? currentControllerIndex : 0);
-      const timer = setTimeout(() => setCanInput(true), 200);
-      return () => clearTimeout(timer);
     }
   }, [isOpen, currentType]);
 
   const handleInput = useCallback(
     action => {
-      if (!canInput) return;
 
       if (action === "UP") {
         setSelectedOption(p => Math.max(0, p - 1));
@@ -96,7 +91,6 @@ const BigPictureSettingsDialog = ({
       }
     },
     [
-      canInput,
       selectedOption,
       settingsOptions,
       onTypeChange,
@@ -109,6 +103,7 @@ const BigPictureSettingsDialog = ({
     if (!isOpen) return;
 
     const handleKeyDown = e => {
+      if (e.repeat && !e.key.startsWith("Arrow")) return;
       e.preventDefault();
       e.stopPropagation();
       const keyMap = {
@@ -124,36 +119,9 @@ const BigPictureSettingsDialog = ({
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [handleInput, isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let animationFrameId;
-    const loop = () => {
-      const gp = getGamepadInput();
-      if (gp && canInput) {
-        const now = Date.now();
-        if (now - lastInputTime.current > 200) {
-          if (gp.up) {
-            handleInput("UP");
-            lastInputTime.current = now;
-          } else if (gp.down) {
-            handleInput("DOWN");
-            lastInputTime.current = now;
-          } else if (gp.a) {
-            handleInput("CONFIRM");
-            lastInputTime.current = now;
-          } else if (gp.b) {
-            handleInput("BACK");
-            lastInputTime.current = now;
-          }
-        }
-      }
-      animationFrameId = requestAnimationFrame(loop);
-    };
-
-    loop();
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [handleInput, canInput, isOpen]);
+  useControllerInput(handleInput, {
+    priority: 30, enabled: isOpen,
+  });
 
   if (!isOpen) return null;
 

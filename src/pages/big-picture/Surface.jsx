@@ -1,8 +1,9 @@
-import { memo, useContext, useEffect, useRef, useState } from "react";
+import { memo, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PageNavigationContext, pageFocusIds } from "./PageHeader";
 import { Gamepad2 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { moveFocus, gameName } from "./surfaceNavigation";
+import { scrollSurfaceFocus, cancelSurfaceScroll } from "./controllerNavigation";
 
 export function useSurface(
   navigation,
@@ -17,32 +18,34 @@ export function useSurface(
     .flat()
     .find((id) => id && !pageFocusIds.includes(id));
   const defaultFocus =
-    initialFocus ??
+    (pageNavigation?.pageFocusRequest?.current ? `page-${pageNavigation.view}` : initialFocus) ??
     firstSurfaceFocus ??
     (pageNavigation ? `page-${pageNavigation.view}` : null);
   const [selected, setSelected] = useState(defaultFocus);
   const root = useRef(null);
+  useLayoutEffect(() => {
+    const element = root.current;
+    return () => cancelSurfaceScroll(element);
+  }, []);
   const ids = rows.flat();
+  const focusProps = useRef(new Map());
   const current = ids.includes(selected)
     ? selected
     : ids.includes(defaultFocus) ? defaultFocus : ids[0];
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
+    if (pageNavigation?.pageFocusRequest) pageNavigation.pageFocusRequest.current = false;
     const element = Array.from(
       root.current?.querySelectorAll("[data-focus-id]") || [],
     ).find((item) => item.dataset.focusId === current);
     element?.focus({ preventScroll: true });
-    element?.scrollIntoView({
-      block: "nearest",
-      inline: "nearest",
-      behavior: "smooth",
-    });
-  }, [current, active]);
-  useEffect(() => {
+    scrollSurfaceFocus(root.current, element);
+  }, [current, active, pageNavigation?.pageFocusRequest]);
+  useLayoutEffect(() => {
     if (!active) return;
     navigation.current = (action) => {
       if (["UP", "DOWN", "LEFT", "RIGHT"].includes(action)) {
-        setSelected(moveFocus(rows, current, action));
+        setSelected(previous => moveFocus(rows, ids.includes(previous) ? previous : current, action));
       } else if (action === "CONFIRM") {
         Array.from(root.current?.querySelectorAll("[data-focus-id]") || [])
           .find((item) => item.dataset.focusId === current)
@@ -52,14 +55,27 @@ export function useSurface(
     return () => {
       navigation.current = null;
     };
-  }, [navigation, rows, current, onBack, active]);
-  const focus = (id) => ({
-    "data-focus-id": id,
-    tabIndex: current === id ? 0 : -1,
-    onFocus: () => setSelected(id),
-    "data-selected": active && current === id,
+  }, [navigation, rows, ids, current, onBack, active]);
+  useLayoutEffect(() => {
+    const valid = new Set(ids);
+    for (const id of focusProps.current.keys()) {
+      if (!valid.has(id)) focusProps.current.delete(id);
+    }
   });
-  return { root, focus, current };
+  const focus = id => {
+    const tabIndex = current === id ? 0 : -1;
+    const selected = active && current === id;
+    const cached = focusProps.current.get(id);
+    if (cached && cached.tabIndex === tabIndex && cached["data-selected"] === selected) return cached;
+    const props = {
+      "data-focus-id": id, tabIndex,
+      onFocus: cached?.onFocus || (() => setSelected(id)),
+      "data-selected": selected,
+    };
+    focusProps.current.set(id, props);
+    return props;
+  };
+  return { root, focus, current, selectFocus: setSelected };
 }
 
 export function SurfaceButton({
@@ -82,6 +98,7 @@ export function SurfaceButton({
 export const SurfaceGame = memo(function SurfaceGame({
   game,
   onClick,
+  onOpen,
   focus,
   subtitle,
   artworkOnly = false,
@@ -124,7 +141,7 @@ export const SurfaceGame = memo(function SurfaceGame({
     <button
       ref={ref}
       {...focus}
-      onClick={onClick}
+      onClick={onOpen ? () => onOpen(game) : onClick}
       aria-label={name}
       className={`bp-game${artworkOnly ? " bp-game--artwork" : ""}`}
       data-missing-art={!artwork || artwork === failed}

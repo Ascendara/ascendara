@@ -50,9 +50,9 @@ export function LibrarySurface({
   const [manage, setManage] = useState(null);
   const [revision, setRevision] = useState(0);
   const folders = useMemo(() => loadFolders(), [revision]);
-  const favorites = readStoredList("game-favorites");
-  const recent = recentGamesService.getRecentGames();
-  const filtered = libraryGames(
+  const favorites = useMemo(() => readStoredList("game-favorites"), [revision]);
+  const recent = useMemo(() => recentGamesService.getRecentGames(), [games]);
+  const filtered = useMemo(() => libraryGames(
     games.map((game) => ({
       ...game,
       lastPlayed:
@@ -67,10 +67,11 @@ export function LibrarySurface({
       hiddenFolders:
         hidden || folder?.hidden ? [] : folders.filter((item) => item.hidden),
     },
-  );
+  ), [games, recent, query, sort, folder, filter, favorites, hidden, folders]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 24));
   const currentPage = Math.min(page, pageCount - 1);
-  const displayed = gameEntries(filtered).slice(
+  const entries = useMemo(() => gameEntries(filtered), [filtered]);
+  const displayed = entries.slice(
     currentPage * 24,
     (currentPage + 1) * 24,
   );
@@ -270,7 +271,7 @@ export function LibrarySurface({
                 key={key}
                 game={game}
                 focus={focus(`game-${key}`)}
-                onClick={() => setManage(game)}
+                onOpen={setManage}
                 subtitle={
                   game.playTime
                     ? `${(Number(game.playTime) / 3600).toFixed(1)}h played`

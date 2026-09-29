@@ -97,6 +97,9 @@ export function PageFooter({ fallback }) {
   return (
     <footer className="bp-home-footer">
       <span>
+        <kbd>{buttons.previousPage}</kbd><kbd>{buttons.nextPage}</kbd>Switch page
+      </span>
+      <span>
         <kbd>{buttons.confirm}</kbd>Select
       </span>
       <span>

@@ -27,6 +27,8 @@ const getControllerButtons = (controllerType = "xbox") => {
       delete: "X",
       space: "Y",
       menu: "Start",
+      previousPage: "LB / LT",
+      nextPage: "RB / RT",
     },
     playstation: {
       confirm: <PSButton type="cross" className="h-4 w-4" />,
@@ -34,6 +36,8 @@ const getControllerButtons = (controllerType = "xbox") => {
       delete: <PSButton type="square" className="h-4 w-4" />,
       space: <PSButton type="triangle" className="h-4 w-4" />,
       menu: "Options",
+      previousPage: "L1 / L2",
+      nextPage: "R1 / R2",
     },
     generic: {
       confirm: "A",
@@ -41,6 +45,8 @@ const getControllerButtons = (controllerType = "xbox") => {
       delete: "X",
       space: "Y",
       menu: "Menu",
+      previousPage: "LB / LT",
+      nextPage: "RB / RT",
     },
     keyboard: {
       confirm: "Enter",
@@ -48,6 +54,8 @@ const getControllerButtons = (controllerType = "xbox") => {
       delete: "Del",
       space: "Space",
       menu: "Tab",
+      previousPage: "PgUp",
+      nextPage: "PgDn",
     },
   };
 

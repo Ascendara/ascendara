@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { getGamepadInput } from "./gamepad";
+import { observeController } from "./controllerDispatcher";
 
 const useHideCursorOnGamepad = () => {
   useEffect(() => {
@@ -24,28 +24,15 @@ const useHideCursorOnGamepad = () => {
     window.addEventListener("mousemove", showCursor);
     window.addEventListener("mousedown", showCursor);
 
-    // Loop for controller
-    let animationFrameId;
-    const loop = () => {
-      const gp = getGamepadInput();
-
-      if (gp) {
-        const isGamepadActive = Object.values(gp).some(value => value === true);
-
-        if (isGamepadActive) {
-          hideCursor();
-        }
-      }
-      animationFrameId = requestAnimationFrame(loop);
-    };
-
-    loop();
+    const unsubscribe = observeController(input => {
+      if (input && Object.values(input).some(value => value === true)) hideCursor();
+    });
 
     // Cleanup when leaving the screen
     return () => {
       window.removeEventListener("mousemove", showCursor);
       window.removeEventListener("mousedown", showCursor);
-      cancelAnimationFrame(animationFrameId);
+      unsubscribe();
       document.body.style.cursor = "auto";
     };
   }, []);

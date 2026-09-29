@@ -18,8 +18,9 @@ import { useHideCursorOnGamepad } from "./useHideCursorOnGamepad";
 import { getControllerButtons } from "./controller";
 import { createFuzzyMatcher } from "./utils";
 import { useDebouncedValue } from "./useDebouncedValue";
-import { getGamepadInput } from "./gamepad";
+import { useControllerInput } from "./useControllerInput";
 import { sidebarItems } from "./SidebarMenu";
+import { pageLinks } from "./PageHeader";
 
 function useBigPicturePage() {
   useHideCursorOnGamepad();
@@ -28,6 +29,7 @@ function useBigPicturePage() {
   const { isAuthenticated, user } = useAuth();
   const surfaceNavigation = useRef(null);
   const surfaceInputLock = useRef(false);
+  const pageFocusRequest = useRef(false);
   const controllerType = settings.controllerType || "xbox";
   const buttons = getControllerButtons(controllerType);
   const [assetSearchOpen, setAssetSearchOpen] = useState(false);
@@ -167,9 +169,6 @@ function useBigPicturePage() {
   const GAMES_PER_LOAD = 30;
 
   const navigate = useNavigate();
-  const lastNavTime = useRef(0);
-  const lastActionTime = useRef(0);
-  const lastButtonState = useRef({});
   const GRID_COLS = 6;
 
   // --- DOWNLOAD POLLING ---
@@ -643,23 +642,15 @@ function useBigPicturePage() {
       if (newView === view || isTransitioning) return;
 
       setPreviousView(view);
-      setIsTransitioning(true);
-
-      // Start transition out
-      setTimeout(() => {
-        setCarouselIndex(0);
-        setLibraryIndex(0);
-        setStoreIndex(0);
-        setIsSearchBarSelected(false);
-        setStoreSearchQuery("");
-        setView(newView);
-        setDisplayedCount(30);
-
-        // Transition in
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 50);
-      }, 200);
+      // Top-level surfaces have no exit animation. Commit immediately so rapid
+      // shoulder presses are not dropped behind an artificial transition lock.
+      setCarouselIndex(0);
+      setLibraryIndex(0);
+      setStoreIndex(0);
+      setIsSearchBarSelected(false);
+      setStoreSearchQuery("");
+      setView(newView);
+      setDisplayedCount(30);
     },
     [view, isTransitioning]
   );
@@ -904,17 +895,6 @@ function useBigPicturePage() {
   // --- MAIN NAVIGATION LOGIC (SHARED BETWEEN KEYBOARD & GAMEPAD) ---
   const handleNavigation = useCallback(
     action => {
-      console.log(
-        "[NAV]",
-        action,
-        "→",
-        view,
-        "| installedGameView:",
-        installedGameView,
-        "| isKeyboardOpen:",
-        isKeyboardOpen
-      );
-
       // Block all navigation when any dialog is open
       if (
         showExitDialog ||
@@ -924,29 +904,15 @@ function useBigPicturePage() {
         showProviderDialog ||
         showQueuePrompt
       ) {
-        const dialogType = showKillDialog
-          ? "kill"
-          : showProviderDialog
-            ? "provider"
-            : showQueuePrompt
-              ? "queue"
-              : showExitDialog
-                ? "exit"
-                : showExitBigPictureDialog
-                  ? "exitBP"
-                  : "settings";
-        console.log(`[NAV] Blocked by ${dialogType} dialog`);
         return;
       }
 
       if (isKeyboardOpen) {
-        console.log("[NAV] Blocked by keyboard");
         return;
       }
 
       // Allow InstalledGameDetailsView to handle its own navigation
       if (installedGameView) {
-        console.log("[NAV] Blocked by installedGameView - letting component handle it");
         return;
       }
 
@@ -975,6 +941,15 @@ function useBigPicturePage() {
       }
 
       if (["carousel", "library", "retro", "cloud", "profile", "preferences", "power", "downloads", "store"].includes(view)) {
+        if (action === "PREVIOUS_PAGE" || action === "NEXT_PAGE") {
+          const index = pageLinks.findIndex(([id]) => id === view);
+          const step = action === "NEXT_PAGE" ? 1 : -1;
+          const next = index < 0 ? (step > 0 ? 0 : pageLinks.length - 1)
+            : (index + step + pageLinks.length) % pageLinks.length;
+          pageFocusRequest.current = true;
+          changeView(pageLinks[next][0]);
+          return;
+        }
         if (action === "MENU") setIsMenuOpen(true);
         else if (action === "SEARCH") setIsKeyboardOpen(true);
         else surfaceNavigation.current?.(action);
@@ -1169,6 +1144,9 @@ function useBigPicturePage() {
       showExitDialog,
       showExitBigPictureDialog,
       showControllerSettings,
+      showKillDialog,
+      showProviderDialog,
+      showQueuePrompt,
     ]
   );
 
@@ -1189,8 +1167,7 @@ function useBigPicturePage() {
       )
         return;
 
-      const now = Date.now();
-      if (now - lastNavTime.current < 100) return;
+      if (e.defaultPrevented || (e.repeat && !e.key.startsWith("Arrow"))) return;
 
       const keyMap = {
         ArrowUp: "UP",
@@ -1204,10 +1181,11 @@ function useBigPicturePage() {
         m: "MENU",
         ContextMenu: "MENU",
         " ": "SEARCH",
+        PageUp: "PREVIOUS_PAGE",
+        PageDown: "NEXT_PAGE",
       };
 
       if (keyMap[e.key]) {
-        lastNavTime.current = now;
         e.preventDefault();
         handleNavigation(keyMap[e.key]);
       }
@@ -1225,96 +1203,12 @@ function useBigPicturePage() {
     view,
   ]);
 
-  // GAMEPAD POLLING LOOP for Main Navigation
-  useEffect(() => {
-    let animationFrameId;
-
-    const loop = () => {
-      const gp = getGamepadInput();
-
-      // Always update button states to prevent held buttons from triggering when view changes
-      if (gp) {
-        const updateButtonState = buttonName => {
-          lastButtonState.current[buttonName] = gp[buttonName];
-        };
-
-        // Block navigation when any dialog is open or just closed
-        if (
-          showExitDialog ||
-          showExitBigPictureDialog ||
-          showControllerSettings ||
-          showKillDialog ||
-          showProviderDialog ||
-          assetSearchOpen ||
-          providerDialogJustClosed.current ||
-          isKeyboardOpen
-        ) {
-          // Update button states even when blocked
-          updateButtonState("up");
-          updateButtonState("down");
-          updateButtonState("left");
-          updateButtonState("right");
-          updateButtonState("a");
-          updateButtonState("b");
-          updateButtonState("menu");
-          updateButtonState("y");
-          animationFrameId = requestAnimationFrame(loop);
-          return;
-        }
-
-        const now = Date.now();
-
-        // Track button state changes - only trigger on new press (not hold)
-        const checkNavButton = (buttonName, action) => {
-          if (gp[buttonName] && !lastButtonState.current[buttonName]) {
-            // Button just pressed (wasn't pressed before)
-            const timeSinceLastNav = now - lastNavTime.current;
-            if (timeSinceLastNav > 170) {
-              handleNavigation(action);
-              lastNavTime.current = now;
-            }
-          }
-          lastButtonState.current[buttonName] = gp[buttonName];
-        };
-
-        const checkActionButton = (buttonName, action) => {
-          if (gp[buttonName] && !lastButtonState.current[buttonName]) {
-            // Button just pressed (wasn't pressed before)
-            if (now - lastActionTime.current > 250) {
-              handleNavigation(action);
-              lastActionTime.current = now;
-            }
-          }
-          lastButtonState.current[buttonName] = gp[buttonName];
-        };
-
-        // 1. NAVIGATION
-        checkNavButton("up", "UP");
-        checkNavButton("down", "DOWN");
-        checkNavButton("left", "LEFT");
-        checkNavButton("right", "RIGHT");
-
-        // 2. ACTIONS
-        checkActionButton("a", "CONFIRM");
-        checkActionButton("b", "BACK");
-        checkActionButton("menu", "MENU");
-        checkActionButton("y", "SEARCH");
-      }
-      animationFrameId = requestAnimationFrame(loop);
-    };
-
-    loop();
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [
-    handleNavigation,
-    showExitDialog,
-    showExitBigPictureDialog,
-    showControllerSettings,
-    showKillDialog,
-    showProviderDialog,
-    assetSearchOpen,
-    isKeyboardOpen,
-  ]);
+  useControllerInput(handleNavigation, {
+    priority: 0,
+    blocked: showExitDialog || showExitBigPictureDialog || showControllerSettings ||
+      showKillDialog || showProviderDialog || showQueuePrompt || assetSearchOpen ||
+      providerDialogJustClosed.current || isKeyboardOpen || !!installedGameView,
+  });
 
   return {
     selectedSort,
@@ -1322,6 +1216,7 @@ function useBigPicturePage() {
     refreshStore: () => { setStoreGames([]); setStoreRevision(value => value + 1); },
     surfaceNavigation,
     surfaceInputLock,
+    pageFocusRequest,
     handleMenuAction,
     handleShowInstalledGameDetails,
     refreshLibrary: () => setRefreshTrigger(value => value + 1),

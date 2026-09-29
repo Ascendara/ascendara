@@ -278,9 +278,8 @@ export function HomeDashboard({
               <SurfaceGame
                 key={key}
                 game={game}
-                artworkOnly={section.id === "library"}
                 focus={focus(`${section.id}-${key}`)}
-                onClick={() => section.open(game)}
+                onOpen={section.open}
               />
             ))}
           </div>

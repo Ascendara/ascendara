@@ -9,7 +9,7 @@ import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import recentGamesService from "@/services/recentGamesService";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
 import { getControllerButtons } from "./controller";
-import { getGamepadInput } from "./gamepad";
+import { useControllerInput } from "./useControllerInput";
 import { hasActiveSubscription, uploadBackupToCloud } from "@/services/cloudBackupService";
 import { listBackups as listCloudBackups } from "@/services/firebaseService";
 import { restoreCloudSave } from "@/services/restoreCloudSave";
@@ -44,8 +44,6 @@ function useInstalledGameDetails({
   const [selectedMenuItem, setSelectedMenuItem] = useState(0);
   const [trainerToggleFocused, setTrainerToggleFocused] = useState(false);
   const [achievementsToggleFocused, setAchievementsToggleFocused] = useState(false);
-  const lastInputTime = useRef(0);
-  const lastButtonState = useRef({});
   const buttons = getControllerButtons(controllerType);
   const gameName = game.game || game.name;
   const [showDirectoryBrowser, setShowDirectoryBrowser] = useState(false);
@@ -115,21 +113,6 @@ function useInstalledGameDetails({
   useEffect(() => {
     console.log("[InstalledGameDetailsView] Mounted with game:", gameName);
     console.log("[InstalledGameDetailsView] Game object:", game);
-
-    // Initialize button states with current gamepad state to prevent held buttons from triggering
-    const gp = getGamepadInput();
-    if (gp) {
-      lastButtonState.current = {
-        up: gp.up,
-        down: gp.down,
-        left: gp.left,
-        right: gp.right,
-        a: gp.a,
-        b: gp.b,
-        x: gp.x,
-        menu: gp.menu,
-      };
-    }
 
     if (gameName) {
       window.electron.ensureGameAssets(gameName);
@@ -982,57 +965,13 @@ function useInstalledGameDetails({
   }, [handleInput, isRunning, isLaunching]);
 
   // Gamepad Polling
-  useEffect(() => {
-    let rAF;
-    const loop = () => {
-      // Block input when game is running or launching
-      if (isRunning || isLaunching) {
-        rAF = requestAnimationFrame(loop);
-        return;
-      }
-      if (showExecutableManager || showDirectoryBrowser) {
-        rAF = requestAnimationFrame(loop);
-        return;
-      }
-      const gp = getGamepadInput();
-      if (gp && canInput) {
-        const now = Date.now();
-
-        // Track button state changes - only trigger on new press (not hold)
-        const checkButton = (buttonName, action) => {
-          // Ignore B during 800ms after file browser closed
-          if (
-            buttonName === "b" &&
-            window.__bReleasedAt &&
-            now - window.__bReleasedAt < 800
-          ) {
-            lastButtonState.current[buttonName] = gp[buttonName];
-            return;
-          }
-          if (gp[buttonName] && !lastButtonState.current[buttonName]) {
-            // Button just pressed (wasn't pressed before)
-            if (now - lastInputTime.current > 150) {
-              handleInput(action);
-              lastInputTime.current = now;
-            }
-          }
-          lastButtonState.current[buttonName] = gp[buttonName];
-        };
-
-        checkButton("down", "DOWN");
-        checkButton("up", "UP");
-        checkButton("left", "LEFT");
-        checkButton("right", "RIGHT");
-        checkButton("b", "BACK");
-        checkButton("a", "CONFIRM");
-        checkButton("x", "X");
-        checkButton("menu", "MENU");
-      }
-      rAF = requestAnimationFrame(loop);
-    };
-    loop();
-    return () => cancelAnimationFrame(rAF);
-  }, [handleInput, canInput, isRunning, isLaunching]);
+  useControllerInput(action => {
+    if (action === "BACK" && window.__bReleasedAt && Date.now() - window.__bReleasedAt < 800) return;
+    handleInput(action);
+  }, {
+    priority: 5,
+    blocked: !canInput || isRunning || isLaunching || showExecutableManager || showDirectoryBrowser,
+  });
 
   const formatPlayTime = time => {
     if (!time || time < 60) return t("library.notPlayedYet");

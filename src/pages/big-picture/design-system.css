@@ -230,6 +230,8 @@
 }
 .bp-home {
   padding-inline: clamp(24px, 5vw, 120px);
+  scroll-padding-top: calc(clamp(72px, 8vh, 96px) + 16px);
+  scroll-padding-bottom: 64px;
 }
 .bp-page h2 {
   font-size: 1.2em;
