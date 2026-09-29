@@ -5,11 +5,20 @@ import {
   BigPictureToolbar,
   BigPictureEmptyState,
 } from "./BigPictureShell";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SurfaceButton, useSurface } from "./Surface";
 import { BrowseGameCard } from "./BrowseGameCard";
 import { gameName, gameEntries, readStoredList } from "./surfaceNavigation";
 import "./browse-controls.css";
+
+const genresFor = (game) =>
+    Array.isArray(game.genre || game.genres)
+      ? (game.genre || game.genres)
+          .map((item) => (typeof item === "string" ? item : item.name))
+          .filter(Boolean)
+      : typeof (game.genre || game.genres) === "string"
+        ? (game.genre || game.genres).split(",").map((item) => item.trim())
+        : [];
 
 export function BrowseSurface({
   navigation,
@@ -35,27 +44,30 @@ export function BrowseSurface({
     setLastQuery(query);
     setPage(0);
   }
-  const genresFor = (game) =>
-    Array.isArray(game.genre || game.genres)
-      ? (game.genre || game.genres)
-          .map((item) => (typeof item === "string" ? item : item.name))
-          .filter(Boolean)
-      : typeof (game.genre || game.genres) === "string"
-        ? (game.genre || game.genres).split(",").map((item) => item.trim())
-        : [];
-  const genres = [...new Set(games.flatMap(genresFor))].sort();
-  const saved = new Set(readStoredList("play-later-games").map(gameName));
-  const filtered = games.filter(
+  const genres = useMemo(() => [...new Set(games.flatMap(genresFor))].sort(), [games]);
+  const [savedRevision, setSavedRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setSavedRevision(value => value + 1);
+    window.addEventListener("play-later-updated", refresh);
+    return () => window.removeEventListener("play-later-updated", refresh);
+  }, []);
+  const saved = useMemo(() => new Set(readStoredList("play-later-games").map(gameName)), [savedRevision]);
+  const filtered = useMemo(() => games.filter(
     (game) =>
       (!savedOnly || saved.has(gameName(game))) &&
       (!genre || genresFor(game).includes(genre)),
-  );
-  const pages = Math.max(1, Math.ceil(filtered.length / 24));
+  ), [games, savedOnly, saved, genre]);
+  // Always load complete rows (25 cards in the five-column layout).
+  const batchSize = Math.ceil(24 / columns) * columns;
+  const pages = Math.max(1, Math.ceil(filtered.length / batchSize));
   const currentPage = Math.min(page, pages - 1);
-  const displayed = gameEntries(filtered).slice(
-    currentPage * 24,
-    (currentPage + 1) * 24,
-  );
+  const entries = useMemo(() => gameEntries(filtered), [filtered]);
+  const displayed = useMemo(() => entries.slice(
+    0,
+    (currentPage + 1) * batchSize,
+  ), [entries, currentPage, batchSize]);
+  const hasMore = displayed.length < filtered.length;
+  const loadMoreRef = useRef(null);
   const rows = [
     ["search", ...(query ? ["clear"] : [])],
     ...(columns === 3
@@ -69,9 +81,37 @@ export function BrowseSurface({
         .slice(i * columns, i * columns + columns)
         .map(({ key }) => `store-${key}`),
     ),
-    ["previous", "next"],
+    ...(hasMore ? [["next"]] : []),
   ];
-  const { root, focus } = useSurface(navigation, rows, onBack, active);
+  const { root, focus, current, selectFocus } = useSurface(navigation, rows, onBack, active);
+  const focusedIndex = displayed.findIndex(({ key }) => `store-${key}` === current);
+  const lastRowStart = Math.floor((displayed.length - 1) / columns) * columns;
+  const nextFocus = entries[displayed.length]?.key;
+  const loadMore = useCallback((moveSelection = false) => {
+    if (loading || !hasMore) return;
+    // The footer moves with every appended batch. Never leave focus following it.
+    if ((moveSelection || current === "next") && nextFocus) {
+      selectFocus(`store-${nextFocus}`);
+    }
+    setPage(currentPage + 1);
+  }, [loading, hasMore, current, nextFocus, selectFocus, currentPage]);
+
+  // Preload on the last row so the next Down press moves into the new results.
+  useEffect(() => {
+    if (active && (current === "next" || focusedIndex >= lastRowStart)) {
+      loadMore();
+    }
+  }, [active, current, focusedIndex, lastRowStart, loadMore]);
+
+  // Mouse/trackpad scrolling follows the same incremental loading behavior.
+  useEffect(() => {
+    if (!active || loading || !hasMore || !loadMoreRef.current) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) loadMore();
+    }, { root: root.current, rootMargin: "0px 0px 300px 0px" });
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [active, loading, hasMore, loadMore, root]);
   const sorts = {
     weight: ["Popular", "latest_update-desc"],
     "latest_update-desc": ["Recently updated", "name"],
@@ -181,26 +221,22 @@ export function BrowseSurface({
             key={key}
             game={game}
             focus={focus(`store-${key}`)}
-            onClick={() => openGame(game, 0)}
+            onOpen={openGame}
           />
         ))}
       </div>
-      <div className="bp-pagination">
-        <SurfaceButton
-          {...focus("previous")}
-          onClick={() => setPage(Math.max(0, currentPage - 1))}
-        >
-          Previous
-        </SurfaceButton>
-        <span>
-          {currentPage + 1} / {pages}
+      <div className="bp-pagination" ref={loadMoreRef}>
+        <span role="status">
+          {displayed.length.toLocaleString()} of {filtered.length.toLocaleString()} games
         </span>
-        <SurfaceButton
-          {...focus("next")}
-          onClick={() => setPage(Math.min(pages - 1, currentPage + 1))}
-        >
-          Next
-        </SurfaceButton>
+        {hasMore && (
+          <SurfaceButton
+            {...focus("next")}
+            onClick={() => loadMore(true)}
+          >
+            Load more
+          </SurfaceButton>
+        )}
       </div>
     </BigPictureShell>
   );

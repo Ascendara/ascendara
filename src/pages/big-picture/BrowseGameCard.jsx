@@ -21,7 +21,7 @@ const validRating = (value) => {
 export const BrowseGameCard = memo(function BrowseGameCard({
   game,
   focus,
-  onClick,
+  onOpen,
 }) {
   const ref = useRef(null);
   const id = useId();
@@ -96,7 +96,7 @@ export const BrowseGameCard = memo(function BrowseGameCard({
       ref={ref}
       type="button"
       {...focus}
-      onClick={onClick}
+      onClick={() => onOpen(game, 0)}
       className="bp-game bp-browse-game"
       aria-labelledby={`${id}-title`}
       aria-describedby={`${id}-details${rating !== null ? ` ${id}-rating` : ""}`}
