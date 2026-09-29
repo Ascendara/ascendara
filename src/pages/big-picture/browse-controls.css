@@ -1,0 +1,65 @@
+.bp-browse-controls {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.bp-browse-controls .bp-toolbar {
+  margin: 0;
+  overflow: visible;
+  min-width: 0;
+}
+
+.bp-browse-controls .bp-search-button {
+  flex: 1 1 0 !important;
+  min-width: 0;
+}
+
+.bp-browse-controls .bp-search-button span,
+.bp-browse-filters .bp-action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-browse-controls .bp-toolbar:last-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem;
+}
+
+.bp-browse-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.bp-browse-filters .bp-action {
+  min-width: 0;
+  justify-content: space-between;
+}
+
+.bp-browse-controls .bp-action svg {
+  flex-shrink: 0;
+}
+
+.bp-browse-catalogue-actions {
+  display: flex;
+  gap: 0.65rem;
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--bp-line);
+}
+
+@media (max-width: 999px) {
+  .bp-browse-controls .bp-toolbar:last-child {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bp-browse-catalogue-actions {
+    justify-content: flex-end;
+    padding: 0.85rem 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--bp-line);
+  }
+}

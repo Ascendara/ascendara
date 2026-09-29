@@ -1,4 +1,4 @@
-import { Search, X, RefreshCw, ChevronDown } from "lucide-react";
+import { Search, X, RefreshCw, ChevronDown, Database } from "lucide-react";
 import { useGridColumns } from "./useGridColumns";
 import {
   BigPictureShell,
@@ -6,8 +6,10 @@ import {
   BigPictureEmptyState,
 } from "./BigPictureShell";
 import { useState } from "react";
-import { SurfaceButton, SurfaceGame, useSurface } from "./Surface";
+import { SurfaceButton, useSurface } from "./Surface";
+import { BrowseGameCard } from "./BrowseGameCard";
 import { gameName, gameEntries, readStoredList } from "./surfaceNavigation";
+import "./browse-controls.css";
 
 export function BrowseSurface({
   navigation,
@@ -22,6 +24,7 @@ export function BrowseSurface({
   openGame,
   onBack,
   retry,
+  openIndexes,
 }) {
   const columns = useGridColumns();
   const [page, setPage] = useState(0);
@@ -54,7 +57,13 @@ export function BrowseSurface({
     (currentPage + 1) * 24,
   );
   const rows = [
-    ["search", ...(query ? ["clear"] : []), "sort", "saved", "genre", "retry"],
+    ["search", ...(query ? ["clear"] : [])],
+    ...(columns === 3
+      ? [
+          ["sort", "saved", "genre"],
+          ["retry", "indexes"],
+        ]
+      : [["sort", "saved", "genre", "retry", "indexes"]]),
     ...Array.from({ length: Math.ceil(displayed.length / columns) }, (_, i) =>
       displayed
         .slice(i * columns, i * columns + columns)
@@ -75,66 +84,84 @@ export function BrowseSurface({
       title="Browse"
       focus={focus}
     >
-      <BigPictureToolbar label="Browse filters">
-        <SurfaceButton
-          className="bp-search-button"
-          {...focus("search")}
-          onClick={search}
-        >
-          <Search />
-          {query || "Search games"}
-        </SurfaceButton>
-        {query && (
+      <div className="bp-browse-controls">
+        <BigPictureToolbar label="Search catalogue">
           <SurfaceButton
-            variant="icon"
-            {...focus("clear")}
-            aria-label="Clear search"
-            onClick={clearSearch}
+            className="bp-search-button"
+            {...focus("search")}
+            onClick={search}
           >
-            <X />
+            <Search />
+            <span>{query || "Search games"}</span>
           </SurfaceButton>
-        )}
-        <SurfaceButton
-          {...focus("sort")}
-          onClick={() => {
-            setSort(sorts[sort]?.[1] || "weight");
-            setPage(0);
-          }}
-        >
-          {sorts[sort]?.[0]}
-          <ChevronDown />
-        </SurfaceButton>
-        <SurfaceButton
-          {...focus("saved")}
-          aria-pressed={savedOnly}
-          onClick={() => {
-            setSavedOnly(!savedOnly);
-            setPage(0);
-          }}
-        >
-          {savedOnly ? "Saved for later" : "All games"}
-          <ChevronDown />
-        </SurfaceButton>
-        <SurfaceButton
-          {...focus("genre")}
-          onClick={() => {
-            const index = genres.indexOf(genre);
-            setGenre(genres[index + 1] || "");
-            setPage(0);
-          }}
-        >
-          {genre || "All genres"}
-          <ChevronDown />
-        </SurfaceButton>
-        <SurfaceButton
-          variant="icon"
-          {...focus("retry")}
-          aria-label="Refresh catalogue"
-          onClick={retry}
-        >
-          <RefreshCw />
-        </SurfaceButton>
-      </BigPictureToolbar>
+          {query && (
+            <SurfaceButton
+              variant="icon"
+              {...focus("clear")}
+              aria-label="Clear search"
+              onClick={clearSearch}
+            >
+              <X />
+            </SurfaceButton>
+          )}
+        </BigPictureToolbar>
+        <BigPictureToolbar label="Browse filters and catalogue actions">
+          <div
+            className="bp-browse-filters"
+            role="group"
+            aria-label="Catalogue filters"
+          >
+            <SurfaceButton
+              {...focus("sort")}
+              onClick={() => {
+                setSort(sorts[sort]?.[1] || "weight");
+                setPage(0);
+              }}
+            >
+              <span>{sorts[sort]?.[0]}</span>
+              <ChevronDown />
+            </SurfaceButton>
+            <SurfaceButton
+              {...focus("saved")}
+              aria-pressed={savedOnly}
+              onClick={() => {
+                setSavedOnly(!savedOnly);
+                setPage(0);
+              }}
+            >
+              <span>{savedOnly ? "Saved for later" : "All games"}</span>
+              <ChevronDown />
+            </SurfaceButton>
+            <SurfaceButton
+              {...focus("genre")}
+              onClick={() => {
+                const index = genres.indexOf(genre);
+                setGenre(genres[index + 1] || "");
+                setPage(0);
+              }}
+            >
+              <span>{genre || "All genres"}</span>
+              <ChevronDown />
+            </SurfaceButton>
+          </div>
+          <div
+            className="bp-browse-catalogue-actions"
+            role="group"
+            aria-label="Catalogue actions"
+          >
+            <SurfaceButton
+              {...focus("retry")}
+              aria-label="Refresh catalogue"
+              onClick={retry}
+            >
+              <RefreshCw /> Reload
+            </SurfaceButton>
+            <SurfaceButton {...focus("indexes")} onClick={openIndexes}>
+              <Database /> Manage indexes
+            </SurfaceButton>
+          </div>
+        </BigPictureToolbar>
+      </div>
       <p className="bp-muted" role="status">
         {loading
           ? "Loading catalogue…"
@@ -150,12 +177,11 @@ export function BrowseSurface({
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
         {displayed.map(({ game, key }) => (
-          <SurfaceGame
+          <BrowseGameCard
             key={key}
             game={game}
             focus={focus(`store-${key}`)}
             onClick={() => openGame(game, 0)}
-            subtitle={game.size}
           />
         ))}
       </div>

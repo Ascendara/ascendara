@@ -1,0 +1,255 @@
+.bp-browse .bp-browse-game {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: linear-gradient(
+    155deg,
+    rgb(var(--color-card)),
+    rgb(var(--color-background))
+  );
+  border: 1px solid rgb(var(--color-border) / 0.8);
+  text-align: left;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.bp-browse .bp-browse-game:is(:hover, :focus-visible, [data-selected="true"]) {
+  transform: translateY(-5px);
+  border-color: rgb(var(--color-primary) / 0.8);
+  box-shadow:
+    0 14px 35px rgb(0 0 0 / 0.25),
+    0 0 24px rgb(var(--color-primary) / 0.1);
+}
+
+.bp-browse-artwork {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(
+      ellipse at 30% 20%,
+      rgb(var(--color-primary) / 0.25),
+      transparent 70%
+    ),
+    rgb(var(--color-muted));
+}
+
+.bp-browse-artwork > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+.bp-browse-game:is(:hover, :focus-visible, [data-selected="true"])
+  .bp-browse-artwork
+  > img {
+  transform: scale(1.05);
+}
+.bp-browse-artwork-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgb(0 0 0 / 0.2),
+    transparent 45%,
+    rgb(0 0 0 / 0.4)
+  );
+}
+.bp-browse-artwork-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+}
+.bp-browse-artwork-placeholder > svg {
+  width: 3.5rem;
+  height: 3.5rem;
+  color: rgb(var(--color-primary));
+  opacity: 0.7;
+}
+.bp-browse-artwork-placeholder > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bp-browse-game .bp-browse-rating {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.65rem;
+  background: rgb(9 12 18 / 0.82);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(10px);
+}
+.bp-browse-game .bp-browse-rating > span {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+.bp-browse-rating > svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  display: block;
+  fill: #fbbf24;
+  color: #fbbf24;
+}
+.bp-browse-game .bp-browse-open {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(5px);
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+.bp-browse-open svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.bp-browse-game:is(:hover, :focus-visible, [data-selected="true"])
+  .bp-browse-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.bp-browse-game-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.15rem;
+  flex: 1;
+  min-width: 0;
+}
+.bp-browse .bp-browse-game-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  min-height: 2.7em;
+  font-size: clamp(1rem, 1.2vw, 1.4rem);
+  line-height: 1.35;
+  font-weight: 650;
+  color: rgb(var(--color-foreground));
+}
+.bp-browse-game-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: 1;
+}
+.bp-browse-game .bp-browse-game-genres {
+  display: block;
+  min-height: 1.4em;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-browse-game-features {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.7rem;
+}
+.bp-browse-game .bp-browse-feature {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid currentColor;
+  border-radius: 0.45rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 600;
+}
+.bp-browse-feature > svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+.bp-browse-game .bp-browse-feature--online {
+  color: #38bdf8;
+  background: rgb(56 189 248 / 0.08);
+  border-color: rgb(56 189 248 / 0.25);
+}
+.bp-browse-game .bp-browse-feature--dlc {
+  color: #c084fc;
+  background: rgb(192 132 252 / 0.08);
+  border-color: rgb(192 132 252 / 0.25);
+}
+.bp-browse-game .bp-browse-feature--vr {
+  color: #34d399;
+  background: rgb(52 211 153 / 0.08);
+  border-color: rgb(52 211 153 / 0.25);
+}
+.bp-browse-game-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.8rem;
+  margin-top: auto;
+  border-top: 1px solid rgb(var(--color-border) / 0.65);
+}
+.bp-browse-game-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+.bp-browse-game-footer svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+.bp-browse-game .bp-browse-game-link {
+  color: rgb(var(--color-primary));
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-browse .bp-browse-game,
+  .bp-browse-artwork > img,
+  .bp-browse-game .bp-browse-open {
+    transition: none;
+  }
+  .bp-browse .bp-browse-game:is(:hover, :focus-visible, [data-selected="true"]),
+  .bp-browse-game:is(:hover, :focus-visible, [data-selected="true"])
+    .bp-browse-artwork
+    > img {
+    transform: none;
+  }
+}

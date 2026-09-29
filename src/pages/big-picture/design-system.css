@@ -160,7 +160,7 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .bp-game--artwork .bp-cover {
   border-radius: inherit;
@@ -170,7 +170,7 @@
   inset: auto 0 0;
   margin: 0;
   padding: 1.8em 0.8em 0.7em;
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 12px 12px;
   background: linear-gradient(transparent, rgb(0 0 0 / 0.85));
   color: white;
   opacity: 0;
