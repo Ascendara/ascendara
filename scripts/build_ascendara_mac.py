@@ -120,6 +120,8 @@ def main():
     run(['yarn', 'build'])
     shutil.copy2(ROOT / 'build/index.html', ROOT / 'electron/index.html')
     shutil.copytree(ROOT / 'build/assets', ROOT / 'electron/assets', dirs_exist_ok=True)
+    shutil.copy2(ROOT / 'build/icon.png', ROOT / 'electron/icon.png')
+    shutil.copytree(ROOT / 'build/sounds', ROOT / 'electron/sounds', dirs_exist_ok=True)
     run(['node', 'scripts/generate_build_signature.js'])
     for arch in arches:
         build_arch(arch, args, identity)

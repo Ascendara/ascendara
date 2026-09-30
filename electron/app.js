@@ -117,34 +117,48 @@ function launchCrashReporter(errorType, errorMessage) {
 function createTray() {
   // Use the correct icon path - try multiple locations
   const isUnix = process.platform !== "win32";
+  const isMac = process.platform === "darwin";
   let iconPath;
   if (isDev) {
-    iconPath = isUnix
-      ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
-      : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
+    iconPath = isMac
+      ? path.join(__dirname, "../readme/logo/icns/icon.icns")
+      : isUnix
+        ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
+        : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   } else {
     // In production, icon should be in resources
-    iconPath = isUnix
-      ? path.join(process.resourcesPath, "icon.png")
-      : path.join(process.resourcesPath, "icon.ico");
+    iconPath = path.join(
+      process.resourcesPath,
+      isMac ? "icon.icns" : isUnix ? "icon.png" : "icon.ico"
+    );
     // Fallback to app directory if not in resources
     if (!fs.existsSync(iconPath)) {
-      iconPath = isUnix
-        ? path.join(config.appDirectory, "icon.png")
-        : path.join(config.appDirectory, "icon.ico");
+      iconPath = path.join(
+        config.appDirectory,
+        isMac ? "icon.icns" : isUnix ? "icon.png" : "icon.ico"
+      );
     }
   }
 
   // Verify icon exists
   if (!fs.existsSync(iconPath)) {
     console.error("Tray icon not found at:", iconPath);
-    iconPath = isUnix
-      ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
-      : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
+    iconPath = isMac
+      ? path.join(__dirname, "../readme/logo/icns/icon.icns")
+      : isUnix
+        ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
+        : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   }
 
-  const icon = nativeImage.createFromPath(iconPath);
-  tray = new Tray(icon);
+  let icon = nativeImage.createFromPath(iconPath);
+  if (isMac && icon.isEmpty()) {
+    icon = nativeImage.createFromPath(
+      isDev
+        ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
+        : path.join(process.resourcesPath, "icon.png")
+    );
+  }
+  tray = new Tray(isMac ? icon.resize({ width: 16, height: 16 }) : icon);
 
   const contextMenu = Menu.buildFromTemplate([
     {
