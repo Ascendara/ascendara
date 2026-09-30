@@ -1205,74 +1205,137 @@ function registerDownloadHandlers() {
     }
   });
 
-  // Check retry extract
+  // Resolve retained downloads across every configured library.
+  async function extractionTarget(game) {
+    const settings = settingsManager.getSettings();
+    const name = sanitizeGameName(sanitizeText(game));
+    if (!name || name !== game) throw new Error("Invalid game name.");
+    for (const directory of [
+      settings.downloadDirectory,
+      ...(settings.additionalDirectories || []),
+    ].filter(Boolean)) {
+      const metadata = path.join(directory, name, `${name}.ascendara.json`);
+      if (!(await fs.pathExists(metadata))) continue;
+      const info = await fs.readJson(metadata);
+      const data = info.downloadingData;
+      if (
+        !data ||
+        !(data.error || data.stopped || data.verifyError?.length) ||
+        (!info.extractionSources && Number.parseFloat(data.progressCompleted) < 100) ||
+        (!info.extractionSources &&
+          !Number.isFinite(Number.parseFloat(data.progressCompleted)))
+      ) {
+        throw new Error("This download is not ready for an extraction retry.");
+      }
+      return { metadata, info };
+    }
+    throw new Error("Download metadata was not found.");
+  }
+
   ipcMain.handle("check-retry-extract", async (_, game) => {
     try {
-      const settings = settingsManager.getSettings();
-      if (!settings.downloadDirectory) return;
-
-      const gameDirectory = path.join(settings.downloadDirectory, game);
-      const files = await fs.promises.readdir(gameDirectory);
-      const jsonFile = `${game}.ascendara.json`;
-      if (files.length === 1 && files[0] === jsonFile) {
-        return false;
-      }
-      return files.length > 1;
-    } catch (error) {
-      console.error("Error checking retry extract:", error);
-      return;
+      await extractionTarget(game);
+      return true;
+    } catch {
+      return false;
     }
   });
 
-  // Retry extract handler
-  ipcMain.handle("retry-extract", async (_, game, online, dlc, version) => {
-    const { dialog } = require("electron");
-    console.log(`Retrying extract: ${game}`);
-    const result = await dialog.showOpenDialog({
-      properties: ["openFile", "openDirectory"],
-    });
-
-    if (result.canceled) {
-      return null;
-    } else {
-      const settings = settingsManager.getSettings();
-      if (!settings.downloadDirectory) {
-        throw new Error("Download directory not set. Please configure it in Settings.");
+  const extractionStarts = new Set();
+  ipcMain.handle("retry-extract", async (_, game) => {
+    const running = downloadProcesses.get(game);
+    if (
+      extractionStarts.has(game) ||
+      (running &&
+        running.exitCode === null &&
+        running.signalCode === null &&
+        !running.killed)
+    ) {
+      return {
+        success: false,
+        error: "A downloader is still running for this game. Try again after it exits.",
+      };
+    }
+    extractionStarts.add(game);
+    try {
+      const { metadata, info } = await extractionTarget(game);
+      let executable = isWindows
+        ? isDev
+          ? path.resolve("binaries/AscendaraDownloader/dist/AscendaraDownloader.exe")
+          : path.join(appDirectory, "resources/AscendaraDownloader.exe")
+        : isDev
+          ? getPythonPath()
+          : path.join(process.resourcesPath, "AscendaraDownloader");
+      let args = ["--retry-extraction", metadata];
+      if (isDev && !isWindows)
+        args.unshift(
+          path.resolve("binaries/AscendaraDownloader/src/AscendaraDownloader.py")
+        );
+      if (process.platform === "linux" && !isDev) {
+        executable = await prepareDownloaderRuntime(
+          executable,
+          path.join(app.getPath("userData"), "downloader-runtime")
+        );
       }
-      const downloadDirectory = settings.downloadDirectory;
-      const gameDirectory = path.join(downloadDirectory, game);
-      const selectedPaths = result.filePaths;
-
-      selectedPaths.forEach(selectedPath => {
-        const itemName = path.basename(selectedPath);
-        const executablePath = getHelperPath("AscendaraDownloader");
-
-        const downloadProcess = spawn(executablePath, [
-          "retryfolder",
-          game,
-          online,
-          dlc,
-          version,
-          gameDirectory,
-          itemName,
-        ]);
-
-        downloadProcesses.set(game, downloadProcess);
-
-        downloadProcess.stdout.on("data", data => {
-          console.log(`stdout: ${data}`);
+      // Publish a busy state before spawning so repeated clicks cannot start a
+      // second extraction. Restore the prior state if the process cannot start.
+      const previous = info.downloadingData;
+      info.downloadingData = {
+        ...previous,
+        error: false,
+        stopped: false,
+        verifyError: null,
+        extracting: true,
+        downloading: false,
+        verifying: false,
+        awaitingRecoveryAction: false,
+        progressCompleted: "100.00",
+        progressDownloadSpeeds: "0.00 KB/s",
+        timeUntilComplete: "Preparing extraction...",
+      };
+      await fs.writeJson(metadata, info, { spaces: 4 });
+      try {
+        const child = spawn(executable, args, { stdio: "ignore", windowsHide: true });
+        downloadProcesses.set(game, child);
+        child.once("close", async code => {
+          if (downloadProcesses.get(game) === child) downloadProcesses.delete(game);
+          // An incompatible or crashed binary must not leave the UI extracting forever.
+          if (code !== 0) {
+            try {
+              const current = await fs.readJson(metadata);
+              if (
+                current.downloadingData &&
+                !current.downloadingData.error &&
+                !current.downloadingData.stopped
+              ) {
+                current.downloadingData = {
+                  ...previous,
+                  error: true,
+                  extracting: false,
+                  message: `Extraction process exited (code ${code}). Source files were retained. Check downloadmanager.log.`,
+                };
+                await fs.writeJson(metadata, current, { spaces: 4 });
+              }
+            } catch (error) {
+              console.error("Could not record extraction exit:", error);
+            }
+          }
         });
-
-        downloadProcess.stderr.on("data", data => {
-          console.error(`stderr: ${data}`);
+        await new Promise((resolve, reject) => {
+          child.once("spawn", resolve);
+          child.once("error", reject);
         });
-
-        downloadProcess.on("close", code => {
-          console.log(`child process exited with code ${code}`);
-        });
-      });
-
-      return;
+        return { success: true };
+      } catch (error) {
+        downloadProcesses.delete(game);
+        info.downloadingData = previous;
+        await fs.writeJson(metadata, info, { spaces: 4 });
+        throw error;
+      }
+    } catch (error) {
+      return { success: false, error: error.message };
+    } finally {
+      extractionStarts.delete(game);
     }
   });
 

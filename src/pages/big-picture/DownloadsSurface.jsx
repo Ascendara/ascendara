@@ -4,6 +4,7 @@ import {
   BigPictureEmptyState,
 } from "./BigPictureShell";
 import { useState } from "react";
+import { canRetryExtraction } from "@/services/extractionRetryService";
 import { toast } from "sonner";
 import {
   removeFromQueue,
@@ -23,6 +24,7 @@ export function DownloadsSurface({
   resuming,
   pause,
   resume,
+  retryExtraction,
   cancel,
   openFolder,
   onBack,
@@ -32,34 +34,45 @@ export function DownloadsSurface({
 }) {
   const [remove, setRemove] = useState(null);
   const [starting, setStarting] = useState(false);
+  const [extracting, setExtracting] = useState(new Set());
+  const retry = async game => {
+    if (extracting.has(game.game)) return;
+    setExtracting(current => new Set(current).add(game.game));
+    try {
+      await retryExtraction(game);
+      toast.success(t("downloads.extractionRecovery.retryingArchive"));
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setExtracting(current => {
+        const next = new Set(current);
+        next.delete(game.game);
+        return next;
+      });
+    }
+  };
   const rows = remove
     ? [["keep", "remove"]]
     : [
         ["browse", "start"],
-        ...downloads.map((game) => {
+        ...downloads.map(game => {
           const data = game.downloadingData || {};
           const count =
-            !data.error &&
-            !data.verifyError?.length &&
-            (data.stopped || data.downloading)
+            canRetryExtraction(game) ||
+            (!data.error &&
+              !data.verifyError?.length &&
+              (data.stopped || data.downloading))
               ? 3
               : 2;
-          return Array.from(
-            { length: count },
-            (_, i) => `download-${game.game}-${i}`,
-          );
+          return Array.from({ length: count }, (_, i) => `download-${game.game}-${i}`);
         }),
-        ...queue.map((item) => [
-          `up-${item.id}`,
-          `down-${item.id}`,
-          `remove-${item.id}`,
-        ]),
+        ...queue.map(item => [`up-${item.id}`, `down-${item.id}`, `remove-${item.id}`]),
       ];
   const { root, focus } = useSurface(
     navigation,
     rows,
     () => (remove ? setRemove(null) : onBack()),
-    active,
+    active
   );
   const start = async () => {
     if (starting) return;
@@ -69,7 +82,7 @@ export function DownloadsSurface({
       toast.info(
         item
           ? `Starting ${item.gameName}`
-          : "Queue is empty, waiting for an active download, or could not start. Check Downloads for details.",
+          : "Queue is empty, waiting for an active download, or could not start. Check Downloads for details."
       );
     } catch (error) {
       toast.error(error.message);
@@ -78,12 +91,7 @@ export function DownloadsSurface({
     }
   };
   return (
-    <BigPictureShell
-      ref={root}
-      className="bp-downloads"
-      title="Downloads"
-      focus={focus}
-    >
+    <BigPictureShell ref={root} className="bp-downloads" title="Downloads" focus={focus}>
       {remove ? (
         <>
           <h2>Remove {remove.gameName} from the queue?</h2>
@@ -122,7 +130,7 @@ export function DownloadsSurface({
             <section>
               <h2>Downloads · {downloads.length}</h2>
               <div className="space-y-6">
-                {downloads.map((game) => (
+                {downloads.map(game => (
                   <BigPictureDownloadCard
                     key={game.game}
                     game={game}
@@ -131,10 +139,11 @@ export function DownloadsSurface({
                     torboxState={torboxStates[game.torboxWebdownloadId]}
                     onPause={() => pause(game)}
                     onResume={() => resume(game)}
+                    onRetryExtraction={() => retry(game)}
                     onKill={() => cancel(game)}
                     onOpenFolder={() => openFolder(game)}
                     isStopping={stopping.has(game.game)}
-                    isResuming={resuming.has(game.game)}
+                    isResuming={resuming.has(game.game) || extracting.has(game.game)}
                     t={t}
                     buttons={buttons}
                   />

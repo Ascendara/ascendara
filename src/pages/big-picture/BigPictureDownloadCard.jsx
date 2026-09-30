@@ -1,6 +1,6 @@
 import React from "react";
-import { FolderOpen, Trash2, Play, Pause, Loader } from "lucide-react";
-
+import { FolderOpen, Trash2, Play, Pause, Loader, RefreshCcw } from "lucide-react";
+import { canRetryExtraction } from "@/services/extractionRetryService";
 
 // --- BIG PICTURE DOWNLOAD CARD ---
 const BigPictureDownloadCard = ({
@@ -11,13 +11,13 @@ const BigPictureDownloadCard = ({
   onResume,
   onKill,
   onOpenFolder,
+  onRetryExtraction,
   isStopping,
   isResuming,
   t,
   buttons,
   focus,
 }) => {
-
   const data = game.downloadingData || {};
   const progress = parseFloat(data.progressCompleted || 0);
   const speed = data.progressDownloadSpeeds || "0 KB/s";
@@ -42,6 +42,11 @@ const BigPictureDownloadCard = ({
   const hasError = data.error || (data.verifyError && data.verifyError.length > 0);
 
   const getStatus = () => {
+    if (data.awaitingRecoveryAction)
+      return {
+        text: t("downloads.extractionRecovery.archiveTitle"),
+        color: "text-amber-500",
+      };
     if (hasError) return { text: t("downloads.error"), color: "text-red-500" };
     if (isResuming) return { text: t("downloads.resuming"), color: "text-amber-500" };
     if (isStopping) return { text: t("downloads.pausing"), color: "text-amber-500" };
@@ -55,6 +60,17 @@ const BigPictureDownloadCard = ({
   const status = getStatus();
 
   const getActions = () => {
+    if (canRetryExtraction(game)) {
+      return [
+        {
+          label: t("downloads.retryExtraction"),
+          icon: RefreshCcw,
+          action: onRetryExtraction,
+        },
+        { label: t("downloads.openFolder"), icon: FolderOpen, action: onOpenFolder },
+        { label: t("downloads.kill"), icon: Trash2, action: onKill, danger: true },
+      ];
+    }
     if (hasError) {
       return [
         { label: t("downloads.openFolder"), icon: FolderOpen, action: onOpenFolder },
@@ -200,11 +216,20 @@ const BigPictureDownloadCard = ({
       )}
 
       {/* Error Message */}
+      {data.awaitingRecoveryAction && (
+        <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+          <p>
+            {data.recoverableError?.message ||
+              t("downloads.extractionRecovery.description")}
+          </p>
+        </div>
+      )}
       {hasError && (
         <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3">
           <p className="text-sm text-red-500">
-            {data.error ||
-              (data.verifyError && data.verifyError[0]) ||
+            {data.message ||
+              data.recoverableError?.message ||
+              (data.verifyError?.length && JSON.stringify(data.verifyError[0])) ||
               t("downloads.unknownError")}
           </p>
         </div>
@@ -220,8 +245,8 @@ const BigPictureDownloadCard = ({
             disabled={isStopping || isResuming}
             className={`bp-action flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
               action.danger
-                  ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
-                  : "bg-primary/20 text-primary hover:bg-primary/30"
+                ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                : "bg-primary/20 text-primary hover:bg-primary/30"
             } ${isStopping || isResuming ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <action.icon className="h-4 w-4" />

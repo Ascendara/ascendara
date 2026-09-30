@@ -38,7 +38,8 @@ contextBridge.exposeInMainWorld("electron", {
     restore: (id, data) => ipcRenderer.invoke("retro-restore", id, data),
     recoveryFolder: () => ipcRenderer.invoke("retro-recovery-folder"),
     cards: id => ipcRenderer.invoke("retro-cards", id),
-    cardAction: (id, original, name, duplicate) => ipcRenderer.invoke("retro-card-action", id, original, name, duplicate),
+    cardAction: (id, original, name, duplicate) =>
+      ipcRenderer.invoke("retro-card-action", id, original, name, duplicate),
     onChanged: callback => preloadIpc.subscribe("retro-changed", callback),
   },
   //===========================================================================
@@ -146,8 +147,7 @@ contextBridge.exposeInMainWorld("electron", {
   timestampTime: () => ipcRenderer.invoke("timestamp-time"),
 
   // External Source JSON (user-provided bucket JSON stored in <localIndex>/external-sources)
-  getExternalSourcesDirectory: () =>
-    ipcRenderer.invoke("get-external-sources-directory"),
+  getExternalSourcesDirectory: () => ipcRenderer.invoke("get-external-sources-directory"),
   setExternalSourceJson: (sourceId, data) =>
     ipcRenderer.invoke("set-external-source-json", sourceId, data),
   getExternalSourceJson: sourceId =>
@@ -248,10 +248,8 @@ contextBridge.exposeInMainWorld("electron", {
     preloadIpc.subscribe("steamrip-cookie-received", callback, {
       selectArgs: args => [args[0]],
     }),
-  offLocalRefreshProgress: () =>
-    preloadIpc.removeAllListeners("local-refresh-progress"),
-  offLocalRefreshComplete: () =>
-    preloadIpc.removeAllListeners("local-refresh-complete"),
+  offLocalRefreshProgress: () => preloadIpc.removeAllListeners("local-refresh-progress"),
+  offLocalRefreshComplete: () => preloadIpc.removeAllListeners("local-refresh-complete"),
   offLocalRefreshError: () => preloadIpc.removeAllListeners("local-refresh-error"),
   offLocalRefreshCookieNeeded: () =>
     preloadIpc.removeAllListeners("local-refresh-cookie-needed"),
@@ -331,9 +329,11 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("rename-existing-game-directory", game, additionalDirIndex),
   verifyGame: game => ipcRenderer.invoke("verify-game", game),
   getLauncherImportState: () => ipcRenderer.invoke("get-launcher-import-state"),
-  startLauncherImport: launchers => ipcRenderer.invoke("start-launcher-import", launchers),
+  startLauncherImport: launchers =>
+    ipcRenderer.invoke("start-launcher-import", launchers),
   cancelLauncherImport: () => ipcRenderer.invoke("cancel-launcher-import"),
-  onLauncherImportProgress: callback => preloadIpc.subscribe("launcher-import-progress", callback),
+  onLauncherImportProgress: callback =>
+    preloadIpc.subscribe("launcher-import-progress", callback),
 
   // Game Cover/Image
   updateGameCover: (gameName, imgID, imageData) =>
@@ -369,8 +369,7 @@ contextBridge.exposeInMainWorld("electron", {
 
   // Game Shortcuts & Executables
   createGameShortcut: game => ipcRenderer.invoke("create-game-shortcut", game),
-  createStartMenuShortcut: game =>
-    ipcRenderer.invoke("create-start-menu-shortcut", game),
+  createStartMenuShortcut: game => ipcRenderer.invoke("create-start-menu-shortcut", game),
   modifyGameExecutable: (game, executable) =>
     ipcRenderer.invoke("modify-game-executable", game, executable),
   getGameExecutables: (game, isCustom) =>
@@ -493,8 +492,7 @@ contextBridge.exposeInMainWorld("electron", {
   retryDownload: (link, game, online, dlc, version) =>
     ipcRenderer.invoke("retry-download", link, game, online, dlc, version),
   checkRetryExtract: game => ipcRenderer.invoke("check-retry-extract", game),
-  retryExtract: (game, online, dlc, version) =>
-    ipcRenderer.invoke("retry-extract", game, online, dlc, version),
+  retryExtract: game => ipcRenderer.invoke("retry-extract", game),
   extractionRecoveryAction: (game, requestId, action) =>
     ipcRenderer.invoke("extraction-recovery-action", game, requestId, action),
   downloadItem: url => ipcRenderer.invoke("download-item", url),
@@ -597,8 +595,7 @@ contextBridge.exposeInMainWorld("electron", {
     }),
   removeUpdateAvailableListener: callback =>
     preloadIpc.unsubscribe("update-available", callback),
-  removeUpdateReadyListener: callback =>
-    preloadIpc.unsubscribe("update-ready", callback),
+  removeUpdateReadyListener: callback => preloadIpc.unsubscribe("update-ready", callback),
   onBranchSwitchProgress: callback =>
     preloadIpc.subscribe("branch-switch-progress", callback, {
       selectArgs: args => [args[0]],
@@ -689,8 +686,7 @@ contextBridge.exposeInMainWorld("electron", {
     createRecoveryPoint: (reason, appVersion) =>
       ipcRenderer.invoke("create-settings-recovery-point", reason, appVersion),
     listRecoveryPoints: () => ipcRenderer.invoke("list-settings-recovery-points"),
-    restoreRecoveryPoint: id =>
-      ipcRenderer.invoke("restore-settings-recovery-point", id),
+    restoreRecoveryPoint: id => ipcRenderer.invoke("restore-settings-recovery-point", id),
     listOfficialRollbackVersions: () =>
       ipcRenderer.invoke("list-official-rollback-versions"),
     rollbackAscendaraVersion: version =>

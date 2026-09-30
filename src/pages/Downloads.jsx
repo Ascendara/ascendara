@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
 import {
   getCachedDownloadData,
   clearCachedDownloadData,
@@ -18,7 +19,47 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Loader, FolderOpen, MoreVertical, RefreshCcw, Trash2, AlertCircle, AlertTriangle, Clock, Clock1, Clock2, Clock3, Clock4, Clock5, Clock6, Clock7, Clock8, Clock9, Clock10, Clock11, Clock12, ExternalLink, CircleCheck, Coffee, RefreshCw, Zap, TrendingUp, Activity, Pause, Package, CheckCircle2, XCircle, ArrowDownToLine, Wifi, Play, FileText, ScrollText, ShieldAlert, Copy, FolderCog } from "lucide-react";
+import {
+  Loader,
+  FolderOpen,
+  MoreVertical,
+  RefreshCcw,
+  Trash2,
+  AlertCircle,
+  AlertTriangle,
+  Clock,
+  Clock1,
+  Clock2,
+  Clock3,
+  Clock4,
+  Clock5,
+  Clock6,
+  Clock7,
+  Clock8,
+  Clock9,
+  Clock10,
+  Clock11,
+  Clock12,
+  ExternalLink,
+  CircleCheck,
+  Coffee,
+  RefreshCw,
+  Zap,
+  TrendingUp,
+  Activity,
+  Pause,
+  Package,
+  CheckCircle2,
+  XCircle,
+  ArrowDownToLine,
+  Wifi,
+  Play,
+  FileText,
+  ScrollText,
+  ShieldAlert,
+  Copy,
+  FolderCog,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,12 +70,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -597,21 +633,21 @@ const Downloads = () => {
   useEffect(() => {
     let animationFrameId;
     let lastTime = performance.now();
-    
-    const animate = (currentTime) => {
+
+    const animate = currentTime => {
       const deltaTime = currentTime - lastTime;
-      
+
       // Update approximately 30 times per second for smooth animation
       if (deltaTime >= 33) {
         lastTime = currentTime;
         animationIndexRef.current += 1;
-        
+
         setSpeedHistory(prevHistory => {
           // Smoothly interpolate between current and target speed
           const currentSpeed = lastSpeedRef.current;
           const targetSpeed = targetSpeedRef.current;
           const difference = Math.abs(targetSpeed - currentSpeed);
-          
+
           // Adaptive interpolation: slower for large changes, faster for small changes
           // This prevents sudden jumps when speed changes dramatically
           let interpolationFactor;
@@ -624,19 +660,20 @@ const Downloads = () => {
           } else {
             interpolationFactor = 0.2; // Faster for tiny changes
           }
-          
-          let newSpeed = currentSpeed + (targetSpeed - currentSpeed) * interpolationFactor;
-          
+
+          let newSpeed =
+            currentSpeed + (targetSpeed - currentSpeed) * interpolationFactor;
+
           // Clamp to prevent negative values or very small numbers that cause glitches
           newSpeed = Math.max(0, newSpeed);
-          
+
           // If very close to target (within 0.01), snap to target to prevent endless interpolation
           if (Math.abs(newSpeed - targetSpeed) < 0.01) {
             newSpeed = targetSpeed;
           }
-          
+
           lastSpeedRef.current = newSpeed;
-          
+
           // Shift all values left and add new interpolated value
           const newHistory = prevHistory.map((item, i) => {
             if (i < prevHistory.length - 1) {
@@ -645,18 +682,17 @@ const Downloads = () => {
               return { index: i, speed: newSpeed };
             }
           });
-          
+
           return newHistory;
         });
       }
-      
+
       animationFrameId = requestAnimationFrame(animate);
     };
-    
+
     animationFrameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrameId);
   }, []);
-
 
   // Poll queued downloads
   useEffect(() => {
@@ -726,9 +762,7 @@ const Downloads = () => {
       }
       setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
       toast.success(
-        deleteFiles
-          ? t("downloads.killSuccess")
-          : t("downloads.killSuccessKeepFiles")
+        deleteFiles ? t("downloads.killSuccess") : t("downloads.killSuccessKeepFiles")
       );
 
       // Wait for the download to be fully removed from filesystem
@@ -909,7 +943,7 @@ const Downloads = () => {
             <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/5 blur-3xl" />
             <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
 
-            <div className="relative flex flex-col p-5 gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative flex flex-col gap-6 p-5 lg:flex-row lg:items-center lg:justify-between">
               {/* Title and status */}
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
@@ -1027,8 +1061,8 @@ const Downloads = () => {
                       dot={false}
                       baseValue={0}
                     />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
               <p className="mt-2 px-5 text-center text-xs text-muted-foreground">
                 {t("downloads.speedHistory")}
@@ -1358,6 +1392,18 @@ const DownloadCard = ({
   const [installerLaunched, setInstallerLaunched] = useState(false);
   const [isFinishingInstall, setIsFinishingInstall] = useState(false);
   const [isSubmittingRecovery, setIsSubmittingRecovery] = useState(false);
+  const handleRetryExtraction = async () => {
+    if (isSubmittingRecovery) return;
+    setIsSubmittingRecovery(true);
+    try {
+      await retryExtraction(game);
+      toast.success(t("downloads.extractionRecovery.retryingArchive"));
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsSubmittingRecovery(false);
+    }
+  };
   const [showInstallLocationDialog, setShowInstallLocationDialog] = useState(false);
   const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
   const [heroImage, setHeroImage] = useState(null);
@@ -1398,7 +1444,9 @@ const DownloadCard = ({
     if (!gameName) return;
     window.electron
       .getGameImage(gameName, "hero")
-      .then(b64 => { if (b64) setHeroImage(`data:image/jpeg;base64,${b64}`); })
+      .then(b64 => {
+        if (b64) setHeroImage(`data:image/jpeg;base64,${b64}`);
+      })
       .catch(() => {});
   }, [game?.game]);
 
@@ -1536,7 +1584,9 @@ const DownloadCard = ({
         action
       );
       if (!result?.success) {
-        throw new Error(result?.error || t("downloads.extractionRecovery.continueFailed"));
+        throw new Error(
+          result?.error || t("downloads.extractionRecovery.continueFailed")
+        );
       }
       if (action === "retry") {
         toast.success(
@@ -1605,8 +1655,7 @@ const DownloadCard = ({
       const result = await window.electron.completeManualInstall(game.game);
       if (!result.success) throw new Error(result.error);
       toast.success(t("downloads.installComplete") || "Installation Complete", {
-        description:
-          t("downloads.installCompleteDesc") || "Your game is ready to play",
+        description: t("downloads.installCompleteDesc") || "Your game is ready to play",
       });
     } catch (error) {
       console.error("Failed to finalize installation:", error);
@@ -1668,6 +1717,9 @@ const DownloadCard = ({
         "```",
         getErrorMessage() || "Unknown error",
         "```",
+        ...(downloadingData.message && downloadingData.message !== getErrorMessage()
+          ? ["", "**Original Error**", "```", downloadingData.message, "```"]
+          : []),
         "",
         "**Download State**",
         `• Progress: ${downloadingData.progressCompleted || "0"}%`,
@@ -1724,6 +1776,12 @@ const DownloadCard = ({
   const getErrorMessage = () => {
     const msg = downloadingData.message;
     if (!msg) return null;
+
+    if (msg.trim().toLowerCase() === "conflict")
+      return t(
+        "downloads.downloadConflictError",
+        "The download could not start (Conflict). Refresh the download link or choose another source. If this continues, check downloadmanager.log for the original error."
+      );
 
     if (msg.includes("content_type_error")) return t("downloads.contentTypeError");
     if (msg.includes("no_files_error")) return t("downloads.noFilesError");
@@ -1799,17 +1857,19 @@ const DownloadCard = ({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-center gap-3">
-
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-lg font-semibold text-foreground">
                   {game.game}
                 </h3>
                 <div className="mt-0.5 flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{game.size}</span>
-                  {!hasError && !isStopped && !hasVerifyError && !isPendingManualInstall && (
-                    <StatusBadge status={getStatus()} t={t} />
+                  {!hasError &&
+                    !isStopped &&
+                    !hasVerifyError &&
+                    !isPendingManualInstall && <StatusBadge status={getStatus()} t={t} />}
+                  {isPendingManualInstall && (
+                    <StatusBadge status="actionRequired" t={t} />
                   )}
-                  {isPendingManualInstall && <StatusBadge status="actionRequired" t={t} />}
                 </div>
               </div>
             </div>
@@ -1831,6 +1891,16 @@ const DownloadCard = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              {canRetryExtraction(game) && (
+                <DropdownMenuItem
+                  onClick={handleRetryExtraction}
+                  disabled={isSubmittingRecovery}
+                  className="gap-2"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  {t("downloads.retryExtraction")}
+                </DropdownMenuItem>
+              )}
               {isStopped ? (
                 <>
                   <DropdownMenuItem onClick={() => onResume(game)} className="gap-2">
@@ -1892,77 +1962,88 @@ const DownloadCard = ({
         <div className="mt-4">
           {isAwaitingRecovery &&
             (recoverableError?.type === "missingExtractedFiles" || isArchiveRecovery) && (
-            <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-                  <ShieldAlert className="h-5 w-5 text-amber-600" />
+              <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                    <ShieldAlert className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-amber-600">
+                      {t(
+                        isArchiveRecovery
+                          ? "downloads.extractionRecovery.archiveTitle"
+                          : "downloads.extractionRecovery.title"
+                      )}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        isArchiveRecovery
+                          ? "downloads.extractionRecovery.archiveDescription"
+                          : "downloads.extractionRecovery.description"
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-amber-600">
-                    {t(isArchiveRecovery
-                      ? "downloads.extractionRecovery.archiveTitle"
-                      : "downloads.extractionRecovery.title")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t(isArchiveRecovery
-                      ? "downloads.extractionRecovery.archiveDescription"
-                      : "downloads.extractionRecovery.description")}
-                  </p>
+                <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/50 p-2 text-xs">
+                  {isArchiveRecovery && (
+                    <div className="space-y-1 break-words text-muted-foreground">
+                      <p className="font-medium">{recoverableError.archive}</p>
+                      <p>{recoverableError.message}</p>
+                      {recoverableError.extractionError !== recoverableError.message && (
+                        <p>{recoverableError.extractionError}</p>
+                      )}
+                    </div>
+                  )}
+                  {(recoverableError.files || []).map((error, index) => (
+                    <div
+                      key={`${error.file}-${index}`}
+                      className="py-0.5 text-muted-foreground"
+                    >
+                      <span className="font-medium">{error.file}</span>
+                      <span className="ml-2">{error.error}</span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/50 p-2 text-xs">
-                {isArchiveRecovery && (
-                  <div className="space-y-1 break-words text-muted-foreground">
-                    <p className="font-medium">{recoverableError.archive}</p>
-                    <p>{recoverableError.message}</p>
-                    {recoverableError.extractionError !== recoverableError.message && (
-                      <p>{recoverableError.extractionError}</p>
+                <div className="flex flex-wrap gap-2">
+                  {!isArchiveRecovery &&
+                    window.electron.getPlatform() === "win32" &&
+                    !settings.excludeFolders && (
+                      <Button
+                        onClick={() => handleExtractionRecovery(true)}
+                        disabled={isSubmittingRecovery}
+                        className="gap-2 text-secondary"
+                      >
+                        {isSubmittingRecovery ? (
+                          <Loader className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ShieldAlert className="h-4 w-4" />
+                        )}
+                        {t("downloads.extractionRecovery.enableProtectionAndRetry")}
+                      </Button>
                     )}
-                  </div>
-                )}
-                {(recoverableError.files || []).map((error, index) => (
-                  <div key={`${error.file}-${index}`} className="py-0.5 text-muted-foreground">
-                    <span className="font-medium">{error.file}</span>
-                    <span className="ml-2">{error.error}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {!isArchiveRecovery && window.electron.getPlatform() === "win32" && !settings.excludeFolders && (
                   <Button
-                    onClick={() => handleExtractionRecovery(true)}
+                    variant="outline"
+                    onClick={() => handleExtractionRecovery(false)}
                     disabled={isSubmittingRecovery}
-                    className="gap-2 text-secondary"
+                    className="gap-2"
                   >
-                    {isSubmittingRecovery ? (
-                      <Loader className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ShieldAlert className="h-4 w-4" />
+                    <RefreshCcw className="h-4 w-4" />
+                    {t(
+                      isArchiveRecovery
+                        ? "downloads.retryExtraction"
+                        : "downloads.extractionRecovery.retryMissingFiles"
                     )}
-                    {t("downloads.extractionRecovery.enableProtectionAndRetry")}
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={() => handleExtractionRecovery(false)}
-                  disabled={isSubmittingRecovery}
-                  className="gap-2"
-                >
-                  <RefreshCcw className="h-4 w-4" />
-                  {t(isArchiveRecovery
-                    ? "downloads.retryExtraction"
-                    : "downloads.extractionRecovery.retryMissingFiles")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleExtractionRecovery(false, "cancel")}
-                  disabled={isSubmittingRecovery}
-                >
-                  {t("common.cancel")}
-                </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleExtractionRecovery(false, "cancel")}
+                    disabled={isSubmittingRecovery}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Pending Manual Install State */}
           {isPendingManualInstall && !installerLaunched && (
@@ -2218,11 +2299,16 @@ const DownloadCard = ({
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={onRetry}
+                  onClick={canRetryExtraction(game) ? handleRetryExtraction : onRetry}
+                  disabled={isSubmittingRecovery}
                   className="gap-2 text-secondary"
                 >
                   <RefreshCcw className="h-4 w-4" />
-                  {t("common.retry")}
+                  {t(
+                    canRetryExtraction(game)
+                      ? "downloads.retryExtraction"
+                      : "common.retry"
+                  )}
                 </Button>
               </div>
             </div>
@@ -2330,7 +2416,9 @@ const DownloadCard = ({
                       </div>
                       {downloadingData.extractionProgress.currentFile ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("downloads.currentFile", "Current file")}</span>
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                            {t("downloads.currentFile", "Current file")}
+                          </span>
                           <div className="flex items-center gap-1.5 rounded-md bg-muted/70 px-2 py-0.5">
                             <FileText className="h-3 w-3 text-muted-foreground" />
                             <span
@@ -2396,20 +2484,23 @@ const DownloadCard = ({
 
       {/* Log Viewer Dialog */}
       <Dialog open={logDialogOpen} onOpenChange={setLogDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogContent className="max-h-[80vh] max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ScrollText className="h-5 w-5" />
               {t("downloads.logViewerTitle")}
             </DialogTitle>
           </DialogHeader>
-          <div ref={logScrollRef} className="h-[60vh] w-full overflow-y-auto rounded-md border bg-muted/30 p-4">
+          <div
+            ref={logScrollRef}
+            className="h-[60vh] w-full overflow-y-auto rounded-md border bg-muted/30 p-4"
+          >
             {logLoading ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex h-full items-center justify-center">
                 <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
+              <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground">
                 {logContent || t("downloads.noLogContent")}
               </pre>
             )}

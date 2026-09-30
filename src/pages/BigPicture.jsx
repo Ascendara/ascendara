@@ -1,4 +1,5 @@
 import { PageNavigationContext } from "./big-picture/PageHeader";
+import { retryExtraction } from "@/services/extractionRetryService";
 import { Toaster, toast } from "sonner";
 import { Search, Coffee, ListEnd, X, Gamepad2 } from "lucide-react";
 import { removeFromQueue, addToQueue } from "@/services/downloadQueueService";
@@ -253,25 +254,159 @@ function BigPicture() {
       <div
         className={`relative flex w-full flex-1 items-center pb-16 transition-all duration-200 ${isMenuOpen ? "scale-95 opacity-50 blur-sm" : ""}`}
       >
-        <PageNavigationContext.Provider value={{view, changeView, pageFocusRequest, search: () => setIsKeyboardOpen(true), downloadCount: downloadingGames.length + queuedDownloads.length, buttons, hideChrome: installedGameView}}>
-        {view === "indexes" && <IndexSurface navigation={surfaceNavigation} onBack={() => { refreshStore(); changeView("store"); }} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
-        {view === "power" && <PowerSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} onDesktop={() => navigate("/")} />}
-        {view === "carousel" && <HomeDashboard navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView && !showControllerSettings && !isKeyboardOpen && !showExitBigPictureDialog} search={() => setIsKeyboardOpen(true)} openMenu={() => setIsMenuOpen(true)} pause={handlePauseDownload} resume={handleResumeDownload} stopping={stoppingDownloads} resuming={resumingDownloads} playGame={game => handleShowInstalledGameDetails(game, true)} games={allGames} downloads={downloadingGames} queue={queuedDownloads} discover={filteredStoreGames} openGame={handleShowInstalledGameDetails} openStore={game => handleSelectStoreGame(game, 0)} changeView={changeView} openSettings={() => changeView("preferences")} />}
-        {view === "library" && <LibrarySurface navigation={surfaceNavigation} active={!isMenuOpen && !installedGameView} games={allGames} openGame={handleShowInstalledGameDetails} refresh={refreshLibrary} onBack={() => changeView("carousel")} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
-        {view === "retro" && <RetroSurface navigation={surfaceNavigation} active={!isMenuOpen} onBack={() => changeView("carousel")} />}
-        {view === "cloud" && <CloudSurface navigation={surfaceNavigation} inputLock={surfaceInputLock} active={!isMenuOpen && !isKeyboardOpen && !showExitBigPictureDialog && !showControllerSettings} games={allGames} refreshLibrary={refreshLibrary} onBack={() => changeView("carousel")} onAccount={() => navigate("/ascend")} t={t} controllerType={controllerType} keyboardLayout={keyboardLayout} />}
-        {["preferences", "profile"].includes(view) && <PreferencesSurface key={view} navigation={surfaceNavigation} active={!isMenuOpen && !showControllerSettings} profile={view === "profile"} onBack={() => changeView("carousel")} openController={() => setShowControllerSettings(true)} openIndexes={() => changeView("indexes")} />}
+        <PageNavigationContext.Provider
+          value={{
+            view,
+            changeView,
+            pageFocusRequest,
+            search: () => setIsKeyboardOpen(true),
+            downloadCount: downloadingGames.length + queuedDownloads.length,
+            buttons,
+            hideChrome: installedGameView,
+          }}
+        >
+          {view === "indexes" && (
+            <IndexSurface
+              navigation={surfaceNavigation}
+              onBack={() => {
+                refreshStore();
+                changeView("store");
+              }}
+              t={t}
+              controllerType={controllerType}
+              keyboardLayout={keyboardLayout}
+            />
+          )}
+          {view === "power" && (
+            <PowerSurface
+              navigation={surfaceNavigation}
+              active={!isMenuOpen}
+              onBack={() => changeView("carousel")}
+              onDesktop={() => navigate("/")}
+            />
+          )}
+          {view === "carousel" && (
+            <HomeDashboard
+              navigation={surfaceNavigation}
+              active={
+                !isMenuOpen &&
+                !installedGameView &&
+                !showControllerSettings &&
+                !isKeyboardOpen &&
+                !showExitBigPictureDialog
+              }
+              search={() => setIsKeyboardOpen(true)}
+              openMenu={() => setIsMenuOpen(true)}
+              pause={handlePauseDownload}
+              resume={handleResumeDownload}
+              stopping={stoppingDownloads}
+              resuming={resumingDownloads}
+              playGame={game => handleShowInstalledGameDetails(game, true)}
+              games={allGames}
+              downloads={downloadingGames}
+              queue={queuedDownloads}
+              discover={filteredStoreGames}
+              openGame={handleShowInstalledGameDetails}
+              openStore={game => handleSelectStoreGame(game, 0)}
+              changeView={changeView}
+              openSettings={() => changeView("preferences")}
+            />
+          )}
+          {view === "library" && (
+            <LibrarySurface
+              navigation={surfaceNavigation}
+              active={!isMenuOpen && !installedGameView}
+              games={allGames}
+              openGame={handleShowInstalledGameDetails}
+              refresh={refreshLibrary}
+              onBack={() => changeView("carousel")}
+              t={t}
+              controllerType={controllerType}
+              keyboardLayout={keyboardLayout}
+            />
+          )}
+          {view === "retro" && (
+            <RetroSurface
+              navigation={surfaceNavigation}
+              active={!isMenuOpen}
+              onBack={() => changeView("carousel")}
+            />
+          )}
+          {view === "cloud" && (
+            <CloudSurface
+              navigation={surfaceNavigation}
+              inputLock={surfaceInputLock}
+              active={
+                !isMenuOpen &&
+                !isKeyboardOpen &&
+                !showExitBigPictureDialog &&
+                !showControllerSettings
+              }
+              games={allGames}
+              refreshLibrary={refreshLibrary}
+              onBack={() => changeView("carousel")}
+              onAccount={() => navigate("/ascend")}
+              t={t}
+              controllerType={controllerType}
+              keyboardLayout={keyboardLayout}
+            />
+          )}
+          {["preferences", "profile"].includes(view) && (
+            <PreferencesSurface
+              key={view}
+              navigation={surfaceNavigation}
+              active={!isMenuOpen && !showControllerSettings}
+              profile={view === "profile"}
+              onBack={() => changeView("carousel")}
+              openController={() => setShowControllerSettings(true)}
+              openIndexes={() => changeView("indexes")}
+            />
+          )}
 
-        {view === "store" && <BrowseSurface navigation={surfaceNavigation} active={!isMenuOpen && !isKeyboardOpen} games={filteredStoreGames} loading={storeLoading} query={storeSearchQuery} search={() => setIsKeyboardOpen(true)} clearSearch={() => setStoreSearchQuery("")} sort={selectedSort} setSort={setSelectedSort} openGame={handleSelectStoreGame} onBack={() => changeView("carousel")} retry={refreshStore} openIndexes={() => changeView("indexes")} />}
+          {view === "store" && (
+            <BrowseSurface
+              navigation={surfaceNavigation}
+              active={!isMenuOpen && !isKeyboardOpen}
+              games={filteredStoreGames}
+              loading={storeLoading}
+              query={storeSearchQuery}
+              search={() => setIsKeyboardOpen(true)}
+              clearSearch={() => setStoreSearchQuery("")}
+              sort={selectedSort}
+              setSort={setSelectedSort}
+              openGame={handleSelectStoreGame}
+              onBack={() => changeView("carousel")}
+              retry={refreshStore}
+              openIndexes={() => changeView("indexes")}
+            />
+          )}
 
-        {view === "downloads" && <DownloadsSurface navigation={surfaceNavigation} active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog} downloads={downloadingGames} queue={queuedDownloads} torboxStates={torboxStates} stopping={stoppingDownloads} resuming={resumingDownloads} pause={handlePauseDownload} resume={handleResumeDownload} cancel={handleKillDownload} openFolder={handleOpenFolder} onBack={() => changeView("carousel")} browse={() => changeView("store")} t={t} buttons={buttons} />}
-
+          {view === "downloads" && (
+            <DownloadsSurface
+              navigation={surfaceNavigation}
+              active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog}
+              downloads={downloadingGames}
+              queue={queuedDownloads}
+              torboxStates={torboxStates}
+              stopping={stoppingDownloads}
+              resuming={resumingDownloads}
+              pause={handlePauseDownload}
+              resume={handleResumeDownload}
+              retryExtraction={retryExtraction}
+              cancel={handleKillDownload}
+              openFolder={handleOpenFolder}
+              onBack={() => changeView("carousel")}
+              browse={() => changeView("store")}
+              t={t}
+              buttons={buttons}
+            />
+          )}
         </PageNavigationContext.Provider>
 
         {view === "details" && selectedStoreGame && (
           <div
             className={`absolute inset-0 transition-all duration-300 ease-out ${
-              isTransitioning ? "opacity-0 scale-95" : "opacity-100 scale-100"
+              isTransitioning ? "scale-95 opacity-0" : "scale-100 opacity-100"
             }`}
           >
             <GameDetailsView
@@ -308,7 +443,7 @@ function BigPicture() {
         {installedGameView && selectedInstalledGame && (
           <div
             className={`absolute inset-0 transition-all duration-300 ease-out ${
-              isTransitioning ? "opacity-0 scale-95" : "opacity-100 scale-100"
+              isTransitioning ? "scale-95 opacity-0" : "scale-100 opacity-100"
             }`}
           >
             <InstalledGameDetailsView
@@ -445,7 +580,7 @@ function BigPicture() {
               </h1>
               <div className="flex items-center gap-3">
                 <div className="h-px w-24 bg-gradient-to-r from-transparent to-primary/50" />
-                <p className="text-xl text-muted-foreground uppercase tracking-widest">
+                <p className="text-xl uppercase tracking-widest text-muted-foreground">
                   {t("bigPicture.bigPictureMode") || "Big Picture Mode"}
                 </p>
                 <div className="h-px w-24 bg-gradient-to-l from-transparent to-primary/50" />
