@@ -493,8 +493,7 @@ contextBridge.exposeInMainWorld("electron", {
   retryDownload: (link, game, online, dlc, version) =>
     ipcRenderer.invoke("retry-download", link, game, online, dlc, version),
   checkRetryExtract: game => ipcRenderer.invoke("check-retry-extract", game),
-  retryExtract: (game, online, dlc, version) =>
-    ipcRenderer.invoke("retry-extract", game, online, dlc, version),
+  retryExtract: game => ipcRenderer.invoke("retry-extract", game),
   extractionRecoveryAction: (game, requestId, action) =>
     ipcRenderer.invoke("extraction-recovery-action", game, requestId, action),
   downloadItem: url => ipcRenderer.invoke("download-item", url),

@@ -228,7 +228,10 @@ class IncompleteArchiveOutput(RuntimeError):
 
 
 class ExtractionRecoveryCancelled(RuntimeError):
-    pass
+    def __init__(self, message, failure=None):
+        if failure is not None:
+            message += f'. Extraction failure: {failure}'
+        super().__init__(message)
 
 
 class SmoothETA:
@@ -830,7 +833,9 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
                     action = connection.recv()
                     break
             if action != 'retry':
-                raise ExtractionRecoveryCancelled('Extraction recovery cancelled; the downloaded source files were retained')
+                raise ExtractionRecoveryCancelled(
+                    'Extraction recovery cancelled; the downloaded source files were retained',
+                    f'Missing or incomplete extracted files: {errors[0]}')
             state.update(name='Recovering missing files...', percent=0)
             report(True)
             failed_names = [error['file'] for error in errors]
@@ -1335,7 +1340,7 @@ class AscendaraDownloader:
                 }, force=True)
                 if action != 'retry':
                     raise ExtractionRecoveryCancelled(
-                        'Extraction recovery cancelled; the downloaded source files were retained') from exc
+                        'Extraction recovery cancelled; the downloaded source files were retained', exc) from exc
         logging.info(f"[AscendaraDownloader] Detected file type: {filetype}")
         
         ext_map = {'zip': '.zip', 'rar': '.rar', '7z': '.7z', 'exe': '.exe'}
@@ -1821,6 +1826,17 @@ class AscendaraDownloader:
             allow_sleep()
 
     def _extract_files(self, archive_path=None, loose_files=None, cleanup_folder=None):
+        if archive_path is not None:
+            archives = list(archive_path) if isinstance(archive_path, (list, tuple)) else [archive_path]
+            self.game_info['extractionSources'] = {
+                'archives': [os.path.relpath(p, self.download_dir) for p in archives],
+                'loose': [dict(filename=i['filename'], size=i['size'],
+                               source=os.path.relpath(i['source'], self.download_dir))
+                          for i in (loose_files or [])],
+                'cleanup': os.path.relpath(cleanup_folder, self.download_dir) if cleanup_folder else None,
+                'updating': self.updateFlow,
+            }
+            safe_write_json(self.game_info_path, self.game_info)
         # Restart the whole staging transaction: earlier archives and nested
         # wrappers may have contributed files to the same payload directory.
         for attempt in range(2):
@@ -1844,7 +1860,7 @@ class AscendaraDownloader:
                     })
                     if action != 'retry':
                         raise ExtractionRecoveryCancelled(
-                            'Extraction recovery cancelled; the downloaded source files were retained') from exc
+                            'Extraction recovery cancelled; the downloaded source files were retained', exc) from exc
                 self._check_cancelled()
                 logging.warning('Retrying extraction from retained archives in a fresh stage: %s', exc)
                 data = self.game_info['downloadingData']
@@ -1894,7 +1910,7 @@ class AscendaraDownloader:
 
     def _extract_archive_with_recovery(self, archive, payload, stage, started):
         """Keep the stage alive while the user retries only the failed archive."""
-        repair_attempted = False
+        repair_attempted = getattr(self, '_local_extraction_only', False)
         manual_retry = False
         while True:
             self._check_cancelled()
@@ -1928,7 +1944,8 @@ class AscendaraDownloader:
                 }, force=True)
                 if action != 'retry':
                     raise ExtractionRecoveryCancelled(
-                        'Extraction recovery cancelled; the downloaded source files were retained') from failure
+                        'Extraction recovery cancelled; the downloaded source files were retained',
+                        f'{exc}; recovery failed: {failure}' if failure is not exc else exc) from failure
                 manual_retry = True
                 data = self.game_info['downloadingData']
                 data.update(downloading=False, extracting=True, verifying=False,
@@ -2055,6 +2072,7 @@ class AscendaraDownloader:
                           self.download_dir, empty_only=True)
         # Publish completion only after cleanup, before sleep/shutdown actions.
         del self.game_info['downloadingData']
+        self.game_info.pop('extractionSources', None)
         safe_write_json(self.game_info_path, self.game_info)
         self._handle_post_download_behavior()
 
@@ -2371,6 +2389,70 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
             _native_error(code, 'Closing archive')
 
 
+def retry_local_extraction(metadata_path):
+    """Restart staging from retained sources without entering any network path."""
+    metadata_path = os.path.abspath(metadata_path)
+    with open(metadata_path, encoding='utf-8') as stream:
+        info = json.load(stream)
+    worker = AscendaraDownloader.__new__(AscendaraDownloader)
+    worker.game_info, worker.game_info_path = info, metadata_path
+    worker.download_dir = os.path.dirname(metadata_path)
+    worker.game = info['game']
+    worker.withNotification = None
+    worker._local_extraction_only = True
+    plan = info.get('extractionSources')
+    worker.updateFlow = bool((plan or {}).get('updating', info.get('downloadingData', {}).get('updating', False)))
+    prevent_sleep()
+    try:
+        def source_path(name):
+            target = _member_path(worker.download_dir, name)
+            _check_path(worker.download_dir, target)
+            if not os.path.isfile(target):
+                raise FileNotFoundError(f'Retained source is missing: {name}')
+            return target
+        if plan:
+            archives = [source_path(name) for name in plan['archives']]
+            loose = [dict(item, source=source_path(item['source'])) for item in plan.get('loose', [])]
+        else:
+            # Older downloads did not record a source manifest. Search only the
+            # download cache and top-level archives, never installed subfolders.
+            archives, loose = [], []
+            roots = [worker.download_dir]
+            cache = os.path.join(worker.download_dir, '.ascendara-downloads')
+            if os.path.isdir(cache):
+                roots.extend(root for root, dirs, files in os.walk(cache)
+                             if '.ascendara-receipts' not in root.split(os.sep))
+            for root in roots:
+                for name in os.listdir(root):
+                    if name.lower().endswith(('.zip', '.rar', '.7z')):
+                        archives.append(source_path(os.path.relpath(os.path.join(root, name), worker.download_dir)))
+                receipts = os.path.join(root, '.ascendara-receipts')
+                if os.path.isdir(receipts):
+                    for name in os.listdir(receipts):
+                        with open(os.path.join(receipts, name), encoding='utf-8') as stream:
+                            item = json.load(stream)
+                        filename = item['filename']
+                        if not filename.lower().endswith(('.zip', '.rar', '.7z')) and not re.search(r'\.[r-z]\d{2}$', filename, re.I) and _wanted(filename):
+                            loose.append(dict(filename=filename, size=item['size'], source=source_path(
+                                os.path.relpath(os.path.join(root, filename), worker.download_dir))))
+        if not archives and not loose:
+            raise RuntimeError('No retained archives were found. Choose another download source.')
+        info['downloadingData'] = dict(downloading=False, extracting=True, verifying=False,
+                                      updating=worker.updateFlow, progressCompleted='100.00',
+                                      progressDownloadSpeeds='0.00 KB/s', timeUntilComplete='Preparing extraction...')
+        safe_write_json(metadata_path, info, reset_stop=True)
+        worker._extract_files(archives, loose)
+    except InterruptedError:
+        logging.info('Local extraction stopped; source files retained')
+    except VerificationFailure:
+        logging.exception('Local extraction verification failed')
+    except Exception as exc:
+        logging.exception('Local extraction failed')
+        handleerror(worker.game_info, metadata_path, str(exc))
+    finally:
+        allow_sleep()
+
+
 def create_argument_parser():
     parser = ArgumentParser(description='Ascendara Downloader V4')
     parser.add_argument('url', help='Download URL')
@@ -2391,6 +2473,11 @@ def create_argument_parser():
 
 
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == '--retry-extraction':
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
+                            handlers=[logging.FileHandler(get_ascendara_log_path(), encoding='utf-8')])
+        retry_local_extraction(sys.argv[2])
+        return
     args = create_argument_parser().parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
                         handlers=[logging.FileHandler(get_ascendara_log_path(), encoding='utf-8'),
