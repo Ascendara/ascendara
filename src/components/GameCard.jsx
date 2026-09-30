@@ -2,7 +2,22 @@ import { useState, memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Gift, Gamepad2, Zap, Loader, ArrowUpFromLine, Calendar, Clock, Check, Info, Download, Trophy, Star, ShieldCheck, Heart } from "lucide-react";
+import {
+  Gift,
+  Gamepad2,
+  Zap,
+  Loader,
+  ArrowUpFromLine,
+  Calendar,
+  Clock,
+  Check,
+  Info,
+  Download,
+  Trophy,
+  Star,
+  ShieldCheck,
+  Heart,
+} from "lucide-react";
 import {
   TooltipProvider,
   Tooltip,
@@ -20,7 +35,7 @@ import {
 import TorboxIcon from "./TorboxIcon";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import torboxService from "@/services/torboxService";
@@ -29,7 +44,11 @@ import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import verifiedGamesService from "@/services/verifiedGamesService";
-import { SEAMLESS_PROVIDERS, TORBOX_PROVIDERS, TORBOX_ELIGIBLE_SEAMLESS } from "@/config/providers";
+import {
+  SEAMLESS_PROVIDERS,
+  TORBOX_PROVIDERS,
+  TORBOX_ELIGIBLE_SEAMLESS,
+} from "@/config/providers";
 
 const GameCard = memo(function GameCard(props) {
   return props.game ? <GameCardContent {...props} /> : null;
@@ -52,6 +71,14 @@ function GameCardContent({ game, compact }) {
   const [isInstalled, setIsInstalled] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { key: locationKey } = useLocation();
+
+  // The Search page stays mounted while hidden, so the loading state set by the
+  // details button must be cleared once navigation has completed.
+  useEffect(() => {
+    setIsLoading(false);
+  }, [locationKey]);
+
   const [gameRating, setGameRating] = useState(game?.rating || 0);
   const [isVerified, setIsVerified] = useState(false);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
@@ -386,7 +413,7 @@ function GameCardContent({ game, compact }) {
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p className='text-secondary'>{t("gameCard.ratingTooltip")}</p>
+                        <p className="text-secondary">{t("gameCard.ratingTooltip")}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -420,19 +447,21 @@ function GameCardContent({ game, compact }) {
           </div>
 
           {/* Content Section */}
-          <div className="flex flex-col space-y-2.5 p-4 flex-grow overflow-y-auto">
+          <div className="flex flex-grow flex-col space-y-2.5 overflow-y-auto p-4">
             {/* Categories + DLC/Online pills */}
             <div className="flex flex-wrap gap-1.5">
               {game.dlc && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge className="gap-1 border-0 bg-violet-500/15 px-2 py-0.5 text-xs text-violet-400 hover:bg-violet-500/25 cursor-default">
+                      <Badge className="cursor-default gap-1 border-0 bg-violet-500/15 px-2 py-0.5 text-xs text-violet-400 hover:bg-violet-500/25">
                         <Gift className="h-3 w-3" />
                         DLC
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent><p>{t("gameCard.dlcTooltip")}</p></TooltipContent>
+                    <TooltipContent>
+                      <p>{t("gameCard.dlcTooltip")}</p>
+                    </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
@@ -440,12 +469,14 @@ function GameCardContent({ game, compact }) {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge className="gap-1 border-0 bg-sky-500/15 px-2 py-0.5 text-xs text-sky-400 hover:bg-sky-500/25 cursor-default">
+                      <Badge className="cursor-default gap-1 border-0 bg-sky-500/15 px-2 py-0.5 text-xs text-sky-400 hover:bg-sky-500/25">
                         <Gamepad2 className="h-3 w-3" />
                         Online
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent><p>{t("gameCard.onlineTooltip")}</p></TooltipContent>
+                    <TooltipContent>
+                      <p>{t("gameCard.onlineTooltip")}</p>
+                    </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
@@ -519,7 +550,9 @@ function GameCardContent({ game, compact }) {
                 {isPlayLater ? (
                   <>
                     <Check className="h-3.5 w-3.5" />
-                    <span className="text-xs font-medium">{t("gameCard.addedToPlayLater")}</span>
+                    <span className="text-xs font-medium">
+                      {t("gameCard.addedToPlayLater")}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -567,10 +600,7 @@ function GameCardContent({ game, compact }) {
             }
 
             let provider = "default";
-            if (
-              prioritizedTorbox &&
-              TORBOX_ELIGIBLE_SEAMLESS.includes(host)
-            ) {
+            if (prioritizedTorbox && TORBOX_ELIGIBLE_SEAMLESS.includes(host)) {
               provider = "torbox";
             } else if (seamlessHosts.includes(host)) {
               provider = "seamless";
