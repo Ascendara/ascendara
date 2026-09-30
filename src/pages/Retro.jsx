@@ -6,7 +6,6 @@ import {
   Disc3,
   HardDrive,
   ArrowDownWideNarrow,
-  ArrowLeft,
   Play,
   Settings2,
   FolderOpen,
@@ -1056,30 +1055,14 @@ export default function Retro() {
   const activePlatform = availablePlatforms.find(platform => platform.id === filter);
   const currentGame = accessibleGames.find(game => game.id === selected);
   return (
-    <div className="mx-auto max-w-7xl space-y-7 px-2 py-8 md:px-6">
-      <header className="space-y-5">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-2 text-muted-foreground"
-          onClick={() => navigate("/library")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          {t("common.library")}
-        </Button>
-        <div className="flex flex-wrap items-end justify-between gap-5">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Gamepad2 className="h-6 w-6" />
-              </span>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                {t("retro.title")}
-              </h1>
+    <div className="space-y-6">
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
+              <Gamepad2 className="h-6 w-6 text-primary" />
             </div>
-            <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
-              {t("retro.layout.subtitle")}
-            </p>
+            <h2 className="text-2xl font-bold leading-none text-foreground">{t("retro.title")}</h2>
           </div>
           <Button
             variant="outline"
@@ -1091,7 +1074,7 @@ export default function Retro() {
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border pb-5 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border pb-4 text-xs text-muted-foreground">
           <span>
             <strong className="mr-1.5 text-base font-medium tabular-nums text-foreground">
               {accessibleGames.filter(game => !game.missing).length}

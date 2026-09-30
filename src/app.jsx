@@ -119,7 +119,6 @@ const pageLoaders = {
   profile: () => import("./pages/Profile"),
   ascend: () => import("./pages/Ascend"),
   library: () => import("./pages/Library"),
-  retro: () => import("./pages/Retro"),
   folderView: () => import("./pages/FolderView"),
   localRefresh: () => import("./pages/LocalRefresh"),
   settings: () => import("./pages/Settings"),
@@ -137,12 +136,18 @@ const GameScreen = lazyPage(pageLoaders.gameScreen);
 const Profile = lazyPage(pageLoaders.profile);
 const Ascend = lazyPage(pageLoaders.ascend);
 const Library = lazyPage(pageLoaders.library);
-const Retro = lazyPage(pageLoaders.retro);
 const FolderView = lazyPage(pageLoaders.folderView);
 const LocalRefresh = lazyPage(pageLoaders.localRefresh);
 const Settings = lazyPage(pageLoaders.settings);
 const Welcome = lazyPage(pageLoaders.welcome);
 const BigPicture = lazyPage(pageLoaders.bigPicture);
+
+function RetroRedirect() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  params.set("tab", "retro");
+  return <Navigate to={`/library?${params}`} replace />;
+}
 
 // Warm every page chunk in the background while the splash screen is up so
 // navigating between pages renders instantly instead of flashing a fallback.
@@ -1899,7 +1904,7 @@ const AppRoutes = () => {
             <Route index element={<Home />} />
             <Route path="search" element={null} />
             <Route path="library" element={<Library />} />
-            <Route path="retro" element={<Retro />} />
+            <Route path="retro" element={<RetroRedirect />} />
             <Route path="folderview/:folderName" element={<FolderView />} />
             <Route path="gamescreen" element={<GameScreen />} />
             <Route path="downloads" element={<Downloads />} />

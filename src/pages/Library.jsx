@@ -57,6 +57,8 @@ import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { loadFolders, createFolder, addGameToFolder, filterGamesNotInFolders, getGamesInFolders } from "@/lib/folderManager";
 
+const Retro = React.lazy(() => import("./Retro"));
+
 // Module-level cache so images survive page switches without re-fetching via IPC
 const gameImageCache = new Map();
 let libraryGamesCache = null;
@@ -301,6 +303,9 @@ const Library = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("tab") === "retro") setActiveTab("retro");
+  }, [location.search]);
   const { user, userData } = useAuth();
   const { settings } = useSettings();
   const [ascendAccess, setAscendAccess] = useState({
@@ -1476,9 +1481,8 @@ const Library = () => {
     },
     {
       id: "retro",
-      label: "Retro",
+      label: t("retro.title"),
       icon: <Gamepad2 className="h-4 w-4" />,
-      nav: "/retro",
     }
   ].filter(tab => !tab.hidden);
 
@@ -1656,7 +1660,15 @@ const Library = () => {
 
                 <button
                   onClick={() => {
-                    tab.nav ? navigate(tab.nav) : setActiveTab(tab.id);
+                    setActiveTab(tab.id);
+                    const params = new URLSearchParams(location.search);
+                    if (tab.id === "retro") params.set("tab", "retro");
+                    else {
+                      params.delete("tab");
+                      params.delete("saves");
+                    }
+                    if (params.toString() !== new URLSearchParams(location.search).toString())
+                      navigate({ search: params.toString() ? `?${params}` : "" }, { replace: true });
                     if (tab.id === "hiddenFolders") {
                       setSearchQuery("");
                       setFilters({ favorites: false, vrOnly: false, onlineGames: false });
@@ -1905,7 +1917,15 @@ const Library = () => {
               value={searchQuery}
               onChange={e => {
                 setSearchQuery(e.target.value);
-                if (e.target.value && activeTab !== "all" && activeTab !== "hiddenFolders") { setActiveTab("all"); }
+                if (e.target.value && activeTab !== "all" && activeTab !== "hiddenFolders") {
+                  setActiveTab("all");
+                  const params = new URLSearchParams(location.search);
+                  if (params.has("tab")) {
+                    params.delete("tab");
+                    params.delete("saves");
+                    navigate({ search: params.toString() ? `?${params}` : "" }, { replace: true });
+                  }
+                }
               }}
               className="h-9 pl-9"
             />
@@ -2066,7 +2086,7 @@ const Library = () => {
         </div>
 
         {/* Scrollable game grid */}
-        <div className="flex-1 overflow-y-auto px-6 pt-5 pb-28">
+        <div className={cn("flex-1 overflow-y-auto px-6 pt-5", activeTab === "retro" ? "pb-6" : "pb-28")}>
           {/* ── Tab page header ── */}
           {activeTab !== "favoritesGallery" && (() => {
             const tabMeta = {
@@ -2105,7 +2125,7 @@ const Library = () => {
                 </div>
                 <div className="flex flex-col gap-0">
                   <h2 className="text-2xl font-bold leading-none text-foreground">{meta.title}</h2>
-                  <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
+                  {meta.subtitle && <p className="text-sm text-muted-foreground">{meta.subtitle}</p>}
                 </div>
               </div>
             );
@@ -2237,6 +2257,12 @@ const Library = () => {
               </DndProvider>
             );
           })()}
+
+          {activeTab === "retro" && (
+            <React.Suspense fallback={<div className="flex justify-center py-20"><Loader className="h-8 w-8 animate-spin" /></div>}>
+              <Retro />
+            </React.Suspense>
+          )}
 
           {/* ── Cloud Library tab ── */}
           {activeTab === "cloud" && (
