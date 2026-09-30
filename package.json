@@ -193,7 +193,7 @@
         "zip"
       ],
       "category": "public.app-category.utilities",
-      "icon": "readme/logo/png/ascendara_512x.png",
+      "icon": "readme/logo/icns/icon.icns",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
       "extraResources": [
         {
