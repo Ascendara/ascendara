@@ -1,7 +1,7 @@
 "use strict";
 
 const path = require("path");
-const os = require('os')
+const os = require("os");
 const parentFind = require("find-up");
 function omit(obj, keys) {
   const result = {};
@@ -44,14 +44,14 @@ async function dirHasAchievementFiles(dirPath) {
   try {
     await fs.access(dirPath);
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    
+
     // Check if any achievement files exist in this directory
     for (const file of files.achievement) {
       if (entries.some(e => e.isFile() && e.name === file)) {
         return true;
       }
     }
-    
+
     // Check subdirectories (but only 1 level deep to avoid excessive scanning)
     for (const entry of entries) {
       if (entry.isDirectory()) {
@@ -77,7 +77,7 @@ module.exports.getFolders = async userDir_file => {
   let steamEmu = [];
 
   // --- WINDOWS PATHS ---
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     const potentialDirs = [
       {
         dir: path.join(process.env["Public"], "Documents/Steam/CODEX"),
@@ -150,7 +150,7 @@ module.exports.getFolders = async userDir_file => {
         options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[7]] },
       },
     ];
-    
+
     // Filter to only include directories that exist and have achievement files
     for (const dirConfig of potentialDirs) {
       try {
@@ -162,15 +162,14 @@ module.exports.getFolders = async userDir_file => {
     }
   }
 
-
   // --- LINUX PATHS (Proton/Wine Prefixes) ---
-  else if (process.platform === "linux") {
+  else if (process.platform === "linux" || process.platform === "darwin") {
     const compatDataRoot = path.join(os.homedir(), ".ascendara/compatdata");
-    
+
     try {
       if (await fs.stat(compatDataRoot).catch(() => false)) {
         const gameFolders = await fs.readdir(compatDataRoot);
-        
+
         for (const game of gameFolders) {
           const driveC = path.join(compatDataRoot, game, "pfx/drive_c");
           if (!(await fs.stat(driveC).catch(() => false))) continue;
@@ -181,64 +180,78 @@ module.exports.getFolders = async userDir_file => {
             {
               path: "users/Public/Documents/Steam/CODEX",
               file: [files.achievement[0]],
-              filter: /.*/
+              filter: /.*/,
             },
             {
               path: "users/Public/Documents/EMPRESS",
               file: [files.achievement[1]],
-              filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/
+              filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
             },
             {
               path: "users/Public/Documents/Steam/RUNE",
               file: [files.achievement[0]],
-              filter: /.*/
+              filter: /.*/,
             },
             {
               path: "users/Public/Documents/OnlineFix",
               file: [files.achievement[0], files.achievement[1]],
-              filter: /([0-9]+)[\\/]Stats/i
+              filter: /([0-9]+)[\\/]Stats/i,
             },
             // AppData/Roaming
             {
               path: "users/steamuser/AppData/Roaming/Steam/CODEX",
               file: [files.achievement[0]],
-              filter: /.*/
+              filter: /.*/,
             },
             {
               path: "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves",
               file: [files.achievement[1], files.achievement[0]],
-              filter: /([0-9]+)/
+              filter: /([0-9]+)/,
             },
             {
               path: "users/steamuser/AppData/Roaming/GSE Saves",
               file: [files.achievement[2]],
-              filter: /([0-9]+)/
+              filter: /([0-9]+)/,
             },
             {
               path: "users/steamuser/AppData/Roaming/EMPRESS",
               file: [files.achievement[1]],
-              filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/
+              filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
             },
             {
               path: "users/steamuser/AppData/Roaming/SmartSteamEmu",
               file: [files.achievement[7]],
-              filter: /([0-9]+)/
+              filter: /([0-9]+)/,
             },
             // LocalAppData
             {
               path: "users/steamuser/AppData/Local/SKIDROW",
               file: [files.achievement[5]],
-              filter: /([0-9]+)/
+              filter: /([0-9]+)/,
             },
             // ProgramData
             {
               path: "ProgramData/Steam",
               file: [files.achievement[0], files.achievement[1]],
               filter: /([0-9]+)[\\/]stats/i,
-              options: { disableCheckIfProcessIsRunning: true, disableCheckTimestamp: true }
-            }
+              options: {
+                disableCheckIfProcessIsRunning: true,
+                disableCheckTimestamp: true,
+              },
+            },
           ];
 
+          const usernames = await fs.readdir(path.join(driveC, "users")).catch(() => []);
+          for (const rel of [...relativePaths]) {
+            if (rel.path.includes("users/steamuser/")) {
+              for (const username of usernames.filter(name => name !== "steamuser")) {
+                relativePaths.push({
+                  ...rel,
+                  path: rel.path.replace("users/steamuser/", `users/${username}/`),
+                });
+              }
+            }
+          }
           for (const rel of relativePaths) {
             const fullPath = path.join(driveC, rel.path);
             // Ensure folder exists before adding it
@@ -249,8 +262,8 @@ module.exports.getFolders = async userDir_file => {
                   recursive: true,
                   filter: rel.filter,
                   file: rel.file,
-                  ...(rel.options || {})
-                }
+                  ...(rel.options || {}),
+                },
               });
             }
           }
@@ -581,9 +594,8 @@ module.exports.parse = async filePath => {
             //RLD!
             //uint32 little endian
             local[achievement].State = new DataView(
-              new Uint8Array(
-                Buffer.from(local[achievement].State.toString(), "hex")
-              ).buffer
+              new Uint8Array(Buffer.from(local[achievement].State.toString(), "hex"))
+                .buffer
             ).getUint32(0, true);
             local[achievement].CurProgress = new DataView(
               new Uint8Array(
@@ -596,9 +608,8 @@ module.exports.parse = async filePath => {
               ).buffer
             ).getUint32(0, true);
             local[achievement].Time = new DataView(
-              new Uint8Array(
-                Buffer.from(local[achievement].Time.toString(), "hex")
-              ).buffer
+              new Uint8Array(Buffer.from(local[achievement].Time.toString(), "hex"))
+                .buffer
             ).getUint32(0, true);
           }
 

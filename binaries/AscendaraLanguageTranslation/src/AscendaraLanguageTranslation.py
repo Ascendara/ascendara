@@ -56,7 +56,7 @@ rate_limiter = RateLimiter(8)
 def _launch_crash_reporter_on_exit(error_code, error_message):
     try:
         binary_name = 'AscendaraCrashReporter.exe' if sys.platform == 'win32' else 'AscendaraCrashReporter'
-        crash_reporter_path = os.path.join('.', binary_name)
+        crash_reporter_path = os.path.join(os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.abspath(os.path.join(os.path.dirname(__file__), '../../AscendaraCrashReporter/target/release')), binary_name)
         if os.path.exists(crash_reporter_path):
             kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
             subprocess.Popen(

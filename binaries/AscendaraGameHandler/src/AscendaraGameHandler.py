@@ -22,6 +22,7 @@ import time
 import json
 import logging
 import platform
+import plistlib
 import subprocess
 import shlex
 from datetime import datetime
@@ -255,7 +256,7 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
     env["WINEPREFIX"] = prefix_path
     env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
 
-    if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
+    if sys.platform == "linux" and "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
         env["DISPLAY"] = ":0"
 
     if "WAYLAND_DISPLAY" in env and not env.get("SDL_VIDEODRIVER"):
@@ -444,7 +445,7 @@ def _launch_crash_reporter_on_exit(error_code, error_message):
     logging.info(f"[ENTRY] _launch_crash_reporter_on_exit(error_code={error_code}, error_message={error_message})")
     try:
         binary_name = 'AscendaraCrashReporter.exe' if sys.platform == 'win32' else 'AscendaraCrashReporter'
-        crash_reporter_path = os.path.join('.', binary_name)
+        crash_reporter_path = os.path.join(os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.abspath(os.path.join(os.path.dirname(__file__), '../../AscendaraCrashReporter/target/release')), binary_name)
         logging.info(f"Attempting to launch crash reporter with error code {error_code}")
         if os.path.exists(crash_reporter_path):
             kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
@@ -663,6 +664,8 @@ def run_ludusavi_backup(game_name):
             # Linux : in ~/.ascendara/
             ascendara_config = os.path.join(os.path.expanduser('~'), '.ascendara')
             ludusavi_path = os.path.join(ascendara_config, 'ludusavi')
+            if sys.platform == 'darwin' and not os.path.exists(ludusavi_path):
+                ludusavi_path = shutil.which('ludusavi') or ludusavi_path
 
         if not os.path.exists(ludusavi_path):
             logging.error(f"Ludusavi executable not found at: {ludusavi_path}")
@@ -884,7 +887,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
     
     logging.info(f"Resolved game_dir: {os.path.dirname(exe_path)}, exe_path: {exe_path}")
 
-    if not os.path.isfile(exe_path):
+    is_mac_app = sys.platform == "darwin" and exe_path.lower().endswith(".app") and os.path.isfile(os.path.join(exe_path, "Contents", "Info.plist"))
+    if not os.path.isfile(exe_path) and not is_mac_app:
         logging.error(f"Executable file does not exist: {exe_path}")
         error = "The exe file does not exist"
         if not is_custom_game:
@@ -980,7 +984,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         elif current_platform in ('linux', 'darwin') and is_windows_exe and not linux_runner_config:
             # Fallback: basic Wine (no Proton config from Electron)
             logging.warning("[Launch] No runner config from Electron, falling back to system Wine")
-            wine_bin = shutil.which("wine")
+            wine_bin = shutil.which("wine") or shutil.which("wine64")
             if wine_bin:
                 fallback_compat = os.path.join(
                     os.path.expanduser("~/.ascendara/compatdata"),
@@ -997,6 +1001,15 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 logging.error("[Launch] No Wine found on system!")
                 process = None
                 return
+
+        elif current_platform == 'darwin' and exe_path.lower().endswith('.app'):
+            with open(os.path.join(exe_path, 'Contents', 'Info.plist'), 'rb') as manifest:
+                binary_name = plistlib.load(manifest).get('CFBundleExecutable')
+            if not isinstance(binary_name, str) or os.path.basename(binary_name) != binary_name:
+                raise ValueError('Invalid macOS application executable')
+            binary = os.path.join(exe_path, 'Contents', 'MacOS', binary_name)
+            process = subprocess.Popen([binary, *shlex.split(game_launch_cmd or '')],
+                                       cwd=os.path.dirname(binary))
 
         elif current_platform in ('linux', 'darwin') and not is_windows_exe:
             # Native Linux/macOS executable
@@ -1106,7 +1119,9 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         # spawns the real game executable and exits almost immediately - if
         # that happens we don't want to stop tracking play time just because
         # the process we launched has ended.
-        if not is_custom_game and json_file_path:
+        if is_mac_app:
+            game_root_dir = exe_path
+        elif not is_custom_game and json_file_path:
             game_root_dir = os.path.dirname(json_file_path)
         else:
             game_root_dir = os.path.dirname(exe_path)
@@ -1149,7 +1164,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                                 except Exception as proton_err:
                                     logging.error(f"Proton trainer launch failed, falling back to Wine: {proton_err}", exc_info=True)
                                     # Fallback to system Wine
-                                    wine_bin = shutil.which("wine")
+                                    wine_bin = shutil.which("wine") or shutil.which("wine64")
                                     if wine_bin:
                                         fallback_wine_config = {
                                             "runner_type": "wine",
@@ -1162,7 +1177,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                                         trainer_process = None
                             else:
                                 logging.info("Launching trainer with Wine")
-                                wine_bin = shutil.which("wine")
+                                wine_bin = shutil.which("wine") or shutil.which("wine64")
                                 if wine_bin:
                                     wine_config = {
                                         "runner_type": "wine",

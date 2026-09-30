@@ -31,7 +31,7 @@ from typing import Dict, Any, Optional, List, Tuple
 def _launch_crash_reporter_on_exit(error_code, error_message):
     try:
         binary_name = 'AscendaraCrashReporter.exe' if sys.platform == 'win32' else 'AscendaraCrashReporter'
-        crash_reporter_path = os.path.join('.', binary_name)
+        crash_reporter_path = os.path.join(os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.abspath(os.path.join(os.path.dirname(__file__), '../../AscendaraCrashReporter/target/release')), binary_name)
         if os.path.exists(crash_reporter_path):
             kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
             subprocess.Popen(
@@ -230,7 +230,7 @@ def _launch_notification(theme, title, message):
     try:
         # Get the directory where the current executable is located
         exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        notification_helper_path = os.path.join(exe_dir, 'AscendaraNotificationHelper.exe')
+        notification_helper_path = os.path.join(exe_dir, 'AscendaraNotificationHelper.exe' if sys.platform == 'win32' else 'AscendaraNotificationHelper')
         logging.debug(f"Looking for notification helper at: {notification_helper_path}")
         
         if os.path.exists(notification_helper_path):
@@ -755,11 +755,13 @@ class TorrentManager:
         """Extract archives using the fastest available CLI tool (7z preferred)."""
         archive_size = os.path.getsize(archive_path)
         timeout_seconds = 14400 if archive_size > 50 * 1024 * 1024 * 1024 else 7200
-        _CREATE_NO_WINDOW = 0x08000000
+        _CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
         # Prefer 7z because it handles both RAR and 7z and is usually fastest
         _7z_paths = [
-            shutil.which('7z'), shutil.which('7za'),
+            os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(__file__)), '7zz'),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../.build-tools/macos/7zip/7zz')) if sys.platform == 'darwin' and not getattr(sys, 'frozen', False) else None,
+            shutil.which('7zz'), shutil.which('7z'), shutil.which('7za'),
             r'C:\Program Files\7-Zip\7z.exe',
             r'C:\Program Files (x86)\7-Zip\7z.exe',
         ]

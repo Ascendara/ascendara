@@ -408,8 +408,11 @@ class StopSignal:
 def _find_7z():
     roots = [getattr(sys, '_MEIPASS', ''), os.path.dirname(sys.executable),
              os.path.dirname(__file__), r'C:\Program Files\7-Zip', r'C:\Program Files (x86)\7-Zip']
-    candidates = [shutil.which('7z'), shutil.which('7zz'), shutil.which('7za')]
-    candidates += [os.path.join(root, name) for root in roots for name in ('7z.exe', '7zz', '7z')]
+    if sys.platform == 'darwin' and not getattr(sys, 'frozen', False):
+        roots.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../.build-tools/macos/7zip')))
+    # Prefer our verified, full-codec tool over an unrelated system installation.
+    candidates = [os.path.join(root, name) for root in roots if root for name in ('7z.exe', '7zz', '7z')]
+    candidates += [shutil.which('7zz'), shutil.which('7z'), shutil.which('7za')]
     return next((path for path in candidates if path and os.path.isfile(path)), None)
 
 
@@ -960,7 +963,7 @@ def get_ascendara_log_path():
 def _launch_crash_reporter_on_exit(error_code, error_message):
     try:
         binary_name = 'AscendaraCrashReporter.exe' if sys.platform == 'win32' else 'AscendaraCrashReporter'
-        crash_reporter_path = os.path.join('.', binary_name)
+        crash_reporter_path = os.path.join(os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.abspath(os.path.join(os.path.dirname(__file__), '../../AscendaraCrashReporter/target/release')), binary_name)
         if os.path.exists(crash_reporter_path):
             kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
             subprocess.Popen(
@@ -982,7 +985,7 @@ def launch_crash_reporter(error_code, error_message):
 def _launch_notification(theme, title, message):
     try:
         exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        notification_helper_path = os.path.join(exe_dir, 'AscendaraNotificationHelper.exe')
+        notification_helper_path = os.path.join(exe_dir, 'AscendaraNotificationHelper.exe' if sys.platform == 'win32' else 'AscendaraNotificationHelper')
         logging.debug(f"Looking for notification helper at: {notification_helper_path}")
         
         if os.path.exists(notification_helper_path):

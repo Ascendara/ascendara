@@ -11,7 +11,10 @@ const os = require("os");
 
 const appData =
   process.env["APPDATA"] ||
-  path.join(process.env.HOME || os.homedir(), ".config");
+  path.join(
+    process.env.HOME || os.homedir(),
+    process.platform === "darwin" ? "Library/Application Support" : ".config"
+  );
 
 // Simple fetch wrapper for Node.js
 async function fetchJson(url) {
@@ -97,11 +100,7 @@ module.exports.loadSteamData = async (appID, lang, key = null) => {
     throw "Unsupported API language code";
   }
 
-  const cache = path.join(
-    appData,
-    "Achievement Watcher/steam_cache/schema",
-    lang
-  );
+  const cache = path.join(appData, "Achievement Watcher/steam_cache/schema", lang);
 
   try {
     let filePath = path.join(`${cache}`, `${appID}.db`);
@@ -127,10 +126,7 @@ module.exports.loadSteamData = async (appID, lang, key = null) => {
 
 module.exports.fetchIcon = async (url, appID) => {
   try {
-    const cache = path.join(
-      appData,
-      `Achievement Watcher/steam_cache/icon/${appID}`
-    );
+    const cache = path.join(appData, `Achievement Watcher/steam_cache/icon/${appID}`);
 
     const filename = path.parse(urlParser.parse(url).pathname).base;
 
@@ -191,10 +187,7 @@ async function getSteamData(appID, lang, key = null) {
 async function findInAppList(appID, key) {
   if (!appID || !(Number.isInteger(appID) && appID > 0)) throw "ERR_INVALID_APPID";
 
-  const cache = path.join(
-    appData,
-    "Achievement Watcher/steam_cache/schema"
-  );
+  const cache = path.join(appData, "Achievement Watcher/steam_cache/schema");
   const filepath = path.join(cache, "appList.json");
 
   // 1. Try reading local cache

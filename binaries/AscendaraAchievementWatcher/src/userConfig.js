@@ -9,7 +9,10 @@ async function getSettings() {
   try {
     const appData =
       process.env.APPDATA ||
-      path.join(process.env.HOME || require("os").homedir(), ".config");
+      path.join(
+        process.env.HOME || require("os").homedir(),
+        process.platform === "darwin" ? "Library/Application Support" : ".config"
+      );
     const settingsPath = path.join(appData, "ascendara", "ascendarasettings.json");
     const data = await fs.readFile(settingsPath, "utf8");
     return JSON.parse(data);

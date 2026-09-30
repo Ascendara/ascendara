@@ -148,7 +148,7 @@ def _launch_notification(title, message):
     """Launch notification helper to show a system notification if enabled."""
     try:
         exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        notification_helper_path = os.path.join(exe_dir, 'AscendaraNotificationHelper.exe')
+        notification_helper_path = os.path.join(exe_dir, 'AscendaraNotificationHelper.exe' if sys.platform == 'win32' else 'AscendaraNotificationHelper')
         
         if os.path.exists(notification_helper_path):
             from utils import get_notification_settings
@@ -168,7 +168,7 @@ def _launch_crash_reporter_on_exit(error_code, error_message):
     """Launch crash reporter on exit"""
     try:
         binary_name = 'AscendaraCrashReporter.exe' if sys.platform == 'win32' else 'AscendaraCrashReporter'
-        crash_reporter_path = os.path.join('.', binary_name)
+        crash_reporter_path = os.path.join(os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.abspath(os.path.join(os.path.dirname(__file__), '../../AscendaraCrashReporter/target/release')), binary_name)
         if os.path.exists(crash_reporter_path):
             subprocess.Popen(
                 [crash_reporter_path, "localrefresh", str(error_code), error_message],
