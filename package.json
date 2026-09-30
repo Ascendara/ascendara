@@ -44,7 +44,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "dist-mac": "python3 ./scripts/build_ascendara_mac.py",
+    "setup-mac": "python3 ./scripts/setup_macos_tools.py",
+    "test-mac-extraction": "python3 -m unittest discover -s tests -p 'test_macos*.py'",
+    "dist-mac-arm64": "python3 ./scripts/build_ascendara_mac.py --arch arm64",
+    "dist-mac-intel": "python3 ./scripts/build_ascendara_mac.py --arch x64",
+    "dist-mac-all": "python3 ./scripts/build_ascendara_mac.py --arch both"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.3",
@@ -139,48 +145,103 @@
       {
         "from": "src/public",
         "to": "public"
-      },
-      {
-        "from": "readme/logo/ico/ascendara_64x.ico",
-        "to": "icon.ico"
-      },
-      {
-        "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader.exe",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler.exe",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh.exe",
-        "to": "."
-      },
-      {
-        "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe",
-        "to": "."
       }
     ],
     "extraMetadata": {
       "main": "electron/app.js"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "extraResources": [
+        {
+          "from": "readme/logo/ico/ascendara_64x.ico",
+          "to": "icon.ico"
+        },
+        {
+          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader.exe",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler.exe",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh.exe",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe",
+          "to": "."
+        }
+      ]
     },
     "mac": {
-      "target": "dmg"
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "readme/logo/png/ascendara_512x.png",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "readme/logo/png/ascendara_512x.png",
+          "to": "icon.png"
+        },
+        {
+          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
+          "to": "."
+        },
+        {
+          "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher",
+          "to": "."
+        }
+      ],
+      "protocols": [
+        {
+          "name": "Ascendara",
+          "schemes": [
+            "ascendara"
+          ]
+        }
+      ],
+      "hardenedRuntime": true
     },
     "linux": {
       "target": [

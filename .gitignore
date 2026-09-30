@@ -64,3 +64,12 @@ scripts/upload.py
 binaries/AscendaraLocalRefresh/src/AscendaraLocalRefresh_old.py
 /binaries/AscendaraLocalRefresh/src/__pycache__
 binaries/AscendaraDownloader/src/AscendaraDownloader_OLD.py
+
+.build_venv_mac/
+
+.build-tools/
+
+# Generated native build and renderer artifacts
+__pycache__/
+/electron/assets/
+/electron/index.html
