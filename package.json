@@ -243,6 +243,28 @@
       ],
       "hardenedRuntime": true
     },
+    "dmg": {
+      "background": "readme/logo/png/dmg-background.png",
+      "window": {
+        "width": 640,
+        "height": 400
+      },
+      "iconSize": 96,
+      "iconTextSize": 13,
+      "contents": [
+        {
+          "x": 170,
+          "y": 250,
+          "type": "file"
+        },
+        {
+          "x": 470,
+          "y": 250,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
     "linux": {
       "target": [
         {
