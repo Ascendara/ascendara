@@ -4,6 +4,7 @@ import {
   BigPictureEmptyState,
 } from "./BigPictureShell";
 import { useState } from "react";
+import { canRetryExtraction } from "@/services/extractionRetryService";
 import { toast } from "sonner";
 import {
   removeFromQueue,
@@ -23,6 +24,7 @@ export function DownloadsSurface({
   resuming,
   pause,
   resume,
+  retryExtraction,
   cancel,
   openFolder,
   onBack,
@@ -32,6 +34,23 @@ export function DownloadsSurface({
 }) {
   const [remove, setRemove] = useState(null);
   const [starting, setStarting] = useState(false);
+  const [extracting, setExtracting] = useState(new Set());
+  const retry = async game => {
+    if (extracting.has(game.game)) return;
+    setExtracting(current => new Set(current).add(game.game));
+    try {
+      await retryExtraction(game);
+      toast.success(t("downloads.extractionRecovery.retryingArchive"));
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setExtracting(current => {
+        const next = new Set(current);
+        next.delete(game.game);
+        return next;
+      });
+    }
+  };
   const rows = remove
     ? [["keep", "remove"]]
     : [
@@ -39,9 +58,9 @@ export function DownloadsSurface({
         ...downloads.map((game) => {
           const data = game.downloadingData || {};
           const count =
-            !data.error &&
+            canRetryExtraction(game) || (!data.error &&
             !data.verifyError?.length &&
-            (data.stopped || data.downloading)
+            (data.stopped || data.downloading))
               ? 3
               : 2;
           return Array.from(
@@ -131,10 +150,11 @@ export function DownloadsSurface({
                     torboxState={torboxStates[game.torboxWebdownloadId]}
                     onPause={() => pause(game)}
                     onResume={() => resume(game)}
+                    onRetryExtraction={() => retry(game)}
                     onKill={() => cancel(game)}
                     onOpenFolder={() => openFolder(game)}
                     isStopping={stopping.has(game.game)}
-                    isResuming={resuming.has(game.game)}
+                    isResuming={resuming.has(game.game) || extracting.has(game.game)}
                     t={t}
                     buttons={buttons}
                   />

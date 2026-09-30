@@ -1,5 +1,6 @@
 import React from "react";
-import { FolderOpen, Trash2, Play, Pause, Loader } from "lucide-react";
+import { FolderOpen, Trash2, Play, Pause, Loader, RefreshCcw } from "lucide-react";
+import { canRetryExtraction } from "@/services/extractionRetryService";
 
 
 // --- BIG PICTURE DOWNLOAD CARD ---
@@ -11,6 +12,7 @@ const BigPictureDownloadCard = ({
   onResume,
   onKill,
   onOpenFolder,
+  onRetryExtraction,
   isStopping,
   isResuming,
   t,
@@ -42,6 +44,7 @@ const BigPictureDownloadCard = ({
   const hasError = data.error || (data.verifyError && data.verifyError.length > 0);
 
   const getStatus = () => {
+    if (data.awaitingRecoveryAction) return { text: t("downloads.extractionRecovery.archiveTitle"), color: "text-amber-500" };
     if (hasError) return { text: t("downloads.error"), color: "text-red-500" };
     if (isResuming) return { text: t("downloads.resuming"), color: "text-amber-500" };
     if (isStopping) return { text: t("downloads.pausing"), color: "text-amber-500" };
@@ -55,6 +58,13 @@ const BigPictureDownloadCard = ({
   const status = getStatus();
 
   const getActions = () => {
+    if (canRetryExtraction(game)) {
+      return [
+        { label: t("downloads.retryExtraction"), icon: RefreshCcw, action: onRetryExtraction },
+        { label: t("downloads.openFolder"), icon: FolderOpen, action: onOpenFolder },
+        { label: t("downloads.kill"), icon: Trash2, action: onKill, danger: true },
+      ];
+    }
     if (hasError) {
       return [
         { label: t("downloads.openFolder"), icon: FolderOpen, action: onOpenFolder },
@@ -200,11 +210,16 @@ const BigPictureDownloadCard = ({
       )}
 
       {/* Error Message */}
+      {data.awaitingRecoveryAction && (
+        <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+          <p>{data.recoverableError?.message || t("downloads.extractionRecovery.description")}</p>
+        </div>
+      )}
       {hasError && (
         <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3">
           <p className="text-sm text-red-500">
-            {data.error ||
-              (data.verifyError && data.verifyError[0]) ||
+            {data.message || data.recoverableError?.message ||
+              (data.verifyError?.length && JSON.stringify(data.verifyError[0])) ||
               t("downloads.unknownError")}
           </p>
         </div>

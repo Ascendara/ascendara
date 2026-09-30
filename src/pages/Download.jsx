@@ -1,4 +1,5 @@
 import SafeHtml from "@/components/SafeHtml";
+import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -371,6 +372,28 @@ export default function DownloadPage() {
   const [directoryConflict, setDirectoryConflict] = useState(null); // { path, sanitizedName, pendingArgs }
   const [conflictStep, setConflictStep] = useState("choose"); // "choose" | "confirmDelete" | "confirmMerge"
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+  const [retainedDownload, setRetainedDownload] = useState(null);
+  const [retryingExtraction, setRetryingExtraction] = useState(false);
+  useEffect(() => {
+    let disposed = false;
+    window.electron.getGames().then(games => {
+      const match = games.find(game => game.game === sanitizeText(gameData?.game || "") && canRetryExtraction(game));
+      if (!disposed) setRetainedDownload(match || null);
+    }).catch(() => {});
+    return () => { disposed = true; };
+  }, [gameData?.game]);
+  const handleRetryRetainedExtraction = async () => {
+    if (retryingExtraction || !retainedDownload) return;
+    setRetryingExtraction(true);
+    try {
+      await retryExtraction(retainedDownload);
+      navigate("/downloads");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setRetryingExtraction(false);
+    }
+  };
 
   // Sync isFavorite when changed from elsewhere (e.g. Library favorites tab)
   useEffect(() => {
@@ -2303,6 +2326,14 @@ export default function DownloadPage() {
         </AlertDialogContent>
       </AlertDialog>
       <div className="w-full max-w-6xl">
+        {retainedDownload && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <p>{t("downloads.retryRetainedDescription", "Retry extraction using the files already downloaded for this game.")}</p>
+            <Button onClick={handleRetryRetainedExtraction} disabled={retryingExtraction}>
+              {t("downloads.retryExtraction")}
+            </Button>
+          </div>
+        )}
         <div
           className="cursor-pointer text-center font-bold text-muted-foreground transition-colors hover:text-foreground"
           style={{

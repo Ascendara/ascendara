@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
 import {
   getCachedDownloadData,
   clearCachedDownloadData,
@@ -1358,6 +1359,18 @@ const DownloadCard = ({
   const [installerLaunched, setInstallerLaunched] = useState(false);
   const [isFinishingInstall, setIsFinishingInstall] = useState(false);
   const [isSubmittingRecovery, setIsSubmittingRecovery] = useState(false);
+  const handleRetryExtraction = async () => {
+    if (isSubmittingRecovery) return;
+    setIsSubmittingRecovery(true);
+    try {
+      await retryExtraction(game);
+      toast.success(t("downloads.extractionRecovery.retryingArchive"));
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsSubmittingRecovery(false);
+    }
+  };
   const [showInstallLocationDialog, setShowInstallLocationDialog] = useState(false);
   const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
   const [heroImage, setHeroImage] = useState(null);
@@ -1668,6 +1681,9 @@ const DownloadCard = ({
         "```",
         getErrorMessage() || "Unknown error",
         "```",
+        ...(downloadingData.message && downloadingData.message !== getErrorMessage()
+          ? ["", "**Original Error**", "```", downloadingData.message, "```"]
+          : []),
         "",
         "**Download State**",
         `• Progress: ${downloadingData.progressCompleted || "0"}%`,
@@ -1724,6 +1740,12 @@ const DownloadCard = ({
   const getErrorMessage = () => {
     const msg = downloadingData.message;
     if (!msg) return null;
+
+    if (msg.trim().toLowerCase() === "conflict")
+      return t(
+        "downloads.downloadConflictError",
+        'The download could not start (Conflict). Refresh the download link or choose another source. If this continues, check downloadmanager.log for the original error.'
+      );
 
     if (msg.includes("content_type_error")) return t("downloads.contentTypeError");
     if (msg.includes("no_files_error")) return t("downloads.noFilesError");
@@ -1831,6 +1853,12 @@ const DownloadCard = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              {canRetryExtraction(game) && (
+                <DropdownMenuItem onClick={handleRetryExtraction} disabled={isSubmittingRecovery} className="gap-2">
+                  <RefreshCcw className="h-4 w-4" />
+                  {t("downloads.retryExtraction")}
+                </DropdownMenuItem>
+              )}
               {isStopped ? (
                 <>
                   <DropdownMenuItem onClick={() => onResume(game)} className="gap-2">
@@ -2218,11 +2246,12 @@ const DownloadCard = ({
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={onRetry}
+                  onClick={canRetryExtraction(game) ? handleRetryExtraction : onRetry}
+                  disabled={isSubmittingRecovery}
                   className="gap-2 text-secondary"
                 >
                   <RefreshCcw className="h-4 w-4" />
-                  {t("common.retry")}
+                  {t(canRetryExtraction(game) ? "downloads.retryExtraction" : "common.retry")}
                 </Button>
               </div>
             </div>

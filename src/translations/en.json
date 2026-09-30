@@ -1522,6 +1522,7 @@
     "resumingDescription": "Restarting the download process...",
     "retryDataNotAvailable": "Retry data not available. The download will be deleted and you will have to manually restart the download.",
     "retryExtraction": "Retry Extraction",
+    "retryRetainedDescription": "Retry extraction using the files already downloaded for this game.",
     "runAsAdmin": "Run Installer as Admin",
     "setInstallLocationDescription": "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it.",
     "setInstallLocationTitle": "Set the Install Location",

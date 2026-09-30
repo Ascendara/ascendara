@@ -1,4 +1,5 @@
 import { PageNavigationContext } from "./big-picture/PageHeader";
+import { retryExtraction } from "@/services/extractionRetryService";
 import { Toaster, toast } from "sonner";
 import { Search, Coffee, ListEnd, X, Gamepad2 } from "lucide-react";
 import { removeFromQueue, addToQueue } from "@/services/downloadQueueService";
@@ -264,7 +265,7 @@ function BigPicture() {
 
         {view === "store" && <BrowseSurface navigation={surfaceNavigation} active={!isMenuOpen && !isKeyboardOpen} games={filteredStoreGames} loading={storeLoading} query={storeSearchQuery} search={() => setIsKeyboardOpen(true)} clearSearch={() => setStoreSearchQuery("")} sort={selectedSort} setSort={setSelectedSort} openGame={handleSelectStoreGame} onBack={() => changeView("carousel")} retry={refreshStore} openIndexes={() => changeView("indexes")} />}
 
-        {view === "downloads" && <DownloadsSurface navigation={surfaceNavigation} active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog} downloads={downloadingGames} queue={queuedDownloads} torboxStates={torboxStates} stopping={stoppingDownloads} resuming={resumingDownloads} pause={handlePauseDownload} resume={handleResumeDownload} cancel={handleKillDownload} openFolder={handleOpenFolder} onBack={() => changeView("carousel")} browse={() => changeView("store")} t={t} buttons={buttons} />}
+        {view === "downloads" && <DownloadsSurface navigation={surfaceNavigation} active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog} downloads={downloadingGames} queue={queuedDownloads} torboxStates={torboxStates} stopping={stoppingDownloads} resuming={resumingDownloads} pause={handlePauseDownload} resume={handleResumeDownload} retryExtraction={retryExtraction} cancel={handleKillDownload} openFolder={handleOpenFolder} onBack={() => changeView("carousel")} browse={() => changeView("store")} t={t} buttons={buttons} />}
 
         </PageNavigationContext.Provider>
 
