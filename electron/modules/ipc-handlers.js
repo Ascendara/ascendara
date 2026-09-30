@@ -192,7 +192,11 @@ function registerMiscHandlers() {
       const externalWindow = new BrowserWindow({
         width: 1280,
         height: 800,
-        icon: path.join(__dirname, "..", process.platform === "linux" ? "icon.png" : "icon.ico"),
+        icon: path.join(
+          __dirname,
+          "..",
+          process.platform === "linux" ? "icon.png" : "icon.ico"
+        ),
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,
@@ -233,7 +237,11 @@ function registerMiscHandlers() {
               return;
             }
           } catch (error) {
-            console.error("Failed to parse external window resource URL:", details.url, error);
+            console.error(
+              "Failed to parse external window resource URL:",
+              details.url,
+              error
+            );
           }
           callback({ cancel: false });
         }
@@ -252,9 +260,11 @@ function registerMiscHandlers() {
       externalWindow.webContents.on("will-navigate", (event, navUrl) => {
         try {
           const host = new URL(navUrl).hostname.toLowerCase();
-          const isAllowed = isSafeExternalUrl(navUrl) && allowedHosts.some(
-            allowed => host === allowed || host.endsWith(`.${allowed}`)
-          );
+          const isAllowed =
+            isSafeExternalUrl(navUrl) &&
+            allowedHosts.some(
+              allowed => host === allowed || host.endsWith(`.${allowed}`)
+            );
           if (!isAllowed) {
             console.log("Blocked navigation in external window:", navUrl);
             event.preventDefault();
@@ -284,13 +294,16 @@ function registerMiscHandlers() {
         }
       };
 
-      externalWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-        // -3 is ERR_ABORTED, which fires for cancelled/redirected navigations
-        // (e.g. blocked ad popups) and isn't an actual load failure.
-        if (isMainFrame && errorCode !== -3) {
-          notifyBlocked(`${errorDescription} (${errorCode})`);
+      externalWindow.webContents.on(
+        "did-fail-load",
+        (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+          // -3 is ERR_ABORTED, which fires for cancelled/redirected navigations
+          // (e.g. blocked ad popups) and isn't an actual load failure.
+          if (isMainFrame && errorCode !== -3) {
+            notifyBlocked(`${errorDescription} (${errorCode})`);
+          }
         }
-      });
+      );
 
       let blankPageTimeout;
       externalWindow.webContents.on("did-finish-load", () => {
@@ -409,14 +422,19 @@ function registerMiscHandlers() {
           console.error("Failed to forward intercepted download URL:", error);
         }
 
-        externalWindow.webContents.session.removeListener("will-download", onWillDownload);
+        externalWindow.webContents.session.removeListener(
+          "will-download",
+          onWillDownload
+        );
         if (!externalWindow.isDestroyed()) {
           externalWindow.close();
         }
       };
       externalWindow.webContents.session.on("will-download", onWillDownload);
       const providerSession = externalWindow.webContents.session;
-      externalWindow.once("closed", () => providerSession.removeListener("will-download", onWillDownload));
+      externalWindow.once("closed", () =>
+        providerSession.removeListener("will-download", onWillDownload)
+      );
     } else {
       await shell.openExternal(url);
     }
@@ -491,7 +509,7 @@ function registerMiscHandlers() {
   ipcMain.handle("writeFile", async (_, filePath, buffer) => {
     try {
       // Ensure parent folder exists (creates it if needed)
-      await fs.ensureDir(path.dirname(filePath)); 
+      await fs.ensureDir(path.dirname(filePath));
       await fs.promises.writeFile(filePath, Buffer.from(buffer));
       return true;
     } catch (error) {
@@ -578,7 +596,11 @@ function registerMiscHandlers() {
   ipcMain.handle("get-download-log", async (_, lines = 200) => {
     try {
       const appDataPath = app.getPath("appData");
-      const logPath = path.join(appDataPath, "Ascendara by tagoWorks", "downloadmanager.log");
+      const logPath = path.join(
+        appDataPath,
+        "Ascendara by tagoWorks",
+        "downloadmanager.log"
+      );
       if (!fs.existsSync(logPath)) return "";
       const content = await fs.promises.readFile(logPath, "utf-8");
       const all = content.split("\n");
@@ -650,7 +672,9 @@ function registerMiscHandlers() {
     const result = await dialog.showOpenDialog({
       defaultPath,
       properties: ["openFile"],
-      filters: [{ name: "Executable Files", extensions: ["exe", "bat", "cmd"] }],
+      filters: isWindows
+        ? [{ name: "Executable Files", extensions: ["exe", "bat", "cmd"] }]
+        : [],
     });
 
     return result.canceled ? null : result.filePaths[0];
@@ -666,7 +690,9 @@ function registerMiscHandlers() {
     const rootPath = result.filePaths[0];
     try {
       const rootEntries = await fs.promises.readdir(rootPath, { withFileTypes: true });
-      const directories = rootEntries.filter(entry => entry.isDirectory() && !entry.isSymbolicLink());
+      const directories = rootEntries.filter(
+        entry => entry.isDirectory() && !entry.isSymbolicLink()
+      );
       const games = [];
       let skipped = 0;
       let inaccessible = 0;
@@ -1199,7 +1225,10 @@ function registerMiscHandlers() {
       try {
         if (!settings.downloadDirectory) {
           console.error("Download directory not set");
-          return { success: false, error: "Download directory not set. Please configure it in Settings." };
+          return {
+            success: false,
+            error: "Download directory not set. Please configure it in Settings.",
+          };
         }
 
         const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
@@ -1224,7 +1253,7 @@ function registerMiscHandlers() {
             imageBuffer = Buffer.from(response.data);
             const mimeType = response.headers["content-type"];
             extension = getExtensionFromMimeType(mimeType);
-            
+
             if (imageBuffer) {
               await fs.promises.writeFile(
                 path.join(gamesDirectory, `${game}.ascendara${extension}`),
@@ -1241,7 +1270,11 @@ function registerMiscHandlers() {
           ? JSON.parse(fs.readFileSync(gamesFilePath, "utf8"))
           : { games: [] };
         const { sameGame } = require("./launcher-import");
-        if (gamesData.games.some(existing => !existing._isDeleted && sameGame(existing, { game, executable }))) {
+        if (
+          gamesData.games.some(
+            existing => !existing._isDeleted && sameGame(existing, { game, executable })
+          )
+        ) {
           return { success: false, error: "This game is already in your library." };
         }
         gamesData.games.push({
@@ -1285,42 +1318,45 @@ function registerMiscHandlers() {
 
       if (imgID) {
         // App only uses local index now
-      if (!settings.usingLocalIndex || !settings.localIndex) {
-        console.warn(`Cannot update game cover: local index is not enabled`);
-        return false;
-      }
-      
-      const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
-      try {
-        imageBuffer = await fs.promises.readFile(localImagePath);
-      } catch (error) {
-        console.warn(`Could not load local image for ${imgID}:`, error);
-        
-        // Try SteamGridDB fallback
-        try {
-          console.log(`Trying SteamGridDB fallback for game cover: ${game}`);
-          const steamGridHeader = await steamgrid.fetchGameHeader(game);
-          if (steamGridHeader && steamGridHeader.url) {
-            const response = await axios({
-              url: steamGridHeader.url,
-              method: "GET",
-              responseType: "arraybuffer",
-              timeout: 10000,
-            });
-            
-            imageBuffer = Buffer.from(response.data);
-            const mimeType = response.headers["content-type"];
-            extension = getExtensionFromMimeType(mimeType);
-            console.log(`SteamGridDB game cover downloaded for: ${game}`);
-          } else {
-            console.log(`No SteamGridDB game cover found for: ${game}`);
-            return false;
-          }
-        } catch (steamGridError) {
-          console.warn(`SteamGridDB fallback failed for ${game}:`, steamGridError.message);
+        if (!settings.usingLocalIndex || !settings.localIndex) {
+          console.warn(`Cannot update game cover: local index is not enabled`);
           return false;
         }
-      }
+
+        const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
+        try {
+          imageBuffer = await fs.promises.readFile(localImagePath);
+        } catch (error) {
+          console.warn(`Could not load local image for ${imgID}:`, error);
+
+          // Try SteamGridDB fallback
+          try {
+            console.log(`Trying SteamGridDB fallback for game cover: ${game}`);
+            const steamGridHeader = await steamgrid.fetchGameHeader(game);
+            if (steamGridHeader && steamGridHeader.url) {
+              const response = await axios({
+                url: steamGridHeader.url,
+                method: "GET",
+                responseType: "arraybuffer",
+                timeout: 10000,
+              });
+
+              imageBuffer = Buffer.from(response.data);
+              const mimeType = response.headers["content-type"];
+              extension = getExtensionFromMimeType(mimeType);
+              console.log(`SteamGridDB game cover downloaded for: ${game}`);
+            } else {
+              console.log(`No SteamGridDB game cover found for: ${game}`);
+              return false;
+            }
+          } catch (steamGridError) {
+            console.warn(
+              `SteamGridDB fallback failed for ${game}:`,
+              steamGridError.message
+            );
+            return false;
+          }
+        }
       } else if (imageData) {
         const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
         imageBuffer = Buffer.from(base64Data, "base64");
@@ -1383,11 +1419,13 @@ function registerMiscHandlers() {
   ipcMain.handle("read-game-entry", (_, game, isCustom) => {
     const settings = settingsManager.getSettings();
     try {
-      if (!settings.downloadDirectory) return { success: false, error: "Download directory not set" };
+      if (!settings.downloadDirectory)
+        return { success: false, error: "Download directory not set" };
 
       if (isCustom) {
         const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-        if (!fs.existsSync(gamesFilePath)) return { success: false, error: "games.json not found" };
+        if (!fs.existsSync(gamesFilePath))
+          return { success: false, error: "games.json not found" };
         const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
         const gameInfo = gamesData.games.find(g => g.game === game);
         if (!gameInfo) return { success: false, error: "Game not found in games.json" };
@@ -1418,11 +1456,13 @@ function registerMiscHandlers() {
   ipcMain.handle("write-game-entry", (_, game, updatedData, isCustom) => {
     const settings = settingsManager.getSettings();
     try {
-      if (!settings.downloadDirectory) return { success: false, error: "Download directory not set" };
+      if (!settings.downloadDirectory)
+        return { success: false, error: "Download directory not set" };
 
       if (isCustom) {
         const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-        if (!fs.existsSync(gamesFilePath)) return { success: false, error: "games.json not found" };
+        if (!fs.existsSync(gamesFilePath))
+          return { success: false, error: "games.json not found" };
         const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
         const idx = gamesData.games.findIndex(g => g.game === game);
         if (idx === -1) return { success: false, error: "Game not found in games.json" };
@@ -1547,6 +1587,11 @@ function registerMiscHandlers() {
 
   // Uninstall Ascendara
   ipcMain.handle("uninstall-ascendara", async () => {
+    if (!isWindows)
+      return {
+        success: false,
+        error: "Quit Ascendara and remove the application using your file manager.",
+      };
     const executablePath = process.execPath;
     const executableDir = path.dirname(executablePath);
     const uninstallerPath = path.join(executableDir, "Uninstall Ascendara.exe");
@@ -1574,8 +1619,10 @@ function registerMiscHandlers() {
 
   const resolveQbitEndpoint = overrides => {
     const manager = getSettingsManager();
-    const host = (overrides && overrides.host) || manager.getSetting("torrentHost") || "localhost";
-    const portRaw = (overrides && overrides.port) || manager.getSetting("torrentPort") || 8080;
+    const host =
+      (overrides && overrides.host) || manager.getSetting("torrentHost") || "localhost";
+    const portRaw =
+      (overrides && overrides.port) || manager.getSetting("torrentPort") || 8080;
     const port = parseInt(portRaw, 10) || 8080;
     const origin = `http://${host}:${port}`;
     return { host, port, origin, baseURL: `${origin}/api/v2` };
@@ -1610,7 +1657,10 @@ function registerMiscHandlers() {
         }
       );
 
-      if (typeof response.data === "string" && response.data.trim().toLowerCase() === "fails.") {
+      if (
+        typeof response.data === "string" &&
+        response.data.trim().toLowerCase() === "fails."
+      ) {
         return { success: false, error: "Authentication failed" };
       }
 
@@ -1719,21 +1769,21 @@ function registerMiscHandlers() {
 
   // Start Steam handler
   ipcMain.handle("start-steam", async () => {
-    const { shell } = require('electron');
+    const { shell } = require("electron");
     try {
-      await shell.openExternal('steam://open');
+      await shell.openExternal("steam://open");
       return true;
     } catch (error) {
-      console.error('Failed to start Steam:', error);
+      console.error("Failed to start Steam:", error);
       return false;
     }
   });
 
-  ipcMain.handle('get-drives', async () => {
-    if (os.platform() === 'win32') {
+  ipcMain.handle("get-drives", async () => {
+    if (os.platform() === "win32") {
       const drives = [];
       for (let i = 65; i <= 90; i++) {
-        const letter = String.fromCharCode(i) + ':\\';
+        const letter = String.fromCharCode(i) + ":\\";
         try {
           await fs.access(letter);
           drives.push({ name: letter, path: letter });
@@ -1742,16 +1792,16 @@ function registerMiscHandlers() {
       return drives;
     } else {
       // On Linux/macOS, return the root
-      return [{ name: '/', path: '/' }];
+      return [{ name: "/", path: "/" }];
     }
   });
 
-  ipcMain.handle('list-directory', async (event, dirPath) => {
+  ipcMain.handle("list-directory", async (event, dirPath) => {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
       const files = entries.map(entry => ({
         name: entry.name,
-        type: entry.isDirectory() ? 'directory' : 'file',
+        type: entry.isDirectory() ? "directory" : "file",
         path: path.join(dirPath, entry.name),
       }));
       return files;

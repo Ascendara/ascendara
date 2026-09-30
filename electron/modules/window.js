@@ -8,7 +8,12 @@ const path = require("path");
 const { isDev } = require("./config");
 const { initializeDiscordRPC } = require("./discord-rpc");
 const { getSettingsManager } = require("./settings");
-const { isAllowedAppNavigation, isAllowedAuthPopup, isSafeExternalUrl, registerTrustedWebContents } = require("./security");
+const {
+  isAllowedAppNavigation,
+  isAllowedAuthPopup,
+  isSafeExternalUrl,
+  registerTrustedWebContents,
+} = require("./security");
 
 let mainWindowHidden = false;
 let isHandlingProtocolUrl = false;
@@ -31,7 +36,7 @@ function createWindow() {
   const windowWidth = isLaptop ? Math.min(1500, screenWidth * 0.9) : 1600;
   const windowHeight = isLaptop ? Math.min(700, screenHeight * 0.9) : 800;
 
-  const iconFile = process.platform === "linux" ? "icon.png" : "icon.ico";
+  const iconFile = process.platform !== "win32" ? "icon.png" : "icon.ico";
   const mainWindow = new BrowserWindow({
     title: "Ascendara",
     icon: path.join(__dirname, "..", iconFile),
@@ -84,7 +89,11 @@ function createWindow() {
   // This handles cases where the event might not fire properly on some Linux configurations
   if (process.platform === "linux") {
     setTimeout(() => {
-      if (!mainWindow.isDestroyed() && !windowShown && !process.argv.includes("--hidden")) {
+      if (
+        !mainWindow.isDestroyed() &&
+        !windowShown &&
+        !process.argv.includes("--hidden")
+      ) {
         console.log("ready-to-show timeout - forcing window show on Linux");
         mainWindow.show();
         mainWindowHidden = false;
@@ -95,10 +104,10 @@ function createWindow() {
   // Adding hash to URL
   const urlSuffix = startInBigPicture ? "#/bigpicture" : "";
 
-  const targetUrl = isDev 
-    ? "http://localhost:5173" + urlSuffix 
+  const targetUrl = isDev
+    ? "http://localhost:5173" + urlSuffix
     : "http://localhost:46859" + urlSuffix;
-  
+
   console.log(`Loading window from: ${targetUrl}`);
   registerTrustedWebContents(mainWindow.webContents, new URL(targetUrl).origin);
   mainWindow.loadURL(targetUrl);
@@ -117,14 +126,18 @@ function createWindow() {
   });
 
   // Handle load failures (e.g., local server not running)
-  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    if (!isMainFrame || errorCode === -3 || validatedURL?.startsWith("data:")) return;
-    const safeDescription = String(errorDescription).replace(/[&<>"']/g, char =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
-    );
-    console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
-    // Show a helpful error page instead of white screen
-    mainWindow.loadURL(`data:text/html,
+  mainWindow.webContents.on(
+    "did-fail-load",
+    (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame || errorCode === -3 || validatedURL?.startsWith("data:")) return;
+      const safeDescription = String(errorDescription).replace(
+        /[&<>"']/g,
+        char =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
+      );
+      console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
+      // Show a helpful error page instead of white screen
+      mainWindow.loadURL(`data:text/html,
       <html>
         <head>
           <style>
@@ -145,7 +158,8 @@ function createWindow() {
         </body>
       </html>
     `);
-  });
+    }
+  );
 
   const guardNavigation = (event, url) => {
     if (!isAllowedAppNavigation(url)) event.preventDefault();
@@ -156,13 +170,24 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Allow Firebase/Google auth popups
     if (isAllowedAuthPopup(url)) {
-      return { action: "allow", overrideBrowserWindowOptions: {
-        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, preload: "" },
-      } };
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+            webSecurity: true,
+            preload: "",
+          },
+        },
+      };
     }
     // Open other external links in system browser
     if (isSafeExternalUrl(url)) {
-      require("electron").shell.openExternal(url).catch(error => console.warn("Unable to open link:", error.message));
+      require("electron")
+        .shell.openExternal(url)
+        .catch(error => console.warn("Unable to open link:", error.message));
     }
     return { action: "deny" };
   });
@@ -188,7 +213,9 @@ function createWindow() {
 
   // Recover from GPU/renderer process crashes that cause a black screen
   mainWindow.webContents.on("render-process-gone", (event, details) => {
-    console.error(`Renderer process gone: ${details.reason} (exitCode: ${details.exitCode})`);
+    console.error(
+      `Renderer process gone: ${details.reason} (exitCode: ${details.exitCode})`
+    );
     if (details.reason === "clean-exit") return;
     // Defer reload so Chromium can finish crash cleanup first (prevents observer assertion)
     setTimeout(() => {

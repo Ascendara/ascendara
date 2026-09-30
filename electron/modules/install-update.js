@@ -5,6 +5,8 @@ const { app } = require("electron");
 
 // Share the same installation path for automatic updates and branch switches.
 module.exports = async function installUpdate(installerPath, isLinux) {
+  if (process.platform === "darwin")
+    throw new Error("Install the macOS update from its DMG.");
   let command = installerPath;
   let args = [];
   let stagingDir;

@@ -8,7 +8,7 @@ const path = require("path");
 const os = require("os");
 const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow } = require("electron");
-const { isDev, isWindows, LANG_DIR, appDirectory } = require("./config");
+const { LANG_DIR, getHelperPath } = require("./config");
 
 let currentTranslationProcess = null;
 const TRANSLATION_PROGRESS_FILE = path.join(
@@ -67,11 +67,7 @@ function registerTranslationHandlers() {
         timestamp: Date.now(),
       });
 
-      const translationExePath = isDev
-        ? path.join(
-            "./binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation.exe"
-          )
-        : path.join(appDirectory, "/resources/AscendaraLanguageTranslation.exe");
+      const translationExePath = getHelperPath("AscendaraLanguageTranslation");
 
       if (!fs.existsSync(translationExePath)) {
         console.error("Translation executable not found at:", translationExePath);

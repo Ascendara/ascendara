@@ -14,6 +14,9 @@ const isWindows = os.platform().startsWith("win");
 const isMac = process.platform === "darwin";
 const isLinux = process.platform === "linux";
 
+// Shared Unix tool storage; Proton paths remain Linux-only.
+const unixConfigDir = !isWindows ? path.join(os.homedir(), ".ascendara") : null;
+
 // Linux-specific paths
 const linuxConfigDir = isLinux ? path.join(os.homedir(), ".ascendara") : null;
 const linuxCompatDataDir = isLinux ? path.join(linuxConfigDir, "compatdata") : null;
@@ -52,7 +55,9 @@ const TIMESTAMP_FILE = !isWindows
 
 const LANG_DIR = isWindows
   ? path.join(process.env.LOCALAPPDATA, "Ascendara", "languages")
-  : path.join(os.homedir(), ".ascendara", "languages");
+  : isMac
+    ? path.join(os.homedir(), "Library/Application Support/ascendara/languages")
+    : path.join(os.homedir(), ".ascendara", "languages");
 
 const appDirectory = path.join(path.dirname(app.getPath("exe")));
 
@@ -82,11 +87,26 @@ function getPythonPath() {
   return fs.existsSync(venvPython) ? venvPython : "python3";
 }
 
+function getHelperPath(name) {
+  const filename = name + (isWindows ? ".exe" : "");
+  return isDev
+    ? path.resolve(__dirname, "../../binaries", name, "dist", filename)
+    : path.join(process.resourcesPath, filename);
+}
+
+function getLudusaviPath() {
+  const local = path.join(unixConfigDir || appDirectory, "ludusavi");
+  if (fs.existsSync(local)) return local;
+  return isMac ? require("./wine-setup").findCommand("ludusavi") : null;
+}
+
 // Tool executables mapping
 const toolExecutables = {
-  torrent: "AscendaraTorrentHandler.exe",
-  translator: "AscendaraLanguageTranslation.exe",
-  ludusavi: "ludusavi.exe",
+  torrent: isWindows ? "AscendaraTorrentHandler.exe" : "AscendaraTorrentHandler",
+  translator: isWindows
+    ? "AscendaraLanguageTranslation.exe"
+    : "AscendaraLanguageTranslation",
+  ludusavi: isWindows ? "ludusavi.exe" : "ludusavi",
 };
 
 // Dependency registry paths for Windows
@@ -162,8 +182,11 @@ module.exports = {
   toolExecutables,
   DEPENDENCY_REGISTRY_PATHS,
   getPythonPath,
+  getHelperPath,
+  getLudusaviPath,
   isLinux,
   isMac,
+  unixConfigDir,
   linuxConfigDir,
   linuxCompatDataDir,
   linuxRunnersDir,

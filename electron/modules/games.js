@@ -9,13 +9,22 @@ const os = require("os");
 const axios = require("axios");
 const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, BrowserWindow } = require("electron");
-const { isDev, isWindows, isLinux, appDirectory, linuxUmuBin, getPythonPath } = require("./config");
-const { sanitizeGameName, sanitizeText, getExtensionFromMimeType, shouldLogError } = require("./utils");
-const { getSettingsManager } = require("./settings");
 const {
-  setPlayingActivity,
-  updateDiscordRPCToLibrary,
-} = require("./discord-rpc");
+  isDev,
+  isWindows,
+  isLinux,
+  appDirectory,
+  linuxUmuBin,
+  getPythonPath,
+} = require("./config");
+const {
+  sanitizeGameName,
+  sanitizeText,
+  getExtensionFromMimeType,
+  shouldLogError,
+} = require("./utils");
+const { getSettingsManager } = require("./settings");
+const { setPlayingActivity, updateDiscordRPCToLibrary } = require("./discord-rpc");
 const { hideWindow, showWindow } = require("./window");
 
 const steamgrid = require("./steamgrid");
@@ -27,13 +36,21 @@ const proton = isLinux ? require("./proton") : null;
 const runGameProcesses = new Map();
 
 function findCustomGame(game, settings) {
-  for (const directory of [settings.downloadDirectory, ...(settings.additionalDirectories || [])].filter(Boolean)) {
+  for (const directory of [
+    settings.downloadDirectory,
+    ...(settings.additionalDirectories || []),
+  ].filter(Boolean)) {
     try {
-      const data = JSON.parse(fs.readFileSync(path.join(directory, "games.json"), "utf8"));
-      const gameInfo = (data.games || []).find(entry => entry.game === game && !entry._isDeleted);
+      const data = JSON.parse(
+        fs.readFileSync(path.join(directory, "games.json"), "utf8")
+      );
+      const gameInfo = (data.games || []).find(
+        entry => entry.game === game && !entry._isDeleted
+      );
       if (gameInfo) return gameInfo;
     } catch (error) {
-      if (error.code !== "ENOENT") console.warn("Could not read custom game metadata:", error.message);
+      if (error.code !== "ENOENT")
+        console.warn("Could not read custom game metadata:", error.message);
     }
   }
   return null;
@@ -42,15 +59,26 @@ function findCustomGame(game, settings) {
 function getCustomGameDirectory(gameInfo, settings) {
   if (!gameInfo) return null;
   if (gameInfo.assetDirectory || gameInfo.launcher) {
-    if (typeof gameInfo.assetDirectory !== "string" || !path.isAbsolute(gameInfo.assetDirectory)) return null;
+    if (
+      typeof gameInfo.assetDirectory !== "string" ||
+      !path.isAbsolute(gameInfo.assetDirectory)
+    )
+      return null;
     const assetDirectory = path.resolve(gameInfo.assetDirectory);
-    for (const directory of [settings.downloadDirectory, ...(settings.additionalDirectories || [])].filter(Boolean)) {
+    for (const directory of [
+      settings.downloadDirectory,
+      ...(settings.additionalDirectories || []),
+    ].filter(Boolean)) {
       const root = path.resolve(directory);
       const importedRoot = path.join(root, "games", "imported");
       const relative = path.relative(importedRoot, assetDirectory);
       if (!/^[a-zA-Z0-9_-]+$/.test(relative)) continue;
       try {
-        for (const candidate of [path.join(root, "games"), importedRoot, assetDirectory]) {
+        for (const candidate of [
+          path.join(root, "games"),
+          importedRoot,
+          assetDirectory,
+        ]) {
           if (fs.existsSync(candidate)) {
             const stats = fs.lstatSync(candidate);
             if (stats.isSymbolicLink() || !stats.isDirectory()) return null;
@@ -81,7 +109,12 @@ async function validateGameExecutable(gameData) {
   }
 
   const stats = await fs.promises.stat(gameData.executable);
-  if (!stats.isFile()) {
+  const isMacApp =
+    process.platform === "darwin" &&
+    stats.isDirectory() &&
+    gameData.executable.toLowerCase().endsWith(".app") &&
+    fs.existsSync(path.join(gameData.executable, "Contents", "Info.plist"));
+  if (!stats.isFile() && !isMacApp) {
     throw new Error("Game executable path is not a file");
   }
 }
@@ -113,7 +146,7 @@ async function createShortcutInDirectory(game, shortcutDir) {
     $Shortcut.TargetPath = "${handlerPath}"
     $Shortcut.Arguments = '"${exePath}" ${isCustom ? 1 : 0} "--shortcut"'
     $Shortcut.WorkingDirectory = "${path.dirname(handlerPath)}"
-    ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = "${exePath},0"` : ''}
+    ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = "${exePath},0"` : ""}
     $Shortcut.Save()
   `;
 
@@ -171,9 +204,18 @@ async function createStartMenuShortcut(game) {
  */
 function getStartMenuProgramsDirectory() {
   return (
-    process.env.APPDATA &&
-    path.join(process.env.APPDATA, "Microsoft", "Windows", "Start Menu", "Programs")
-  ) || path.join(os.homedir(), "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs");
+    (process.env.APPDATA &&
+      path.join(process.env.APPDATA, "Microsoft", "Windows", "Start Menu", "Programs")) ||
+    path.join(
+      os.homedir(),
+      "AppData",
+      "Roaming",
+      "Microsoft",
+      "Windows",
+      "Start Menu",
+      "Programs"
+    )
+  );
 }
 
 /**
@@ -381,7 +423,9 @@ function registerGameHandlers() {
       try {
         fs.ensureDirSync(gameDirectory);
         const result = gameInfo?.launcher
-          ? ["complete", "partial"].includes(await require("./launcher-import").ensureImportedAssets(gameInfo))
+          ? ["complete", "partial"].includes(
+              await require("./launcher-import").ensureImportedAssets(gameInfo)
+            )
           : await steamgrid.fetchGameAssets(game, gameDirectory, null);
         if (result) {
           // Notify all windows that assets were updated
@@ -482,10 +526,14 @@ function registerGameHandlers() {
               try {
                 // Search in parent directory
                 const parentContents = fs.readdirSync(parentDir, { withFileTypes: true });
-                
+
                 for (const dirent of parentContents) {
                   if (dirent.isDirectory()) {
-                    const testPath = path.join(parentDir, dirent.name, executableBasename);
+                    const testPath = path.join(
+                      parentDir,
+                      dirent.name,
+                      executableBasename
+                    );
                     if (fs.existsSync(testPath)) {
                       foundPath = testPath;
                       console.log(`[Games] Found executable at: ${foundPath}`);
@@ -493,7 +541,11 @@ function registerGameHandlers() {
                     }
 
                     // Also check if the relative path works from this directory
-                    const testPathWithRelative = path.join(parentDir, dirent.name, executableToUse);
+                    const testPathWithRelative = path.join(
+                      parentDir,
+                      dirent.name,
+                      executableToUse
+                    );
                     if (fs.existsSync(testPathWithRelative)) {
                       foundPath = testPathWithRelative;
                       console.log(`[Games] Found executable at: ${foundPath}`);
@@ -504,7 +556,7 @@ function registerGameHandlers() {
               } catch (searchError) {
                 console.error(`[Games] Error searching for executable:`, searchError);
               }
-              
+
               if (foundPath) {
                 executable = foundPath;
                 // Update the game info file with the correct absolute path
@@ -533,16 +585,23 @@ function registerGameHandlers() {
 
           executable = specificExecutable || gameInfo.executable;
           if (!executable) {
-            throw new Error("No game executable is set. Use the Executable Manager to choose the game's executable, or scan your launcher again.");
+            throw new Error(
+              "No game executable is set. Use the Executable Manager to choose the game's executable, or scan your launcher again."
+            );
           }
-          if (typeof executable !== "string" || !executable ||
+          if (
+            typeof executable !== "string" ||
+            !executable ||
             /^[a-z][a-z0-9+.-]*:\/\//i.test(executable) ||
-            ((gameInfo.launcher || gameInfo.assetDirectory) && !path.isAbsolute(executable))) {
+            ((gameInfo.launcher || gameInfo.assetDirectory) &&
+              !path.isAbsolute(executable))
+          ) {
             throw new Error("Game executable must be a valid file path");
           }
-          gameDirectory = gameInfo.launcher || gameInfo.assetDirectory
-            ? getCustomGameDirectory(gameInfo, settings)
-            : path.dirname(executable);
+          gameDirectory =
+            gameInfo.launcher || gameInfo.assetDirectory
+              ? getCustomGameDirectory(gameInfo, settings)
+              : path.dirname(executable);
         }
 
         if (!fs.existsSync(executable)) {
@@ -586,7 +645,6 @@ function registerGameHandlers() {
 
         // Linux Proton/Wine: inject runner args
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
-
           // Auto-detect UMU ID if not already set
           try {
             const { autoDetectAndSaveUmuId, getGameUmuId } = require("./umu-database");
@@ -643,9 +701,7 @@ function registerGameHandlers() {
             "--linux-runner-type",
             launchConfig.mode === "umu" ? "umu" : launchConfig.runner.type,
             "--linux-runner-path",
-            launchConfig.mode === "umu"
-              ? linuxUmuBin 
-              : launchConfig.runner.path,
+            launchConfig.mode === "umu" ? linuxUmuBin : launchConfig.runner.path,
             "--linux-compat-data",
             launchConfig.compatDataPath,
             "--linux-steam-path",
@@ -732,9 +788,11 @@ function registerGameHandlers() {
         if (isWindows && gameDirectory) {
           const customGame = isCustom ? findCustomGame(game, settings) : null;
           fs.ensureDir(gameDirectory)
-            .then(() => customGame?.launcher
-              ? require("./launcher-import").ensureImportedAssets(customGame)
-              : steamgrid.fetchGameAssets(game, gameDirectory))
+            .then(() =>
+              customGame?.launcher
+                ? require("./launcher-import").ensureImportedAssets(customGame)
+                : steamgrid.fetchGameAssets(game, gameDirectory)
+            )
             .catch(err => console.error(`Failed to fetch assets for ${game}:`, err));
         }
 
@@ -777,13 +835,17 @@ function registerGameHandlers() {
       for (const dir of allDirectories) {
         const testPath = path.join(dir, sanitizedGame, `${sanitizedGame}.ascendara.json`);
         if (fs.existsSync(testPath)) {
-          try { gameInfo = JSON.parse(fs.readFileSync(testPath, "utf8")); } catch (e) {}
+          try {
+            gameInfo = JSON.parse(fs.readFileSync(testPath, "utf8"));
+          } catch (e) {}
           break;
         }
         // Also try with original name (unsanitized folder)
         const testPathOrig = path.join(dir, gameName, `${gameName}.ascendara.json`);
         if (fs.existsSync(testPathOrig)) {
-          try { gameInfo = JSON.parse(fs.readFileSync(testPathOrig, "utf8")); } catch (e) {}
+          try {
+            gameInfo = JSON.parse(fs.readFileSync(testPathOrig, "utf8"));
+          } catch (e) {}
           break;
         }
       }
@@ -793,7 +855,9 @@ function registerGameHandlers() {
       // Ensure games.json exists
       let gamesData = { games: [] };
       if (fs.existsSync(gamesFilePath)) {
-        try { gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8")); } catch (e) {}
+        try {
+          gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+        } catch (e) {}
       }
       if (!Array.isArray(gamesData.games)) gamesData.games = [];
 
@@ -834,7 +898,8 @@ function registerGameHandlers() {
       if (!settings.downloadDirectory) return { success: false };
 
       const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-      if (!fs.existsSync(gamesFilePath)) return { success: false, error: "No games.json" };
+      if (!fs.existsSync(gamesFilePath))
+        return { success: false, error: "No games.json" };
 
       const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
       const stub = (gamesData.games || []).find(g => g._isDeleted && g.game === gameName);
@@ -850,18 +915,28 @@ function registerGameHandlers() {
       let restored = false;
       for (const dir of allDirectories) {
         for (const nameVariant of [sanitizedGame, gameName]) {
-          const gameInfoPath = path.join(dir, nameVariant, `${nameVariant}.ascendara.json`);
+          const gameInfoPath = path.join(
+            dir,
+            nameVariant,
+            `${nameVariant}.ascendara.json`
+          );
           if (fs.existsSync(gameInfoPath)) {
             try {
               const gameData = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
               gameData.playTime = Math.max(gameData.playTime || 0, stub.playTime || 0);
-              gameData.launchCount = Math.max(gameData.launchCount || 0, stub.launchCount || 0);
+              gameData.launchCount = Math.max(
+                gameData.launchCount || 0,
+                stub.launchCount || 0
+              );
               if (stub.lastPlayed) gameData.lastPlayed = stub.lastPlayed;
               if (stub.favorite) gameData.favorite = true;
               fs.writeFileSync(gameInfoPath, JSON.stringify(gameData, null, 2));
               restored = true;
             } catch (e) {
-              console.warn(`[restore-deleted-game-data] Could not write game info:`, e.message);
+              console.warn(
+                `[restore-deleted-game-data] Could not write game info:`,
+                e.message
+              );
             }
             break;
           }
@@ -871,7 +946,9 @@ function registerGameHandlers() {
 
       // If no .ascendara.json found, try merging into a matching custom game entry in games.json
       if (!restored) {
-        const customIdx = gamesData.games.findIndex(g => !g._isDeleted && g.game === gameName);
+        const customIdx = gamesData.games.findIndex(
+          g => !g._isDeleted && g.game === gameName
+        );
         if (customIdx !== -1) {
           const entry = gamesData.games[customIdx];
           gamesData.games[customIdx] = {
@@ -886,7 +963,9 @@ function registerGameHandlers() {
       }
 
       // Remove the stub regardless of whether the game info was found
-      gamesData.games = gamesData.games.filter(g => !(g._isDeleted && g.game === gameName));
+      gamesData.games = gamesData.games.filter(
+        g => !(g._isDeleted && g.game === gameName)
+      );
       fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
       console.log(`[restore-deleted-game-data] Restored data for: ${gameName}`);
       return { success: true, restored };
@@ -906,7 +985,9 @@ function registerGameHandlers() {
       if (!fs.existsSync(gamesFilePath)) return { success: true };
 
       const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-      gamesData.games = (gamesData.games || []).filter(g => !(g._isDeleted && g.game === gameName));
+      gamesData.games = (gamesData.games || []).filter(
+        g => !(g._isDeleted && g.game === gameName)
+      );
       fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
       console.log(`[discard-deleted-game-data] Discarded stub for: ${gameName}`);
       return { success: true };
@@ -950,34 +1031,37 @@ function registerGameHandlers() {
 
   // Rename an existing conflicting game folder out of the way (e.g. "_OLD")
   // so a fresh download can use the original folder name.
-  ipcMain.handle("rename-existing-game-directory", async (_, game, additionalDirIndex) => {
-    try {
-      const settings = settingsManager.getSettings();
-      if (!settings.downloadDirectory) return { success: false };
+  ipcMain.handle(
+    "rename-existing-game-directory",
+    async (_, game, additionalDirIndex) => {
+      try {
+        const settings = settingsManager.getSettings();
+        if (!settings.downloadDirectory) return { success: false };
 
-      const sanitizedGame = sanitizeGameName(sanitizeText(game));
-      const targetDirectory = resolveTargetDirectory(settings, additionalDirIndex);
-      const gameDirectory = path.join(targetDirectory, sanitizedGame);
+        const sanitizedGame = sanitizeGameName(sanitizeText(game));
+        const targetDirectory = resolveTargetDirectory(settings, additionalDirIndex);
+        const gameDirectory = path.join(targetDirectory, sanitizedGame);
 
-      if (!fs.existsSync(gameDirectory)) {
-        return { success: true, skipped: true };
+        if (!fs.existsSync(gameDirectory)) {
+          return { success: true, skipped: true };
+        }
+
+        let newPath = `${gameDirectory}_OLD`;
+        let counter = 1;
+        while (fs.existsSync(newPath)) {
+          newPath = `${gameDirectory}_OLD${counter}`;
+          counter++;
+        }
+
+        fs.renameSync(gameDirectory, newPath);
+        console.log(`Renamed existing game directory: ${gameDirectory} -> ${newPath}`);
+        return { success: true, newPath };
+      } catch (error) {
+        console.error("Error renaming existing game directory:", error);
+        return { success: false, error: error.message };
       }
-
-      let newPath = `${gameDirectory}_OLD`;
-      let counter = 1;
-      while (fs.existsSync(newPath)) {
-        newPath = `${gameDirectory}_OLD${counter}`;
-        counter++;
-      }
-
-      fs.renameSync(gameDirectory, newPath);
-      console.log(`Renamed existing game directory: ${gameDirectory} -> ${newPath}`);
-      return { success: true, newPath };
-    } catch (error) {
-      console.error("Error renaming existing game directory:", error);
-      return { success: false, error: error.message };
     }
-  });
+  );
 
   // Delete game
   ipcMain.handle("delete-game", async (_, game) => {
@@ -1061,7 +1145,11 @@ function registerGameHandlers() {
     }
 
     if (game === "debuglog") {
-      shell.openPath(path.join(process.env.APPDATA, "Ascendara by tagoWorks"));
+      shell.openPath(
+        isWindows
+          ? path.join(process.env.APPDATA, "Ascendara by tagoWorks")
+          : app.getPath("userData")
+      );
       return;
     }
 
@@ -1101,8 +1189,15 @@ function registerGameHandlers() {
         const gameInfo = findCustomGame(game, settings);
         const directory = gameInfo?.launcher
           ? gameInfo.installPath
-          : gameInfo?.executable ? path.dirname(gameInfo.executable) : null;
-        if (typeof directory === "string" && path.isAbsolute(directory) && fs.existsSync(directory) && fs.statSync(directory).isDirectory()) {
+          : gameInfo?.executable
+            ? path.dirname(gameInfo.executable)
+            : null;
+        if (
+          typeof directory === "string" &&
+          path.isAbsolute(directory) &&
+          fs.existsSync(directory) &&
+          fs.statSync(directory).isDirectory()
+        ) {
           return shell.openPath(directory);
         }
       } catch (error) {
@@ -1140,10 +1235,24 @@ function registerGameHandlers() {
     const gameInfo = findCustomGame(game, settings);
     const customDir = getCustomGameDirectory(gameInfo, settings);
     if (gameInfo?.launcher && type === "header") {
-      searchPatterns = [...searchPatterns, "hero.ascendara.jpg", "hero.ascendara.png", "grid.ascendara.jpg", "grid.ascendara.png"];
+      searchPatterns = [
+        ...searchPatterns,
+        "hero.ascendara.jpg",
+        "hero.ascendara.png",
+        "grid.ascendara.jpg",
+        "grid.ascendara.png",
+      ];
     }
-    if (gameInfo?.launcher && customDir && ["grid", "header"].includes(type) && path.basename(game) === game) {
-      for (const directory of [settings.downloadDirectory, ...(settings.additionalDirectories || [])].filter(Boolean)) {
+    if (
+      gameInfo?.launcher &&
+      customDir &&
+      ["grid", "header"].includes(type) &&
+      path.basename(game) === game
+    ) {
+      for (const directory of [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ].filter(Boolean)) {
         for (const extension of [".jpg", ".png", ".jpeg"]) {
           const cover = path.join(directory, "games", `${game}.ascendara${extension}`);
           if (fs.existsSync(cover)) return fs.readFileSync(cover).toString("base64");
@@ -1201,7 +1310,8 @@ function registerGameHandlers() {
   // Save game asset (grid, logo, hero images)
   ipcMain.handle("save-game-asset", async (_, gameName, filename, dataUrl) => {
     const settings = settingsManager.getSettings();
-    if (!settings.downloadDirectory) return { success: false, error: "No download directory" };
+    if (!settings.downloadDirectory)
+      return { success: false, error: "No download directory" };
 
     try {
       // Convert data URL to buffer
@@ -1237,17 +1347,17 @@ function registerGameHandlers() {
         return { success: false, error: "Game directory not found" };
       }
 
-      if (typeof filename !== "string" || !/^(header|grid|hero|logo)\.ascendara\.(jpg|jpeg|png)$/.test(filename)) {
+      if (
+        typeof filename !== "string" ||
+        !/^(header|grid|hero|logo)\.ascendara\.(jpg|jpeg|png)$/.test(filename)
+      ) {
         return { success: false, error: "Invalid asset filename" };
       }
       fs.ensureDirSync(gameDir);
 
       // Delete old assets with same type (e.g., old grid.ascendara.jpg)
       const assetType = filename.split(".")[0]; // grid, logo, or hero
-      const oldPatterns = [
-        `${assetType}.ascendara.jpg`,
-        `${assetType}.ascendara.png`,
-      ];
+      const oldPatterns = [`${assetType}.ascendara.jpg`, `${assetType}.ascendara.png`];
       for (const pattern of oldPatterns) {
         const oldPath = path.join(gameDir, pattern);
         if (fs.existsSync(oldPath)) {
@@ -1297,7 +1407,9 @@ function registerGameHandlers() {
 
     // Check if header image already exists (race condition guard)
     let files = [];
-    try { files = fs.readdirSync(gameDirectory); } catch (e) {}
+    try {
+      files = fs.readdirSync(gameDirectory);
+    } catch (e) {}
     const existingHeader = files.find(f => f.startsWith("header.ascendara"));
     if (existingHeader) {
       const buffer = fs.readFileSync(path.join(gameDirectory, existingHeader));
@@ -1314,15 +1426,15 @@ function registerGameHandlers() {
       if (fs.existsSync(gamesJsonPath)) {
         try {
           const gamesData = JSON.parse(fs.readFileSync(gamesJsonPath, "utf8"));
-          const games = Array.isArray(gamesData) ? gamesData : (gamesData.games || []);
+          const games = Array.isArray(gamesData) ? gamesData : gamesData.games || [];
           let imgID = null;
           if (gameID) {
             const match = games.find(g => g.gameID === gameID);
             if (match?.imgID) imgID = match.imgID;
           }
           if (!imgID) {
-            const match = games.find(g =>
-              (g.game || g.name || "").toLowerCase() === gameName.toLowerCase()
+            const match = games.find(
+              g => (g.game || g.name || "").toLowerCase() === gameName.toLowerCase()
             );
             if (match?.imgID) imgID = match.imgID;
           }
@@ -1332,11 +1444,16 @@ function registerGameHandlers() {
               imageBuffer = fs.readFileSync(localImagePath);
               headerImagePath = path.join(gameDirectory, "header.ascendara.jpg");
               await fs.promises.writeFile(headerImagePath, imageBuffer);
-              console.log(`[repair-game-image] Restored header from local index for: ${gameName}`);
+              console.log(
+                `[repair-game-image] Restored header from local index for: ${gameName}`
+              );
             }
           }
         } catch (e) {
-          console.warn(`[repair-game-image] Local index lookup failed for ${gameName}:`, e.message);
+          console.warn(
+            `[repair-game-image] Local index lookup failed for ${gameName}:`,
+            e.message
+          );
         }
       }
     }
@@ -1346,16 +1463,26 @@ function registerGameHandlers() {
       try {
         const steamGridHeader = await steamgrid.getHeaderUrl(gameName);
         if (steamGridHeader?.url) {
-          const response = await axios({ url: steamGridHeader.url, method: "GET", responseType: "arraybuffer", timeout: 10000 });
+          const response = await axios({
+            url: steamGridHeader.url,
+            method: "GET",
+            responseType: "arraybuffer",
+            timeout: 10000,
+          });
           imageBuffer = Buffer.from(response.data);
           const mimeType = response.headers["content-type"] || "image/jpeg";
           const ext = getExtensionFromMimeType(mimeType);
           headerImagePath = path.join(gameDirectory, `header.ascendara${ext}`);
           await fs.promises.writeFile(headerImagePath, imageBuffer);
-          console.log(`[repair-game-image] Restored header from SteamGridDB for: ${gameName}`);
+          console.log(
+            `[repair-game-image] Restored header from SteamGridDB for: ${gameName}`
+          );
         }
       } catch (e) {
-        console.warn(`[repair-game-image] SteamGridDB fallback failed for ${gameName}:`, e.message);
+        console.warn(
+          `[repair-game-image] SteamGridDB fallback failed for ${gameName}:`,
+          e.message
+        );
       }
     }
 
@@ -1426,11 +1553,16 @@ function registerGameHandlers() {
       }
 
       if (isCustom) {
-        for (const directory of [settings.downloadDirectory, ...(settings.additionalDirectories || [])].filter(Boolean)) {
+        for (const directory of [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ].filter(Boolean)) {
           const gamesPath = path.join(directory, "games.json");
           if (!fs.existsSync(gamesPath)) continue;
           const gamesData = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
-          const gameIndex = gamesData.games.findIndex(g => g.game === game && !g._isDeleted);
+          const gameIndex = gamesData.games.findIndex(
+            g => g.game === game && !g._isDeleted
+          );
           if (gameIndex === -1) continue;
           gamesData.games[gameIndex].executable = executables[0];
           gamesData.games[gameIndex].executables = executables;
@@ -1704,10 +1836,7 @@ function registerGameHandlers() {
           gameData.playTime = mergeNumber(gameData.playTime, cloudData.playTime);
         }
         if (cloudData.launchCount !== undefined) {
-          gameData.launchCount = mergeNumber(
-            gameData.launchCount,
-            cloudData.launchCount
-          );
+          gameData.launchCount = mergeNumber(gameData.launchCount, cloudData.launchCount);
         }
         if (cloudData.lastPlayed !== undefined) {
           gameData.lastPlayed = mergeLastPlayed(
@@ -1751,16 +1880,10 @@ function registerGameHandlers() {
             target.playTime = mergeNumber(target.playTime, cloudData.playTime);
           }
           if (cloudData.launchCount !== undefined) {
-            target.launchCount = mergeNumber(
-              target.launchCount,
-              cloudData.launchCount
-            );
+            target.launchCount = mergeNumber(target.launchCount, cloudData.launchCount);
           }
           if (cloudData.lastPlayed !== undefined) {
-            target.lastPlayed = mergeLastPlayed(
-              target.lastPlayed,
-              cloudData.lastPlayed
-            );
+            target.lastPlayed = mergeLastPlayed(target.lastPlayed, cloudData.lastPlayed);
           }
           if (cloudData.favorite !== undefined) {
             target.favorite = !!(target.favorite || cloudData.favorite);

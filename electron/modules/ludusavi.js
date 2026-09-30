@@ -25,9 +25,7 @@ function writeLudusaviConfig(configDir, customGames = []) {
 
   const localUserDir = os.homedir();
   // Different default user according to the platform
-  const cloudUserDir = isWindows
-    ? "C:\\Users\\ascendara_user"
-    : "/home/ascendara_user";
+  const cloudUserDir = isWindows ? "C:\\Users\\ascendara_user" : "/home/ascendara_user";
 
   let yaml = `redirects:\n`;
   yaml += `  - kind: bidirectional\n`;
@@ -71,7 +69,9 @@ function writeLudusaviConfig(configDir, customGames = []) {
 function getConfiguredGameDirectories(settings) {
   const directories = [
     settings.downloadDirectory,
-    ...(Array.isArray(settings.additionalDirectories) ? settings.additionalDirectories : []),
+    ...(Array.isArray(settings.additionalDirectories)
+      ? settings.additionalDirectories
+      : []),
   ]
     .map(directory => (typeof directory === "string" ? directory.trim() : ""))
     .filter(Boolean);
@@ -319,11 +319,10 @@ function registerLudusaviHandlers() {
           : path.join(appDirectory, "/resources/ludusavi.exe");
       } else {
         // Linux : downloaded in ~/.ascendara/
-        const { linuxConfigDir } = require("./config");
-        ludusaviPath = path.join(linuxConfigDir, "ludusavi");
+        ludusaviPath = require("./config").getLudusaviPath();
       }
 
-      if (!fs.existsSync(ludusaviPath)) {
+      if (!ludusaviPath || !fs.existsSync(ludusaviPath)) {
         console.error(`[Ludusavi] Executable not found at: ${ludusaviPath}`);
         return {
           success: false,
@@ -334,12 +333,15 @@ function registerLudusaviHandlers() {
       const settings = settingsManager.getSettings();
       const ludusaviSettings = settings.ludusavi || {};
 
-      if (!fs.existsSync(ludusaviPath)) {
+      if (!ludusaviPath || !fs.existsSync(ludusaviPath)) {
         return { success: false, error: "Ludusavi executable not found" };
       }
 
       // Always regenerate config.yaml with up-to-date customGames before any command
-      const ludusaviConfigDir = path.join(app.getPath("userData"), "ludusavi-cloud-config");
+      const ludusaviConfigDir = path.join(
+        app.getPath("userData"),
+        "ludusavi-cloud-config"
+      );
       const allCustomGames = collectAllCustomGames(settings);
       writeLudusaviConfig(ludusaviConfigDir, allCustomGames);
 
@@ -351,7 +353,10 @@ function registerLudusaviHandlers() {
       // to the manifest's canonical title before backup/restore/list, while
       // keeping `game` (Ascendara's own name) for everything else below.
       let resolvedGame = game;
-      if (game && (action === "backup" || action === "restore" || action === "list-backups")) {
+      if (
+        game &&
+        (action === "backup" || action === "restore" || action === "list-backups")
+      ) {
         resolvedGame = await resolveLudusaviGameName(
           ludusaviPath,
           ludusaviConfigDir,
@@ -532,7 +537,10 @@ function registerLudusaviHandlers() {
       writeCustomSavePaths(gameName, isCustomGame, settings, cleaned);
 
       // Eagerly regenerate config.yaml
-      const ludusaviConfigDir = path.join(app.getPath("userData"), "ludusavi-cloud-config");
+      const ludusaviConfigDir = path.join(
+        app.getPath("userData"),
+        "ludusavi-cloud-config"
+      );
       const allCustomGames = collectAllCustomGames(settings);
       writeLudusaviConfig(ludusaviConfigDir, allCustomGames);
 

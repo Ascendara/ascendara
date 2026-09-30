@@ -20,7 +20,6 @@ const {
   isLinux,
   TIMESTAMP_FILE,
   LANG_DIR,
-  appDirectory,
   getPythonPath,
 } = require("./config");
 const { updateTimestampFile } = require("./utils");
@@ -142,10 +141,18 @@ async function checkVersionAndUpdate() {
       `Version check [${currentBranch}]: Current=${currentVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
-      if (settings.autoUpdate && !updateDownloadInProgress && !updateDownloaded) {
+      if (
+        process.platform !== "darwin" &&
+        settings.autoUpdate &&
+        !updateDownloadInProgress &&
+        !updateDownloaded
+      ) {
         // Start background download
         downloadUpdatePromise = downloadUpdateInBackground();
-      } else if (!settings.autoUpdate && !notificationShown) {
+      } else if (
+        (!settings.autoUpdate || process.platform === "darwin") &&
+        !notificationShown
+      ) {
         // Show update available notification
         notificationShown = true;
         BrowserWindow.getAllWindows().forEach(window => {
@@ -265,7 +272,7 @@ async function getNewLangKeys() {
               ? path.join(
                   "./binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation.exe"
                 )
-              : path.join(appDirectory, "/resources/AscendaraLanguageTranslation.exe");
+              : path.join(process.resourcesPath, "AscendaraLanguageTranslation.exe");
             args = [langCode, "--updateKeys"];
           } else if (isDev) {
             translatorExePath = getPythonPath();
@@ -276,8 +283,8 @@ async function getNewLangKeys() {
             ];
           } else {
             translatorExePath = path.join(
-              appDirectory,
-              "/resources/AscendaraLanguageTranslation"
+              process.resourcesPath,
+              "AscendaraLanguageTranslation"
             );
             args = [langCode, "--updateKeys"];
           }
@@ -351,6 +358,10 @@ async function getNewLangKeys() {
  * Download update in background
  */
 async function downloadUpdateInBackground() {
+  if (process.platform === "darwin")
+    throw new Error(
+      "Install macOS updates from the latest Ascendara DMG. Automatic macOS updates are not configured."
+    );
   if (updateDownloadInProgress) return;
   updateDownloadInProgress = true;
 
@@ -528,6 +539,12 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("switch-branch", async (_, branch) => {
+    if (process.platform === "darwin")
+      return {
+        success: false,
+        error:
+          "Install the macOS DMG for the desired branch. Automatic macOS branch switching is not configured.",
+      };
     const branchUrls = {
       live: "https://lfs.ascendara.app/download?update",
       "public-testing": "https://lfs.ascendara.app/download?branch=public-testing",

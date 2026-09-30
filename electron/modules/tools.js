@@ -10,6 +10,8 @@ const { ipcMain, BrowserWindow } = require("electron");
 const {
   isDev,
   isWindows,
+  isMac,
+  getHelperPath,
   TIMESTAMP_FILE,
   toolExecutables,
   appDirectory,
@@ -32,7 +34,7 @@ function checkInstalledTools() {
     if (isDev) {
       return;
     }
-    const toolsDirectory = path.join(appDirectory, "resources");
+    const toolsDirectory = process.resourcesPath;
 
     if (fs.existsSync(TIMESTAMP_FILE)) {
       const timestampData = JSON.parse(fs.readFileSync(TIMESTAMP_FILE, "utf8"));
@@ -63,6 +65,19 @@ function checkInstalledTools() {
  * @param {string} tool - Tool name to install
  */
 async function installTool(tool) {
+  if (!Object.hasOwn(toolExecutables, tool))
+    return { success: false, message: "Unknown tool" };
+  if (isMac) {
+    const installed = getInstalledTools().includes(tool);
+    return {
+      success: installed,
+      message: installed
+        ? `${tool} is available`
+        : tool === "ludusavi"
+          ? "Install the macOS version of Ludusavi on PATH or at ~/.ascendara/ludusavi."
+          : "Reinstall Ascendara to restore the bundled helper.",
+    };
+  }
   console.log(`Installing ${tool}`);
   const toolUrls = {
     torrent: "https://cdn.ascendara.app/files/AscendaraTorrentHandler.exe",
@@ -74,7 +89,7 @@ async function installTool(tool) {
 
   let toolPath;
   if (!isWindows && tool === "ludusavi") {
-    const { linuxConfigDir } = require("./config");
+    const { unixConfigDir: linuxConfigDir } = require("./config");
     fs.ensureDirSync(linuxConfigDir);
     toolPath = path.join(linuxConfigDir, "ludusavi");
   } else {
@@ -112,12 +127,19 @@ async function installTool(tool) {
  * @returns {string[]} - Array of installed tool names
  */
 function getInstalledTools() {
+  if (isMac) {
+    const tools = ["translator", "torrent"].filter(tool =>
+      fs.existsSync(getHelperPath(toolExecutables[tool]))
+    );
+    if (require("./config").getLudusaviPath()) tools.push("ludusavi");
+    return tools;
+  }
   if (isWindows && !isDev) {
     return installedTools;
   } else if (!isWindows) {
-    const { linuxConfigDir } = require("./config");
+    const { unixConfigDir: linuxConfigDir } = require("./config");
     const tools = ["translator", "torrent"];
-    
+
     // verify ludusavi
     if (fs.existsSync(path.join(linuxConfigDir, "ludusavi"))) {
       tools.push("ludusavi");
@@ -137,6 +159,7 @@ function registerToolHandlers() {
   });
 
   ipcMain.handle("install-tool", async (_, tool) => {
+    if (isMac || !Object.hasOwn(toolExecutables, tool)) return installTool(tool);
     console.log(`Installing ${tool}`);
 
     const toolUrls = {
@@ -150,13 +173,13 @@ function registerToolHandlers() {
     // On Linux, ludusavi is downloaded directly from the CDN into ~/.ascendara/
     let toolDirectory, toolExecutable;
     if (!isWindows && tool === "ludusavi") {
-      const { linuxConfigDir } = require("./config");
+      const { unixConfigDir: linuxConfigDir } = require("./config");
       fs.ensureDirSync(linuxConfigDir);
       toolDirectory = linuxConfigDir;
       toolExecutable = "ludusavi";
     } else {
       toolExecutable = toolExecutables[tool];
-      toolDirectory = path.join(appDirectory, "resources");
+      toolDirectory = process.resourcesPath;
     }
     const toolPath = path.join(toolDirectory, toolExecutable);
 

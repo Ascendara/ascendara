@@ -116,20 +116,20 @@ function launchCrashReporter(errorType, errorMessage) {
  */
 function createTray() {
   // Use the correct icon path - try multiple locations
-  const isLinux = process.platform === "linux";
+  const isUnix = process.platform !== "win32";
   let iconPath;
   if (isDev) {
-    iconPath = isLinux
+    iconPath = isUnix
       ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
       : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   } else {
     // In production, icon should be in resources
-    iconPath = isLinux
+    iconPath = isUnix
       ? path.join(process.resourcesPath, "icon.png")
       : path.join(process.resourcesPath, "icon.ico");
     // Fallback to app directory if not in resources
     if (!fs.existsSync(iconPath)) {
-      iconPath = isLinux
+      iconPath = isUnix
         ? path.join(config.appDirectory, "icon.png")
         : path.join(config.appDirectory, "icon.ico");
     }
@@ -138,7 +138,7 @@ function createTray() {
   // Verify icon exists
   if (!fs.existsSync(iconPath)) {
     console.error("Tray icon not found at:", iconPath);
-    iconPath = isLinux
+    iconPath = isUnix
       ? path.join(__dirname, "../readme/logo/png/ascendara_64x.png")
       : path.join(__dirname, "../readme/logo/ico/ascendara_64x.ico");
   }
@@ -197,19 +197,16 @@ function createTray() {
 }
 
 /**
- * Start the achievement watcher process (Windows and Linux)
+ * Start the achievement watcher process
  */
 function startAchievementWatcher() {
   // Migrate the legacy completion flag before the watcher can rewrite it.
   require("./modules/onboarding").hasCompletedOnboarding();
-  if (process.platform !== "win32" && process.platform !== "linux") {
-    return;
-  }
 
   const { spawn } = require("child_process");
 
-  const isLinux = process.platform === "linux";
-  const watcherExePath = isLinux
+  const isUnix = process.platform !== "win32";
+  const watcherExePath = isUnix
     ? isDev
       ? "./binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher"
       : path.join(process.resourcesPath, "AscendaraAchievementWatcher")
@@ -228,7 +225,7 @@ function startAchievementWatcher() {
       ...process.env,
       ASCENDARA_STEAM_WEB_API_KEY: config.steamWebApiKey,
     },
-    windowsHide: !isLinux,
+    windowsHide: !isUnix,
   });
 
   watcherProcess.stdout.on("data", data => {
@@ -463,6 +460,8 @@ async function initializeApp() {
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         windowModule.createWindow();
+      } else {
+        windowModule.showWindow();
       }
     });
   });

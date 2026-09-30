@@ -76,17 +76,22 @@ function registerSteamCMDHandlers() {
   });
 
   // Install steamcmd.exe from Ascendara CDN
-  ipcMain.handle("install-steamcmd", async (event) => {
+  ipcMain.handle("install-steamcmd", async event => {
+    if (!isWindows) return { success: false, error: "This feature requires Windows." };
     try {
       const steamCMDUrl = "https://cdn.ascendara.app/files/steamcmd.exe";
       const steamCMDDir = path.join(os.homedir(), "ascendaraSteamcmd");
 
-      event.sender.send("install-progress", { message: "Creating installation directory..." });
+      event.sender.send("install-progress", {
+        message: "Creating installation directory...",
+      });
 
       // Ensure the directory exists
       await fs.promises.mkdir(steamCMDDir, { recursive: true });
 
-      event.sender.send("install-progress", { message: "Downloading SteamCMD from CDN..." });
+      event.sender.send("install-progress", {
+        message: "Downloading SteamCMD from CDN...",
+      });
 
       // Download steamcmd.exe
       await electronDl.download(BrowserWindow.getFocusedWindow(), steamCMDUrl, {
@@ -94,21 +99,23 @@ function registerSteamCMDHandlers() {
         filename: "steamcmd.exe",
       });
 
-      event.sender.send("install-progress", { message: "Download complete. Initializing SteamCMD..." });
+      event.sender.send("install-progress", {
+        message: "Download complete. Initializing SteamCMD...",
+      });
 
       // Run steamcmd.exe to create initial files
       const steamCMDPath = path.join(steamCMDDir, "steamcmd.exe");
       await new Promise((resolve, reject) => {
         const steamCmd = spawn(steamCMDPath, ["+quit"]);
 
-        steamCmd.stdout.on("data", (data) => {
+        steamCmd.stdout.on("data", data => {
           const text = data.toString().trim();
           if (text) {
             event.sender.send("install-progress", { message: text });
           }
         });
 
-        steamCmd.stderr.on("data", (data) => {
+        steamCmd.stderr.on("data", data => {
           const text = data.toString().trim();
           if (text) {
             event.sender.send("install-progress", { message: text });
@@ -135,7 +142,9 @@ function registerSteamCMDHandlers() {
         steamCMD: true,
       });
 
-      event.sender.send("install-progress", { message: "Installation completed successfully!" });
+      event.sender.send("install-progress", {
+        message: "Installation completed successfully!",
+      });
 
       return {
         success: true,
@@ -153,6 +162,7 @@ function registerSteamCMDHandlers() {
 
   // Download item with steamcmd
   ipcMain.handle("download-item", async (event, url) => {
+    if (!isWindows) return { success: false, error: "This feature requires Windows." };
     try {
       // Extract the item ID from the URL
       const itemId = url.match(/id=(\d+)/)?.[1];

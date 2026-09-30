@@ -26,7 +26,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ShieldAlert, Languages, Loader, Hand, RefreshCw, CircleAlert, Plus, FolderOpen, X, ExternalLink, History, ArrowRight, Download, Scale, FlaskConical, ChevronLeft, ChevronRight, Zap, Battery, BatteryMedium, BatteryLow, BatteryFull, SquareTerminal, Package, AlertTriangle, FolderSync, FileCheck2, CpuIcon, CornerDownRight, Database, LoaderIcon, Palette, Download as DownloadIcon, UploadIcon, Globe, MessageCircleQuestion, Star, Home, CheckCircle, Info, Search, Library, Settings2, Gamepad2, ClipboardList } from "lucide-react";
+import {
+  ShieldAlert,
+  Languages,
+  Loader,
+  Hand,
+  RefreshCw,
+  CircleAlert,
+  Plus,
+  FolderOpen,
+  X,
+  ExternalLink,
+  History,
+  ArrowRight,
+  Download,
+  Scale,
+  FlaskConical,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
+  Battery,
+  BatteryMedium,
+  BatteryLow,
+  BatteryFull,
+  SquareTerminal,
+  Package,
+  AlertTriangle,
+  FolderSync,
+  FileCheck2,
+  CpuIcon,
+  CornerDownRight,
+  Database,
+  LoaderIcon,
+  Palette,
+  Download as DownloadIcon,
+  UploadIcon,
+  Globe,
+  MessageCircleQuestion,
+  Star,
+  Home,
+  CheckCircle,
+  Info,
+  Search,
+  Library,
+  Settings2,
+  Gamepad2,
+  ClipboardList,
+} from "lucide-react";
 import gameService from "@/services/gameService";
 import { useNavigate } from "react-router-dom";
 import { getAvailableLanguages, handleLanguageChange } from "@/services/languageService";
@@ -413,7 +459,11 @@ function Settings() {
     if (window.electron?.onLocalRefreshProgress) {
       const handleProgressUpdate = async data => {
         // Any progress update while status is not terminal means a refresh is active
-        if (data.status === "completed" || data.status === "failed" || data.status === "error") {
+        if (
+          data.status === "completed" ||
+          data.status === "failed" ||
+          data.status === "error"
+        ) {
           setIsIndexRefreshing(false);
           setIndexRefreshProgress(null);
           if (data.status === "completed" && data.lastSuccessfulTimestamp) {
@@ -679,15 +729,15 @@ function Settings() {
 
   // Load qBittorrent install note dismissal state
   useEffect(() => {
-    const dismissed = localStorage.getItem('hideQbitInstallNote');
-    if (dismissed === 'true') {
+    const dismissed = localStorage.getItem("hideQbitInstallNote");
+    if (dismissed === "true") {
       setHideQbitInstallNote(true);
     }
   }, []);
 
   // Save qBittorrent install note dismissal state
   const handleDismissQbitInstallNote = () => {
-    localStorage.setItem('hideQbitInstallNote', 'true');
+    localStorage.setItem("hideQbitInstallNote", "true");
     setHideQbitInstallNote(true);
   };
 
@@ -1181,8 +1231,7 @@ function Settings() {
         if (scrollToBottom) {
           // Scroll to the very bottom of the settings page (torrenting +
           // experimental sections live there).
-          const scroller =
-            document.scrollingElement || document.documentElement;
+          const scroller = document.scrollingElement || document.documentElement;
           window.scrollTo({
             top: scroller.scrollHeight,
             behavior: "smooth",
@@ -1347,25 +1396,28 @@ function Settings() {
               const cs = settings?.customSource || null;
               const isCustomList = customMode && (activeList || cs?.isCustomList);
               const sourceName = isCustomList
-                ? activeList?.name || cs?.name || t("localRefresh.noSourceSelected") || "No source selected"
+                ? activeList?.name ||
+                  cs?.name ||
+                  t("localRefresh.noSourceSelected") ||
+                  "No source selected"
                 : customMode
                   ? cs?.name || t("localRefresh.noSourceSelected") || "No source selected"
                   : t("localRefresh.ascendaraIndex") || "Ascendara Index";
               const gameCount = isCustomList
-                ? activeList?.itemCount ?? cs?.gameCount ?? null
+                ? (activeList?.itemCount ?? cs?.gameCount ?? null)
                 : customMode
-                  ? cs?.gameCount ?? cs?.gamesCount ?? null
-                  : indexInfo?.gameCount ?? null;
+                  ? (cs?.gameCount ?? cs?.gamesCount ?? null)
+                  : (indexInfo?.gameCount ?? null);
               const lastSyncedMs = isCustomList
-                ? activeList?.createdAt ?? cs?.lastSynced ?? null
+                ? (activeList?.createdAt ?? cs?.lastSynced ?? null)
                 : customMode
-                  ? cs?.lastSynced ?? null
+                  ? (cs?.lastSynced ?? null)
                   : lastRefreshTime
                     ? lastRefreshTime.getTime()
                     : indexInfo?.date
                       ? new Date(indexInfo.date).getTime()
                       : null;
-              const formatLastSync = (ms) => {
+              const formatLastSync = ms => {
                 if (!ms) return t("localRefresh.never") || "Never";
                 const d = new Date(ms);
                 const diff = Date.now() - d.getTime();
@@ -1488,7 +1540,7 @@ function Settings() {
                             <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
                             {indexRefreshProgress?.progress != null
                               ? `${Math.min(Math.round(indexRefreshProgress.progress * 100), 100)}%`
-                              : (t("localRefresh.statusRunning") || "Refreshing...")}
+                              : t("localRefresh.statusRunning") || "Refreshing..."}
                           </span>
                         ) : customMode ? (
                           cs?.lastSynced ? (
@@ -1515,52 +1567,54 @@ function Settings() {
                     </div>
                   </div>
 
-              {/* Index Reminder Setting */}
-              <div
-                id="index-reminder"
-                className="mt-6 space-y-2 border-t border-border/50 pt-6"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <Label>
-                      {t("settings.indexReminder") || "Index Refresh Reminder"}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.indexReminderDescription") ||
-                        "Get reminded to refresh your local index after this many days"}
-                    </p>
-                  </div>
-                  <Select
-                    value={settings.indexReminder || "7"}
-                    onValueChange={value => handleSettingChange("indexReminder", value)}
+                  {/* Index Reminder Setting */}
+                  <div
+                    id="index-reminder"
+                    className="mt-6 space-y-2 border-t border-border/50 pt-6"
                   >
-                    <SelectTrigger className="w-[180px] bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2">
-                        {t("settings.indexReminderOptions.twoDays") || "2 Days"}
-                      </SelectItem>
-                      <SelectItem value="3">
-                        {t("settings.indexReminderOptions.threeDays") || "3 Days"}
-                      </SelectItem>
-                      <SelectItem value="5">
-                        {t("settings.indexReminderOptions.fiveDays") || "5 Days"}
-                      </SelectItem>
-                      <SelectItem value="7">
-                        {t("settings.indexReminderOptions.oneWeek") || "1 Week"}
-                      </SelectItem>
-                      <SelectItem value="10">
-                        {t("settings.indexReminderOptions.tenDays") || "10 Days"}
-                      </SelectItem>
-                      <SelectItem value="14">
-                        {t("settings.indexReminderOptions.twoWeeks") || "2 Weeks"}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </Card>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <Label>
+                          {t("settings.indexReminder") || "Index Refresh Reminder"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.indexReminderDescription") ||
+                            "Get reminded to refresh your local index after this many days"}
+                        </p>
+                      </div>
+                      <Select
+                        value={settings.indexReminder || "7"}
+                        onValueChange={value =>
+                          handleSettingChange("indexReminder", value)
+                        }
+                      >
+                        <SelectTrigger className="w-[180px] bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2">
+                            {t("settings.indexReminderOptions.twoDays") || "2 Days"}
+                          </SelectItem>
+                          <SelectItem value="3">
+                            {t("settings.indexReminderOptions.threeDays") || "3 Days"}
+                          </SelectItem>
+                          <SelectItem value="5">
+                            {t("settings.indexReminderOptions.fiveDays") || "5 Days"}
+                          </SelectItem>
+                          <SelectItem value="7">
+                            {t("settings.indexReminderOptions.oneWeek") || "1 Week"}
+                          </SelectItem>
+                          <SelectItem value="10">
+                            {t("settings.indexReminderOptions.tenDays") || "10 Days"}
+                          </SelectItem>
+                          <SelectItem value="14">
+                            {t("settings.indexReminderOptions.twoWeeks") || "2 Weeks"}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </Card>
               );
             })()}
 
@@ -1750,8 +1804,8 @@ function Settings() {
                   </Select>
                 </div>
 
-                {/* Auto-update is not available on Linux - users must update via terminal */}
-                {window.electron.getPlatform() !== "linux" && (
+                {/* Only Windows exposes the automatic update preference. */}
+                {window.electron.getPlatform() === "win32" && (
                   <div id="auto-update" className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>{t("settings.ascendaraUpdates")}</Label>
@@ -1953,10 +2007,7 @@ function Settings() {
                   <Switch
                     checked={settings.extraGameOptions}
                     onCheckedChange={() =>
-                      handleSettingChange(
-                        "extraGameOptions",
-                        !settings.extraGameOptions
-                      )
+                      handleSettingChange("extraGameOptions", !settings.extraGameOptions)
                     }
                   />
                 </div>
@@ -2176,10 +2227,7 @@ function Settings() {
                   />
                 </div>
 
-                <div
-                  id="torbox-torrents"
-                  className="flex items-center justify-between"
-                >
+                <div id="torbox-torrents" className="flex items-center justify-between">
                   <div
                     className={`space-y-2${
                       !(
@@ -2220,26 +2268,17 @@ function Settings() {
                         : ""
                     }`}
                   >
-                    <Label>
-                      {t("settings.fallbackToQbittorrentOnTorboxFailure")}
-                    </Label>
+                    <Label>{t("settings.fallbackToQbittorrentOnTorboxFailure")}</Label>
                     <p className="text-sm text-muted-foreground">
                       {t("settings.fallbackToQbittorrentOnTorboxFailureDesc")}
                     </p>
                   </div>
                   <Switch
-                    checked={
-                      settings.fallbackToQbittorrentOnTorboxFailure ?? false
-                    }
+                    checked={settings.fallbackToQbittorrentOnTorboxFailure ?? false}
                     onCheckedChange={value =>
-                      handleSettingChange(
-                        "fallbackToQbittorrentOnTorboxFailure",
-                        value
-                      )
+                      handleSettingChange("fallbackToQbittorrentOnTorboxFailure", value)
                     }
-                    disabled={
-                      !settings.useTorboxForTorrents || !settings.torrentEnabled
-                    }
+                    disabled={!settings.useTorboxForTorrents || !settings.torrentEnabled}
                   />
                 </div>
 
@@ -2889,11 +2928,14 @@ function Settings() {
                         if (selectedRunner === "auto") {
                           activeRunnerName = runners[0]?.name?.toLowerCase() || "";
                         } else {
-                          activeRunnerName = (selectedRunner.split("/").pop() || "").toLowerCase();
+                          activeRunnerName = (
+                            selectedRunner.split("/").pop() || ""
+                          ).toLowerCase();
                         }
                         const runnerType = activeRunnerName.includes("cachyos")
                           ? "cachyos"
-                          : activeRunnerName.includes("ge-proton") || activeRunnerName.includes("proton-ge")
+                          : activeRunnerName.includes("ge-proton") ||
+                              activeRunnerName.includes("proton-ge")
                             ? "ge"
                             : null;
 
@@ -2953,7 +2995,10 @@ function Settings() {
                           try {
                             const info = await window.electron.getProtonCachyOSInfo();
                             if (!info.success) {
-                              console.error("Failed to get Proton-CachyOS info:", info.error);
+                              console.error(
+                                "Failed to get Proton-CachyOS info:",
+                                info.error
+                              );
                               return;
                             }
                             if (info.alreadyInstalled) {
@@ -3036,34 +3081,35 @@ function Settings() {
                       </div>
                     )}
 
-                    {protonCachyUpdateStatus === "update-available" && protonCachyInfo && (
-                      <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                          <p className="text-sm text-yellow-500">
-                            {t("settings.linuxCompat.updateAvailable", {
-                              version: protonCachyInfo.latestVersion,
-                            })}
-                            {protonCachyInfo.installedVersions.length > 0 && (
-                              <span className="text-yellow-500/70">
-                                {" "}
-                                {t("settings.linuxCompat.updateAvailableCurrent", {
-                                  version: protonCachyInfo.installedVersions[0],
-                                })}
-                              </span>
-                            )}
-                          </p>
+                    {protonCachyUpdateStatus === "update-available" &&
+                      protonCachyInfo && (
+                        <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                            <p className="text-sm text-yellow-500">
+                              {t("settings.linuxCompat.updateAvailable", {
+                                version: protonCachyInfo.latestVersion,
+                              })}
+                              {protonCachyInfo.installedVersions.length > 0 && (
+                                <span className="text-yellow-500/70">
+                                  {" "}
+                                  {t("settings.linuxCompat.updateAvailableCurrent", {
+                                    version: protonCachyInfo.installedVersions[0],
+                                  })}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => setShowProtonCachyConfirm(true)}
+                            className="gap-1"
+                          >
+                            <Download className="h-3 w-3" />
+                            {t("settings.linuxCompat.update")}
+                          </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => setShowProtonCachyConfirm(true)}
-                          className="gap-1"
-                        >
-                          <Download className="h-3 w-3" />
-                          {t("settings.linuxCompat.update")}
-                        </Button>
-                      </div>
-                    )}
+                      )}
 
                     {/* Advanced options: Proton-GE alternative */}
                     <details className="group rounded-lg border border-border bg-muted/30">
@@ -3082,7 +3128,10 @@ function Settings() {
                             try {
                               const info = await window.electron.getProtonGEInfo();
                               if (!info.success) {
-                                console.error("Failed to get Proton-GE info:", info.error);
+                                console.error(
+                                  "Failed to get Proton-GE info:",
+                                  info.error
+                                );
                                 return;
                               }
                               if (info.alreadyInstalled) {
@@ -3107,7 +3156,9 @@ function Settings() {
                           ) : (
                             <>
                               <Download className="h-4 w-4" />
-                              {runners.some(r => r.name.toLowerCase().includes("ge-proton"))
+                              {runners.some(r =>
+                                r.name.toLowerCase().includes("ge-proton")
+                              )
                                 ? t("settings.linuxCompat.updateProtonGE")
                                 : t("settings.linuxCompat.downloadProtonGE")}
                             </>
@@ -3157,7 +3208,9 @@ function Settings() {
                         {protonGEUpdateStatus === "up-to-date" && (
                           <div className="flex w-full items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
                             <FileCheck2 className="h-4 w-4 text-green-500" />
-                            <p className="text-sm text-green-500">{t("settings.linuxCompat.upToDate")}</p>
+                            <p className="text-sm text-green-500">
+                              {t("settings.linuxCompat.upToDate")}
+                            </p>
                           </div>
                         )}
 
@@ -3179,7 +3232,11 @@ function Settings() {
                                 )}
                               </p>
                             </div>
-                            <Button size="sm" onClick={() => setShowProtonGEConfirm(true)} className="gap-1">
+                            <Button
+                              size="sm"
+                              onClick={() => setShowProtonGEConfirm(true)}
+                              className="gap-1"
+                            >
                               <Download className="h-3 w-3" />
                               {t("settings.linuxCompat.update")}
                             </Button>
@@ -3197,7 +3254,7 @@ function Settings() {
                     </div>
                   </div>
                   {/* ── UMU Section ── */}
-                  <div className="border-t border-border pt-6 space-y-4">
+                  <div className="space-y-4 border-t border-border pt-6">
                     <h4 className="text-sm font-medium text-foreground">
                       UMU Launcher & UMU-Proton
                     </h4>
@@ -3207,7 +3264,7 @@ function Settings() {
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {/* UMU Launcher */}
-                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">UMU Launcher</span>
                           {umuInstalled ? (
@@ -3231,30 +3288,51 @@ function Settings() {
                             onClick={async () => {
                               setIsDownloadingUmuLauncher(true);
                               try {
-                                const result = await window.electron.downloadUmuLauncher();
+                                const result =
+                                  await window.electron.downloadUmuLauncher();
                                 if (result.success) {
                                   setUmuInstalled(true);
-                                  toast.success(t("settings.linuxCompat.umu.launcher.installSuccess"));
+                                  toast.success(
+                                    t("settings.linuxCompat.umu.launcher.installSuccess")
+                                  );
                                 } else {
-                                  toast.error(t("settings.linuxCompat.umu.launcher.installFailed") + ": " + (result.error || result.message));
+                                  toast.error(
+                                    t("settings.linuxCompat.umu.launcher.installFailed") +
+                                      ": " +
+                                      (result.error || result.message)
+                                  );
                                 }
                               } catch (e) {
-                                toast.error(t("settings.linuxCompat.umu.launcher.installError"));
+                                toast.error(
+                                  t("settings.linuxCompat.umu.launcher.installError")
+                                );
                               }
                               setIsDownloadingUmuLauncher(false);
                             }}
                           >
                             {isDownloadingUmuLauncher ? (
-                              <><Loader className="h-3 w-3 animate-spin" /> {t("common.installing")}</>
+                              <>
+                                <Loader className="h-3 w-3 animate-spin" />{" "}
+                                {t("common.installing")}
+                              </>
                             ) : umuInstalled ? (
-                              <><RefreshCw className="h-3 w-3" /> {t("settings.linuxCompat.reinstallUpdate")}</>
+                              <>
+                                <RefreshCw className="h-3 w-3" />{" "}
+                                {t("settings.linuxCompat.reinstallUpdate")}
+                              </>
                             ) : (
-                              <><Download className="h-3 w-3" /> {t("common.install")}</>
+                              <>
+                                <Download className="h-3 w-3" /> {t("common.install")}
+                              </>
                             )}
                           </Button>
                           <button
-                            onClick={() => window.electron.openURL("https://github.com/Open-Wine-Components/umu-launcher")}
-                            className="text-xs text-muted-foreground hover:text-primary underline"
+                            onClick={() =>
+                              window.electron.openURL(
+                                "https://github.com/Open-Wine-Components/umu-launcher"
+                              )
+                            }
+                            className="text-xs text-muted-foreground underline hover:text-primary"
                           >
                             GitHub
                           </button>
@@ -3262,7 +3340,7 @@ function Settings() {
                       </div>
 
                       {/* UMU Proton */}
-                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">UMU-Proton</span>
                           {umuProtonInfo?.alreadyInstalled ? (
@@ -3271,7 +3349,8 @@ function Settings() {
                             </span>
                           ) : umuProtonInfo?.updateAvailable ? (
                             <span className="flex items-center gap-1 rounded bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-500">
-                              <FolderSync className="h-3 w-3" /> {t("settings.linuxCompat.updateAvailableUmu")}
+                              <FolderSync className="h-3 w-3" />{" "}
+                              {t("settings.linuxCompat.updateAvailableUmu")}
                             </span>
                           ) : (
                             <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
@@ -3281,7 +3360,8 @@ function Settings() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {t("settings.linuxCompat.infoBoxUmuProton")}
-                          {umuProtonInfo?.sizeFormatted && ` Latest: ${umuProtonInfo.name} (${umuProtonInfo.sizeFormatted})`}
+                          {umuProtonInfo?.sizeFormatted &&
+                            ` Latest: ${umuProtonInfo.name} (${umuProtonInfo.sizeFormatted})`}
                         </p>
                         <div className="flex items-center gap-2">
                           <Button
@@ -3294,28 +3374,49 @@ function Settings() {
                               try {
                                 const result = await window.electron.downloadUmuProton();
                                 if (result.success) {
-                                  toast.success(t("settings.linuxCompat.umu.proton.installSuccess", { name: result.name }));
+                                  toast.success(
+                                    t("settings.linuxCompat.umu.proton.installSuccess", {
+                                      name: result.name,
+                                    })
+                                  );
                                   const updated = await window.electron.getRunners();
                                   setRunners(updated);
                                   const info = await window.electron.getUmuProtonInfo();
                                   if (info?.success) setUmuProtonInfo(info);
                                 } else {
-                                  toast.error(t("settings.linuxCompat.umu.proton.installFailed", { message: result.message || "Unknown error" }));
+                                  toast.error(
+                                    t("settings.linuxCompat.umu.proton.installFailed", {
+                                      message: result.message || "Unknown error",
+                                    })
+                                  );
                                 }
                               } catch (e) {
-                                toast.error(t("settings.linuxCompat.umu.proton.installError"));
+                                toast.error(
+                                  t("settings.linuxCompat.umu.proton.installError")
+                                );
                               }
                               setIsDownloadingUmuProton(false);
                             }}
                           >
                             {isDownloadingUmuProton ? (
-                              <><Loader className="h-3 w-3 animate-spin" /> {t("common.installing")}</>
+                              <>
+                                <Loader className="h-3 w-3 animate-spin" />{" "}
+                                {t("common.installing")}
+                              </>
                             ) : umuProtonInfo?.alreadyInstalled ? (
-                              <><FolderSync className="h-3 w-3" /> {t("settings.linuxCompat.reinstall")}</>
+                              <>
+                                <FolderSync className="h-3 w-3" />{" "}
+                                {t("settings.linuxCompat.reinstall")}
+                              </>
                             ) : umuProtonInfo?.updateAvailable ? (
-                              <><Download className="h-3 w-3" /> {t("settings.linuxCompat.update")}</>
+                              <>
+                                <Download className="h-3 w-3" />{" "}
+                                {t("settings.linuxCompat.update")}
+                              </>
                             ) : (
-                              <><Download className="h-3 w-3" /> {t("common.install")}</>
+                              <>
+                                <Download className="h-3 w-3" /> {t("common.install")}
+                              </>
                             )}
                           </Button>
                           <Button
@@ -3329,7 +3430,11 @@ function Settings() {
                               if (info?.success) {
                                 setUmuProtonInfo(info);
                                 setUmuProtonUpdateStatus(
-                                  info.alreadyInstalled ? "up-to-date" : info.updateAvailable ? "update-available" : null
+                                  info.alreadyInstalled
+                                    ? "up-to-date"
+                                    : info.updateAvailable
+                                      ? "update-available"
+                                      : null
                                 );
                               } else {
                                 setUmuProtonUpdateStatus(null);
@@ -3346,13 +3451,16 @@ function Settings() {
                         </div>
 
                         {umuProtonUpdateStatus === "up-to-date" && (
-                          <p className="text-xs text-green-500 flex items-center gap-1">
-                            <FileCheck2 className="h-3 w-3" /> {t("settings.linuxCompat.upToDate")}
+                          <p className="flex items-center gap-1 text-xs text-green-500">
+                            <FileCheck2 className="h-3 w-3" />{" "}
+                            {t("settings.linuxCompat.upToDate")}
                           </p>
                         )}
                         {umuProtonUpdateStatus === "update-available" && (
-                          <p className="text-xs text-blue-500 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" /> {t("settings.linuxCompat.updateAvailableUmu")}: {umuProtonInfo?.latestVersion}
+                          <p className="flex items-center gap-1 text-xs text-blue-500">
+                            <AlertTriangle className="h-3 w-3" />{" "}
+                            {t("settings.linuxCompat.updateAvailableUmu")}:{" "}
+                            {umuProtonInfo?.latestVersion}
                           </p>
                         )}
                       </div>
@@ -3361,7 +3469,7 @@ function Settings() {
                     {/* Warning if UMU not installed */}
                     {!umuInstalled && (
                       <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                        <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
                         <p className="text-xs text-yellow-600 dark:text-yellow-400">
                           {t("gameScreen.umuLauncherNotInstalled")}
                         </p>
@@ -3373,16 +3481,16 @@ function Settings() {
                 <ProtonOptionsDialog
                   open={protonOptionsOpen}
                   onOpenChange={setProtonOptionsOpen}
-                  runnerType={
-                    (() => {
-                      let name = selectedRunner === "auto"
-                        ? (runners[0]?.name?.toLowerCase() || "")
+                  runnerType={(() => {
+                    let name =
+                      selectedRunner === "auto"
+                        ? runners[0]?.name?.toLowerCase() || ""
                         : (selectedRunner.split("/").pop() || "").toLowerCase();
-                      if (name.includes("cachyos")) return "cachyos";
-                      if (name.includes("ge-proton") || name.includes("proton-ge")) return "ge";
-                      return null;
-                    })()
-                  }
+                    if (name.includes("cachyos")) return "cachyos";
+                    if (name.includes("ge-proton") || name.includes("proton-ge"))
+                      return "ge";
+                    return null;
+                  })()}
                 />
 
                 {/* Proton-GE Download Confirmation Dialog */}
@@ -3522,39 +3630,57 @@ function Settings() {
                         <p>
                           {protonCachyInfo?.updateAvailable ? (
                             <>
-                              {t("settings.linuxCompat.protonConfirm.updateAvailablePrefixCachy")}{" "}
-                              <strong className="text-foreground">{protonCachyInfo.name}</strong>
+                              {t(
+                                "settings.linuxCompat.protonConfirm.updateAvailablePrefixCachy"
+                              )}{" "}
+                              <strong className="text-foreground">
+                                {protonCachyInfo.name}
+                              </strong>
                               {protonCachyInfo.installedVersions?.length > 0 && (
                                 <span>
                                   {" "}
                                   {t("settings.linuxCompat.protonConfirm.replacing", {
-                                    versions: protonCachyInfo.installedVersions.join(", "),
+                                    versions:
+                                      protonCachyInfo.installedVersions.join(", "),
                                   })}
                                 </span>
                               )}
                             </>
                           ) : (
                             <>
-                              {t("settings.linuxCompat.protonConfirm.aboutToDownloadPrefix")}{" "}
-                              <strong className="text-foreground">{protonCachyInfo?.name}</strong>.
+                              {t(
+                                "settings.linuxCompat.protonConfirm.aboutToDownloadPrefix"
+                              )}{" "}
+                              <strong className="text-foreground">
+                                {protonCachyInfo?.name}
+                              </strong>
+                              .
                             </>
                           )}
                         </p>
                         <p>
                           {t("settings.linuxCompat.protonConfirm.file")}{" "}
-                          <code className="rounded bg-muted px-1 text-xs">{protonCachyInfo?.fileName}</code>
+                          <code className="rounded bg-muted px-1 text-xs">
+                            {protonCachyInfo?.fileName}
+                          </code>
                         </p>
                         <p>
                           {t("settings.linuxCompat.protonConfirm.size")}{" "}
-                          <strong className="text-foreground">{protonCachyInfo?.sizeFormatted}</strong>{" "}
+                          <strong className="text-foreground">
+                            {protonCachyInfo?.sizeFormatted}
+                          </strong>{" "}
                           {protonCachyInfo &&
                             t("settings.linuxCompat.protonConfirm.sizeApprox", {
-                              gb: (protonCachyInfo.size / (1024 * 1024 * 1024)).toFixed(1),
+                              gb: (protonCachyInfo.size / (1024 * 1024 * 1024)).toFixed(
+                                1
+                              ),
                             })}
                         </p>
                         <p>
                           {t("settings.linuxCompat.protonConfirm.descriptionCachy")}{" "}
-                          <code className="rounded bg-muted px-1 text-xs">~/.ascendara/runners/</code>
+                          <code className="rounded bg-muted px-1 text-xs">
+                            ~/.ascendara/runners/
+                          </code>
                         </p>
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -3792,7 +3918,8 @@ function Settings() {
                 settings.customSource?.torrentOnly &&
                 settings.torrentEnabled && (
                   <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
-                    {(t("settings.torrentLockedBySourceNote") ||
+                    {(
+                      t("settings.torrentLockedBySourceNote") ||
                       "Torrenting can't be disabled while {{name}} is selected — it only publishes magnet links. Change the external source in Local Refresh first."
                     ).replace(
                       "{{name}}",
@@ -3802,241 +3929,255 @@ function Settings() {
                 )}
 
               <div className="space-y-6">
-                  {/* qBittorrent Status */}
-                  <div className={`rounded-lg p-4 ${settings.torrentEnabled ? 'bg-muted/30' : 'bg-muted/20'}`}>
-                    <div className="flex items-center gap-2 text-sm">
-                      {settings.torrentEnabled ? (
-                        <QbittorrentStatus refreshKey={qbitStatusRefreshKey} />
-                      ) : (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Badge className="h-2 w-2 rounded-full bg-gray-400" />
-                          <span>{t("app.qbittorrent.inactive")}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* qBittorrent Installation */}
-                  {settings.torrentEnabled && !hideQbitInstallNote && (
-                    <div className="rounded-lg border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1">
-                          <Download className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                          <div className="space-y-2">
-                            <h4 className="font-semibold text-amber-900 dark:text-amber-100">
-                              {t("settings.qbitInstall.title")}
-                            </h4>
-                            <p className="text-sm text-amber-800 dark:text-amber-200">
-                              {t("settings.qbitInstall.description")}
-                            </p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="mt-2 border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800"
-                              onClick={() => window.electron.openURL("https://www.qbittorrent.org/download")}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              {t("settings.qbitInstall.downloadButton")}
-                            </Button>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
-                          onClick={handleDismissQbitInstallNote}
-                        >
-                          <X className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        </Button>
+                {/* qBittorrent Status */}
+                <div
+                  className={`rounded-lg p-4 ${settings.torrentEnabled ? "bg-muted/30" : "bg-muted/20"}`}
+                >
+                  <div className="flex items-center gap-2 text-sm">
+                    {settings.torrentEnabled ? (
+                      <QbittorrentStatus refreshKey={qbitStatusRefreshKey} />
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Badge className="h-2 w-2 rounded-full bg-gray-400" />
+                        <span>{t("app.qbittorrent.inactive")}</span>
                       </div>
-                    </div>
-                  )}
-
-                  {/* qBittorrent Configuration */}
-                  <div className={`space-y-4 ${!settings.torrentEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">
-                        {t("settings.qbitConfig.title")}
-                      </h3>
-                      {!settings.torrentEnabled && (
-                        <Badge variant="secondary" className="text-xs">
-                          {t("common.disabled")}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className={`text-sm ${!settings.torrentEnabled ? 'text-muted-foreground/60' : 'text-muted-foreground'}`}>
-                      {t("settings.qbitConfig.description")}
-                    </p>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="qbit-host" className={!settings.torrentEnabled ? 'text-muted-foreground/60' : ''}>
-                          {t("settings.qbitConfig.host")}
-                        </Label>
-                        <Input
-                          id="qbit-host"
-                          type="text"
-                          placeholder="localhost"
-                          disabled={!settings.torrentEnabled}
-                          value={
-                            qbitConfigDraft?.host ??
-                            settings.torrentHost ??
-                            "localhost"
-                          }
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              host: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="qbit-port" className={!settings.torrentEnabled ? 'text-muted-foreground/60' : ''}>
-                          {t("settings.qbitConfig.port")}
-                        </Label>
-                        <Input
-                          id="qbit-port"
-                          type="number"
-                          min={1}
-                          max={65535}
-                          placeholder="8080"
-                          disabled={!settings.torrentEnabled}
-                          value={
-                            qbitConfigDraft?.port ??
-                            settings.torrentPort ??
-                            8080
-                          }
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              port: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="qbit-username" className={!settings.torrentEnabled ? 'text-muted-foreground/60' : ''}>
-                          {t("settings.qbitConfig.username")}
-                        </Label>
-                        <Input
-                          id="qbit-username"
-                          type="text"
-                          autoComplete="off"
-                          placeholder="admin"
-                          disabled={!settings.torrentEnabled}
-                          value={
-                            qbitConfigDraft?.username ??
-                            settings.torrentUsername ??
-                            "admin"
-                          }
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              username: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="qbit-password" className={!settings.torrentEnabled ? 'text-muted-foreground/60' : ''}>
-                          {t("settings.qbitConfig.password")}
-                        </Label>
-                        <Input
-                          id="qbit-password"
-                          type="password"
-                          autoComplete="new-password"
-                          placeholder="adminadmin"
-                          disabled={!settings.torrentEnabled}
-                          value={
-                            qbitConfigDraft?.password ??
-                            settings.torrentPassword ??
-                            "adminadmin"
-                          }
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              password: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary"
-                        disabled={!qbitConfigDraft || !settings.torrentEnabled}
-                        onClick={() => setQbitConfigDraft(null)}
-                      >
-                        {t("common.cancel")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="text-muted"
-                        disabled={!qbitConfigDraft || !settings.torrentEnabled}
-                        onClick={() => {
-                          const draft = qbitConfigDraft;
-                          if (!draft) return;
-                          const portNum = parseInt(draft.port, 10);
-                          if (!draft.host || draft.host.trim() === "") {
-                            toast.error(t("settings.qbitConfig.errors.host"));
-                            return;
-                          }
-                          if (
-                            isNaN(portNum) ||
-                            portNum < 1 ||
-                            portNum > 65535
-                          ) {
-                            toast.error(t("settings.qbitConfig.errors.port"));
-                            return;
-                          }
-                          setSettings(s => ({
-                            ...s,
-                            torrentHost: draft.host.trim(),
-                            torrentPort: portNum,
-                            torrentUsername:
-                              (draft.username ?? "").trim() || "admin",
-                            torrentPassword:
-                              draft.password ?? "adminadmin",
-                          }));
-                          setQbitConfigDraft(null);
-                          setQbitStatusRefreshKey(k => k + 1);
-                          toast.success(
-                            t("settings.qbitConfig.saved")
-                          );
-                        }}
-                      >
-                        {t("settings.qbitConfig.save")}
-                      </Button>
-                    </div>
+                    )}
                   </div>
                 </div>
+
+                {/* qBittorrent Installation */}
+                {settings.torrentEnabled && !hideQbitInstallNote && (
+                  <div className="rounded-lg border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-1 items-start gap-3">
+                        <Download className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-amber-900 dark:text-amber-100">
+                            {t("settings.qbitInstall.title")}
+                          </h4>
+                          <p className="text-sm text-amber-800 dark:text-amber-200">
+                            {t("settings.qbitInstall.description")}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800"
+                            onClick={() =>
+                              window.electron.openURL(
+                                "https://www.qbittorrent.org/download"
+                              )
+                            }
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            {t("settings.qbitInstall.downloadButton")}
+                          </Button>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
+                        onClick={handleDismissQbitInstallNote}
+                      >
+                        <X className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* qBittorrent Configuration */}
+                <div
+                  className={`space-y-4 ${!settings.torrentEnabled ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">
+                      {t("settings.qbitConfig.title")}
+                    </h3>
+                    {!settings.torrentEnabled && (
+                      <Badge variant="secondary" className="text-xs">
+                        {t("common.disabled")}
+                      </Badge>
+                    )}
+                  </div>
+                  <p
+                    className={`text-sm ${!settings.torrentEnabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}
+                  >
+                    {t("settings.qbitConfig.description")}
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="qbit-host"
+                        className={
+                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                        }
+                      >
+                        {t("settings.qbitConfig.host")}
+                      </Label>
+                      <Input
+                        id="qbit-host"
+                        type="text"
+                        placeholder="localhost"
+                        disabled={!settings.torrentEnabled}
+                        value={
+                          qbitConfigDraft?.host ?? settings.torrentHost ?? "localhost"
+                        }
+                        onChange={e =>
+                          setQbitConfigDraft(prev => ({
+                            ...(prev || {
+                              host: settings.torrentHost ?? "localhost",
+                              port: settings.torrentPort ?? 8080,
+                              username: settings.torrentUsername ?? "admin",
+                              password: settings.torrentPassword ?? "adminadmin",
+                            }),
+                            host: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="qbit-port"
+                        className={
+                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                        }
+                      >
+                        {t("settings.qbitConfig.port")}
+                      </Label>
+                      <Input
+                        id="qbit-port"
+                        type="number"
+                        min={1}
+                        max={65535}
+                        placeholder="8080"
+                        disabled={!settings.torrentEnabled}
+                        value={qbitConfigDraft?.port ?? settings.torrentPort ?? 8080}
+                        onChange={e =>
+                          setQbitConfigDraft(prev => ({
+                            ...(prev || {
+                              host: settings.torrentHost ?? "localhost",
+                              port: settings.torrentPort ?? 8080,
+                              username: settings.torrentUsername ?? "admin",
+                              password: settings.torrentPassword ?? "adminadmin",
+                            }),
+                            port: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="qbit-username"
+                        className={
+                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                        }
+                      >
+                        {t("settings.qbitConfig.username")}
+                      </Label>
+                      <Input
+                        id="qbit-username"
+                        type="text"
+                        autoComplete="off"
+                        placeholder="admin"
+                        disabled={!settings.torrentEnabled}
+                        value={
+                          qbitConfigDraft?.username ?? settings.torrentUsername ?? "admin"
+                        }
+                        onChange={e =>
+                          setQbitConfigDraft(prev => ({
+                            ...(prev || {
+                              host: settings.torrentHost ?? "localhost",
+                              port: settings.torrentPort ?? 8080,
+                              username: settings.torrentUsername ?? "admin",
+                              password: settings.torrentPassword ?? "adminadmin",
+                            }),
+                            username: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="qbit-password"
+                        className={
+                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                        }
+                      >
+                        {t("settings.qbitConfig.password")}
+                      </Label>
+                      <Input
+                        id="qbit-password"
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="adminadmin"
+                        disabled={!settings.torrentEnabled}
+                        value={
+                          qbitConfigDraft?.password ??
+                          settings.torrentPassword ??
+                          "adminadmin"
+                        }
+                        onChange={e =>
+                          setQbitConfigDraft(prev => ({
+                            ...(prev || {
+                              host: settings.torrentHost ?? "localhost",
+                              port: settings.torrentPort ?? 8080,
+                              username: settings.torrentUsername ?? "admin",
+                              password: settings.torrentPassword ?? "adminadmin",
+                            }),
+                            password: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary"
+                      disabled={!qbitConfigDraft || !settings.torrentEnabled}
+                      onClick={() => setQbitConfigDraft(null)}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="text-muted"
+                      disabled={!qbitConfigDraft || !settings.torrentEnabled}
+                      onClick={() => {
+                        const draft = qbitConfigDraft;
+                        if (!draft) return;
+                        const portNum = parseInt(draft.port, 10);
+                        if (!draft.host || draft.host.trim() === "") {
+                          toast.error(t("settings.qbitConfig.errors.host"));
+                          return;
+                        }
+                        if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+                          toast.error(t("settings.qbitConfig.errors.port"));
+                          return;
+                        }
+                        setSettings(s => ({
+                          ...s,
+                          torrentHost: draft.host.trim(),
+                          torrentPort: portNum,
+                          torrentUsername: (draft.username ?? "").trim() || "admin",
+                          torrentPassword: draft.password ?? "adminadmin",
+                        }));
+                        setQbitConfigDraft(null);
+                        setQbitStatusRefreshKey(k => k + 1);
+                        toast.success(t("settings.qbitConfig.saved"));
+                      }}
+                    >
+                      {t("settings.qbitConfig.save")}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </Card>
           </div>
 
@@ -4770,7 +4911,7 @@ function Settings() {
               {isDownloading ? t("common.downloading") : t("welcome.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogContent> 
+        </AlertDialogContent>
       </AlertDialog>
 
       {/* No Ludusavi Tool Dialog */}
@@ -5849,12 +5990,34 @@ const QbittorrentStatus = ({ refreshKey = 0 } = {}) => {
             <AlertDialogDescription asChild>
               <div className="space-y-4 text-muted-foreground">
                 <div className="rounded-lg bg-muted p-4">
-                  <h4 className="font-semibold mb-2">{t("settings.qbitConfigDialog.currentConfig")}</h4>
+                  <h4 className="mb-2 font-semibold">
+                    {t("settings.qbitConfigDialog.currentConfig")}
+                  </h4>
                   <div className="space-y-2 text-sm">
-                    <div><span className="font-medium">{t("settings.qbitConfigDialog.host")}:</span> {settings.torrentHost || "localhost"}</div>
-                    <div><span className="font-medium">{t("settings.qbitConfigDialog.port")}:</span> {settings.torrentPort || 8080}</div>
-                    <div><span className="font-medium">{t("settings.qbitConfigDialog.username")}:</span> {settings.torrentUsername || "admin"}</div>
-                    <div><span className="font-medium">{t("settings.qbitConfigDialog.password")}:</span> {settings.torrentPassword || "adminadmin"}</div>
+                    <div>
+                      <span className="font-medium">
+                        {t("settings.qbitConfigDialog.host")}:
+                      </span>{" "}
+                      {settings.torrentHost || "localhost"}
+                    </div>
+                    <div>
+                      <span className="font-medium">
+                        {t("settings.qbitConfigDialog.port")}:
+                      </span>{" "}
+                      {settings.torrentPort || 8080}
+                    </div>
+                    <div>
+                      <span className="font-medium">
+                        {t("settings.qbitConfigDialog.username")}:
+                      </span>{" "}
+                      {settings.torrentUsername || "admin"}
+                    </div>
+                    <div>
+                      <span className="font-medium">
+                        {t("settings.qbitConfigDialog.password")}:
+                      </span>{" "}
+                      {settings.torrentPassword || "adminadmin"}
+                    </div>
                   </div>
                 </div>
                 <p>{t("app.qbittorrent.configInstructions")}</p>
@@ -5893,13 +6056,13 @@ const QbittorrentStatus = ({ refreshKey = 0 } = {}) => {
                 <p className="text-sm">
                   {t("settings.qbitConfigDialog.stillCantConnect.intro")}
                 </p>
-                <ol className="list-decimal list-inside space-y-1 text-sm">
+                <ol className="list-inside list-decimal space-y-1 text-sm">
                   <li>{t("settings.qbitConfigDialog.stillCantConnect.step1")}</li>
                   <li>{t("settings.qbitConfigDialog.stillCantConnect.step2")}</li>
                   <li>{t("settings.qbitConfigDialog.stillCantConnect.step3")}</li>
                   <li>
                     {t("settings.qbitConfigDialog.stillCantConnect.step4")}
-                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                    <ul className="ml-4 mt-1 list-inside list-disc space-y-1">
                       <li>{t("settings.qbitConfigDialog.stillCantConnect.step4a")}</li>
                       <li>{t("settings.qbitConfigDialog.stillCantConnect.step4b")}</li>
                     </ul>

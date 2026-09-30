@@ -443,6 +443,7 @@ function registerSystemHandlers() {
 
   // Folder exclusion (Windows Defender)
   ipcMain.handle("folder-exclusion", async (_, enabled) => {
+    if (!isWindows) return { success: false, error: "This feature requires Windows." };
     const runPowerShell = args =>
       new Promise((resolve, reject) => {
         execFile(
@@ -518,6 +519,7 @@ function registerSystemHandlers() {
 
   // Install dependencies
   ipcMain.handle("install-dependencies", async event => {
+    if (!isWindows) return { success: false, error: "This feature requires Windows." };
     let isInstalling = false;
     if (isInstalling) {
       return { success: false, message: "Installation already in progress" };
