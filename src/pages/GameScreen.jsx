@@ -2737,20 +2737,20 @@ export default function GameScreen() {
             <Card className="overflow-hidden">
               <CardContent className="space-y-6 p-6">
                 {/* Cloud Library Status */}
-                <div className="flex items-center justify-between rounded-lg border bg-card/50 p-3">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 rounded-lg border bg-card/50 p-3">
+                  <div className="flex min-w-0 items-start gap-3">
                     {isAuthenticated ? (
                       cloudLibraryLoading ? (
-                        <Loader className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <Loader className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
                       ) : isInCloudLibrary ? (
-                        <Cloud className="h-5 w-5 text-primary" />
+                        <Cloud className="h-5 w-5 shrink-0 text-primary" />
                       ) : (
-                        <CloudOff className="h-5 w-5 text-muted-foreground" />
+                        <CloudOff className="h-5 w-5 shrink-0 text-muted-foreground" />
                       )
                     ) : (
-                      <CloudOff className="h-5 w-5 text-muted-foreground" />
+                      <CloudOff className="h-5 w-5 shrink-0 text-muted-foreground" />
                     )}
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-medium">
                         {isAuthenticated
                           ? isInCloudLibrary
@@ -2769,7 +2769,7 @@ export default function GameScreen() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1 whitespace-nowrap"
+                      className="w-full"
                       onClick={() => navigate("/ascend")}
                     >
                       {t("gameScreen.getAscend")}
