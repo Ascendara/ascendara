@@ -18,6 +18,7 @@ import {
   Smartphone,
   FlaskConical,
   Joystick,
+  HardDriveDownload,
 } from "lucide-react";
 
 export default function PremiumSection({ t }) {
@@ -183,6 +184,27 @@ export default function PremiumSection({ t }) {
             <p className="mt-2 text-sm text-muted-foreground">
               {t("ascend.premium.cloudBackups.description") ||
                 "Automatically back up your game saves to the cloud. Never lose your progress and restore your saves on any device."}
+            </p>
+          </div>
+        </motion.div>
+
+        {/* Library Backups */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.68 }}
+          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+        >
+          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-violet-500/10 blur-2xl transition-all group-hover:bg-violet-500/20" />
+          <div className="relative">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500">
+              <HardDriveDownload className="h-6 w-6" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold">
+              {t("ascend.premium.libraryBackups.title")}
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("ascend.premium.libraryBackups.description")}
             </p>
           </div>
         </motion.div>

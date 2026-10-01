@@ -26,6 +26,7 @@ import {
   Infinity as InfinityIcon,
   Smartphone,
   Joystick,
+  LibraryBig,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -158,7 +159,7 @@ export default function AuthSection({
                   { icon: UserPlus, name: "friends" },
                   { icon: MessageCircle, name: "chat" },
                   { icon: Trophy, name: "leaderboard" },
-                  { icon: Gamepad2, name: "retroCloudSaves" },
+                  { icon: LibraryBig, name: "libraryBackups" },
                   { icon: InfinityIcon, name: "unlimitedDownloads" },
                   { icon: Puzzle, name: "nexusMods" },
                   { icon: Zap, name: "trainers" },

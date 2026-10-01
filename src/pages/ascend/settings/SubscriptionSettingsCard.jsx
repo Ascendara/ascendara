@@ -30,6 +30,9 @@ import {
   Puzzle,
   Infinity as InfinityIcon,
   Smartphone,
+  Joystick,
+  FlaskConical,
+  HardDriveDownload,
 } from "lucide-react";
 
 export default function SubscriptionSettingsCard({
@@ -489,6 +492,11 @@ export default function SubscriptionSettingsCard({
                   desc: t("ascend.premium.cloudBackups.description"),
                 },
                 {
+                  icon: HardDriveDownload,
+                  title: t("ascend.premium.libraryBackups.title"),
+                  desc: t("ascend.premium.libraryBackups.description"),
+                },
+                {
                   icon: Gamepad2,
                   title: t("ascend.premium.retroCloudSaves.title"),
                   desc: t("ascend.premium.retroCloudSaves.description"),
@@ -529,9 +537,14 @@ export default function SubscriptionSettingsCard({
                   desc: t("ascend.premium.downloadQueue.description"),
                 },
                 {
-                  icon: Users,
-                  title: t("ascend.premium.communities.title"),
-                  desc: t("ascend.premium.communities.description"),
+                  icon: Joystick,
+                  title: t("ascend.premium.emulatorPresets.title"),
+                  desc: t("ascend.premium.emulatorPresets.description"),
+                },
+                {
+                  icon: FlaskConical,
+                  title: t("ascend.premium.experimentalBranch.title"),
+                  desc: t("ascend.premium.experimentalBranch.description"),
                 },
                 {
                   icon: Sparkle,
