@@ -185,19 +185,6 @@ const AscendSidebar = ({
     { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
   ];
 
-  // Conditionally add Ad Stats for adUser
-  if (userData?.adUser) {
-    mainNavItems.splice(
-      mainNavItems.findIndex(item => item.id === "notifications"),
-      0,
-      {
-        id: "adstats",
-        icon: BarChart,
-        label: t("ascend.nav.adStats") || "Ad Stats",
-      }
-    );
-  }
-
   // Quick access icon button
   const QuickAccessButton = ({ item, isActive }) => (
     <motion.button
