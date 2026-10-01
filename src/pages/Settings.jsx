@@ -4517,6 +4517,10 @@ function Settings() {
                       disabled={isActive}
                       onClick={() => {
                         if (isActive) return;
+                        if (navigator.userAgent.toLowerCase().includes("macintosh")) {
+                          toast.warning(t("settings.appBranch.macUnsupported"));
+                          return;
+                        }
 
                         // Show Ascend promo dialog if locked
                         if (isLocked) {
