@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Check,
@@ -39,6 +39,7 @@ const SubscriptionPlanDialog = ({
   t,
 }) => {
   const [showRedirectDialog, setShowRedirectDialog] = useState(false);
+  const redirectCloseRef = useRef(null);
 
   // Auto-close redirect dialog after 10 seconds
   useEffect(() => {
@@ -51,7 +52,9 @@ const SubscriptionPlanDialog = ({
     }
   }, [showRedirectDialog]);
 
-  const handlePlanClick = async planId => {
+  const handlePlanClick = async (planId, event) => {
+    if (event.currentTarget.contains(document.activeElement)) document.activeElement.blur();
+
     // Close the main dialog
     onOpenChange(false);
 
@@ -59,7 +62,7 @@ const SubscriptionPlanDialog = ({
     setShowRedirectDialog(true);
 
     // Call the plan selection handler
-    await onPlanSelection(planId);
+    if (!(await onPlanSelection(planId))) setShowRedirectDialog(false);
   };
   const features = [
     { key: "cloudSyncing", icon: Cloud },
@@ -120,7 +123,7 @@ const SubscriptionPlanDialog = ({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    onClick={() => handlePlanClick(plan.id)}
+                    onClick={event => handlePlanClick(plan.id, event)}
                     className={`group relative cursor-pointer overflow-hidden rounded-2xl border transition-all duration-300 ${
                       is6Month
                         ? "scale-105 border-primary/40 bg-primary/5 shadow-lg shadow-primary/10 hover:shadow-xl hover:shadow-primary/20"
@@ -271,8 +274,12 @@ const SubscriptionPlanDialog = ({
 
       {/* Redirect Loading Dialog */}
       <AlertDialog open={showRedirectDialog} onOpenChange={setShowRedirectDialog}>
-        <AlertDialogContent className="max-w-md border-border/50 bg-background">
+        <AlertDialogContent
+          className="max-w-md border-border/50 bg-background"
+          onOpenAutoFocus={() => redirectCloseRef.current?.focus()}
+        >
           <button
+            ref={redirectCloseRef}
             onClick={() => setShowRedirectDialog(false)}
             className="absolute right-4 top-4 z-10 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >

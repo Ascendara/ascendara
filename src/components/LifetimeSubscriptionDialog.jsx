@@ -90,9 +90,16 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
       setShowRedirectDialog(true);
 
       // Determine which price ID to use
-      const priceId = isLifetime
-        ? "price_1ULnZACfu5zjwIKZEhc9jTiU" // Lifetime
-        : "price_1QnMnNCfu5zjwIKZFbCRwBHd"; // Monthly $1.50
+      let priceId = "price_1QnMnNCfu5zjwIKZFbCRwBHd"; // Monthly $1.50
+      if (isLifetime) {
+        const productResponse = await fetch("https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW");
+        if (!productResponse.ok) throw new Error("Unable to load lifetime price");
+        const product = await productResponse.json();
+        priceId = product.lifetimePriceId;
+        if (!product.prices?.some(price => price.id === priceId && price.interval === null)) {
+          throw new Error("Lifetime price is unavailable");
+        }
+      }
 
       // Create checkout session
       const response = await userAuthenticatedFetch(

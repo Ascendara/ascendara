@@ -2079,13 +2079,15 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
           }))
           .sort((a, b) => a.intervalCount - b.intervalCount) || [];
 
-      // Add lifetime plan manually
-      plans.push({
-        id: "price_1ULnZACfu5zjwIKZEhc9jTiU",
-        intervalCount: 0, // 0 indicates lifetime
-        unitAmount: 3900, // $39.00 minimum
-        currency: "usd",
-      });
+      const lifetimePrice = product.prices?.find(price => price.id === product.lifetimePriceId && price.interval === null);
+      if (lifetimePrice) {
+        plans.push({
+          id: lifetimePrice.id,
+          intervalCount: 0,
+          unitAmount: lifetimePrice.minimumAmount ?? lifetimePrice.unitAmount,
+          currency: lifetimePrice.currency,
+        });
+      }
 
       console.log("Filtered plans:", plans);
 
@@ -2127,15 +2129,17 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         }
       );
 
-      if (response.ok) {
-        const { url } = await response.json();
-        window.electron?.openURL?.(url);
-      } else {
-        toast.error(t("ascend.settings.checkoutError"));
+      const result = await response.json();
+      if (!response.ok || !result.url) {
+        toast.error(result.error || t("ascend.settings.checkoutError"));
+        return false;
       }
+      window.electron?.openURL?.(result.url);
+      return true;
     } catch (error) {
       console.error("Error creating checkout session:", error);
       toast.error(t("ascend.settings.checkoutError"));
+      return false;
     }
   };
 
