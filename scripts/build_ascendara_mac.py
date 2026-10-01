@@ -125,7 +125,18 @@ def main():
     run(['node', 'scripts/generate_build_signature.js'])
     for arch in arches:
         build_arch(arch, args, identity)
-    print('macOS build complete. Register electron/build-signature.json with your release backend before distribution.')
+    print('Registering build with backend API...', flush=True)
+    register_script = ROOT / 'scripts/register_build.py'
+    if not register_script.is_file():
+        print('Warning: register_build.py not found. You will need to register this build manually.')
+    else:
+        try:
+            run(['python3', register_script])
+            print('Build registration completed successfully!')
+        except (subprocess.CalledProcessError, OSError) as error:
+            print(f'Warning: Build registration failed with error: {error}')
+            print('The build is complete but will not work until registered manually.')
+    print('macOS build complete.')
     return 0
 
 
