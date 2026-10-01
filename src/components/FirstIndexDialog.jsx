@@ -1,6 +1,5 @@
-
 import { motion, AnimatePresence } from "framer-motion";
-import { Database, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -27,12 +26,6 @@ const FirstIndexDialog = ({ onClose }) => {
           className="relative mx-4 w-full max-w-lg rounded-lg bg-card p-6 shadow-xl"
         >
           <div className="space-y-6">
-            <div className="flex justify-center">
-              <div className="rounded-full bg-primary/10 p-4">
-                <Database className="h-12 w-12 text-primary" />
-              </div>
-            </div>
-
             <div className="space-y-2 text-center">
               <h2 className="text-2xl font-bold text-foreground">
                 {t("app.firstIndexDialog.title") || "Game Index Required"}

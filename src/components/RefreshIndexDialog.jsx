@@ -10,7 +10,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ExternalLink, CircleCheck, ChevronRight, ChevronLeft, Terminal, Cookie, Copy, Check, Loader, Radio } from "lucide-react";
+import {
+  ExternalLink,
+  CircleCheck,
+  ChevronRight,
+  ChevronLeft,
+  Terminal,
+  Cookie,
+  Copy,
+  Check,
+  Loader,
+  Radio,
+} from "lucide-react";
 
 const STEAMRIP_POSTS_URL = "https://steamrip.com/wp-json/wp/v2/posts?per_page=1&page=1";
 
@@ -45,7 +56,9 @@ const RefreshIndexDialog = ({
       try {
         const postsResult = await Promise.race([
           fetch(STEAMRIP_POSTS_URL, { method: "GET", mode: "cors" }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 8000)
+          ),
         ]);
 
         console.log(`CF check - posts: ${postsResult.status}`);
@@ -65,7 +78,9 @@ const RefreshIndexDialog = ({
             handleClose();
           }, 500);
         } else {
-          console.log(`Cloudflare protection is active (status: ${postsResult.status}) - cookie required`);
+          console.log(
+            `Cloudflare protection is active (status: ${postsResult.status}) - cookie required`
+          );
           setCfActive(true);
         }
       } catch (error) {
@@ -177,7 +192,6 @@ const RefreshIndexDialog = ({
         <>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Loader className="h-5 w-5 animate-spin text-primary" />
               {t("refreshDialog.checkingCF") || "Checking Cloudflare Status..."}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -213,7 +227,6 @@ const RefreshIndexDialog = ({
         <>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <CircleCheck className="h-5 w-5 text-green-500" />
               {t("refreshDialog.noCFTitle") || "No Protection Detected"}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -459,17 +472,23 @@ const RefreshIndexDialog = ({
                             {t("refreshDialog.noCookieNeeded") || "No captcha required?"}
                           </p>
                           <p className="mb-3 text-muted-foreground">
-                            {t("refreshDialog.noCookieNeededDesc") || "The SteamRIP API appears to be accessible without a cookie. You can start the refresh directly."}
+                            {t("refreshDialog.noCookieNeededDesc") ||
+                              "The SteamRIP API appears to be accessible without a cookie. You can start the refresh directly."}
                           </p>
                           <Button
                             size="sm"
                             onClick={() => {
                               setHasStartedRefresh(true);
-                              onStartRefresh({ method: "no-cookie", cfClearance: null, isCookieRefresh });
+                              onStartRefresh({
+                                method: "no-cookie",
+                                cfClearance: null,
+                                isCookieRefresh,
+                              });
                               handleClose();
                             }}
                           >
-                            {t("refreshDialog.startWithoutCookie") || "Start without cookie"}
+                            {t("refreshDialog.startWithoutCookie") ||
+                              "Start without cookie"}
                           </Button>
                         </div>
                       )}
@@ -508,7 +527,6 @@ const RefreshIndexDialog = ({
           <>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <Terminal className="h-5 w-5 text-primary" />
                 {t("refreshDialog.step4Title") || "Open Developer Tools"}
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
@@ -607,7 +625,6 @@ const RefreshIndexDialog = ({
           <>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <Cookie className="h-5 w-5 text-primary" />
                 {t("refreshDialog.step5Title") || "Paste the Cookie"}
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
@@ -675,7 +692,6 @@ const RefreshIndexDialog = ({
           <>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <Loader className="h-5 w-5 animate-spin text-primary" />
                 {t("refreshDialog.startingRefresh") || "Starting Refresh..."}
               </AlertDialogTitle>
               <AlertDialogDescription asChild>

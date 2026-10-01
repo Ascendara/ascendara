@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Loader, Download, Image as ImageIcon, X } from "lucide-react";
+import { Search, Loader, Download, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,12 +86,19 @@ export const GameAssetSearchDialog = ({
             } else if (focusedSection === "buttons" && selectedButton > 0) {
               setSelectedButton(selectedButton - 1);
               handledNav = true;
-            } else if (focusedSection === "buttons" && selectedButton === 0 && searchResults.length > 0) {
+            } else if (
+              focusedSection === "buttons" &&
+              selectedButton === 0 &&
+              searchResults.length > 0
+            ) {
               setFocusedSection("results");
               handledNav = true;
             }
           } else if (gp.down) {
-            if (focusedSection === "results" && selectedIndex < searchResults.length - 1) {
+            if (
+              focusedSection === "results" &&
+              selectedIndex < searchResults.length - 1
+            ) {
               setSelectedIndex(selectedIndex + 1);
               handledNav = true;
             } else if (focusedSection === "results" && selectedGame) {
@@ -154,15 +161,28 @@ export const GameAssetSearchDialog = ({
 
     loop();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [isControllerMode, open, selectedIndex, searchResults, selectedGame, focusedSection, selectedButton, isDownloading]);
+  }, [
+    isControllerMode,
+    open,
+    selectedIndex,
+    searchResults,
+    selectedGame,
+    focusedSection,
+    selectedButton,
+    isDownloading,
+  ]);
 
   // Scroll selected item into view when navigating with controller
   useEffect(() => {
-    if (isControllerMode && focusedSection === "results" && resultRefs.current[selectedIndex]) {
+    if (
+      isControllerMode &&
+      focusedSection === "results" &&
+      resultRefs.current[selectedIndex]
+    ) {
       resultRefs.current[selectedIndex].scrollIntoView({
         behavior: "smooth",
         block: "nearest",
-        inline: "nearest"
+        inline: "nearest",
       });
     }
   }, [selectedIndex, focusedSection, isControllerMode]);
@@ -174,7 +194,7 @@ export const GameAssetSearchDialog = ({
     }
   }, [open, isControllerMode]);
 
-  const handleSearch = async (query) => {
+  const handleSearch = async query => {
     if (!query || query.length < 2) {
       setSearchResults([]);
       return;
@@ -213,7 +233,7 @@ export const GameAssetSearchDialog = ({
     }, 300);
   };
 
-  const handleSelectGame = async (game) => {
+  const handleSelectGame = async game => {
     setSelectedGame(game);
     setAssetPreviews({});
 
@@ -254,9 +274,24 @@ export const GameAssetSearchDialog = ({
     try {
       // Download all available assets
       const assetTypes = [
-        { type: "grids", key: "grid", filename: "grid.ascendara.jpg", params: "?styles=alternate&dimensions=600x900" },
-        { type: "logos", key: "logo", filename: "logo.ascendara.png", params: "?styles=white&sort=score" },
-        { type: "heroes", key: "hero", filename: "hero.ascendara.jpg", params: "?styles=alternate" },
+        {
+          type: "grids",
+          key: "grid",
+          filename: "grid.ascendara.jpg",
+          params: "?styles=alternate&dimensions=600x900",
+        },
+        {
+          type: "logos",
+          key: "logo",
+          filename: "logo.ascendara.png",
+          params: "?styles=white&sort=score",
+        },
+        {
+          type: "heroes",
+          key: "hero",
+          filename: "hero.ascendara.jpg",
+          params: "?styles=alternate",
+        },
       ];
 
       let downloadedCount = 0;
@@ -265,25 +300,25 @@ export const GameAssetSearchDialog = ({
         try {
           const url = `https://api.ascendara.app/api/proxy/steamgrid/${type}/game/${selectedGame.id}${params}`;
           const response = await fetch(url);
-          
+
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.data && data.data.length > 0) {
               const assetUrl = data.data[0].url;
-              
+
               // Download the image
               const imageResponse = await fetch(assetUrl);
               const blob = await imageResponse.blob();
-              
+
               // Convert to base64
               const reader = new FileReader();
-              const base64Promise = new Promise((resolve) => {
+              const base64Promise = new Promise(resolve => {
                 reader.onloadend = () => resolve(reader.result);
                 reader.readAsDataURL(blob);
               });
-              
+
               const dataUrl = await base64Promise;
-              
+
               // Save to game directory via IPC
               await window.electron.saveGameAsset(gameName, filename, dataUrl);
               downloadedCount++;
@@ -338,11 +373,12 @@ export const GameAssetSearchDialog = ({
         )}
       >
         <AlertDialogHeader>
-          <AlertDialogTitle className={cn(
-            "flex items-center gap-2",
-            isControllerMode ? "text-2xl font-bold" : ""
-          )}>
-            <ImageIcon className={isControllerMode ? "h-6 w-6" : "h-5 w-5"} />
+          <AlertDialogTitle
+            className={cn(
+              "flex items-center gap-2",
+              isControllerMode ? "text-2xl font-bold" : ""
+            )}
+          >
             {t("library.assetSearch.title") || "Search Game Assets"}
           </AlertDialogTitle>
           <AlertDialogDescription className={isControllerMode ? "text-base" : ""}>
@@ -359,11 +395,13 @@ export const GameAssetSearchDialog = ({
               <Input
                 ref={inputRef}
                 value={searchQuery}
-                onChange={(e) => {
+                onChange={e => {
                   setSearchQuery(e.target.value);
                   handleSearch(e.target.value);
                 }}
-                placeholder={t("library.assetSearch.searchPlaceholder") || "Search for game..."}
+                placeholder={
+                  t("library.assetSearch.searchPlaceholder") || "Search for game..."
+                }
                 className="pl-10 text-primary"
               />
             </div>
@@ -372,31 +410,50 @@ export const GameAssetSearchDialog = ({
           {/* Search Results */}
           {isSearching ? (
             <div className="flex items-center justify-center py-8">
-              <Loader className={cn(isControllerMode ? "h-10 w-10" : "h-8 w-8", "animate-spin text-primary")} />
+              <Loader
+                className={cn(
+                  isControllerMode ? "h-10 w-10" : "h-8 w-8",
+                  "animate-spin text-primary"
+                )}
+              />
             </div>
           ) : searchResults.length > 0 ? (
-            <div className={cn(
-              "max-h-[300px] space-y-2 overflow-y-auto border p-12",
-              isControllerMode ? "rounded-xl" : "rounded-lg"
-            )}>
+            <div
+              className={cn(
+                "max-h-[300px] space-y-2 overflow-y-auto border p-12",
+                isControllerMode ? "rounded-xl" : "rounded-lg"
+              )}
+            >
               {searchResults.map((result, index) => (
                 <div
                   key={result.id}
-                  ref={(el) => (resultRefs.current[index] = el)}
+                  ref={el => (resultRefs.current[index] = el)}
                   onClick={() => handleSelectGame(result)}
                   className={cn(
-                    "cursor-pointer border-2 text-primary p-3 transition-all",
+                    "cursor-pointer border-2 p-3 text-primary transition-all",
                     isControllerMode ? "rounded-xl" : "rounded-lg",
                     selectedGame?.id === result.id
                       ? "border-primary bg-primary/10"
-                      : isControllerMode && focusedSection === "results" && index === selectedIndex
+                      : isControllerMode &&
+                          focusedSection === "results" &&
+                          index === selectedIndex
                         ? "scale-105 border-primary bg-primary/20 shadow-lg shadow-primary/30 ring-4 ring-primary/50"
                         : "border-transparent hover:border-primary/30 hover:bg-muted/50"
                   )}
                 >
-                  <p className={isControllerMode ? "text-lg font-semibold" : "font-medium"}>{result.name}</p>
+                  <p
+                    className={isControllerMode ? "text-lg font-semibold" : "font-medium"}
+                  >
+                    {result.name}
+                  </p>
                   {result.release_date && (
-                    <p className={isControllerMode ? "text-sm text-muted-foreground" : "text-xs text-muted-foreground"}>
+                    <p
+                      className={
+                        isControllerMode
+                          ? "text-sm text-muted-foreground"
+                          : "text-xs text-muted-foreground"
+                      }
+                    >
                       {new Date(result.release_date * 1000).getFullYear()}
                     </p>
                   )}
@@ -412,13 +469,25 @@ export const GameAssetSearchDialog = ({
           {/* Asset Previews */}
           {selectedGame && Object.keys(assetPreviews).length > 0 && (
             <div className="space-y-3">
-              <p className={isControllerMode ? "text-base font-semibold" : "text-sm font-medium"}>
+              <p
+                className={
+                  isControllerMode ? "text-base font-semibold" : "text-sm font-medium"
+                }
+              >
                 {t("library.assetSearch.preview") || "Preview Assets"}
               </p>
               <div className="grid grid-cols-3 gap-3">
                 {assetPreviews.grid && (
                   <div className="space-y-1">
-                    <p className={isControllerMode ? "text-sm font-medium text-muted-foreground" : "text-xs text-muted-foreground"}>Grid</p>
+                    <p
+                      className={
+                        isControllerMode
+                          ? "text-sm font-medium text-muted-foreground"
+                          : "text-xs text-muted-foreground"
+                      }
+                    >
+                      Grid
+                    </p>
                     <img
                       src={assetPreviews.grid}
                       alt="Grid"
@@ -431,7 +500,15 @@ export const GameAssetSearchDialog = ({
                 )}
                 {assetPreviews.logo && (
                   <div className="space-y-1">
-                    <p className={isControllerMode ? "text-sm font-medium text-muted-foreground" : "text-xs text-muted-foreground"}>Logo</p>
+                    <p
+                      className={
+                        isControllerMode
+                          ? "text-sm font-medium text-muted-foreground"
+                          : "text-xs text-muted-foreground"
+                      }
+                    >
+                      Logo
+                    </p>
                     <img
                       src={assetPreviews.logo}
                       alt="Logo"
@@ -444,7 +521,15 @@ export const GameAssetSearchDialog = ({
                 )}
                 {assetPreviews.hero && (
                   <div className="space-y-1">
-                    <p className={isControllerMode ? "text-sm font-medium text-muted-foreground" : "text-xs text-muted-foreground"}>Hero</p>
+                    <p
+                      className={
+                        isControllerMode
+                          ? "text-sm font-medium text-muted-foreground"
+                          : "text-xs text-muted-foreground"
+                      }
+                    >
+                      Hero
+                    </p>
                     <img
                       src={assetPreviews.hero}
                       alt="Hero"

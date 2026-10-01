@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Info, LogOut, X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import { getControllerButtons, getButtonBadgeClass } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 
@@ -16,7 +16,6 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
 
   const handleInput = useCallback(
     action => {
-
       if (action === "LEFT") setSelectedButton(0);
       else if (action === "RIGHT") setSelectedButton(1);
       else if (action === "CONFIRM") {
@@ -48,7 +47,8 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
   }, [handleInput, isOpen]);
 
   useControllerInput(handleInput, {
-    priority: 30, enabled: isOpen,
+    priority: 30,
+    enabled: isOpen,
   });
 
   if (!isOpen) return null;
@@ -57,9 +57,6 @@ const ExitBigPictureDialog = ({ isOpen, onClose, onConfirm, t, controllerType })
     <div className="fixed inset-0 z-[30000] flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div className="mx-8 max-w-2xl rounded-2xl border-2 border-primary/30 bg-card p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
         <div className="mb-6 flex items-center gap-4">
-          <div className="rounded-full bg-primary/20 p-3">
-            <Info className="h-8 w-8 text-primary" />
-          </div>
           <h2 className="text-3xl font-bold text-foreground">
             {t("bigPicture.exitBigPictureConfirm")}
           </h2>

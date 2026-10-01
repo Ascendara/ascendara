@@ -33,7 +33,12 @@ export default function RetroEmulators({ access, platforms, onChoose, onClose, b
   const matches = entries.filter(
     entry =>
       (group === "all" || entry.group === group) &&
-      [t(entry.nameKey), t(`retro.families.${entry.group}`), t(entry.notesKey), ...names(entry.platforms || [])]
+      [
+        t(entry.nameKey),
+        t(`retro.families.${entry.group}`),
+        t(entry.notesKey),
+        ...names(entry.platforms || []),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(query.trim().toLowerCase())
@@ -50,7 +55,6 @@ export default function RetroEmulators({ access, platforms, onChoose, onClose, b
       <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto border-border bg-background text-foreground">
         <DialogHeader className="pr-6 text-left">
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
             {t("retro.expanded.title")}
           </DialogTitle>
           <DialogDescription>{t("retro.expanded.description")}</DialogDescription>
@@ -79,7 +83,7 @@ export default function RetroEmulators({ access, platforms, onChoose, onClose, b
         )}
         {access.error && (
           <div role="alert" className="space-y-2">
-            <p className="text-sm text-destructive">{access.error}</p>
+            <p className="text-destructive text-sm">{access.error}</p>
             <Button variant="outline" onClick={access.retry}>
               {t("retro.errors.retry")}
             </Button>
@@ -108,7 +112,9 @@ export default function RetroEmulators({ access, platforms, onChoose, onClose, b
                     aria-pressed={group === value}
                     onClick={() => setGroup(value)}
                   >
-                    {value === "all" ? t("retro.expanded.all") : t(`retro.families.${value}`)}
+                    {value === "all"
+                      ? t("retro.expanded.all")
+                      : t(`retro.families.${value}`)}
                   </Button>
                 )
               )}
@@ -133,7 +139,8 @@ export default function RetroEmulators({ access, platforms, onChoose, onClose, b
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {names(entry.platforms || []).join(" · ") || t(`retro.families.${entry.group}`)}
+                      {names(entry.platforms || []).join(" · ") ||
+                        t(`retro.families.${entry.group}`)}
                     </p>
                   </div>
                   <p className="text-sm leading-relaxed text-muted-foreground">

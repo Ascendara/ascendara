@@ -20,10 +20,15 @@ export default function MoveToFolderDialog({ game, folders, onMove, onClose }) {
   );
 
   return (
-    <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="flex max-h-[80vh] flex-col border-border bg-background text-foreground">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-foreground">{t("library.moveToFolder.title")}</DialogTitle>
+          <DialogTitle>{t("library.moveToFolder.title")}</DialogTitle>
           <DialogDescription className="break-words text-muted-foreground">
             {t("library.moveToFolder.description", { game: game.game || game.name })}
           </DialogDescription>
@@ -46,16 +51,22 @@ export default function MoveToFolderDialog({ game, folders, onMove, onClose }) {
                   onClick={() => onMove(folder.game)}
                 >
                   <FolderOpen className="h-5 w-5 shrink-0 text-primary" />
-                  <span className="min-w-0 whitespace-normal break-words">{folder.game}</span>
+                  <span className="min-w-0 whitespace-normal break-words">
+                    {folder.game}
+                  </span>
                 </Button>
               ))}
               {filteredFolders.length === 0 && (
-                <p className="py-4 text-sm text-muted-foreground">{t("library.moveToFolder.noMatches")}</p>
+                <p className="py-4 text-sm text-muted-foreground">
+                  {t("library.moveToFolder.noMatches")}
+                </p>
               )}
             </div>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">{t("library.moveToFolder.noFolders")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("library.moveToFolder.noFolders")}
+          </p>
         )}
         <DialogFooter>
           <Button variant="outline" className="text-foreground" onClick={onClose}>

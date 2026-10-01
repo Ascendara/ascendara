@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Folder, FolderOpen, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,6 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
-
 // Keep covers available synchronously when cards remount after navigation.
 const thumbnailCache = new Map();
 window.addEventListener("game-cover-updated", ({ detail }) => {
@@ -25,10 +23,11 @@ window.addEventListener("game-cover-updated", ({ detail }) => {
   if (detail.dataUrl) thumbnailCache.set(detail.gameName, detail.dataUrl);
   else thumbnailCache.delete(detail.gameName);
 });
-const getPreview = items => items.slice(0, 4).map(game => {
-  const id = game.game || game.name;
-  return { id, name: id, image: thumbnailCache.get(id) || null };
-});
+const getPreview = items =>
+  items.slice(0, 4).map(game => {
+    const id = game.game || game.name;
+    return { id, name: id, image: thumbnailCache.get(id) || null };
+  });
 
 const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFolder }) => {
   const { t } = useLanguage();
@@ -36,7 +35,9 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
   const [isHovered, setIsHovered] = useState(false);
   const folder = suppliedFolder || getFolderByName(name);
   const folderGames = folder?.items || [];
-  const previewKey = JSON.stringify(folderGames.slice(0, 4).map(game => game.game || game.name));
+  const previewKey = JSON.stringify(
+    folderGames.slice(0, 4).map(game => game.game || game.name)
+  );
   const [gameThumbnails, setGameThumbnails] = useState(() => getPreview(folderGames));
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -44,17 +45,21 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
     let active = true;
     const ids = JSON.parse(previewKey);
     const refresh = async () => {
-      const results = await Promise.all(ids.map(async id => {
-        let image = thumbnailCache.get(id);
-        if (!image) {
-          try {
-            const base64 = await window.electron.getGameImage(id, "grid");
-            image = base64 ? `data:image/jpeg;base64,${base64}` : null;
-            if (image) thumbnailCache.set(id, image);
-          } catch { image = null; }
-        }
-        return { id, name: id, image };
-      }));
+      const results = await Promise.all(
+        ids.map(async id => {
+          let image = thumbnailCache.get(id);
+          if (!image) {
+            try {
+              const base64 = await window.electron.getGameImage(id, "grid");
+              image = base64 ? `data:image/jpeg;base64,${base64}` : null;
+              if (image) thumbnailCache.set(id, image);
+            } catch {
+              image = null;
+            }
+          }
+          return { id, name: id, image };
+        })
+      );
       if (active) setGameThumbnails(results);
     };
     const onCoverUpdate = ({ detail }) => {
@@ -73,7 +78,8 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
       if (detail?.folderName === name) setShowDeleteDialog(true);
     };
     window.addEventListener("ascendara:remove-folder-requested", onRemoveRequested);
-    return () => window.removeEventListener("ascendara:remove-folder-requested", onRemoveRequested);
+    return () =>
+      window.removeEventListener("ascendara:remove-folder-requested", onRemoveRequested);
   }, [name]);
 
   const handleFolderClick = e => {
@@ -85,7 +91,9 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
     }
   };
 
-  const slots = Array(4).fill(null).map((_, i) => gameThumbnails[i] ?? null);
+  const slots = Array(4)
+    .fill(null)
+    .map((_, i) => gameThumbnails[i] ?? null);
 
   return (
     <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -93,7 +101,7 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
         data-library-folder={name}
         className={cn(
           "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-          "hover:-translate-y-1 hover:shadow-xl hover:border-primary/30",
+          "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
           "cursor-pointer",
           className
         )}
@@ -105,7 +113,7 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
           <div className="relative aspect-[2/3] overflow-hidden bg-muted/20">
             {/* 2×2 portrait thumbnail grid */}
             <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5 p-0.5">
-              {slots.map((slot, index) => (
+              {slots.map((slot, index) =>
                 slot?.image ? (
                   <div key={slot.id} className="overflow-hidden">
                     <img
@@ -122,7 +130,7 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
                     <Folder className="h-5 w-5 text-muted-foreground/30" />
                   </div>
                 )
-              ))}
+              )}
             </div>
 
             {/* Hover overlay */}
@@ -132,7 +140,7 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
             <button
               type="button"
               className={cn(
-                "absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white transition-opacity hover:bg-destructive/80",
+                "hover:bg-destructive/80 absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white transition-opacity",
                 isHovered ? "opacity-100" : "pointer-events-none opacity-0"
               )}
               title={t("library.removeFolder")}
@@ -146,7 +154,11 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
 
             {/* Game count badge — top-left */}
             <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-              {isHovered ? <FolderOpen className="h-3 w-3" /> : <Folder className="h-3 w-3" />}
+              {isHovered ? (
+                <FolderOpen className="h-3 w-3" />
+              ) : (
+                <Folder className="h-3 w-3" />
+              )}
               {folderGames.length}
             </span>
           </div>
@@ -165,9 +177,7 @@ const FolderCard = ({ name, onClick, className, refreshKey, folder: suppliedFold
       {/* Remove Folder Alert Dialog */}
       <AlertDialogContent className="border-border bg-background">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-lg font-semibold text-foreground">
-            {t("library.confirmRemoveFolderTitle")}
-          </AlertDialogTitle>
+          <AlertDialogTitle>{t("library.confirmRemoveFolderTitle")}</AlertDialogTitle>
           <AlertDialogDescription className="text-muted-foreground">
             {t("library.confirmRemoveFolderDesc")}
           </AlertDialogDescription>

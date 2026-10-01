@@ -2116,7 +2116,6 @@ export default function DownloadPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <TriangleAlert className="h-5 w-5 text-yellow-500" />
               {t("download.reinstallWarning.title") || "Game Already Installed"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -2172,7 +2171,6 @@ export default function DownloadPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <TriangleAlert className="h-5 w-5 text-yellow-500" />
               {conflictStep === "confirmMerge"
                 ? t("download.directoryConflict.confirmMergeTitle")
                 : t("download.directoryConflict.title")}
@@ -2294,7 +2292,6 @@ export default function DownloadPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <TriangleAlert className="h-5 w-5 text-yellow-500" />
               {t("download.providerBlocked.title")}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -3141,9 +3138,7 @@ export default function DownloadPage() {
           <AlertDialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
             <AlertDialogContent className="max-w-2xl border-border bg-background/95 p-6 backdrop-blur-sm">
               <AlertDialogHeader className="mb-4">
-                <AlertDialogTitle className="text-xl font-bold text-primary">
-                  {t("download.compareYourPC")}
-                </AlertDialogTitle>
+                <AlertDialogTitle>{t("download.compareYourPC")}</AlertDialogTitle>
               </AlertDialogHeader>
 
               {systemSpecsLoading ? (
@@ -4362,9 +4357,7 @@ export default function DownloadPage() {
       <AlertDialog open={showSelectPath} onOpenChange={setShowSelectPath}>
         <AlertDialogContent className="sm:max-w-[425px]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg font-bold text-foreground">
-              {t("download.selectPath.title")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("download.selectPath.title")}</AlertDialogTitle>
             <AlertDialogDescription>
               {t("download.selectPath.description")}
             </AlertDialogDescription>
@@ -4466,26 +4459,9 @@ export default function DownloadPage() {
       <AlertDialog open={showVerifiedDialog} onOpenChange={setShowVerifiedDialog}>
         <AlertDialogContent className="max-w-md border-primary/20">
           <AlertDialogHeader>
-            <div className="flex items-center gap-3">
-              <div
-                className="relative flex items-center justify-center rounded-full bg-gradient-to-br from-primary via-primary/90 to-primary/80 p-3"
-                style={{
-                  boxShadow:
-                    "0 0 25px rgba(59, 130, 246, 0.6), 0 0 50px rgba(59, 130, 246, 0.4), 0 0 75px rgba(59, 130, 246, 0.2)",
-                  filter: "drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))",
-                }}
-              >
-                <ShieldCheck className="h-7 w-7 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.6)]" />
-                <div className="absolute -inset-1 animate-pulse rounded-full bg-primary/40 blur-xl" />
-                <div
-                  className="absolute -inset-2 animate-pulse rounded-full bg-primary/20 blur-2xl"
-                  style={{ animationDelay: "0.5s" }}
-                />
-              </div>
-              <AlertDialogTitle className="text-2xl font-bold">
-                {t("gameCard.verified.dialogTitle")}
-              </AlertDialogTitle>
-            </div>
+            <AlertDialogTitle className="text-2xl font-bold">
+              {t("gameCard.verified.dialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4 pt-4 text-left">
               <p className="text-base leading-relaxed">
                 {

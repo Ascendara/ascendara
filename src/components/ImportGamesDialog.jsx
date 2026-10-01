@@ -274,9 +274,6 @@ export default function ImportGamesDialog({
       >
         <DialogHeader className="shrink-0 border-b border-border px-6 py-5 text-left">
           <div className="mb-2 flex items-center gap-3 pr-8">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Download className="h-5 w-5" aria-hidden="true" />
-            </span>
             <DialogTitle>{t("library.launcherImport.title")}</DialogTitle>
           </div>
           <DialogDescription>{t("library.launcherImport.description")}</DialogDescription>
@@ -292,17 +289,6 @@ export default function ImportGamesDialog({
         </DialogClose>
 
         <div className="min-h-0 space-y-5 overflow-y-auto px-6 py-5">
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <HardDrive className="h-3.5 w-3.5" aria-hidden="true" />
-              {t("library.launcherImport.installedOnly")}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              {t("library.launcherImport.noSignIn")}
-            </span>
-          </div>
-
           <fieldset disabled={busy || loading} className="space-y-3">
             <legend className="text-sm font-medium">
               {t("library.launcherImport.chooseLaunchers")}
@@ -484,10 +470,10 @@ export default function ImportGamesDialog({
           {error && (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground"
+              className="border-destructive/30 bg-destructive/10 flex items-start gap-2 rounded-lg border p-3 text-sm text-foreground"
             >
               <AlertCircle
-                className="mt-0.5 h-4 w-4 shrink-0 text-destructive"
+                className="text-destructive mt-0.5 h-4 w-4 shrink-0"
                 aria-hidden="true"
               />
               {t(`library.launcherImport.errors.${error}`)}
@@ -630,7 +616,7 @@ export default function ImportGamesDialog({
           </p>
         </div>
 
-        <DialogFooter className="shrink-0 gap-2 border-t text-secondary border-border bg-muted/10 px-6 py-4 sm:items-center">
+        <DialogFooter className="shrink-0 gap-2 border-t border-border bg-muted/10 px-6 py-4 text-secondary sm:items-center">
           {busy ? (
             <>
               <Button
@@ -652,7 +638,11 @@ export default function ImportGamesDialog({
             </>
           ) : (
             <>
-              <Button variant="outline" className="text-primary" onClick={() => onOpenChange(false)}>
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={() => onOpenChange(false)}
+              >
                 {t("library.launcherImport.close")}
               </Button>
               {!state ? (

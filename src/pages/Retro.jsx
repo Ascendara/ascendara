@@ -221,14 +221,12 @@ function ConsoleSetup({
       <DialogContent className={`${dialogStyle} max-w-2xl`}>
         <DialogHeader className="space-y-2 border-b border-border pb-4 pr-6 text-left">
           <div className="flex flex-wrap items-center gap-3">
-            <DialogTitle className="text-xl font-semibold leading-snug text-foreground">
-              {t("retro.setup.title", { name: platform.name })}
-            </DialogTitle>
+            <DialogTitle>{t("retro.setup.title", { name: platform.name })}</DialogTitle>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-auto mb-3 min-h-10 gap-2 rounded-lg border-primary/30 bg-primary/10 px-3 py-2 text-primary shadow-sm hover:border-primary/60 hover:bg-primary/15 hover:text-primary"
+                  className="mb-3 h-auto min-h-10 gap-2 rounded-lg border-primary/30 bg-primary/10 px-3 py-2 text-primary shadow-sm hover:border-primary/60 hover:bg-primary/15 hover:text-primary"
                   aria-label={t("retro.setup.recommendedEmulator")}
                 >
                   <Info className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -476,9 +474,7 @@ function GameDetails({ game, platform, profile, running, onClose, onChanged, onS
     <Dialog open onOpenChange={open => !open && !busy && onClose()}>
       <DialogContent className={`${dialogStyle} max-w-3xl`}>
         <DialogHeader className="space-y-2 border-b border-border pb-4 pr-6 text-left">
-          <DialogTitle className="text-xl font-semibold leading-snug text-foreground">
-            {game.title}
-          </DialogTitle>
+          <DialogTitle>{game.title}</DialogTitle>
           <DialogDescription className="leading-relaxed">
             {platform.name}
             {game.year ? ` · ${game.year}` : ""}
@@ -738,9 +734,7 @@ function SavesDialog({ platform, profile, onClose, onSetup, running }) {
     <Dialog open onOpenChange={open => !open && !busy && onClose()}>
       <DialogContent className={`${dialogStyle} max-w-2xl`}>
         <DialogHeader className="space-y-2 border-b border-border pb-4 pr-6 text-left">
-          <DialogTitle className="text-xl font-semibold leading-snug text-foreground">
-            {t("retro.saves.title", { name: platform.name })}
-          </DialogTitle>
+          <DialogTitle>{t("retro.saves.title", { name: platform.name })}</DialogTitle>
           <DialogDescription className="leading-relaxed">
             {t("retro.saves.description")}
           </DialogDescription>
@@ -1044,7 +1038,10 @@ export default function Retro() {
         <span className="sr-only">{t("retro.loading")}</span>
       </div>
     );
-  const localizedPlatforms = state.platforms.map(platform => ({ ...platform, name: t(`retro.platformNames.${platform.id}`) }));
+  const localizedPlatforms = state.platforms.map(platform => ({
+    ...platform,
+    name: t(`retro.platformNames.${platform.id}`),
+  }));
   const platformFor = id => localizedPlatforms.find(p => p.id === id);
   const availablePlatforms = localizedPlatforms.filter(
     platform => !platform.ascend || access.allowed
@@ -1062,7 +1059,9 @@ export default function Retro() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
               <Gamepad2 className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold leading-none text-foreground">{t("retro.title")}</h2>
+            <h2 className="text-2xl font-bold leading-none text-foreground">
+              {t("retro.title")}
+            </h2>
           </div>
           <Button
             variant="outline"
@@ -1499,8 +1498,7 @@ export default function Retro() {
       <Dialog open={showWelcome} onOpenChange={setShowWelcome}>
         <DialogContent className={`${dialogStyle} max-w-lg`}>
           <DialogHeader className="space-y-2 border-b border-border pb-4 pr-6 text-left">
-            <DialogTitle className="flex items-center gap-2 text-xl font-semibold leading-snug text-foreground">
-              <Gamepad2 className="h-5 w-5 text-primary" />
+            <DialogTitle className="flex items-center gap-2">
               {t("retro.welcome.title")}
             </DialogTitle>
             <DialogDescription className="leading-relaxed">

@@ -77,9 +77,7 @@ export default function LocalLibraryBackupsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden border-border bg-background p-0 text-foreground sm:max-w-2xl">
         <DialogHeader className="shrink-0 border-b border-border px-6 py-5 text-left">
-          <DialogTitle className="pr-6 text-lg font-semibold text-foreground">
-            {t("library.libraryBackups.title")}
-          </DialogTitle>
+          <DialogTitle className="pr-6">{t("library.libraryBackups.title")}</DialogTitle>
           <DialogDescription className="pr-6 text-sm leading-relaxed text-muted-foreground">
             {t("library.libraryBackups.viewerDescription")}
           </DialogDescription>
@@ -250,7 +248,7 @@ export default function LocalLibraryBackupsDialog({
                     {t("library.libraryBackups.loadingLocal")}
                   </p>
                 ) : error ? (
-                  <p role="alert" className="text-sm text-destructive">
+                  <p role="alert" className="text-destructive text-sm">
                     {error}
                   </p>
                 ) : backups.length === 0 ? (

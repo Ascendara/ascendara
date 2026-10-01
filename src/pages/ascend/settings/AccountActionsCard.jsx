@@ -89,7 +89,6 @@ export default function AccountActionsCard({
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-foreground">
-              <Trash2 className="h-5 w-5 text-primary" />
               {t("account.deletion.title") || "Delete Account"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">

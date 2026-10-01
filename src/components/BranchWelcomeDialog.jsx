@@ -1,6 +1,5 @@
-
 import { useTranslation } from "react-i18next";
-import { FlaskConical, TestTube2 } from "lucide-react";
+
 import {
   AlertDialog,
   AlertDialogContent,
@@ -30,11 +29,6 @@ const BranchWelcomeDialog = ({ branch, open, onOpenChange }) => {
       <AlertDialogContent className="border-border">
         <AlertDialogHeader>
           <div className="flex items-center gap-4">
-            {isPublicTesting ? (
-              <TestTube2 className="mb-2 h-10 w-10 text-blue-500" />
-            ) : (
-              <FlaskConical className="mb-2 h-10 w-10 text-orange-500" />
-            )}
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
               {isPublicTesting
                 ? t("branchWelcome.publicTesting.title")

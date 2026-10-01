@@ -1,9 +1,60 @@
+import { dialogTitleClassName } from "@/components/ui/dialog-styles";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import SafeHtml from "@/components/SafeHtml";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Heart, Play, FolderOpen, Tag, PackageOpen, Trash2, Pencil, Monitor, StopCircle, Loader, FileCheck2, Check, FolderSync, AlertTriangle, Info, Star, Clock, ExternalLink, Settings2, Download, FileSearch, Search, Edit3, ThumbsUp, Copy, Music2, HeadphoneOff, Trophy, Award, BookX, LockIcon, ImageUp, ImageIcon, Bolt, Plus, GripVertical, X, Puzzle, ChevronDown, ChevronUp, Gem, Cloud, CloudOff, Terminal, RefreshCw, ArrowRightLeft, CheckCircle2, LayoutGrid } from "lucide-react";
+import {
+  ChevronLeft,
+  Heart,
+  Play,
+  FolderOpen,
+  Tag,
+  PackageOpen,
+  Trash2,
+  Pencil,
+  Monitor,
+  StopCircle,
+  Loader,
+  FileCheck2,
+  Check,
+  FolderSync,
+  AlertTriangle,
+  Info,
+  Star,
+  Clock,
+  ExternalLink,
+  Settings2,
+  Download,
+  FileSearch,
+  Search,
+  Edit3,
+  ThumbsUp,
+  Copy,
+  Music2,
+  HeadphoneOff,
+  Trophy,
+  Award,
+  BookX,
+  LockIcon,
+  ImageUp,
+  ImageIcon,
+  Bolt,
+  Plus,
+  GripVertical,
+  X,
+  Puzzle,
+  ChevronDown,
+  ChevronUp,
+  Gem,
+  Cloud,
+  CloudOff,
+  Terminal,
+  RefreshCw,
+  ArrowRightLeft,
+  CheckCircle2,
+  LayoutGrid,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
@@ -476,7 +527,14 @@ const UninstallConfirmationDialog = ({
   </AlertDialog>
 );
 
-const AudioDownloadConfirmDialog = ({ open, onClose, onConfirm, onCancel, trackCount, t }) => (
+const AudioDownloadConfirmDialog = ({
+  open,
+  onClose,
+  onConfirm,
+  onCancel,
+  trackCount,
+  t,
+}) => (
   <AlertDialog open={open} onOpenChange={onClose}>
     <AlertDialogContent>
       <AlertDialogHeader>
@@ -488,10 +546,14 @@ const AudioDownloadConfirmDialog = ({ open, onClose, onConfirm, onCancel, trackC
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter className="flex gap-2">
-        <Button variant="outline" className="text-primary" onClick={() => {
-          onCancel();
-          onClose();
-        }}>
+        <Button
+          variant="outline"
+          className="text-primary"
+          onClick={() => {
+            onCancel();
+            onClose();
+          }}
+        >
           {t("common.cancel")}
         </Button>
         <Button
@@ -544,29 +606,106 @@ const PurchasePromptDialog = ({ open, onClose, gameName, appId, t }) => {
 };
 
 const FIELD_META = {
-  game:           { label: "Game Name",          desc: "The display name of the game.",                          type: "text",   readonly: true                },
-  version:        { label: "Version",            desc: "The installed version string.",                          type: "text"                                  },
-  size:           { label: "Install Size",       desc: "Disk size reported at download time.",                   type: "text"                                  },
-  executable:     { label: "Primary Executable", desc: "Path to the main .exe that Ascendara launches.",         type: "text"                                  },
-  launchCommands: { label: "Launch Commands",    desc: "Extra CLI arguments passed when launching the game.",    type: "text"                                  },
-  online:         { label: "Online Fix",         desc: "Whether the game uses an online / Steamworks fix.",      type: "bool"                                  },
-  dlc:            { label: "Includes DLC",       desc: "Whether DLC content is bundled with this install.",      type: "bool"                                  },
-  isVr:           { label: "VR Game",            desc: "Whether this game requires a VR headset.",               type: "bool"                                  },
-  favorite:       { label: "Favorite",           desc: "Marks the game as a favorite in your library.",          type: "bool"                                  },
-  backups:        { label: "Auto-Backups",       desc: "Whether automatic save-file backups are enabled.",       type: "bool"                                  },
-  isRunning:      { label: "Is Running",         desc: "Live flag — true while the game process is active.",     type: "bool",   readonly: true                },
-  hasRated:       { label: "Has Been Rated",     desc: "Whether you have submitted a rating for this game.",     type: "bool",   readonly: true, leaderboard: true },
-  launchCount:    { label: "Launch Count",       desc: "Total number of times you have launched this game.",     type: "number", readonly: true, leaderboard: true },
-  playTime:       { label: "Play Time (min)",    desc: "Total play time tracked by Ascendara, in minutes.",      type: "number", readonly: true, leaderboard: true },
-  lastPlayed:     { label: "Last Played",        desc: "Timestamp of the last session (null if never played).",  type: "text",   readonly: true                },
-  executables:    { label: "All Executables",    desc: "List of known executables for this game.",               type: "array"                                 },
+  game: {
+    label: "Game Name",
+    desc: "The display name of the game.",
+    type: "text",
+    readonly: true,
+  },
+  version: { label: "Version", desc: "The installed version string.", type: "text" },
+  size: {
+    label: "Install Size",
+    desc: "Disk size reported at download time.",
+    type: "text",
+  },
+  executable: {
+    label: "Primary Executable",
+    desc: "Path to the main .exe that Ascendara launches.",
+    type: "text",
+  },
+  launchCommands: {
+    label: "Launch Commands",
+    desc: "Extra CLI arguments passed when launching the game.",
+    type: "text",
+  },
+  online: {
+    label: "Online Fix",
+    desc: "Whether the game uses an online / Steamworks fix.",
+    type: "bool",
+  },
+  dlc: {
+    label: "Includes DLC",
+    desc: "Whether DLC content is bundled with this install.",
+    type: "bool",
+  },
+  isVr: {
+    label: "VR Game",
+    desc: "Whether this game requires a VR headset.",
+    type: "bool",
+  },
+  favorite: {
+    label: "Favorite",
+    desc: "Marks the game as a favorite in your library.",
+    type: "bool",
+  },
+  backups: {
+    label: "Auto-Backups",
+    desc: "Whether automatic save-file backups are enabled.",
+    type: "bool",
+  },
+  isRunning: {
+    label: "Is Running",
+    desc: "Live flag — true while the game process is active.",
+    type: "bool",
+    readonly: true,
+  },
+  hasRated: {
+    label: "Has Been Rated",
+    desc: "Whether you have submitted a rating for this game.",
+    type: "bool",
+    readonly: true,
+    leaderboard: true,
+  },
+  launchCount: {
+    label: "Launch Count",
+    desc: "Total number of times you have launched this game.",
+    type: "number",
+    readonly: true,
+    leaderboard: true,
+  },
+  playTime: {
+    label: "Play Time (min)",
+    desc: "Total play time tracked by Ascendara, in minutes.",
+    type: "number",
+    readonly: true,
+    leaderboard: true,
+  },
+  lastPlayed: {
+    label: "Last Played",
+    desc: "Timestamp of the last session (null if never played).",
+    type: "text",
+    readonly: true,
+  },
+  executables: {
+    label: "All Executables",
+    desc: "List of known executables for this game.",
+    type: "array",
+  },
 };
 
 const LEADERBOARD_KEYS = Object.entries(FIELD_META)
   .filter(([, m]) => m.leaderboard)
   .map(([k]) => k);
 
-const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, isAuthenticated }) => {
+const EditGameEntryDialog = ({
+  open,
+  onClose,
+  gameName,
+  isCustom,
+  t,
+  onSaved,
+  isAuthenticated,
+}) => {
   const [fields, setFields] = useState({});
   const [originalFields, setOriginalFields] = useState({});
   const [rawTab, setRawTab] = useState(false);
@@ -609,11 +748,15 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
       // Detect if any leaderboard-sensitive keys were changed
       if (isAuthenticated) {
         const tampered = LEADERBOARD_KEYS.filter(
-          k => k in originalFields && JSON.stringify(parsed[k]) !== JSON.stringify(originalFields[k])
+          k =>
+            k in originalFields &&
+            JSON.stringify(parsed[k]) !== JSON.stringify(originalFields[k])
         );
         if (tampered.length > 0) {
           // Revert those keys back to original values
-          tampered.forEach(k => { parsed[k] = originalFields[k]; });
+          tampered.forEach(k => {
+            parsed[k] = originalFields[k];
+          });
           const reverted = JSON.stringify(parsed, null, 2);
           setJsonText(reverted);
           setFields(parsed);
@@ -633,8 +776,19 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
   };
 
   const handleSave = async () => {
-    const data = rawTab ? (() => { try { return JSON.parse(jsonText); } catch { return null; } })() : fields;
-    if (!data) { toast.error(t("gameScreen.editGameEntryInvalidJson")); return; }
+    const data = rawTab
+      ? (() => {
+          try {
+            return JSON.parse(jsonText);
+          } catch {
+            return null;
+          }
+        })()
+      : fields;
+    if (!data) {
+      toast.error(t("gameScreen.editGameEntryInvalidJson"));
+      return;
+    }
     setSaving(true);
     const result = await window.electron.writeGameEntry(gameName, data, isCustom);
     setSaving(false);
@@ -656,21 +810,25 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
     const isDisabled = !!meta.readonly;
 
     const wrapperClass = `rounded-lg border px-4 py-3 ${
-      isDisabled
-        ? "border-border bg-muted/10 opacity-60"
-        : "border-border bg-muted/20"
+      isDisabled ? "border-border bg-muted/10 opacity-60" : "border-border bg-muted/20"
     }`;
 
     if (meta.type === "bool") {
       return (
         <div key={key} className={`flex items-center justify-between ${wrapperClass}`}>
           <div className="flex-1 pr-4">
-            <p className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}>
+            <p
+              className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}
+            >
               {meta.label}
             </p>
             <p className="text-xs text-muted-foreground">{meta.desc}</p>
           </div>
-          <Switch checked={!!value} disabled={isDisabled} onCheckedChange={v => handleFieldChange(key, v)} />
+          <Switch
+            checked={!!value}
+            disabled={isDisabled}
+            onCheckedChange={v => handleFieldChange(key, v)}
+          />
         </div>
       );
     }
@@ -678,7 +836,9 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
     if (meta.type === "number") {
       return (
         <div key={key} className={wrapperClass}>
-          <p className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}>
+          <p
+            className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}
+          >
             {meta.label}
           </p>
           <p className="mb-2 text-xs text-muted-foreground">{meta.desc}</p>
@@ -702,7 +862,7 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
           <div className="space-y-1">
             {arr.map((item, i) => (
               <div key={i} className="flex items-center gap-2">
-                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-mono text-primary">
+                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
                   {i === 0 ? "primary" : `#${i + 1}`}
                 </span>
                 <span className="truncate font-mono text-xs text-foreground">{item}</span>
@@ -715,7 +875,9 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
 
     return (
       <div key={key} className={wrapperClass}>
-        <p className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}>
+        <p
+          className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}
+        >
           {meta.label}
         </p>
         <p className="mb-2 text-xs text-muted-foreground">{meta.desc}</p>
@@ -723,7 +885,7 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
           value={value ?? ""}
           disabled={isDisabled}
           onChange={e => handleFieldChange(key, e.target.value)}
-          className="h-8 text-sm font-mono"
+          className="h-8 font-mono text-sm"
         />
       </div>
     );
@@ -744,7 +906,10 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
         {/* Tab bar */}
         <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
           <button
-            onClick={() => { setRawTab(false); setRawWarnKeys([]); }}
+            onClick={() => {
+              setRawTab(false);
+              setRawWarnKeys([]);
+            }}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${!rawTab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
             Fields
@@ -770,7 +935,8 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                   <p className="text-xs text-red-600 dark:text-red-400">
                     <span className="font-semibold">Reverted protected fields: </span>
-                    {rawWarnKeys.join(", ")}. Editing these fields can get your Ascend account banned from the leaderboard.
+                    {rawWarnKeys.join(", ")}. Editing these fields can get your Ascend
+                    account banned from the leaderboard.
                   </p>
                 </div>
               )}
@@ -792,15 +958,22 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
           ) : (
             <div className="flex flex-col gap-2">
               {/* Combined info notice */}
-              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground space-y-1.5">
+              <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-500" />
-                  <span>Greyed-out fields are read-only and managed automatically by Ascendara.</span>
+                  <span>
+                    Greyed-out fields are read-only and managed automatically by
+                    Ascendara.
+                  </span>
                 </div>
                 {isAuthenticated && (
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
-                    <span><span className="font-semibold text-red-500">Leaderboard: </span>Has Been Rated, Launch Count, and Play Time are protected — tampering can get your Ascend account banned.</span>
+                    <span>
+                      <span className="font-semibold text-red-500">Leaderboard: </span>Has
+                      Been Rated, Launch Count, and Play Time are protected — tampering
+                      can get your Ascend account banned.
+                    </span>
                   </div>
                 )}
               </div>
@@ -811,18 +984,31 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
               {/* Unknown extra fields */}
               {extraKeys.length > 0 && (
                 <>
-                  <p className="mt-2 text-xs font-medium text-muted-foreground">Additional fields</p>
+                  <p className="mt-2 text-xs font-medium text-muted-foreground">
+                    Additional fields
+                  </p>
                   {extraKeys.map(key => (
-                    <div key={key} className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-                      <p className="font-mono text-sm font-medium text-foreground">{key}</p>
+                    <div
+                      key={key}
+                      className="rounded-lg border border-border bg-muted/20 px-4 py-3"
+                    >
+                      <p className="font-mono text-sm font-medium text-foreground">
+                        {key}
+                      </p>
                       <Input
-                        value={typeof fields[key] === "object" ? JSON.stringify(fields[key]) : String(fields[key] ?? "")}
+                        value={
+                          typeof fields[key] === "object"
+                            ? JSON.stringify(fields[key])
+                            : String(fields[key] ?? "")
+                        }
                         onChange={e => {
                           let val = e.target.value;
-                          try { val = JSON.parse(val); } catch {}
+                          try {
+                            val = JSON.parse(val);
+                          } catch {}
                           handleFieldChange(key, val);
                         }}
-                        className="mt-2 h-8 text-sm font-mono"
+                        className="mt-2 h-8 font-mono text-sm"
                       />
                     </div>
                   ))}
@@ -857,7 +1043,16 @@ const EditGameEntryDialog = ({ open, onClose, gameName, isCustom, t, onSaved, is
 };
 
 // Dialog to edit game info (Steam match and assets)
-const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, t, onSave, setAssetSearchOpen }) => {
+const EditGameInfoDialog = ({
+  open,
+  onClose,
+  gameName,
+  currentAppId,
+  steamData,
+  t,
+  onSave,
+  setAssetSearchOpen,
+}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -887,7 +1082,7 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
         if (data.items) {
           // Fetch details for first few results to show more info
           const resultsWithDetails = await Promise.all(
-            data.items.slice(0, 5).map(async (item) => {
+            data.items.slice(0, 5).map(async item => {
               try {
                 const detailsUrl = `https://api.ascendara.app/api/proxy/steam/appdetails?appids=${item.id}`;
                 const detailsRes = await fetch(detailsUrl);
@@ -915,7 +1110,7 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
     setIsSearching(false);
   };
 
-  const handleSelectGame = (game) => {
+  const handleSelectGame = game => {
     setSelectedGame(game);
     setManualAppId(game.id.toString());
   };
@@ -950,7 +1145,9 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
           {/* Current match info */}
           {steamData && (
             <div className="rounded-lg border border-border bg-muted/30 p-4">
-              <p className="text-sm font-medium text-foreground">{t("gameScreen.currentlyMatched")}</p>
+              <p className="text-sm font-medium text-foreground">
+                {t("gameScreen.currentlyMatched")}
+              </p>
               <div className="mt-2 flex items-center gap-3">
                 {steamData.cover?.url && (
                   <img
@@ -961,19 +1158,23 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
                 )}
                 <div>
                   <p className="font-semibold text-foreground">{steamData.name}</p>
-                  <p className="text-xs text-muted-foreground">App ID: {steamData.appid}</p>
+                  <p className="text-xs text-muted-foreground">
+                    App ID: {steamData.appid}
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
           {/* Tabs */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant={activeTab === "search" ? "default" : "outline"}
               size="sm"
               onClick={() => setActiveTab("search")}
-              className={activeTab === "search" ? "bg-primary text-secondary" : "text-foreground"}
+              className={
+                activeTab === "search" ? "bg-primary text-secondary" : "text-foreground"
+              }
             >
               <Search className="mr-2 h-4 w-4" />
               {t("gameScreen.searchSteam")}
@@ -982,7 +1183,9 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
               variant={activeTab === "manual" ? "default" : "outline"}
               size="sm"
               onClick={() => setActiveTab("manual")}
-              className={activeTab === "manual" ? "bg-primary text-secondary" : "text-foreground"}
+              className={
+                activeTab === "manual" ? "bg-primary text-secondary" : "text-foreground"
+              }
             >
               <Edit3 className="mr-2 h-4 w-4" />
               {t("gameScreen.manualEntry")}
@@ -1006,9 +1209,9 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
               <div className="flex gap-2">
                 <Input
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={e => setSearchQuery(e.target.value)}
                   placeholder={t("gameScreen.searchSteamPlaceholder")}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  onKeyDown={e => e.key === "Enter" && handleSearch()}
                   className="text-foreground"
                 />
                 <Button
@@ -1025,8 +1228,8 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
               </div>
 
               {/* Search Results */}
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {searchResults.map((game) => (
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {searchResults.map(game => (
                   <div
                     key={game.id}
                     onClick={() => handleSelectGame(game)}
@@ -1048,11 +1251,11 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
                         <ImageIcon className="h-6 w-6 text-muted-foreground" />
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{game.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-foreground">{game.name}</p>
                       <p className="text-xs text-muted-foreground">App ID: {game.id}</p>
                       {game.short_description && (
-                        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                           {game.short_description}
                         </p>
                       )}
@@ -1067,11 +1270,13 @@ const EditGameInfoDialog = ({ open, onClose, gameName, currentAppId, steamData, 
           ) : (
             <div className="space-y-4">
               <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm text-muted-foreground mb-2">{t("gameScreen.manualAppIdHelp")}</p>
+                <p className="mb-2 text-sm text-muted-foreground">
+                  {t("gameScreen.manualAppIdHelp")}
+                </p>
                 <Input
                   value={manualAppId}
                   className="text-foreground"
-                  onChange={(e) => setManualAppId(e.target.value)}
+                  onChange={e => setManualAppId(e.target.value)}
                   placeholder={t("gameScreen.steamAppIdPlaceholder")}
                 />
               </div>
@@ -1195,32 +1400,35 @@ export default function GameScreen() {
           })
           .catch(() => {});
       }
-      window.electron.isUmuInstalled().then(installed => {
-        setUmuInstalled(installed);
-      }).catch(() => {});
+      window.electron
+        .isUmuInstalled()
+        .then(installed => {
+          setUmuInstalled(installed);
+        })
+        .catch(() => {});
     }
   }, [game]);
 
   useEffect(() => {
-  if (!isOnLinux || !game) return;
-  const gameDir = game.executable
-    ? game.executable.substring(0, game.executable.lastIndexOf("/"))
-    : null;
-  if (!gameDir) return;
+    if (!isOnLinux || !game) return;
+    const gameDir = game.executable
+      ? game.executable.substring(0, game.executable.lastIndexOf("/"))
+      : null;
+    if (!gameDir) return;
 
-  window.electron.umuGetGameId(game.game || game.name).then(id => {
-    setUmuId(id || "");
-    setUmuIdInput(id || "");
-  });
+    window.electron.umuGetGameId(game.game || game.name).then(id => {
+      setUmuId(id || "");
+      setUmuIdInput(id || "");
+    });
 
-  // Auto-detect if none set
-  window.electron.umuAutoDetect(game.game || game.name).then(found => {
-    if (found && !umuId) {
-      setUmuId(found);
-      setUmuIdInput(found);
-    }
-  });
-}, [isOnLinux, game]);
+    // Auto-detect if none set
+    window.electron.umuAutoDetect(game.game || game.name).then(found => {
+      if (found && !umuId) {
+        setUmuId(found);
+        setUmuIdInput(found);
+      }
+    });
+  }, [isOnLinux, game]);
 
   // Nexus Mods state
   const [supportsModManaging, setSupportsModManaging] = useState(false);
@@ -1312,7 +1520,9 @@ export default function GameScreen() {
   const [showPurchasePrompt, setShowPurchasePrompt] = useState(false);
   const [hasShownPurchasePrompt, setHasShownPurchasePrompt] = useState(() => {
     const gameName = game?.game || game?.name;
-    return gameName ? localStorage.getItem(`purchase-prompt-shown-${gameName}`) === 'true' : false;
+    return gameName
+      ? localStorage.getItem(`purchase-prompt-shown-${gameName}`) === "true"
+      : false;
   });
 
   // GO BACK!
@@ -1466,7 +1676,12 @@ export default function GameScreen() {
         try {
           const customGames = await window.electron.getCustomGames();
           const deletedStubs = (customGames || []).filter(g => g._isDeleted);
-          console.log("[GameScreen] Checking for deleted stub for:", gameName, "| All stubs:", deletedStubs.map(g => g.game));
+          console.log(
+            "[GameScreen] Checking for deleted stub for:",
+            gameName,
+            "| All stubs:",
+            deletedStubs.map(g => g.game)
+          );
           const stub = deletedStubs.find(g => g.game === gameName);
           if (stub) {
             console.log("[GameScreen] Found deleted stub, showing restore prompt:", stub);
@@ -1590,10 +1805,7 @@ export default function GameScreen() {
 
   const handleSwitchToAscendaraManaged = () => {
     if (!importCatalogMatch) return;
-    pendingLibrarySwapService.add(
-      sanitizeText(importCatalogMatch.game),
-      game.game
-    );
+    pendingLibrarySwapService.add(sanitizeText(importCatalogMatch.game), game.game);
     navigate("/download", { state: { gameData: importCatalogMatch } });
   };
 
@@ -1705,7 +1917,9 @@ export default function GameScreen() {
     };
 
     const unsubLaunchError = window.electron.onGameLaunchError(handleGameLaunchError);
-    const unsubCoverUpdated = window.electron.onCoverImageUpdated(handleCoverImageUpdated);
+    const unsubCoverUpdated = window.electron.onCoverImageUpdated(
+      handleCoverImageUpdated
+    );
     const unsubAssetsUpdated = window.electron.onGameAssetsUpdated(data =>
       handleGameAssetsUpdated(null, data)
     );
@@ -1730,15 +1944,15 @@ export default function GameScreen() {
   // Check playtime and show purchase prompt after 3 hours (10800 seconds)
   useEffect(() => {
     if (!game || !settings.promptPurchaseAfter3Hours || hasShownPurchasePrompt) return;
-    
+
     const gameName = game.game || game.name;
     const playTime = game.playTime || 0;
-    
+
     // Check if playtime is at least 3 hours (10800 seconds)
     if (playTime >= 10800) {
       setShowPurchasePrompt(true);
       // Mark as shown so it doesn't appear again
-      localStorage.setItem(`purchase-prompt-shown-${gameName}`, 'true');
+      localStorage.setItem(`purchase-prompt-shown-${gameName}`, "true");
       setHasShownPurchasePrompt(true);
     }
   }, [game, settings.promptPurchaseAfter3Hours, hasShownPurchasePrompt]);
@@ -1793,15 +2007,15 @@ export default function GameScreen() {
       setLoadingSoundtrack(false);
     } else {
       setLoadingSoundtrack(true);
-      
+
       // Create confirmation callback for when >10 tracks need to be fetched
-      const confirmFetch = (trackCount) => {
-        return new Promise((resolve) => {
+      const confirmFetch = trackCount => {
+        return new Promise(resolve => {
           setPendingAudioDownloads({ count: trackCount, resolve });
           setShowAudioDownloadDialog(true);
         });
       };
-      
+
       getGameSoundtrack(gameName, confirmFetch)
         .then(tracks => {
           setSoundtrack(tracks);
@@ -2295,7 +2509,7 @@ export default function GameScreen() {
   };
 
   // Step 2: perform the actual deletion (optionally saving data first)
-  const performDeleteGame = async (saveData) => {
+  const performDeleteGame = async saveData => {
     try {
       setIsUninstalling(true);
       const gameId = game.game || game.name;
@@ -2366,7 +2580,11 @@ export default function GameScreen() {
         }
 
         // Save updated entry
-        const saveResult = await window.electron.writeGameEntry(currentGameName, updatedData, game?.isCustom);
+        const saveResult = await window.electron.writeGameEntry(
+          currentGameName,
+          updatedData,
+          game?.isCustom
+        );
         if (saveResult.success) {
           toast.success(t("gameScreen.steamInfoUpdated"));
           // Update local game state
@@ -2397,10 +2615,15 @@ export default function GameScreen() {
       if (gameDetails) {
         const formattedData = steamService.formatSteamData(gameDetails);
         if (formattedData.screenshots && formattedData.screenshots.length > 0) {
-          formattedData.formatted_screenshots = formattedData.screenshots.map(screenshot => ({
-            ...screenshot,
-            formatted_url: steamService.formatImageUrl(screenshot.url, "screenshot_huge"),
-          }));
+          formattedData.formatted_screenshots = formattedData.screenshots.map(
+            screenshot => ({
+              ...screenshot,
+              formatted_url: steamService.formatImageUrl(
+                screenshot.url,
+                "screenshot_huge"
+              ),
+            })
+          );
         }
         console.log("Steam data fetched by App ID:", formattedData.appid);
         setSteamData(formattedData);
@@ -2596,138 +2819,132 @@ export default function GameScreen() {
                   <AlertTriangle
                     className="mb-2 h-6 w-6 text-yellow-500"
                     title={t("library.executableNotFound")}
-                />
-              )}
-            </div>
+                  />
+                )}
+              </div>
 
-            {/* Version + Tags Row */}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {game.version && game.version !== "-1" && (
-                <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
-                  {game.version}
-                  {updateInfo?.updateAvailable && (
-                    <button
-                      onClick={() => setShowUpdateDialog(true)}
-                      className="ml-1 flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
+              {/* Version + Tags Row */}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {game.version && game.version !== "-1" && (
+                  <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
+                    {game.version}
+                    {updateInfo?.updateAvailable && (
+                      <button
+                        onClick={() => setShowUpdateDialog(true)}
+                        className="ml-1 flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
+                      >
+                        <Download className="h-3 w-3" />
+                        {t("gameScreen.updateBadge")}
+                      </button>
+                    )}
+                  </span>
+                )}
+                {!game.version && updateInfo?.updateAvailable && (
+                  <button
+                    onClick={() => setShowUpdateDialog(true)}
+                    className="flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
+                  >
+                    <Download className="h-3 w-3" />
+                    {t("gameScreen.updateBadge")}
+                  </button>
+                )}
+                {game.online && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex cursor-help items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-500">
+                          {t("download.online")}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-secondary">{t("download.onlineTooltip")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {game.dlc && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex cursor-help items-center gap-1 rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-500">
+                          {t("download.allDlc")}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-secondary">{t("download.allDlcTooltip")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {game.isVr && (
+                  <span className="flex items-center gap-1 rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-400">
+                    <svg
+                      className="h-3 w-3"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      <Download className="h-3 w-3" />
-                      {t("gameScreen.updateBadge")}
-                    </button>
-                  )}
-                </span>
-              )}
-              {!game.version && updateInfo?.updateAvailable && (
-                <button
-                  onClick={() => setShowUpdateDialog(true)}
-                  className="flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
-                >
-                  <Download className="h-3 w-3" />
-                  {t("gameScreen.updateBadge")}
-                </button>
-              )}
-              {game.online && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="flex cursor-help items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-500">
-                        {t("download.online")}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-secondary">
-                        {t("download.onlineTooltip")}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {game.dlc && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="flex cursor-help items-center gap-1 rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-500">
-                        {t("download.allDlc")}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-secondary">
-                        {t("download.allDlcTooltip")}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {game.isVr && (
-                <span className="flex items-center gap-1 rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-400">
-                  <svg
-                    className="h-3 w-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  {t("download.gameNeedsVR")}
-                </span>
-              )}
-            </div>
+                      <path
+                        d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {t("download.gameNeedsVR")}
+                  </span>
+                )}
+              </div>
 
-            {/* Game Details Row */}
-            <div className="mt-4 flex flex-wrap items-center gap-4">
-              {game.size && (
+              {/* Game Details Row */}
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                {game.size && (
+                  <div className="flex items-center gap-1 text-sm text-primary/80">
+                    <PackageOpen className="h-4 w-4" />
+                    <span>{game.size}</span>
+                  </div>
+                )}
+                {!game.isCustom && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex cursor-help items-center gap-1 text-sm text-primary/80">
+                          <Check className="h-4 w-4" />
+                          <span>{t("library.launcherImport.managedBadge")}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-secondary">
+                          {t("library.launcherImport.managedBadgeTooltip")}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <div className="flex items-center gap-1 text-sm text-primary/80">
-                  <PackageOpen className="h-4 w-4" />
-                  <span>{game.size}</span>
+                  <Clock className="h-4 w-4" />
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={game.playTime}
+                      initial={{ opacity: 0, y: -6, scale: 0.9 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        color: playtimeJustUpdated ? "var(--primary)" : "currentColor",
+                      }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      className="font-medium"
+                    >
+                      {formatPlaytime(game.playTime)}
+                    </motion.span>
+                  </AnimatePresence>
                 </div>
-              )}
-              {!game.isCustom && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex cursor-help items-center gap-1 text-sm text-primary/80">
-                        <Check className="h-4 w-4" />
-                        <span>{t("library.launcherImport.managedBadge")}</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-secondary">
-                        {t("library.launcherImport.managedBadgeTooltip")}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              <div className="flex items-center gap-1 text-sm text-primary/80">
-                <Clock className="h-4 w-4" />
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={game.playTime}
-                    initial={{ opacity: 0, y: -6, scale: 0.9 }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                      color: playtimeJustUpdated
-                        ? "var(--primary)"
-                        : "currentColor",
-                    }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
-                    className="font-medium"
-                  >
-                    {formatPlaytime(game.playTime)}
-                  </motion.span>
-                </AnimatePresence>
               </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
 
       <div className="container mx-auto">
@@ -2953,7 +3170,11 @@ export default function GameScreen() {
                               <p className="text-xs">
                                 {t("gameScreen.umuIdDescription")}{" "}
                                 <button
-                                  onClick={() => window.electron.openURL("https://umu.openwinecomponents.org")}
+                                  onClick={() =>
+                                    window.electron.openURL(
+                                      "https://umu.openwinecomponents.org"
+                                    )
+                                  }
                                   className="underline"
                                 >
                                   umu.openwinecomponents.org
@@ -2978,7 +3199,10 @@ export default function GameScreen() {
                           onClick={async () => {
                             if (!game.executable) return;
                             setUmuIdSaving(true);
-                            const result = await window.electron.umuSetGameId(game.game || game.name, umuIdInput);
+                            const result = await window.electron.umuSetGameId(
+                              game.game || game.name,
+                              umuIdInput
+                            );
                             if (result.success) {
                               setUmuId(umuIdInput);
                               toast.success("UMU ID saved");
@@ -2988,12 +3212,17 @@ export default function GameScreen() {
                             setUmuIdSaving(false);
                           }}
                         >
-                          {umuIdSaving ? <Loader className="h-3 w-3 animate-spin" /> : "Save"}
+                          {umuIdSaving ? (
+                            <Loader className="h-3 w-3 animate-spin" />
+                          ) : (
+                            "Save"
+                          )}
                         </Button>
                       </div>
                       {umuId && (
                         <p className="text-xs text-muted-foreground">
-                          Active: <span className="font-mono text-foreground">{umuId}</span>
+                          Active:{" "}
+                          <span className="font-mono text-foreground">{umuId}</span>
                         </p>
                       )}
                     </div>
@@ -3408,12 +3637,13 @@ export default function GameScreen() {
                                     onClick={() => {
                                       toast.success(t("gameScreen.downloadStarted"));
                                       trackDownload(
-                                        window.electron.downloadSoundtrack(track.url, game.game)
+                                        window.electron.downloadSoundtrack(
+                                          track.url,
+                                          game.game
+                                        )
                                       ).then(res => {
                                         if (res?.success) {
-                                          toast.success(
-                                            t("gameScreen.downloadComplete")
-                                          );
+                                          toast.success(t("gameScreen.downloadComplete"));
                                         } else {
                                           toast.error(t("gameScreen.downloadFailed"));
                                         }
@@ -3635,7 +3865,7 @@ export default function GameScreen() {
                 </div>
 
                 {/* Steam Match Info */}
-                {(steamData?.appid || game?.steamAppId) ? (
+                {steamData?.appid || game?.steamAppId ? (
                   <Card className="border border-border">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -3707,10 +3937,12 @@ export default function GameScreen() {
                     <CardContent className="p-6">
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                          <div className="rounded-full mb-2 bg-primary/10 p-2">
+                          <div className="mb-2 rounded-full bg-primary/10 p-2">
                             <Info className="h-5 w-5 text-primary" />
                           </div>
-                          <h2 className="text-xl font-bold">{t("gameScreen.aboutGame")}</h2>
+                          <h2 className="text-xl font-bold">
+                            {t("gameScreen.aboutGame")}
+                          </h2>
                         </div>
                         {steamData.about_the_game ? (
                           <SafeHtml
@@ -3837,7 +4069,9 @@ export default function GameScreen() {
                               disabled={refreshingAchievements}
                               title={t("gameScreen.refreshAchievements")}
                             >
-                              <RefreshCw className={`h-4 w-4 ${refreshingAchievements ? "animate-spin" : ""}`} />
+                              <RefreshCw
+                                className={`h-4 w-4 ${refreshingAchievements ? "animate-spin" : ""}`}
+                              />
                             </Button>
                             <div>
                               <span className="mr-1 text-xl font-semibold text-primary">
@@ -3949,16 +4183,18 @@ export default function GameScreen() {
                         <div className="space-y-2">
                           <p className="font-medium">
                             {t("gameScreen.noAchievementsFound")}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-primary hover:bg-transparent hover:text-primary"
-                            onClick={handleRefreshAchievements}
-                            disabled={refreshingAchievements}
-                            title={t("gameScreen.refreshAchievements")}
-                          >
-                            <RefreshCw className={`h-4 w-4 ${refreshingAchievements ? "animate-spin" : ""}`} />
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-primary hover:bg-transparent hover:text-primary"
+                              onClick={handleRefreshAchievements}
+                              disabled={refreshingAchievements}
+                              title={t("gameScreen.refreshAchievements")}
+                            >
+                              <RefreshCw
+                                className={`h-4 w-4 ${refreshingAchievements ? "animate-spin" : ""}`}
+                              />
+                            </Button>
                           </p>
                           <p className="max-w-sm text-sm text-muted-foreground">
                             {t("gameScreen.noAchievementsDescription")}
@@ -4453,9 +4689,7 @@ export default function GameScreen() {
       <AlertDialog open={showModDetails} onOpenChange={setShowModDetails}>
         <AlertDialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold">
-              {selectedMod?.name}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{selectedMod?.name}</AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-muted-foreground">
               {selectedMod?.uploader?.name
                 ? `${t("gameScreen.modBy")} ${selectedMod.uploader.name}`
@@ -4816,7 +5050,7 @@ export default function GameScreen() {
       {showResetPrefixDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
-            <h3 className="text-lg font-semibold">Reset Compatibility Prefix</h3>
+            <h3 className={dialogTitleClassName}>Reset Compatibility Prefix</h3>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
                 You are about to delete the Windows compatibility prefix for
@@ -4870,15 +5104,12 @@ export default function GameScreen() {
 
       {/* Delete/Remove transition overlay - eases the trip back to the library */}
       {isDeleteTransitioning && (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 animate-in zoom-in-50 duration-300">
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-md duration-200 animate-in fade-in">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 duration-300 animate-in zoom-in-50">
             <CheckCircle2 className="h-8 w-8 text-primary" />
           </div>
-          <p className="text-sm font-medium text-muted-foreground animate-in fade-in slide-in-from-bottom-1 duration-300">
-            {game.isCustom
-              ? t("library.removeGameFromLibrary")
-              : t("library.deleteGame")}
-            {" "}
+          <p className="text-sm font-medium text-muted-foreground duration-300 animate-in fade-in slide-in-from-bottom-1">
+            {game.isCustom ? t("library.removeGameFromLibrary") : t("library.deleteGame")}{" "}
             {(game.game || game.name) && `\u2022 ${game.game || game.name}`}
           </p>
         </div>
@@ -4894,21 +5125,25 @@ export default function GameScreen() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 pt-1">
                 <p className="text-sm text-muted-foreground">
-                  {t("library.restoreGameDataDescription", { game: game.game || game.name })}
+                  {t("library.restoreGameDataDescription", {
+                    game: game.game || game.name,
+                  })}
                 </p>
-                {pendingRestoreStub?.playTime > 60 && (() => {
-                  const secs = pendingRestoreStub.playTime;
-                  const h = Math.floor(secs / 3600);
-                  const m = Math.floor((secs % 3600) / 60);
-                  const label = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
-                  return (
-                    <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm">
-                      <span className="text-foreground/80">
-                        <span className="font-medium text-foreground">{label}</span> of playtime saved
-                      </span>
-                    </div>
-                  );
-                })()}
+                {pendingRestoreStub?.playTime > 60 &&
+                  (() => {
+                    const secs = pendingRestoreStub.playTime;
+                    const h = Math.floor(secs / 3600);
+                    const m = Math.floor((secs % 3600) / 60);
+                    const label = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+                    return (
+                      <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                        <span className="text-foreground/80">
+                          <span className="font-medium text-foreground">{label}</span> of
+                          playtime saved
+                        </span>
+                      </div>
+                    );
+                  })()}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -4917,7 +5152,9 @@ export default function GameScreen() {
               variant="outline"
               className="text-primary"
               onClick={async () => {
-                try { await window.electron.discardDeletedGameData(game.game || game.name); } catch (e) {}
+                try {
+                  await window.electron.discardDeletedGameData(game.game || game.name);
+                } catch (e) {}
                 setIsRestorePromptOpen(false);
                 setPendingRestoreStub(null);
               }}
@@ -4927,7 +5164,9 @@ export default function GameScreen() {
             <Button
               className="text-secondary"
               onClick={async () => {
-                try { await window.electron.restoreDeletedGameData(game.game || game.name); } catch (e) {}
+                try {
+                  await window.electron.restoreDeletedGameData(game.game || game.name);
+                } catch (e) {}
                 setIsRestorePromptOpen(false);
                 setPendingRestoreStub(null);
               }}
@@ -4950,10 +5189,19 @@ export default function GameScreen() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex gap-2">
-            <Button variant="outline" className="text-primary" onClick={() => performDeleteGame(false)} disabled={isUninstalling}>
+            <Button
+              variant="outline"
+              className="text-primary"
+              onClick={() => performDeleteGame(false)}
+              disabled={isUninstalling}
+            >
               {t("library.saveGameDataNo")}
             </Button>
-            <Button className="text-secondary" onClick={() => performDeleteGame(true)} disabled={isUninstalling}>
+            <Button
+              className="text-secondary"
+              onClick={() => performDeleteGame(true)}
+              disabled={isUninstalling}
+            >
               {isUninstalling ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />
@@ -5068,9 +5316,10 @@ export default function GameScreen() {
 
                 const browserProviders = ["buzzheavier", "megadb"];
                 const downloadLinks = updateInfo?.downloadLinks || {};
-                const hasBrowserUpdate = browserProviders.some(provider =>
-                  Array.isArray(downloadLinks[provider]) &&
-                  downloadLinks[provider].some(link => typeof link === "string" && link)
+                const hasBrowserUpdate = browserProviders.some(
+                  provider =>
+                    Array.isArray(downloadLinks[provider]) &&
+                    downloadLinks[provider].some(link => typeof link === "string" && link)
                 );
 
                 if (!updateInfo?.autoUpdateSupported && !hasBrowserUpdate) {

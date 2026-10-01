@@ -345,9 +345,7 @@ export default function LibraryBackupsDialog({
         showCloseButton
       >
         <DialogHeader className="shrink-0 border-b border-border px-6 py-5 text-left">
-          <DialogTitle className="pr-6 text-lg font-semibold text-foreground">
-            {t("library.libraryBackups.title")}
-          </DialogTitle>
+          <DialogTitle className="pr-6">{t("library.libraryBackups.title")}</DialogTitle>
           <DialogDescription className="pr-6 text-sm leading-relaxed text-muted-foreground">
             {t("library.libraryBackups.description")}
           </DialogDescription>
@@ -425,7 +423,7 @@ export default function LibraryBackupsDialog({
                   count: gameNames.length,
                 })}
               </p>
-              <label className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 leading-relaxed text-foreground">
+              <label className="border-destructive/30 bg-destructive/5 flex items-start gap-3 rounded-xl border p-4 leading-relaxed text-foreground">
                 <Checkbox
                   checked={restoreConfirmed}
                   onCheckedChange={value => setRestoreConfirmed(value === true)}
@@ -445,7 +443,7 @@ export default function LibraryBackupsDialog({
                   {t("library.libraryBackups.loading")}
                 </p>
               ) : cloudError ? (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className="text-destructive text-sm">
                   {cloudError}
                 </p>
               ) : selectable.length === 0 ? (
@@ -562,7 +560,7 @@ export default function LibraryBackupsDialog({
             </div>
           )}
           {!settings.ludusavi?.backupLocation && (
-            <p className="text-xs text-destructive">
+            <p className="text-destructive text-xs">
               {t("library.libraryBackups.locationRequired")}
             </p>
           )}
@@ -586,7 +584,7 @@ export default function LibraryBackupsDialog({
           ) : screen === "restore" ? (
             <Button
               variant="destructive"
-              className="h-auto min-h-10 text-destructive-foreground"
+              className="text-destructive-foreground h-auto min-h-10"
               disabled={
                 busy ||
                 !restoreConfirmed ||

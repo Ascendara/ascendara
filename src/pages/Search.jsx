@@ -19,7 +19,27 @@ import "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import GameCard from "@/components/GameCard";
 import CategoryFilter from "@/components/CategoryFilter";
-import { Search as SearchIcon, SlidersHorizontal, Gamepad2, Gift, InfoIcon, ExternalLink, RefreshCw, Clock, AlertTriangle, X, Calendar, Database, Sparkles, HardDrive, ShieldCheck, Check, Info, ArrowUpFromLine, Download } from "lucide-react";
+import {
+  Search as SearchIcon,
+  SlidersHorizontal,
+  Gamepad2,
+  Gift,
+  InfoIcon,
+  ExternalLink,
+  RefreshCw,
+  Clock,
+  AlertTriangle,
+  X,
+  Calendar,
+  Database,
+  Sparkles,
+  HardDrive,
+  ShieldCheck,
+  Check,
+  Info,
+  ArrowUpFromLine,
+  Download,
+} from "lucide-react";
 import gameService from "@/services/gameService";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -44,7 +64,6 @@ let gamesCache = {
   timestamp: null,
   expiryTime: 5 * 60 * 1000, // 5 minutes
 };
-
 
 // Debounce hook for search optimization
 const useDebouncedValue = (value, delay) => {
@@ -118,20 +137,20 @@ const createFuzzyMatch = () => {
 const fuzzyMatch = createFuzzyMatch();
 
 // Helper function to parse game size to GB
-const parseSizeToGB = (sizeStr) => {
+const parseSizeToGB = sizeStr => {
   if (!sizeStr) return 0;
   const match = sizeStr.match(/([\d.]+)\s*(GB|MB|TB)/i);
   if (!match) return 0;
-  
+
   const value = parseFloat(match[1]);
   const unit = match[2].toUpperCase();
-  
+
   switch (unit) {
-    case 'TB':
+    case "TB":
       return value * 1024;
-    case 'GB':
+    case "GB":
       return value;
-    case 'MB':
+    case "MB":
       return value / 1024;
     default:
       return 0;
@@ -149,17 +168,17 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     return saved || "";
   });
   const searchTimerRef = useRef(null);
-  
+
   // Debounce the actual search query that triggers filtering
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
-  
+
   // Handle input changes without triggering re-renders
-  const handleSearchInput = useCallback((value) => {
+  const handleSearchInput = useCallback(value => {
     // Clear existing timer
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
     }
-    
+
     // Update search query after user stops typing (500ms delay)
     searchTimerRef.current = setTimeout(() => {
       setSearchQuery(value);
@@ -421,7 +440,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
   useEffect(() => {
     fetch("https://api.ascendara.app/json/featured-game")
       .then(res => res.json())
-      .then(data => { if (data?.gameId) setFeaturedGameId(data.gameId); })
+      .then(data => {
+        if (data?.gameId) setFeaturedGameId(data.gameId);
+      })
       .catch(() => {});
   }, []);
 
@@ -436,7 +457,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     });
 
     // Listen for index refresh events
-    const handleIndexRefresh = (event) => {
+    const handleIndexRefresh = event => {
       console.log("[Search] Index refreshed, reloading games", event.detail);
       // Clear module-level cache to force fresh data fetch
       gamesCache = {
@@ -550,7 +571,10 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       window.sessionStorage.setItem("searchQuery", searchQuery);
-      window.sessionStorage.setItem("selectedCategories", JSON.stringify(selectedCategories));
+      window.sessionStorage.setItem(
+        "selectedCategories",
+        JSON.stringify(selectedCategories)
+      );
       window.sessionStorage.setItem("selectedSort", selectedSort);
       window.sessionStorage.setItem("onlineFilter", onlineFilter);
       window.sessionStorage.setItem("showDLC", showDLC.toString());
@@ -561,7 +585,17 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedCategories, selectedSort, onlineFilter, showDLC, showOnline, maxSize, filterSmallestSize, filterProvider]);
+  }, [
+    searchQuery,
+    selectedCategories,
+    selectedSort,
+    onlineFilter,
+    showDLC,
+    showOnline,
+    maxSize,
+    filterSmallestSize,
+    filterProvider,
+  ]);
 
   const filteredGames = useMemo(() => {
     if (!games?.length) return [];
@@ -576,7 +610,13 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     const isFitGirl = source === "fitgirl";
 
     // If no filters, just sort and return
-    if (!hasSearch && !hasCategories && !hasContentFilters && !hasOnlineFilter && !hasSizeFilter) {
+    if (
+      !hasSearch &&
+      !hasCategories &&
+      !hasContentFilters &&
+      !hasOnlineFilter &&
+      !hasSizeFilter
+    ) {
       if (isFitGirl) return games;
 
       const sortFn = getSortFunction(selectedSort);
@@ -722,36 +762,39 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     return () => observer.disconnect();
   }, [loadMore, isLoadingMore, hasMore, isVisible]);
 
-  const handleDownload = useCallback(async game => {
-    // Save the current search query when downloading a game
-    const currentSearch = mainSearchRef.current?.value || searchQuery;
-    if (currentSearch && currentSearch.trim()) {
-      saveRecentSearch(currentSearch);
-    }
+  const handleDownload = useCallback(
+    async game => {
+      // Save the current search query when downloading a game
+      const currentSearch = mainSearchRef.current?.value || searchQuery;
+      if (currentSearch && currentSearch.trim()) {
+        saveRecentSearch(currentSearch);
+      }
 
-    try {
-      // Get the cached image first
-      const cachedImage = await imageCacheService.getImage(game.imgID);
+      try {
+        // Get the cached image first
+        const cachedImage = await imageCacheService.getImage(game.imgID);
 
-      // Navigate to download page with both game data and cached image
-      navigate("/download", {
-        state: {
-          gameData: {
-            ...game,
-            cachedHeaderImage: cachedImage, // Include the cached header image
+        // Navigate to download page with both game data and cached image
+        navigate("/download", {
+          state: {
+            gameData: {
+              ...game,
+              cachedHeaderImage: cachedImage, // Include the cached header image
+            },
           },
-        },
-      });
-    } catch (error) {
-      console.error("Error preparing download:", error);
-      // Still navigate but without cached image
-      navigate("/download", {
-        state: {
-          gameData: game,
-        },
-      });
-    }
-  }, [searchQuery, saveRecentSearch, navigate, mainSearchRef]);
+        });
+      } catch (error) {
+        console.error("Error preparing download:", error);
+        // Still navigate but without cached image
+        navigate("/download", {
+          state: {
+            gameData: game,
+          },
+        });
+      }
+    },
+    [searchQuery, saveRecentSearch, navigate, mainSearchRef]
+  );
 
   // Handle clicking on a quick search result
   const handleQuickSearchClick = useCallback(
@@ -789,14 +832,17 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     }
   };
 
-  const handleStartDownload = useCallback((game) => {
-    navigate("/download", {
-      state: { 
-        gameData: game,
-        autoStart: true
-      },
-    });
-  }, [navigate]);
+  const handleStartDownload = useCallback(
+    game => {
+      navigate("/download", {
+        state: {
+          gameData: game,
+          autoStart: true,
+        },
+      });
+    },
+    [navigate]
+  );
 
   const handleContextMenu = useCallback((e, game) => {
     e.preventDefault();
@@ -818,16 +864,19 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     setContextMenuOpen(true);
   }, []);
 
-  const handleReadMore = useCallback((game) => {
-    navigate("/download", {
-      state: { gameData: game },
-    });
-  }, [navigate]);
+  const handleReadMore = useCallback(
+    game => {
+      navigate("/download", {
+        state: { gameData: game },
+      });
+    },
+    [navigate]
+  );
 
-  const handlePlayLaterFromContext = useCallback((game) => {
+  const handlePlayLaterFromContext = useCallback(game => {
     const playLaterList = JSON.parse(localStorage.getItem("play-later-games") || "[]");
     const isInList = playLaterList.some(g => g.game === game.game);
-    
+
     if (isInList) {
       const updatedList = playLaterList.filter(g => g.game !== game.game);
       localStorage.setItem("play-later-games", JSON.stringify(updatedList));
@@ -863,7 +912,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
         onStartDownload={handleStartDownload}
         onReadMore={handleReadMore}
         onPlayLater={handlePlayLaterFromContext}
-        isPlayLater={contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)}
+        isPlayLater={
+          contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)
+        }
       />
       {/* Sticky Search Bar */}
       <div
@@ -888,11 +939,13 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
               {!apiMetadata.local && (
                 <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{t("search.usinganApiWarning")}</span>                    
+                  <span>{t("search.usinganApiWarning")}</span>
                   <a
                     className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
                     onClick={() =>
-                      window.electron.openURL("https://ascendara.app/docs/features/external-sources")
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/features/external-sources"
+                      )
                     }
                   >
                     {t("common.learnMore")}
@@ -996,10 +1049,15 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                               {t("search.source")}:{" "}
                               {apiMetadata.sourceName || apiMetadata.source}
                             </p>
-                            {apiMetadata.customSource && apiMetadata.sourceUrl && (
+                            {apiMetadata.customSource &&
+                              apiMetadata.sourceUrl &&
                               (() => {
-                                const isCustomList = String(apiMetadata.sourceUrl).startsWith("custom_list_");
-                                const listId = isCustomList ? apiMetadata.sourceUrl : null;
+                                const isCustomList = String(
+                                  apiMetadata.sourceUrl
+                                ).startsWith("custom_list_");
+                                const listId = isCustomList
+                                  ? apiMetadata.sourceUrl
+                                  : null;
                                 if (isCustomList) {
                                   return (
                                     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1009,7 +1067,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                                       <button
                                         type="button"
                                         onClick={() =>
-                                          window.electron?.showCustomListInFolder?.(listId)
+                                          window.electron?.showCustomListInFolder?.(
+                                            listId
+                                          )
                                         }
                                         className="cursor-pointer text-primary hover:underline"
                                       >
@@ -1040,8 +1100,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                                     </a>
                                   </p>
                                 );
-                              })()
-                            )}
+                              })()}
                             <p>
                               {apiMetadata.customSource
                                 ? t("search.lastSynced") || "Last synced"
@@ -1065,7 +1124,6 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-
             </div>
           )}
 
@@ -1198,7 +1256,10 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                   >
                     <SlidersHorizontal className="h-4 w-4" />
                     {t("search.filters")}
-                    {(showDLC || showOnline || selectedCategories.length > 0 || maxSize < 200) && (
+                    {(showDLC ||
+                      showOnline ||
+                      selectedCategories.length > 0 ||
+                      maxSize < 200) && (
                       <span className="h-2 w-2 rounded-full bg-primary" />
                     )}
                   </Button>
@@ -1248,7 +1309,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                         max={200}
                         step={5}
                         value={[maxSize]}
-                        onValueChange={(value) => setMaxSize(value[0])}
+                        onValueChange={value => setMaxSize(value[0])}
                         className="w-full"
                       />
                       <div className="flex justify-between text-xs text-muted-foreground">
@@ -1406,7 +1467,6 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                <AlertTriangle className="text-yellow-500" />
                 Index Update in Progress
               </AlertDialogTitle>
             </AlertDialogHeader>
@@ -1450,17 +1510,21 @@ function useWindowSize() {
 }
 
 // Memoized game card wrapper to prevent re-renders
-const MemoizedGameCard = memo(({ game, onDownload, onContextMenu }) => (
-  <div 
-    data-game-name={game.game}
-    onContextMenu={(e) => onContextMenu?.(e, game)}
-  >
-    <GameCard game={game} onDownload={onDownload} />
-  </div>
-), (prevProps, nextProps) => {
-  // Only re-render if the game object reference changes
-  return prevProps.game === nextProps.game && prevProps.onDownload === nextProps.onDownload && prevProps.onContextMenu === nextProps.onContextMenu;
-});
+const MemoizedGameCard = memo(
+  ({ game, onDownload, onContextMenu }) => (
+    <div data-game-name={game.game} onContextMenu={e => onContextMenu?.(e, game)}>
+      <GameCard game={game} onDownload={onDownload} />
+    </div>
+  ),
+  (prevProps, nextProps) => {
+    // Only re-render if the game object reference changes
+    return (
+      prevProps.game === nextProps.game &&
+      prevProps.onDownload === nextProps.onDownload &&
+      prevProps.onContextMenu === nextProps.onContextMenu
+    );
+  }
+);
 
 // Featured game card — spans 2 columns with larger image and description
 const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
@@ -1480,10 +1544,15 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
     installedGamesService
       .checkGameStatus(game.game, game.version)
       .then(({ isInstalled: inst, needsUpdate: upd }) => {
-        if (isMounted.current) { setIsInstalled(inst); setNeedsUpdate(upd); }
+        if (isMounted.current) {
+          setIsInstalled(inst);
+          setNeedsUpdate(upd);
+        }
       })
       .catch(() => {});
-    return () => { isMounted.current = false; };
+    return () => {
+      isMounted.current = false;
+    };
   }, [game.game, game.version]);
 
   useEffect(() => {
@@ -1494,19 +1563,30 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
   }, [game?.gameID]);
 
   const handleClick = useCallback(() => {
-    navigate("/download", { state: { gameData: { ...game, download_links: game.download_links || {}, isUpdating: needsUpdate } } });
+    navigate("/download", {
+      state: {
+        gameData: {
+          ...game,
+          download_links: game.download_links || {},
+          isUpdating: needsUpdate,
+        },
+      },
+    });
   }, [navigate, game, needsUpdate]);
 
-  const handleDownloadClick = useCallback(e => {
-    e?.stopPropagation();
-    onDownload?.();
-  }, [onDownload]);
+  const handleDownloadClick = useCallback(
+    e => {
+      e?.stopPropagation();
+      onDownload?.();
+    },
+    [onDownload]
+  );
 
   const gameCategories = Array.isArray(game.category) ? game.category.slice(0, 4) : [];
 
   return (
     <div
-      className="col-span-1 md:col-span-2 cursor-pointer group relative overflow-hidden rounded-xl border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/15"
+      className="group relative col-span-1 cursor-pointer overflow-hidden rounded-xl border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/15 md:col-span-2"
       style={{ minHeight: "380px" }}
       onClick={handleClick}
       onContextMenu={e => onContextMenu?.(e, game)}
@@ -1514,26 +1594,28 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
     >
       {/* Full-bleed background image */}
       {loading && !cachedImage && (
-        <div className="absolute inset-0 animate-pulse bg-muted rounded-xl" />
+        <div className="absolute inset-0 animate-pulse rounded-xl bg-muted" />
       )}
       {cachedImage && (
         <img
           src={cachedImage}
           alt={game.game}
-          className="absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-105 rounded-xl"
+          className="absolute inset-0 h-full w-full rounded-xl object-cover transition-all duration-500 group-hover:scale-105"
         />
       )}
 
       {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent rounded-xl" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent rounded-xl" />
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-black/60 via-transparent to-transparent" />
 
       {/* Top: Featured badge + status */}
       <div className="absolute left-0 right-0 top-0 flex items-start justify-between p-4">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1 backdrop-blur-sm animate-in fade-in-50 slide-in-from-left-3">
             <Sparkles className="h-3.5 w-3.5 text-white" />
-            <span className="text-xs font-bold uppercase tracking-wider text-white">{t("gameCard.highlighted")}</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-white">
+              {t("gameCard.highlighted")}
+            </span>
           </div>
           {isVerified && (
             <div
@@ -1545,9 +1627,11 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
           )}
         </div>
         {(isInstalled || needsUpdate) && (
-          <div className={`rounded-full px-2.5 py-1 backdrop-blur-sm text-xs font-semibold text-white ${
-            needsUpdate ? "bg-amber-500/90" : "bg-green-500/90"
-          }`}>
+          <div
+            className={`rounded-full px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm ${
+              needsUpdate ? "bg-amber-500/90" : "bg-green-500/90"
+            }`}
+          >
             {needsUpdate ? t("gameCard.updateAvailable") : t("gameCard.installed")}
           </div>
         )}
@@ -1618,7 +1702,11 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
             {!isInstalled && !needsUpdate && <Info className="h-4 w-4" />}
             {needsUpdate && <ArrowUpFromLine className="h-4 w-4" />}
             <span>
-              {needsUpdate ? t("gameCard.update") : isInstalled ? t("gameCard.installed") : t("gameCard.viewDetails")}
+              {needsUpdate
+                ? t("gameCard.update")
+                : isInstalled
+                  ? t("gameCard.installed")
+                  : t("gameCard.viewDetails")}
             </span>
           </Button>
         </div>
@@ -1628,70 +1716,79 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
 });
 
 // Memoized game grid component to prevent re-renders on search input
-const GameGrid = memo(({
-  displayedGames,
-  filteredGames,
-  debouncedSearchQuery,
-  handleDownload,
-  handleContextMenu,
-  featuredGameId,
-}) => {
-  // Identify featured game from the full list (only show when not searching)
-  const isSearching = !!debouncedSearchQuery?.trim();
-  const featuredGame = useMemo(() => {
-    if (isSearching || !featuredGameId || !filteredGames?.length) return null;
-    return filteredGames.find(g => g.gameID === featuredGameId) || null;
-  }, [filteredGames, featuredGameId, isSearching]);
+const GameGrid = memo(
+  ({
+    displayedGames,
+    filteredGames,
+    debouncedSearchQuery,
+    handleDownload,
+    handleContextMenu,
+    featuredGameId,
+  }) => {
+    // Identify featured game from the full list (only show when not searching)
+    const isSearching = !!debouncedSearchQuery?.trim();
+    const featuredGame = useMemo(() => {
+      if (isSearching || !featuredGameId || !filteredGames?.length) return null;
+      return filteredGames.find(g => g.gameID === featuredGameId) || null;
+    }, [filteredGames, featuredGameId, isSearching]);
 
-  const regularGames = useMemo(() => {
-    if (!featuredGame) return displayedGames;
-    return displayedGames.filter(g => g.gameID !== featuredGame.gameID);
-  }, [displayedGames, featuredGame]);
+    const regularGames = useMemo(() => {
+      if (!featuredGame) return displayedGames;
+      return displayedGames.filter(g => g.gameID !== featuredGame.gameID);
+    }, [displayedGames, featuredGame]);
 
-  // Create stable callback references for each game
-  const downloadCallbacks = useMemo(() => {
-    const callbacks = new Map();
-    displayedGames.forEach(game => {
-      const key = game.imgID || game.id || `${game.game}-${game.version}`;
-      if (!callbacks.has(key)) {
-        callbacks.set(key, () => handleDownload(game));
-      }
-    });
-    if (featuredGame) {
-      const key = featuredGame.imgID || featuredGame.id || `${featuredGame.game}-${featuredGame.version}`;
-      if (!callbacks.has(key)) {
-        callbacks.set(key, () => handleDownload(featuredGame));
-      }
-    }
-    return callbacks;
-  }, [displayedGames, featuredGame, handleDownload]);
-
-  const featuredKey = featuredGame ? (featuredGame.imgID || featuredGame.id || `${featuredGame.game}-${featuredGame.version}`) : null;
-
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {featuredGame && (
-        <FeaturedGameCard
-          key={featuredKey + "-featured"}
-          game={featuredGame}
-          onDownload={downloadCallbacks.get(featuredKey)}
-          onContextMenu={handleContextMenu}
-        />
-      )}
-      {regularGames.map((game) => {
+    // Create stable callback references for each game
+    const downloadCallbacks = useMemo(() => {
+      const callbacks = new Map();
+      displayedGames.forEach(game => {
         const key = game.imgID || game.id || `${game.game}-${game.version}`;
+        if (!callbacks.has(key)) {
+          callbacks.set(key, () => handleDownload(game));
+        }
+      });
+      if (featuredGame) {
+        const key =
+          featuredGame.imgID ||
+          featuredGame.id ||
+          `${featuredGame.game}-${featuredGame.version}`;
+        if (!callbacks.has(key)) {
+          callbacks.set(key, () => handleDownload(featuredGame));
+        }
+      }
+      return callbacks;
+    }, [displayedGames, featuredGame, handleDownload]);
 
-        return (
-          <MemoizedGameCard 
-            key={key}
-            game={game}
-            onContextMenu={handleContextMenu} 
-            onDownload={downloadCallbacks.get(key)} 
+    const featuredKey = featuredGame
+      ? featuredGame.imgID ||
+        featuredGame.id ||
+        `${featuredGame.game}-${featuredGame.version}`
+      : null;
+
+    return (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {featuredGame && (
+          <FeaturedGameCard
+            key={featuredKey + "-featured"}
+            game={featuredGame}
+            onDownload={downloadCallbacks.get(featuredKey)}
+            onContextMenu={handleContextMenu}
           />
-        );
-      })}
-    </div>
-  );
-});
+        )}
+        {regularGames.map(game => {
+          const key = game.imgID || game.id || `${game.game}-${game.version}`;
+
+          return (
+            <MemoizedGameCard
+              key={key}
+              game={game}
+              onContextMenu={handleContextMenu}
+              onDownload={downloadCallbacks.get(key)}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+);
 
 export default Search;

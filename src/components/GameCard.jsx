@@ -682,26 +682,9 @@ function GameCardContent({ game, compact }) {
           onClick={e => e.stopPropagation()}
         >
           <AlertDialogHeader>
-            <div className="flex items-center gap-3">
-              <div
-                className="relative flex items-center justify-center rounded-full bg-gradient-to-br from-primary via-primary/90 to-primary/80 p-3"
-                style={{
-                  boxShadow:
-                    "0 0 25px rgba(59, 130, 246, 0.6), 0 0 50px rgba(59, 130, 246, 0.4), 0 0 75px rgba(59, 130, 246, 0.2)",
-                  filter: "drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))",
-                }}
-              >
-                <ShieldCheck className="h-7 w-7 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.6)]" />
-                <div className="absolute -inset-1 animate-pulse rounded-full bg-primary/40 blur-xl" />
-                <div
-                  className="absolute -inset-2 animate-pulse rounded-full bg-primary/20 blur-2xl"
-                  style={{ animationDelay: "0.5s" }}
-                />
-              </div>
-              <AlertDialogTitle className="text-2xl font-bold">
-                {t("gameCard.verified.dialogTitle")}
-              </AlertDialogTitle>
-            </div>
+            <AlertDialogTitle className="text-2xl font-bold">
+              {t("gameCard.verified.dialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4 pt-4 text-left">
               <p className="text-base leading-relaxed">
                 {

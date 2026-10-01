@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Download, X } from "lucide-react";
+import { X } from "lucide-react";
 import { getControllerButtons, getButtonBadgeClass } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 
@@ -96,7 +96,9 @@ const ProviderSelectionDialog = ({
   }, [handleInput, isOpen]);
 
   useControllerInput(handleInput, {
-    priority: 30, enabled: isOpen, blocked: !canInput,
+    priority: 30,
+    enabled: isOpen,
+    blocked: !canInput,
   });
 
   if (!isOpen) return null;
@@ -105,9 +107,6 @@ const ProviderSelectionDialog = ({
     <div className="pointer-events-auto fixed inset-0 z-[30000] flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div className="mx-8 max-w-3xl rounded-2xl border-2 border-primary/30 bg-card p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
         <div className="mb-6 flex items-center gap-4">
-          <div className="rounded-full bg-primary/20 p-3">
-            <Download className="h-8 w-8 text-primary" />
-          </div>
           <h2 className="text-3xl font-bold text-foreground">
             {t("bigPicture.selectProvider")}
           </h2>

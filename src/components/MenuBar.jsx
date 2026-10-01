@@ -2,7 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useLibraryBackupStore } from "@/services/libraryBackupStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
-import { subscribeToDownloads, getActiveDownloadCount } from "@/services/khinsiderService";
+import {
+  subscribeToDownloads,
+  getActiveDownloadCount,
+} from "@/services/khinsiderService";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -128,8 +131,7 @@ const MenuBar = () => {
       // Check timestamp file for downloading status (for both auto and manual updates)
       const checkDownloadStatus = async () => {
         try {
-          const timestamp =
-            await window.electron.getTimestampValue("downloadingUpdate");
+          const timestamp = await window.electron.getTimestampValue("downloadingUpdate");
           setIsDownloadingUpdate(timestamp || false);
         } catch (error) {
           console.error("Failed to read timestamp file:", error);
@@ -443,7 +445,9 @@ const MenuBar = () => {
                   strokeWidth="2"
                   className="stroke-purple-500"
                   strokeDasharray="31.4"
-                  strokeDashoffset={31.4 - ((autoRefreshState.progress || 0) / 100) * 31.4}
+                  strokeDashoffset={
+                    31.4 - ((autoRefreshState.progress || 0) / 100) * 31.4
+                  }
                   strokeLinecap="round"
                 />
               </svg>
@@ -563,9 +567,7 @@ const MenuBar = () => {
             >
               <X className="h-5 w-5" />
             </div>
-            <AlertDialogTitle className="text-3xl font-bold text-foreground">
-              {t("server-status.title")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("server-status.title")}</AlertDialogTitle>
 
             <AlertDialogDescription className="sr-only">
               {t("server-status.description")}

@@ -92,14 +92,14 @@ export default function AuthSection({
   const reduceMotion = useReducedMotion();
   return (
     <MotionConfig reducedMotion="user">
-      <div className="ascend-auth mx-auto w-full max-w-6xl mt-12 px-6 pb-24 pt-4 lg:px-10">
+      <div className="ascend-auth mx-auto mt-12 w-full max-w-6xl px-6 pb-24 pt-4 lg:px-10">
         <div className="grid items-start gap-8 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-14">
           <section className="min-w-0">
             <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               {t("account.auth.eyebrow")}
             </p>
             <h1
-              className={`ascend-auth-headline${isLogin ? " ascend-auth-headline-login whitespace-nowrap" : ""}`}
+              className={`ascend-auth-headline${isLogin ? "ascend-auth-headline-login whitespace-nowrap" : ""}`}
             >
               {isLogin
                 ? t("account.auth.loginHeadline")
@@ -698,7 +698,6 @@ export default function AuthSection({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-primary" />
                 {t("account.confirmEmail.title")}
               </AlertDialogTitle>
               <AlertDialogDescription asChild>

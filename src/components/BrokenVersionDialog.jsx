@@ -1,6 +1,5 @@
-
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+
 import { useTranslation } from "react-i18next";
 
 const BrokenVersionDialog = ({ onClose }) => {
@@ -21,7 +20,6 @@ const BrokenVersionDialog = ({ onClose }) => {
           className="relative w-full max-w-lg rounded-lg bg-background p-6 shadow-lg"
         >
           <div className="flex items-center gap-4 text-center">
-            <AlertTriangle className="mb-2 h-10 w-10 text-yellow-500" />
             <div>
               <h2 className="text-2xl font-bold text-foreground">
                 {t("app.brokenVersion.title")}

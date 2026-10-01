@@ -4,13 +4,63 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import "@/components/ui/switch";
 import "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
-import { Plus, EyeOff, FolderOpen, ExternalLink, User, HardDrive, Gamepad2, Gift, Search as SearchIcon, AlertTriangle, Heart, SquareLibrary, Tag, Loader, Import, CheckSquareIcon, ArrowUpAZ, ArrowDownAZ, ImageUp, FolderPlus, ChevronDown, Cloud, CloudDownload, CloudUpload, Clock, DollarSign, ArrowDown, Play, Trash2, Sparkles, MessageSquareText, TriangleAlert, Timer, HardDriveDownload, Star, SlidersHorizontal, GripVertical, Download, History, RotateCcw, CheckCircle2, PlayCircle, Bookmark } from "lucide-react";
+import {
+  Plus,
+  EyeOff,
+  FolderOpen,
+  ExternalLink,
+  User,
+  HardDrive,
+  Gamepad2,
+  Gift,
+  Search as SearchIcon,
+  AlertTriangle,
+  Heart,
+  SquareLibrary,
+  Tag,
+  Loader,
+  Import,
+  CheckSquareIcon,
+  ArrowUpAZ,
+  ArrowDownAZ,
+  ImageUp,
+  FolderPlus,
+  ChevronDown,
+  Cloud,
+  CloudDownload,
+  CloudUpload,
+  Clock,
+  DollarSign,
+  ArrowDown,
+  Play,
+  Trash2,
+  Sparkles,
+  MessageSquareText,
+  TriangleAlert,
+  Timer,
+  HardDriveDownload,
+  Star,
+  SlidersHorizontal,
+  GripVertical,
+  Download,
+  History,
+  RotateCcw,
+  CheckCircle2,
+  PlayCircle,
+  Bookmark,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -57,14 +107,19 @@ import FolderCard from "@/components/FolderCard";
 import EditCoverDialog from "@/components/EditCoverDialog";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { loadFolders, createFolder, addGameToFolder, filterGamesNotInFolders, getGamesInFolders } from "@/lib/folderManager";
+import {
+  loadFolders,
+  createFolder,
+  addGameToFolder,
+  filterGamesNotInFolders,
+  getGamesInFolders,
+} from "@/lib/folderManager";
 
 const Retro = React.lazy(() => import("./Retro"));
 
 // Module-level cache so images survive page switches without re-fetching via IPC
 const gameImageCache = new Map();
 let libraryGamesCache = null;
-
 
 // Normalize every place that compares game names so casing, spaces, and
 // filesystem-invalid characters cannot create duplicate library entries.
@@ -137,10 +192,7 @@ const dedupeLibraryGames = gameList => {
     const identityKey = getLibraryIdentityKey(game) || `unknown:${index}`;
 
     const existing = deduped.get(identityKey);
-    deduped.set(
-      identityKey,
-      existing ? mergeDuplicateLibraryGame(existing, game) : game
-    );
+    deduped.set(identityKey, existing ? mergeDuplicateLibraryGame(existing, game) : game);
   }
 
   return Array.from(deduped.values());
@@ -175,9 +227,14 @@ const Library = () => {
     }
   };
 
-  const [games, setGames] = useState(() => libraryGamesCache
-    ? [...loadFolders(), ...filterGamesNotInFolders(libraryGamesCache.filter(game => !game.isFolder))]
-    : []);
+  const [games, setGames] = useState(() =>
+    libraryGamesCache
+      ? [
+          ...loadFolders(),
+          ...filterGamesNotInFolders(libraryGamesCache.filter(game => !game.isFolder)),
+        ]
+      : []
+  );
   const [loading, setLoading] = useState(() => libraryGamesCache === null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
@@ -195,7 +252,9 @@ const Library = () => {
         if (!active || !image) return;
         const dataUrl = `data:image/jpeg;base64,${image}`;
         gameImageCache.set(game, dataUrl);
-        window.dispatchEvent(new CustomEvent("game-cover-updated", { detail: { gameName: game, dataUrl } }));
+        window.dispatchEvent(
+          new CustomEvent("game-cover-updated", { detail: { gameName: game, dataUrl } })
+        );
       } catch (error) {
         console.warn("Could not refresh imported artwork:", error);
       }
@@ -213,8 +272,12 @@ const Library = () => {
     const saved = localStorage.getItem("library-sortOrder");
     return saved || "asc";
   });
-  const [folderPlacement, setFolderPlacement] = useState(() => localStorage.getItem("library-folderPlacement") || "first");
-  useEffect(() => { safeSetItem("library-folderPlacement", folderPlacement); }, [folderPlacement]);
+  const [folderPlacement, setFolderPlacement] = useState(
+    () => localStorage.getItem("library-folderPlacement") || "first"
+  );
+  useEffect(() => {
+    safeSetItem("library-folderPlacement", folderPlacement);
+  }, [folderPlacement]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [filters, setFilters] = useState({
     favorites: false,
@@ -246,7 +309,9 @@ const Library = () => {
     const saved = localStorage.getItem("game-status");
     return saved ? JSON.parse(saved) : {};
   });
-  const [favGallerySortMode, setFavGallerySortMode] = useState(() => localStorage.getItem("fav-gallery-sort") || "rating");
+  const [favGallerySortMode, setFavGallerySortMode] = useState(
+    () => localStorage.getItem("fav-gallery-sort") || "rating"
+  );
   const [favGalleryGenreFilter, setFavGalleryGenreFilter] = useState("all");
   const [totalGamesSize, setTotalGamesSize] = useState(0);
   const [isCalculatingSize, setIsCalculatingSize] = useState(false);
@@ -281,14 +346,23 @@ const Library = () => {
   const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
   const [sidebarTabOrder, setSidebarTabOrder] = useState(() => {
     const saved = localStorage.getItem("library-tab-order");
-    const order = saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
-    if (!order.includes("hiddenFolders")) order.splice(Math.max(0, order.indexOf("all") + 1), 0, "hiddenFolders");
+    const order = saved
+      ? JSON.parse(saved)
+      : ["all", "favoritesGallery", "cloud", "playLater", "history"];
+    if (!order.includes("hiddenFolders"))
+      order.splice(Math.max(0, order.indexOf("all") + 1), 0, "hiddenFolders");
     return order;
   });
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem("library-tab-order");
-    const order = saved ? JSON.parse(saved) : ["all", "favoritesGallery", "cloud", "playLater", "history"];
-    return order.find(id => id !== "hiddenFolders" || loadFolders().some(folder => folder.hidden)) || "all";
+    const order = saved
+      ? JSON.parse(saved)
+      : ["all", "favoritesGallery", "cloud", "playLater", "history"];
+    return (
+      order.find(
+        id => id !== "hiddenFolders" || loadFolders().some(folder => folder.hidden)
+      ) || "all"
+    );
   }); // "all" | "favoritesGallery" | "cloud" | "playLater" | "history"
 
   // Multiselect is only supported on the "All Games" tab, so leaving it
@@ -302,13 +376,18 @@ const Library = () => {
 
   const dragTabRef = useRef(null);
   const dragOverTabRef = useRef(null);
-  const [groupBy, setGroupBy] = useState(() => localStorage.getItem("library-groupBy") || "none"); // "none" | "directory"
-  const [sortMode, setSortMode] = useState(() => localStorage.getItem("library-sortMode") || "alpha"); // "alpha" | "playtime"
+  const [groupBy, setGroupBy] = useState(
+    () => localStorage.getItem("library-groupBy") || "none"
+  ); // "none" | "directory"
+  const [sortMode, setSortMode] = useState(
+    () => localStorage.getItem("library-sortMode") || "alpha"
+  ); // "alpha" | "playtime"
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("tab") === "retro") setActiveTab("retro");
+    if (new URLSearchParams(location.search).get("tab") === "retro")
+      setActiveTab("retro");
   }, [location.search]);
   const { user, userData } = useAuth();
   const { settings } = useSettings();
@@ -345,29 +424,32 @@ const Library = () => {
     if (dropZoneCounterRef.current === 0) setIsDraggingExeFile(false);
   }, []);
 
-  const handleLibraryDrop = useCallback(e => {
-    if (!e.dataTransfer?.types?.includes("Files")) return;
-    e.preventDefault();
-    dropZoneCounterRef.current = 0;
-    setIsDraggingExeFile(false);
+  const handleLibraryDrop = useCallback(
+    e => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      e.preventDefault();
+      dropZoneCounterRef.current = 0;
+      setIsDraggingExeFile(false);
 
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
 
-    if (!file.name?.toLowerCase().endsWith(".exe")) {
-      toast.error(t("library.addGame.dropInvalidFile"));
-      return;
-    }
+      if (!file.name?.toLowerCase().endsWith(".exe")) {
+        toast.error(t("library.addGame.dropInvalidFile"));
+        return;
+      }
 
-    try {
-      const filePath = window.electron.getPathForFile(file);
-      if (!filePath) return;
-      setDroppedExecutablePath(filePath);
-      setIsAddGameOpen(true);
-    } catch (error) {
-      console.error("Failed to resolve dropped file path:", error);
-    }
-  }, [t]);
+      try {
+        const filePath = window.electron.getPathForFile(file);
+        if (!filePath) return;
+        setDroppedExecutablePath(filePath);
+        setIsAddGameOpen(true);
+      } catch (error) {
+        console.error("Failed to resolve dropped file path:", error);
+      }
+    },
+    [t]
+  );
 
   useEffect(() => {
     safeSetItem("game-favorites", JSON.stringify(favorites));
@@ -471,9 +553,7 @@ const Library = () => {
   // Merge queued stubs into the display list (skip if already showing locally).
   // Compare normalized names so "Game", " game ", and sanitized folder names do not duplicate.
   const existingGameNames = new Set(
-    games
-      .filter(g => !g.isFolder)
-      .map(g => normalizeGameName(g.game || g.name))
+    games.filter(g => !g.isFolder).map(g => normalizeGameName(g.game || g.name))
   );
   const queuedStubs = queuedGames
     .filter(q => !existingGameNames.has(normalizeGameName(q.gameName)))
@@ -491,7 +571,8 @@ const Library = () => {
   const filteredGames = gamesWithQueued
     .slice()
     .filter(game => {
-      if (game.isFolder && Boolean(game.hidden) !== (activeTab === "hiddenFolders")) return false;
+      if (game.isFolder && Boolean(game.hidden) !== (activeTab === "hiddenFolders"))
+        return false;
       if (activeTab === "hiddenFolders" && !game.isFolder) return false;
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = (game.game || game.name || "")
@@ -547,7 +628,7 @@ const Library = () => {
       setFolders(updatedFolders);
       setGames(prev => [...updatedFolders, ...prev.filter(game => !game.isFolder)]);
       if (!updatedFolders.some(folder => folder.hidden)) {
-        setActiveTab(tab => tab === "hiddenFolders" ? "all" : tab);
+        setActiveTab(tab => (tab === "hiddenFolders" ? "all" : tab));
       }
       loadGames();
     };
@@ -740,15 +821,22 @@ const Library = () => {
       let fullGame = null;
       try {
         fullGame = await gameService.findGameByGameID(deletedGame.gameID);
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
       if (!fullGame) {
         try {
           const results = await gameService.searchGames(gameName);
           fullGame = results.find(r => r.game === gameName) || null;
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
       if (!fullGame) {
-        toast.error(t("library.cloudRestore.gameNotFound") || "Game not found. It may have been removed.");
+        toast.error(
+          t("library.cloudRestore.gameNotFound") ||
+            "Game not found. It may have been removed."
+        );
         return;
       }
       navigate("/download", { state: { gameData: fullGame } });
@@ -847,16 +935,21 @@ const Library = () => {
           // Get local game names for comparison
           const installedGames = await window.electron.getGames();
           const customGames = await window.electron.getCustomGames();
-          
+
           // Sanitize game name to match backend directory naming
-          const sanitizeName = (name) => {
+          const sanitizeName = name => {
             if (!name) return "";
-            return name.replace(/[<>:"/\\|?*]/g, "").trim().toLowerCase();
+            return name
+              .replace(/[<>:"/\\|?*]/g, "")
+              .trim()
+              .toLowerCase();
           };
-          
+
           const localGameNames = new Set([
             ...(installedGames || []).map(g => sanitizeName(g.game || g.name)),
-            ...(customGames || []).filter(g => !g._isDeleted).map(g => sanitizeName(g.game || g.name)),
+            ...(customGames || [])
+              .filter(g => !g._isDeleted)
+              .map(g => sanitizeName(g.game || g.name)),
           ]);
 
           // Filter to cloud games that are NOT installed locally
@@ -888,7 +981,10 @@ const Library = () => {
                     imageLoaded = true;
                   }
                 } catch (error) {
-                  console.warn("Electron image not found for cloud game, trying fallbacks:", error);
+                  console.warn(
+                    "Electron image not found for cloud game, trying fallbacks:",
+                    error
+                  );
                 }
 
                 // 2. For local index, try to load from local file system using imgID
@@ -898,7 +994,10 @@ const Library = () => {
                     if (gameData?.imgID) imageId = gameData.imgID;
 
                     const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
-                    const imageData = await window.electron.readLocalFile(localImagePath, "base64");
+                    const imageData = await window.electron.readLocalFile(
+                      localImagePath,
+                      "base64"
+                    );
                     images[game.name] = `data:image/jpeg;base64,${imageData}`;
                     imageLoaded = true;
                   } catch (localError) {
@@ -953,10 +1052,7 @@ const Library = () => {
         favorite: cloudGame.favorite,
         isCustom: true,
       };
-      safeSetItem(
-        `cloud-restore-${cloudGame.name}`,
-        JSON.stringify(cloudRestoreData)
-      );
+      safeSetItem(`cloud-restore-${cloudGame.name}`, JSON.stringify(cloudRestoreData));
 
       // Show info toast and open add game dialog
       toast.info(t("library.cloudRestore.customGameInfo"));
@@ -987,10 +1083,7 @@ const Library = () => {
         lastPlayed: cloudGame.lastPlayed,
         favorite: cloudGame.favorite,
       };
-      safeSetItem(
-        `cloud-restore-${cloudGame.name}`,
-        JSON.stringify(cloudRestoreData)
-      );
+      safeSetItem(`cloud-restore-${cloudGame.name}`, JSON.stringify(cloudRestoreData));
 
       // Navigate to download page with the game data
       navigate("/download", {
@@ -1019,11 +1112,17 @@ const Library = () => {
         setCloudOnlyGames(prev => prev.filter(g => (g.name || g.game) !== gameName));
         toast.success(t("library.cloudOnly.deleted") || "Removed from cloud library");
       } else {
-        toast.error(result.error || t("library.cloudOnly.deleteFailed") || "Failed to remove game from cloud");
+        toast.error(
+          result.error ||
+            t("library.cloudOnly.deleteFailed") ||
+            "Failed to remove game from cloud"
+        );
       }
     } catch (error) {
       console.error("Error deleting cloud game:", error);
-      toast.error(t("library.cloudOnly.deleteFailed") || "Failed to remove game from cloud");
+      toast.error(
+        t("library.cloudOnly.deleteFailed") || "Failed to remove game from cloud"
+      );
     }
     setDeletingCloudGame(null);
   };
@@ -1041,9 +1140,12 @@ const Library = () => {
     }
 
     // Sanitize game name to match backend directory naming
-    const sanitizeName = (name) => {
+    const sanitizeName = name => {
       if (!name) return "";
-      return name.replace(/[<>:"/\\|?*]/g, "").trim().toLowerCase();
+      return name
+        .replace(/[<>:"/\\|?*]/g, "")
+        .trim()
+        .toLowerCase();
     };
 
     for (const key of keysToCheck) {
@@ -1108,17 +1210,29 @@ const Library = () => {
     const folder = loadFolders().find(folder => folder.game === folderName);
     if (!folder) return;
     const gameName = normalizeGameName(getGameDisplayName(game));
-    if (folder.items?.some(item => normalizeGameName(getGameDisplayName(item)) === gameName)) return;
+    if (
+      folder.items?.some(item => normalizeGameName(getGameDisplayName(item)) === gameName)
+    )
+      return;
 
     const updatedFolders = addGameToFolder(game, folderName);
     const updatedFolder = updatedFolders.find(folder => folder.game === folderName);
     setFolders(updatedFolders);
-    setGames(prev => prev
-      .filter(item => item.isFolder || normalizeGameName(getGameDisplayName(item)) !== gameName)
-      .map(item => item.isFolder && item.game === folderName ? updatedFolder : item)
+    setGames(prev =>
+      prev
+        .filter(
+          item =>
+            item.isFolder || normalizeGameName(getGameDisplayName(item)) !== gameName
+        )
+        .map(item => (item.isFolder && item.game === folderName ? updatedFolder : item))
     );
     setGameToMove(null);
-    toast.success(t("library.moveToFolder.success", { game: getGameDisplayName(game), folder: folderName }));
+    toast.success(
+      t("library.moveToFolder.success", {
+        game: getGameDisplayName(game),
+        folder: folderName,
+      })
+    );
   };
 
   const handleCreateFolder = name => {
@@ -1148,7 +1262,9 @@ const Library = () => {
 
       // Track games moved to History (deleted with "Save Data") so they can
       // be shown/restored from the History tab instead of vanishing entirely.
-      setDeletedGames(Array.isArray(customGames) ? customGames.filter(g => g._isDeleted) : []);
+      setDeletedGames(
+        Array.isArray(customGames) ? customGames.filter(g => g._isDeleted) : []
+      );
 
       // If a game that has a History stub has been reinstalled, silently merge
       // its saved playtime/stats back in and drop the stub, then reload once.
@@ -1257,7 +1373,9 @@ const Library = () => {
         ...(installedGames || []).filter(
           g => !g.downloadingData?.downloading && !g.downloadingData?.extracting
         ),
-        ...(customGames || []).filter(g => !g._isDeleted).map(g => ({ ...g, isCustom: true })),
+        ...(customGames || [])
+          .filter(g => !g._isDeleted)
+          .map(g => ({ ...g, isCustom: true })),
       ];
 
       const gamesWithAchievements = await Promise.all(
@@ -1432,17 +1550,22 @@ const Library = () => {
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <div className="space-y-1">
-            <h3 className="text-xl font-semibold tracking-tight">{t("library.loadingLibrary")}</h3>
-            <p className="text-sm text-muted-foreground">{t("library.loadingLibraryMessage")}</p>
+            <h3 className="text-xl font-semibold tracking-tight">
+              {t("library.loadingLibrary")}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {t("library.loadingLibraryMessage")}
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
-  const tabGames = activeTab === "favorites"
-    ? filteredGames.filter(g => !g.isFolder && favorites.includes(g.game || g.name))
-    : filteredGames;
+  const tabGames =
+    activeTab === "favorites"
+      ? filteredGames.filter(g => !g.isFolder && favorites.includes(g.game || g.name))
+      : filteredGames;
 
   const sidebarTabs = [
     {
@@ -1487,13 +1610,15 @@ const Library = () => {
       id: "retro",
       label: t("retro.title"),
       icon: <Gamepad2 className="h-4 w-4" />,
-    }
+    },
   ].filter(tab => !tab.hidden);
 
   // Subtle reminder to sync the library to the cloud if it's been a while.
   // "A while" = 3+ days since the last sync (or never synced at all).
   const daysSinceCloudSync = cloudLibraryLastSynced
-    ? Math.floor((Date.now() - new Date(cloudLibraryLastSynced).getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.floor(
+        (Date.now() - new Date(cloudLibraryLastSynced).getTime()) / (1000 * 60 * 60 * 24)
+      )
     : null;
   const showCloudSyncReminder =
     ascendAccess.hasAccess &&
@@ -1518,22 +1643,28 @@ const Library = () => {
       )}
       {/* ── Left Sidebar ─────────────────────────────────────────── */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border/30 shadow-[1px_0_0_0_hsl(var(--border)/0.15)]">
-
         {/* ── User profile strip ── */}
-        <div className="bg-muted/30 rounded-none">
+        <div className="rounded-none bg-muted/30">
           <div className="flex items-center gap-3 px-4 pb-3 pt-3">
             <button
               className="flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-colors hover:opacity-80"
               onClick={() => navigate("/profile")}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 ring-1 ring-primary/30">
-                {userData?.photoURL
-                  ? <img src={userData.photoURL} className="h-8 w-8 rounded-full object-cover" alt="" />
-                  : <User className="h-3.5 w-3.5 text-primary" />
-                }
+                {userData?.photoURL ? (
+                  <img
+                    src={userData.photoURL}
+                    className="h-8 w-8 rounded-full object-cover"
+                    alt=""
+                  />
+                ) : (
+                  <User className="h-3.5 w-3.5 text-primary" />
+                )}
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-sm font-semibold leading-none text-foreground">{username || "Guest"}</p>
+                <p className="truncate text-sm font-semibold leading-none text-foreground">
+                  {username || "Guest"}
+                </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {games.filter(g => !g.isFolder).length + getGamesInFolders().length}{" "}
                   {t("library.gamesInLibrary") || "games"}
@@ -1565,67 +1696,98 @@ const Library = () => {
           </div>
 
           {/* ── Ascend panel ── */}
-          {showAscendPanel && ascendAccess.hasAccess && (() => {
-            const stats = userData?.profileStats;
-            const level = stats?.level ?? 1;
-            const xp = stats?.xp ?? 0;
-            const nextXP = level * 500;
-            const pct = Math.min(100, Math.round((xp / nextXP) * 100));
-            const onlineFriends = friends.filter(f => f.status === "online" || f.status === "busy");
-            return (
-              <div className="px-4 pb-3 pt-1">
-                {/* Level + XP */}
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-primary">Level {level}</span>
-                  <span className="text-[10px] text-muted-foreground">{xp} / {nextXP} XP</span>
-                </div>
-                <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-                </div>
+          {showAscendPanel &&
+            ascendAccess.hasAccess &&
+            (() => {
+              const stats = userData?.profileStats;
+              const level = stats?.level ?? 1;
+              const xp = stats?.xp ?? 0;
+              const nextXP = level * 500;
+              const pct = Math.min(100, Math.round((xp / nextXP) * 100));
+              const onlineFriends = friends.filter(
+                f => f.status === "online" || f.status === "busy"
+              );
+              return (
+                <div className="px-4 pb-3 pt-1">
+                  {/* Level + XP */}
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-primary">
+                      Level {level}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {xp} / {nextXP} XP
+                    </span>
+                  </div>
+                  <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
 
-                {/* Online friends */}
-                {friends.length > 0 && (
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      Friends {onlineFriends.length > 0 && <span className="text-primary">· {onlineFriends.length} online</span>}
-                    </p>
-                    <div className="space-y-1">
-                      {friends.slice(0, 5).map(friend => (
-                        <div key={friend.uid} className="flex items-center gap-2">
-                          <div className="relative shrink-0">
-                            {friend.photoURL
-                              ? <img src={friend.photoURL} className="h-5 w-5 rounded-full object-cover" alt="" />
-                              : <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">
+                  {/* Online friends */}
+                  {friends.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        Friends{" "}
+                        {onlineFriends.length > 0 && (
+                          <span className="text-primary">
+                            · {onlineFriends.length} online
+                          </span>
+                        )}
+                      </p>
+                      <div className="space-y-1">
+                        {friends.slice(0, 5).map(friend => (
+                          <div key={friend.uid} className="flex items-center gap-2">
+                            <div className="relative shrink-0">
+                              {friend.photoURL ? (
+                                <img
+                                  src={friend.photoURL}
+                                  className="h-5 w-5 rounded-full object-cover"
+                                  alt=""
+                                />
+                              ) : (
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">
                                   {friend.displayName?.[0]?.toUpperCase()}
                                 </div>
-                            }
-                            <span className={cn(
-                              "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-background",
-                              friend.status === "online" ? "bg-green-500"
-                              : friend.status === "busy" ? "bg-yellow-500"
-                              : "bg-muted-foreground/40"
-                            )} />
+                              )}
+                              <span
+                                className={cn(
+                                  "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-background",
+                                  friend.status === "online"
+                                    ? "bg-green-500"
+                                    : friend.status === "busy"
+                                      ? "bg-yellow-500"
+                                      : "bg-muted-foreground/40"
+                                )}
+                              />
+                            </div>
+                            <span className="truncate text-[11px] text-foreground/80">
+                              {friend.displayName}
+                            </span>
                           </div>
-                          <span className="truncate text-[11px] text-foreground/80">{friend.displayName}</span>
-                        </div>
-                      ))}
-                      {friends.length > 5 && (
-                        <p className="text-[10px] text-muted-foreground">+{friends.length - 5} more</p>
-                      )}
+                        ))}
+                        {friends.length > 5 && (
+                          <p className="text-[10px] text-muted-foreground">
+                            +{friends.length - 5} more
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {friends.length === 0 && friendsLoaded && (
-                  <p className="text-[11px] text-muted-foreground">No friends yet</p>
-                )}
-              </div>
-            );
-          })()}
+                  )}
+                  {friends.length === 0 && friendsLoaded && (
+                    <p className="text-[11px] text-muted-foreground">No friends yet</p>
+                  )}
+                </div>
+              );
+            })()}
         </div>
 
         {/* ── Library views ── */}
         <nav className="space-y-0.5 px-2 pt-3">
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Library</p>
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            Library
+          </p>
           {(() => {
             const orderedTabs = [
               ...sidebarTabOrder
@@ -1636,19 +1798,28 @@ const Library = () => {
             return orderedTabs.map((tab, index) => (
               <div
                 key={tab.id}
-                onDragEnter={() => { dragOverTabRef.current = index; }}
+                onDragEnter={() => {
+                  dragOverTabRef.current = index;
+                }}
                 onDragOver={e => e.preventDefault()}
                 className="group/drag relative"
               >
                 {/* Grip handle — absolutely positioned, doesn't affect layout */}
                 <div
                   draggable
-                  onDragStart={e => { e.stopPropagation(); dragTabRef.current = index; }}
+                  onDragStart={e => {
+                    e.stopPropagation();
+                    dragTabRef.current = index;
+                  }}
                   onDragEnd={e => {
                     e.stopPropagation();
                     const from = dragTabRef.current;
                     const to = dragOverTabRef.current;
-                    if (from === null || to === null || from === to) { dragTabRef.current = null; dragOverTabRef.current = null; return; }
+                    if (from === null || to === null || from === to) {
+                      dragTabRef.current = null;
+                      dragOverTabRef.current = null;
+                      return;
+                    }
                     const newOrder = orderedTabs.map(t => t.id);
                     const [moved] = newOrder.splice(from, 1);
                     newOrder.splice(to, 0, moved);
@@ -1657,7 +1828,7 @@ const Library = () => {
                     dragTabRef.current = null;
                     dragOverTabRef.current = null;
                   }}
-                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2 cursor-grab p-1 text-muted-foreground/25 opacity-0 transition-opacity group-hover/drag:opacity-100 active:cursor-grabbing"
+                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2 cursor-grab p-1 text-muted-foreground/25 opacity-0 transition-opacity active:cursor-grabbing group-hover/drag:opacity-100"
                 >
                   <GripVertical className="h-3 w-3" />
                 </div>
@@ -1671,8 +1842,14 @@ const Library = () => {
                       params.delete("tab");
                       params.delete("saves");
                     }
-                    if (params.toString() !== new URLSearchParams(location.search).toString())
-                      navigate({ search: params.toString() ? `?${params}` : "" }, { replace: true });
+                    if (
+                      params.toString() !==
+                      new URLSearchParams(location.search).toString()
+                    )
+                      navigate(
+                        { search: params.toString() ? `?${params}` : "" },
+                        { replace: true }
+                      );
                     if (tab.id === "hiddenFolders") {
                       setSearchQuery("");
                       setFilters({ favorites: false, vrOnly: false, onlineGames: false });
@@ -1685,20 +1862,26 @@ const Library = () => {
                       : "font-medium text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                   )}
                 >
-                  <span className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-                    activeTab === tab.id ? "bg-primary/15 text-primary" : "text-muted-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                      activeTab === tab.id
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground"
+                    )}
+                  >
                     {tab.icon}
                   </span>
                   <span className="flex-1 text-left">{tab.label}</span>
                   {tab.count > 0 && (
-                    <span className={cn(
-                      "min-w-[1.25rem] rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums transition-transform duration-150 group-hover/drag:translate-x-[-14px]",
-                      activeTab === tab.id
-                        ? "bg-primary/20 text-primary"
-                        : "bg-muted/80 text-muted-foreground"
-                    )}>
+                    <span
+                      className={cn(
+                        "min-w-[1.25rem] rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums transition-transform duration-150 group-hover/drag:translate-x-[-14px]",
+                        activeTab === tab.id
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted/80 text-muted-foreground"
+                      )}
+                    >
                       {tab.count}
                     </span>
                   )}
@@ -1710,7 +1893,9 @@ const Library = () => {
 
         {/* ── Actions ── */}
         <div className="space-y-0.5 px-2 pt-3">
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.manage")}</p>
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            {t("library.manage")}
+          </p>
 
           <TooltipProvider>
             <AlertDialog
@@ -1759,7 +1944,11 @@ const Library = () => {
               onClick={() => setIsImportGamesOpen(true)}
             >
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                {isImportingGames ? <Loader className="h-4 w-4 animate-spin text-primary" /> : <Import className="h-4 w-4" />}
+                {isImportingGames ? (
+                  <Loader className="h-4 w-4 animate-spin text-primary" />
+                ) : (
+                  <Import className="h-4 w-4" />
+                )}
               </span>
               <span>{t("library.launcherImport.title")}</span>
             </button>
@@ -1779,7 +1968,11 @@ const Library = () => {
               </span>
               <span>{t("library.newFolder.create") || "New Folder"}</span>
             </button>
-            <NewFolderDialog open={isNewFolderOpen} onOpenChange={setIsNewFolderOpen} onCreate={handleCreateFolder} />
+            <NewFolderDialog
+              open={isNewFolderOpen}
+              onOpenChange={setIsNewFolderOpen}
+              onCreate={handleCreateFolder}
+            />
 
             <button
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
@@ -1791,13 +1984,23 @@ const Library = () => {
               <span>{t("library.libraryBackups.button")}</span>
             </button>
             <LibraryBackupsDialog
-              canManage={!!user && ascendAccess.hasAccess && (ascendAccess.isSubscribed || ascendAccess.isVerified)}
+              canManage={
+                !!user &&
+                ascendAccess.hasAccess &&
+                (ascendAccess.isSubscribed || ascendAccess.isVerified)
+              }
               open={isLibraryBackupsOpen}
               onOpenChange={setIsLibraryBackupsOpen}
-              gameNames={[...new Set([
-                ...games.filter(game => !game.isFolder).map(game => game.game || game.name),
-                ...getGamesInFolders().map(game => game.game || game.name),
-              ].filter(Boolean))]}
+              gameNames={[
+                ...new Set(
+                  [
+                    ...games
+                      .filter(game => !game.isFolder)
+                      .map(game => game.game || game.name),
+                    ...getGamesInFolders().map(game => game.game || game.name),
+                  ].filter(Boolean)
+                ),
+              ]}
             />
 
             <Tooltip>
@@ -1811,13 +2014,19 @@ const Library = () => {
                   disabled={isSyncingLibrary}
                 >
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                    {isSyncingLibrary ? <Loader className="h-4 w-4 animate-spin" /> : <CloudUpload className="h-4 w-4" />}
+                    {isSyncingLibrary ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CloudUpload className="h-4 w-4" />
+                    )}
                   </span>
                   <span>{t("library.cloudSync") || "Sync to Cloud"}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="text-secondary">
-                {user ? t("library.cloudSync") || "Sync to Cloud" : t("library.signInToSync") || "Sign in to sync"}
+                {user
+                  ? t("library.cloudSync") || "Sync to Cloud"
+                  : t("library.signInToSync") || "Sign in to sync"}
               </TooltipContent>
             </Tooltip>
 
@@ -1842,14 +2051,20 @@ const Library = () => {
 
         {/* ── Storage info ── */}
         <div className="px-4 pb-4 pt-2">
-          <div className="rounded-lg bg-muted/30 p-3 space-y-2">
+          <div className="space-y-2 rounded-lg bg-muted/30 p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <HardDrive className="h-3 w-3" />
-                <span className="font-medium">{t("library.availableSpace") || "Available"}</span>
+                <span className="font-medium">
+                  {t("library.availableSpace") || "Available"}
+                </span>
               </div>
               <span className="text-xs font-semibold text-foreground">
-                {storageInfo ? formatBytes(storageInfo.freeSpace) : <Loader className="h-3 w-3 animate-spin" />}
+                {storageInfo ? (
+                  formatBytes(storageInfo.freeSpace)
+                ) : (
+                  <Loader className="h-3 w-3 animate-spin" />
+                )}
               </span>
             </div>
             {storageInfo && (
@@ -1857,15 +2072,23 @@ const Library = () => {
                 <div className="relative h-1 overflow-hidden rounded-full bg-muted/50">
                   <div
                     className="absolute left-0 top-0 h-full rounded-full bg-primary"
-                    style={{ width: `${Math.min((totalGamesSize / storageInfo.totalSpace) * 100, 100)}%`, zIndex: 2 }}
+                    style={{
+                      width: `${Math.min((totalGamesSize / storageInfo.totalSpace) * 100, 100)}%`,
+                      zIndex: 2,
+                    }}
                   />
                   <div
                     className="absolute left-0 top-0 h-full rounded-full bg-muted-foreground/30"
-                    style={{ width: `${Math.min(((storageInfo.totalSpace - storageInfo.freeSpace) / storageInfo.totalSpace) * 100, 100)}%`, zIndex: 1 }}
+                    style={{
+                      width: `${Math.min(((storageInfo.totalSpace - storageInfo.freeSpace) / storageInfo.totalSpace) * 100, 100)}%`,
+                      zIndex: 1,
+                    }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>{isCalculatingSize ? "…" : formatBytes(totalGamesSize)} games</span>
+                  <span>
+                    {isCalculatingSize ? "…" : formatBytes(totalGamesSize)} games
+                  </span>
                   <span>{formatBytes(storageInfo.totalSpace)}</span>
                 </div>
 
@@ -1878,26 +2101,42 @@ const Library = () => {
                     >
                       {showStorageDetails ? "Hide details" : "Show details"}
                       <svg
-                        className={cn("h-3 w-3 transition-transform", showStorageDetails && "rotate-180")}
+                        className={cn(
+                          "h-3 w-3 transition-transform",
+                          showStorageDetails && "rotate-180"
+                        )}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
                         strokeWidth={2}
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m19.5 8.25-7.5 7.5-7.5-7.5"
+                        />
                       </svg>
                     </button>
 
                     {showStorageDetails && (
                       <div className="mt-2 space-y-2 border-t border-border/40 pt-2">
                         {storageInfo.directories.map((dir, idx) => {
-                          const usedPct = Math.min((dir.usedSpace / dir.totalSpace) * 100, 100);
-                          const gamesPct = Math.min(((dir.gamesSize || 0) / dir.totalSpace) * 100, 100);
+                          const usedPct = Math.min(
+                            (dir.usedSpace / dir.totalSpace) * 100,
+                            100
+                          );
+                          const gamesPct = Math.min(
+                            ((dir.gamesSize || 0) / dir.totalSpace) * 100,
+                            100
+                          );
                           const label = dir.path.split(/[\\/]/).pop() || dir.path;
                           return (
                             <div key={dir.path || idx} className="space-y-1">
                               <div className="flex items-center justify-between text-[10px]">
-                                <span className="max-w-[7rem] truncate font-medium text-foreground/80" title={dir.path}>
+                                <span
+                                  className="max-w-[7rem] truncate font-medium text-foreground/80"
+                                  title={dir.path}
+                                >
                                   {label}
                                 </span>
                                 <span className="text-muted-foreground">
@@ -1931,7 +2170,7 @@ const Library = () => {
       {/* ── Main Content ─────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Sticky toolbar */}
-        <div className="flex shrink-0 items-center gap-3 bg-background/95 px-6 py-3 backdrop-blur-sm shadow-[0_1px_0_0_hsl(var(--border)/0.4)]">
+        <div className="flex shrink-0 items-center gap-3 bg-background/95 px-6 py-3 shadow-[0_1px_0_0_hsl(var(--border)/0.4)] backdrop-blur-sm">
           <div className="relative flex-1">
             <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -1940,13 +2179,20 @@ const Library = () => {
               value={searchQuery}
               onChange={e => {
                 setSearchQuery(e.target.value);
-                if (e.target.value && activeTab !== "all" && activeTab !== "hiddenFolders") {
+                if (
+                  e.target.value &&
+                  activeTab !== "all" &&
+                  activeTab !== "hiddenFolders"
+                ) {
                   setActiveTab("all");
                   const params = new URLSearchParams(location.search);
                   if (params.has("tab")) {
                     params.delete("tab");
                     params.delete("saves");
-                    navigate({ search: params.toString() ? `?${params}` : "" }, { replace: true });
+                    navigate(
+                      { search: params.toString() ? `?${params}` : "" },
+                      { replace: true }
+                    );
                   }
                 }
               }}
@@ -1958,8 +2204,15 @@ const Library = () => {
             <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 {(() => {
-                  const activeFilterCount = [filters.vrOnly, filters.onlineGames].filter(Boolean).length;
-                  const hasActiveFilters = activeFilterCount > 0 || sortMode !== "alpha" || sortOrder !== "asc" || folderPlacement !== "first" || groupBy !== "none";
+                  const activeFilterCount = [filters.vrOnly, filters.onlineGames].filter(
+                    Boolean
+                  ).length;
+                  const hasActiveFilters =
+                    activeFilterCount > 0 ||
+                    sortMode !== "alpha" ||
+                    sortOrder !== "asc" ||
+                    folderPlacement !== "first" ||
+                    groupBy !== "none";
                   return (
                     <button
                       type="button"
@@ -1974,7 +2227,10 @@ const Library = () => {
                       <span>{t("search.filters") || "Filter"}</span>
                       {hasActiveFilters && (
                         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-secondary">
-                          {activeFilterCount + (sortMode !== "alpha" || sortOrder !== "asc" ? 1 : 0) + (folderPlacement !== "first" ? 1 : 0) + (groupBy !== "none" ? 1 : 0)}
+                          {activeFilterCount +
+                            (sortMode !== "alpha" || sortOrder !== "asc" ? 1 : 0) +
+                            (folderPlacement !== "first" ? 1 : 0) +
+                            (groupBy !== "none" ? 1 : 0)}
                         </span>
                       )}
                     </button>
@@ -1983,92 +2239,210 @@ const Library = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 p-1.5">
                 {/* Sort section */}
-                <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.sort.title")}</p>
+                <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {t("library.sort.title")}
+                </p>
                 {[
-                  { label: t("library.sort.aToZ"), icon: <ArrowUpAZ className="h-4 w-4" />, active: sortMode === "alpha" && sortOrder === "asc", onClick: () => { setSortOrder("asc"); setSortMode("alpha"); } },
-                  { label: t("library.sort.zToA"), icon: <ArrowDownAZ className="h-4 w-4" />, active: sortMode === "alpha" && sortOrder === "desc", onClick: () => { setSortOrder("desc"); setSortMode("alpha"); } },
-                  { label: t("library.sort.mostPlayed"), icon: <Timer className="h-4 w-4" />, active: sortMode === "playtime", onClick: () => setSortMode("playtime") },
+                  {
+                    label: t("library.sort.aToZ"),
+                    icon: <ArrowUpAZ className="h-4 w-4" />,
+                    active: sortMode === "alpha" && sortOrder === "asc",
+                    onClick: () => {
+                      setSortOrder("asc");
+                      setSortMode("alpha");
+                    },
+                  },
+                  {
+                    label: t("library.sort.zToA"),
+                    icon: <ArrowDownAZ className="h-4 w-4" />,
+                    active: sortMode === "alpha" && sortOrder === "desc",
+                    onClick: () => {
+                      setSortOrder("desc");
+                      setSortMode("alpha");
+                    },
+                  },
+                  {
+                    label: t("library.sort.mostPlayed"),
+                    icon: <Timer className="h-4 w-4" />,
+                    active: sortMode === "playtime",
+                    onClick: () => setSortMode("playtime"),
+                  },
                 ].map(item => (
                   <DropdownMenuItem
                     key={item.label}
                     onClick={item.onClick}
                     className={cn(
                       "cursor-pointer rounded-md px-2 py-1.5",
-                      item.active ? "bg-primary/10 text-primary font-medium" : "text-foreground"
+                      item.active
+                        ? "bg-primary/10 font-medium text-primary"
+                        : "text-foreground"
                     )}
                   >
-                    <span className={cn("mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md", item.active ? "bg-primary/20 text-primary" : "bg-muted/60 text-muted-foreground")}>
+                    <span
+                      className={cn(
+                        "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                        item.active
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted/60 text-muted-foreground"
+                      )}
+                    >
                       {item.icon}
                     </span>
                     {item.label}
-                    {item.active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
+                    {item.active && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
                   </DropdownMenuItem>
                 ))}
 
                 <DropdownMenuSeparator className="my-1.5" />
 
-                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.sort.folderPlacement")}</p>
+                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {t("library.sort.folderPlacement")}
+                </p>
                 {["first", "last"].map(placement => (
                   <DropdownMenuItem
                     key={placement}
                     onClick={() => setFolderPlacement(placement)}
-                    className={cn("cursor-pointer rounded-md px-2 py-1.5", folderPlacement === placement && "bg-primary/10 font-medium text-primary")}
+                    className={cn(
+                      "cursor-pointer rounded-md px-2 py-1.5",
+                      folderPlacement === placement &&
+                        "bg-primary/10 font-medium text-primary"
+                    )}
                   >
                     <FolderOpen className="mr-2 h-4 w-4" />
-                    {t(placement === "first" ? "library.sort.foldersFirst" : "library.sort.foldersLast")}
-                    {folderPlacement === placement && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
+                    {t(
+                      placement === "first"
+                        ? "library.sort.foldersFirst"
+                        : "library.sort.foldersLast"
+                    )}
+                    {folderPlacement === placement && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator className="my-1.5" />
 
                 {/* Group By section */}
-                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("library.sort.groupBy")}</p>
+                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {t("library.sort.groupBy")}
+                </p>
                 {[
-                  { label: t("library.sort.groupNone"), icon: <SquareLibrary className="h-4 w-4" />, active: groupBy === "none", onClick: () => setGroupBy("none") },
-                  { label: t("library.sort.groupByDirectory"), icon: <HardDriveDownload className="h-4 w-4" />, active: groupBy === "directory", onClick: () => setGroupBy("directory") },
+                  {
+                    label: t("library.sort.groupNone"),
+                    icon: <SquareLibrary className="h-4 w-4" />,
+                    active: groupBy === "none",
+                    onClick: () => setGroupBy("none"),
+                  },
+                  {
+                    label: t("library.sort.groupByDirectory"),
+                    icon: <HardDriveDownload className="h-4 w-4" />,
+                    active: groupBy === "directory",
+                    onClick: () => setGroupBy("directory"),
+                  },
                 ].map(item => (
                   <DropdownMenuItem
                     key={item.label}
                     onClick={item.onClick}
                     className={cn(
                       "cursor-pointer rounded-md px-2 py-1.5",
-                      item.active ? "bg-primary/10 text-primary font-medium" : "text-foreground"
+                      item.active
+                        ? "bg-primary/10 font-medium text-primary"
+                        : "text-foreground"
                     )}
                   >
-                    <span className={cn("mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md", item.active ? "bg-primary/20 text-primary" : "bg-muted/60 text-muted-foreground")}>
+                    <span
+                      className={cn(
+                        "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                        item.active
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted/60 text-muted-foreground"
+                      )}
+                    >
                       {item.icon}
                     </span>
                     {item.label}
-                    {item.active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
+                    {item.active && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
                   </DropdownMenuItem>
                 ))}
 
                 <DropdownMenuSeparator className="my-1.5" />
 
                 {/* Filters section */}
-                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{t("search.filters") || "Filters"}</p>
+                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {t("search.filters") || "Filters"}
+                </p>
                 <DropdownMenuItem
                   onClick={() => setFilters(prev => ({ ...prev, vrOnly: !prev.vrOnly }))}
-                  className={cn("cursor-pointer rounded-md px-2 py-1.5", filters.vrOnly ? "bg-primary/10 text-primary font-medium" : "text-foreground")}
+                  className={cn(
+                    "cursor-pointer rounded-md px-2 py-1.5",
+                    filters.vrOnly
+                      ? "bg-primary/10 font-medium text-primary"
+                      : "text-foreground"
+                  )}
                 >
-                  <span className={cn("mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md", filters.vrOnly ? "bg-primary/20 text-primary" : "bg-muted/60 text-muted-foreground")}>
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M3.81253 6.7812C4.5544 5.6684 5.80332 5 7.14074 5H16.8593C18.1967 5 19.4456 5.6684 20.1875 6.7812L21 8H3L3.81253 6.7812Z" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+                  <span
+                    className={cn(
+                      "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                      filters.vrOnly
+                        ? "bg-primary/20 text-primary"
+                        : "bg-muted/60 text-muted-foreground"
+                    )}
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
+                        stroke="currentColor"
+                        strokeWidth={1.3}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M3.81253 6.7812C4.5544 5.6684 5.80332 5 7.14074 5H16.8593C18.1967 5 19.4456 5.6684 20.1875 6.7812L21 8H3L3.81253 6.7812Z"
+                        stroke="currentColor"
+                        strokeWidth={1.3}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </span>
                   {t("library.filters.vrGames")}
-                  {filters.vrOnly && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
+                  {filters.vrOnly && (
+                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setFilters(prev => ({ ...prev, onlineGames: !prev.onlineGames }))}
-                  className={cn("cursor-pointer rounded-md px-2 py-1.5", filters.onlineGames ? "bg-primary/10 text-primary font-medium" : "text-foreground")}
+                  onClick={() =>
+                    setFilters(prev => ({ ...prev, onlineGames: !prev.onlineGames }))
+                  }
+                  className={cn(
+                    "cursor-pointer rounded-md px-2 py-1.5",
+                    filters.onlineGames
+                      ? "bg-primary/10 font-medium text-primary"
+                      : "text-foreground"
+                  )}
                 >
-                  <span className={cn("mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md", filters.onlineGames ? "bg-primary/20 text-primary" : "bg-muted/60 text-muted-foreground")}>
+                  <span
+                    className={cn(
+                      "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                      filters.onlineGames
+                        ? "bg-primary/20 text-primary"
+                        : "bg-muted/60 text-muted-foreground"
+                    )}
+                  >
                     <Gamepad2 className="h-4 w-4" />
                   </span>
                   {t("library.filters.onlineGames")}
-                  {filters.onlineGames && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
+                  {filters.onlineGames && (
+                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2077,14 +2451,22 @@ const Library = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    className={cn("rounded-md p-2 hover:bg-secondary/50", selectionMode && "bg-primary/10 text-primary")}
+                    className={cn(
+                      "rounded-md p-2 hover:bg-secondary/50",
+                      selectionMode && "bg-primary/10 text-primary"
+                    )}
                     type="button"
-                    onClick={() => { setSelectionMode(prev => !prev); setSelectedGames([]); }}
+                    onClick={() => {
+                      setSelectionMode(prev => !prev);
+                      setSelectedGames([]);
+                    }}
                   >
                     <CheckSquareIcon className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent className="text-secondary">{t("library.multiselect")}</TooltipContent>
+                <TooltipContent className="text-secondary">
+                  {t("library.multiselect")}
+                </TooltipContent>
               </Tooltip>
             )}
           </TooltipProvider>
@@ -2094,65 +2476,92 @@ const Library = () => {
               <span className="text-sm font-semibold text-primary">
                 {t("library.tools.selected", { count: selectedGames.length })}
               </span>
-              <Button variant="destructive" size="sm" disabled={selectedGames.length === 0} onClick={handleBulkRemove}>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={selectedGames.length === 0}
+                onClick={handleBulkRemove}
+              >
                 {t("library.tools.bulkRemove")}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { setSelectionMode(false); setSelectedGames([]); }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectionMode(false);
+                  setSelectedGames([]);
+                }}
+              >
                 {t("common.cancel")}
               </Button>
             </div>
           )}
 
-          {error && (
-            <div className="text-sm text-destructive">{error}</div>
-          )}
+          {error && <div className="text-destructive text-sm">{error}</div>}
         </div>
 
         {/* Scrollable game grid */}
-        <div className={cn("flex-1 overflow-y-auto px-6 pt-5", activeTab === "retro" ? "pb-6" : "pb-28")}>
+        <div
+          className={cn(
+            "flex-1 overflow-y-auto px-6 pt-5",
+            activeTab === "retro" ? "pb-6" : "pb-28"
+          )}
+        >
           {/* ── Tab page header ── */}
-          {activeTab !== "favoritesGallery" && (() => {
-            const tabMeta = {
-              hiddenFolders: {
-                icon: <EyeOff className="h-5 w-5 text-primary" />,
-                title: t("library.hiddenFolders.title"),
-                subtitle: t("library.hiddenFolders.description"),
-              },
-              all: {
-                icon: <SquareLibrary className="h-5 w-5 text-primary" />,
-                title: t("library.pageTitle") || "My Library",
-                subtitle: t("library.pageSubtitle") || "All your installed games in one place.",
-              },
-              cloud: {
-                icon: <Cloud className="h-5 w-5 text-primary" />,
-                title: t("library.cloudOnly.title") || "Cloud Library",
-                subtitle: t("library.cloudOnly.subtitle") || "Games stored in your cloud backup.",
-              },
-              playLater: {
-                icon: <Clock className="h-5 w-5 text-primary" />,
-                title: t("library.playLater.title") || "Play Later",
-                subtitle: t("library.playLater.subtitle") || "Games you've saved to download later.",
-              },
-              history: {
-                icon: <History className="h-5 w-5 text-primary" />,
-                title: t("library.history.title") || "History",
-                subtitle: t("library.history.subtitle") || "Games you've removed. Their playtime and stats are preserved here.",
-              },
-            };
-            const meta = tabMeta[activeTab];
-            if (!meta) return null;
-            return (
-              <div className="mb-6 flex items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                  {React.cloneElement(meta.icon, { className: "h-6 w-6 text-primary" })}
+          {activeTab !== "favoritesGallery" &&
+            (() => {
+              const tabMeta = {
+                hiddenFolders: {
+                  icon: <EyeOff className="h-5 w-5 text-primary" />,
+                  title: t("library.hiddenFolders.title"),
+                  subtitle: t("library.hiddenFolders.description"),
+                },
+                all: {
+                  icon: <SquareLibrary className="h-5 w-5 text-primary" />,
+                  title: t("library.pageTitle") || "My Library",
+                  subtitle:
+                    t("library.pageSubtitle") || "All your installed games in one place.",
+                },
+                cloud: {
+                  icon: <Cloud className="h-5 w-5 text-primary" />,
+                  title: t("library.cloudOnly.title") || "Cloud Library",
+                  subtitle:
+                    t("library.cloudOnly.subtitle") ||
+                    "Games stored in your cloud backup.",
+                },
+                playLater: {
+                  icon: <Clock className="h-5 w-5 text-primary" />,
+                  title: t("library.playLater.title") || "Play Later",
+                  subtitle:
+                    t("library.playLater.subtitle") ||
+                    "Games you've saved to download later.",
+                },
+                history: {
+                  icon: <History className="h-5 w-5 text-primary" />,
+                  title: t("library.history.title") || "History",
+                  subtitle:
+                    t("library.history.subtitle") ||
+                    "Games you've removed. Their playtime and stats are preserved here.",
+                },
+              };
+              const meta = tabMeta[activeTab];
+              if (!meta) return null;
+              return (
+                <div className="mb-6 flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
+                    {React.cloneElement(meta.icon, { className: "h-6 w-6 text-primary" })}
+                  </div>
+                  <div className="flex flex-col gap-0">
+                    <h2 className="text-2xl font-bold leading-none text-foreground">
+                      {meta.title}
+                    </h2>
+                    {meta.subtitle && (
+                      <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col gap-0">
-                  <h2 className="text-2xl font-bold leading-none text-foreground">{meta.title}</h2>
-                  {meta.subtitle && <p className="text-sm text-muted-foreground">{meta.subtitle}</p>}
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
           {/* ── Cloud sync reminder ── */}
           {activeTab === "all" && showCloudSyncReminder && (
@@ -2165,14 +2574,16 @@ const Library = () => {
                   {daysSinceCloudSync === null
                     ? t("library.cloudSyncReminder.neverSynced") ||
                       "You haven't synced your library to the cloud yet."
-                    : t("library.cloudSyncReminder.stale", { days: daysSinceCloudSync }) ||
+                    : t("library.cloudSyncReminder.stale", {
+                        days: daysSinceCloudSync,
+                      }) ||
                       `You haven't synced your library in ${daysSinceCloudSync} days.`}
                 </p>
               </div>
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-2 shrink-0 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 hover:text-amber-600 dark:text-amber-400"
+                className="shrink-0 gap-2 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 hover:text-amber-600 dark:text-amber-400"
                 onClick={handleCloudSync}
                 disabled={isSyncingLibrary}
               >
@@ -2189,100 +2600,120 @@ const Library = () => {
           )}
 
           {/* ── All Games / Favorites tab ── */}
-          {(activeTab === "all" || activeTab === "favorites" || activeTab === "hiddenFolders") && (() => {
-            const renderGameCard = game => (
-              <div key={getLibraryCardKey(game)}>
-                {game.isFolder ? (
-                  <DroppableFolderCard
-                    folder={game}
-                    onDropGame={droppedGame => handleMoveToFolder(droppedGame, game.game)}
-                  >
-                    <FolderCard
-                      key={game.game + "-" + (game.items ? game.items.length : 0)}
-                      name={game.game || game.name}
+          {(activeTab === "all" ||
+            activeTab === "favorites" ||
+            activeTab === "hiddenFolders") &&
+            (() => {
+              const renderGameCard = game => (
+                <div key={getLibraryCardKey(game)}>
+                  {game.isFolder ? (
+                    <DroppableFolderCard
                       folder={game}
-                      refreshKey={game.items ? game.items.length : 0}
-                    />
-                  </DroppableFolderCard>
-                ) : (
-                  <DraggableGameCard game={game}>
-                    <InstalledGameCard
-                      game={game}
-                      onPlay={() => selectionMode ? handleSelectGame(game) : handlePlayGame(game)}
-                      favorites={favorites}
-                      onToggleFavorite={() => toggleFavorite(game.game || game.name)}
-                      selectionMode={selectionMode}
-                      isSelected={selectedGames.includes(game.game)}
-                      onSelectCheckbox={() => handleSelectGame(game)}
-                      updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
-                      onRemoved={handleGameRemoved}
-                      onMoveToFolder={() => setGameToMove(game)}
-                    />
-                  </DraggableGameCard>
-                )}
-              </div>
-            );
+                      onDropGame={droppedGame =>
+                        handleMoveToFolder(droppedGame, game.game)
+                      }
+                    >
+                      <FolderCard
+                        key={game.game + "-" + (game.items ? game.items.length : 0)}
+                        name={game.game || game.name}
+                        folder={game}
+                        refreshKey={game.items ? game.items.length : 0}
+                      />
+                    </DroppableFolderCard>
+                  ) : (
+                    <DraggableGameCard game={game}>
+                      <InstalledGameCard
+                        game={game}
+                        onPlay={() =>
+                          selectionMode ? handleSelectGame(game) : handlePlayGame(game)
+                        }
+                        favorites={favorites}
+                        onToggleFavorite={() => toggleFavorite(game.game || game.name)}
+                        selectionMode={selectionMode}
+                        isSelected={selectedGames.includes(game.game)}
+                        onSelectCheckbox={() => handleSelectGame(game)}
+                        updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
+                        onRemoved={handleGameRemoved}
+                        onMoveToFolder={() => setGameToMove(game)}
+                      />
+                    </DraggableGameCard>
+                  )}
+                </div>
+              );
 
-            const gridClass = "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+              const gridClass =
+                "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
-            if (groupBy === "directory") {
-              // Build directory groups from all filtered games so each section is complete
-              const dirGroups = new Map();
-              tabGames.forEach(game => {
-                const dir = game._sourceDir || t("library.sort.addedGames");
-                if (!dirGroups.has(dir)) dirGroups.set(dir, []);
-                dirGroups.get(dir).push(game);
-              });
+              if (groupBy === "directory") {
+                // Build directory groups from all filtered games so each section is complete
+                const dirGroups = new Map();
+                tabGames.forEach(game => {
+                  const dir = game._sourceDir || t("library.sort.addedGames");
+                  if (!dirGroups.has(dir)) dirGroups.set(dir, []);
+                  dirGroups.get(dir).push(game);
+                });
+
+                return (
+                  <DndProvider backend={HTML5Backend}>
+                    {dirGroups.size === 0 && (
+                      <div className="flex flex-col items-center justify-center py-24 text-center">
+                        <SquareLibrary className="mb-4 h-12 w-12 text-muted-foreground/30" />
+                        <p className="text-sm text-muted-foreground">
+                          {t("library.noGamesFound")}
+                        </p>
+                      </div>
+                    )}
+                    {[...dirGroups.entries()].map(([dir, dirGames]) => {
+                      const label = dir.split(/[\\/]/).pop() || dir;
+                      return (
+                        <div key={dir} className="mb-8">
+                          <div className="mb-3 flex items-center gap-2">
+                            <HardDriveDownload className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                            <span
+                              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70"
+                              title={dir}
+                            >
+                              {label}
+                            </span>
+                            <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">
+                              {dirGames.length}
+                            </span>
+                            <div className="ml-1 flex-1 border-t border-border/30" />
+                          </div>
+                          <div className={gridClass}>{dirGames.map(renderGameCard)}</div>
+                        </div>
+                      );
+                    })}
+                  </DndProvider>
+                );
+              }
 
               return (
                 <DndProvider backend={HTML5Backend}>
-                  {dirGroups.size === 0 && (
+                  {tabGames.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-center">
                       <SquareLibrary className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                      <p className="text-sm text-muted-foreground">{t("library.noGamesFound")}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {activeTab === "favorites"
+                          ? t("library.filters.favorites.empty")
+                          : t("library.noGamesFound") || "No games found"}
+                      </p>
                     </div>
+                  ) : (
+                    <div className={gridClass}>{tabGames.map(renderGameCard)}</div>
                   )}
-                  {[...dirGroups.entries()].map(([dir, dirGames]) => {
-                    const label = dir.split(/[\\/]/).pop() || dir;
-                    return (
-                      <div key={dir} className="mb-8">
-                        <div className="mb-3 flex items-center gap-2">
-                          <HardDriveDownload className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-                          <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70" title={dir}>{label}</span>
-                          <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">{dirGames.length}</span>
-                          <div className="ml-1 flex-1 border-t border-border/30" />
-                        </div>
-                        <div className={gridClass}>
-                          {dirGames.map(renderGameCard)}
-                        </div>
-                      </div>
-                    );
-                  })}
                 </DndProvider>
               );
-            }
-
-            return (
-              <DndProvider backend={HTML5Backend}>
-                {tabGames.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-24 text-center">
-                    <SquareLibrary className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">
-                      {activeTab === "favorites" ? (t("library.filters.favorites.empty")) : t("library.noGamesFound") || "No games found"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className={gridClass}>
-                    {tabGames
-                      .map(renderGameCard)}
-                  </div>
-                )}
-              </DndProvider>
-            );
-          })()}
+            })()}
 
           {activeTab === "retro" && (
-            <React.Suspense fallback={<div className="flex justify-center py-20"><Loader className="h-8 w-8 animate-spin" /></div>}>
+            <React.Suspense
+              fallback={
+                <div className="flex justify-center py-20">
+                  <Loader className="h-8 w-8 animate-spin" />
+                </div>
+              }
+            >
               <Retro />
             </React.Suspense>
           )}
@@ -2297,7 +2728,9 @@ const Library = () => {
               ) : cloudOnlyGames.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
                   <Cloud className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                  <p className="text-sm text-muted-foreground">{t("library.cloudOnly.empty") || "No cloud-only games"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.cloudOnly.empty") || "No cloud-only games"}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -2323,7 +2756,9 @@ const Library = () => {
               {playLaterGames.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
                   <Clock className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                  <p className="text-sm text-muted-foreground">{t("library.playLater.empty") || "No games in Play Later"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.playLater.empty") || "No games in Play Later"}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -2346,9 +2781,12 @@ const Library = () => {
               {deletedGames.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
                   <History className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                  <p className="text-sm font-medium text-foreground">{t("library.history.empty") || "No game history yet"}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {t("library.history.empty") || "No game history yet"}
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {t("library.history.emptyHint") || "Delete a game and choose \"Save Data\" to keep it here."}
+                    {t("library.history.emptyHint") ||
+                      'Delete a game and choose "Save Data" to keep it here.'}
                   </p>
                 </div>
               ) : (
@@ -2368,218 +2806,287 @@ const Library = () => {
           )}
 
           {/* ── Favorites Gallery tab ── */}
-          {activeTab === "favoritesGallery" && (() => {
-            // Installed games that are favorited
-            const installedFavNames = new Set(
-              games.filter(g => !g.isFolder).map(g => g.game || g.name)
-            );
-            // Stub entries for favorited games not yet installed
-            const favMeta = JSON.parse(localStorage.getItem("game-favorites-meta") || "{}");
-            const uninstalledFavStubs = favorites
-              .filter(name => !installedFavNames.has(name))
-              .map(name => {
-                const meta = favMeta[name] || {};
-                // If this game was uninstalled with "save data" chosen, its stats
-                // live on in the History stub — merge them in so playtime doesn't
-                // appear lost in the Favorites gallery.
-                const historyStub = deletedGames.find(g => (g.game || g.name) === name);
-                return {
-                  game: name,
-                  name,
-                  _isStub: true,
-                  ...meta,
-                  ...(historyStub && {
-                    playTime: historyStub.playTime || meta.playTime || 0,
-                    lastPlayed: historyStub.lastPlayed || meta.lastPlayed || null,
-                    launchCount: historyStub.launchCount || meta.launchCount || 0,
-                  }),
-                };
-              });
-            const favGames = [
-              ...games.filter(g => !g.isFolder && favorites.includes(g.game || g.name)),
-              ...uninstalledFavStubs,
-            ];
-
-            // Collect all genres from favorite games
-            const genreSet = new Set();
-            favGames.forEach(g => {
-              const cats = Array.isArray(g.category) ? g.category : [];
-              cats.forEach(c => genreSet.add(c));
-            });
-            const allGenres = ["all", ...Array.from(genreSet).sort()];
-
-            // Filter by genre
-            const genreFiltered = favGalleryGenreFilter === "all"
-              ? favGames
-              : favGames.filter(g => {
-                  const cats = Array.isArray(g.category) ? g.category : [];
-                  return cats.includes(favGalleryGenreFilter);
+          {activeTab === "favoritesGallery" &&
+            (() => {
+              // Installed games that are favorited
+              const installedFavNames = new Set(
+                games.filter(g => !g.isFolder).map(g => g.game || g.name)
+              );
+              // Stub entries for favorited games not yet installed
+              const favMeta = JSON.parse(
+                localStorage.getItem("game-favorites-meta") || "{}"
+              );
+              const uninstalledFavStubs = favorites
+                .filter(name => !installedFavNames.has(name))
+                .map(name => {
+                  const meta = favMeta[name] || {};
+                  // If this game was uninstalled with "save data" chosen, its stats
+                  // live on in the History stub — merge them in so playtime doesn't
+                  // appear lost in the Favorites gallery.
+                  const historyStub = deletedGames.find(g => (g.game || g.name) === name);
+                  return {
+                    game: name,
+                    name,
+                    _isStub: true,
+                    ...meta,
+                    ...(historyStub && {
+                      playTime: historyStub.playTime || meta.playTime || 0,
+                      lastPlayed: historyStub.lastPlayed || meta.lastPlayed || null,
+                      launchCount: historyStub.launchCount || meta.launchCount || 0,
+                    }),
+                  };
                 });
+              const favGames = [
+                ...games.filter(g => !g.isFolder && favorites.includes(g.game || g.name)),
+                ...uninstalledFavStubs,
+              ];
 
-            // Sort
-            const sorted = [...genreFiltered].sort((a, b) => {
-              const aName = a.game || a.name || "";
-              const bName = b.game || b.name || "";
-              switch (favGallerySortMode) {
-                case "rating": {
-                  const ar = gameRatings[aName] || 0;
-                  const br = gameRatings[bName] || 0;
-                  return br !== ar ? br - ar : aName.localeCompare(bName);
-                }
-                case "playtime": {
-                  const at = a.playTime || 0;
-                  const bt = b.playTime || 0;
-                  return bt !== at ? bt - at : aName.localeCompare(bName);
-                }
-                case "recentlyPlayed": {
-                  const al = a.lastPlayed || 0;
-                  const bl = b.lastPlayed || 0;
-                  return bl - al;
-                }
-                case "recentlyAdded": {
-                  const aa = a.addedAt || 0;
-                  const ba = b.addedAt || 0;
-                  return ba - aa;
-                }
-                case "alpha":
-                default:
-                  return aName.localeCompare(bName);
-              }
-            });
+              // Collect all genres from favorite games
+              const genreSet = new Set();
+              favGames.forEach(g => {
+                const cats = Array.isArray(g.category) ? g.category : [];
+                cats.forEach(c => genreSet.add(c));
+              });
+              const allGenres = ["all", ...Array.from(genreSet).sort()];
 
-            const sortOptions = [
-              { id: "rating", label: t("library.favoritesGallery.sort.highestRating") || "Highest Rating" },
-              { id: "playtime", label: t("library.favoritesGallery.sort.mostPlayed") || "Most Played" },
-              { id: "recentlyPlayed", label: t("library.favoritesGallery.sort.recentlyPlayed") || "Recently Played" },
-              { id: "recentlyAdded", label: t("library.favoritesGallery.sort.recentlyAdded") || "Recently Added" },
-              { id: "alpha", label: t("library.sort.aToZ") || "A → Z" },
-            ];
+              // Filter by genre
+              const genreFiltered =
+                favGalleryGenreFilter === "all"
+                  ? favGames
+                  : favGames.filter(g => {
+                      const cats = Array.isArray(g.category) ? g.category : [];
+                      return cats.includes(favGalleryGenreFilter);
+                    });
 
-            return (
-              <div className="space-y-5">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                        <Heart className="h-6 w-6 text-primary" />
+              // Sort
+              const sorted = [...genreFiltered].sort((a, b) => {
+                const aName = a.game || a.name || "";
+                const bName = b.game || b.name || "";
+                switch (favGallerySortMode) {
+                  case "rating": {
+                    const ar = gameRatings[aName] || 0;
+                    const br = gameRatings[bName] || 0;
+                    return br !== ar ? br - ar : aName.localeCompare(bName);
+                  }
+                  case "playtime": {
+                    const at = a.playTime || 0;
+                    const bt = b.playTime || 0;
+                    return bt !== at ? bt - at : aName.localeCompare(bName);
+                  }
+                  case "recentlyPlayed": {
+                    const al = a.lastPlayed || 0;
+                    const bl = b.lastPlayed || 0;
+                    return bl - al;
+                  }
+                  case "recentlyAdded": {
+                    const aa = a.addedAt || 0;
+                    const ba = b.addedAt || 0;
+                    return ba - aa;
+                  }
+                  case "alpha":
+                  default:
+                    return aName.localeCompare(bName);
+                }
+              });
+
+              const sortOptions = [
+                {
+                  id: "rating",
+                  label:
+                    t("library.favoritesGallery.sort.highestRating") || "Highest Rating",
+                },
+                {
+                  id: "playtime",
+                  label: t("library.favoritesGallery.sort.mostPlayed") || "Most Played",
+                },
+                {
+                  id: "recentlyPlayed",
+                  label:
+                    t("library.favoritesGallery.sort.recentlyPlayed") ||
+                    "Recently Played",
+                },
+                {
+                  id: "recentlyAdded",
+                  label:
+                    t("library.favoritesGallery.sort.recentlyAdded") || "Recently Added",
+                },
+                { id: "alpha", label: t("library.sort.aToZ") || "A → Z" },
+              ];
+
+              return (
+                <div className="space-y-5">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
+                          <Heart className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex flex-col gap-0">
+                          <h2 className="text-2xl font-bold leading-none text-foreground">
+                            {t("library.favoritesGallery.title") || "Favorites"}
+                          </h2>
+                          <p className="text-sm text-muted-foreground">
+                            {t("library.favoritesGallery.subtitle") ||
+                              "Your favorite games, rated and organized by you."}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-0">
-                        <h2 className="text-2xl font-bold leading-none text-foreground">
-                          {t("library.favoritesGallery.title") || "Favorites"}
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                          {t("library.favoritesGallery.subtitle") || "Your favorite games, rated and organized by you."}
-                        </p>
-                      </div>
+                    </div>
+
+                    {/* Sort dropdown */}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent">
+                            <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                            {t("library.favoritesGallery.sortBy") || "Sort by"}
+                            <span className="ml-1 text-primary">
+                              {sortOptions.find(s => s.id === favGallerySortMode)
+                                ?.label || "Highest Rating"}
+                            </span>
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          {sortOptions.map(opt => (
+                            <DropdownMenuItem
+                              key={opt.id}
+                              className={cn(
+                                "cursor-pointer",
+                                favGallerySortMode === opt.id &&
+                                  "bg-accent/50 font-semibold text-primary"
+                              )}
+                              onClick={() => setFavGallerySortMode(opt.id)}
+                            >
+                              {opt.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
 
-                  {/* Sort dropdown */}
-                  <div className="flex shrink-0 items-center gap-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent">
-                          <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-                          {t("library.favoritesGallery.sortBy") || "Sort by"}
-                          <span className="ml-1 text-primary">
-                            {sortOptions.find(s => s.id === favGallerySortMode)?.label || "Highest Rating"}
-                          </span>
-                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        {sortOptions.map(opt => (
-                          <DropdownMenuItem
-                            key={opt.id}
-                            className={cn("cursor-pointer", favGallerySortMode === opt.id && "bg-accent/50 font-semibold text-primary")}
-                            onClick={() => setFavGallerySortMode(opt.id)}
+                  {/* Genre filter chips */}
+                  {allGenres.length > 1 && (
+                    <div className="flex flex-wrap gap-2">
+                      {allGenres.map(genre => {
+                        const count =
+                          genre === "all"
+                            ? favGames.length
+                            : favGames.filter(g =>
+                                (Array.isArray(g.category) ? g.category : []).includes(
+                                  genre
+                                )
+                              ).length;
+                        return (
+                          <button
+                            key={genre}
+                            onClick={() => setFavGalleryGenreFilter(genre)}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all",
+                              favGalleryGenreFilter === genre
+                                ? "bg-primary text-secondary shadow-sm"
+                                : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            )}
                           >
-                            {opt.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                            <span className="capitalize">
+                              {genre === "all"
+                                ? t("library.favoritesGallery.allGames") || "All Games"
+                                : genre}
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded px-1 py-0.5 text-[10px] font-bold tabular-nums",
+                                favGalleryGenreFilter === genre
+                                  ? "bg-secondary/20 text-secondary"
+                                  : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Gallery grid */}
+                  {sorted.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                      <Heart className="mb-4 h-12 w-12 text-muted-foreground/30" />
+                      <p className="text-sm font-medium text-foreground">
+                        {t("library.favoritesGallery.empty") || "No favorites yet"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t("library.favoritesGallery.emptyHint") ||
+                          "Hover over a game and click the heart icon to add it here."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                      {sorted.map(game => (
+                        <FavoritesGalleryCard
+                          key={getLibraryCardKey(game)}
+                          game={game}
+                          rating={gameRatings[game.game || game.name] || 0}
+                          onRate={rating => setGameRating(game.game || game.name, rating)}
+                          status={gameStatuses[game.game || game.name] || null}
+                          onSetStatus={status =>
+                            setGameStatus(game.game || game.name, status)
+                          }
+                          onPlay={() => !game._isStub && handlePlayGame(game)}
+                          onDownload={
+                            game._isStub
+                              ? async () => {
+                                  // Look up full game data from local index so the Download page
+                                  // receives download_links, version, size, etc.
+                                  const favMeta = JSON.parse(
+                                    localStorage.getItem("game-favorites-meta") || "{}"
+                                  );
+                                  const meta = favMeta[game.game || game.name] || {};
+                                  let fullGame = null;
+                                  const gid = game.gameID || meta.gameID;
+                                  if (gid) {
+                                    try {
+                                      fullGame = await gameService.findGameByGameID(gid);
+                                    } catch {
+                                      /* fall through */
+                                    }
+                                  }
+                                  if (!fullGame && (game.game || game.name)) {
+                                    try {
+                                      const results = await gameService.searchGames(
+                                        game.game || game.name
+                                      );
+                                      fullGame =
+                                        results.find(
+                                          r => r.game === (game.game || game.name)
+                                        ) || null;
+                                    } catch {
+                                      /* fall through */
+                                    }
+                                  }
+                                  navigate("/download", {
+                                    state: { gameData: fullGame || { ...game, ...meta } },
+                                  });
+                                }
+                              : undefined
+                          }
+                          onUnfavorite={() => toggleFavorite(game.game || game.name)}
+                          onRemoved={handleGameRemoved}
+                          onMoveToFolder={
+                            !game._isStub && !game._isDownloading
+                              ? () => setGameToMove(game)
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-
-                {/* Genre filter chips */}
-                {allGenres.length > 1 && (
-                  <div className="flex flex-wrap gap-2">
-                    {allGenres.map(genre => {
-                      const count = genre === "all"
-                        ? favGames.length
-                        : favGames.filter(g => (Array.isArray(g.category) ? g.category : []).includes(genre)).length;
-                      return (
-                        <button
-                          key={genre}
-                          onClick={() => setFavGalleryGenreFilter(genre)}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all",
-                            favGalleryGenreFilter === genre
-                              ? "bg-primary text-secondary shadow-sm"
-                              : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          )}
-                        >
-                          <span className="capitalize">{genre === "all" ? (t("library.favoritesGallery.allGames") || "All Games") : genre}</span>
-                          <span className={cn(
-                            "rounded px-1 py-0.5 text-[10px] font-bold tabular-nums",
-                            favGalleryGenreFilter === genre ? "bg-secondary/20 text-secondary" : "bg-muted text-muted-foreground"
-                          )}>{count}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Gallery grid */}
-                {sorted.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-24 text-center">
-                    <Heart className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                    <p className="text-sm font-medium text-foreground">{t("library.favoritesGallery.empty") || "No favorites yet"}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{t("library.favoritesGallery.emptyHint") || "Hover over a game and click the heart icon to add it here."}</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {sorted.map(game => (
-                      <FavoritesGalleryCard
-                        key={getLibraryCardKey(game)}
-                        game={game}
-                        rating={gameRatings[game.game || game.name] || 0}
-                        onRate={rating => setGameRating(game.game || game.name, rating)}
-                        status={gameStatuses[game.game || game.name] || null}
-                        onSetStatus={status => setGameStatus(game.game || game.name, status)}
-                        onPlay={() => !game._isStub && handlePlayGame(game)}
-                        onDownload={game._isStub ? async () => {
-                          // Look up full game data from local index so the Download page
-                          // receives download_links, version, size, etc.
-                          const favMeta = JSON.parse(localStorage.getItem("game-favorites-meta") || "{}");
-                          const meta = favMeta[game.game || game.name] || {};
-                          let fullGame = null;
-                          const gid = game.gameID || meta.gameID;
-                          if (gid) {
-                            try {
-                              fullGame = await gameService.findGameByGameID(gid);
-                            } catch { /* fall through */ }
-                          }
-                          if (!fullGame && (game.game || game.name)) {
-                            try {
-                              const results = await gameService.searchGames(game.game || game.name);
-                              fullGame = results.find(r => r.game === (game.game || game.name)) || null;
-                            } catch { /* fall through */ }
-                          }
-                          navigate("/download", { state: { gameData: fullGame || { ...game, ...meta } } });
-                        } : undefined}
-                        onUnfavorite={() => toggleFavorite(game.game || game.name)}
-                        onRemoved={handleGameRemoved}
-                        onMoveToFolder={!game._isStub && !game._isDownloading ? () => setGameToMove(game) : undefined}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+              );
+            })()}
         </div>
       </div>
 
@@ -2755,56 +3262,69 @@ const Library = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-
       {/* ── Restore Game Data Dialog (for re-added custom games) ── */}
-      {addGameRestoreEntry && (() => {
-        const { gameName, stub } = addGameRestoreEntry;
-        const secs = stub?.playTime || 0;
-        const h = Math.floor(secs / 3600);
-        const m = Math.floor((secs % 3600) / 60);
-        const playtimeLabel = secs > 60 ? (h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`) : null;
-        return (
-          <AlertDialog open onOpenChange={() => {}}>
-            <AlertDialogContent className="sm:max-w-[440px]">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="text-xl font-bold text-foreground">
-                  {t("library.restoreGameDataTitle")}
-                </AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div className="space-y-3 pt-1">
-                    <p className="text-sm text-muted-foreground">
-                      {t("library.restoreGameDataDescription", { game: gameName })}
-                    </p>
-                    {playtimeLabel && (
-                      <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm">
-                        <Timer className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="text-foreground/80">
-                          <span className="font-medium text-foreground">{playtimeLabel}</span> of playtime saved
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="flex gap-2">
-                <Button variant="outline" className="text-primary" onClick={async () => {
-                  try { await window.electron.discardDeletedGameData(gameName); } catch (e) {}
-                  setAddGameRestoreEntry(null);
-                }}>
-                  {t("library.restoreGameDataNo")}
-                </Button>
-                <Button className="text-secondary" onClick={async () => {
-                  try { await window.electron.restoreDeletedGameData(gameName); } catch (e) {}
-                  setAddGameRestoreEntry(null);
-                  await loadGames();
-                }}>
-                  {t("library.restoreGameDataYes")}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        );
-      })()}
+      {addGameRestoreEntry &&
+        (() => {
+          const { gameName, stub } = addGameRestoreEntry;
+          const secs = stub?.playTime || 0;
+          const h = Math.floor(secs / 3600);
+          const m = Math.floor((secs % 3600) / 60);
+          const playtimeLabel =
+            secs > 60 ? (h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`) : null;
+          return (
+            <AlertDialog open onOpenChange={() => {}}>
+              <AlertDialogContent className="sm:max-w-[440px]">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("library.restoreGameDataTitle")}</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3 pt-1">
+                      <p className="text-sm text-muted-foreground">
+                        {t("library.restoreGameDataDescription", { game: gameName })}
+                      </p>
+                      {playtimeLabel && (
+                        <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                          <Timer className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="text-foreground/80">
+                            <span className="font-medium text-foreground">
+                              {playtimeLabel}
+                            </span>{" "}
+                            of playtime saved
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="text-primary"
+                    onClick={async () => {
+                      try {
+                        await window.electron.discardDeletedGameData(gameName);
+                      } catch (e) {}
+                      setAddGameRestoreEntry(null);
+                    }}
+                  >
+                    {t("library.restoreGameDataNo")}
+                  </Button>
+                  <Button
+                    className="text-secondary"
+                    onClick={async () => {
+                      try {
+                        await window.electron.restoreDeletedGameData(gameName);
+                      } catch (e) {}
+                      setAddGameRestoreEntry(null);
+                      await loadGames();
+                    }}
+                  >
+                    {t("library.restoreGameDataYes")}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          );
+        })()}
 
       {/* ── Drag & drop overlay: dropping an .exe adds it as a custom game ── */}
       <AnimatePresence>
@@ -2886,13 +3406,18 @@ const StarRating = ({ value, onChange, size = "sm" }) => {
             className="focus:outline-none"
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(null)}
-            onClick={e => { e.stopPropagation(); onChange(value === star ? 0 : star); }}
+            onClick={e => {
+              e.stopPropagation();
+              onChange(value === star ? 0 : star);
+            }}
           >
             <Star
               className={cn(
                 iconClass,
                 "transition-colors",
-                filled ? "fill-yellow-400 text-yellow-400" : "fill-none text-muted-foreground/50 hover:text-yellow-300"
+                filled
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "fill-none text-muted-foreground/50 hover:text-yellow-300"
               )}
             />
           </button>
@@ -2908,502 +3433,644 @@ const STATUS_META = {
   backlog: { icon: Bookmark, color: "text-amber-400", bg: "bg-amber-500/90" },
 };
 
-const FavoritesGalleryCard = memo(({ game, rating, onRate, status, onSetStatus, onPlay, onDownload, onUnfavorite, onRemoved, onMoveToFolder }) => {
-  const { t } = useLanguage();
-  const navigate = useNavigate();
-  const [imageData, setImageData] = useState(() => gameImageCache.get(game.game || game.name) ?? null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [pendingRating, setPendingRating] = useState(null);
-  const [showRatingDisclaimer, setShowRatingDisclaimer] = useState(false);
-  const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
-  const [isUninstalling, setIsUninstalling] = useState(false);
-  const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
-  const [isRemoving, setIsRemoving] = useState(false);
+const FavoritesGalleryCard = memo(
+  ({
+    game,
+    rating,
+    onRate,
+    status,
+    onSetStatus,
+    onPlay,
+    onDownload,
+    onUnfavorite,
+    onRemoved,
+    onMoveToFolder,
+  }) => {
+    const { t } = useLanguage();
+    const navigate = useNavigate();
+    const [imageData, setImageData] = useState(
+      () => gameImageCache.get(game.game || game.name) ?? null
+    );
+    const [isHovered, setIsHovered] = useState(false);
+    const [pendingRating, setPendingRating] = useState(null);
+    const [showRatingDisclaimer, setShowRatingDisclaimer] = useState(false);
+    const [contextMenuOpen, setContextMenuOpen] = useState(false);
+    const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
+    const [isUninstalling, setIsUninstalling] = useState(false);
+    const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
 
-  const handleContextMenu = e => {
-    e.preventDefault();
-    e.stopPropagation();
-    const menuWidth = 240;
-    const menuHeight = 380;
-    let x = e.clientX;
-    let y = e.clientY;
-    if (x + menuWidth > window.innerWidth) x = Math.max(0, window.innerWidth - menuWidth);
-    if (y + menuHeight > window.innerHeight) y = Math.max(0, y - menuHeight);
-    setContextMenuPosition({ x, y });
-    setContextMenuOpen(true);
-  };
+    const handleContextMenu = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const menuWidth = 240;
+      const menuHeight = 380;
+      let x = e.clientX;
+      let y = e.clientY;
+      if (x + menuWidth > window.innerWidth)
+        x = Math.max(0, window.innerWidth - menuWidth);
+      if (y + menuHeight > window.innerHeight) y = Math.max(0, y - menuHeight);
+      setContextMenuPosition({ x, y });
+      setContextMenuOpen(true);
+    };
 
-  const confirmDelete = () => {
-    setIsDeleteDialogOpen(false);
-    if (!game.isCustom) {
-      setIsSaveDataDialogOpen(true);
-    } else {
-      performDelete(false);
-    }
-  };
-
-  const performDelete = async (saveData) => {
-    try {
-      setIsUninstalling(true);
-      const gameId = game.game || game.name;
-      if (saveData) {
-        await window.electron.saveDeletedGameData(gameId);
-      }
-      if (game.isCustom) {
-        await window.electron.removeCustomGame(gameId);
+    const confirmDelete = () => {
+      setIsDeleteDialogOpen(false);
+      if (!game.isCustom) {
+        setIsSaveDataDialogOpen(true);
       } else {
-        await window.electron.deleteGame(gameId);
+        performDelete(false);
       }
-      setIsUninstalling(false);
-      setIsSaveDataDialogOpen(false);
-      setIsRemoving(true);
-      setTimeout(() => onRemoved?.(gameId), 280);
-    } catch {
-      setIsUninstalling(false);
-    }
-  };
+    };
 
-  const handleRate = newRating => {
-    if (!hasShownRatingDisclaimer()) {
-      setPendingRating(newRating);
-      setShowRatingDisclaimer(true);
-    } else {
-      onRate(newRating);
-    }
-  };
-  const gameName = game.game || game.name || "";
-  const categories = Array.isArray(game.category) ? game.category.slice(0, 2) : [];
-
-  useEffect(() => {
-    let cancelled = false;
-    const gameId = game.game || game.name;
-
-    const loadImage = async () => {
-      if (gameImageCache.has(gameId)) {
-        setImageData(gameImageCache.get(gameId));
-        return;
-      }
-      // Custom/installed cover lookup works regardless of install status:
-      // installed games resolve via their game folder, while any game
-      // (including uninstalled favorites) can have a cover saved to the
-      // shared "games" cover folder via the Change Cover dialog.
+    const performDelete = async saveData => {
       try {
-        const base64 =
-          (await window.electron.getGameImage(gameId, "grid")) ||
-          (await window.electron.getGameImage(gameId, "hero")) ||
-          (await window.electron.getGameImage(gameId));
-        if (!cancelled && base64) {
-          const dataUrl = `data:image/jpeg;base64,${base64}`;
-          gameImageCache.set(gameId, dataUrl);
-          setImageData(dataUrl);
+        setIsUninstalling(true);
+        const gameId = game.game || game.name;
+        if (saveData) {
+          await window.electron.saveDeletedGameData(gameId);
+        }
+        if (game.isCustom) {
+          await window.electron.removeCustomGame(gameId);
+        } else {
+          await window.electron.deleteGame(gameId);
+        }
+        setIsUninstalling(false);
+        setIsSaveDataDialogOpen(false);
+        setIsRemoving(true);
+        setTimeout(() => onRemoved?.(gameId), 280);
+      } catch {
+        setIsUninstalling(false);
+      }
+    };
+
+    const handleRate = newRating => {
+      if (!hasShownRatingDisclaimer()) {
+        setPendingRating(newRating);
+        setShowRatingDisclaimer(true);
+      } else {
+        onRate(newRating);
+      }
+    };
+    const gameName = game.game || game.name || "";
+    const categories = Array.isArray(game.category) ? game.category.slice(0, 2) : [];
+
+    useEffect(() => {
+      let cancelled = false;
+      const gameId = game.game || game.name;
+
+      const loadImage = async () => {
+        if (gameImageCache.has(gameId)) {
+          setImageData(gameImageCache.get(gameId));
           return;
         }
-      } catch { /* fall through */ }
-
-      // Stub (uninstalled, no custom cover set yet): use imageCacheService by
-      // imgID, then SteamGridDB by name
-      if (game._isStub) {
-        if (game.imgID) {
-          try {
-            const { default: imageCacheSvc } = await import("@/services/imageCacheService");
-            const url = await imageCacheSvc.getImage(game.imgID, { priority: "normal", quality: "high" });
-            if (url && !cancelled) {
-              gameImageCache.set(gameId, url);
-              setImageData(url);
-              return;
-            }
-          } catch { /* fall through */ }
+        // Custom/installed cover lookup works regardless of install status:
+        // installed games resolve via their game folder, while any game
+        // (including uninstalled favorites) can have a cover saved to the
+        // shared "games" cover folder via the Change Cover dialog.
+        try {
+          const base64 =
+            (await window.electron.getGameImage(gameId, "grid")) ||
+            (await window.electron.getGameImage(gameId, "hero")) ||
+            (await window.electron.getGameImage(gameId));
+          if (!cancelled && base64) {
+            const dataUrl = `data:image/jpeg;base64,${base64}`;
+            gameImageCache.set(gameId, dataUrl);
+            setImageData(dataUrl);
+            return;
+          }
+        } catch {
+          /* fall through */
         }
-        if (gameId) {
-          try {
-            const { default: sgSvc } = await import("@/services/steamGridImageService");
-            const assets = await sgSvc.getAssets(gameId);
-            const url = sgSvc.pickUrl(assets, "card");
-            if (url && !cancelled) {
-              gameImageCache.set(gameId, url);
-              setImageData(url);
+
+        // Stub (uninstalled, no custom cover set yet): use imageCacheService by
+        // imgID, then SteamGridDB by name
+        if (game._isStub) {
+          if (game.imgID) {
+            try {
+              const { default: imageCacheSvc } =
+                await import("@/services/imageCacheService");
+              const url = await imageCacheSvc.getImage(game.imgID, {
+                priority: "normal",
+                quality: "high",
+              });
+              if (url && !cancelled) {
+                gameImageCache.set(gameId, url);
+                setImageData(url);
+                return;
+              }
+            } catch {
+              /* fall through */
             }
-          } catch { /* silent */ }
+          }
+          if (gameId) {
+            try {
+              const { default: sgSvc } = await import("@/services/steamGridImageService");
+              const assets = await sgSvc.getAssets(gameId);
+              const url = sgSvc.pickUrl(assets, "card");
+              if (url && !cancelled) {
+                gameImageCache.set(gameId, url);
+                setImageData(url);
+              }
+            } catch {
+              /* silent */
+            }
+          }
         }
-      }
+      };
+
+      loadImage();
+
+      // Reflect cover changes made via the Change Cover dialog immediately
+      const handleCoverUpdate = event => {
+        const { gameName, dataUrl } = event.detail || {};
+        if (gameName === gameId && dataUrl && !cancelled) {
+          gameImageCache.set(gameId, dataUrl);
+          setImageData(dataUrl);
+        }
+      };
+      window.addEventListener("game-cover-updated", handleCoverUpdate);
+
+      return () => {
+        cancelled = true;
+        window.removeEventListener("game-cover-updated", handleCoverUpdate);
+      };
+    }, [game.game, game.name, game._isStub, game.imgID]);
+
+    const formatPlaytime = secs => {
+      if (!secs || secs < 60) return t("library.neverPlayed") || "Never played";
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      if (h === 0) return `${m} minutes`;
+      if (m === 0) return `${h} hours`;
+      return `${h} hours ${m} minutes`;
     };
 
-    loadImage();
-
-    // Reflect cover changes made via the Change Cover dialog immediately
-    const handleCoverUpdate = event => {
-      const { gameName, dataUrl } = event.detail || {};
-      if (gameName === gameId && dataUrl && !cancelled) {
-        gameImageCache.set(gameId, dataUrl);
-        setImageData(dataUrl);
-      }
-    };
-    window.addEventListener("game-cover-updated", handleCoverUpdate);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener("game-cover-updated", handleCoverUpdate);
-    };
-  }, [game.game, game.name, game._isStub, game.imgID]);
-
-  const formatPlaytime = secs => {
-    if (!secs || secs < 60) return t("library.neverPlayed") || "Never played";
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    if (h === 0) return `${m} minutes`;
-    if (m === 0) return `${h} hours`;
-    return `${h} hours ${m} minutes`;
-  };
-
-  return (
-    <>
-      <AlertDialog open={showRatingDisclaimer} onOpenChange={setShowRatingDisclaimer}>
-        <AlertDialogContent className="sm:max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-yellow-400" />
-              {t("library.favoritesGallery.ratingDisclaimer.title") || "Personal Rating"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("library.favoritesGallery.ratingDisclaimer.description") || "This rating is stored locally on your device only. It's purely personal and is never shared, posted, or submitted anywhere."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => {
-              localStorage.setItem("rating-disclaimer-shown", "true");
-              setShowRatingDisclaimer(false);
-              if (pendingRating !== null) { onRate(pendingRating); setPendingRating(null); }
-            }}>
-              {t("common.gotIt") || "Got it"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-    {/* Change Cover Dialog — works for installed games and uninstalled favorites alike */}
-    <EditCoverDialog
-      open={showEditCoverDialog}
-      onOpenChange={setShowEditCoverDialog}
-      gameName={gameName}
-      onImageUpdate={dataUrl => {
-        gameImageCache.set(gameName, dataUrl);
-        setImageData(dataUrl);
-      }}
-    />
-
-    {/* Delete confirmation */}
-    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("library.confirmDelete")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("library.confirmDeleteDescription", { game: game.game || game.name })}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmDelete} disabled={isUninstalling}>
-            {isUninstalling ? t("library.uninstalling") : t("library.delete", { game: game.game || game.name })}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-
-    {/* Save Game Data Dialog */}
-    <AlertDialog open={isSaveDataDialogOpen} onOpenChange={setIsSaveDataDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-2xl font-bold text-foreground">{t("library.saveGameDataTitle")}</AlertDialogTitle>
-          <AlertDialogDescription className="text-muted-foreground">
-            {t("library.saveGameDataDescription", { game: game.game || game.name })}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter className="flex gap-2">
-          <Button variant="outline" className="text-primary" onClick={() => performDelete(false)} disabled={isUninstalling}>
-            {t("library.saveGameDataNo")}
-          </Button>
-          <Button className="text-secondary" onClick={() => performDelete(true)} disabled={isUninstalling}>
-            {isUninstalling ? (
-              <>
-                <Loader className="mr-2 h-4 w-4 animate-spin" />
-                {t("library.deleting")}
-              </>
-            ) : (
-              t("library.saveGameDataYes")
-            )}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-
-    {/* Context menu portal */}
-    {contextMenuOpen && createPortal(
-      <div
-        className="fixed inset-0 z-[9999]"
-        onClick={() => setContextMenuOpen(false)}
-        onContextMenu={e => e.preventDefault()}
-      >
-        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-        <div
-          className="absolute animate-in fade-in zoom-in-95 duration-200"
-          style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="min-w-[240px] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center justify-center border-b border-border/50 px-3 py-3">
-              <span className="text-sm font-semibold text-foreground">{game.game || game.name}</span>
-            </div>
-            <div className="max-h-[60vh] overflow-y-auto p-1.5">
-              {!game._isStub && game.executable && (
-                <button
-                  onClick={() => { setContextMenuOpen(false); onPlay(); }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20">
-                    <Play className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{t("common.contextMenu.playGame")}</div>
-                    <div className="text-xs text-muted-foreground">{t("common.contextMenu.playGameDescription")}</div>
-                  </div>
-                </button>
-              )}
-              {onMoveToFolder && (
-                <button
-                  onClick={() => { setContextMenuOpen(false); onMoveToFolder(); }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                    <FolderPlus className="h-4 w-4 text-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{t("library.moveToFolder.title")}</div>
-                    <div className="text-xs text-muted-foreground">{t("library.moveToFolder.menuDescription")}</div>
-                  </div>
-                </button>
-              )}
-              {!game._isStub && (
-                <button
-                  onClick={async () => { setContextMenuOpen(false); try { await window.electron.openGameDirectory(game.game || game.name); } catch {} }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                    <FolderOpen className="h-4 w-4 text-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{t("common.contextMenu.openDirectory")}</div>
-                    <div className="text-xs text-muted-foreground">{t("common.contextMenu.openDirectoryDescription")}</div>
-                  </div>
-                </button>
-              )}
-              <button
-                onClick={() => { setContextMenuOpen(false); setShowEditCoverDialog(true); }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+    return (
+      <>
+        <AlertDialog open={showRatingDisclaimer} onOpenChange={setShowRatingDisclaimer}>
+          <AlertDialogContent className="sm:max-w-sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                {t("library.favoritesGallery.ratingDisclaimer.title") ||
+                  "Personal Rating"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("library.favoritesGallery.ratingDisclaimer.description") ||
+                  "This rating is stored locally on your device only. It's purely personal and is never shared, posted, or submitted anywhere."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction
+                onClick={() => {
+                  localStorage.setItem("rating-disclaimer-shown", "true");
+                  setShowRatingDisclaimer(false);
+                  if (pendingRating !== null) {
+                    onRate(pendingRating);
+                    setPendingRating(null);
+                  }
+                }}
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                  <ImageUp className="h-4 w-4 text-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-foreground">{t("library.changeCoverImage") || "Change Cover Image"}</div>
-                  <div className="text-xs text-muted-foreground">{t("library.searchForCoverImage") || "Search for a cover image to replace the current one"}</div>
-                </div>
-              </button>
+                {t("common.gotIt") || "Got it"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-              <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+        {/* Change Cover Dialog — works for installed games and uninstalled favorites alike */}
+        <EditCoverDialog
+          open={showEditCoverDialog}
+          onOpenChange={setShowEditCoverDialog}
+          gameName={gameName}
+          onImageUpdate={dataUrl => {
+            gameImageCache.set(gameName, dataUrl);
+            setImageData(dataUrl);
+          }}
+        />
 
-              {/* Personal collection status */}
-              <div className="px-3 pb-1 pt-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t("library.favoritesGallery.status.label") || "Status"}
-              </div>
-              {["completed", "playing", "backlog"].map(key => {
-                const meta = STATUS_META[key];
-                const StatusIcon = meta.icon;
-                const isActive = status === key;
-                const labels = {
-                  completed: t("library.favoritesGallery.status.completed") || "Completed",
-                  playing: t("library.favoritesGallery.status.playing") || "Playing",
-                  backlog: t("library.favoritesGallery.status.backlog") || "Backlog",
-                };
-                return (
-                  <button
-                    key={key}
-                    onClick={() => { setContextMenuOpen(false); onSetStatus(isActive ? null : key); }}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5",
-                      isActive && "bg-accent/50"
+        {/* Delete confirmation */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("library.confirmDelete")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("library.confirmDeleteDescription", { game: game.game || game.name })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} disabled={isUninstalling}>
+                {isUninstalling
+                  ? t("library.uninstalling")
+                  : t("library.delete", { game: game.game || game.name })}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Save Game Data Dialog */}
+        <AlertDialog open={isSaveDataDialogOpen} onOpenChange={setIsSaveDataDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                {t("library.saveGameDataTitle")}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                {t("library.saveGameDataDescription", { game: game.game || game.name })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={() => performDelete(false)}
+                disabled={isUninstalling}
+              >
+                {t("library.saveGameDataNo")}
+              </Button>
+              <Button
+                className="text-secondary"
+                onClick={() => performDelete(true)}
+                disabled={isUninstalling}
+              >
+                {isUninstalling ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    {t("library.deleting")}
+                  </>
+                ) : (
+                  t("library.saveGameDataYes")
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Context menu portal */}
+        {contextMenuOpen &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[9999]"
+              onClick={() => setContextMenuOpen(false)}
+              onContextMenu={e => e.preventDefault()}
+            >
+              <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+              <div
+                className="absolute duration-200 animate-in fade-in zoom-in-95"
+                style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="min-w-[240px] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
+                  <div className="flex items-center justify-center border-b border-border/50 px-3 py-3">
+                    <span className="text-sm font-semibold text-foreground">
+                      {game.game || game.name}
+                    </span>
+                  </div>
+                  <div className="max-h-[60vh] overflow-y-auto p-1.5">
+                    {!game._isStub && game.executable && (
+                      <button
+                        onClick={() => {
+                          setContextMenuOpen(false);
+                          onPlay();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20">
+                          <Play className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-foreground">
+                            {t("common.contextMenu.playGame")}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("common.contextMenu.playGameDescription")}
+                          </div>
+                        </div>
+                      </button>
                     )}
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                      <StatusIcon className={cn("h-4 w-4", meta.color)} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-foreground">{labels[key]}</div>
-                    </div>
-                    {isActive && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                  </button>
-                );
-              })}
+                    {onMoveToFolder && (
+                      <button
+                        onClick={() => {
+                          setContextMenuOpen(false);
+                          onMoveToFolder();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                          <FolderPlus className="h-4 w-4 text-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-foreground">
+                            {t("library.moveToFolder.title")}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("library.moveToFolder.menuDescription")}
+                          </div>
+                        </div>
+                      </button>
+                    )}
+                    {!game._isStub && (
+                      <button
+                        onClick={async () => {
+                          setContextMenuOpen(false);
+                          try {
+                            await window.electron.openGameDirectory(
+                              game.game || game.name
+                            );
+                          } catch {}
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                          <FolderOpen className="h-4 w-4 text-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-foreground">
+                            {t("common.contextMenu.openDirectory")}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("common.contextMenu.openDirectoryDescription")}
+                          </div>
+                        </div>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setContextMenuOpen(false);
+                        setShowEditCoverDialog(true);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                        <ImageUp className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">
+                          {t("library.changeCoverImage") || "Change Cover Image"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("library.searchForCoverImage") ||
+                            "Search for a cover image to replace the current one"}
+                        </div>
+                      </div>
+                    </button>
 
-              <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                    <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-              <button
-                onClick={() => { setContextMenuOpen(false); onUnfavorite(); }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                  <Heart className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-foreground">{t("library.favoritesGallery.removeFromFavorites") || "Remove from favorites"}</div>
-                </div>
-              </button>
-              {!game._isStub && (
-                <>
-                  <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-                  <button
-                    onClick={() => { setContextMenuOpen(false); game.isCustom ? confirmDelete() : setIsDeleteDialogOpen(true); }}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
-                      <Trash2 className="h-4 w-4 text-foreground" />
+                    {/* Personal collection status */}
+                    <div className="px-3 pb-1 pt-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t("library.favoritesGallery.status.label") || "Status"}
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-foreground">{game.isCustom ? t("common.contextMenu.removeGame") : t("common.contextMenu.deleteGame")}</div>
-                      <div className="text-xs text-muted-foreground">{game.isCustom ? t("common.contextMenu.removeGameDescription") : t("common.contextMenu.deleteGameDescription")}</div>
-                    </div>
-                  </button>
-                </>
+                    {["completed", "playing", "backlog"].map(key => {
+                      const meta = STATUS_META[key];
+                      const StatusIcon = meta.icon;
+                      const isActive = status === key;
+                      const labels = {
+                        completed:
+                          t("library.favoritesGallery.status.completed") || "Completed",
+                        playing:
+                          t("library.favoritesGallery.status.playing") || "Playing",
+                        backlog:
+                          t("library.favoritesGallery.status.backlog") || "Backlog",
+                      };
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            setContextMenuOpen(false);
+                            onSetStatus(isActive ? null : key);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent",
+                            isActive && "bg-accent/50"
+                          )}
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                            <StatusIcon className={cn("h-4 w-4", meta.color)} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-foreground">
+                              {labels[key]}
+                            </div>
+                          </div>
+                          {isActive && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                        </button>
+                      );
+                    })}
+
+                    <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+                    <button
+                      onClick={() => {
+                        setContextMenuOpen(false);
+                        onUnfavorite();
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                        <Heart className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">
+                          {t("library.favoritesGallery.removeFromFavorites") ||
+                            "Remove from favorites"}
+                        </div>
+                      </div>
+                    </button>
+                    {!game._isStub && (
+                      <>
+                        <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                        <button
+                          onClick={() => {
+                            setContextMenuOpen(false);
+                            game.isCustom ? confirmDelete() : setIsDeleteDialogOpen(true);
+                          }}
+                          className="hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
+                            <Trash2 className="h-4 w-4 text-foreground" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-foreground">
+                              {game.isCustom
+                                ? t("common.contextMenu.removeGame")
+                                : t("common.contextMenu.deleteGame")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {game.isCustom
+                                ? t("common.contextMenu.removeGameDescription")
+                                : t("common.contextMenu.deleteGameDescription")}
+                            </div>
+                          </div>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
+        <Card
+          className={cn(
+            "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
+            !isRemoving &&
+              "cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl",
+            isRemoving &&
+              "pointer-events-none duration-300 animate-out fade-out zoom-out-95 slide-out-to-bottom-2"
+          )}
+          onClick={game._isStub ? onDownload : onPlay}
+          onContextMenu={handleContextMenu}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          <CardContent className="p-0">
+            <div className="relative aspect-[2/3] overflow-hidden">
+              {imageData ? (
+                <img
+                  src={imageData}
+                  alt={gameName}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-muted">
+                  <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+                </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>,
-      document.body
-    )}
 
-    <Card
-      className={cn(
-        "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-        !isRemoving && "hover:-translate-y-1 hover:shadow-2xl hover:border-primary/40 cursor-pointer",
-        isRemoving && "pointer-events-none animate-out fade-out zoom-out-95 slide-out-to-bottom-2 duration-300"
-      )}
-      onClick={game._isStub ? onDownload : onPlay}
-      onContextMenu={handleContextMenu}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <CardContent className="p-0">
-        <div className="relative aspect-[2/3] overflow-hidden">
-          {imageData ? (
-            <img
-              src={imageData}
-              alt={gameName}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-muted">
-              <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
-            </div>
-          )}
+              {/* Star badge top-left */}
+              {rating > 0 && (
+                <div className="absolute left-2 top-2 z-20 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
+                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                  <span className="text-[11px] font-bold text-white">{rating}.0</span>
+                </div>
+              )}
 
-          {/* Star badge top-left */}
-          {rating > 0 && (
-            <div className="absolute left-2 top-2 z-20 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
-              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-              <span className="text-[11px] font-bold text-white">{rating}.0</span>
-            </div>
-          )}
+              {/* Status badge top-right (Completed / Playing / Backlog) */}
+              {status &&
+                STATUS_META[status] &&
+                (() => {
+                  const StatusIcon = STATUS_META[status].icon;
+                  const labels = {
+                    completed:
+                      t("library.favoritesGallery.status.completed") || "Completed",
+                    playing: t("library.favoritesGallery.status.playing") || "Playing",
+                    backlog: t("library.favoritesGallery.status.backlog") || "Backlog",
+                  };
+                  return (
+                    <div
+                      className={cn(
+                        "absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white shadow backdrop-blur-sm",
+                        STATUS_META[status].bg
+                      )}
+                      title={labels[status]}
+                    >
+                      <StatusIcon className="h-3 w-3" />
+                      <span className="hidden sm:inline">{labels[status]}</span>
+                    </div>
+                  );
+                })()}
 
-          {/* Status badge top-right (Completed / Playing / Backlog) */}
-          {status && STATUS_META[status] && (() => {
-            const StatusIcon = STATUS_META[status].icon;
-            const labels = {
-              completed: t("library.favoritesGallery.status.completed") || "Completed",
-              playing: t("library.favoritesGallery.status.playing") || "Playing",
-              backlog: t("library.favoritesGallery.status.backlog") || "Backlog",
-            };
-            return (
+              {/* Hover overlay */}
               <div
                 className={cn(
-                  "absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white shadow backdrop-blur-sm",
-                  STATUS_META[status].bg
+                  "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-3 transition-opacity duration-200",
+                  isHovered ? "opacity-100" : "opacity-0"
                 )}
-                title={labels[status]}
               >
-                <StatusIcon className="h-3 w-3" />
-                <span className="hidden sm:inline">{labels[status]}</span>
-              </div>
-            );
-          })()}
+                <p className="mb-1.5 line-clamp-2 text-sm font-bold leading-tight text-white">
+                  {gameName}
+                </p>
 
-          {/* Hover overlay */}
-          <div className={cn(
-            "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-3 transition-opacity duration-200",
-            isHovered ? "opacity-100" : "opacity-0"
-          )}>
-            <p className="mb-1.5 line-clamp-2 text-sm font-bold leading-tight text-white">{gameName}</p>
+                {/* Genre chips */}
+                {categories.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {categories.map(cat => (
+                      <span
+                        key={cat}
+                        className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white/90"
+                      >
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-            {/* Genre chips */}
-            {categories.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1">
-                {categories.map(cat => (
-                  <span key={cat} className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white/90">{cat}</span>
-                ))}
-              </div>
-            )}
-
-            {/* Playtime row — shown whenever we have playtime data, even for
+                {/* Playtime row — shown whenever we have playtime data, even for
                 uninstalled favorites whose stats were preserved via History */}
-            {(!game._isStub || game.playTime > 0) && (
-              <div className="mb-2 flex items-center gap-1.5 text-xs text-white/70">
-                <Clock className="h-3 w-3 shrink-0" />
-                <span>{formatPlaytime(game.playTime)}</span>
-              </div>
-            )}
+                {(!game._isStub || game.playTime > 0) && (
+                  <div className="mb-2 flex items-center gap-1.5 text-xs text-white/70">
+                    <Clock className="h-3 w-3 shrink-0" />
+                    <span>{formatPlaytime(game.playTime)}</span>
+                  </div>
+                )}
 
-            {/* Download badge for uninstalled stubs */}
-            {game._isStub && (
-              <div className="mb-2 flex items-center gap-1 rounded-md bg-primary/80 px-2 py-1 text-[11px] font-semibold text-white w-fit">
-                <Download className="h-3 w-3" />
-                {t("gameCard.viewDetails") || "Not installed"}
-              </div>
-            )}
+                {/* Download badge for uninstalled stubs */}
+                {game._isStub && (
+                  <div className="mb-2 flex w-fit items-center gap-1 rounded-md bg-primary/80 px-2 py-1 text-[11px] font-semibold text-white">
+                    <Download className="h-3 w-3" />
+                    {t("gameCard.viewDetails") || "Not installed"}
+                  </div>
+                )}
 
-            {/* Star rating row */}
-            <div className="flex items-center justify-between">
-              <StarRating value={rating} onChange={handleRate} />
-              <button
-                type="button"
-                className="rounded-md p-1 hover:bg-white/20"
-                onClick={e => { e.stopPropagation(); onUnfavorite(); }}
-                title={t("library.favoritesGallery.removeFromFavorites") || "Remove from favorites"}
-              >
-                <Heart className="h-4 w-4 fill-primary text-primary" />
-              </button>
+                {/* Star rating row */}
+                <div className="flex items-center justify-between">
+                  <StarRating value={rating} onChange={handleRate} />
+                  <button
+                    type="button"
+                    className="rounded-md p-1 hover:bg-white/20"
+                    onClick={e => {
+                      e.stopPropagation();
+                      onUnfavorite();
+                    }}
+                    title={
+                      t("library.favoritesGallery.removeFromFavorites") ||
+                      "Remove from favorites"
+                    }
+                  >
+                    <Heart className="h-4 w-4 fill-primary text-primary" />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col items-start gap-0.5 px-3 py-2">
-        <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">{gameName}</h3>
-        <div className="flex w-full items-center justify-between">
-          <p className="text-xs text-muted-foreground">{formatPlaytime(game.playTime)}</p>
-          {rating > 0 ? (
-            <div className="flex items-center gap-0.5">
-              {[1,2,3,4,5].map(s => (
-                <Star key={s} className={cn("h-2.5 w-2.5", s <= rating ? "fill-yellow-400 text-yellow-400" : "fill-none text-muted-foreground/30")} />
-              ))}
+          </CardContent>
+          <CardFooter className="flex flex-col items-start gap-0.5 px-3 py-2">
+            <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">
+              {gameName}
+            </h3>
+            <div className="flex w-full items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {formatPlaytime(game.playTime)}
+              </p>
+              {rating > 0 ? (
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <Star
+                      key={s}
+                      className={cn(
+                        "h-2.5 w-2.5",
+                        s <= rating
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "fill-none text-muted-foreground/30"
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <span className="text-[10px] text-muted-foreground/50">
+                  {t("library.favoritesGallery.noRating") || "Unrated"}
+                </span>
+              )}
             </div>
-          ) : (
-            <span className="text-[10px] text-muted-foreground/50">{t("library.favoritesGallery.noRating") || "Unrated"}</span>
-          )}
-        </div>
-      </CardFooter>
-    </Card>
-    </>
-  );
-});
+          </CardFooter>
+        </Card>
+      </>
+    );
+  }
+);
 
 FavoritesGalleryCard.displayName = "FavoritesGalleryCard";
 
@@ -3425,7 +4092,9 @@ const InstalledGameCard = memo(
     const navigate = useNavigate();
     const [isRunning, setIsRunning] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    const [imageData, setImageData] = useState(() => gameImageCache.get(game.game || game.name) ?? null);
+    const [imageData, setImageData] = useState(
+      () => gameImageCache.get(game.game || game.name) ?? null
+    );
     const [executableExists, setExecutableExists] = useState(null);
     const [contextMenuOpen, setContextMenuOpen] = useState(false);
     const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
@@ -3549,7 +4218,9 @@ const InstalledGameCard = memo(
               gameImageCache.set(gameId, url);
               setImageData(url);
             }
-          } catch { /* silent */ }
+          } catch {
+            /* silent */
+          }
         }
       };
 
@@ -3621,7 +4292,7 @@ const InstalledGameCard = memo(
       e.stopPropagation();
 
       if (game._isDownloading) return;
-      
+
       const x = e.clientX;
       const y = e.clientY;
       const menuWidth = 260; // min-w-[260px] from the menu
@@ -3647,7 +4318,7 @@ const InstalledGameCard = memo(
       if (adjustedY < 0) {
         adjustedY = Math.max(0, Math.min(y, viewportHeight - menuHeight));
       }
-      
+
       setContextMenuPosition({ x: adjustedX, y: adjustedY });
       setContextMenuOpen(true);
     };
@@ -3655,12 +4326,12 @@ const InstalledGameCard = memo(
     const handlePlayFromContext = async e => {
       e.stopPropagation();
       setContextMenuOpen(false);
-      
+
       if (!game.executable && !game.isCustom) {
         toast.error(t("library.noExecutableSet"));
         return;
       }
-      
+
       navigate("/gamescreen", {
         state: {
           gameData: game,
@@ -3693,7 +4364,7 @@ const InstalledGameCard = memo(
       }
     };
 
-    const performDelete = async (saveData) => {
+    const performDelete = async saveData => {
       try {
         setIsUninstalling(true);
         const gameId = game.game || game.name;
@@ -3721,7 +4392,7 @@ const InstalledGameCard = memo(
     const handleOpenDirectory = async e => {
       e.stopPropagation();
       setContextMenuOpen(false);
-      
+
       try {
         await window.electron.openGameDirectory(game.game || game.name);
       } catch (error) {
@@ -3749,7 +4420,7 @@ const InstalledGameCard = memo(
         const searchResponse = await fetch(searchUrl);
 
         if (!searchResponse.ok) {
-          throw new Error('SteamGridDB search failed');
+          throw new Error("SteamGridDB search failed");
         }
 
         const searchData = await searchResponse.json();
@@ -3950,10 +4621,18 @@ const InstalledGameCard = memo(
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex gap-2">
-              <Button variant="outline" className="text-primary" onClick={() => setIsDeleteDialogOpen(false)}>
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
                 {t("common.cancel")}
               </Button>
-              <Button className="text-secondary" onClick={confirmDeleteGame} disabled={isUninstalling}>
+              <Button
+                className="text-secondary"
+                onClick={confirmDeleteGame}
+                disabled={isUninstalling}
+              >
                 {isUninstalling ? (
                   <>
                     <Loader className="mr-2 h-4 w-4 animate-spin" />
@@ -3979,10 +4658,19 @@ const InstalledGameCard = memo(
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex gap-2">
-              <Button variant="outline" className="text-primary" onClick={() => performDelete(false)} disabled={isUninstalling}>
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={() => performDelete(false)}
+                disabled={isUninstalling}
+              >
                 {t("library.saveGameDataNo")}
               </Button>
-              <Button className="text-secondary" onClick={() => performDelete(true)} disabled={isUninstalling}>
+              <Button
+                className="text-secondary"
+                onClick={() => performDelete(true)}
+                disabled={isUninstalling}
+              >
                 {isUninstalling ? (
                   <>
                     <Loader className="mr-2 h-4 w-4 animate-spin" />
@@ -3999,12 +4687,15 @@ const InstalledGameCard = memo(
         <Card
           className={cn(
             "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-            !game._isDownloading && !game._isQueued && "hover:-translate-y-1 hover:shadow-xl hover:border-primary/30",
-            (game._isDownloading || game._isQueued) && "opacity-60 cursor-default",
+            !game._isDownloading &&
+              !game._isQueued &&
+              "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+            (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
             isSelected && "ring-2 ring-primary",
             selectionMode && game.isCustom && "selectable-card",
             !game._isDownloading && !game._isQueued && "cursor-pointer",
-            isRemoving && "pointer-events-none animate-out fade-out zoom-out-95 slide-out-to-bottom-2 duration-300"
+            isRemoving &&
+              "pointer-events-none duration-300 animate-out fade-out zoom-out-95 slide-out-to-bottom-2"
           )}
           onClick={e => {
             if (game._isDownloading || game._isQueued) return;
@@ -4031,170 +4722,190 @@ const InstalledGameCard = memo(
             </div>
           )}
           {/* Context Menu Portal */}
-          {contextMenuOpen && createPortal(
-            <div
-              className="fixed inset-0 z-[9999] flex items-start justify-start"
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                setContextMenuOpen(false);
-              }}
-              onContextMenu={e => e.preventDefault()}
-            >
-              {/* Backdrop with blur */}
-              <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-              
-              {/* Context Menu */}
+          {contextMenuOpen &&
+            createPortal(
               <div
-                className="absolute animate-in fade-in zoom-in-95 duration-200 transition-all"
-                style={{
-                  top: contextMenuPosition.y,
-                  left: contextMenuPosition.x,
+                className="fixed inset-0 z-[9999] flex items-start justify-start"
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setContextMenuOpen(false);
                 }}
-                onClick={e => e.stopPropagation()}
+                onContextMenu={e => e.preventDefault()}
               >
-                <div className="min-w-[260px] max-h-[80vh] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
-                  {/* Header with game logo */}
-                  <div className="flex items-center justify-center border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent px-3 py-3">
-                    {logoData ? (
-                      <img 
-                        src={logoData} 
-                        alt={game.game || game.name} 
-                        className="h-8 max-w-[200px] object-contain"
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold text-foreground">
-                        {game.game || game.name}
-                      </span>
-                    )}
-                  </div>
+                {/* Backdrop with blur */}
+                <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
 
-                  {/* Menu Items */}
-                  <div className="max-h-[calc(80vh-60px)] overflow-y-auto p-1.5">
-                    {game.executable ? (
+                {/* Context Menu */}
+                <div
+                  className="absolute transition-all duration-200 animate-in fade-in zoom-in-95"
+                  style={{
+                    top: contextMenuPosition.y,
+                    left: contextMenuPosition.x,
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="max-h-[80vh] min-w-[260px] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
+                    {/* Header with game logo */}
+                    <div className="flex items-center justify-center border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent px-3 py-3">
+                      {logoData ? (
+                        <img
+                          src={logoData}
+                          alt={game.game || game.name}
+                          className="h-8 max-w-[200px] object-contain"
+                        />
+                      ) : (
+                        <span className="text-sm font-semibold text-foreground">
+                          {game.game || game.name}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="max-h-[calc(80vh-60px)] overflow-y-auto p-1.5">
+                      {game.executable ? (
+                        <button
+                          onClick={handlePlayFromContext}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20 transition-all group-hover:bg-primary">
+                            <Play className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-foreground">
+                              {t("common.contextMenu.playGame")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {t("common.contextMenu.playGameDescription")}
+                            </div>
+                          </div>
+                        </button>
+                      ) : null}
                       <button
-                        onClick={handlePlayFromContext}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                        onClick={() => {
+                          setContextMenuOpen(false);
+                          onMoveToFolder();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20 transition-all group-hover:bg-primary">
-                          <Play className="h-4 w-4 text-primary" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                          <FolderPlus className="h-4 w-4 text-foreground" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium text-foreground">{t("common.contextMenu.playGame")}</div>
+                          <div className="font-medium text-foreground">
+                            {t("library.moveToFolder.title")}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            {t("common.contextMenu.playGameDescription")}
+                            {t("library.moveToFolder.menuDescription")}
                           </div>
                         </div>
                       </button>
-                    ) : null}
-                    <button
-                      onClick={() => { setContextMenuOpen(false); onMoveToFolder(); }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                        <FolderPlus className="h-4 w-4 text-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-foreground">{t("library.moveToFolder.title")}</div>
-                        <div className="text-xs text-muted-foreground">{t("library.moveToFolder.menuDescription")}</div>
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={handleOpenDirectory}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                        <FolderOpen className="h-4 w-4 text-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-foreground">{t("common.contextMenu.openDirectory")}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {t("common.contextMenu.openDirectoryDescription")}
-                        </div>
-                      </div>
-                    </button>
-                    
-                    {game.isCustom ? (
+
                       <button
-                        onClick={handleRemoveGame}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
+                        onClick={handleOpenDirectory}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
-                          <Trash2 className="h-4 w-4 text-foreground" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                          <FolderOpen className="h-4 w-4 text-foreground" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium text-foreground">{t("common.contextMenu.removeGame")}</div>
+                          <div className="font-medium text-foreground">
+                            {t("common.contextMenu.openDirectory")}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            {t("common.contextMenu.removeGameDescription")}
+                            {t("common.contextMenu.openDirectoryDescription")}
                           </div>
                         </div>
                       </button>
-                    ) : (
+
+                      {game.isCustom ? (
+                        <button
+                          onClick={handleRemoveGame}
+                          className="hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
+                            <Trash2 className="h-4 w-4 text-foreground" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-foreground">
+                              {t("common.contextMenu.removeGame")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {t("common.contextMenu.removeGameDescription")}
+                            </div>
+                          </div>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleDeleteGame}
+                          className="hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
+                            <Trash2 className="h-4 w-4 text-foreground" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-foreground">
+                              {t("common.contextMenu.deleteGame")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {t("common.contextMenu.deleteGameDescription")}
+                            </div>
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Divider between game actions and default options */}
+                      <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+                      {/* Report Issue */}
                       <button
-                        onClick={handleDeleteGame}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-destructive/10 hover:translate-x-0.5"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setIsReportOpen(true);
+                          setContextMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
-                          <Trash2 className="h-4 w-4 text-foreground" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                          <TriangleAlert className="h-4 w-4 text-foreground" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium text-foreground">{t("common.contextMenu.deleteGame")}</div>
+                          <div className="font-medium text-foreground">
+                            {t("common.reportIssue")}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            {t("common.contextMenu.deleteGameDescription")}
+                            {t("common.contextMenu.reportIssueDescription")}
                           </div>
                         </div>
                       </button>
-                    )}
-                    
-                    {/* Divider between game actions and default options */}
-                    <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-                    
-                    {/* Report Issue */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsReportOpen(true);
-                        setContextMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                        <TriangleAlert className="h-4 w-4 text-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-foreground">{t("common.reportIssue")}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {t("common.contextMenu.reportIssueDescription")}
+
+                      {/* Give Feedback */}
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          window.electron.openURL("https://ascendara.app/feedback");
+                          setContextMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                          <MessageSquareText className="h-4 w-4 text-foreground" />
                         </div>
-                      </div>
-                    </button>
-                    
-                    {/* Give Feedback */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.electron.openURL("https://ascendara.app/feedback");
-                        setContextMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                        <MessageSquareText className="h-4 w-4 text-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-foreground">{t("common.giveFeedback")}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {t("common.contextMenu.shareFeedbackDescription")}
+                        <div className="flex-1">
+                          <div className="font-medium text-foreground">
+                            {t("common.giveFeedback")}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {t("common.contextMenu.shareFeedbackDescription")}
+                          </div>
                         </div>
-                      </div>
-                    </button>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>,
-            document.body
-          )}
+              </div>,
+              document.body
+            )}
 
           <CardContent className="p-0">
             <div className="relative aspect-[2/3] overflow-hidden">
@@ -4214,7 +4925,7 @@ const InstalledGameCard = memo(
                 <>
                   <div className="absolute inset-0 bg-black/60" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="rounded bg-black/70 px-2 py-1 text-xs font-bold text-white flex items-center gap-1">
+                    <span className="flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
                       <Loader className="h-3 w-3 animate-spin" />
                       Queued
                     </span>
@@ -4222,52 +4933,56 @@ const InstalledGameCard = memo(
                 </>
               )}
               {/* Download progress fill overlay */}
-              {game._isDownloading && (() => {
-                const pct = parseFloat(game.downloadingData?.progressCompleted || 0);
-                const isExtracting = game.downloadingData?.extracting;
-                const isStopped = game.downloadingData?.stopped;
-                const label = isExtracting
-                  ? `Extracting…`
-                  : isStopped
-                  ? `Paused · ${pct.toFixed(0)}%`
-                  : `${pct.toFixed(0)}%`;
-                return (
-                  <>
-                    {/* dark mask covering the unfilled portion from top */}
-                    <div
-                      className="absolute inset-x-0 top-0 bg-black/60 transition-all duration-500"
-                      style={{ height: `${100 - pct}%` }}
-                    />
-                    {/* colored fill from bottom */}
-                    <div
-                      className="absolute inset-x-0 bottom-0 bg-primary/30 transition-all duration-500"
-                      style={{ height: `${pct}%` }}
-                    />
-                    {/* progress bar line at fill boundary */}
-                    <div
-                      className="absolute inset-x-0 h-0.5 bg-primary transition-all duration-500"
-                      style={{ bottom: `${pct}%` }}
-                    />
-                    {/* label */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
-                        {label}
-                      </span>
-                    </div>
-                  </>
-                );
-              })()}
+              {game._isDownloading &&
+                (() => {
+                  const pct = parseFloat(game.downloadingData?.progressCompleted || 0);
+                  const isExtracting = game.downloadingData?.extracting;
+                  const isStopped = game.downloadingData?.stopped;
+                  const label = isExtracting
+                    ? `Extracting…`
+                    : isStopped
+                      ? `Paused · ${pct.toFixed(0)}%`
+                      : `${pct.toFixed(0)}%`;
+                  return (
+                    <>
+                      {/* dark mask covering the unfilled portion from top */}
+                      <div
+                        className="absolute inset-x-0 top-0 bg-black/60 transition-all duration-500"
+                        style={{ height: `${100 - pct}%` }}
+                      />
+                      {/* colored fill from bottom */}
+                      <div
+                        className="absolute inset-x-0 bottom-0 bg-primary/30 transition-all duration-500"
+                        style={{ height: `${pct}%` }}
+                      />
+                      {/* progress bar line at fill boundary */}
+                      <div
+                        className="absolute inset-x-0 h-0.5 bg-primary transition-all duration-500"
+                        style={{ bottom: `${pct}%` }}
+                      />
+                      {/* label */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
+                          {label}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               {/* Running indicator */}
               {isRunning && (
                 <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-green-500 to-emerald-400" />
               )}
               {/* Badges row */}
               <div className="absolute left-2 top-2 z-20 flex flex-col gap-1">
-                {typeof game.launchCount === "undefined" && !game.isCustom && !game._isDownloading && !game._isQueued && (
-                  <span className="rounded bg-secondary px-1.5 py-0.5 text-xs font-bold text-primary">
-                    {t("library.newBadge")}
-                  </span>
-                )}
+                {typeof game.launchCount === "undefined" &&
+                  !game.isCustom &&
+                  !game._isDownloading &&
+                  !game._isQueued && (
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-xs font-bold text-primary">
+                      {t("library.newBadge")}
+                    </span>
+                  )}
                 {updateInfo?.updateAvailable && (
                   <span className="flex items-center gap-1 rounded bg-primary px-1.5 py-0.5 text-xs font-bold text-secondary">
                     <Import className="h-3 w-3" />
@@ -4276,10 +4991,12 @@ const InstalledGameCard = memo(
                 )}
               </div>
               {/* Hover overlay with title + actions */}
-              <div className={cn(
-                "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
-                isHovered ? "opacity-100" : "opacity-0"
-              )}>
+              <div
+                className={cn(
+                  "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
+                  isHovered ? "opacity-100" : "opacity-0"
+                )}
+              >
                 <p className="mb-2 line-clamp-2 text-sm font-semibold leading-tight text-white">
                   {game.game}
                 </p>
@@ -4287,15 +5004,25 @@ const InstalledGameCard = memo(
                   <div className="flex items-center gap-1">
                     {game.online && <Gamepad2 className="h-3.5 w-3.5 text-white/70" />}
                     {game.dlc && <Gift className="h-3.5 w-3.5 text-white/70" />}
-                    {isRunning && <span className="text-xs font-medium text-green-400">Playing</span>}
+                    {isRunning && (
+                      <span className="text-xs font-medium text-green-400">Playing</span>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-white hover:bg-white/20 hover:text-primary"
-                    onClick={e => { e.stopPropagation(); onToggleFavorite(game.game || game.name); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onToggleFavorite(game.game || game.name);
+                    }}
                   >
-                    <Heart className={cn("h-4 w-4", isFavorite ? "fill-primary text-primary" : "fill-none text-white")} />
+                    <Heart
+                      className={cn(
+                        "h-4 w-4",
+                        isFavorite ? "fill-primary text-primary" : "fill-none text-white"
+                      )}
+                    />
                   </Button>
                 </div>
               </div>
@@ -4326,188 +5053,195 @@ const InstalledGameCard = memo(
 InstalledGameCard.displayName = "InstalledGameCard";
 
 // Cloud-only game card with gray animation effect
-const CloudOnlyGameCard = memo(({ game, imageData, onRestore, isRestoring, onDelete, isDeleting }) => {
-  const { t } = useLanguage();
-  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+const CloudOnlyGameCard = memo(
+  ({ game, imageData, onRestore, isRestoring, onDelete, isDeleting }) => {
+    const { t } = useLanguage();
+    const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
-  const formatPlaytime = seconds => {
-    if (!seconds || seconds < 60) return t("library.neverPlayed");
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours === 0) return `${minutes} minutes`;
-    if (minutes === 0) return `${hours} hours`;
-    return `${hours} hours ${minutes} minutes`;
-  };
+    const formatPlaytime = seconds => {
+      if (!seconds || seconds < 60) return t("library.neverPlayed");
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours === 0) return `${minutes} minutes`;
+      if (minutes === 0) return `${hours} hours`;
+      return `${hours} hours ${minutes} minutes`;
+    };
 
-  const isCustomGame = game.isCustom;
+    const isCustomGame = game.isCustom;
 
-  // Card-body click: this game isn't installed locally, so launching/inspecting
-  // it isn't possible. Surface a clear warning telling the user to use the
-  // Add & Restore button instead. The button's own onClick is stopped from
-  // bubbling so it still works normally.
-  const handleCardClick = () => {
-    if (isRestoring || isDeleting) return;
-    toast.warning(
-      isCustomGame
-        ? t("library.cloudOnly.noFilesFoundCustom") ||
-            "No local files found for this custom game. Click \"Add & Restore\" to re-add it and recover your cloud playtime."
-        : t("library.cloudOnly.noFilesFound") ||
-            "No local files found for this game. Click \"Download & Restore\" to install it and recover your cloud playtime."
-    );
-  };
+    // Card-body click: this game isn't installed locally, so launching/inspecting
+    // it isn't possible. Surface a clear warning telling the user to use the
+    // Add & Restore button instead. The button's own onClick is stopped from
+    // bubbling so it still works normally.
+    const handleCardClick = () => {
+      if (isRestoring || isDeleting) return;
+      toast.warning(
+        isCustomGame
+          ? t("library.cloudOnly.noFilesFoundCustom") ||
+              'No local files found for this custom game. Click "Add & Restore" to re-add it and recover your cloud playtime.'
+          : t("library.cloudOnly.noFilesFound") ||
+              'No local files found for this game. Click "Download & Restore" to install it and recover your cloud playtime.'
+      );
+    };
 
-  return (
-    <>
-    <Card
-      onClick={handleCardClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          handleCardClick();
-        }
-      }}
-      className={cn(
-        "group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-        "hover:-translate-y-1 hover:shadow-xl",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      )}
-    >
-      <CardContent className="p-0">
-        <div className="relative aspect-[2/3] overflow-hidden">
-          {/* Gray overlay with shimmer animation */}
-          <div
-            className={cn(
-              "absolute inset-0 z-10",
-              isCustomGame
-                ? "bg-gradient-to-br from-purple-400/60 via-purple-500/50 to-purple-600/60"
-                : "bg-gradient-to-br from-gray-400/60 via-gray-500/50 to-gray-600/60"
-            )}
-          >
-            {/* Animated shimmer effect */}
-            <div
-              className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
-              style={{
-                background:
-                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
-              }}
-            />
-          </div>
-          {imageData ? (
-            <img
-              src={imageData}
-              alt={game.name}
-              className="h-full w-full border-b border-border object-cover grayscale"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-muted">
-              <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
-            </div>
-          )}
-          {/* Cloud badge - different color for custom games */}
-          <span
-            className={cn(
-              "absolute left-2 top-2 z-20 flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-white",
-              isCustomGame ? "bg-purple-500/90" : "bg-blue-500/90"
-            )}
-          >
-            <Cloud className="h-3 w-3" />
-            {isCustomGame
-              ? t("library.cloudOnly.customBadge")
-              : t("library.cloudOnly.badge")}
-          </span>
-          {/* Remove from cloud button */}
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              setIsConfirmDeleteOpen(true);
-            }}
-            disabled={isDeleting}
-            className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/70 group-hover:opacity-100 disabled:opacity-100"
-            title={t("library.cloudOnly.delete") || "Remove from Cloud"}
-          >
-            {isDeleting ? (
-              <Loader className="h-3 w-3 animate-spin" />
-            ) : (
-              <Trash2 className="h-3 w-3" />
-            )}
-          </button>
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col items-start gap-1.5 px-3 py-2">
-        <div className="flex w-full items-center gap-1.5">
-          <h3 className="flex-1 truncate text-sm font-semibold leading-tight text-foreground">
-            {game.name}
-          </h3>
-          {game.online && <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-          {game.dlc && <Gift className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-        </div>
-        <div className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3 shrink-0" />
-          <span className="truncate">{formatPlaytime(game.playTime)}</span>
-        </div>
-        <Button
-          size="sm"
-          onClick={e => {
-            e.stopPropagation();
-            onRestore?.();
+    return (
+      <>
+        <Card
+          onClick={handleCardClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleCardClick();
+            }
           }}
-          disabled={isRestoring}
           className={cn(
-            "w-full gap-1.5 text-xs text-white",
-            isCustomGame
-              ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-              : "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+            "group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+            "hover:-translate-y-1 hover:shadow-xl",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           )}
         >
-          {isRestoring ? (
-            <>
-              <Loader className="h-3.5 w-3.5 animate-spin" />
-              {t("library.cloudOnly.restoring")}
-            </>
-          ) : isCustomGame ? (
-            <>
-              <Plus className="h-3.5 w-3.5" />
-              {t("library.cloudOnly.restoreCustom")}
-            </>
-          ) : (
-            <>
-              <CloudDownload className="h-3.5 w-3.5" />
-              {t("library.cloudOnly.restore")}
-            </>
-          )}
-        </Button>
-      </CardFooter>
-    </Card>
+          <CardContent className="p-0">
+            <div className="relative aspect-[2/3] overflow-hidden">
+              {/* Gray overlay with shimmer animation */}
+              <div
+                className={cn(
+                  "absolute inset-0 z-10",
+                  isCustomGame
+                    ? "bg-gradient-to-br from-purple-400/60 via-purple-500/50 to-purple-600/60"
+                    : "bg-gradient-to-br from-gray-400/60 via-gray-500/50 to-gray-600/60"
+                )}
+              >
+                {/* Animated shimmer effect */}
+                <div
+                  className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+                  }}
+                />
+              </div>
+              {imageData ? (
+                <img
+                  src={imageData}
+                  alt={game.name}
+                  className="h-full w-full border-b border-border object-cover grayscale"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-muted">
+                  <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+                </div>
+              )}
+              {/* Cloud badge - different color for custom games */}
+              <span
+                className={cn(
+                  "absolute left-2 top-2 z-20 flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-white",
+                  isCustomGame ? "bg-purple-500/90" : "bg-blue-500/90"
+                )}
+              >
+                <Cloud className="h-3 w-3" />
+                {isCustomGame
+                  ? t("library.cloudOnly.customBadge")
+                  : t("library.cloudOnly.badge")}
+              </span>
+              {/* Remove from cloud button */}
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  setIsConfirmDeleteOpen(true);
+                }}
+                disabled={isDeleting}
+                className="absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/70 disabled:opacity-100 group-hover:opacity-100"
+                title={t("library.cloudOnly.delete") || "Remove from Cloud"}
+              >
+                {isDeleting ? (
+                  <Loader className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3" />
+                )}
+              </button>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col items-start gap-1.5 px-3 py-2">
+            <div className="flex w-full items-center gap-1.5">
+              <h3 className="flex-1 truncate text-sm font-semibold leading-tight text-foreground">
+                {game.name}
+              </h3>
+              {game.online && (
+                <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              )}
+              {game.dlc && (
+                <Gift className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3 shrink-0" />
+              <span className="truncate">{formatPlaytime(game.playTime)}</span>
+            </div>
+            <Button
+              size="sm"
+              onClick={e => {
+                e.stopPropagation();
+                onRestore?.();
+              }}
+              disabled={isRestoring}
+              className={cn(
+                "w-full gap-1.5 text-xs text-white",
+                isCustomGame
+                  ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                  : "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+              )}
+            >
+              {isRestoring ? (
+                <>
+                  <Loader className="h-3.5 w-3.5 animate-spin" />
+                  {t("library.cloudOnly.restoring")}
+                </>
+              ) : isCustomGame ? (
+                <>
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("library.cloudOnly.restoreCustom")}
+                </>
+              ) : (
+                <>
+                  <CloudDownload className="h-3.5 w-3.5" />
+                  {t("library.cloudOnly.restore")}
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
 
-    <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-xl font-bold text-foreground">
-            {t("library.cloudOnly.deleteConfirmTitle") || "Remove from Cloud Library?"}
-          </AlertDialogTitle>
-          <AlertDialogDescription className="text-muted-foreground">
-            {t("library.cloudOnly.deleteConfirmDescription", { game: game.name }) ||
-              `This will permanently remove "${game.name}" and its saved playtime from your cloud library. This cannot be undone.`}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              setIsConfirmDeleteOpen(false);
-              onDelete?.();
-            }}
-          >
-            {t("library.cloudOnly.delete") || "Remove from Cloud"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    </>
-  );
-});
+        <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t("library.cloudOnly.deleteConfirmTitle") ||
+                  "Remove from Cloud Library?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                {t("library.cloudOnly.deleteConfirmDescription", { game: game.name }) ||
+                  `This will permanently remove "${game.name}" and its saved playtime from your cloud library. This cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setIsConfirmDeleteOpen(false);
+                  onDelete?.();
+                }}
+              >
+                {t("library.cloudOnly.delete") || "Remove from Cloud"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
+);
 
 CloudOnlyGameCard.displayName = "CloudOnlyGameCard";
 
@@ -4665,7 +5399,9 @@ PlayLaterGameCard.displayName = "PlayLaterGameCard";
 
 const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
   const { t } = useLanguage();
-  const [imageData, setImageData] = useState(() => gameImageCache.get(game.game || game.name) ?? null);
+  const [imageData, setImageData] = useState(
+    () => gameImageCache.get(game.game || game.name) ?? null
+  );
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
   const gameName = game.game || game.name || "";
   const isCustomGame = !game.gameID;
@@ -4680,13 +5416,18 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
       if (game.imgID) {
         try {
           const { default: imageCacheSvc } = await import("@/services/imageCacheService");
-          const url = await imageCacheSvc.getImage(game.imgID, { priority: "low", quality: "high" });
+          const url = await imageCacheSvc.getImage(game.imgID, {
+            priority: "low",
+            quality: "high",
+          });
           if (url && !cancelled) {
             gameImageCache.set(gameName, url);
             setImageData(url);
             return;
           }
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
       if (gameName) {
         try {
@@ -4697,14 +5438,19 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
             gameImageCache.set(gameName, url);
             setImageData(url);
           }
-        } catch { /* silent */ }
+        } catch {
+          /* silent */
+        }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [gameName, game.imgID]);
 
   const formatPlaytime = seconds => {
-    if (!seconds || seconds < 60) return t("library.neverPlayed") || "You haven't played this game yet";
+    if (!seconds || seconds < 60)
+      return t("library.neverPlayed") || "You haven't played this game yet";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours === 0) return `${minutes} ${t("library.minutes") || "minutes"}`;
@@ -4767,7 +5513,9 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
             <h3 className="flex-1 truncate text-sm font-semibold leading-tight text-foreground">
               {gameName}
             </h3>
-            {game.online && <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            {game.online && (
+              <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            )}
             {game.dlc && <Gift className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
           </div>
           <div className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
@@ -4777,7 +5525,8 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
           {game.deletedAt && (
             <div className="flex w-full items-center gap-1.5 text-[11px] text-muted-foreground/70">
               <span className="truncate">
-                {t("library.history.removedOn") || "Removed"} {formatDeletedAt(game.deletedAt)}
+                {t("library.history.removedOn") || "Removed"}{" "}
+                {formatDeletedAt(game.deletedAt)}
               </span>
             </div>
           )}
@@ -4785,7 +5534,7 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
             size="sm"
             onClick={onRestore}
             disabled={isRestoring}
-            className="w-full gap-1.5 text-xs text-white bg-gradient-to-r from-primary to-primary/70 hover:from-primary/90 hover:to-primary/60"
+            className="w-full gap-1.5 bg-gradient-to-r from-primary to-primary/70 text-xs text-white hover:from-primary/90 hover:to-primary/60"
           >
             {isRestoring ? (
               <>
@@ -4810,7 +5559,7 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
       <AlertDialog open={isConfirmRemoveOpen} onOpenChange={setIsConfirmRemoveOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold text-foreground">
+            <AlertDialogTitle>
               {t("library.history.removeForeverTitle") || "Remove from History?"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -5284,7 +6033,7 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
         const searchResponse = await fetch(searchUrl);
 
         if (!searchResponse.ok) {
-          throw new Error('SteamGridDB search failed');
+          throw new Error("SteamGridDB search failed");
         }
 
         const searchData = await searchResponse.json();
@@ -5351,7 +6100,7 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
           ...prev,
           results: [],
           selectedCover: null,
-          isLoading: false
+          isLoading: false,
         }));
         setCoverImageUrls({});
         toast.error(t("library.coverSearchError"));
@@ -5361,7 +6110,10 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
 
   // Shared by manual file picking and OS drag-and-drop of an .exe onto the library
   const applyExecutablePath = filePath => {
-    const gameName = filePath.split("\\").pop().replace(/\.exe$/i, "");
+    const gameName = filePath
+      .split("\\")
+      .pop()
+      .replace(/\.exe$/i, "");
     setFormData(prev => ({
       ...prev,
       executable: filePath,
@@ -5411,7 +6163,10 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
         customCount: customGames?.length,
       });
 
-      const allExistingGames = [...(installedGames || []), ...(customGames || []).filter(g => !g._isDeleted)];
+      const allExistingGames = [
+        ...(installedGames || []),
+        ...(customGames || []).filter(g => !g._isDeleted),
+      ];
 
       const normalizedFormName = normalizeGameName(formData.name);
       const gameExists = allExistingGames.some(
@@ -5458,9 +6213,24 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
       if (coverSearch.selectedCover?.gameID) {
         console.log("[AddGameForm] Downloading game assets...");
         const assetTypes = [
-          { type: "grids", key: "grid", filename: "grid.ascendara.jpg", params: "?styles=alternate&dimensions=600x900" },
-          { type: "logos", key: "logo", filename: "logo.ascendara.png", params: "?styles=white&sort=score" },
-          { type: "heroes", key: "hero", filename: "hero.ascendara.jpg", params: "?styles=alternate" },
+          {
+            type: "grids",
+            key: "grid",
+            filename: "grid.ascendara.jpg",
+            params: "?styles=alternate&dimensions=600x900",
+          },
+          {
+            type: "logos",
+            key: "logo",
+            filename: "logo.ascendara.png",
+            params: "?styles=white&sort=score",
+          },
+          {
+            type: "heroes",
+            key: "hero",
+            filename: "hero.ascendara.jpg",
+            params: "?styles=alternate",
+          },
         ];
 
         let downloadedCount = 0;
@@ -5512,7 +6282,8 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
       try {
         const freshCustomGames = await window.electron.getCustomGames();
         const stub = (freshCustomGames || []).find(
-          g => g._isDeleted && normalizeGameName(g.game) === normalizeGameName(formData.name)
+          g =>
+            g._isDeleted && normalizeGameName(g.game) === normalizeGameName(formData.name)
         );
         if (stub && onRestorePrompt) {
           onRestorePrompt({ gameName: formData.name, stub });
@@ -5533,7 +6304,6 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
 
   return (
     <div className="space-y-4">
-
       {/* ── Executable picker + Steam import ── */}
       <div className="flex gap-2">
         <Button
@@ -5564,7 +6334,13 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
       <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={() => setFormData(prev => ({ ...prev, hasVersion: !prev.hasVersion, version: prev.hasVersion ? "" : prev.version }))}
+          onClick={() =>
+            setFormData(prev => ({
+              ...prev,
+              hasVersion: !prev.hasVersion,
+              version: prev.hasVersion ? "" : prev.version,
+            }))
+          }
           className={cn(
             "flex flex-col items-center gap-1 rounded-lg border px-3 py-2 text-xs transition-colors",
             formData.hasVersion
@@ -5642,7 +6418,9 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
               {coverSearch.results.map((cover, index) => (
                 <div
                   key={index}
-                  onClick={() => setCoverSearch(prev => ({ ...prev, selectedCover: cover }))}
+                  onClick={() =>
+                    setCoverSearch(prev => ({ ...prev, selectedCover: cover }))
+                  }
                   className={cn(
                     "relative aspect-[3/4] cursor-pointer overflow-hidden rounded-md border-2 transition-all",
                     coverSearch.selectedCover === cover
@@ -5650,12 +6428,26 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
                       : "border-transparent hover:border-primary/40"
                   )}
                 >
-                  <img src={cover.img} alt={cover.title} className="h-full w-full object-cover" />
+                  <img
+                    src={cover.img}
+                    alt={cover.title}
+                    className="h-full w-full object-cover"
+                  />
                   {coverSearch.selectedCover === cover && (
                     <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
                       <div className="rounded-full bg-primary p-1">
-                        <svg className="h-3 w-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        <svg
+                          className="text-primary-foreground h-3 w-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -5664,7 +6456,9 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
               ))}
             </div>
           ) : (
-            <p className="text-center text-xs text-muted-foreground">{t("library.noResultsFound")}</p>
+            <p className="text-center text-xs text-muted-foreground">
+              {t("library.noResultsFound")}
+            </p>
           )}
         </div>
 
@@ -5692,7 +6486,10 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
           className="bg-primary text-secondary"
         >
           {isSubmitting ? (
-            <><Loader className="mr-2 h-4 w-4 animate-spin" />{t("common.loading")}</>
+            <>
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              {t("common.loading")}
+            </>
           ) : (
             t("library.addGame.title")
           )}

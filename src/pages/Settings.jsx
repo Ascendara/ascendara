@@ -4791,7 +4791,6 @@ function Settings() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <Star className="h-6 w-6 text-yellow-500" />
               {t("settings.ascendPromoDialog.title")}
             </AlertDialogTitle>
             <div className="space-y-4 text-muted-foreground">
@@ -4961,7 +4960,6 @@ function Settings() {
         <AlertDialogContent className="max-h-[95vh] max-w-6xl overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <Palette />
               {t("settings.customColors") || "Customize Theme"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -5573,7 +5571,6 @@ function Settings() {
         <AlertDialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <Palette />
               {t("settings.communityThemes") || "Community Themes"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -5696,7 +5693,6 @@ function Settings() {
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <MessageCircleQuestion className="h-6 w-6" />
               {t("settings.quickSupport")}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -5792,8 +5788,7 @@ function Settings() {
       >
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-xl font-bold text-foreground">
-              <ShieldAlert className="h-5 w-5 text-yellow-500" />
+            <AlertDialogTitle className="flex items-center gap-2">
               {t("settings.logUploadWarningTitle") || "Log Upload Notice"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-muted-foreground">

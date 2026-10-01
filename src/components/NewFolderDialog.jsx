@@ -46,9 +46,7 @@ const NewFolderDialog = ({ open, onOpenChange, onCreate }) => {
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="border-border bg-background">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-lg font-semibold text-foreground">
-            {t("library.newFolder.title")}
-          </AlertDialogTitle>
+          <AlertDialogTitle>{t("library.newFolder.title")}</AlertDialogTitle>
           <AlertDialogDescription className="text-muted-foreground">
             {t("library.newFolder.desc")}
           </AlertDialogDescription>

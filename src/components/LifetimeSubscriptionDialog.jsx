@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Crown, Sparkles, Zap, Loader2, X } from "lucide-react";
+import { Sparkles, Zap, Loader2, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userAuthenticatedFetch } from "@/utils/authHelper";
 
@@ -137,7 +137,7 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
       hasCheckedRef.current = true;
     }
   }, []);
-  
+
   // Auto-close redirect dialog after 10 seconds
   useEffect(() => {
     if (showRedirectDialog) {
@@ -155,125 +155,176 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
 
   return (
     <>
-    <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
-      <AlertDialogContent className="max-w-md">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <Crown className="h-5 w-5 text-yellow-500" />
-            {hasActiveSubscription
-              ? t("ascend.settings.lifetimeDialog.title", "Sounds like there's a deal...")
-              : t("ascend.settings.lifetimeDialog.titleNoSub", "Join Ascend Today")}
-          </AlertDialogTitle>
-          <AlertDialogDescription className="space-y-3">
-            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <div className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                <Sparkles className="h-4 w-4" />
-                {t("ascend.settings.lifetimeDialog.limitedTime", "Limited Time Offer")}
-              </div>
-              {hasActiveSubscription && discountInfo?.discount > 0 && (
-                <div className="mt-2 text-lg font-bold text-yellow-900 dark:text-yellow-100">
-                  {t("ascend.settings.lifetimeDialog.saveAmount", { amount: discountInfo.discount })}
-                </div>
-              )}
-            </div>
-            
-            {hasActiveSubscription ? (
-              <>
-                <p className="text-sm">
-                  {discountInfo?.discount > 0 
-                    ? t("ascend.settings.lifetimeDialog.descriptionWithDiscount", { 
-                        tier: discountInfo.subscriptionTier, 
-                        amount: discountInfo.discount 
-                      })
-                    : t("ascend.settings.lifetimeDialog.description", "You're currently on a recurring subscription. Upgrade to Lifetime Ascend and pay once, forever!")
-                  }
-                </p>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-green-500" />
-                    <span>{t("ascend.settings.lifetimeDialog.benefit1", "One-time payment, lifetime access")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-green-500" />
-                    <span>{t("ascend.settings.lifetimeDialog.benefit2", "Never worry about renewals again")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-green-500" />
-                    <span>{t("ascend.settings.lifetimeDialog.benefit3", "All future updates included")}</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm">
-                  {t("ascend.settings.lifetimeDialog.descriptionNoSub", "Unlock premium features with Ascend! Start with a 7-day free trial, then just $1.50/month.")}
-                </p>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-green-500" />
-                    <span>{t("ascend.settings.lifetimeDialog.benefitTrial", "7-day free trial included")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-green-500" />
-                    <span>{t("ascend.settings.lifetimeDialog.benefitPrice", "Only $1.50/month after trial")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-green-500" />
-                    <span>{t("ascend.settings.lifetimeDialog.benefitLifetimeOption", "Or upgrade to lifetime for a one-time payment")}</span>
-                  </div>
-                </div>
-              </>
-            )}
-            
-            <p className="text-xs text-muted-foreground italic">
-              {t("ascend.settings.lifetimeDialog.disclaimer", "This special offer is available for a limited time only. Don't miss out!")}
-            </p>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleDismiss}>
-            {t("common.maybeLater", "Maybe Later")}
-          </AlertDialogCancel>
-          {hasActiveSubscription ? (
-            <AlertDialogAction onClick={() => handleUpgrade(true)} className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 text-secondary hover:to-orange-600">
-              {t("ascend.settings.lifetimeDialog.upgradeToLifetime", "Upgrade to Lifetime")}
-            </AlertDialogAction>
-          ) : (
-            <AlertDialogAction onClick={() => navigate('/ascend')} className="bg-primary hover:bg-primary/90">
-              {t("ascend.settings.lifetimeDialog.startTrial", "Start Free Trial")}
-            </AlertDialogAction>
-          )}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    
-    {/* Redirect Loading Dialog */}
-    <AlertDialog open={showRedirectDialog} onOpenChange={setShowRedirectDialog}>
-      <AlertDialogContent className="max-w-md border-border/50 bg-background">
-        <button
-          onClick={() => setShowRedirectDialog(false)}
-          className="absolute right-4 top-4 z-10 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-5 w-5" />
-        </button>
-        
-        <div className="flex flex-col items-center justify-center space-y-4 py-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-          <AlertDialogHeader className="text-center">
-            <AlertDialogTitle className="text-xl font-bold text-primary">
-              {t("ascend.settings.subscriptionDialogV2.redirectingToCheckout")}
+      <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {hasActiveSubscription
+                ? t(
+                    "ascend.settings.lifetimeDialog.title",
+                    "Sounds like there's a deal..."
+                  )
+                : t("ascend.settings.lifetimeDialog.titleNoSub", "Join Ascend Today")}
             </AlertDialogTitle>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.settings.subscriptionDialogV2.completeCheckoutMessage")}
-            </p>
+            <AlertDialogDescription className="space-y-3">
+              <div className="rounded-lg border border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50 p-3 dark:border-yellow-800 dark:from-yellow-900/20 dark:to-orange-900/20">
+                <div className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                  <Sparkles className="h-4 w-4" />
+                  {t("ascend.settings.lifetimeDialog.limitedTime", "Limited Time Offer")}
+                </div>
+                {hasActiveSubscription && discountInfo?.discount > 0 && (
+                  <div className="mt-2 text-lg font-bold text-yellow-900 dark:text-yellow-100">
+                    {t("ascend.settings.lifetimeDialog.saveAmount", {
+                      amount: discountInfo.discount,
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {hasActiveSubscription ? (
+                <>
+                  <p className="text-sm">
+                    {discountInfo?.discount > 0
+                      ? t("ascend.settings.lifetimeDialog.descriptionWithDiscount", {
+                          tier: discountInfo.subscriptionTier,
+                          amount: discountInfo.discount,
+                        })
+                      : t(
+                          "ascend.settings.lifetimeDialog.description",
+                          "You're currently on a recurring subscription. Upgrade to Lifetime Ascend and pay once, forever!"
+                        )}
+                  </p>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-green-500" />
+                      <span>
+                        {t(
+                          "ascend.settings.lifetimeDialog.benefit1",
+                          "One-time payment, lifetime access"
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-green-500" />
+                      <span>
+                        {t(
+                          "ascend.settings.lifetimeDialog.benefit2",
+                          "Never worry about renewals again"
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-green-500" />
+                      <span>
+                        {t(
+                          "ascend.settings.lifetimeDialog.benefit3",
+                          "All future updates included"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm">
+                    {t(
+                      "ascend.settings.lifetimeDialog.descriptionNoSub",
+                      "Unlock premium features with Ascend! Start with a 7-day free trial, then just $1.50/month."
+                    )}
+                  </p>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-green-500" />
+                      <span>
+                        {t(
+                          "ascend.settings.lifetimeDialog.benefitTrial",
+                          "7-day free trial included"
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-green-500" />
+                      <span>
+                        {t(
+                          "ascend.settings.lifetimeDialog.benefitPrice",
+                          "Only $1.50/month after trial"
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-green-500" />
+                      <span>
+                        {t(
+                          "ascend.settings.lifetimeDialog.benefitLifetimeOption",
+                          "Or upgrade to lifetime for a one-time payment"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <p className="text-xs italic text-muted-foreground">
+                {t(
+                  "ascend.settings.lifetimeDialog.disclaimer",
+                  "This special offer is available for a limited time only. Don't miss out!"
+                )}
+              </p>
+            </AlertDialogDescription>
           </AlertDialogHeader>
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDismiss}>
+              {t("common.maybeLater", "Maybe Later")}
+            </AlertDialogCancel>
+            {hasActiveSubscription ? (
+              <AlertDialogAction
+                onClick={() => handleUpgrade(true)}
+                className="bg-gradient-to-r from-yellow-500 to-orange-500 text-secondary hover:from-yellow-600 hover:to-orange-600"
+              >
+                {t(
+                  "ascend.settings.lifetimeDialog.upgradeToLifetime",
+                  "Upgrade to Lifetime"
+                )}
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                onClick={() => navigate("/ascend")}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {t("ascend.settings.lifetimeDialog.startTrial", "Start Free Trial")}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Redirect Loading Dialog */}
+      <AlertDialog open={showRedirectDialog} onOpenChange={setShowRedirectDialog}>
+        <AlertDialogContent className="max-w-md border-border/50 bg-background">
+          <button
+            onClick={() => setShowRedirectDialog(false)}
+            className="absolute right-4 top-4 z-10 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="flex flex-col items-center justify-center space-y-4 py-6">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+            <AlertDialogHeader className="text-center">
+              <AlertDialogTitle>
+                {t("ascend.settings.subscriptionDialogV2.redirectingToCheckout")}
+              </AlertDialogTitle>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t("ascend.settings.subscriptionDialogV2.completeCheckoutMessage")}
+              </p>
+            </AlertDialogHeader>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

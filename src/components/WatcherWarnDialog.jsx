@@ -1,5 +1,3 @@
-
-import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
@@ -19,7 +17,6 @@ const WatcherWarnDialog = ({ open, onOpenChange }) => {
       <AlertDialogContent className="border-border">
         <AlertDialogHeader>
           <div className="flex items-center gap-4">
-            <AlertTriangle className="mb-2 h-10 w-10 text-red-500" />
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
               {t("app.watchdog.error.title")}
             </AlertDialogTitle>

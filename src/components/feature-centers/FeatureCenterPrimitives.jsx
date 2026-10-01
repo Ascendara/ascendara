@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +13,6 @@ export function FeatureCenterDialog({
   onOpenChange,
   title,
   description,
-  icon: Icon,
   children,
   maxWidth = "max-w-5xl",
 }) {
@@ -27,8 +25,7 @@ export function FeatureCenterDialog({
         )}
       >
         <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:py-5">
-          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
-            {Icon && <Icon className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6" />}
+          <DialogTitle className="flex items-center gap-2">
             <span className="truncate">{title}</span>
           </DialogTitle>
           {description && (
@@ -71,7 +68,13 @@ export function FeatureTabs({ items, activeId, onChange, children }) {
   );
 }
 
-export function FeatureState({ icon: Icon, title, description, action, compact = false }) {
+export function FeatureState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  compact = false,
+}) {
   return (
     <div
       className={cn(
@@ -96,12 +99,16 @@ export function FeatureState({ icon: Icon, title, description, action, compact =
 
 export function FeatureSection({ title, description, actions, children, className }) {
   return (
-    <section className={cn("rounded-xl border border-border bg-card/70 p-4 sm:p-5", className)}>
+    <section
+      className={cn("rounded-xl border border-border bg-card/70 p-4 sm:p-5", className)}
+    >
       {(title || description || actions) && (
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {title && <h3 className="font-medium text-foreground">{title}</h3>}
-            {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+            {description && (
+              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            )}
           </div>
           {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
         </div>
@@ -114,8 +121,12 @@ export function FeatureSection({ title, description, actions, children, classNam
 export function FeatureStat({ label, value, hint }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-2 break-words text-xl font-semibold text-foreground sm:text-2xl">{value}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-xl font-semibold text-foreground sm:text-2xl">
+        {value}
+      </p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );

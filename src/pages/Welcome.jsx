@@ -1,3 +1,4 @@
+import { dialogTitleClassName } from "@/components/ui/dialog-styles";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -581,9 +582,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
       }
     };
 
-    const unsubscribe = window.electron.onDependencyInstallationStatus(
-      handleDependencyStatus
-    );
+    const unsubscribe =
+      window.electron.onDependencyInstallationStatus(handleDependencyStatus);
 
     return () => {
       unsubscribe();
@@ -1177,9 +1177,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <div className="mb-2 flex items-center gap-3">
-              <div className="rounded-lg bg-yellow-500/15 p-2">
-                <AlertTriangle className="h-6 w-6 text-yellow-500" />
-              </div>
               <AlertDialogTitle className="mt-2 text-2xl font-bold text-foreground">
                 {t("welcome.manualUpdateConfirm.title")}
               </AlertDialogTitle>
@@ -3079,7 +3076,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
       {showProtonCachyConfirm && protonCachyInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
-            <h3 className="text-lg font-semibold">
+            <h3 className={dialogTitleClassName}>
               {protonCachyInfo.updateAvailable
                 ? t("welcome.protonGEDialog.updateTitleCachy")
                 : t("welcome.protonGEDialog.downloadTitleCachy")}
@@ -3167,7 +3164,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
       {showProtonGEConfirm && protonGEInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
-            <h3 className="text-lg font-semibold">
+            <h3 className={dialogTitleClassName}>
               {protonGEInfo.updateAvailable
                 ? t("welcome.protonGEDialog.updateTitle")
                 : t("welcome.protonGEDialog.downloadTitle")}

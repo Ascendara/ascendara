@@ -60,16 +60,7 @@ import Home from "./pages/Home";
 import i18n from "./i18n";
 import "./index.css";
 import "./styles/scrollbar.css";
-import {
-  AlertTriangle,
-  RefreshCwIcon,
-  Clock,
-  Gamepad2,
-  X,
-  Circle,
-  Square,
-  Triangle,
-} from "lucide-react";
+import { AlertTriangle, RefreshCwIcon, X, Circle, Square, Triangle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -201,7 +192,6 @@ const TrialWarningChecker = () => {
       <AlertDialogContent className="border-border">
         <AlertDialogHeader>
           <div className="flex items-center gap-4">
-            <Clock className="mb-2 h-10 w-10 text-yellow-500" />
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
               {t("ascend.access.trialEndingSoon")}
             </AlertDialogTitle>
@@ -305,7 +295,6 @@ const GiantBombMigrationWarning = () => {
       <AlertDialogContent className="border-border">
         <AlertDialogHeader>
           <div className="flex items-center gap-4">
-            <AlertTriangle className="mb-2 h-10 w-10 text-yellow-500" />
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
               {t("welcome.apiMigration.title")}
             </AlertDialogTitle>
@@ -557,7 +546,6 @@ const AutomaticIndexRefresher = () => {
         <AlertDialogContent className="border-border">
           <AlertDialogHeader>
             <div className="flex items-center gap-4">
-              <RefreshCwIcon className="mb-2 h-10 w-10 text-green-500" />
               <AlertDialogTitle className="text-2xl font-bold text-foreground">
                 {t("localRefresh.autoRefreshComplete") ||
                   "Automatic Index Refresh Complete"}
@@ -751,7 +739,6 @@ const ControllerDetectionPrompt = () => {
       <AlertDialogContent className="border-border">
         <AlertDialogHeader>
           <div className="flex items-center gap-4">
-            <Gamepad2 className="mb-2 h-10 w-10 text-primary" />
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
               {t("bigPicture.controllerDetected")}
             </AlertDialogTitle>

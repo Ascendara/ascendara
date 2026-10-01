@@ -2487,7 +2487,6 @@ const DownloadCard = ({
         <DialogContent className="max-h-[80vh] max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ScrollText className="h-5 w-5" />
               {t("downloads.logViewerTitle")}
             </DialogTitle>
           </DialogHeader>
@@ -2516,7 +2515,6 @@ const DownloadCard = ({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <FolderCog className="h-6 w-6 text-amber-600" />
               {t("downloads.setInstallLocationTitle") || "Set the Install Location"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-muted-foreground">

@@ -1,14 +1,12 @@
 import { useState, useEffect } from "react";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
-import { Button } from "./ui/button";
 import {
-  AlertTriangle,
-  CircleCheck,
-  Loader,
-  FileSearch,
-  RefreshCw,
-  FileWarning,
-} from "lucide-react";
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import { Button } from "./ui/button";
+import { AlertTriangle, CircleCheck, Loader, RefreshCw, FileWarning } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
 import { ScrollArea } from "./ui/scroll-area";
@@ -237,7 +235,6 @@ const VerifyingGameDialog = ({ game, open, onOpenChange }) => {
       <AlertDialogContent className="max-w-xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-            <FileSearch className="h-6 w-6 text-primary" />
             {isLegacyGame ? t("library.cannotVerifyFiles") : t("library.verifyGameFiles")}
           </AlertDialogTitle>
           <span className="text-sm text-muted-foreground">
