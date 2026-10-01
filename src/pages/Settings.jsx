@@ -1256,18 +1256,18 @@ function Settings() {
     }
   }, [location.state, isLoading, navigate, location.pathname]);
 
-  // On linux, verify that ludusavi is installed
+  // On Unix, verify that ludusavi is installed
   useEffect(() => {
-    if (!isOnLinux || !settings?.ludusavi?.enabled) return;
+    if (isOnWindows !== false || !settings?.ludusavi?.enabled) return;
     (async () => {
       const tools = await window.electron.getInstalledTools();
       if (!tools.includes("ludusavi")) {
         // Fix if binary missing but toggle activated
         handleSettingChange("enabled", false, true);
-        console.log("[Ludusavi] Binary not found on Linux, disabling in settings");
+        console.log("[Ludusavi] Binary not found on Unix, disabling in settings");
       }
     })();
-  }, [isOnLinux]);
+  }, [isOnWindows, settings?.ludusavi?.enabled, handleSettingChange]);
 
   // Show loading state
   if (isLoading) {
@@ -4934,10 +4934,16 @@ function Settings() {
               onClick={async () => {
                 try {
                   setIsDownloading(true);
-                  await window.electron.installTool("ludusavi");
+                  const result = await window.electron.installTool("ludusavi");
+                  if (!result.success) {
+                    toast.error(result.message);
+                    return;
+                  }
                   setShowNoLudusaviDialog(false);
+                  handleSettingChange("enabled", true, true);
                 } catch (error) {
                   console.error("Failed to install Ludusavi:", error);
+                  toast.error(t("settings.noLudusaviTool"));
                 } finally {
                   setIsDownloading(false);
                 }

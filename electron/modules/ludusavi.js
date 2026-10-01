@@ -8,7 +8,7 @@ const path = require("path");
 const os = require("os");
 const { spawn } = require("child_process");
 const { ipcMain, app, dialog } = require("electron");
-const { isDev, isWindows, appDirectory } = require("./config");
+const { isDev, isWindows, isLinux, appDirectory, getLudusaviPath } = require("./config");
 const { getSettingsManager } = require("./settings");
 const { sanitizeGameName } = require("./utils");
 
@@ -318,8 +318,8 @@ function registerLudusaviHandlers() {
           ? path.join("./binaries/AscendaraGameHandler/dist/ludusavi.exe")
           : path.join(appDirectory, "/resources/ludusavi.exe");
       } else {
-        // Linux : downloaded in ~/.ascendara/
-        ludusaviPath = require("./config").getLudusaviPath();
+        // Unix: downloaded in ~/.ascendara/ (or installed on PATH on macOS)
+        ludusaviPath = getLudusaviPath();
       }
 
       if (!ludusaviPath || !fs.existsSync(ludusaviPath)) {
@@ -401,7 +401,7 @@ function registerLudusaviHandlers() {
           }
 
           // Linux : add --wine-prefix if no customSavePaths for this game
-          if (!isWindows && game) {
+          if (isLinux && game) {
             const { sanitizeGameSlug } = require("./proton");
             const { linuxCompatDataDir } = require("./config");
             const customPaths = readCustomSavePaths(game, false, settings);

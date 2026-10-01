@@ -6,6 +6,8 @@
 const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
+const { randomUUID } = require("crypto");
+const { pipeline } = require("stream/promises");
 const { ipcMain, BrowserWindow } = require("electron");
 const {
   isDev,
@@ -31,7 +33,7 @@ let electronDl = null;
  */
 function checkInstalledTools() {
   try {
-    if (isDev) {
+    if (isDev || isMac) {
       return;
     }
     const toolsDirectory = process.resourcesPath;
@@ -67,15 +69,13 @@ function checkInstalledTools() {
 async function installTool(tool) {
   if (!Object.hasOwn(toolExecutables, tool))
     return { success: false, message: "Unknown tool" };
-  if (isMac) {
+  if (isMac && tool !== "ludusavi") {
     const installed = getInstalledTools().includes(tool);
     return {
       success: installed,
       message: installed
         ? `${tool} is available`
-        : tool === "ludusavi"
-          ? "Install the macOS version of Ludusavi on PATH or at ~/.ascendara/ludusavi."
-          : "Reinstall Ascendara to restore the bundled helper.",
+        : "Reinstall Ascendara to restore the bundled helper.",
     };
   }
   console.log(`Installing ${tool}`);
@@ -84,18 +84,21 @@ async function installTool(tool) {
     translator: "https://cdn.ascendara.app/files/AscendaraLanguageTranslation.exe",
     ludusavi: isWindows
       ? "https://cdn.ascendara.app/files/ludusavi.exe"
-      : "https://cdn.ascendara.app/files/linux/ludusavi",
+      : isMac
+        ? "https://cdn.ascendara.app/files/mac/ludusavi"
+        : "https://cdn.ascendara.app/files/linux/ludusavi",
   };
 
   let toolPath;
   if (!isWindows && tool === "ludusavi") {
-    const { unixConfigDir: linuxConfigDir } = require("./config");
-    fs.ensureDirSync(linuxConfigDir);
-    toolPath = path.join(linuxConfigDir, "ludusavi");
+    const { unixConfigDir } = require("./config");
+    fs.ensureDirSync(unixConfigDir);
+    toolPath = path.join(unixConfigDir, "ludusavi");
   } else {
     const toolExecutable = toolExecutables[tool];
     toolPath = path.join(appDirectory, "resources", toolExecutable);
   }
+  const downloadPath = isMac ? `${toolPath}.${randomUUID()}.download` : toolPath;
   try {
     const response = await axios({
       method: "get",
@@ -103,20 +106,17 @@ async function installTool(tool) {
       responseType: "stream",
     });
 
-    await new Promise((resolve, reject) => {
-      const writer = fs.createWriteStream(toolPath);
-      response.data.pipe(writer);
-      writer.on("finish", resolve);
-      writer.on("error", reject);
-    });
+    await pipeline(response.data, fs.createWriteStream(downloadPath));
 
     if (!isWindows && tool === "ludusavi") {
-      fs.chmodSync(toolPath, 0o755);
+      fs.chmodSync(downloadPath, 0o755);
     }
+    if (isMac) fs.renameSync(downloadPath, toolPath);
 
     console.log(`${tool} downloaded successfully`);
     return { success: true, message: `${tool} installed successfully` };
   } catch (error) {
+    if (isMac) await fs.remove(downloadPath);
     console.error(`Error installing ${tool}:`, error);
     return { success: false, message: `Failed to install ${tool}: ${error.message}` };
   }
