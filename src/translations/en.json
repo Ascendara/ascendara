@@ -755,12 +755,15 @@
         "benefitLifetimeOption": "Or upgrade to lifetime for a one-time payment",
         "benefitPrice": "Only $1.50/month after trial",
         "benefitTrial": "7-day free trial included",
+        "chooseAmount": "Lifetime access starts at $39. You can choose to contribute more at checkout to support Ascendara.",
         "description": "You're currently on a recurring subscription. Upgrade to Lifetime Ascend and pay once, forever!",
         "descriptionNoSub": "Unlock premium features with Ascend! Start with a 7-day free trial, then just $1.50/month.",
         "descriptionWithDiscount": "You're currently on a {{tier}} subscription. Upgrade to Lifetime Ascend and save ${{amount}}!",
         "disclaimer": "This special offer is available for a limited time only. Don't miss out!",
         "getLifetime": "Get Lifetime",
+        "lifetimeOfferTitle": "Lifetime Ascend",
         "limitedTime": "Limited Time Offer",
+        "oneTimeOffer": "One-time purchase",
         "saveAmount": "Save ${{amount}}!",
         "startTrial": "Start Free Trial",
         "title": "Sounds like there's a deal...",
@@ -827,12 +830,87 @@
         "earlySupporter": "Early Supporter",
         "everythingIncluded": "Everything included",
         "flexible": "Flexible",
+        "includedFeatures": {
+          "andMoreComing": {
+            "description": "There are constantly new features for Ascend subscribers. Your subscription helps fund development of exciting new capabilities.",
+            "title": "And More Coming"
+          },
+          "ascendaraCompanion": {
+            "description": "Connect as many devices as you want to your Ascend account and manage your downloads, view the game catalog and your cloud games from any device.",
+            "title": "Ascendara Companion"
+          },
+          "autoUpdates": {
+            "description": "Automatically check for game updates in the background. Get notified when updates are available and install them with a single click.",
+            "title": "Auto Updates"
+          },
+          "cloudBackups": {
+            "description": "Automatically back up your game saves to the cloud. Never lose your progress and restore your saves on any device.",
+            "title": "Cloud Backups"
+          },
+          "cloudSyncing": {
+            "description": "Your profile, achievements, and game data are automatically synced to the cloud. Access your complete gaming history from anywhere, on any device.",
+            "title": "Cloud Syncing"
+          },
+          "customProfiles": {
+            "description": "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours.",
+            "title": "Custom Profiles"
+          },
+          "expandedEmulatorPresets": {
+            "description": "Unlock an expanded library of emulator presets covering dozens of additional systems beyond the 12 that ship with Ascendara, complete with download links and ready-to-use configurations.",
+            "title": "Expanded Emulator Presets"
+          },
+          "experimentalBranch": {
+            "description": "Switch and test very early features on Ascendara's experimental branch within the app.",
+            "title": "Experimental Branch"
+          },
+          "flingTrainers": {
+            "description": "Automatically downloads the correct FLiNG trainer for your game and handles installation, no manual searching or setup required.",
+            "title": "FLiNG Trainers"
+          },
+          "friendsSocial": {
+            "description": "Send and accept friend requests, build your gaming network, and see when your friends are online. Connect with other Ascendara users and grow your community.",
+            "title": "Friends & Social"
+          },
+          "leaderboard": {
+            "description": "Compete with the community on the public leaderboard. See how your stats stack up against other players and climb the ranks.",
+            "title": "Leaderboard"
+          },
+          "libraryBackups": {
+            "description": "Back up and restore save data across your entire game library with Ludusavi, upload backups to Ascend cloud storage, and import them on another device.",
+            "title": "Library Backups"
+          },
+          "nexusModsIntegration": {
+            "description": "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
+            "title": "Nexus Mods Integration"
+          },
+          "realTimeChat": {
+            "description": "Chat directly with your friends within Ascendara. Share game recommendations, coordinate play sessions, and stay connected with your gaming circle.",
+            "title": "Real-time Chat"
+          },
+          "retroCloudSaves": {
+            "description": "Back up your Retro library's memory cards and save folders to the cloud, then restore them on any device. Ascendara keeps a recovery copy of your local saves before every restore.",
+            "title": "Retro Cloud Saves"
+          },
+          "smartQueue": {
+            "description": "Queue multiple downloads and let Ascendara handle them automatically. Start downloads and come back when they're all ready.",
+            "title": "Smart Queue"
+          },
+          "unlimitedDownloads": {
+            "description": "Download as many games as you want with no restrictions. Ascend removes all download limits so you can build your library freely.",
+            "title": "Unlimited Downloads"
+          },
+          "updatePreview": {
+            "description": "Get an exclusive preview of what's coming in the next Ascendara update. Stay ahead of the curve and know what new features are on the horizon.",
+            "title": "Update Preview"
+          }
+        },
         "learnMore": "Learn More",
-        "limitedTime": "Limited Time",
+        "lifetime": "Lifetime",
+        "lifetimeSupport": "Pay once for lifetime access. Choose any amount from $39 at checkout to support Ascendara.",
         "mostPopular": "Most Popular",
         "neverPayAgain": "Never pay again",
         "nexusModsIntegration": "Nexus Mods integration",
-        "payOnceOwnForever": "Pay once, own forever",
+        "oneTimePurchase": "One-time purchase",
         "prioritySupport": "Support the developer",
         "redirectingToCheckout": "Redirecting to Stripe Checkout",
         "retroCloudSaves": "Retro cloud saves",

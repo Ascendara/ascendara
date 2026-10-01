@@ -91,7 +91,7 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
 
       // Determine which price ID to use
       const priceId = isLifetime
-        ? "price_1TKjjMCfu5zjwIKZyrWXZFJ1" // Lifetime
+        ? "price_1ULnZACfu5zjwIKZEhc9jTiU" // Lifetime
         : "price_1QnMnNCfu5zjwIKZFbCRwBHd"; // Monthly $1.50
 
       // Create checkout session
@@ -160,17 +160,14 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               {hasActiveSubscription
-                ? t(
-                    "ascend.settings.lifetimeDialog.title",
-                    "Sounds like there's a deal..."
-                  )
+                ? t("ascend.settings.lifetimeDialog.lifetimeOfferTitle")
                 : t("ascend.settings.lifetimeDialog.titleNoSub", "Join Ascend Today")}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <div className="rounded-lg border border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50 p-3 dark:border-yellow-800 dark:from-yellow-900/20 dark:to-orange-900/20">
                 <div className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
                   <Sparkles className="h-4 w-4" />
-                  {t("ascend.settings.lifetimeDialog.limitedTime", "Limited Time Offer")}
+                  {t("ascend.settings.lifetimeDialog.oneTimeOffer")}
                 </div>
                 {hasActiveSubscription && discountInfo?.discount > 0 && (
                   <div className="mt-2 text-lg font-bold text-yellow-900 dark:text-yellow-100">
@@ -267,10 +264,7 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
               )}
 
               <p className="text-xs italic text-muted-foreground">
-                {t(
-                  "ascend.settings.lifetimeDialog.disclaimer",
-                  "This special offer is available for a limited time only. Don't miss out!"
-                )}
+                {t("ascend.settings.lifetimeDialog.chooseAmount")}
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>

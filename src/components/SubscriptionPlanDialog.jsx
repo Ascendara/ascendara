@@ -12,6 +12,17 @@ import {
   Gamepad2,
   ExternalLink,
   Loader2,
+  MessageCircle,
+  Smartphone,
+  Joystick,
+  User,
+  Trophy,
+  RefreshCw,
+  Eye,
+  Sparkles,
+  FlaskConical,
+  HardDriveDownload,
+  ListOrdered,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -51,19 +62,24 @@ const SubscriptionPlanDialog = ({
     await onPlanSelection(planId);
   };
   const features = [
-    {
-      icon: Download,
-      text: t("ascend.settings.subscriptionDialogV2.unlimitedDownloads"),
-    },
-    { icon: Zap, text: t("ascend.settings.subscriptionDialogV2.smartDownloadQueue") },
-    { icon: Cloud, text: t("ascend.settings.subscriptionDialogV2.automaticUpdates") },
-    { icon: Shield, text: t("ascend.settings.subscriptionDialogV2.cloudBackups") },
-    { icon: Gamepad2, text: t("ascend.settings.subscriptionDialogV2.retroCloudSaves") },
-    {
-      icon: Puzzle,
-      text: t("ascend.settings.subscriptionDialogV2.nexusModsIntegration"),
-    },
-    { icon: Users, text: t("ascend.settings.subscriptionDialogV2.socialFeatures") },
+    { key: "cloudSyncing", icon: Cloud },
+    { key: "friendsSocial", icon: Users },
+    { key: "realTimeChat", icon: MessageCircle },
+    { key: "ascendaraCompanion", icon: Smartphone },
+    { key: "cloudBackups", icon: Shield },
+    { key: "retroCloudSaves", icon: Gamepad2 },
+    { key: "expandedEmulatorPresets", icon: Joystick },
+    { key: "customProfiles", icon: User },
+    { key: "leaderboard", icon: Trophy },
+    { key: "autoUpdates", icon: RefreshCw },
+    { key: "updatePreview", icon: Eye },
+    { key: "nexusModsIntegration", icon: Puzzle },
+    { key: "unlimitedDownloads", icon: Download },
+    { key: "flingTrainers", icon: Zap },
+    { key: "smartQueue", icon: ListOrdered },
+    { key: "experimentalBranch", icon: FlaskConical },
+    { key: "libraryBackups", icon: HardDriveDownload },
+    { key: "andMoreComing", icon: Sparkles },
   ];
 
   return (
@@ -120,7 +136,7 @@ const SubscriptionPlanDialog = ({
                     )}
                     {isLifetime && (
                       <div className="absolute left-1/2 top-0 -translate-x-1/2 rounded-b-lg bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-1.5 text-xs font-medium text-black">
-                        {t("ascend.settings.subscriptionDialogV2.limitedTime")}
+                        {t("ascend.settings.subscriptionDialogV2.oneTimePurchase")}
                       </div>
                     )}
 
@@ -128,7 +144,7 @@ const SubscriptionPlanDialog = ({
                       <div className="mb-6">
                         <h3 className="mb-1 text-sm font-medium text-muted-foreground">
                           {isLifetime
-                            ? t("ascend.settings.subscriptionDialogV2.earlySupporter")
+                            ? t("ascend.settings.subscriptionDialogV2.lifetime")
                             : is6Month
                               ? t("ascend.settings.subscriptionDialogV2.bestValue")
                               : t("ascend.settings.subscriptionDialogV2.flexible")}
@@ -136,6 +152,7 @@ const SubscriptionPlanDialog = ({
                         <div className="mb-2 flex items-baseline gap-1">
                           <span className="text-4xl font-semibold tracking-tight text-foreground">
                             ${totalPrice}
+                            {isLifetime && "+"}
                           </span>
                           {!isLifetime && (
                             <span className="text-sm text-muted-foreground">
@@ -145,7 +162,7 @@ const SubscriptionPlanDialog = ({
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {isLifetime
-                            ? t("ascend.settings.subscriptionDialogV2.payOnceOwnForever")
+                            ? t("ascend.settings.subscriptionDialogV2.lifetimeSupport")
                             : isMonthly
                               ? t("ascend.settings.subscriptionDialogV2.billedMonthly")
                               : t(
@@ -220,19 +237,30 @@ const SubscriptionPlanDialog = ({
                   </span>
                 </button>
               </div>
-              <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {features.map((feature, i) => (
                   <motion.div
-                    key={i}
+                    key={feature.key}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 + i * 0.05 }}
-                    className="flex items-center gap-3"
+                    className="flex gap-3 rounded-lg border border-border/50 bg-background/60 p-4"
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                       <feature.icon className="h-4 w-4 text-primary" />
                     </div>
-                    <span className="text-sm text-muted-foreground">{feature.text}</span>
+                    <div>
+                      <h4 className="text-sm font-medium text-foreground">
+                        {t(
+                          `ascend.settings.subscriptionDialogV2.includedFeatures.${feature.key}.title`
+                        )}
+                      </h4>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {t(
+                          `ascend.settings.subscriptionDialogV2.includedFeatures.${feature.key}.description`
+                        )}
+                      </p>
+                    </div>
                   </motion.div>
                 ))}
               </div>

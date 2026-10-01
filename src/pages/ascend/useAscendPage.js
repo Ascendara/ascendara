@@ -2081,9 +2081,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
       // Add lifetime plan manually
       plans.push({
-        id: "price_1TKjjMCfu5zjwIKZyrWXZFJ1",
+        id: "price_1ULnZACfu5zjwIKZEhc9jTiU",
         intervalCount: 0, // 0 indicates lifetime
-        unitAmount: 2900, // $29.00
+        unitAmount: 3900, // $39.00 minimum
         currency: "usd",
       });
 
