@@ -1,3 +1,4 @@
+import { useLibraryBackupStore } from "@/services/libraryBackupStore";
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,6 +50,7 @@ import { calculateLibraryValue } from "@/services/cheapsharkService";
 import { getDownloadQueue } from "@/services/downloadQueueService";
 
 import ImportGamesDialog from "@/components/ImportGamesDialog";
+import LibraryBackupsDialog from "@/components/LibraryBackupsDialog";
 import NewFolderDialog from "@/components/NewFolderDialog";
 import MoveToFolderDialog from "@/components/MoveToFolderDialog";
 import FolderCard from "@/components/FolderCard";
@@ -180,6 +182,8 @@ const Library = () => {
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
   const [isImportingGames, setIsImportingGames] = useState(false);
+  const isLibraryBackupsOpen = useLibraryBackupStore(state => state.open);
+  const setIsLibraryBackupsOpen = useLibraryBackupStore(state => state.setOpen);
 
   useEffect(() => {
     let active = true;
@@ -1776,6 +1780,25 @@ const Library = () => {
               <span>{t("library.newFolder.create") || "New Folder"}</span>
             </button>
             <NewFolderDialog open={isNewFolderOpen} onOpenChange={setIsNewFolderOpen} onCreate={handleCreateFolder} />
+
+            <button
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
+              onClick={() => setIsLibraryBackupsOpen(true)}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
+                <HardDriveDownload className="h-4 w-4" />
+              </span>
+              <span>{t("library.libraryBackups.button")}</span>
+            </button>
+            <LibraryBackupsDialog
+              canManage={!!user && ascendAccess.hasAccess && (ascendAccess.isSubscribed || ascendAccess.isVerified)}
+              open={isLibraryBackupsOpen}
+              onOpenChange={setIsLibraryBackupsOpen}
+              gameNames={[...new Set([
+                ...games.filter(game => !game.isFolder).map(game => game.game || game.name),
+                ...getGamesInFolders().map(game => game.game || game.name),
+              ].filter(Boolean))]}
+            />
 
             <Tooltip>
               <TooltipTrigger asChild>

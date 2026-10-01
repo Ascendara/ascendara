@@ -543,6 +543,7 @@ function registerMiscHandlers() {
 
   ipcMain.handle("write-file", async (_, filePath, content) => {
     try {
+      fs.ensureDirSync(path.dirname(filePath));
       fs.writeFileSync(filePath, content);
       return true;
     } catch (error) {

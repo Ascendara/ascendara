@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLibraryBackupStore } from "@/services/libraryBackupStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
 import { subscribeToDownloads, getActiveDownloadCount } from "@/services/khinsiderService";
@@ -24,6 +25,7 @@ import {
   ExternalLink,
   Gamepad2,
   TestTube2,
+  Loader,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { checkForUpdates } from "@/services/updateCheckingService";
@@ -33,6 +35,11 @@ const MenuBar = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+  const libraryBackupBusy = useLibraryBackupStore(state => state.busy);
+  const libraryBackupProgress = useLibraryBackupStore(state => state.progress);
+  const libraryBackupScreen = useLibraryBackupStore(state => state.screen);
+  const libraryBackupCompleted = useLibraryBackupStore(state => state.results.length);
+  const openLibraryBackups = useLibraryBackupStore(state => state.setOpen);
   const [serverStatus, setServerStatus] = useState(() => {
     // Default status if no valid cache exists
     return {
@@ -347,6 +354,29 @@ const MenuBar = () => {
           >
             <Gamepad2 className="h-3 w-3" />
             {t("bigPicture.enterBigPicture")}
+          </button>
+        )}
+
+        {libraryBackupBusy && (
+          <button
+            type="button"
+            onClick={() => {
+              openLibraryBackups(true);
+              navigate("/library");
+            }}
+            className="ml-2 flex shrink-0 items-center gap-1.5 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ WebkitAppRegion: "no-drag" }}
+            title={t("library.libraryBackups.backgroundDetails", {
+              game: libraryBackupProgress?.game || "",
+            })}
+          >
+            <Loader className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+            <span>
+              {t(`library.libraryBackups.background.${libraryBackupScreen}`, {
+                completed: libraryBackupCompleted,
+                total: libraryBackupProgress?.total || 0,
+              })}
+            </span>
           </button>
         )}
 
