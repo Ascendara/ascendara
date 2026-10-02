@@ -102,6 +102,9 @@ import {
   TORBOX_PROVIDER_DISPLAY_NAMES,
 } from "@/config/providers";
 
+const FILE_ISSUE_REPORT_PATTERN =
+  /\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b.{0,30}\b(?:files?|downloads?|archives?|installations?)\b|\b(?:files?|downloads?|archives?|installations?)\b.{0,30}\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b/i;
+
 const LOCAL_FALLBACK_PATTERNS = {
   fileditch: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
   fileditchfiles: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
@@ -327,6 +330,7 @@ export default function DownloadPage() {
   const [isReporting, setIsReporting] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
+  const showIndexRefreshWarning = FILE_ISSUE_REPORT_PATTERN.test(reportDetails);
   const [timemachineSetting, setTimemachineSetting] = useState(false);
   const [showSelectPath, setShowSelectPath] = useState(false);
   const [showTimemachineSelection, setShowTimemachineSelection] = useState(false);
@@ -2801,6 +2805,15 @@ export default function DownloadPage() {
                                       className="min-h-[100px]"
                                     />
                                   </div>
+                                  {showIndexRefreshWarning && (
+                                    <div
+                                      role="alert"
+                                      className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
+                                    >
+                                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                      <span>{t("download.refreshIndexBeforeReport")}</span>
+                                    </div>
+                                  )}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter className="mt-4 gap-2">

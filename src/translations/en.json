@@ -1408,6 +1408,7 @@
     "reportDescription": "Please provide more details about the issue",
     "reportError": "Please provide a reason and details for your report",
     "reportReason": "Why are you reporting this game?",
+    "refreshIndexBeforeReport": "Before reporting missing files or a corrupted download, refresh your game index and check the download again. If the issue remains, submit your report.",
     "reportReasons": {
       "filesNotDownloading": "Files Not Downloading",
       "gameDetails": "Game Details Misleading",
