@@ -13,6 +13,7 @@ const { createWindow, setHandlingProtocolUrl, setMainWindowHidden } = require(".
 let lastHandledUrl = null;
 let lastHandleTime = 0;
 let pendingUrls = new Set();
+const pendingCheckoutSessions = new Set();
 const URL_DEBOUNCE_TIME = 2000;
 
 /**
@@ -82,6 +83,10 @@ function handleProtocolUrl(url) {
             );
           const urlParams = new URL(normalizedUrl);
           const sessionId = urlParams.searchParams.get("session_id");
+          if (!sessionId || !/^cs_[A-Za-z0-9_]{1,255}$/.test(sessionId)) {
+            throw new Error("Invalid checkout session ID");
+          }
+          pendingCheckoutSessions.add(sessionId);
           console.log("Checkout success with session:", sessionId);
           existingWindow.webContents.send("checkout-success", { sessionId });
         } catch (error) {
@@ -190,6 +195,10 @@ function registerProtocolHandlers() {
 
   ipcMain.handle("get-pending-urls", () => {
     return getPendingUrls();
+  });
+  ipcMain.handle("get-pending-checkouts", () => [...pendingCheckoutSessions]);
+  ipcMain.handle("acknowledge-checkout", (_event, sessionId) => {
+    pendingCheckoutSessions.delete(sessionId);
   });
 }
 

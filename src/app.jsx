@@ -46,6 +46,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AdminWarningScreen from "@/components/AdminWarningScreen";
 import LifetimeSubscriptionDialog from "@/components/LifetimeSubscriptionDialog";
+import CheckoutReturnHandler from "@/components/CheckoutReturnHandler";
 import {
   Navigate,
   Route,
@@ -2188,6 +2189,7 @@ function App() {
                     <AutomaticIndexRefresher />
                     <ControllerDetectionPrompt />
                     <LifetimeSubscriptionDialog launchCount={launchCount} />
+                    <CheckoutReturnHandler />
                     <SearchInitializer />
                     <GlobalSearch />
                     <AppRoutes />

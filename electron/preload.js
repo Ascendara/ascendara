@@ -670,6 +670,8 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // ASCEND CHECKOUT
   //===========================================================================
+  getPendingCheckouts: () => ipcRenderer.invoke("get-pending-checkouts"),
+  acknowledgeCheckout: sessionId => ipcRenderer.invoke("acknowledge-checkout", sessionId),
   onCheckoutSuccess: callback =>
     preloadIpc.subscribe("checkout-success", callback, {
       selectArgs: args => [args[0]],

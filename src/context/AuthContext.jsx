@@ -306,6 +306,7 @@ export const AuthProvider = ({ children }) => {
         photoURL: u.photoURL,
         providerData: u.providerData,
         metadata: u.metadata,
+        getIdToken: u.getIdToken.bind(u),
       });
     }
     return result;
