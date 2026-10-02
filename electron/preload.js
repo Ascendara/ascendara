@@ -671,7 +671,6 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   onCheckoutSuccess: callback =>
     preloadIpc.subscribe("checkout-success", callback, {
-      includeEventPlaceholder: true,
       selectArgs: args => [args[0]],
     }),
   onCheckoutCanceled: callback =>
