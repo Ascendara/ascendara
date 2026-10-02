@@ -12,12 +12,8 @@ import {
   BigPictureToolbar,
   BigPictureEmptyState,
 } from "./BigPictureShell";
-import { useMemo, useState } from "react";
-import {
-  loadFolders,
-  addGameToFolder,
-  removeGameFromFolder,
-} from "@/lib/folderManager";
+import { useEffect, useMemo, useState } from "react";
+import { loadFolders } from "@/lib/folderManager";
 import recentGamesService from "@/services/recentGamesService";
 import { SurfaceButton, SurfaceGame, useSurface } from "./Surface";
 import { VirtualKeyboard } from "./VirtualKeyboard";
@@ -49,10 +45,19 @@ export function LibrarySurface({
   const [page, setPage] = useState(0);
   const [folder, setFolder] = useState(null);
   const [hidden, setHidden] = useState(false);
-  const [manage, setManage] = useState(null);
   const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const syncLibrary = () => setRevision(value => value + 1);
+    window.addEventListener("favorites-updated", syncLibrary);
+    window.addEventListener("ascendara:folders-updated", syncLibrary);
+    return () => {
+      window.removeEventListener("favorites-updated", syncLibrary);
+      window.removeEventListener("ascendara:folders-updated", syncLibrary);
+    };
+  }, []);
   const folders = useMemo(() => loadFolders(), [revision]);
   const favorites = useMemo(() => readStoredList("game-favorites"), [revision]);
+  const selectedFolder = folder && folders.find(item => item.game === folder.game);
   const recent = useMemo(() => recentGamesService.getRecentGames(), [games]);
   const filtered = useMemo(() => libraryGames(
     games.map((game) => ({
@@ -64,12 +69,12 @@ export function LibrarySurface({
     {
       query,
       sort,
-      folder,
+      folder: selectedFolder,
       favorites: filter === "favorites" ? favorites : undefined,
       hiddenFolders:
-        hidden || folder?.hidden ? [] : folders.filter((item) => item.hidden),
+        hidden || selectedFolder?.hidden ? [] : folders.filter((item) => item.hidden),
     },
-  ), [games, recent, query, sort, folder, filter, favorites, hidden, folders]);
+  ), [games, recent, query, sort, selectedFolder, filter, favorites, hidden, folders]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 24));
   const currentPage = Math.min(page, pageCount - 1);
   const entries = useMemo(() => gameEntries(filtered), [filtered]);
@@ -79,25 +84,19 @@ export function LibrarySurface({
   );
   const visibleFolders = folders.filter((item) => hidden || !item.hidden);
   const toolbar = ["search", "sort", "filter", "hidden", "refresh", ...((pendingCount > 0) ? ["duplicates"] : [])];
-  const rows = manage
-    ? [
-        ["details", "favorite", "done"],
-        ...visibleFolders.map((item) => [`folder-${item.game}`]),
-      ]
-    : [
-        toolbar,
-        ["root", ...visibleFolders.map((item) => `folder-${item.game}`)],
-        ...Array.from(
-          { length: Math.ceil(displayed.length / columns) },
-          (_, i) =>
-            displayed
-              .slice(i * columns, i * columns + columns)
-              .map(({ key }) => `game-${key}`),
-        ),
-        ["previous", "next"],
-      ];
-  const back = () =>
-    manage ? setManage(null) : folder ? setFolder(null) : onBack();
+  const rows = [
+    toolbar,
+    ["root", ...visibleFolders.map((item) => `folder-${item.game}`)],
+    ...Array.from(
+      { length: Math.ceil(displayed.length / columns) },
+      (_, i) =>
+        displayed
+          .slice(i * columns, i * columns + columns)
+          .map(({ key }) => `game-${key}`),
+    ),
+    ["previous", "next"],
+  ];
+  const back = () => folder ? setFolder(null) : onBack();
   const { root, focus } = useSurface(
     navigation,
     rows,
@@ -110,19 +109,6 @@ export function LibrarySurface({
     setter(value);
     setPage(0);
   };
-  const toggleFavorite = () => {
-    const name = gameName(manage);
-    localStorage.setItem(
-      "game-favorites",
-      JSON.stringify(
-        favorites.includes(name)
-          ? favorites.filter((item) => item !== name)
-          : [...favorites, name],
-      ),
-    );
-    window.dispatchEvent(new CustomEvent("favorites-updated"));
-    setRevision((value) => value + 1);
-  };
   return (
     <BigPictureShell
       ref={root}
@@ -130,50 +116,7 @@ export function LibrarySurface({
       title="Library"
       focus={focus}
     >
-      {manage ? (
-        <>
-          <h2>{gameName(manage)}</h2>
-          <div className="bp-actions">
-            <SurfaceButton
-              {...focus("details")}
-              onClick={() => openGame(manage)}
-            >
-              Play / Game details
-            </SurfaceButton>
-            <SurfaceButton {...focus("favorite")} onClick={toggleFavorite}>
-              {favorites.includes(gameName(manage))
-                ? "Remove favorite"
-                : "Add favorite"}
-            </SurfaceButton>
-            <SurfaceButton {...focus("done")} onClick={() => setManage(null)}>
-              Back to library
-            </SurfaceButton>
-          </div>
-          <h2>Organize in folders</h2>
-          {visibleFolders.map((item) => {
-            const contains = item.items?.some(
-              (game) => gameName(game) === gameName(manage),
-            );
-            return (
-              <div className="bp-actions" key={item.game}>
-                <SurfaceButton
-                  {...focus(`folder-${item.game}`)}
-                  onClick={() => {
-                    if (contains)
-                      removeGameFromFolder(gameName(manage), item.game);
-                    else addGameToFolder(manage, item.game);
-                    setRevision((value) => value + 1);
-                  }}
-                >
-                  {contains ? "Remove from" : "Add to"} {item.game}
-                </SurfaceButton>
-              </div>
-            );
-          })}
-        </>
-      ) : (
-        <>
-          <BigPictureToolbar label="Library filters">
+      <BigPictureToolbar label="Library filters">
             <SurfaceButton
               className="bp-search-button"
               {...focus("search")}
@@ -278,10 +221,10 @@ export function LibrarySurface({
                 key={key}
                 game={game}
                 focus={focus(`game-${key}`)}
-                onOpen={setManage}
+                onOpen={openGame}
                 subtitle={
                   game._hasMultipleInstalls
-                    ? `${game.isCustom ? "Custom / imported" : "Installed"} ? ${game.executable || game._sourceDir || "Unknown location"}`
+                    ? `${game.isCustom ? "Custom / imported" : "Installed"} · ${game.executable || game._sourceDir || "Unknown location"}`
                     : game.playTime
                     ? `${(Number(game.playTime) / 3600).toFixed(1)}h played`
                     : "Installed"
@@ -306,8 +249,6 @@ export function LibrarySurface({
               Next page
             </SurfaceButton>
           </div>
-        </>
-      )}
       {keyboard && (
         <VirtualKeyboard
           value={query}

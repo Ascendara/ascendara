@@ -18,6 +18,8 @@ import {
   Pencil,
   AlertTriangle,
   Trash2,
+  Heart,
+  FolderPlus,
   Award,
   Check,
   ChevronLeft,
@@ -28,6 +30,7 @@ import {
   CloudUpload,
   X,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import GamepadFileBrowser from "@/components/GamepadFileBrowser";
@@ -86,6 +89,9 @@ function InstalledGameDetailsView({
     showManagementMenu,
     setBackupDialogOpen,
     selectedMenuItem,
+    folders,
+    isFavorite,
+    handleManagementAction,
     setShowExecutableManager,
     executableExists,
     handleDeleteGame,
@@ -139,6 +145,12 @@ function InstalledGameDetailsView({
     assetSearchOpen,
     autoLaunch,
   });
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (showManagementMenu) {
+      menuRef.current?.querySelector('[data-menu-selected="true"]')?.scrollIntoView({ block: "nearest" });
+    }
+  }, [showManagementMenu, selectedMenuItem]);
   return (
     <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-background text-primary">
       <DetailBackButton
@@ -519,19 +531,14 @@ function InstalledGameDetailsView({
       {/* Management Menu Overlay */}
       {showManagementMenu && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="w-[600px] rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl">
+          <div ref={menuRef} className="max-h-[85vh] w-[600px] overflow-y-auto rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl">
             <h2 className="mb-6 text-3xl font-bold text-primary">
               {t("bigPicture.gameManagement") || "Game Management"}
             </h2>
             <div className="space-y-3">
               <button
-                onClick={() => {
-                  window.electron.createGameShortcut(game).then(success => {
-                    if (success) toast.success(t("library.shortcutCreated"));
-                    else toast.error(t("library.shortcutError"));
-                  });
-                  setShowManagementMenu(false);
-                }}
+                onClick={() => handleManagementAction(0)}
+                data-menu-selected={selectedMenuItem === 0}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
                   selectedMenuItem === 0
                     ? "bg-primary text-secondary shadow-lg"
@@ -544,10 +551,8 @@ function InstalledGameDetailsView({
                 </span>
               </button>
               <button
-                onClick={() => {
-                  setShowExecutableManager(true);
-                  setShowManagementMenu(false);
-                }}
+                onClick={() => handleManagementAction(1)}
+                data-menu-selected={selectedMenuItem === 1}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
                   selectedMenuItem === 1
                     ? "bg-primary text-secondary shadow-lg"
@@ -565,16 +570,44 @@ function InstalledGameDetailsView({
                 </div>
               </button>
               <button
-                onClick={() => {
-                  if (game.isCustom) {
-                    handleDeleteGame();
-                  } else {
-                    setIsDeleteDialogOpen(true);
-                  }
-                  setShowManagementMenu(false);
-                }}
+                onClick={() => handleManagementAction(2)}
+                data-menu-selected={selectedMenuItem === 2}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
                   selectedMenuItem === 2
+                    ? "bg-primary text-secondary shadow-lg"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                <Heart className="h-6 w-6" fill={isFavorite ? "currentColor" : "none"} />
+                <span className="text-lg font-semibold">
+                  {isFavorite ? "Remove favorite" : "Add favorite"}
+                </span>
+              </button>
+              {folders.map((folder, index) => {
+                const contains = folder.items?.some(item => (item.game || item.name) === gameName);
+                return (
+                  <button
+                    key={folder.game}
+                    onClick={() => handleManagementAction(index + 3)}
+                    data-menu-selected={selectedMenuItem === index + 3}
+                    className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                      selectedMenuItem === index + 3
+                        ? "bg-primary text-secondary shadow-lg"
+                        : "bg-muted hover:bg-muted/80"
+                    }`}
+                  >
+                    <FolderPlus className="h-6 w-6 shrink-0" />
+                    <span className="text-lg font-semibold">
+                      {contains ? "Remove from" : "Add to"} {folder.game}
+                    </span>
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => handleManagementAction(folders.length + 3)}
+                data-menu-selected={selectedMenuItem === folders.length + 3}
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                  selectedMenuItem === folders.length + 3
                     ? "bg-red-500 text-white shadow-lg"
                     : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                 }`}

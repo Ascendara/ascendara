@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import gameUpdateService from "@/services/gameUpdateService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import recentGamesService from "@/services/recentGamesService";
-import { loadFolders, saveFolders } from "@/lib/folderManager";
+import { loadFolders, saveFolders, addGameToFolder, removeGameFromFolder } from "@/lib/folderManager";
+import { readStoredList } from "./surfaceNavigation";
 import { getControllerButtons } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 import { hasActiveSubscription, uploadBackupToCloud } from "@/services/cloudBackupService";
@@ -42,6 +43,8 @@ function useInstalledGameDetails({
   const [playTime, setPlayTime] = useState(0);
   const [selectedButton, setSelectedButton] = useState("play"); // 'play' or 'folder' or 'manage'
   const [selectedMenuItem, setSelectedMenuItem] = useState(0);
+  const [folders, setFolders] = useState(loadFolders);
+  const [isFavorite, setIsFavorite] = useState(() => readStoredList("game-favorites").includes(game.game || game.name));
   const [trainerToggleFocused, setTrainerToggleFocused] = useState(false);
   const [achievementsToggleFocused, setAchievementsToggleFocused] = useState(false);
   const buttons = getControllerButtons(controllerType);
@@ -594,6 +597,40 @@ function useInstalledGameDetails({
     }
   }, [autoCloudBackupEnabled, backupScreen, cloudAvailable, cloudBackups, cloudRestoreBusy, gameName, navigate, selectedCloudBackup, settings, t, user, userData]);
 
+  const handleManagementAction = index => {
+    if (index === 0) {
+      window.electron.createGameShortcut(game).then(success => {
+        if (success) toast.success(t("library.shortcutCreated"));
+        else toast.error(t("library.shortcutError"));
+      });
+    } else if (index === 1) {
+      setShowExecutableManager(true);
+    } else if (index === 2) {
+      const favorites = readStoredList("game-favorites");
+      const isSaved = favorites.includes(gameName);
+      localStorage.setItem("game-favorites", JSON.stringify(
+        isSaved ? favorites.filter(name => name !== gameName) : [...favorites, gameName]
+      ));
+      setIsFavorite(!isSaved);
+      window.dispatchEvent(new CustomEvent("favorites-updated"));
+      return;
+    } else if (index < folders.length + 3) {
+      const folder = folders[index - 3];
+      const contains = folder.items?.some(item => (item.game || item.name) === gameName);
+      setFolders(contains
+        ? removeGameFromFolder(gameName, folder.game)
+        : addGameToFolder(game, folder.game));
+      window.dispatchEvent(new CustomEvent("ascendara:folders-updated"));
+      return;
+    } else if (game.isCustom) {
+      handleDeleteGame();
+    } else {
+      setIsDeleteDialogOpen(true);
+    }
+    setShowManagementMenu(false);
+    setDialogButtonIndex(0);
+  };
+
   const handleInput = useCallback(
     action => {
       if (!canInput) return;
@@ -750,34 +787,14 @@ function useInstalledGameDetails({
       // Management menu navigation
       if (showManagementMenu) {
         if (action === "DOWN") {
-          const menuItemCount = 3; // Shortcut, Executable, Delete
+          const menuItemCount = folders.length + 4; // Shortcut, Executable, Favorite, Folders, Delete
           setSelectedMenuItem(prev => (prev + 1) % menuItemCount);
         } else if (action === "UP") {
-          const menuItemCount = 3;
+          const menuItemCount = folders.length + 4;
           setSelectedMenuItem(prev => (prev - 1 + menuItemCount) % menuItemCount);
         } else if (action === "CONFIRM") {
           // Execute selected menu item
-          console.log("[GAME DETAILS] Menu item selected:", selectedMenuItem);
-          setShowManagementMenu(false);
-          setDialogButtonIndex(0);
-
-          if (selectedMenuItem === 0) {
-            console.log("[GAME DETAILS] Creating shortcut");
-            window.electron.createGameShortcut(game).then(success => {
-              if (success) toast.success(t("library.shortcutCreated"));
-              else toast.error(t("library.shortcutError"));
-            });
-          } else if (selectedMenuItem === 1) {
-            console.log("[GAME DETAILS] Opening executable manager");
-            setShowExecutableManager(true);
-          } else if (selectedMenuItem === 2) {
-            console.log("[GAME DETAILS] Opening delete dialog");
-            if (game.isCustom) {
-              handleDeleteGame();
-            } else {
-              setIsDeleteDialogOpen(true);
-            }
-          }
+          handleManagementAction(selectedMenuItem);
         } else if (action === "BACK") {
           setShowManagementMenu(false);
           setSelectedMenuItem(0);
@@ -919,6 +936,8 @@ function useInstalledGameDetails({
       dialogButtonIndex,
       handleBackupAction,
       selectedMenuItem,
+      folders.length,
+      handleManagementAction,
       onBack,
       isLaunching,
       isRunning,
@@ -1042,6 +1061,9 @@ function useInstalledGameDetails({
     showManagementMenu,
     setBackupDialogOpen,
     selectedMenuItem,
+    folders,
+    isFavorite,
+    handleManagementAction,
     setShowExecutableManager,
     executableExists,
     handleDeleteGame,
