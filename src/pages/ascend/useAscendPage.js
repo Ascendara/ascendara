@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { applyAscendEntitlements } from "@/utils/ascendAccess";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -130,7 +131,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [userStatus, setUserStatus] = useState("online");
 
   // Ascend access state (server-verified)
-  const [ascendAccess, setAscendAccess] = useState({
+  const [checkedAccess, setAscendAccess] = useState({
     hasAccess: true,
     daysRemaining: 7,
     isSubscribed: false,
@@ -139,6 +140,8 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     noTrial: false,
     noTrialReason: null,
   });
+  const ascendAccess = applyAscendEntitlements(checkedAccess, userData);
+  const accessRequestRef = useRef(0);
   const [verifyingAccess, setVerifyingAccess] = useState(true);
   const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
   // Subscription tier info from API (more reliable than Firestore data)
@@ -294,7 +297,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   // Verify Ascend access and load data when user is logged in
   useEffect(() => {
     if (user?.uid && !showDisplayNamePrompt) {
-      verifyAccess();
       if (!cloudOnly) loadFriendsData();
       if (!cloudOnly) loadRequestsData();
       // Note: User status is loaded by AscendSidebar and synced via onStatusChange prop
@@ -304,6 +306,16 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       if (!cloudOnly) loadNotifications();
     }
   }, [user?.uid, showDisplayNamePrompt]);
+
+  // Purchases and subscription changes arrive through the live account listener.
+  useEffect(() => {
+    if (user?.uid && !showDisplayNamePrompt) verifyAccess();
+    return () => {
+      accessRequestRef.current += 1;
+    };
+  }, [user?.uid, showDisplayNamePrompt, userData?.ascendSubscription?.active,
+    userData?.ascendSubscription?.lifetime, userData?.verified, userData?.owner,
+    userData?.contributor, userData?.noTrial]);
 
   // Re-run cloud-first stats merge once Ascend access is verified. The first
   // loadLocalStats call (above) runs before verifyAccess resolves and would
@@ -703,6 +715,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   };
 
   const verifyAccess = async () => {
+    const requestId = ++accessRequestRef.current;
     setVerifyingAccess(true);
     try {
       // Get hardware ID from Electron for trial verification
@@ -711,6 +724,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         hardwareId = await window.electron.getHardwareId();
       }
       const result = await verifyAscendAccess(hardwareId);
+      if (requestId !== accessRequestRef.current) return;
       setAscendAccess({ ...result, verified: true });
 
       // If trial is expired or user has no access, disconnect all remote access sessions
@@ -759,6 +773,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         }
       }
     } catch (e) {
+      if (requestId !== accessRequestRef.current) return;
       console.error("Failed to verify Ascend access:", e);
       // Default to allowing access on error (fail open for better UX)
       setAscendAccess({
@@ -772,7 +787,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         verified: true,
       });
     }
-    setVerifyingAccess(false);
+    if (requestId === accessRequestRef.current) setVerifyingAccess(false);
   };
 
   const loadUserStatus = async () => {
