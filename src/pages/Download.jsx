@@ -1346,7 +1346,13 @@ export default function DownloadPage() {
       } catch (error) {
         console.error(`Error processing ${selectedProvider} link with Torbox:`, error);
         toast.dismiss();
-        toast.error(t("download.toast.torboxProcessingError"));
+        toast.error(
+          error?.code === "UNSUPPORTED_SITE"
+            ? t("download.toast.torboxUnsupportedSite", {
+                provider: selectedProvider,
+              })
+            : t("download.toast.torboxProcessingError")
+        );
         setIsStartingDownload(false);
         return;
       }

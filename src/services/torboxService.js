@@ -203,9 +203,13 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("[Torbox] Error response data:", errorData);
-      throw new Error(
-        errorData.message || `Failed to create premium download link: ${response.status}`
+      const error = new Error(
+        errorData.detail ||
+          errorData.message ||
+          `Failed to create premium download link: ${response.status}`
       );
+      error.code = errorData.error;
+      throw error;
     }
 
     return await response.json();
@@ -423,9 +427,11 @@ export const getDirectDownloadLinkFromUrl = async (
       if (createResult.detail) {
         console.error("[Torbox] API error detail:", createResult.detail);
       }
-      throw new Error(
+      const error = new Error(
         "Failed to create premium download: " + (createResult.detail || "Unknown error")
       );
+      error.code = createResult.error;
+      throw error;
     }
     const createdWebdownloadId = createResult.data.webdownload_id;
     console.log("[Torbox] Premium download created with ID:", createdWebdownloadId);

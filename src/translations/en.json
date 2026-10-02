@@ -1484,6 +1484,7 @@
       "reportSubmitted": "Report submitted successfully",
       "torboxOffline": "This provider is offline on Torbox at the moment. Try another provider.",
       "torboxProcessingError": "Error processing Torbox link",
+      "torboxUnsupportedSite": "TorBox does not support this {{provider}} download link. Choose another provider or disable TorBox for this download.",
       "torboxTorrentFallback": "TorBox failed to add the torrent. Retrying with qBittorrent.",
       "torrentDisabled": "Enable torrenting in Settings to download this game.",
       "torrentSent": "Torrent sent to qBittorrent"
