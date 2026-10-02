@@ -102,6 +102,7 @@ export const SurfaceGame = memo(function SurfaceGame({
   focus,
   subtitle,
   artworkOnly = false,
+  landscapeArtwork = null,
 }) {
   const [image, setImage] = useState(game.cover || game.image || null);
   const [visible, setVisible] = useState(false);
@@ -136,7 +137,7 @@ export const SurfaceGame = memo(function SurfaceGame({
       observer.disconnect();
     };
   }, [name, game.imgID, game.platform]);
-  const artwork = image || cachedImage;
+  const artwork = landscapeArtwork || image || cachedImage;
   return (
     <button
       ref={ref}

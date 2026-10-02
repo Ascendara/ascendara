@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld("electron", {
   minimizeWindow: () => ipcRenderer.invoke("minimize-window"),
   maximizeWindow: () => ipcRenderer.invoke("maximize-window"),
   closeWindow: forceQuit => ipcRenderer.invoke("close-window", forceQuit),
+  shutdownSystem: () => ipcRenderer.invoke("shutdown-system"),
   toggleFullscreen: () => ipcRenderer.invoke("toggle-fullscreen"),
   isWindowMaximized: () => ipcRenderer.invoke("is-window-maximized"),
   getFullscreenState: () => ipcRenderer.invoke("get-fullscreen-state"),

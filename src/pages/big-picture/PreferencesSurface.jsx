@@ -67,6 +67,7 @@ const categories = [
     icon: Gamepad2,
     description: "Startup and controller experience",
     options: [
+      ["bigPictureHomeStyle", "Home style", "Ascendara offers a full dashboard. Classic puts your games in a simple cinematic carousel."],
       [
         "smoothTransitions",
         "Smooth transitions",
@@ -121,7 +122,9 @@ export function PreferencesSurface({
       ? settings.defaultOpenPage === "bigpicture"
       : !!settings[key];
   const toggle = (key) =>
-    key === "indexes"
+    key === "bigPictureHomeStyle"
+      ? updateSetting(key, settings[key] === "classic" ? "ascendara" : "classic")
+      : key === "indexes"
       ? openIndexes()
       : key === "controller"
       ? openController()
@@ -218,7 +221,7 @@ export function PreferencesSurface({
                   className="bp-setting-row"
                   key={key}
                   {...focus(key)}
-                  {...(!["controller", "indexes"].includes(key)
+                  {...(!["controller", "indexes", "bigPictureHomeStyle"].includes(key)
                     ? { role: "switch", "aria-checked": enabled(key) }
                     : {})}
                   onClick={() => toggle(key)}
@@ -227,7 +230,9 @@ export function PreferencesSurface({
                     <strong>{label}</strong>
                     <small>{description}</small>
                   </span>
-                  {["controller", "indexes"].includes(key) ? (
+                  {key === "bigPictureHomeStyle" ? (
+                    <span>{settings.bigPictureHomeStyle === "classic" ? "Classic" : "Ascendara"}</span>
+                  ) : ["controller", "indexes"].includes(key) ? (
                     <ChevronRight />
                   ) : (
                     <span

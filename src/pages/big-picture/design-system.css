@@ -909,3 +909,28 @@
     transition: none !important;
   }
 }
+
+/* Power actions keep their descriptions readable from the couch. */
+.bp-power .bp-panel { width: min(850px, 100%); margin: clamp(24px, 5vh, 70px) auto; padding: clamp(24px, 3vw, 48px); }
+.bp-power-symbol { width: 40px; height: 40px; margin-bottom: 24px; color: rgb(var(--color-primary)); }
+.bp-power-options { display: grid; gap: 12px; margin-top: 28px; }
+.bp-power-option { justify-content: flex-start; text-align: left; padding: 18px 22px; gap: 20px; }
+.bp-power-option strong, .bp-power-option small { display: block; }
+.bp-power-option small { margin-top: 4px; color: rgb(var(--color-muted-foreground)); font-weight: 400; }
+.bp-power .bp-actions { margin-top: 24px; }
+.bp-power-warning { margin-block: 20px; color: rgb(var(--color-foreground)); }
+.bp-classic { position: relative; isolation: isolate; min-height: 100%; }
+.bp-classic-art { position: absolute; inset: 0; z-index: -1; background-size: cover; background-position: center; opacity: .22; mask-image: linear-gradient(to bottom, #000, transparent 95%); }
+.bp-classic-content { display: flex; flex-direction: column; justify-content: center; min-height: calc(100vh - 180px); padding-block: 32px 72px; }
+.bp-classic-heading { margin-bottom: 28px; }
+.bp-classic-heading > span { letter-spacing: .25em; font-size: .75em; color: rgb(var(--color-primary)); }
+.bp-classic-heading h1 { font-size: clamp(24px, 2.4vw, 48px); margin-top: 12px; font-weight: 600; }
+.bp-classic-heading p { color: rgb(var(--color-muted-foreground)); margin-top: 6px; }
+.bp-classic-row { display: flex; gap: clamp(16px, 1.5vw, 32px); overflow-x: auto; padding: 16px 8px 38px; scroll-padding-inline: 8px; }
+.bp-classic-tile { flex: 0 0 auto; width: clamp(140px, 16vw, 300px); transition: width .25s ease; }
+.bp-classic-tile[data-expanded="true"] { width: clamp(290px, 37vw, 690px); }
+.bp-classic-tile .bp-game { width: 100%; }
+.bp-classic-tile .bp-cover { aspect-ratio: auto; height: clamp(210px, 36vh, 450px); }
+.bp-classic-tile .bp-cover img { width: 100%; height: 100%; object-fit: cover; }
+.bp-classic-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 18px; }
+@media (prefers-reduced-motion: reduce) { .bp-classic-tile { transition: none; } }

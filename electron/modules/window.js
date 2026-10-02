@@ -328,6 +328,7 @@ async function showErrorDialog(title, message) {
  * Register window-related IPC handlers
  */
 function registerWindowHandlers() {
+  ipcMain.handle("shutdown-system", () => require("./system-power").shutdownSystem());
   // Open DevTools (available in production on Linux for debugging)
   ipcMain.handle("open-devtools", () => {
     const mainWindow = BrowserWindow.getAllWindows()[0];

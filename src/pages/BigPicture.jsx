@@ -11,6 +11,7 @@ import { ExitBigPictureDialog } from "./big-picture/ExitBigPictureDialog";
 import { BigPictureSettingsDialog } from "./big-picture/BigPictureSettingsDialog";
 import { SidebarMenu } from "./big-picture/SidebarMenu";
 import { PowerSurface } from "./big-picture/PowerSurface";
+import { ClassicHome } from "./big-picture/ClassicHome";
 import { HomeDashboard } from "./big-picture/HomeDashboard";
 import { LibrarySurface } from "./big-picture/LibrarySurface";
 import { RetroSurface } from "./big-picture/RetroSurface";
@@ -133,6 +134,7 @@ function BigPicture() {
     assetSearchGame,
     showWelcomeAnimation,
   } = useBigPicturePage();
+  const HomeStyle = settings.bigPictureHomeStyle === "classic" ? ClassicHome : HomeDashboard;
   return (
     <div
       className={`fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-background text-primary ${showKillDialog || showProviderDialog ? "pointer-events-none" : ""}`}
@@ -280,13 +282,14 @@ function BigPicture() {
           {view === "power" && (
             <PowerSurface
               navigation={surfaceNavigation}
+              downloads={downloadingGames.length}
               active={!isMenuOpen}
               onBack={() => changeView("carousel")}
               onDesktop={() => navigate("/")}
             />
           )}
           {view === "carousel" && (
-            <HomeDashboard
+            <HomeStyle
               navigation={surfaceNavigation}
               active={
                 !isMenuOpen &&

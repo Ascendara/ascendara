@@ -36,6 +36,7 @@ class SettingsManager {
       gameSource: "steamrip",
       autoCreateShortcuts: true,
       smoothTransitions: true,
+    bigPictureHomeStyle: "ascendara",
       sendAnalytics: true,
       autoUpdate: true,
       endOnClose: false,
