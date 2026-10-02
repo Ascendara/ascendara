@@ -274,7 +274,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { setTheme } = useTheme();
-  const [isV7Welcome, setIsV7Welcome] = useState(welcomeData.isV7Welcome);
+  const [isV7Welcome, setIsV7Welcome] = useState(welcomeData?.isV7Welcome);
   // Restore step and refresh state from navigation state if coming back from localrefresh
   const [step, setStep] = useState(location.state?.welcomeStep || "language");
   const restoredRefreshState = location.state?.indexRefreshStarted || false;
@@ -1029,7 +1029,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
     };
   }, []);
 
-  if (welcomeData.isV7Welcome) {
+  if (welcomeData?.isV7Welcome) {
     return (
       <div
         className={`relative flex h-screen items-center justify-center overflow-hidden bg-background text-foreground transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}

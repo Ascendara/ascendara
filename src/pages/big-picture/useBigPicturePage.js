@@ -44,14 +44,12 @@ function useBigPicturePage() {
   // Big Picture. Calling window.electron.setFullscreen explicitly guarantees
   // the window state is always synced on the way in and out.
   useEffect(() => {
+    const useNativeFullscreen = typeof window.electron?.setFullscreen === "function";
     const enterFullScreen = async () => {
       try {
-        await window.electron?.setFullscreen?.(true);
-      } catch (err) {
-        // Silently ignore fullscreen errors
-      }
-      try {
-        if (!document.fullscreenElement) {
+        if (useNativeFullscreen) {
+          await window.electron.setFullscreen(true);
+        } else if (!document.fullscreenElement) {
           await document.documentElement.requestFullscreen();
         }
       } catch (err) {
@@ -75,28 +73,36 @@ function useBigPicturePage() {
     // Quit full-screen when leaving Big Picture
     return () => {
       document.removeEventListener("keydown", preventEscapeFullscreen, { capture: true });
-      if (document.fullscreenElement) {
+      if (useNativeFullscreen) {
+        window.electron
+          .setFullscreen(false)
+          .catch(err => console.error("Error exiting native fullscreen:", err));
+      } else if (document.fullscreenElement) {
         document
           .exitFullscreen()
           .catch(err => console.error("Error exiting fullscreen:", err));
       }
-      window.electron
-        ?.setFullscreen?.(false)
-        ?.catch(err => console.error("Error exiting native fullscreen:", err));
     };
   }, []);
 
   // Welcome animation effect
   useEffect(() => {
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    const timer = setTimeout(() => {
-      setShowWelcomeAnimation(false);
-    }, reducedMotion ? 300 : 2700);
+    const reducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)"
+    )?.matches;
+    const timer = setTimeout(
+      () => {
+        setShowWelcomeAnimation(false);
+      },
+      reducedMotion ? 300 : 2700
+    );
 
     return () => clearTimeout(timer);
   }, []);
   const [libraryRecords, setLibraryRecords] = useState([]);
-  const library = useLibraryConflicts(libraryRecords, () => toast.error("Unable to save your library choice. Please try again."));
+  const library = useLibraryConflicts(libraryRecords, () =>
+    toast.error("Unable to save your library choice. Please try again.")
+  );
   const allGames = library.games;
   const libraryConflict = library.conflict;
   const resolveLibraryConflict = library.resolve;
@@ -781,18 +787,27 @@ function useBigPicturePage() {
         ];
 
         setLibraryRecords(records);
-      } catch (error) { toast.error("Unable to load library. Open Library and choose Refresh to retry."); }
+      } catch (error) {
+        toast.error("Unable to load library. Open Library and choose Refresh to retry.");
+      }
     };
     fetchGames();
   }, [refreshTrigger]);
 
   useEffect(() => {
-    const recent = new Map(recentGamesService.getRecentGames().map((game, index) => [game.game, index]));
-    let carousel = [...allGames].sort((a, b) =>
-      (recent.get(a.game) ?? Infinity) - (recent.get(b.game) ?? Infinity) ||
-      (a.game || a.name || "").localeCompare(b.game || b.name || ""),
+    const recent = new Map(
+      recentGamesService.getRecentGames().map((game, index) => [game.game, index])
     );
-    if (carousel.length > 20) carousel = [...carousel.slice(0, 20), { isSeeMore: true, game: t("bigPicture.seeMore"), name: t("bigPicture.seeMore") }];
+    let carousel = [...allGames].sort(
+      (a, b) =>
+        (recent.get(a.game) ?? Infinity) - (recent.get(b.game) ?? Infinity) ||
+        (a.game || a.name || "").localeCompare(b.game || b.name || "")
+    );
+    if (carousel.length > 20)
+      carousel = [
+        ...carousel.slice(0, 20),
+        { isSeeMore: true, game: t("bigPicture.seeMore"), name: t("bigPicture.seeMore") },
+      ];
     setCarouselGames(carousel);
   }, [allGames, t]);
 
@@ -852,13 +867,16 @@ function useBigPicturePage() {
     [isTransitioning]
   );
 
-  const handleMenuAction = useCallback(action => {
-    setIsMenuOpen(false);
-    if (action === "controller") setShowControllerSettings(true);
-    else if (action === "refresh") setRefreshTrigger(value => value + 1);
-    else if (action === "exit_bp") setShowExitBigPictureDialog(true);
-    else if (action === "power") changeView("power");
-  }, [changeView]);
+  const handleMenuAction = useCallback(
+    action => {
+      setIsMenuOpen(false);
+      if (action === "controller") setShowControllerSettings(true);
+      else if (action === "refresh") setRefreshTrigger(value => value + 1);
+      else if (action === "exit_bp") setShowExitBigPictureDialog(true);
+      else if (action === "power") changeView("power");
+    },
+    [changeView]
+  );
 
   // --- MAIN NAVIGATION LOGIC (SHARED BETWEEN KEYBOARD & GAMEPAD) ---
   const handleNavigation = useCallback(
@@ -901,19 +919,36 @@ function useBigPicturePage() {
       }
 
       if (isMenuOpen) {
-        if (action === "DOWN") setMenuIndex(p => Math.min(p + 1, sidebarItems.length - 1));
+        if (action === "DOWN")
+          setMenuIndex(p => Math.min(p + 1, sidebarItems.length - 1));
         else if (action === "UP") setMenuIndex(p => Math.max(p - 1, 0));
         else if (action === "BACK" || action === "MENU") setIsMenuOpen(false);
         else if (action === "CONFIRM") handleMenuAction(sidebarItems[menuIndex]?.action);
         return;
       }
 
-      if (["carousel", "library", "retro", "cloud", "profile", "preferences", "power", "downloads", "store"].includes(view)) {
+      if (
+        [
+          "carousel",
+          "library",
+          "retro",
+          "cloud",
+          "profile",
+          "preferences",
+          "power",
+          "downloads",
+          "store",
+        ].includes(view)
+      ) {
         if (action === "PREVIOUS_PAGE" || action === "NEXT_PAGE") {
           const index = pageLinks.findIndex(([id]) => id === view);
           const step = action === "NEXT_PAGE" ? 1 : -1;
-          const next = index < 0 ? (step > 0 ? 0 : pageLinks.length - 1)
-            : (index + step + pageLinks.length) % pageLinks.length;
+          const next =
+            index < 0
+              ? step > 0
+                ? 0
+                : pageLinks.length - 1
+              : (index + step + pageLinks.length) % pageLinks.length;
           pageFocusRequest.current = true;
           changeView(pageLinks[next][0]);
           return;
@@ -1173,9 +1208,17 @@ function useBigPicturePage() {
 
   useControllerInput(handleNavigation, {
     priority: 0,
-    blocked: showExitDialog || showExitBigPictureDialog || showControllerSettings ||
-      showKillDialog || showProviderDialog || showQueuePrompt || assetSearchOpen ||
-      providerDialogJustClosed.current || isKeyboardOpen || !!installedGameView,
+    blocked:
+      showExitDialog ||
+      showExitBigPictureDialog ||
+      showControllerSettings ||
+      showKillDialog ||
+      showProviderDialog ||
+      showQueuePrompt ||
+      assetSearchOpen ||
+      providerDialogJustClosed.current ||
+      isKeyboardOpen ||
+      !!installedGameView,
   });
 
   return {
@@ -1186,7 +1229,10 @@ function useBigPicturePage() {
     libraryPendingCount: library.pendingCount,
     selectedSort,
     setSelectedSort,
-    refreshStore: () => { setStoreGames([]); setStoreRevision(value => value + 1); },
+    refreshStore: () => {
+      setStoreGames([]);
+      setStoreRevision(value => value + 1);
+    },
     surfaceNavigation,
     surfaceInputLock,
     pageFocusRequest,

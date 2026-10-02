@@ -17,6 +17,7 @@ const {
 
 let mainWindowHidden = false;
 let isHandlingProtocolUrl = false;
+let bigPictureWindowBounds = null;
 
 /**
  * Create the main application window
@@ -46,7 +47,11 @@ function createWindow() {
     show: false,
     backgroundColor: "#09090b",
     // Enable native full-screen if asked for
-    fullscreen: startInBigPicture,
+    ...(startInBigPicture
+      ? process.platform === "darwin"
+        ? { simpleFullscreen: true }
+        : { fullscreen: true }
+      : {}),
     webPreferences: {
       preload: path.join(__dirname, "..", "preload.js"),
       nodeIntegration: false,
@@ -392,6 +397,27 @@ function registerWindowHandlers() {
   ipcMain.handle("set-fullscreen", (_, value) => {
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
+      if (process.platform === "darwin") {
+        if (value) {
+          if (bigPictureWindowBounds || win.isSimpleFullScreen()) return true;
+          const bounds = win.getBounds();
+          win.setSimpleFullScreen(true);
+          if (win.isSimpleFullScreen()) return true;
+          const displayBounds = screen.getDisplayMatching(bounds).bounds;
+          bigPictureWindowBounds = bounds;
+          win.setBounds(displayBounds);
+          const currentBounds = win.getBounds();
+          return Object.keys(displayBounds).every(
+            key => currentBounds[key] === displayBounds[key]
+          );
+        }
+        if (win.isSimpleFullScreen()) win.setSimpleFullScreen(false);
+        if (bigPictureWindowBounds) {
+          win.setBounds(bigPictureWindowBounds);
+          bigPictureWindowBounds = null;
+        }
+        return false;
+      }
       win.setFullScreen(!!value);
       return win.isFullScreen();
     }

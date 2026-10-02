@@ -1297,6 +1297,7 @@ const AppRoutes = () => {
       console.log("Is V7:", isV7);
 
       setIsNewInstall(isNew);
+      setWelcomeData({ isNew, isV7 });
       setShowWelcome(isNew || !isV7);
 
       console.log("Welcome check:", { isNew, isV7, shouldShow: isNew || !isV7 });
@@ -1305,17 +1306,13 @@ const AppRoutes = () => {
       console.error("Error checking welcome status:", error);
       setShowWelcome(false);
       return null;
-    } finally {
-      await ensureMinLoadingTime();
-      setIsLoading(false);
     }
   };
 
   const checkAndSetWelcomeStatus = async () => {
     const hasLaunched = await window.electron.hasLaunched();
     if (!hasLaunched) {
-      const data = await checkWelcomeStatus();
-      setWelcomeData(data);
+      await checkWelcomeStatus();
       // Update launch count since this is the first launch
       const count = await window.electron.updateLaunchCount();
       if (count === 5) {
@@ -1446,9 +1443,9 @@ const AppRoutes = () => {
           // Clear the updating flag after a delay
           setTimeout(async () => {
             await window.electron.setTimestampValue("isUpdating", false);
+            await checkAndSetWelcomeStatus();
             setIsUpdating(false);
             setIsLoading(false);
-            await checkAndSetWelcomeStatus();
 
             // Only show changelog on live branch
             const branch = await window.electron.getBranch();
