@@ -920,6 +920,18 @@
 .bp-power .bp-actions { margin-top: 24px; }
 .bp-power-warning { margin-block: 20px; color: rgb(var(--color-foreground)); }
 .bp-classic { position: relative; isolation: isolate; min-height: 100%; }
+.bp-classic .bp-navigation { background: none; }
+.bp-classic .bp-navigation::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: -clamp(96px, 12vh, 160px);
+  left: calc(-1 * clamp(24px, 5vw, 120px));
+  right: calc(-1 * clamp(24px, 5vw, 120px));
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(var(--color-background)), rgb(var(--color-background) / 0.85) 40%, rgb(var(--color-background) / 0));
+}
 .bp-classic-art { position: absolute; inset: 0; z-index: -1; background-size: cover; background-position: center; opacity: .22; mask-image: linear-gradient(to bottom, #000, transparent 95%); }
 .bp-classic-content { display: flex; flex-direction: column; justify-content: center; min-height: calc(100vh - 180px); padding-block: 32px 72px; }
 .bp-classic-heading { margin-bottom: 28px; }

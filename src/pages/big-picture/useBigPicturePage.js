@@ -889,7 +889,7 @@ function useBigPicturePage() {
     if (action === "controller") setShowControllerSettings(true);
     else if (action === "refresh") setRefreshTrigger(value => value + 1);
     else if (action === "exit_bp") setShowExitBigPictureDialog(true);
-    else if (action === "quit_app") changeView("power");
+    else if (action === "power") changeView("power");
   }, [changeView]);
 
   // --- MAIN NAVIGATION LOGIC (SHARED BETWEEN KEYBOARD & GAMEPAD) ---

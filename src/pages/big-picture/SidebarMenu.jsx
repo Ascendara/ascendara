@@ -2,10 +2,10 @@ import { RefreshCw, LogOut, Power, Gamepad2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 export const sidebarItems = [
-  { icon: Gamepad2, label: "Controller & keyboard", action: "controller" },
-  { icon: RefreshCw, label: "Refresh game library", action: "refresh" },
-  { icon: LogOut, label: "Return to desktop", action: "exit_bp" },
-  { icon: Power, label: "Exit Ascendara", action: "quit_app", danger: true },
+  { icon: Gamepad2, label: "bigPicture.controllerAndKeyboard", action: "controller" },
+  { icon: RefreshCw, label: "bigPicture.refreshGameLibrary", action: "refresh" },
+  { icon: LogOut, label: "bigPicture.returnToDesktop", action: "exit_bp" },
+  { icon: Power, label: "bigPicture.powerOptions", action: "power" },
 ];
 
 // Side menu
@@ -32,15 +32,15 @@ const SidebarMenu = ({ isOpen, selectedIndex, t, onItemClick, onSelectIndex, but
             tabIndex={isOpen && selectedIndex === idx ? 0 : -1}
             onFocus={() => onSelectIndex?.(idx)}
             onClick={() => onItemClick?.(item.action)}
-            className={`flex cursor-pointer items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? (item.danger ? "scale-105 bg-red-600 text-secondary shadow-lg shadow-red-900/50" : "scale-105 bg-white text-black shadow-lg") : "text-slate-400 hover:bg-muted"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
+            className={`flex cursor-pointer items-center gap-4 rounded-lg p-4 transition-all duration-150 ${selectedIndex === idx ? "scale-105 bg-white text-black shadow-lg" : "text-slate-400 hover:bg-muted"} ${item.action === "exit_bp" ? "mt-auto" : ""}`}
           >
             <item.icon className="h-6 w-6" />
-            <span className="font-bold tracking-wide">{item.label}</span>
+            <span className="font-bold tracking-wide">{t(item.label)}</span>
           </button>
         ))}
       </div>
       <div className="mt-auto text-center text-xs uppercase tracking-wider text-muted-foreground">
-        Press {buttons.cancel} to close
+        {t("bigPicture.pressToClose", { button: buttons.cancel })}
       </div>
     </div>
   );
