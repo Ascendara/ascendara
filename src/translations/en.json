@@ -1699,6 +1699,7 @@
     "copyTrackName": "Copy Track Name",
     "currentVersion": "Current Version",
     "currentlyMatched": "Currently Matched",
+    "deletePrefix": "Delete Prefix",
     "dismiss": "Dismiss",
     "dontShowSteamWarning": "Don't show this again",
     "downloadAll": "Download All",
@@ -1716,9 +1717,79 @@
     "editGameEntryDescription": "Edit the raw data for this game entry. Be careful — incorrect values may cause issues.",
     "editGameEntryError": "Failed to save game entry.",
     "editGameEntryInvalidJson": "Invalid JSON — please fix the errors before saving.",
+    "editGameEntryLoadError": "Failed to load game entry",
     "editGameEntrySuccess": "Game entry saved successfully.",
     "editGameInfo": "Edit Game Info",
     "editGameInfoDescription": "Manually configure the Steam match and game assets for this game.",
+    "entryAdditionalFields": "Additional fields",
+    "entryFields": {
+      "backups": {
+        "description": "Whether automatic save-file backups are enabled.",
+        "label": "Auto-Backups"
+      },
+      "dlc": {
+        "description": "Whether DLC content is bundled with this install.",
+        "label": "Includes DLC"
+      },
+      "executable": {
+        "description": "Path to the main .exe that Ascendara launches.",
+        "label": "Primary Executable"
+      },
+      "executables": {
+        "description": "List of known executables for this game.",
+        "label": "All Executables"
+      },
+      "favorite": {
+        "description": "Marks the game as a favorite in your library.",
+        "label": "Favorite"
+      },
+      "game": { "description": "The display name of the game.", "label": "Game Name" },
+      "hasRated": {
+        "description": "Whether you have submitted a rating for this game.",
+        "label": "Has Been Rated"
+      },
+      "isRunning": {
+        "description": "Live flag — true while the game process is active.",
+        "label": "Is Running"
+      },
+      "isVr": {
+        "description": "Whether this game requires a VR headset.",
+        "label": "VR Game"
+      },
+      "lastPlayed": {
+        "description": "Timestamp of the last session (null if never played).",
+        "label": "Last Played"
+      },
+      "launchCommands": {
+        "description": "Extra CLI arguments passed when launching the game.",
+        "label": "Launch Commands"
+      },
+      "launchCount": {
+        "description": "Total number of times you have launched this game.",
+        "label": "Launch Count"
+      },
+      "online": {
+        "description": "Whether the game uses an online / Steamworks fix.",
+        "label": "Online Fix"
+      },
+      "playTime": {
+        "description": "Total play time tracked by Ascendara, in minutes.",
+        "label": "Play Time (min)"
+      },
+      "size": {
+        "description": "Disk size reported at download time.",
+        "label": "Install Size"
+      },
+      "version": { "description": "The installed version string.", "label": "Version" }
+    },
+    "entryFieldsTab": "Fields",
+    "entryLeaderboardTitle": "Leaderboard:",
+    "entryLeaderboardWarning": "{{hasRated}}, {{launchCount}}, and {{playTime}} are protected — tampering can get your Ascend account hidden from the leaderboard",
+    "entryPrimary": "primary",
+    "entryRawJsonTab": "Raw JSON",
+    "entryReadOnlyNotice": "Greyed-out fields are read-only and managed automatically by Ascendara.",
+    "entryRevertedFieldsTitle": "Reverted protected fields:",
+    "entryRevertedFieldsWarning": "{{fields}}. Editing these fields can get your Ascend account hidden from the leaderboard.",
     "gameNotFound": "Game Not Found",
     "getAscend": "Join Ascend",
     "getAscendToUpdate": "Get Ascend to Update",
@@ -1746,11 +1817,13 @@
     "modFiles": "Available Files",
     "mods": "Mods",
     "modsAscendPromo": "Browse and download mods directly in Ascendara with Ascend. Get access to thousands of mods from Nexus Mods without leaving the app.",
+    "modsAscendRequired": "Ascend subscription required to access mods",
     "modsAvailable": "{{count}} mods available on Nexus Mods",
     "modsDescription": "This game has mods available on Nexus Mods. Browse and download mods to enhance your gaming experience.",
     "modsSupported": "Mods Available",
     "modsTitle": "Nexus Mods",
     "newAchievementsFound": "{{count}} new achievement(s) found!",
+    "nextPage": "Next page",
     "noAchievementsDescription": "No achievements found for this game. Play the game and Ascendara will automatically detect and track them.",
     "noAchievementsFound": "No Achievements Found",
     "noFilesFound": "No files available. View on Nexus Mods for more options.",
@@ -1764,6 +1837,7 @@
     "overview": "Overview",
     "playTrack": "Play Track",
     "popularMods": "Popular Mods",
+    "previousPage": "Previous page",
     "purchasePromptMessage": "You've played {{game}} for over 3 hours. If you're enjoying it, consider supporting the developers by purchasing the game.",
     "purchasePromptTitle": "Support the Developers",
     "quickExitDialog": {
@@ -1775,6 +1849,15 @@
     "rateThisGame": "Leave a Review?",
     "refreshAchievements": "Refresh Achievements",
     "refreshAchievementsError": "Failed to refresh achievements",
+    "resetPrefix": "Reset Prefix",
+    "resetPrefixContents": "This will remove all Windows configurations, DLLs, registry entries, and temporary files associated with this game.",
+    "resetPrefixDescription": "You are about to delete the Windows compatibility prefix for {{game}}.",
+    "resetPrefixDiskSpace": "This will free approximately {{size}} of disk space.",
+    "resetPrefixSaveWarning": "⚠️ Your save files may be lost if they are stored inside the prefix. Consider backing up your saves first.",
+    "resetPrefixTitle": "Reset Compatibility Prefix",
+    "resettingPrefix": "Resetting...",
+    "restorePlaytimeSaved": "{{time}} of playtime saved",
+    "screenshotAlt": "Screenshot {{number}}",
     "screenshots": "Screenshots",
     "searchMods": "Search mods...",
     "searchSteam": "Search Steam",
@@ -1790,11 +1873,13 @@
     "startSteam": "Start Steam",
     "startingSteam": "Starting Steam...",
     "startingUpdate": "Starting Update...",
+    "steamAppIdLabel": "App ID: {{id}}",
     "steamAppIdPlaceholder": "e.g., 1551360",
     "steamAppIdRequired": "Steam App ID is required",
     "steamDataNotFound": "Could not find Steam data for this App ID",
     "steamInfoUpdateError": "Failed to update Steam info",
     "steamInfoUpdated": "Steam info updated successfully",
+    "subscribeToAscend": "Subscribe to Ascend",
     "summary": "Summary",
     "trackNameCopied": "Track name copied!",
     "trackTitle": "Track Title",
@@ -1809,11 +1894,17 @@
     "trainerInstalled": "Installed",
     "trainerInstalledDescription": "The trainer is now available in your game folder. Toggle 'Launch with Trainer' to use it with your game.",
     "trainerInstalledSuccess": "Trainer Installed Successfully",
+    "trainerOptions": "{{count}} Options",
     "trainers": "Trainers",
     "trainersAscendPromo": "Download and use game trainers directly in Ascendara with Ascend. Get access to trainers from FLiNG Trainer without leaving the app.",
+    "trainersAscendRequired": "Ascend subscription required to access trainers",
     "trainersDescription": "Game trainers let you modify gameplay with cheats like infinite health, unlimited ammo, and more. Install the trainer to your game folder and launch it automatically with your game.",
     "trainersTitle": "FLiNG Trainer",
+    "umuId": "UMU ID",
+    "umuIdActive": "Active:",
     "umuIdDescription": "The UMU ID links this game to Protonfixes, which automatically installs missing DLLs and redistributables (DirectX, Visual C++…) on launch. Find IDs at",
+    "umuIdSaveFailed": "Failed to save UMU ID",
+    "umuIdSaved": "UMU ID saved",
     "umuLauncherNotInstalled": "UMU Launcher is not installed - games may crash at launch.",
     "updateAvailable": "Update Available",
     "updateAvailableDescription": "A newer version of this game is available. Would you like to update this game?",
