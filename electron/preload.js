@@ -403,7 +403,8 @@ contextBridge.exposeInMainWorld("electron", {
     backupOnClose,
     launchWithAdmin,
     specificExecutable,
-    launchWithTrainer
+    launchWithTrainer,
+    installation
   ) =>
     ipcRenderer.invoke(
       "play-game",
@@ -412,7 +413,8 @@ contextBridge.exposeInMainWorld("electron", {
       backupOnClose,
       launchWithAdmin,
       specificExecutable,
-      launchWithTrainer
+      launchWithTrainer,
+      installation
     ),
   checkTrainerExists: (gameName, isCustom) =>
     ipcRenderer.invoke("check-trainer-exists", gameName, isCustom),

@@ -359,7 +359,9 @@ function useInstalledGameDetails({
 
       // Check for multiple executables if no specific one was provided
       if (!specificExecutable) {
-        const executables = await gameUpdateService.getGameExecutables(
+        const executables = game._sourceDir
+          ? (game.executables || (game.executable ? [game.executable] : []))
+          : await gameUpdateService.getGameExecutables(
           gameName,
           game.isCustom
         );
@@ -382,7 +384,8 @@ function useInstalledGameDetails({
         game.backups ?? false,
         false,
         specificExecutable,
-        trainerExists && launchWithTrainerEnabled
+        trainerExists && launchWithTrainerEnabled,
+        game._sourceDir ? { _sourceDir: game._sourceDir, executable: game.executable } : null
       );
 
       if (result === false || result?.success === false) {

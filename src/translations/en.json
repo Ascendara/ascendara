@@ -1970,6 +1970,22 @@
     "viewGame": "View Game"
   },
   "library": {
+    "duplicateInstalls": {
+      "reviewPending": "Review unresolved duplicates ({{count}})",
+      "resolved": "All duplicate entries resolved.",
+      "manageSaved": "Manage saved install choices",
+      "keptAll": "Saved: keeping all entries for {{game}}.",
+      "keptOne": "Saved: keeping the selected install for {{game}} and hiding the others.",
+      "title": "Multiple installs found",
+      "description": "Keep all entries, or choose one and permanently hide the others. This choice applies to your library and Big Picture. Your game files stay on disk.",
+      "custom": "Custom / imported",
+      "installed": "Installed",
+      "noExecutable": "No executable selected",
+      "keepOne": "Keep this entry and hide the others",
+      "keepAll": "Keep all entries",
+      "later": "Decide later",
+      "review": "Review hidden / duplicate installs"
+    },
     "addFavorite": "Add to Favorites",
     "addGame": {
       "dropDescription": "Release to add it as a custom game",

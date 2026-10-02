@@ -1855,7 +1855,10 @@ export default function GameScreen() {
         const freshList = game?.isCustom
           ? await window.electron.getCustomGames()
           : await window.electron.getGames();
-        const freshGame = (freshList || []).find(g => (g.game || g.name) === gameName);
+        const freshGame = (freshList || []).find(g =>
+          (g.game || g.name) === gameName &&
+          (!game._sourceDir || (g._sourceDir === game._sourceDir && g.executable === game.executable))
+        );
         if (freshGame) {
           setGame(prev => (prev ? { ...prev, ...freshGame } : freshGame));
           setPlaytimeJustUpdated(true);
@@ -2357,7 +2360,9 @@ export default function GameScreen() {
 
       // Check for multiple executables if no specific one was provided
       if (!specificExecutable) {
-        const executables = await gameUpdateService.getGameExecutables(
+        const executables = game._sourceDir
+          ? (game.executables || (game.executable ? [game.executable] : []))
+          : await gameUpdateService.getGameExecutables(
           gameName,
           game.isCustom
         );
@@ -2392,7 +2397,8 @@ export default function GameScreen() {
         game.backups ?? false,
         isShiftKeyPressed,
         specificExecutable,
-        trainerExists && launchWithTrainerEnabled
+        trainerExists && launchWithTrainerEnabled,
+        game._sourceDir ? { _sourceDir: game._sourceDir, executable: game.executable } : null
       );
 
       if (result === false || result?.success === false) {

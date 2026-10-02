@@ -34,6 +34,8 @@ export function LibrarySurface({
   games,
   openGame,
   refresh,
+  reviewDuplicates,
+  pendingCount = 0,
   onBack,
   t,
   controllerType,
@@ -76,7 +78,7 @@ export function LibrarySurface({
     (currentPage + 1) * 24,
   );
   const visibleFolders = folders.filter((item) => hidden || !item.hidden);
-  const toolbar = ["search", "sort", "filter", "hidden", "refresh"];
+  const toolbar = ["search", "sort", "filter", "hidden", "refresh", ...((pendingCount > 0) ? ["duplicates"] : [])];
   const rows = manage
     ? [
         ["details", "favorite", "done"],
@@ -229,6 +231,11 @@ export function LibrarySurface({
               <RefreshCw />
             </SurfaceButton>
           </BigPictureToolbar>
+          {(pendingCount > 0) && (
+            <SurfaceButton {...focus("duplicates")} onClick={reviewDuplicates}>
+              {`Review unresolved duplicates (${pendingCount})`}
+            </SurfaceButton>
+          )}
           <p className="bp-section-label">Folders</p>
           <div className="bp-chip-row">
             <SurfaceButton
@@ -273,7 +280,9 @@ export function LibrarySurface({
                 focus={focus(`game-${key}`)}
                 onOpen={setManage}
                 subtitle={
-                  game.playTime
+                  game._hasMultipleInstalls
+                    ? `${game.isCustom ? "Custom / imported" : "Installed"} ? ${game.executable || game._sourceDir || "Unknown location"}`
+                    : game.playTime
                     ? `${(Number(game.playTime) / 3600).toFixed(1)}h played`
                     : "Installed"
                 }

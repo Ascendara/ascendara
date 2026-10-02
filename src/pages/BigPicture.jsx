@@ -1,3 +1,4 @@
+import { LibraryConflictSurface } from "./big-picture/LibraryConflictSurface";
 import { PageNavigationContext } from "./big-picture/PageHeader";
 import { retryExtraction } from "@/services/extractionRetryService";
 import { Toaster, toast } from "sonner";
@@ -35,6 +36,11 @@ import "@/components/GamesBackupDialog";
 
 function BigPicture() {
   const {
+    libraryConflict,
+    resolveLibraryConflict,
+    deferLibraryConflict,
+    reviewLibraryConflicts,
+    libraryPendingCount,
     selectedSort,
     setSelectedSort,
     refreshStore,
@@ -254,6 +260,7 @@ function BigPicture() {
       />
 
       <div
+        inert={libraryConflict ? true : undefined}
         className={`relative flex w-full flex-1 items-center pb-16 transition-all duration-200 ${isMenuOpen ? "scale-95 opacity-50 blur-sm" : ""}`}
       >
         <PageNavigationContext.Provider
@@ -322,6 +329,8 @@ function BigPicture() {
               games={allGames}
               openGame={handleShowInstalledGameDetails}
               refresh={refreshLibrary}
+              reviewDuplicates={reviewLibraryConflicts}
+              pendingCount={libraryPendingCount}
               onBack={() => changeView("carousel")}
               t={t}
               controllerType={controllerType}
@@ -561,6 +570,14 @@ function BigPicture() {
         />
       )}
 
+      {libraryConflict && (
+        <LibraryConflictSurface
+          key={libraryConflict.key}
+          conflict={libraryConflict}
+          resolve={resolveLibraryConflict}
+          onLater={deferLibraryConflict}
+        />
+      )}
       {/* Game Asset Search Dialog */}
       <GameAssetSearchDialog
         open={assetSearchOpen}

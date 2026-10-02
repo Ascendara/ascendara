@@ -1,3 +1,7 @@
+import { useLibraryConflicts } from "@/hooks/useLibraryConflicts";
+import { libraryInstallKey, reconcileFolderItems } from "@/lib/libraryConflicts";
+import LibraryConflictDialog from "@/components/LibraryConflictDialog";
+import { normalizeGameName, getGameDisplayName, getLibraryIdentityKey } from "@/lib/libraryGames";
 import { useLibraryBackupStore } from "@/services/libraryBackupStore";
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
@@ -109,6 +113,7 @@ import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
   loadFolders,
+  saveFolders,
   createFolder,
   addGameToFolder,
   filterGamesNotInFolders,
@@ -121,85 +126,9 @@ const Retro = React.lazy(() => import("./Retro"));
 const gameImageCache = new Map();
 let libraryGamesCache = null;
 
-// Normalize every place that compares game names so casing, spaces, and
-// filesystem-invalid characters cannot create duplicate library entries.
-const normalizeGameName = name =>
-  (name || "")
-    .replace(/[<>:"/\\|?*]/g, "")
-    .trim()
-    .toLowerCase();
-
-const getGameDisplayName = game => game?.game || game?.name || "";
-
-const getLibraryIdentityKey = game => {
-  const normalizedName = normalizeGameName(getGameDisplayName(game));
-  if (game?.isFolder && normalizedName) return `folder:${normalizedName}`;
-  if (normalizedName) return `name:${normalizedName}`;
-  if (game?.gameID) return `id:${game.gameID}`;
-  if (game?._queueId) return `queued:${game._queueId}`;
-  return "";
-};
-
-const toFiniteNumber = value => {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-};
-
-const getComparableTime = value => {
-  if (value === null || value === undefined || value === "") return 0;
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const parsedAsNumber = Number(value);
-  if (Number.isFinite(parsedAsNumber)) return parsedAsNumber;
-  const parsedAsDate = Date.parse(value);
-  return Number.isFinite(parsedAsDate) ? parsedAsDate : 0;
-};
-
-const pickMostRecentValue = (a, b) =>
-  getComparableTime(b) > getComparableTime(a) ? b : a;
-
-const mergeDuplicateLibraryGame = (existing, incoming) => {
-  const existingIsInstalled = existing?.isCustom === false || existing?.custom === false;
-  const incomingIsInstalled = incoming?.isCustom === false || incoming?.custom === false;
-
-  // Prefer installed-game metadata over custom-game metadata, but keep the
-  // highest stats so the user's hours do not disappear when duplicates merge.
-  const preferred = incomingIsInstalled && !existingIsInstalled ? incoming : existing;
-  const secondary = preferred === existing ? incoming : existing;
-
-  return {
-    ...secondary,
-    ...preferred,
-    game: getGameDisplayName(preferred) || getGameDisplayName(secondary),
-    name: preferred?.name || preferred?.game || secondary?.name || secondary?.game,
-    playTime: Math.max(
-      toFiniteNumber(existing?.playTime),
-      toFiniteNumber(incoming?.playTime)
-    ),
-    launchCount: Math.max(
-      toFiniteNumber(existing?.launchCount),
-      toFiniteNumber(incoming?.launchCount)
-    ),
-    lastPlayed: pickMostRecentValue(existing?.lastPlayed, incoming?.lastPlayed),
-    _isDownloading: Boolean(existing?._isDownloading || incoming?._isDownloading),
-    _isQueued: Boolean(existing?._isQueued || incoming?._isQueued),
-  };
-};
-
-const dedupeLibraryGames = gameList => {
-  const deduped = new Map();
-
-  for (const [index, game] of (gameList || []).entries()) {
-    const identityKey = getLibraryIdentityKey(game) || `unknown:${index}`;
-
-    const existing = deduped.get(identityKey);
-    deduped.set(identityKey, existing ? mergeDuplicateLibraryGame(existing, game) : game);
-  }
-
-  return Array.from(deduped.values());
-};
-
+// Keep deliberately retained installs independently reachable in React.
 const getLibraryCardKey = game =>
-  getLibraryIdentityKey(game) ||
+  (game._hasMultipleInstalls ? `${getLibraryIdentityKey(game)}:${libraryInstallKey(game)}` : getLibraryIdentityKey(game)) ||
   `library-item:${game?.executable || game?.path || game?.installPath || "unknown"}`;
 
 const Library = () => {
@@ -235,6 +164,16 @@ const Library = () => {
         ]
       : []
   );
+  const [libraryRecords, setLibraryRecords] = useState([]);
+  const library = useLibraryConflicts(libraryRecords, () => toast.error("Unable to save your library choice. Please try again."));
+  useEffect(() => {
+    if (!libraryRecords.length) return;
+    const currentFolders = loadFolders().map(folder => ({ ...folder, isFolder: true, items: reconcileFolderItems(folder.items || [], library.games) }));
+    saveFolders(currentFolders);
+    libraryGamesCache = [...currentFolders, ...filterGamesNotInFolders(library.games)];
+    setGames(libraryGamesCache);
+    setFolders(currentFolders);
+  }, [library.games, libraryRecords]);
   const [loading, setLoading] = useState(() => libraryGamesCache === null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
@@ -565,7 +504,7 @@ const Library = () => {
       _isQueued: true,
       _queueId: q.id,
     }));
-  const gamesWithQueued = dedupeLibraryGames([...games, ...queuedStubs]);
+  const gamesWithQueued = [...games, ...queuedStubs];
 
   // Filter games based on search query
   const filteredGames = gamesWithQueued
@@ -1318,28 +1257,13 @@ const Library = () => {
         })),
       ];
 
-      // Load folders using the folderManager library
-      const folders = loadFolders();
-
-      // Add folders to the games list
-      const foldersAsGames = folders.map(folder => ({
-        ...folder,
-        isFolder: true,
-      }));
-
-      // Remove duplicate records before rendering. Large libraries can return the
-      // same title from installed + custom/imported sources with different stats.
-      const dedupedGames = dedupeLibraryGames(allGames);
-
-      // Filter out games that are in folders using the folderManager library
-      const gamesNotInFolders = filterGamesNotInFolders(dedupedGames);
-
-      // Set the folders state
-      setFolders(folders);
-
-      // Combine games not in folders with folder items
-      libraryGamesCache = [...foldersAsGames, ...gamesNotInFolders];
-      setGames(libraryGamesCache);
+      setLibraryRecords(allGames);
+      if (!allGames.length) {
+        const currentFolders = loadFolders().map(folder => ({ ...folder, isFolder: true }));
+        libraryGamesCache = currentFolders;
+        setGames(currentFolders);
+        setFolders(currentFolders);
+      }
       setLoading(false);
     } catch (error) {
       console.error("Error loading games:", error);
@@ -2564,6 +2488,12 @@ const Library = () => {
             })()}
 
           {/* ── Cloud sync reminder ── */}
+          {activeTab === "all" && library.pendingCount > 0 && (
+            <Button variant="outline" size="sm" className="mb-6 gap-2" onClick={library.review}>
+              <EyeOff className="h-4 w-4" />
+              {t("library.duplicateInstalls.reviewPending", { count: library.pendingCount, defaultValue: "Review unresolved duplicates ({{count}})" })}
+            </Button>
+          )}
           {activeTab === "all" && showCloudSyncReminder && (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
               <div className="flex items-center gap-3">
@@ -3090,6 +3020,7 @@ const Library = () => {
         </div>
       </div>
 
+      <LibraryConflictDialog conflict={library.conflict} resolve={library.resolve} onLater={library.defer} />
       {/* Library Value Dialog */}
       <AlertDialog open={isLibraryValueOpen} onOpenChange={setIsLibraryValueOpen}>
         <AlertDialogContent className="flex max-h-[80vh] max-w-lg flex-col overflow-hidden">
@@ -4041,6 +3972,11 @@ const FavoritesGalleryCard = memo(
             <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">
               {gameName}
             </h3>
+            {game._hasMultipleInstalls && (
+              <p className="w-full truncate text-xs text-muted-foreground" title={game.executable || game._sourceDir}>
+                {game._sourceDir || game.executable}
+              </p>
+            )}
             <div className="flex w-full items-center justify-between">
               <p className="text-xs text-muted-foreground">
                 {formatPlaytime(game.playTime)}
@@ -5032,6 +4968,11 @@ const InstalledGameCard = memo(
             <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">
               {game.game}
             </h3>
+            {game._hasMultipleInstalls && (
+              <p className="w-full truncate text-xs text-muted-foreground" title={game.executable || game._sourceDir}>
+                {game._sourceDir || game.executable}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               {(() => {
                 const s = game.playTime;
@@ -5513,6 +5454,11 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
             <h3 className="flex-1 truncate text-sm font-semibold leading-tight text-foreground">
               {gameName}
             </h3>
+            {game._hasMultipleInstalls && (
+              <p className="w-full truncate text-xs text-muted-foreground" title={game.executable || game._sourceDir}>
+                {game._sourceDir || game.executable}
+              </p>
+            )}
             {game.online && (
               <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}

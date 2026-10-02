@@ -1,3 +1,4 @@
+import { libraryInstallKey, resolveLibraryConflicts, readLibraryChoices, reconcileFolderItems } from "@/lib/libraryConflicts";
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "@/components/ui/button";
@@ -260,32 +261,12 @@ const FolderView = () => {
         ]);
         if (cancelled || currentRequest !== requestId) return;
 
-        const installedByName = new Map(
-          (Array.isArray(installedGames) ? installedGames : []).map(game => [
-            game.game || game.name,
-            game,
-          ])
-        );
-        const customByName = new Map(
-          (Array.isArray(customGames) ? customGames : []).map(game => [
-            game.game || game.name,
-            game,
-          ])
-        );
-        setFolderGames(previous => {
-          let changed = false;
-          const updated = previous.map(game => {
-            const name = game.game || game.name;
-            const current =
-              game.isCustom || game.custom
-                ? customByName.get(name) || installedByName.get(name)
-                : installedByName.get(name) || customByName.get(name);
-            if (!current || current.playTime === game.playTime) return game;
-            changed = true;
-            return { ...game, playTime: current.playTime };
-          });
-          return changed ? updated : previous;
-        });
+        const records = [
+          ...(Array.isArray(installedGames) ? installedGames : []).map(game => ({ ...game, isCustom: false })),
+          ...(Array.isArray(customGames) ? customGames : []).map(game => ({ ...game, isCustom: true })),
+        ];
+        const visible = resolveLibraryConflicts(records, readLibraryChoices()).games;
+        setFolderGames(previous => reconcileFolderItems(previous, visible));
       } catch (error) {
         console.error("Error refreshing folder playtime:", error);
       }
@@ -293,10 +274,12 @@ const FolderView = () => {
 
     refreshPlaytime();
     window.addEventListener("focus", refreshPlaytime);
+    window.addEventListener("library-install-choices-updated", refreshPlaytime);
     const unsubscribe = window.electron.onGameClosed(refreshPlaytime);
     return () => {
       cancelled = true;
       window.removeEventListener("focus", refreshPlaytime);
+      window.removeEventListener("library-install-choices-updated", refreshPlaytime);
       unsubscribe();
     };
   }, [folderName, location.key]);
@@ -420,7 +403,7 @@ const FolderView = () => {
     try {
       // First try to get from installed games
       const installedGames = await window.electron.getGames();
-      const installedGame = installedGames.find(g => (g.game || g.name) === gameId);
+      const installedGame = installedGames.find(g => !game.isCustom && (g.game || g.name) === gameId && (!game._sourceDir || (g._sourceDir === game._sourceDir && g.executable === game.executable)));
 
       if (installedGame) {
         // Use the installed game data but preserve any folder-specific properties
@@ -429,6 +412,7 @@ const FolderView = () => {
             returnToFolder: location.pathname,
             gameData: {
               ...installedGame,
+              isCustom: false,
               // Preserve folder-specific properties if they exist
               ...(game.folderSpecificProps
                 ? { folderSpecificProps: game.folderSpecificProps }
@@ -441,7 +425,7 @@ const FolderView = () => {
 
       // If not found in installed games, try custom games
       const customGames = await window.electron.getCustomGames();
-      const customGame = customGames.find(g => (g.game || g.name) === gameId);
+      const customGame = customGames.find(g => (g.game || g.name) === gameId && (!game._sourceDir || (g._sourceDir === game._sourceDir && g.executable === game.executable)));
 
       if (customGame) {
         // Use the custom game data but preserve any folder-specific properties
@@ -700,7 +684,7 @@ const FolderView = () => {
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {gamesToShow.map(game => (
                   <GameCard
-                    key={game.game || game.name}
+                    key={libraryInstallKey(game)}
                     game={game}
                     favorites={favorites}
                     onPlay={handlePlayGame}

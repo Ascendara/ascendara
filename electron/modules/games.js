@@ -24,6 +24,7 @@ const {
   shouldLogError,
 } = require("./utils");
 const { getSettingsManager } = require("./settings");
+const { getGameDirectories } = require("./gameDirectories");
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("./discord-rpc");
 const { hideWindow, showWindow } = require("./window");
 
@@ -35,7 +36,7 @@ const proton = isLinux ? require("./proton") : null;
 
 const runGameProcesses = new Map();
 
-function findCustomGame(game, settings) {
+function findCustomGame(game, settings, selectedExecutable = null) {
   for (const directory of [
     settings.downloadDirectory,
     ...(settings.additionalDirectories || []),
@@ -45,7 +46,8 @@ function findCustomGame(game, settings) {
         fs.readFileSync(path.join(directory, "games.json"), "utf8")
       );
       const gameInfo = (data.games || []).find(
-        entry => entry.game === game && !entry._isDeleted
+        entry => entry.game === game && !entry._isDeleted &&
+          (!selectedExecutable || entry.executable === selectedExecutable)
       );
       if (gameInfo) return gameInfo;
     } catch (error) {
@@ -270,10 +272,7 @@ function registerGameHandlers() {
         return [];
       }
 
-      const allDownloadDirectories = [
-        settings.downloadDirectory,
-        ...(settings.additionalDirectories || []),
-      ].filter(Boolean);
+      const allDownloadDirectories = getGameDirectories(settings);
 
       const allGamesPromises = allDownloadDirectories.map(async downloadDir => {
         try {
@@ -344,10 +343,7 @@ function registerGameHandlers() {
     try {
       if (!settings.downloadDirectory) return [];
 
-      const allDirectories = [
-        settings.downloadDirectory,
-        ...(settings.additionalDirectories || []),
-      ].filter(Boolean);
+      const allDirectories = getGameDirectories(settings);
 
       const allGames = [];
       for (const dir of allDirectories) {
@@ -455,7 +451,8 @@ function registerGameHandlers() {
       backupOnClose = false,
       launchWithAdmin = false,
       specificExecutable = null,
-      launchWithTrainer = false
+      launchWithTrainer = false,
+      installation = null
     ) => {
       try {
         const settings = settingsManager.getSettings();
@@ -465,10 +462,17 @@ function registerGameHandlers() {
 
         let executable;
         let gameDirectory;
-        const allDirectories = [
-          settings.downloadDirectory,
-          ...(settings.additionalDirectories || []),
-        ];
+        let allDirectories = getGameDirectories(settings);
+        if (installation?._sourceDir) {
+          const requested = path.resolve(installation._sourceDir);
+          allDirectories = allDirectories.filter(directory => {
+            const configured = path.resolve(directory);
+            return isWindows
+              ? configured.toLowerCase() === requested.toLowerCase()
+              : configured === requested;
+          });
+          if (!allDirectories.length) throw new Error("Selected game directory is no longer configured");
+        }
         let launchCommands = null;
 
         if (!isCustom) {
@@ -571,7 +575,11 @@ function registerGameHandlers() {
             }
           }
         } else {
-          const gameInfo = findCustomGame(game, settings);
+          const gameInfo = findCustomGame(game, {
+            ...settings,
+            downloadDirectory: allDirectories[0],
+            additionalDirectories: allDirectories.slice(1),
+          }, installation?.executable);
 
           if (!gameInfo) {
             throw new Error(`Game not found in games.json: ${game}`);

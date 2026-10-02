@@ -1,3 +1,4 @@
+import { useLibraryConflicts } from "@/hooks/useLibraryConflicts";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
@@ -94,7 +95,11 @@ function useBigPicturePage() {
 
     return () => clearTimeout(timer);
   }, []);
-  const [allGames, setAllGames] = useState([]);
+  const [libraryRecords, setLibraryRecords] = useState([]);
+  const library = useLibraryConflicts(libraryRecords, () => toast.error("Unable to save your library choice. Please try again."));
+  const allGames = library.games;
+  const libraryConflict = library.conflict;
+  const resolveLibraryConflict = library.resolve;
   const [carouselGames, setCarouselGames] = useState([]);
   const [storeGames, setStoreGames] = useState([]);
   const [storeRevision, setStoreRevision] = useState(0);
@@ -757,15 +762,8 @@ function useBigPicturePage() {
         try {
           custom = await window.electron.getCustomGames();
         } catch (e) {}
-        let games = [...installed, ...custom];
-
-
-
-        // Get recently played games using the service (same logic as Home.jsx)
-        const recentlyPlayed = recentGamesService.getRecentGames();
-
         // Combine installed and custom games
-        const actuallyInstalledGames = [
+        const records = [
           ...(installed || []).map(game => ({
             ...game,
             isCustom: false,
@@ -782,51 +780,21 @@ function useBigPicturePage() {
           })),
         ];
 
-        setAllGames(actuallyInstalledGames);
-
-        // Filter out games that are no longer installed and merge with full game details
-        const recentGames = recentlyPlayed
-          .filter(recentGame =>
-            actuallyInstalledGames.some(g => g.game === recentGame.game)
-          )
-          .map(recentGame => {
-            const gameDetails = games.find(g => g.game === recentGame.game);
-            return {
-              ...gameDetails,
-              lastPlayed: recentGame.lastPlayed,
-            };
-          });
-
-        // Sort all games with recent games first (in order of last played), then alphabetically
-        const recentGameIndexMap = new Map(
-          recentGames.map((g, index) => [g.game, index])
-        );
-        let carousel = [...actuallyInstalledGames].sort((a, b) => {
-          const aIndex = recentGameIndexMap.get(a.game);
-          const bIndex = recentGameIndexMap.get(b.game);
-          // If both are recent, sort by their index in recentGames (0 = most recent)
-          if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex;
-          // If only a is recent, it comes first
-          if (aIndex !== undefined) return -1;
-          // If only b is recent, it comes first
-          if (bIndex !== undefined) return 1;
-          // Neither is recent, sort alphabetically
-          return (a.game || a.name).localeCompare(b.game || b.name);
-        });
-
-        if (carousel.length > 20) {
-          carousel = carousel.slice(0, 20);
-          carousel.push({
-            isSeeMore: true,
-            game: t("bigPicture.seeMore"),
-            name: t("bigPicture.seeMore"),
-          });
-        }
-        setCarouselGames(carousel);
+        setLibraryRecords(records);
       } catch (error) { toast.error("Unable to load library. Open Library and choose Refresh to retry."); }
     };
     fetchGames();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+    const recent = new Map(recentGamesService.getRecentGames().map((game, index) => [game.game, index]));
+    let carousel = [...allGames].sort((a, b) =>
+      (recent.get(a.game) ?? Infinity) - (recent.get(b.game) ?? Infinity) ||
+      (a.game || a.name || "").localeCompare(b.game || b.name || ""),
+    );
+    if (carousel.length > 20) carousel = [...carousel.slice(0, 20), { isSeeMore: true, game: t("bigPicture.seeMore"), name: t("bigPicture.seeMore") }];
+    setCarouselGames(carousel);
+  }, [allGames, t]);
 
   useEffect(() => {
     const fetchStore = async () => {
@@ -1211,6 +1179,11 @@ function useBigPicturePage() {
   });
 
   return {
+    libraryConflict,
+    resolveLibraryConflict,
+    deferLibraryConflict: library.defer,
+    reviewLibraryConflicts: library.review,
+    libraryPendingCount: library.pendingCount,
     selectedSort,
     setSelectedSort,
     refreshStore: () => { setStoreGames([]); setStoreRevision(value => value + 1); },
