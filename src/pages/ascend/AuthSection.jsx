@@ -99,7 +99,11 @@ export default function AuthSection({
               {t("account.auth.eyebrow")}
             </p>
             <h1
-              className={`ascend-auth-headline${isLogin ? "ascend-auth-headline-login whitespace-nowrap" : ""}`}
+              className={
+                isLogin
+                  ? "ascend-auth-headline ascend-auth-headline-login whitespace-nowrap"
+                  : "ascend-auth-headline"
+              }
             >
               {isLogin
                 ? t("account.auth.loginHeadline")
