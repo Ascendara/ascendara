@@ -45,7 +45,6 @@ import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AdminWarningScreen from "@/components/AdminWarningScreen";
-import LifetimeSubscriptionDialog from "@/components/LifetimeSubscriptionDialog";
 import CheckoutReturnHandler from "@/components/CheckoutReturnHandler";
 import {
   Navigate,
@@ -152,26 +151,29 @@ const TrialWarningChecker = () => {
   const navigate = useNavigate();
   const [showTrialWarning, setShowTrialWarning] = useState(false);
   const [trialDaysRemaining, setTrialDaysRemaining] = useState(0);
-  const hasCheckedRef = useRef(false);
 
   useEffect(() => {
-    if (!user?.uid || hasCheckedRef.current) return;
+    if (!user?.uid) return;
+    const reminderKey = `ascend-trial-ending-reminder:${user.uid}`;
+    let canceled = false;
 
     const checkTrialStatus = async () => {
+      if (canceled || localStorage.getItem(reminderKey) === "shown") return;
       try {
         const accessStatus = await verifyAscendAccess();
 
-        // Only show warning if user is on trial (not subscribed, not verified)
-        // and has less than 7 days remaining
+        // Show once, during the final day of the seven-day trial.
         if (
+          !canceled &&
           !accessStatus.isSubscribed &&
           !accessStatus.isVerified &&
+          accessStatus.hasAccess &&
           accessStatus.daysRemaining > 0 &&
-          accessStatus.daysRemaining <= 7
+          accessStatus.daysRemaining <= 1
         ) {
           setTrialDaysRemaining(accessStatus.daysRemaining);
           setShowTrialWarning(true);
-          hasCheckedRef.current = true;
+          localStorage.setItem(reminderKey, "shown");
         }
       } catch (error) {
         console.error("[TrialWarningChecker] Error checking trial status:", error);
@@ -179,8 +181,13 @@ const TrialWarningChecker = () => {
     };
 
     // Delay the check to let the app initialize
-    const timeout = setTimeout(checkTrialStatus, 5000);
-    return () => clearTimeout(timeout);
+    const timeout = setTimeout(checkTrialStatus, 30000);
+    const interval = setInterval(checkTrialStatus, 60 * 60 * 1000);
+    return () => {
+      canceled = true;
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, [user?.uid]);
 
   const handleSubscribe = () => {
@@ -2047,22 +2054,6 @@ function ToasterWithTheme() {
 function App() {
   const { t } = useTranslation();
   const [playerExpanded, setPlayerExpanded] = useState(false);
-  const [launchCount, setLaunchCount] = useState(0);
-
-  useEffect(() => {
-    const initializeLaunchCount = async () => {
-      try {
-        const count = await window.electron.updateLaunchCount();
-        // TEMPORARY: Override for testing - change this value to test different scenarios
-        // Use 0-4 to test before dialog shows, 5+ to test after dialog shows
-        setLaunchCount(5); // Change this number for testing
-      } catch (error) {
-        console.error("[App] Error initializing launch count:", error);
-      }
-    };
-
-    initializeLaunchCount();
-  }, []);
 
   useEffect(() => {
     const checkUpdates = async () => {
@@ -2188,7 +2179,6 @@ function App() {
                     <GiantBombMigrationWarning />
                     <AutomaticIndexRefresher />
                     <ControllerDetectionPrompt />
-                    <LifetimeSubscriptionDialog launchCount={launchCount} />
                     <CheckoutReturnHandler />
                     <SearchInitializer />
                     <GlobalSearch />
