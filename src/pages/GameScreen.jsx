@@ -606,91 +606,22 @@ const PurchasePromptDialog = ({ open, onClose, gameName, appId, t }) => {
 };
 
 const FIELD_META = {
-  game: {
-    label: "Game Name",
-    desc: "The display name of the game.",
-    type: "text",
-    readonly: true,
-  },
-  version: { label: "Version", desc: "The installed version string.", type: "text" },
-  size: {
-    label: "Install Size",
-    desc: "Disk size reported at download time.",
-    type: "text",
-  },
-  executable: {
-    label: "Primary Executable",
-    desc: "Path to the main .exe that Ascendara launches.",
-    type: "text",
-  },
-  launchCommands: {
-    label: "Launch Commands",
-    desc: "Extra CLI arguments passed when launching the game.",
-    type: "text",
-  },
-  online: {
-    label: "Online Fix",
-    desc: "Whether the game uses an online / Steamworks fix.",
-    type: "bool",
-  },
-  dlc: {
-    label: "Includes DLC",
-    desc: "Whether DLC content is bundled with this install.",
-    type: "bool",
-  },
-  isVr: {
-    label: "VR Game",
-    desc: "Whether this game requires a VR headset.",
-    type: "bool",
-  },
-  favorite: {
-    label: "Favorite",
-    desc: "Marks the game as a favorite in your library.",
-    type: "bool",
-  },
-  backups: {
-    label: "Auto-Backups",
-    desc: "Whether automatic save-file backups are enabled.",
-    type: "bool",
-  },
-  isRunning: {
-    label: "Is Running",
-    desc: "Live flag — true while the game process is active.",
-    type: "bool",
-    readonly: true,
-  },
-  hasRated: {
-    label: "Has Been Rated",
-    desc: "Whether you have submitted a rating for this game.",
-    type: "bool",
-    readonly: true,
-    leaderboard: true,
-  },
-  launchCount: {
-    label: "Launch Count",
-    desc: "Total number of times you have launched this game.",
-    type: "number",
-    readonly: true,
-    leaderboard: true,
-  },
-  playTime: {
-    label: "Play Time (min)",
-    desc: "Total play time tracked by Ascendara, in minutes.",
-    type: "number",
-    readonly: true,
-    leaderboard: true,
-  },
-  lastPlayed: {
-    label: "Last Played",
-    desc: "Timestamp of the last session (null if never played).",
-    type: "text",
-    readonly: true,
-  },
-  executables: {
-    label: "All Executables",
-    desc: "List of known executables for this game.",
-    type: "array",
-  },
+  game: { type: "text", readonly: true },
+  version: { type: "text" },
+  size: { type: "text" },
+  executable: { type: "text" },
+  launchCommands: { type: "text" },
+  online: { type: "bool" },
+  dlc: { type: "bool" },
+  isVr: { type: "bool" },
+  favorite: { type: "bool" },
+  backups: { type: "bool" },
+  isRunning: { type: "bool", readonly: true },
+  hasRated: { type: "bool", readonly: true, leaderboard: true },
+  launchCount: { type: "number", readonly: true, leaderboard: true },
+  playTime: { type: "number", readonly: true, leaderboard: true },
+  lastPlayed: { type: "text", readonly: true },
+  executables: { type: "array" },
 };
 
 const LEADERBOARD_KEYS = Object.entries(FIELD_META)
@@ -727,7 +658,7 @@ const EditGameEntryDialog = ({
           setOriginalFields(result.data);
           setJsonText(JSON.stringify(result.data, null, 2));
         } else {
-          setJsonError(result.error || "Failed to load game entry");
+          setJsonError(result.error || t("gameScreen.editGameEntryLoadError"));
         }
         setLoading(false);
       });
@@ -820,9 +751,11 @@ const EditGameEntryDialog = ({
             <p
               className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}
             >
-              {meta.label}
+              {t(`gameScreen.entryFields.${key}.label`)}
             </p>
-            <p className="text-xs text-muted-foreground">{meta.desc}</p>
+            <p className="text-xs text-muted-foreground">
+              {t(`gameScreen.entryFields.${key}.description`)}
+            </p>
           </div>
           <Switch
             checked={!!value}
@@ -839,9 +772,11 @@ const EditGameEntryDialog = ({
           <p
             className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}
           >
-            {meta.label}
+            {t(`gameScreen.entryFields.${key}.label`)}
           </p>
-          <p className="mb-2 text-xs text-muted-foreground">{meta.desc}</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {t(`gameScreen.entryFields.${key}.description`)}
+          </p>
           <Input
             type="number"
             value={value ?? ""}
@@ -857,13 +792,17 @@ const EditGameEntryDialog = ({
       const arr = Array.isArray(value) ? value : [];
       return (
         <div key={key} className={wrapperClass}>
-          <p className="text-sm font-medium text-foreground">{meta.label}</p>
-          <p className="mb-2 text-xs text-muted-foreground">{meta.desc}</p>
+          <p className="text-sm font-medium text-foreground">
+            {t(`gameScreen.entryFields.${key}.label`)}
+          </p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {t(`gameScreen.entryFields.${key}.description`)}
+          </p>
           <div className="space-y-1">
             {arr.map((item, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
-                  {i === 0 ? "primary" : `#${i + 1}`}
+                  {i === 0 ? t("gameScreen.entryPrimary") : `#${i + 1}`}
                 </span>
                 <span className="truncate font-mono text-xs text-foreground">{item}</span>
               </div>
@@ -878,9 +817,11 @@ const EditGameEntryDialog = ({
         <p
           className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}
         >
-          {meta.label}
+          {t(`gameScreen.entryFields.${key}.label`)}
         </p>
-        <p className="mb-2 text-xs text-muted-foreground">{meta.desc}</p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          {t(`gameScreen.entryFields.${key}.description`)}
+        </p>
         <Input
           value={value ?? ""}
           disabled={isDisabled}
@@ -912,13 +853,13 @@ const EditGameEntryDialog = ({
             }}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${!rawTab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Fields
+            {t("gameScreen.entryFieldsTab")}
           </button>
           <button
             onClick={() => setRawTab(true)}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${rawTab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Raw JSON
+            {t("gameScreen.entryRawJsonTab")}
           </button>
         </div>
 
@@ -934,9 +875,14 @@ const EditGameEntryDialog = ({
                 <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                   <p className="text-xs text-red-600 dark:text-red-400">
-                    <span className="font-semibold">Reverted protected fields: </span>
-                    {rawWarnKeys.join(", ")}. Editing these fields can get your Ascend
-                    account banned from the leaderboard.
+                    <span className="font-semibold">
+                      {t("gameScreen.entryRevertedFieldsTitle")}{" "}
+                    </span>
+                    {t("gameScreen.entryRevertedFieldsWarning", {
+                      fields: rawWarnKeys
+                        .map(key => t(`gameScreen.entryFields.${key}.label`))
+                        .join(", "),
+                    })}
                   </p>
                 </div>
               )}
@@ -961,18 +907,20 @@ const EditGameEntryDialog = ({
               <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-500" />
-                  <span>
-                    Greyed-out fields are read-only and managed automatically by
-                    Ascendara.
-                  </span>
+                  <span>{t("gameScreen.entryReadOnlyNotice")}</span>
                 </div>
                 {isAuthenticated && (
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
                     <span>
-                      <span className="font-semibold text-red-500">Leaderboard: </span>Has
-                      Been Rated, Launch Count, and Play Time are protected — tampering
-                      can get your Ascend account banned.
+                      <span className="font-semibold text-red-500">
+                        {t("gameScreen.entryLeaderboardTitle")}{" "}
+                      </span>
+                      {t("gameScreen.entryLeaderboardWarning", {
+                        hasRated: t("gameScreen.entryFields.hasRated.label"),
+                        launchCount: t("gameScreen.entryFields.launchCount.label"),
+                        playTime: t("gameScreen.entryFields.playTime.label"),
+                      })}
                     </span>
                   </div>
                 )}
@@ -985,7 +933,7 @@ const EditGameEntryDialog = ({
               {extraKeys.length > 0 && (
                 <>
                   <p className="mt-2 text-xs font-medium text-muted-foreground">
-                    Additional fields
+                    {t("gameScreen.entryAdditionalFields")}
                   </p>
                   {extraKeys.map(key => (
                     <div
@@ -1253,7 +1201,9 @@ const EditGameInfoDialog = ({
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-foreground">{game.name}</p>
-                      <p className="text-xs text-muted-foreground">App ID: {game.id}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("gameScreen.steamAppIdLabel", { id: game.id })}
+                      </p>
                       {game.short_description && (
                         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                           {game.short_description}
@@ -3140,7 +3090,7 @@ export default function GameScreen() {
                       className="hover:text-destructive gap-2 text-muted-foreground"
                     >
                       <FolderSync className="h-4 w-4" />
-                      Reset Prefix
+                      {t("gameScreen.resetPrefix")}
                       {prefixSize > 0 && (
                         <span className="text-xs opacity-60">
                           (
@@ -3160,7 +3110,9 @@ export default function GameScreen() {
                     <div className="flex flex-col gap-2 rounded-lg border border-border bg-card/50 p-3">
                       <div className="flex items-center gap-2">
                         <Terminal className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">UMU ID</span>
+                        <span className="text-sm font-medium">
+                          {t("gameScreen.umuId")}
+                        </span>
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3205,9 +3157,9 @@ export default function GameScreen() {
                             );
                             if (result.success) {
                               setUmuId(umuIdInput);
-                              toast.success("UMU ID saved");
+                              toast.success(t("gameScreen.umuIdSaved"));
                             } else {
-                              toast.error("Failed to save UMU ID");
+                              toast.error(t("gameScreen.umuIdSaveFailed"));
                             }
                             setUmuIdSaving(false);
                           }}
@@ -3215,13 +3167,13 @@ export default function GameScreen() {
                           {umuIdSaving ? (
                             <Loader className="h-3 w-3 animate-spin" />
                           ) : (
-                            "Save"
+                            t("common.save")
                           )}
                         </Button>
                       </div>
                       {umuId && (
                         <p className="text-xs text-muted-foreground">
-                          Active:{" "}
+                          {t("gameScreen.umuIdActive")}{" "}
                           <span className="font-mono text-foreground">{umuId}</span>
                         </p>
                       )}
@@ -3993,7 +3945,7 @@ export default function GameScreen() {
                             >
                               <img
                                 src={screenshot.formatted_url}
-                                alt={`Screenshot ${index + 1}`}
+                                alt={t("gameScreen.screenshotAlt", { number: index + 1 })}
                                 className="h-full w-full object-cover transition-transform group-hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
@@ -4022,7 +3974,7 @@ export default function GameScreen() {
                           >
                             <img
                               src={screenshot.formatted_url}
-                              alt={`Screenshot ${index + 1}`}
+                              alt={t("gameScreen.screenshotAlt", { number: index + 1 })}
                               className="h-full w-full cursor-pointer object-cover"
                               onClick={() =>
                                 window.electron.openURL(screenshot.formatted_url)
@@ -4153,7 +4105,7 @@ export default function GameScreen() {
                               className="rounded-full border px-4 py-2 text-primary disabled:cursor-not-allowed disabled:opacity-50"
                               onClick={() => setAchievementsPage(p => Math.max(0, p - 1))}
                               disabled={achievementsPage === 0}
-                              aria-label="Previous page"
+                              aria-label={t("gameScreen.previousPage")}
                             >
                               {t("common.prev")}
                             </button>
@@ -4166,7 +4118,7 @@ export default function GameScreen() {
                                 setAchievementsPage(p => Math.min(totalPages - 1, p + 1))
                               }
                               disabled={achievementsPage === totalPages - 1}
-                              aria-label="Next page"
+                              aria-label={t("gameScreen.nextPage")}
                             >
                               {t("common.next")}
                             </button>
@@ -4231,8 +4183,7 @@ export default function GameScreen() {
                             <p className="max-w-md text-sm text-muted-foreground">
                               {!isAuthenticated
                                 ? t("gameScreen.modsAscendPromo")
-                                : t("gameScreen.modsAscendRequired") ||
-                                  "Ascend subscription required to access mods"}
+                                : t("gameScreen.modsAscendRequired")}
                             </p>
                           </div>
                           <Button
@@ -4242,8 +4193,7 @@ export default function GameScreen() {
                             <Gem className="h-4 w-4" />
                             {!isAuthenticated
                               ? t("gameScreen.getAscend")
-                              : t("gameScreen.subscribeToAscend") ||
-                                "Subscribe to Ascend"}
+                              : t("gameScreen.subscribeToAscend")}
                           </Button>
                         </div>
                       ) : (
@@ -4499,8 +4449,7 @@ export default function GameScreen() {
                             <p className="max-w-md text-sm text-muted-foreground">
                               {!isAuthenticated
                                 ? t("gameScreen.trainersAscendPromo")
-                                : t("gameScreen.trainersAscendRequired") ||
-                                  "Ascend subscription required to access trainers"}
+                                : t("gameScreen.trainersAscendRequired")}
                             </p>
                           </div>
                           <Button
@@ -4510,8 +4459,7 @@ export default function GameScreen() {
                             <Gem className="h-4 w-4" />
                             {!isAuthenticated
                               ? t("gameScreen.getAscend")
-                              : t("gameScreen.subscribeToAscend") ||
-                                "Subscribe to Ascend"}
+                              : t("gameScreen.subscribeToAscend")}
                           </Button>
                         </div>
                       ) : (
@@ -4536,7 +4484,9 @@ export default function GameScreen() {
                             </h2>
                             {flingTrainerData?.options && (
                               <p className="text-lg text-primary">
-                                {flingTrainerData.options} Options
+                                {t("gameScreen.trainerOptions", {
+                                  count: flingTrainerData.options,
+                                })}
                               </p>
                             )}
                             {flingTrainerData?.version && (
@@ -5050,42 +5000,40 @@ export default function GameScreen() {
       {showResetPrefixDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="mx-4 max-w-md space-y-4 rounded-xl border border-border bg-background p-6">
-            <h3 className={dialogTitleClassName}>Reset Compatibility Prefix</h3>
+            <h3 className={dialogTitleClassName}>{t("gameScreen.resetPrefixTitle")}</h3>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                You are about to delete the Windows compatibility prefix for
-                <strong className="text-foreground"> {game?.game || game?.name}</strong>.
+                {t("gameScreen.resetPrefixDescription", {
+                  game: game?.game || game?.name,
+                })}
               </p>
-              <p>
-                This will remove all Windows configurations, DLLs, registry entries, and
-                temporary files associated with this game.
-              </p>
+              <p>{t("gameScreen.resetPrefixContents")}</p>
               <p className="font-medium text-yellow-500">
-                ⚠️ Your save files may be lost if they are stored inside the prefix.
-                Consider backing up your saves first.
+                {t("gameScreen.resetPrefixSaveWarning")}
               </p>
               {prefixSize > 0 && (
                 <p>
-                  This will free approximately{" "}
-                  <strong>
-                    {prefixSize < 1024 * 1024 * 1024
-                      ? `${(prefixSize / (1024 * 1024)).toFixed(1)} MB`
-                      : `${(prefixSize / (1024 * 1024 * 1024)).toFixed(2)} GB`}
-                  </strong>{" "}
-                  of disk space.
+                  {t("gameScreen.resetPrefixDiskSpace", {
+                    size:
+                      prefixSize < 1024 * 1024 * 1024
+                        ? `${(prefixSize / (1024 * 1024)).toFixed(1)} MB`
+                        : `${(prefixSize / (1024 * 1024 * 1024)).toFixed(2)} GB`,
+                  })}
                 </p>
               )}
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => setShowResetPrefixDialog(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="destructive"
                 onClick={handleResetPrefix}
                 disabled={isResettingPrefix}
               >
-                {isResettingPrefix ? "Resetting..." : "Delete Prefix"}
+                {isResettingPrefix
+                  ? t("gameScreen.resettingPrefix")
+                  : t("gameScreen.deletePrefix")}
               </Button>
             </div>
           </div>
@@ -5138,8 +5086,7 @@ export default function GameScreen() {
                     return (
                       <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm">
                         <span className="text-foreground/80">
-                          <span className="font-medium text-foreground">{label}</span> of
-                          playtime saved
+                          {t("gameScreen.restorePlaytimeSaved", { time: label })}
                         </span>
                       </div>
                     );
