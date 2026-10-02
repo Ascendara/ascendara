@@ -39,6 +39,7 @@ export function visibilityDelta(start, end, visibleStart, visibleEnd) {
 }
 
 const scrollAnimations = new WeakMap();
+const horizontalRails = ".bp-row, .bp-classic-row, .bp-navigation-tabs";
 
 // Native smooth scrolling can take several hundred milliseconds and restarts on
 // each held-direction repeat. Retarget a short animation from its actual position.
@@ -75,7 +76,7 @@ export function scrollToFocus(element, target, immediate = false) {
 
 export function cancelSurfaceScroll(root) {
   if (!root) return;
-  for (const element of [root, ...root.querySelectorAll(".bp-row, .bp-navigation-tabs")]) {
+  for (const element of [root, ...root.querySelectorAll(horizontalRails)]) {
     const frame = scrollAnimations.get(element);
     if (frame !== undefined) cancelAnimationFrame(frame);
     scrollAnimations.delete(element);
@@ -97,7 +98,7 @@ export function scrollSurfaceFocus(root, element) {
   else if (delta) scrollToFocus(root, { top: root.scrollTop + delta }, immediate);
 
   // Scroll the horizontal rail separately: nested scrollIntoView can leave the page stationary.
-  const rail = element.closest(".bp-row, .bp-navigation-tabs");
+  const rail = element.closest(horizontalRails);
   if (rail) {
     const bounds = rail.getBoundingClientRect();
     const horizontal = visibilityDelta(rect.left, rect.right, bounds.left + 12, bounds.right - 12);

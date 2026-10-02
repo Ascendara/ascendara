@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Menu, Library, Power } from "lucide-react";
 import { BigPictureShell } from "./BigPictureShell";
 import { SurfaceButton, SurfaceGame, useSurface } from "./Surface";
@@ -6,6 +6,7 @@ import { gameEntries, gameName, libraryGames } from "./surfaceNavigation";
 import { useHomeArtwork } from "./useHomeArtwork";
 import { loadFolders } from "@/lib/folderManager";
 import recentGamesService from "@/services/recentGamesService";
+import { scrollSurfaceFocus } from "./controllerNavigation";
 
 export function ClassicHome({ navigation, active, games, openGame, openMenu, changeView, downloads }) {
   const visible = libraryGames(games, { hiddenFolders: loadFolders().filter(folder => folder.hidden) })
@@ -15,7 +16,20 @@ export function ClassicHome({ navigation, active, games, openGame, openMenu, cha
   const [selectedKey, setSelectedKey] = useState(null);
   const selected = entries.find(entry => entry.key === selectedKey) || entries[0];
   const artwork = useHomeArtwork(selected?.game);
-  const { root, focus } = useSurface(navigation, [entries.map(({ key }) => `classic-${key}`), ["classic-menu", "classic-library", "classic-power"]], openMenu, active);
+  const { root, focus, current } = useSurface(navigation, [entries.map(({ key }) => `classic-${key}`), ["classic-menu", "classic-library", "classic-power"]], openMenu, active);
+  useLayoutEffect(() => {
+    if (!active) return;
+    const element = root.current?.querySelector('.bp-classic-row [data-selected="true"]');
+    if (!element) return;
+    // Focusing a game changes both tile widths and their positions in the rail.
+    // Recheck visibility during expansion and when the carousel viewport resizes.
+    scrollSurfaceFocus(root.current, element);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => scrollSurfaceFocus(root.current, element));
+    observer.observe(element);
+    observer.observe(element.closest(".bp-classic-row"));
+    return () => observer.disconnect();
+  }, [root, current, selected?.key, active]);
   return <BigPictureShell ref={root} title="Home" cinematic className="bp-classic" focus={focus}>
     <div className="bp-classic-art" style={artwork ? { backgroundImage: `url("${artwork}")` } : undefined} aria-hidden="true" />
     <section className="bp-classic-content" aria-label="Your games">
