@@ -60,7 +60,7 @@ Release mode requires signing and notarization credentials and enables forced co
 - Native executable files and `.app` bundles can be selected for games. Windows `.exe` games require a working Wine installation; compatibility remains game-dependent. Proton/UMU features remain Linux-only. The catalogue is not converted into native Mac games.
 - Ludusavi is detected at `~/.ascendara/ludusavi` or on PATH on macOS. Install a native macOS Ludusavi binary; the Linux CDN binary is not used on Mac.
 - Steam Workshop's existing SteamCMD installer, Windows dependency installers, Defender exclusions, and the Windows uninstaller do not run on macOS. Launcher discovery supports Steam on Mac; other launcher integrations still depend on Windows metadata.
-- Automatic updates and branch switches require a macOS release feed and installer implementation. Until those exist, install the desired DMG manually. Mac handlers reject Windows/AppImage update payloads.
+- Live branch updates download the matching `mac-arm64.zip` or `mac-x64.zip` from the GitHub release, replace the installed app after quit, and reopen it. The app must be installed in a writable location. Testing branch switches still require a manual installation.
 - Torrent downloads still require qBittorrent with its Web UI configured, as in the existing implementation.
 
 ## Validation

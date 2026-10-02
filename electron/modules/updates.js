@@ -32,6 +32,13 @@ let downloadUpdatePromise = null;
 let isBrokenVersion = false;
 let languageCheckInProgress = false;
 let translationUpdateInProgress = false;
+let availableVersion = null;
+
+function macUpdateName(version) {
+  const arch = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
+  if (!arch) throw new Error(`Unsupported macOS architecture: ${process.arch}`);
+  return `Ascendara-${version}-mac-${arch}.zip`;
+}
 
 /**
  * Check if current version is broken
@@ -137,20 +144,22 @@ async function checkVersionAndUpdate() {
 
     // Use version comparison function instead of simple equality
     isLatest = !isVersionLower(currentVersion, latestVersion);
+    availableVersion = isLatest ? null : latestVersion;
     console.log(
       `Version check [${currentBranch}]: Current=${currentVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
       if (
-        process.platform !== "darwin" &&
         settings.autoUpdate &&
+        (process.platform !== "darwin" || currentBranch === "live") &&
         !updateDownloadInProgress &&
         !updateDownloaded
       ) {
         // Start background download
         downloadUpdatePromise = downloadUpdateInBackground();
       } else if (
-        (!settings.autoUpdate || process.platform === "darwin") &&
+        (!settings.autoUpdate ||
+          (process.platform === "darwin" && currentBranch !== "live")) &&
         !notificationShown
       ) {
         // Show update available notification
@@ -358,10 +367,6 @@ async function getNewLangKeys() {
  * Download update in background
  */
 async function downloadUpdateInBackground() {
-  if (process.platform === "darwin")
-    throw new Error(
-      "Install macOS updates from the latest Ascendara DMG. Automatic macOS updates are not configured."
-    );
   if (updateDownloadInProgress) return;
   updateDownloadInProgress = true;
 
@@ -384,20 +389,35 @@ async function downloadUpdateInBackground() {
     const headers = {
       "X-Ascendara-Client": "app",
       "X-Ascendara-Version": currentVersion,
-      "X-Ascendara-Platform": isWindows ? "windows" : "linux",
+      "X-Ascendara-Platform": isWindows
+        ? "windows"
+        : process.platform === "darwin"
+          ? "macos"
+          : "linux",
     };
 
     // Determine update URL based on branch
     let updateUrl;
-    if (currentBranch === "live") {
+    if (process.platform === "darwin") {
+      if (currentBranch !== "live")
+        throw new Error("Automatic updates for macOS testing branches are unavailable.");
+      if (!availableVersion || !/^\d+(?:\.\d+)*(?:-\d+)?$/.test(availableVersion)) {
+        throw new Error("No valid macOS update version is available.");
+      }
+      const fileName = macUpdateName(availableVersion);
+      updateUrl = `https://github.com/Ascendara/ascendara/releases/download/${encodeURIComponent(availableVersion)}/${fileName}`;
+    } else if (currentBranch === "live") {
       updateUrl = `https://lfs.ascendara.app/download?update`;
     } else {
       updateUrl = `https://lfs.ascendara.app/download?branch=${currentBranch}`;
     }
     const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-    const installerFileName = isWindows
-      ? "AscendaraInstaller.exe"
-      : "AscendaraInstaller.AppImage";
+    const installerFileName =
+      process.platform === "darwin"
+        ? "AscendaraInstaller.zip"
+        : isWindows
+          ? "AscendaraInstaller.exe"
+          : "AscendaraInstaller.AppImage";
     const installerPath = path.join(tempDir, installerFileName);
 
     if (!fs.existsSync(tempDir)) {
@@ -519,7 +539,11 @@ function registerUpdateHandlers() {
       const installerPath = path.join(
         os.tmpdir(),
         "ascendarainstaller",
-        isWindows ? "AscendaraInstaller.exe" : "AscendaraInstaller.AppImage"
+        process.platform === "darwin"
+          ? "AscendaraInstaller.zip"
+          : isWindows
+            ? "AscendaraInstaller.exe"
+            : "AscendaraInstaller.AppImage"
       );
       await installUpdate(installerPath, isLinux);
       return { success: true };

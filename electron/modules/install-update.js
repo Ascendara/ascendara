@@ -5,13 +5,67 @@ const { app } = require("electron");
 
 // Share the same installation path for automatic updates and branch switches.
 module.exports = async function installUpdate(installerPath, isLinux) {
-  if (process.platform === "darwin")
-    throw new Error("Install the macOS update from its DMG.");
   let command = installerPath;
   let args = [];
   let stagingDir;
   try {
-    if (isLinux) {
+    if (process.platform === "darwin") {
+      const match = process.execPath.match(/^(.*?\.app)\/Contents\/MacOS\//);
+      if (!match) throw new Error("Automatic updates require an installed macOS app.");
+      const target = match[1];
+      const parent = path.dirname(target);
+      stagingDir = fs.mkdtempSync(path.join(parent, ".ascendara-update-"));
+      const extracted = path.join(stagingDir, "extracted");
+      fs.mkdirSync(extracted);
+      await new Promise((resolve, reject) => {
+        const child = spawn("ditto", ["-x", "-k", installerPath, extracted]);
+        child.once("error", reject);
+        child.once("close", code =>
+          code === 0
+            ? resolve()
+            : reject(new Error(`Could not extract macOS update (${code}).`))
+        );
+      });
+      const apps = fs.readdirSync(extracted).filter(name => name.endsWith(".app"));
+      if (apps.length !== 1)
+        throw new Error("The macOS update archive must contain one app.");
+      const stagedApp = path.join(stagingDir, apps[0]);
+      const executable = path.join(stagedApp, "Contents", "MacOS");
+      if (
+        !fs.existsSync(path.join(stagedApp, "Contents", "Info.plist")) ||
+        !fs.existsSync(executable)
+      ) {
+        throw new Error("The macOS update archive does not contain a valid app.");
+      }
+      fs.moveSync(path.join(extracted, apps[0]), stagedApp);
+      fs.removeSync(extracted);
+      const scriptPath = path.join(stagingDir, "install.sh");
+      fs.writeFileSync(
+        scriptPath,
+        `#!/bin/sh
+while kill -0 "$1" 2>/dev/null; do sleep 1; done
+if mv "$3" "$4"; then
+  if mv "$2" "$3"; then
+    rm -rf "$4"
+    open "$3"
+    rm -f "$0"
+    rmdir "$5"
+  else
+    mv "$4" "$3"
+  fi
+fi
+`
+      );
+      command = "sh";
+      args = [
+        scriptPath,
+        String(process.pid),
+        stagedApp,
+        target,
+        path.join(stagingDir, "backup.app"),
+        stagingDir,
+      ];
+    } else if (isLinux) {
       if (!process.env.APPIMAGE) {
         throw new Error("Automatic updates require running the installed AppImage.");
       }
