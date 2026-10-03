@@ -7,11 +7,19 @@ import { toast } from "sonner";
 import gameUpdateService from "@/services/gameUpdateService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import recentGamesService from "@/services/recentGamesService";
-import { loadFolders, saveFolders, addGameToFolder, removeGameFromFolder } from "@/lib/folderManager";
+import {
+  loadFolders,
+  saveFolders,
+  addGameToFolder,
+  removeGameFromFolder,
+} from "@/lib/folderManager";
 import { readStoredList } from "./surfaceNavigation";
 import { getControllerButtons } from "./controller";
 import { useControllerInput } from "./useControllerInput";
-import { hasActiveSubscription, uploadBackupToCloud } from "@/services/cloudBackupService";
+import {
+  hasActiveSubscription,
+  uploadBackupToCloud,
+} from "@/services/cloudBackupService";
 import { listBackups as listCloudBackups } from "@/services/firebaseService";
 import { restoreCloudSave } from "@/services/restoreCloudSave";
 
@@ -44,7 +52,9 @@ function useInstalledGameDetails({
   const [selectedButton, setSelectedButton] = useState("play"); // 'play' or 'folder' or 'manage'
   const [selectedMenuItem, setSelectedMenuItem] = useState(0);
   const [folders, setFolders] = useState(loadFolders);
-  const [isFavorite, setIsFavorite] = useState(() => readStoredList("game-favorites").includes(game.game || game.name));
+  const [isFavorite, setIsFavorite] = useState(() =>
+    readStoredList("game-favorites").includes(game.game || game.name)
+  );
   const [trainerToggleFocused, setTrainerToggleFocused] = useState(false);
   const [achievementsToggleFocused, setAchievementsToggleFocused] = useState(false);
   const buttons = getControllerButtons(controllerType);
@@ -89,7 +99,9 @@ function useInstalledGameDetails({
     if (backupDialogOpen) {
       setBackupScreen("options");
       setDialogButtonIndex(0);
-      setAutoCloudBackupEnabled(localStorage.getItem(`cloudBackup_${gameName}`) === "true");
+      setAutoCloudBackupEnabled(
+        localStorage.getItem(`cloudBackup_${gameName}`) === "true"
+      );
     }
   }, [backupDialogOpen, gameName]);
   const [showBrowseExeWarning, setShowBrowseExeWarning] = useState(false);
@@ -131,7 +143,6 @@ function useInstalledGameDetails({
       }
     };
 
-
     // Check if trainer exists
     const checkTrainer = async () => {
       try {
@@ -141,7 +152,9 @@ function useInstalledGameDetails({
         setTrainerExists(false);
       }
     };
-    Promise.all([checkExecutable(), checkTrainer()]).catch(() => setExecutableExists(false)).finally(() => setLaunchChecksReady(true));
+    Promise.all([checkExecutable(), checkTrainer()])
+      .catch(() => setExecutableExists(false))
+      .finally(() => setLaunchChecksReady(true));
 
     // Fetch achievements
     const fetchAchievements = async () => {
@@ -331,7 +344,7 @@ function useInstalledGameDetails({
       }
 
       // Check Steam for online games
-      if (game.online) {
+      if (game.online && (await window.electron.isOnWindows())) {
         const hideSteamWarning = localStorage.getItem("hideSteamWarning");
         if (!hideSteamWarning) {
           if (!(await window.electron.isSteamRunning())) {
@@ -363,11 +376,8 @@ function useInstalledGameDetails({
       // Check for multiple executables if no specific one was provided
       if (!specificExecutable) {
         const executables = game._sourceDir
-          ? (game.executables || (game.executable ? [game.executable] : []))
-          : await gameUpdateService.getGameExecutables(
-          gameName,
-          game.isCustom
-        );
+          ? game.executables || (game.executable ? [game.executable] : [])
+          : await gameUpdateService.getGameExecutables(gameName, game.isCustom);
         if (executables.length > 1) {
           setPendingLaunchOptions({ forcePlay });
           setAvailableExecutables(executables);
@@ -388,7 +398,9 @@ function useInstalledGameDetails({
         false,
         specificExecutable,
         trainerExists && launchWithTrainerEnabled,
-        game._sourceDir ? { _sourceDir: game._sourceDir, executable: game.executable } : null
+        game._sourceDir
+          ? { _sourceDir: game._sourceDir, executable: game.executable }
+          : null
       );
 
       if (result === false || result?.success === false) {
@@ -456,7 +468,8 @@ function useInstalledGameDetails({
 
   // Home Play uses the same launch flow, including warnings and executable selection.
   useEffect(() => {
-    if (!autoLaunch || !launchChecksReady || !canInput || autoLaunchHandled.current) return;
+    if (!autoLaunch || !launchChecksReady || !canInput || autoLaunchHandled.current)
+      return;
     autoLaunchHandled.current = true;
     if (canLaunchGame) handlePlayGame();
     else setShowBrowseExeWarning(true);
@@ -513,89 +526,124 @@ function useInstalledGameDetails({
     }
   };
 
-  const handleBackupAction = useCallback(async index => {
-    if (backupScreen === "cloudList") {
-      if (index === cloudBackups.length) {
-        setBackupScreen("options");
-        setDialogButtonIndex(2);
-      } else {
-        setSelectedCloudBackup(cloudBackups[index]);
-        setBackupScreen("cloudConfirm");
-        setDialogButtonIndex(1);
+  const handleBackupAction = useCallback(
+    async index => {
+      if (backupScreen === "cloudList") {
+        if (index === cloudBackups.length) {
+          setBackupScreen("options");
+          setDialogButtonIndex(2);
+        } else {
+          setSelectedCloudBackup(cloudBackups[index]);
+          setBackupScreen("cloudConfirm");
+          setDialogButtonIndex(1);
+        }
+        return;
       }
-      return;
-    }
-    if (backupScreen === "cloudConfirm") {
-      if (index === 1) {
+      if (backupScreen === "cloudConfirm") {
+        if (index === 1) {
+          setBackupScreen("cloudList");
+          setDialogButtonIndex(0);
+          return;
+        }
+        if (cloudRestoreBusy || !selectedCloudBackup) return;
+        setCloudRestoreBusy(true);
+        try {
+          await restoreCloudSave(selectedCloudBackup, settings);
+          toast.success(t("library.backups.restoreSuccess"));
+          setBackupDialogOpen(false);
+          setBackupScreen("options");
+        } catch (error) {
+          toast.error(error.message || t("library.backups.restoreFailed"));
+        } finally {
+          setCloudRestoreBusy(false);
+        }
+        return;
+      }
+      if (index === 2) {
+        if (!cloudAvailable) {
+          setBackupDialogOpen(false);
+          navigate("/ascend");
+          return;
+        }
         setBackupScreen("cloudList");
+        setDialogButtonIndex(0);
+        setCloudBackupLoading(true);
+        setCloudBackupError(null);
+        try {
+          const result = await listCloudBackups(gameName);
+          if (result.error) throw new Error(result.error);
+          setCloudBackups(
+            (Array.isArray(result.backups) ? result.backups : [])
+              .map(backup => ({ ...backup, gameName: backup.gameName || gameName }))
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          );
+        } catch (error) {
+          setCloudBackupError(error.message || t("library.backups.loadBackupsFailed"));
+        } finally {
+          setCloudBackupLoading(false);
+        }
+        return;
+      }
+      if (index === 3 && cloudAvailable) {
+        const enabled = !autoCloudBackupEnabled;
+        localStorage.setItem(`cloudBackup_${gameName}`, String(enabled));
+        setAutoCloudBackupEnabled(enabled);
+        toast.success(
+          t(
+            enabled
+              ? "library.backups.cloudBackupsEnabledToast"
+              : "library.backups.cloudBackupsDisabledToast"
+          )
+        );
+        return;
+      }
+      if (index > 1) {
+        setBackupDialogOpen(false);
         setDialogButtonIndex(0);
         return;
       }
-      if (cloudRestoreBusy || !selectedCloudBackup) return;
-      setCloudRestoreBusy(true);
-      try {
-        await restoreCloudSave(selectedCloudBackup, settings);
-        toast.success(t("library.backups.restoreSuccess"));
-        setBackupDialogOpen(false);
-        setBackupScreen("options");
-      } catch (error) {
-        toast.error(error.message || t("library.backups.restoreFailed"));
-      } finally {
-        setCloudRestoreBusy(false);
-      }
-      return;
-    }
-    if (index === 2) {
-      if (!cloudAvailable) {
-        setBackupDialogOpen(false);
-        navigate("/ascend");
-        return;
-      }
-      setBackupScreen("cloudList");
-      setDialogButtonIndex(0);
-      setCloudBackupLoading(true);
-      setCloudBackupError(null);
-      try {
-        const result = await listCloudBackups(gameName);
-        if (result.error) throw new Error(result.error);
-        setCloudBackups((Array.isArray(result.backups) ? result.backups : [])
-          .map(backup => ({ ...backup, gameName: backup.gameName || gameName }))
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-      } catch (error) {
-        setCloudBackupError(error.message || t("library.backups.loadBackupsFailed"));
-      } finally {
-        setCloudBackupLoading(false);
-      }
-      return;
-    }
-    if (index === 3 && cloudAvailable) {
-      const enabled = !autoCloudBackupEnabled;
-      localStorage.setItem(`cloudBackup_${gameName}`, String(enabled));
-      setAutoCloudBackupEnabled(enabled);
-      toast.success(t(enabled ? "library.backups.cloudBackupsEnabledToast" : "library.backups.cloudBackupsDisabledToast"));
-      return;
-    }
-    if (index > 1) {
       setBackupDialogOpen(false);
       setDialogButtonIndex(0);
-      return;
-    }
-    setBackupDialogOpen(false);
-    setDialogButtonIndex(0);
-    const operation = index === 0 ? "backup" : "restore";
-    try {
-      const result = await window.electron.ludusavi(operation, gameName);
-      toast[result?.success ? "success" : "error"](
-        t(`library.backups.${operation}${result?.success ? "Success" : "Failed"}`)
-      );
-      if (result?.success && operation === "backup" && autoCloudBackupEnabled && cloudAvailable) {
-        const cloudResult = await uploadBackupToCloud(gameName, settings, user, userData);
-        if (!cloudResult.success) toast.error(cloudResult.error || t("library.backups.backupFailed"));
+      const operation = index === 0 ? "backup" : "restore";
+      try {
+        const result = await window.electron.ludusavi(operation, gameName);
+        toast[result?.success ? "success" : "error"](
+          t(`library.backups.${operation}${result?.success ? "Success" : "Failed"}`)
+        );
+        if (
+          result?.success &&
+          operation === "backup" &&
+          autoCloudBackupEnabled &&
+          cloudAvailable
+        ) {
+          const cloudResult = await uploadBackupToCloud(
+            gameName,
+            settings,
+            user,
+            userData
+          );
+          if (!cloudResult.success)
+            toast.error(cloudResult.error || t("library.backups.backupFailed"));
+        }
+      } catch {
+        toast.error(t(`library.backups.${operation}Failed`));
       }
-    } catch {
-      toast.error(t(`library.backups.${operation}Failed`));
-    }
-  }, [autoCloudBackupEnabled, backupScreen, cloudAvailable, cloudBackups, cloudRestoreBusy, gameName, navigate, selectedCloudBackup, settings, t, user, userData]);
+    },
+    [
+      autoCloudBackupEnabled,
+      backupScreen,
+      cloudAvailable,
+      cloudBackups,
+      cloudRestoreBusy,
+      gameName,
+      navigate,
+      selectedCloudBackup,
+      settings,
+      t,
+      user,
+      userData,
+    ]
+  );
 
   const handleManagementAction = index => {
     if (index === 0) {
@@ -608,18 +656,23 @@ function useInstalledGameDetails({
     } else if (index === 2) {
       const favorites = readStoredList("game-favorites");
       const isSaved = favorites.includes(gameName);
-      localStorage.setItem("game-favorites", JSON.stringify(
-        isSaved ? favorites.filter(name => name !== gameName) : [...favorites, gameName]
-      ));
+      localStorage.setItem(
+        "game-favorites",
+        JSON.stringify(
+          isSaved ? favorites.filter(name => name !== gameName) : [...favorites, gameName]
+        )
+      );
       setIsFavorite(!isSaved);
       window.dispatchEvent(new CustomEvent("favorites-updated"));
       return;
     } else if (index < folders.length + 3) {
       const folder = folders[index - 3];
       const contains = folder.items?.some(item => (item.game || item.name) === gameName);
-      setFolders(contains
-        ? removeGameFromFolder(gameName, folder.game)
-        : addGameToFolder(game, folder.game));
+      setFolders(
+        contains
+          ? removeGameFromFolder(gameName, folder.game)
+          : addGameToFolder(game, folder.game)
+      );
       window.dispatchEvent(new CustomEvent("ascendara:folders-updated"));
       return;
     } else if (game.isCustom) {
@@ -760,17 +813,21 @@ function useInstalledGameDetails({
       // Backup dialog navigation
       if (backupDialogOpen) {
         if (cloudRestoreBusy) return;
-        const lastIndex = backupScreen === "cloudConfirm"
-          ? 1
-          : backupScreen === "cloudList"
-            ? cloudBackups.length
-            : cloudAvailable ? 4 : 3;
+        const lastIndex =
+          backupScreen === "cloudConfirm"
+            ? 1
+            : backupScreen === "cloudList"
+              ? cloudBackups.length
+              : cloudAvailable
+                ? 4
+                : 3;
         if (action === "UP") {
           setDialogButtonIndex(prev => Math.max(0, prev - 1));
         } else if (action === "DOWN") {
           setDialogButtonIndex(prev => Math.min(lastIndex, prev + 1));
         } else if (action === "CONFIRM") {
-          if (!cloudBackupLoading && !cloudRestoreBusy) handleBackupAction(dialogButtonIndex);
+          if (!cloudBackupLoading && !cloudRestoreBusy)
+            handleBackupAction(dialogButtonIndex);
         } else if (action === "BACK") {
           if (backupScreen === "cloudConfirm") {
             setBackupScreen("cloudList");
@@ -987,13 +1044,26 @@ function useInstalledGameDetails({
   }, [handleInput, isRunning, isLaunching]);
 
   // Gamepad Polling
-  useControllerInput(action => {
-    if (action === "BACK" && window.__bReleasedAt && Date.now() - window.__bReleasedAt < 800) return;
-    handleInput(action);
-  }, {
-    priority: 5,
-    blocked: !canInput || isRunning || isLaunching || showExecutableManager || showDirectoryBrowser,
-  });
+  useControllerInput(
+    action => {
+      if (
+        action === "BACK" &&
+        window.__bReleasedAt &&
+        Date.now() - window.__bReleasedAt < 800
+      )
+        return;
+      handleInput(action);
+    },
+    {
+      priority: 5,
+      blocked:
+        !canInput ||
+        isRunning ||
+        isLaunching ||
+        showExecutableManager ||
+        showDirectoryBrowser,
+    }
+  );
 
   const formatPlayTime = time => {
     if (!time || time < 60) return t("library.notPlayedYet");

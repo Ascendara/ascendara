@@ -1855,9 +1855,11 @@ export default function GameScreen() {
         const freshList = game?.isCustom
           ? await window.electron.getCustomGames()
           : await window.electron.getGames();
-        const freshGame = (freshList || []).find(g =>
-          (g.game || g.name) === gameName &&
-          (!game._sourceDir || (g._sourceDir === game._sourceDir && g.executable === game.executable))
+        const freshGame = (freshList || []).find(
+          g =>
+            (g.game || g.name) === gameName &&
+            (!game._sourceDir ||
+              (g._sourceDir === game._sourceDir && g.executable === game.executable))
         );
         if (freshGame) {
           setGame(prev => (prev ? { ...prev, ...freshGame } : freshGame));
@@ -2327,7 +2329,7 @@ export default function GameScreen() {
       }
 
       // Check if Steam is running for onlinefix
-      if (game.online) {
+      if (game.online && (await window.electron.isOnWindows())) {
         const hideSteamWarning = localStorage.getItem("hideSteamWarning");
         if (!hideSteamWarning) {
           if (!(await window.electron.isSteamRunning())) {
@@ -2361,11 +2363,8 @@ export default function GameScreen() {
       // Check for multiple executables if no specific one was provided
       if (!specificExecutable) {
         const executables = game._sourceDir
-          ? (game.executables || (game.executable ? [game.executable] : []))
-          : await gameUpdateService.getGameExecutables(
-          gameName,
-          game.isCustom
-        );
+          ? game.executables || (game.executable ? [game.executable] : [])
+          : await gameUpdateService.getGameExecutables(gameName, game.isCustom);
         if (executables.length > 1) {
           // Store launch options and show selection dialog
           setPendingLaunchOptions({
@@ -2398,7 +2397,9 @@ export default function GameScreen() {
         isShiftKeyPressed,
         specificExecutable,
         trainerExists && launchWithTrainerEnabled,
-        game._sourceDir ? { _sourceDir: game._sourceDir, executable: game.executable } : null
+        game._sourceDir
+          ? { _sourceDir: game._sourceDir, executable: game.executable }
+          : null
       );
 
       if (result === false || result?.success === false) {

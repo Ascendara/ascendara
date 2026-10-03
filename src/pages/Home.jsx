@@ -20,7 +20,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Flame, Globe, ChevronLeft, ChevronRight, Zap, Play, Sparkles, TrendingUp, Gamepad2, RefreshCw, ArrowRight, Gift, ExternalLink, HandCoins, BanknoteIcon, Search, Library, Download, MessageSquare, HelpCircle } from "lucide-react";
+import {
+  Flame,
+  Globe,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
+  Play,
+  Sparkles,
+  TrendingUp,
+  Gamepad2,
+  RefreshCw,
+  ArrowRight,
+  Gift,
+  ExternalLink,
+  HandCoins,
+  BanknoteIcon,
+  Search,
+  Library,
+  Download,
+  MessageSquare,
+  HelpCircle,
+} from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/gameService";
 import imageCacheService from "@/services/imageCacheService";
@@ -55,8 +76,7 @@ const computeSourceKey = settings => {
 
 // Unified key for the carousel image map: prefer imgID (official index),
 // fall back to a title-based key for custom sources that have no imgID.
-const carouselCoverKey = g =>
-  g?.imgID ? g.imgID : g?.game ? `sgdb:${g.game}` : null;
+const carouselCoverKey = g => (g?.imgID ? g.imgID : g?.game ? `sgdb:${g.game}` : null);
 
 // Stable gradient fallback for games without a cover image (custom sources).
 // Deterministic per-title so the same game always gets the same tint.
@@ -78,8 +98,7 @@ const hashGradient = (key = "") => {
 const GameCoverFallback = memo(({ game, size = "md" }) => {
   const title = sanitizeText(game?.game || game?.name || "");
   const gradient = hashGradient(title);
-  const iconSize =
-    size === "xs" ? "h-5 w-5" : size === "sm" ? "h-7 w-7" : "h-10 w-10";
+  const iconSize = size === "xs" ? "h-5 w-5" : size === "sm" ? "h-7 w-7" : "h-10 w-10";
   return (
     <div
       className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${gradient} relative overflow-hidden`}
@@ -98,7 +117,9 @@ const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setIsVisible(true); },
+      ([entry]) => {
+        if (entry.isIntersecting) setIsVisible(true);
+      },
       { rootMargin: "200px", threshold: 0.1 }
     );
     if (cardRef.current) observer.observe(cardRef.current);
@@ -121,7 +142,7 @@ const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
       className="group relative flex-shrink-0 cursor-pointer"
       style={{ width: "280px" }}
       onClick={onClick}
-      onContextMenu={(e) => {
+      onContextMenu={e => {
         e.preventDefault();
         e.stopPropagation();
         onContextMenu?.(e, game);
@@ -174,7 +195,9 @@ const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setIsVisible(true); },
+      ([entry]) => {
+        if (entry.isIntersecting) setIsVisible(true);
+      },
       { rootMargin: "200px", threshold: 0.1 }
     );
     if (cardRef.current) observer.observe(cardRef.current);
@@ -196,7 +219,7 @@ const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
       ref={cardRef}
       className="group/mini relative cursor-pointer overflow-hidden rounded-lg"
       onClick={onClick}
-      onContextMenu={(e) => {
+      onContextMenu={e => {
         e.preventDefault();
         e.stopPropagation();
         onContextMenu?.(e, game);
@@ -318,7 +341,9 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
       ) : game?.imgID ? (
         <Skeleton className="absolute inset-0 h-full w-full" />
       ) : (
-        <div className="absolute inset-0"><GameCoverFallback game={game} size="xs" /></div>
+        <div className="absolute inset-0">
+          <GameCoverFallback game={game} size="xs" />
+        </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-70 transition-opacity group-hover:opacity-100" />
       <div className="absolute bottom-0 left-0 right-0 p-2">
@@ -552,31 +577,40 @@ const Home = memo(() => {
     setContextMenuOpen(true);
   }, []);
 
-  const handleDownloadFromContext = useCallback((game) => {
-    navigate("/download", {
-      state: { gameData: game },
-    });
-  }, [navigate]);
+  const handleDownloadFromContext = useCallback(
+    game => {
+      navigate("/download", {
+        state: { gameData: game },
+      });
+    },
+    [navigate]
+  );
 
-  const handleStartDownload = useCallback((game) => {
-    navigate("/download", {
-      state: { 
-        gameData: game,
-        autoStart: true
-      },
-    });
-  }, [navigate]);
+  const handleStartDownload = useCallback(
+    game => {
+      navigate("/download", {
+        state: {
+          gameData: game,
+          autoStart: true,
+        },
+      });
+    },
+    [navigate]
+  );
 
-  const handleReadMore = useCallback((game) => {
-    navigate("/download", {
-      state: { gameData: game },
-    });
-  }, [navigate]);
+  const handleReadMore = useCallback(
+    game => {
+      navigate("/download", {
+        state: { gameData: game },
+      });
+    },
+    [navigate]
+  );
 
-  const handlePlayLaterFromContext = useCallback((game) => {
+  const handlePlayLaterFromContext = useCallback(game => {
     const playLaterList = JSON.parse(localStorage.getItem("play-later-games") || "[]");
     const isInList = playLaterList.some(g => g.game === game.game);
-    
+
     if (isInList) {
       const updatedList = playLaterList.filter(g => g.game !== game.game);
       localStorage.setItem("play-later-games", JSON.stringify(updatedList));
@@ -612,8 +646,10 @@ const Home = memo(() => {
         try {
           const currentSettings = await window.electron.getSettings();
           const currentKey = computeSourceKey(currentSettings);
-          if (gamesCacheRevision !== imageCacheService.getRevision() ||
-              (gamesCacheSourceKey && gamesCacheSourceKey !== currentKey)) {
+          if (
+            gamesCacheRevision !== imageCacheService.getRevision() ||
+            (gamesCacheSourceKey && gamesCacheSourceKey !== currentKey)
+          ) {
             console.log(
               "[Home] Active source changed, invalidating cache",
               gamesCacheSourceKey,
@@ -657,7 +693,10 @@ const Home = memo(() => {
         }
 
         // Fetch fresh data if no cache or forcing refresh
-        console.log("[Home] Loading fresh game data", forceRefresh ? "(forced refresh)" : "");
+        console.log(
+          "[Home] Loading fresh game data",
+          forceRefresh ? "(forced refresh)" : ""
+        );
         const [gamesData, carouselGames] = await Promise.all([
           gameService.getAllGames(),
           gameService.getRandomTopGames(),
@@ -697,7 +736,7 @@ const Home = memo(() => {
     loadGames();
 
     // Listen for index refresh events
-    const handleIndexRefresh = (event) => {
+    const handleIndexRefresh = event => {
       console.log("[Home] Index refreshed, reloading games", event.detail);
       // Clear module-level caches to force fresh data
       gamesCache = null;
@@ -761,7 +800,9 @@ const Home = memo(() => {
     };
 
     loadCarouselImages();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [carouselGames, currentSlide, imageRefreshKey]);
 
   // Initial load - preload all carousel images for smooth transitions
@@ -857,9 +898,7 @@ const Home = memo(() => {
       recentlyUpdatedSection.forEach(g => usedGames.add(g.game));
 
       // "Top" for custom sources = newest entries we haven't shown yet
-      const topSection = games
-        .filter(g => !usedGames.has(g.game))
-        .slice(0, 100);
+      const topSection = games.filter(g => !usedGames.has(g.game)).slice(0, 100);
       topSection.forEach(g => usedGames.add(g.game));
 
       return {
@@ -1024,7 +1063,7 @@ const Home = memo(() => {
       }
 
       // Check if Steam is running for onlinefix games
-      if (game.online) {
+      if (game.online && (await window.electron.isOnWindows())) {
         const hideSteamWarning = localStorage.getItem("hideSteamWarning");
         if (!hideSteamWarning) {
           if (!(await window.electron.isSteamRunning())) {
@@ -1221,7 +1260,9 @@ const Home = memo(() => {
         onStartDownload={handleStartDownload}
         onReadMore={handleReadMore}
         onPlayLater={handlePlayLaterFromContext}
-        isPlayLater={contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)}
+        isPlayLater={
+          contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)
+        }
       />
 
       <SteamNotRunningDialog
