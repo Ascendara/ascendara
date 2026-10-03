@@ -272,6 +272,7 @@ export default function DownloadPage() {
         setReportReason("");
         setReportDetails("");
         setShowNewUserGuide(false);
+        pendingBrowserLinkRef.current = null;
 
         // Remove the state from history
         window.history.replaceState({}, document.title, location.pathname);
@@ -335,6 +336,7 @@ export default function DownloadPage() {
   const [showSelectPath, setShowSelectPath] = useState(false);
   const [showTimemachineSelection, setShowTimemachineSelection] = useState(false);
   const [showNewUserGuide, setShowNewUserGuide] = useState(false);
+  const pendingBrowserLinkRef = useRef(null);
   const [lastProcessedUrl, setLastProcessedUrl] = useState(null);
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
@@ -1882,8 +1884,20 @@ export default function DownloadPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigate, location.pathname]);
 
+  const openBrowserLink = ({ link, needsReferrerSpoofing }) => {
+    if (needsReferrerSpoofing) {
+      return window.electron.openURL(link, { referrer: "https://steamrip.com/" });
+    }
+    return window.electron.openURL(link);
+  };
+
   const handleCloseGuide = () => {
     setShowNewUserGuide(false);
+    if (pendingBrowserLinkRef.current) {
+      const pendingLink = pendingBrowserLinkRef.current;
+      pendingBrowserLinkRef.current = null;
+      openBrowserLink(pendingLink);
+    }
   };
 
   const checkIfNewUser = async () => {
@@ -1920,15 +1934,12 @@ export default function DownloadPage() {
         link
       );
 
-    if (needsReferrerSpoofing) {
-      await window.electron.openURL(link, { referrer: "https://steamrip.com/" });
-    } else {
-      window.electron.openURL(link);
-    }
-
-    const isNewUser = await checkIfNewUser();
-    if (isNewUser) {
+    const browserLink = { link, needsReferrerSpoofing };
+    if (await checkIfNewUser()) {
+      pendingBrowserLinkRef.current = browserLink;
       setShowNewUserGuide(true);
+    } else {
+      await openBrowserLink(browserLink);
     }
   };
 
@@ -2817,7 +2828,9 @@ export default function DownloadPage() {
                                       className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
                                     >
                                       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                      <span>{t("download.refreshIndexBeforeReport")}</span>
+                                      <span>
+                                        {t("download.refreshIndexBeforeReport")}
+                                      </span>
                                     </div>
                                   )}
                                 </AlertDialogDescription>
@@ -4461,7 +4474,7 @@ export default function DownloadPage() {
               onClick={() => {
                 setSettings({ downloadHandler: true })
                   .then(() => {
-                    setShowNewUserGuide(false);
+                    handleCloseGuide();
                   })
                   .catch(error => {
                     console.error("Failed to save settings:", error);
