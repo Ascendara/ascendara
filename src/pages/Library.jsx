@@ -129,7 +129,7 @@ let libraryGamesCache = null;
 
 // Keep deliberately retained installs independently reachable in React.
 const getLibraryCardKey = game =>
-  (game._hasMultipleInstalls ? `${getLibraryIdentityKey(game)}:${libraryInstallKey(game)}` : getLibraryIdentityKey(game)) ||
+  (game.isFolder ? getLibraryIdentityKey(game) : `${getLibraryIdentityKey(game)}:${libraryInstallKey(game)}`) ||
   `library-item:${game?.executable || game?.path || game?.installPath || "unknown"}`;
 
 const Library = () => {
@@ -147,7 +147,9 @@ const Library = () => {
     if (selectedGames.length === 0) return;
     try {
       for (const gameName of selectedGames) {
-        await window.electron.removeCustomGame(gameName);
+        for (const entry of libraryRecords.filter(item => item.isCustom && item.game === gameName)) {
+          await window.electron.removeCustomGame(gameName, entry);
+        }
       }
       setSelectedGames([]);
       setSelectionMode(false);
@@ -1270,9 +1272,11 @@ const Library = () => {
   // Called by game cards after a delete/remove completes. Optimistically drops
   // the game from local state for an instant, seamless UI update, then
   // resyncs with disk in the background (no full page/app reload needed).
-  const handleGameRemoved = gameId => {
-    if (gameId) {
-      setGames(prev => prev.filter(g => (g.game || g.name) !== gameId));
+  const handleGameRemoved = removed => {
+    if (removed) {
+      const key = libraryInstallKey(removed);
+      setLibraryRecords(prev => prev.filter(g => libraryInstallKey(g) !== key));
+      setGames(prev => prev.filter(g => g.isFolder || libraryInstallKey(g) !== key));
     }
     loadGames();
   };
@@ -3416,17 +3420,17 @@ const FavoritesGalleryCard = memo(
         setIsUninstalling(true);
         const gameId = game.game || game.name;
         if (saveData) {
-          await window.electron.saveDeletedGameData(gameId);
+          await window.electron.saveDeletedGameData(gameId, game);
         }
         if (game.isCustom) {
-          await window.electron.removeCustomGame(gameId);
+          await window.electron.removeCustomGame(gameId, game);
         } else {
-          await window.electron.deleteGame(gameId);
+          await window.electron.deleteGame(gameId, game);
         }
         setIsUninstalling(false);
         setIsSaveDataDialogOpen(false);
         setIsRemoving(true);
-        setTimeout(() => onRemoved?.(gameId), 280);
+        setTimeout(() => onRemoved?.(game), 280);
       } catch {
         setIsUninstalling(false);
       }
@@ -3703,7 +3707,7 @@ const FavoritesGalleryCard = memo(
                           setContextMenuOpen(false);
                           try {
                             await window.electron.openGameDirectory(
-                              game.game || game.name
+                              game.game || game.name, game.isCustom, game
                             );
                           } catch {}
                         }}
@@ -4301,19 +4305,19 @@ const InstalledGameCard = memo(
         const gameId = game.game || game.name;
 
         if (saveData) {
-          await window.electron.saveDeletedGameData(gameId);
+          await window.electron.saveDeletedGameData(gameId, game);
         }
 
         if (game.isCustom) {
-          await window.electron.removeCustomGame(gameId);
+          await window.electron.removeCustomGame(gameId, game);
         } else {
-          await window.electron.deleteGame(gameId);
+          await window.electron.deleteGame(gameId, game);
         }
 
         setIsUninstalling(false);
         setIsSaveDataDialogOpen(false);
         setIsRemoving(true);
-        setTimeout(() => onRemoved?.(gameId), 280);
+        setTimeout(() => onRemoved?.(game), 280);
       } catch (error) {
         console.error("Error deleting game:", error);
         setIsUninstalling(false);
@@ -4325,7 +4329,7 @@ const InstalledGameCard = memo(
       setContextMenuOpen(false);
 
       try {
-        await window.electron.openGameDirectory(game.game || game.name);
+        await window.electron.openGameDirectory(game.game || game.name, game.isCustom, game);
       } catch (error) {
         console.error("Failed to open directory:", error);
         toast.error(t("library.failedToOpenDirectory"));

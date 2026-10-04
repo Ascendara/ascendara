@@ -21,4 +21,29 @@ function getGameDirectories(settings) {
     });
 }
 
-module.exports = { getGameDirectories };
+function getSelectedGameDirectories(settings, installation) {
+  const directories = getGameDirectories(settings);
+  if (!installation?._sourceDir) return directories;
+  const identity = directory => {
+    let resolved = path.resolve(directory);
+    try { resolved = fs.realpathSync.native(resolved); } catch {}
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  };
+  const selected = directories.filter(
+    directory => identity(directory) === identity(installation._sourceDir)
+  );
+  if (!selected.length) throw new Error("Selected library directory is no longer configured");
+  return selected;
+}
+
+function getManagedGameDirectory(directory, game, installation) {
+  const folder = installation?._folderName || game.replace(/[<>:"/\\|?*]/g, "");
+  const root = path.resolve(directory);
+  const target = path.resolve(root, folder);
+  if (!folder || path.dirname(target) !== root || target === root) {
+    throw new Error("Invalid game folder");
+  }
+  return target;
+}
+
+module.exports = { getGameDirectories, getSelectedGameDirectories, getManagedGameDirectory };

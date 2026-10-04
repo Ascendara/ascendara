@@ -266,7 +266,8 @@ const FolderView = () => {
           ...(Array.isArray(customGames) ? customGames : []).map(game => ({ ...game, isCustom: true })),
         ];
         const visible = resolveLibraryConflicts(records, readLibraryChoices()).games;
-        setFolderGames(previous => reconcileFolderItems(previous, visible));
+        const folder = getFolderByName(decodeURIComponent(folderName));
+        setFolderGames(reconcileFolderItems(folder?.items || [], visible));
       } catch (error) {
         console.error("Error refreshing folder playtime:", error);
       }

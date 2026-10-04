@@ -48,7 +48,9 @@ export function reconcileFolderItems(items, visibleGames) {
     if (seen.has(identity)) return [];
     seen.add(identity);
     const matches = visibleGames.filter(game => getLibraryIdentityKey(game) === identity);
-    return matches.length ? matches.map(game => ({ ...item, ...game })) : [item];
+    // Snapshots only record membership. Never resurrect removed installs or
+    // carry custom paths/flags into the currently selected managed install.
+    return matches.map(game => ({ ...game }));
   });
 }
 

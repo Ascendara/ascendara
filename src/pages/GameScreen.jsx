@@ -2452,7 +2452,7 @@ export default function GameScreen() {
   // Handle open directory
   const handleOpenDirectory = async () => {
     if (!game) return;
-    await window.electron.openGameDirectory(game.game || game.name, game.isCustom);
+    await window.electron.openGameDirectory(game.game || game.name, game.isCustom, game);
   };
 
   // Handle delete game — step 1: confirm delete, then ask about saving data
@@ -2472,7 +2472,7 @@ export default function GameScreen() {
       const gameId = game.game || game.name;
 
       if (saveData) {
-        await window.electron.saveDeletedGameData(gameId);
+        await window.electron.saveDeletedGameData(gameId, game);
       }
 
       // Remove the game from all folders
@@ -2504,9 +2504,9 @@ export default function GameScreen() {
 
       // Delete the game from the main library
       if (game.isCustom) {
-        await window.electron.removeCustomGame(gameId);
+        await window.electron.removeCustomGame(gameId, game);
       } else {
-        await window.electron.deleteGame(gameId);
+        await window.electron.deleteGame(gameId, game);
       }
 
       setIsUninstalling(false);

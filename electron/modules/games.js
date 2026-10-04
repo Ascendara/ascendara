@@ -24,7 +24,7 @@ const {
   shouldLogError,
 } = require("./utils");
 const { getSettingsManager } = require("./settings");
-const { getGameDirectories } = require("./gameDirectories");
+const { getGameDirectories, getSelectedGameDirectories, getManagedGameDirectory } = require("./gameDirectories");
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("./discord-rpc");
 const { hideWindow, showWindow } = require("./window");
 
@@ -289,7 +289,7 @@ function registerGameHandlers() {
               try {
                 const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
                 const parsed = JSON.parse(gameInfoData);
-                return { ...parsed, _sourceDir: downloadDir };
+                return { ...parsed, isCustom: false, custom: false, _sourceDir: downloadDir, _folderName: dir };
               } catch (error) {
                 const errorKey = `${dir}_${error.code}`;
                 if (shouldLogError(errorKey)) {
@@ -368,7 +368,7 @@ function registerGameHandlers() {
               }
             }
 
-            return { ...game, imagePath, _sourceDir: dir };
+            return { ...game, isCustom: true, custom: true, imagePath, _sourceDir: dir };
           });
 
           allGames.push(...gamesWithImagePaths);
@@ -827,21 +827,18 @@ function registerGameHandlers() {
   });
 
   // Save deleted game data as a stub in games.json before deletion
-  ipcMain.handle("save-deleted-game-data", async (_, gameName) => {
+  ipcMain.handle("save-deleted-game-data", async (_, gameName, installation) => {
     const settings = settingsManager.getSettings();
     try {
       if (!settings.downloadDirectory) return { success: false };
 
       const sanitizedGame = sanitizeGameName(gameName);
-      const allDirectories = [
-        settings.downloadDirectory,
-        ...(settings.additionalDirectories || []),
-      ];
+      const allDirectories = getSelectedGameDirectories(settings, installation);
 
       // Find the game's .ascendara.json to extract stats
       let gameInfo = null;
       for (const dir of allDirectories) {
-        const testPath = path.join(dir, sanitizedGame, `${sanitizedGame}.ascendara.json`);
+        const testPath = path.join(getManagedGameDirectory(dir, gameName, installation), `${installation?._folderName || sanitizedGame}.ascendara.json`);
         if (fs.existsSync(testPath)) {
           try {
             gameInfo = JSON.parse(fs.readFileSync(testPath, "utf8"));
@@ -869,8 +866,8 @@ function registerGameHandlers() {
       }
       if (!Array.isArray(gamesData.games)) gamesData.games = [];
 
-      // Remove any existing entry for this game (reinstall clean-slate)
-      gamesData.games = gamesData.games.filter(g => g.game !== gameName);
+      // Replace history only; a same-title custom installation is independent.
+      gamesData.games = gamesData.games.filter(g => g.game !== gameName || !g._isDeleted);
 
       // Build the stub with preserved stats
       const stub = {
@@ -1071,82 +1068,64 @@ function registerGameHandlers() {
     }
   );
 
-  // Delete game
-  ipcMain.handle("delete-game", async (_, game) => {
+  // Mutations use the selected record's source, never another install with the same title.
+  ipcMain.handle("delete-game", async (_, game, installation) => {
     try {
       if (game === "local") {
         resetOnboarding();
         return;
       }
-
       const settings = settingsManager.getSettings();
-      if (!settings.downloadDirectory || !settings.additionalDirectories) return;
-
-      const allDirectories = [
-        settings.downloadDirectory,
-        ...settings.additionalDirectories,
-      ];
-
-      if (isWindows) {
-        deleteGameShortcut(game);
-        deleteStartMenuShortcut(game);
-      }
-
-      for (const directory of allDirectories) {
-        const gameDirectory = path.join(directory, game);
-        if (fs.existsSync(gameDirectory)) {
-          fs.rmSync(gameDirectory, { recursive: true, force: true });
-          console.log(`Deleted game from directory: ${gameDirectory}`);
-          if (isLinux && proton) {
-            await proton.deleteGamePrefix(game);
-            console.log(`Deleted compat data for: ${game}`);
-          }
-          return;
-        }
-      }
-
-      console.error(`Game directory not found for ${game}`);
-    } catch (error) {
-      console.error("Error deleting game:", error);
-    }
-  });
-
-  // Remove custom game
-  ipcMain.handle("remove-game", async (_, game) => {
-    const settings = settingsManager.getSettings();
-    try {
-      if (!settings.downloadDirectory) return;
-
-      const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-      const gamesDirectory = path.join(settings.downloadDirectory, "games");
-
-      const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-      const gameIndex = gamesData.games.findIndex(g => g.game === game);
-      if (gameIndex !== -1) {
-        gamesData.games.splice(gameIndex, 1);
-        fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
-
+      for (const directory of getSelectedGameDirectories(settings, installation)) {
+        const gameDirectory = getManagedGameDirectory(directory, game, installation);
+        const metadata = path.join(gameDirectory, `${path.basename(gameDirectory)}.ascendara.json`);
+        if (!fs.existsSync(metadata)) continue;
+        fs.rmSync(gameDirectory, { recursive: true, force: true });
         if (isWindows) {
           deleteGameShortcut(game);
           deleteStartMenuShortcut(game);
         }
-
-        const possibleExtensions = [".jpg", ".jpeg", ".png"];
-        for (const ext of possibleExtensions) {
-          const imagePath = path.join(gamesDirectory, `${game}.ascendara${ext}`);
-          if (fs.existsSync(imagePath)) {
-            fs.unlinkSync(imagePath);
-            break;
-          }
-        }
+        if (isLinux && proton) await proton.deleteGamePrefix(game);
+        return true;
       }
+      throw new Error(`Game directory not found for ${game}`);
     } catch (error) {
-      console.error("Error removing game:", error);
+      console.error("Error deleting game:", error);
+      throw error;
     }
   });
 
+  ipcMain.handle("remove-game", async (_, game, installation) => {
+    const settings = settingsManager.getSettings();
+    for (const directory of getSelectedGameDirectories(settings, installation)) {
+      const gamesFilePath = path.join(directory, "games.json");
+      if (!fs.existsSync(gamesFilePath)) continue;
+      const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+      const matches = entry => entry.game === game && !entry._isDeleted &&
+        (!installation || entry.executable === installation.executable);
+      if (!gamesData.games.some(matches)) continue;
+      gamesData.games = gamesData.games.filter(entry => !matches(entry));
+      fs.writeFileSync(gamesFilePath, JSON.stringify(gamesData, null, 2));
+      if (!gamesData.games.some(entry => entry.game === game)) {
+        if (isWindows) {
+          deleteGameShortcut(game);
+          deleteStartMenuShortcut(game);
+        }
+        for (const ext of [".jpg", ".jpeg", ".png"]) {
+          const gamesDirectory = path.resolve(directory, "games");
+          const imagePath = path.resolve(gamesDirectory, `${game}.ascendara${ext}`);
+          if (path.dirname(imagePath) === gamesDirectory && fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+          }
+        }
+      }
+      return true;
+    }
+    throw new Error(`Custom game not found for ${game}`);
+  });
+
   // Open game directory
-  ipcMain.handle("open-game-directory", (_, game, isCustom) => {
+  ipcMain.handle("open-game-directory", (_, game, isCustom, installation) => {
     if (game === "local") {
       shell.openPath(path.dirname(process.execPath));
       return;
@@ -1179,14 +1158,11 @@ function registerGameHandlers() {
     const settings = settingsManager.getSettings();
     if (!settings.downloadDirectory) return;
 
-    const allDirectories = [
-      settings.downloadDirectory,
-      ...(settings.additionalDirectories || []),
-    ];
+    const allDirectories = getSelectedGameDirectories(settings, installation);
 
     if (!isCustom) {
       for (const directory of allDirectories) {
-        const gameDirectory = path.join(directory, game);
+        const gameDirectory = getManagedGameDirectory(directory, game, installation);
         if (fs.existsSync(gameDirectory)) {
           shell.openPath(gameDirectory);
           return;
@@ -1194,7 +1170,7 @@ function registerGameHandlers() {
       }
     } else {
       try {
-        const gameInfo = findCustomGame(game, settings);
+        const gameInfo = findCustomGame(game, { downloadDirectory: allDirectories[0], additionalDirectories: allDirectories.slice(1) }, installation?.executable);
         const directory = gameInfo?.launcher
           ? gameInfo.installPath
           : gameInfo?.executable

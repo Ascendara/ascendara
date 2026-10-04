@@ -318,9 +318,9 @@ contextBridge.exposeInMainWorld("electron", {
       executable,
       imageUrl
     ),
-  removeCustomGame: game => ipcRenderer.invoke("remove-game", game),
-  deleteGame: game => ipcRenderer.invoke("delete-game", game),
-  saveDeletedGameData: game => ipcRenderer.invoke("save-deleted-game-data", game),
+  removeCustomGame: (game, installation) => ipcRenderer.invoke("remove-game", game, installation),
+  deleteGame: (game, installation) => ipcRenderer.invoke("delete-game", game, installation),
+  saveDeletedGameData: (game, installation) => ipcRenderer.invoke("save-deleted-game-data", game, installation),
   restoreDeletedGameData: game => ipcRenderer.invoke("restore-deleted-game-data", game),
   discardDeletedGameData: game => ipcRenderer.invoke("discard-deleted-game-data", game),
   deleteGameDirectory: game => ipcRenderer.invoke("delete-game-directory", game),
@@ -525,8 +525,8 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // FILE & DIRECTORY MANAGEMENT
   //===========================================================================
-  openGameDirectory: (game, isCustom) =>
-    ipcRenderer.invoke("open-game-directory", game, isCustom),
+  openGameDirectory: (game, isCustom, installation) =>
+    ipcRenderer.invoke("open-game-directory", game, isCustom, installation),
   openDirectoryDialog: () => ipcRenderer.invoke("open-directory-dialog"),
   openFileDialog: (exePath = null) => ipcRenderer.invoke("open-file-dialog", exePath),
   scanGameFolders: () => ipcRenderer.invoke("scan-game-folders"),

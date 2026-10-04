@@ -519,7 +519,7 @@ function useBigPicturePage() {
   };
 
   const handleOpenFolder = async game => {
-    await window.electron.openGameDirectory(game.game);
+    await window.electron.openGameDirectory(game.game, game.isCustom, game);
   };
 
   // --- INSTALLED GAME DETAILS HANDLERS ---

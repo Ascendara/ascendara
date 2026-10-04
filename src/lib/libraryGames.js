@@ -42,8 +42,9 @@ const mergeDuplicateLibraryGame = (existing, incoming) => {
   const secondary = preferred === existing ? incoming : existing;
 
   return {
-    ...secondary,
     ...preferred,
+    isCustom: preferred.isCustom ?? preferred.custom ?? false,
+    custom: preferred.isCustom ?? preferred.custom ?? false,
     game: getGameDisplayName(preferred) || getGameDisplayName(secondary),
     name: preferred?.name || preferred?.game || secondary?.name || secondary?.game,
     playTime: Math.max(

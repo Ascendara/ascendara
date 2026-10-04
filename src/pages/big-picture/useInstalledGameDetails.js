@@ -510,9 +510,9 @@ function useInstalledGameDetails({
 
       // Delete the game from the main library
       if (game.isCustom) {
-        await window.electron.removeCustomGame(gameId);
+        await window.electron.removeCustomGame(gameId, game);
       } else {
-        await window.electron.deleteGame(gameId);
+        await window.electron.deleteGame(gameId, game);
       }
 
       setIsUninstalling(false);
