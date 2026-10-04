@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { getUserAuthHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
 import { retroBackupPlatform, restoreRetroCloudBackup } from "@/services/retroService";
 import { checkForUpdates } from "@/services/updateCheckingService";
+import gameService from "@/services/gameService";
+import imageCacheService from "@/services/imageCacheService";
 import {
   calculateLevelFromXP,
   getLevelConstants,
@@ -958,18 +960,10 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         for (const game of cloudOnlyGames.slice(0, 20)) {
           // Limit for performance (no localStorage caching for data URLs)
           try {
-            const response = await fetch(
-              `https://api.ascendara.app/v3/image/${game.gameID}`
-            );
-            if (response.ok) {
-              const blob = await response.blob();
-              const dataUrl = await new Promise(resolve => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.readAsDataURL(blob);
-              });
-              images[game.name] = dataUrl;
-            }
+            const gameData = await gameService.findGameByGameID(game.gameID);
+            if (!gameData?.imgID) continue;
+            const image = await imageCacheService.getImage(gameData.imgID);
+            if (image) images[game.name] = image;
           } catch (error) {
             console.error("Error loading cloud game image:", error);
           }

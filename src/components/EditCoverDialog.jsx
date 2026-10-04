@@ -118,46 +118,37 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
     }
 
     if (activeTab === "search" && coverSearch.selectedCover) {
-      // Fetch new image from search results and save to localStorage
+      // Fetch new image from search results
       try {
-        // Use v3 endpoint with gameID when using local index, otherwise use v2 with imgID
-        const imageUrl =
-          settings.usingLocalIndex && coverSearch.selectedCover.gameID
-            ? gameService.getImageUrlByGameId(coverSearch.selectedCover.gameID)
-            : gameService.getImageUrl(coverSearch.selectedCover.imgID);
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const dataUrl = reader.result;
-          try {
-            // 3. Update the image on disk via Electron IPC (no localStorage
-            // caching - quota issues with base64 data URLs)
-            if (window.electron && window.electron.updateGameCover) {
-              await window.electron.updateGameCover(
-                gameName,
-                coverSearch.selectedCover.imgID,
-                dataUrl
-              );
-              toast.success("Cover image updated successfully");
-            }
-          } catch (e) {
-            console.warn("Could not update cover image on disk:", e);
+        // Load the selected imgID from the local index or API
+        const dataUrl = await imageCacheService.getImage(coverSearch.selectedCover.imgID);
+        if (!dataUrl) throw new Error("Cover image not found");
+        try {
+          // 3. Update the image on disk via Electron IPC (no localStorage
+          // caching - quota issues with base64 data URLs)
+          if (window.electron && window.electron.updateGameCover) {
+            await window.electron.updateGameCover(
+              gameName,
+              coverSearch.selectedCover.imgID,
+              dataUrl
+            );
+            toast.success("Cover image updated successfully");
           }
+        } catch (e) {
+          console.warn("Could not update cover image on disk:", e);
+        }
 
-          // 5. Notify parent component to update UI
-          onImageUpdate && onImageUpdate(dataUrl, coverSearch.selectedCover.imgID);
+        // 5. Notify parent component to update UI
+        onImageUpdate && onImageUpdate(dataUrl, coverSearch.selectedCover.imgID);
 
-          // 6. Dispatch a custom event to notify all components
-          window.dispatchEvent(
-            new CustomEvent("game-cover-updated", {
-              detail: { gameName, dataUrl, imgID: coverSearch.selectedCover.imgID },
-            })
-          );
+        // 6. Dispatch a custom event to notify all components
+        window.dispatchEvent(
+          new CustomEvent("game-cover-updated", {
+            detail: { gameName, dataUrl, imgID: coverSearch.selectedCover.imgID },
+          })
+        );
 
-          onOpenChange(false);
-        };
-        reader.readAsDataURL(blob);
+        onOpenChange(false);
       } catch (e) {
         console.error("Failed to update cover image from search", e);
         toast.error("Failed to update cover image");

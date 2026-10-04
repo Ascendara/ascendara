@@ -85,6 +85,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import gameService from "@/services/gameService";
+import imageCacheService from "@/services/imageCacheService";
 import { safeSetItem } from "@/services/gameInfoCacheService";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -909,7 +910,6 @@ const Library = () => {
             try {
               if (game.gameID) {
                 // For local index, we need to find the game's imgID
-                let imageId = game.gameID;
                 let imageLoaded = false;
 
                 // 1. Try with electron
@@ -926,38 +926,33 @@ const Library = () => {
                   );
                 }
 
-                // 2. For local index, try to load from local file system using imgID
-                if (!imageLoaded && settings.usingLocalIndex) {
-                  try {
-                    const gameData = await gameService.findGameByGameID(game.gameID);
-                    if (gameData?.imgID) imageId = gameData.imgID;
+                const gameData = imageLoaded
+                  ? null
+                  : await gameService.findGameByGameID(game.gameID);
+                const imageId = gameData?.imgID;
 
+                // 2. For local index, try to load from local file system using imgID
+                if (!imageLoaded && settings.usingLocalIndex && imageId) {
+                  try {
                     const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
                     const imageData = await window.electron.readLocalFile(
                       localImagePath,
                       "base64"
                     );
-                    images[game.name] = `data:image/jpeg;base64,${imageData}`;
-                    imageLoaded = true;
+                    if (imageData) {
+                      images[game.name] = `data:image/jpeg;base64,${imageData}`;
+                      imageLoaded = true;
+                    }
                   } catch (localError) {
                     console.warn("Could not load from local index:", localError);
                   }
                 }
 
                 // 3. Ascendara API
-                if (!imageLoaded) {
+                if (!imageLoaded && imageId) {
                   try {
-                    const imageUrl = `https://api.ascendara.app/v3/image/${game.gameID}`;
-                    const response = await fetch(imageUrl);
-                    if (response.ok) {
-                      const blob = await response.blob();
-                      const dataUrl = await new Promise(resolve => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                      });
-                      images[game.name] = dataUrl;
-                    }
+                    const image = await imageCacheService.getImage(imageId);
+                    if (image) images[game.name] = image;
                   } catch (error) {
                     console.error("Error loading cloud game image from API:", error);
                   }

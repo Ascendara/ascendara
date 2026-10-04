@@ -780,10 +780,6 @@ const gameService = {
     return `${API_URL}/v2/image/${imgID}`;
   },
 
-  getImageUrlByGameId(gameID) {
-    return `${API_URL}/v3/image/${gameID}`;
-  },
-
   async getLocalImagePath(imgID) {
     if (!memoryCache.isLocalIndex || !memoryCache.localIndexPath) {
       return null;
