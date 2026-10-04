@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,6 +28,9 @@ export default function AccountActionsCard({
   handleLogout,
   showDeleteDialog,
   setShowDeleteDialog,
+  showDepartureDialog,
+  handleCancelDeparture,
+  handleAccountDeletion,
   deletePassword,
   setDeletePassword,
   isDeletingAccount,
@@ -35,6 +40,15 @@ export default function AccountActionsCard({
   deleteConfirmed,
   setDeleteHoldProgress,
 }) {
+  const [departureReason, setDepartureReason] = useState("");
+  useEffect(() => {
+    if (!showDepartureDialog) setDepartureReason("");
+  }, [showDepartureDialog]);
+  const closeDeparture = () => {
+    setDepartureReason("");
+    handleCancelDeparture();
+  };
+
   return (
     <div className="mt-8 space-y-4 border-t border-border/50 pt-8">
       <h3 className="mb-4 text-sm font-medium text-muted-foreground">
@@ -205,6 +219,54 @@ export default function AccountActionsCard({
                 setDeleteHoldProgress(0);
               }}
             >
+              {t("common.cancel") || "Cancel"}
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={showDepartureDialog}
+        onOpenChange={open => {
+          if (!open && !isDeletingAccount) closeDeparture();
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("account.deletion.departureTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("account.deletion.departureDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="departure-reason">{t("account.deletion.departureTitle")}</Label>
+            <Textarea
+              id="departure-reason"
+              value={departureReason}
+              onChange={e => setDepartureReason(e.target.value)}
+              placeholder={t("account.deletion.departurePlaceholder")}
+              maxLength={1000}
+              rows={4}
+              disabled={isDeletingAccount}
+            />
+          </div>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+            <button
+              type="button"
+              onClick={() => handleAccountDeletion("")}
+              disabled={isDeletingAccount}
+              className="h-10 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              {t("account.deletion.departureSkip")}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAccountDeletion(departureReason.trim())}
+              disabled={isDeletingAccount || !departureReason.trim()}
+              className="h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {isDeletingAccount ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("account.deletion.departureSubmit")}
+            </button>
+            <AlertDialogCancel disabled={isDeletingAccount} onClick={closeDeparture}>
               {t("common.cancel") || "Cancel"}
             </AlertDialogCancel>
           </AlertDialogFooter>

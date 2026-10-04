@@ -517,7 +517,7 @@ export const changePassword = async (currentPassword, newPassword) => {
  * @param {string} password - Current password for reauthentication
  * @returns {Promise<{success: boolean, error: string|null}>}
  */
-export const deleteAccount = async password => {
+export const deleteAccount = async (password, reason) => {
   try {
     const user = auth.currentUser;
     if (!user || !user.email) {
@@ -545,6 +545,7 @@ export const deleteAccount = async password => {
           userId: user.uid,
           email: user.email,
           displayName: userData.displayName || user.displayName || "Unknown",
+          reason: reason?.trim() || "",
         }),
       }
     );

@@ -242,9 +242,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Delete account (request deletion and sign out)
-  const removeAccount = async password => {
+  const removeAccount = async (password, reason) => {
     setError(null);
-    const result = await deleteAccount(password);
+    const result = await deleteAccount(password, reason);
     if (result.error) {
       setError(result.error);
     } else if (result.success) {

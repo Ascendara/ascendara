@@ -44,6 +44,9 @@ export default function SettingsSection({
   handleLogout,
   showDeleteDialog,
   setShowDeleteDialog,
+  showDepartureDialog,
+  handleCancelDeparture,
+  handleAccountDeletion,
   deletePassword,
   setDeletePassword,
   isDeletingAccount,
@@ -121,6 +124,9 @@ export default function SettingsSection({
         handleLogout={handleLogout}
         showDeleteDialog={showDeleteDialog}
         setShowDeleteDialog={setShowDeleteDialog}
+        showDepartureDialog={showDepartureDialog}
+        handleCancelDeparture={handleCancelDeparture}
+        handleAccountDeletion={handleAccountDeletion}
         deletePassword={deletePassword}
         setDeletePassword={setDeletePassword}
         isDeletingAccount={isDeletingAccount}

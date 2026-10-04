@@ -147,6 +147,9 @@ const Ascend = () => {
     setShowSubscriptionSuccess,
     showDeleteDialog,
     setShowDeleteDialog,
+    showDepartureDialog,
+    handleCancelDeparture,
+    handleAccountDeletion,
     deletePassword,
     setDeletePassword,
     isDeletingAccount,
@@ -766,6 +769,9 @@ const Ascend = () => {
               handleLogout={handleLogout}
               showDeleteDialog={showDeleteDialog}
               setShowDeleteDialog={setShowDeleteDialog}
+              showDepartureDialog={showDepartureDialog}
+              handleCancelDeparture={handleCancelDeparture}
+              handleAccountDeletion={handleAccountDeletion}
               deletePassword={deletePassword}
               setDeletePassword={setDeletePassword}
               isDeletingAccount={isDeletingAccount}

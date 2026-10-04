@@ -121,6 +121,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [isHoldingDelete, setIsHoldingDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDepartureDialog, setShowDepartureDialog] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
@@ -2557,7 +2558,8 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         setDeleteConfirmed(true);
         // Brief pause to show the confirmed state before deletion
         setTimeout(() => {
-          handleAccountDeletion();
+          setShowDeleteDialog(false);
+          setShowDepartureDialog(true);
         }, 800);
       }
     }, 16);
@@ -2585,12 +2587,20 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     requestAnimationFrame(animateDown);
   };
 
-  const handleAccountDeletion = async () => {
+  const handleCancelDeparture = () => {
+    setShowDepartureDialog(false);
+    setDeletePassword("");
+    setDeleteHoldProgress(0);
+    setIsHoldingDelete(false);
+    setDeleteConfirmed(false);
+  };
+
+  const handleAccountDeletion = async reason => {
     setIsDeletingAccount(true);
-    const result = await removeAccount(deletePassword);
+    const result = await removeAccount(deletePassword, reason);
     if (result.success) {
       toast.success(t("account.deletion.success") || "Account deleted successfully");
-      setShowDeleteDialog(false);
+      setShowDepartureDialog(false);
       setDeletePassword("");
     } else {
       toast.error(
@@ -2963,6 +2973,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     setShowSubscriptionSuccess,
     showDeleteDialog,
     setShowDeleteDialog,
+    showDepartureDialog,
+    handleCancelDeparture,
+    handleAccountDeletion,
     deletePassword,
     setDeletePassword,
     isDeletingAccount,

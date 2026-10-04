@@ -30,6 +30,11 @@
       "holdToDelete": "Hold to request",
       "passwordRequired": "Please enter your password",
       "pendingWarning": "Your account has a pending deletion request. Join the Discord to restore your account if this was a mistake.",
+      "departureTitle": "Why are you leaving Ascend?",
+      "departureDescription": "Your feedback helps us improve. This is optional and won't prevent your deletion request.",
+      "departurePlaceholder": "Tell us what led to your decision...",
+      "departureSkip": "Skip and request deletion",
+      "departureSubmit": "Send feedback and request deletion",
       "success": "Deletion request submitted successfully",
       "title": "Request Account Deletion"
     },
