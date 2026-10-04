@@ -2022,6 +2022,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
   // Subscribe to Ascend via Stripe Checkout
   const handleSubscribe = async () => {
+    if (userData?.ascendSubscription?.lifetime) return;
     try {
       // Validate account exists and is not deleted
       if (!user || !user.uid) {
@@ -2082,6 +2083,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         product.prices
           ?.filter(
             price =>
+              !ascendAccess.isSubscribed &&
               price.interval === "month" &&
               price.id !== "price_1ScUAMCfu5zjwIKZd4FezEnW" &&
               price.id !== "price_1SrPMrCfu5zjwIKZTIRsRAZG"
@@ -2122,6 +2124,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
   // Process subscription checkout with selected plan
   const handlePlanSelection = async priceId => {
+    if (userData?.ascendSubscription?.lifetime) return false;
     try {
       setShowPlanDialog(false);
 

@@ -771,6 +771,8 @@
         "upgradeToLifetime": "Upgrade to Lifetime"
       },
       "manageSubscription": "Manage Subscription",
+      "upgradeToLifetime": "Upgrade to Lifetime",
+      "lifetimeUpgradeDescription": "Keep Ascend forever with a one-time payment. Your current subscription will stop renewing after your lifetime purchase succeeds.",
       "monthly": "Monthly",
       "noConnectedDevices": "No devices connected",
       "noProfileInfo": "Add a bio, country, or social links to personalize your profile",

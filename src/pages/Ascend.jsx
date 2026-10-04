@@ -908,6 +908,7 @@ const Ascend = () => {
 
         {/* Subscription Plan Selection Dialog */}
         <SubscriptionPlanDialog
+          isLifetimeUpgrade={ascendAccess.isSubscribed && !userData?.ascendSubscription?.lifetime}
           open={showPlanDialog}
           onOpenChange={setShowPlanDialog}
           availablePlans={availablePlans}

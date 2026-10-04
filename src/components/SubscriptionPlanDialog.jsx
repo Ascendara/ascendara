@@ -23,12 +23,14 @@ import {
   FlaskConical,
   HardDriveDownload,
   ListOrdered,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogDescription,
 } from "./ui/alert-dialog";
 
 const SubscriptionPlanDialog = ({
@@ -36,8 +38,10 @@ const SubscriptionPlanDialog = ({
   onOpenChange,
   availablePlans,
   onPlanSelection,
+  isLifetimeUpgrade = false,
   t,
 }) => {
+  const lifetimePlan = availablePlans.find(plan => plan.intervalCount === 0);
   const [showRedirectDialog, setShowRedirectDialog] = useState(false);
   const redirectCloseRef = useRef(null);
 
@@ -88,14 +92,66 @@ const SubscriptionPlanDialog = ({
   return (
     <>
       <AlertDialog open={open} onOpenChange={onOpenChange}>
-        <AlertDialogContent className="max-w-5xl border-border/50 bg-background p-0">
+        <AlertDialogContent
+          className={`${isLifetimeUpgrade ? "max-w-md" : "max-w-5xl"} overflow-hidden border-border/50 bg-background p-0`}
+        >
           <button
             onClick={() => onOpenChange(false)}
+            aria-label={t("common.close", { defaultValue: "Close" })}
             className="absolute right-4 top-4 z-10 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
 
+          {isLifetimeUpgrade ? (
+            <div className="relative px-8 pb-8 pt-10">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-amber-500/10 to-transparent" />
+              <div className="relative">
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
+                  <InfinityIcon className="h-7 w-7 text-amber-500" />
+                </div>
+                <AlertDialogHeader className="text-left">
+                  <AlertDialogTitle className="text-2xl">
+                    {t("ascend.settings.upgradeToLifetime", { defaultValue: "Upgrade to Lifetime" })}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="leading-relaxed">
+                    {t("ascend.settings.lifetimeUpgradeDescription", {
+                      defaultValue: "Keep Ascend forever with a one-time payment. Your current subscription will stop renewing after your lifetime purchase succeeds.",
+                    })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                {lifetimePlan && (
+                  <div className="my-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {t("ascend.settings.subscriptionDialogV2.oneTimePurchase")}
+                    </p>
+                    <p className="mt-2 text-4xl font-semibold tracking-tight">
+                      {new Intl.NumberFormat(undefined, {
+                        style: "currency",
+                        currency: lifetimePlan.currency || "usd",
+                        maximumFractionDigits: 2,
+                      }).format(lifetimePlan.unitAmount / 100)}+
+                    </p>
+                    <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 shrink-0 text-amber-500" />
+                      {t("ascend.settings.subscriptionDialogV2.allPremiumFeatures")}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 shrink-0 text-amber-500" />
+                      {t("ascend.settings.subscriptionDialogV2.neverPayAgain")}
+                    </div>
+                  </div>
+                )}
+                <button
+                  disabled={!lifetimePlan}
+                  onClick={event => handlePlanClick(lifetimePlan.id, event)}
+                  className="mt-2 w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-3 font-semibold text-black transition-colors hover:from-amber-400 hover:to-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
+                >
+                  {t("ascend.settings.upgradeToLifetime", { defaultValue: "Upgrade to Lifetime" })}
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="px-8 pb-8 pt-12">
             <AlertDialogHeader className="mb-12 text-center">
               <AlertDialogTitle>
@@ -106,7 +162,7 @@ const SubscriptionPlanDialog = ({
               </p>
             </AlertDialogHeader>
 
-            <div className="mb-10 grid gap-5 md:grid-cols-3">
+            <div className={`mb-10 grid gap-5 ${availablePlans.length === 1 ? "mx-auto max-w-sm" : "md:grid-cols-3"}`}>
               {availablePlans.map((plan, index) => {
                 const isMonthly = plan.intervalCount === 1;
                 const is6Month = plan.intervalCount === 6;
@@ -269,6 +325,7 @@ const SubscriptionPlanDialog = ({
               </div>
             </div>
           </div>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 

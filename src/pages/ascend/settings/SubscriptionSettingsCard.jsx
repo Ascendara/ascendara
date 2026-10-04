@@ -201,6 +201,19 @@ export default function SubscriptionSettingsCard({
           (!isDev && ascendAccess.isSubscribed) ? (
           // Active Subscription - Premium Design
           <div className="space-y-6">
+            {!userData?.ascendSubscription?.lifetime && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                <p className="mb-3 text-sm text-muted-foreground">
+                  {t("ascend.settings.lifetimeUpgradeDescription", {
+                    defaultValue: "Keep Ascend forever with a one-time payment. Your current subscription will stop renewing after your lifetime purchase succeeds.",
+                  })}
+                </p>
+                <Button onClick={handleSubscribe} disabled={deletedAccountWarning} className="gap-2">
+                  <InfinityIcon className="h-4 w-4" />
+                  {t("ascend.settings.upgradeToLifetime", { defaultValue: "Upgrade to Lifetime" })}
+                </Button>
+              </div>
+            )}
             <div className="flex items-center gap-4">
               <div className="relative">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-600 shadow-lg shadow-yellow-500/25">
