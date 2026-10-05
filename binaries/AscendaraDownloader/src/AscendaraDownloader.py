@@ -141,6 +141,50 @@ def replace_file(source, target, check_cancelled=lambda: None):
                 return False
             wait_for_retry(min(.1 * 2 ** attempt, 1), stopped)
 
+def install_staged_file(source, target, check_cancelled=lambda: None):
+    """Install verified staging output even when a reader denies source renames.
+
+    The caller journals the destination and owns staging cleanup. Leave the
+    source in staging on the copy path so a delete lock cannot fail installation.
+    Never use this fallback for rollback backups, which must actually move.
+    """
+    try:
+        replace_file(source, target, check_cancelled)
+        return
+    except OSError as exc:
+        if not (isinstance(exc, PermissionError) or getattr(exc, 'winerror', None) in (5, 32, 33)):
+            raise
+        logging.warning('Staged file rename blocked; trying atomic copy: %s -> %s', source, target)
+
+    source, target = _extended_path(source), _extended_path(target)
+    temporary = None
+    try:
+        check_cancelled()
+        with open(source, 'rb') as incoming:
+            expected = os.fstat(incoming.fileno()).st_size
+            with NamedTemporaryFile('wb', delete=False, dir=os.path.dirname(target),
+                                    prefix='.ascendara-install-') as output:
+                temporary = output.name
+                copied = 0
+                while True:
+                    check_cancelled()
+                    chunk = incoming.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    output.write(chunk)
+                    copied += len(chunk)
+                if copied != expected or os.fstat(incoming.fileno()).st_size != expected:
+                    raise OSError(f'Staged file changed while being installed: {source}')
+        # Preserve executable permissions on platforms that use them, without
+        # copying Windows archive attributes or security descriptors.
+        if os.name != 'nt':
+            shutil.copymode(source, temporary)
+        replace_file(temporary, target, check_cancelled)
+    finally:
+        if temporary is not None:
+            cleanup_temporary(temporary, os.path.dirname(target))
+
+
 def cleanup_temporary(path, root, empty_only=False):
     """Remove an owned temporary path, retrying Windows locks/read-only files."""
     path, root = os.path.abspath(path), os.path.abspath(root)
@@ -2231,7 +2275,7 @@ class AscendaraDownloader:
                     backup = os.path.join(rollback, str(len(journal)))
                     replace_file(target, backup, self._check_cancelled)
                 journal.append((target, backup))
-                replace_file(source, target, self._check_cancelled)
+                install_staged_file(source, target, self._check_cancelled)
             safe_write_json(old_filemap, installed_manifest)
             data = self.game_info['downloadingData']
             data.update(extracting=False, verifying=True)
