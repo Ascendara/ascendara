@@ -405,31 +405,55 @@ def verify_manifest(root, manifest, check_cancelled):
 
 
 def flatten_payload(root, manifest, game):
-    """Strip a single wrapper using the manifest, without scanning the game tree."""
+    """Remove archive wrappers, retaining game-relative asset directories."""
     root = _extended_path(root)
-    roots = {name.split('/')[0] for name in manifest}
-    if len(roots) != 1:
-        return manifest
-    wrapper = next(iter(roots))
-    if not os.path.isdir(os.path.join(root, wrapper)):
-        return manifest
-    # A lone engine asset folder is not a repack wrapper.
-    match = re.sub(r'[^a-z0-9]', '', wrapper.lower()) == re.sub(r'[^a-z0-9]', '', game.lower())
-    if not match and not any(name.lower().endswith('.exe') for name in manifest):
-        return manifest
-    prefix = wrapper + '/'
-    mapped = {name[len(prefix):]: info for name, info in manifest.items()}
-    for name in mapped:
-        _member_path(root, name)
-    source = os.path.join(root, wrapper)
-    # A same-name nested wrapper needs a temporary rename to avoid self-collision.
-    temporary = tempfile.mkdtemp(prefix='.flatten-', dir=os.path.dirname(root))
-    os.rmdir(temporary)
-    replace_file(source, temporary)
-    for name in os.listdir(temporary):
-        replace_file(os.path.join(temporary, name), os.path.join(root, name))
-    os.rmdir(temporary)
-    return mapped
+    normalize = lambda value: re.sub(r'[^a-z0-9]', '', value.lower())
+    asset_folders = {'bin', 'bin32', 'bin64', 'binaries', 'data', 'engine',
+                     'content', 'assets', 'plugins', 'redist', '_commonredist'}
+    sidecar_extensions = {'.txt', '.nfo', '.pdf', '.html', '.htm', '.url',
+                          '.jpg', '.jpeg', '.png', '.webp', '.ico'}
+    while manifest:
+        directories = {name.split('/')[0] for name in manifest if '/' in name}
+        loose = [name for name in manifest if '/' not in name]
+        # A launcher or other runtime file at this level means it is already
+        # the game root. Moving its dependencies would break relative paths.
+        if len(directories) != 1 or any(os.path.splitext(name)[1].lower()
+                                       not in sidecar_extensions for name in loose):
+            break
+        wrapper = next(iter(directories))
+        if wrapper.lower() in asset_folders or wrapper.lower().endswith('_data'):
+            break
+        prefix = wrapper + '/'
+        wrapped = {name: info for name, info in manifest.items() if name.startswith(prefix)}
+        match = normalize(wrapper) == normalize(game)
+        if not match and not any(name.lower().endswith('.exe') for name in wrapped):
+            break
+        mapped = {name: manifest[name] for name in loose}
+        for name, info in wrapped.items():
+            destination = name[len(prefix):]
+            _member_path(root, destination)
+            # Check Windows case-insensitive file and directory collisions before
+            # moving anything, including collisions with loose archive readmes.
+            mapped[destination] = info
+        folded = [name.casefold() for name in loose]
+        folded.extend(name[len(prefix):].casefold() for name in wrapped)
+        names = set(folded)
+        if len(names) != len(folded) or any(
+                '/'.join(name.split('/')[:index]) in names
+                for name in names for index in range(1, len(name.split('/')))):
+            raise ValueError(f'Archive wrapper has conflicting files: {wrapper}')
+        # Move the wrapper aside first to handle repeated, same-name wrappers.
+        temporary = tempfile.mkdtemp(prefix='.flatten-', dir=os.path.dirname(root))
+        os.rmdir(temporary)
+        replace_file(_member_path(root, wrapper), temporary)
+        for name in wrapped:
+            relative = name[len(prefix):]
+            destination = _member_path(root, relative)
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            install_staged_file(_member_path(temporary, relative), destination)
+        cleanup_temporary(temporary, os.path.dirname(root))
+        manifest = mapped
+    return manifest
 
 
 def _wanted(name):
