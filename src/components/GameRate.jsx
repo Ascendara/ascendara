@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 
 const GameRate = ({ game, isOpen, onClose }) => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comments, setComments] = useState("");
@@ -80,12 +82,14 @@ const GameRate = ({ game, isOpen, onClose }) => {
     try {
       // Get a fresh token for each request to ensure timestamp validity
       const freshToken = await getToken();
+      const ascendToken = user ? await user.getIdToken() : null;
 
       const response = await fetch("https://api.ascendara.app/app/v2/gamerate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${freshToken}`,
+          ...(ascendToken && { "X-Ascend-Token": ascendToken }),
         },
         body: JSON.stringify({
           gameID: game.gameID,
@@ -200,10 +204,17 @@ const GameRate = ({ game, isOpen, onClose }) => {
             <Textarea
               id="comments"
               value={comments}
+              maxLength={5000}
               onChange={e => setComments(e.target.value)}
               placeholder={t("library.rateGame.commentPlaceholder")}
               className="min-h-[100px] resize-none text-foreground"
             />
+            <p className="text-xs text-muted-foreground">
+              {t("library.rateGame.publicReviewNotice", {
+                defaultValue:
+                  "Your review will be public, with your Ascend username or an anonymous name.",
+              })}
+            </p>
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 import SafeHtml from "@/components/SafeHtml";
+import GameReviews from "@/components/GameReviews";
 import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
 import {
   AlertDialog,
@@ -438,28 +439,9 @@ export default function DownloadPage() {
       });
   }, [gameData?.game, gameData?.version, gameData?.isUpdating]);
 
-  // Fetch rating from new API when using local index
   useEffect(() => {
-    const fetchRating = async () => {
-      if (settings.usingLocalIndex && gameData?.gameID) {
-        try {
-          const response = await fetch(
-            `https://api.ascendara.app/app/v2/gamerating/${gameData.gameID}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (data.rating > 0) {
-              setGameRating(data.rating);
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching game rating:", error);
-        }
-      }
-    };
-
-    fetchRating();
-  }, [gameData?.gameID, settings.usingLocalIndex]);
+    setGameRating(gameData?.rating || 0);
+  }, [gameData?.gameID, gameData?.rating]);
 
   // Check if index is outdated based on indexReminder setting
   useEffect(() => {
@@ -3945,6 +3927,12 @@ export default function DownloadPage() {
         </TooltipProvider>
       )}
 
+      <GameReviews
+        key={gameData?.gameID}
+        gameID={gameData?.gameID}
+        onRating={setGameRating}
+      />
+
       {/* Steam Game Info Section */}
       {gameData && (
         <div
@@ -4052,7 +4040,7 @@ export default function DownloadPage() {
                               </TooltipProvider>
                             )}
 
-                            {gameData.rating > 0 && (
+                            {gameRating > 0 && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -4066,14 +4054,14 @@ export default function DownloadPage() {
                                         }}
                                       />
                                       <span className="text-sm font-medium text-primary">
-                                        {gameData.rating}
+                                        {gameRating}
                                       </span>
                                     </div>
                                   </TooltipTrigger>
                                   <TooltipContent side="bottom">
                                     <p className="max-w-[300px] font-semibold text-secondary">
                                       {t("download.ratingTooltip", {
-                                        rating: gameData.rating,
+                                        rating: gameRating,
                                       })}
                                     </p>
                                   </TooltipContent>
