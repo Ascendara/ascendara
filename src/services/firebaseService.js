@@ -1140,20 +1140,10 @@ export const applyGameSessionDelta = async (gameName, deltas = {}, meta = {}) =>
         lastSynced: nowIso,
       };
 
-      // Profile-level totals — keep in sync so dashboards / leaderboards see
-      // accurate aggregate playtime without recomputing per-game.
-      const existingProfileStats = data.profileStats || {};
-      const newProfileStats = {
-        ...existingProfileStats,
-        totalPlaytime: (existingProfileStats.totalPlaytime || 0) + playtimeDelta,
-        lastSynced: nowIso,
-      };
-
       tx.set(
         userRef,
         {
           cloudLibrary: newCloudLibrary,
-          profileStats: newProfileStats,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
