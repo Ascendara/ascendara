@@ -308,6 +308,8 @@ export default function DownloadPage() {
   const [steamError, setSteamError] = useState(null);
   const [steamLoading, setSteamLoading] = useState(false);
   const [gameRating, setGameRating] = useState(gameData?.rating || 0);
+  const [writtenReviews, setWrittenReviews] = useState({ gameID: null, count: 0 });
+  const reviewsRef = useRef(null);
   const [supportsModManaging, setSupportsModManaging] = useState(false);
   const [nexusGameData, setNexusGameData] = useState(null);
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
@@ -1968,6 +1970,12 @@ export default function DownloadPage() {
               isVerified={isVerified}
               onShowVerified={() => setShowVerifiedDialog(true)}
               gameRating={gameRating}
+              hasWrittenReviews={
+                writtenReviews.gameID === gameData.gameID && writtenReviews.count > 0
+              }
+              onReadReviews={() =>
+                reviewsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
               steamRating={steamData?.rating ? (steamData.rating / 10).toFixed(1) : null}
               releaseDate={steamData?.release_date}
               showTimemachine={timemachineSetting}
@@ -2041,6 +2049,8 @@ export default function DownloadPage() {
               key={gameData.gameID}
               gameID={gameData.gameID}
               onRating={setGameRating}
+              onReviewCount={setWrittenReviews}
+              sectionRef={reviewsRef}
             />
           </div>
         </div>
