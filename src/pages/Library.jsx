@@ -101,6 +101,7 @@ import {
   getFriendsList,
   deleteCloudGame,
 } from "@/services/firebaseService";
+import { syncFavoritesNow } from "@/services/favoritesCloudSync";
 import { calculateLibraryValue } from "@/services/cheapsharkService";
 import { getDownloadQueue } from "@/services/downloadQueueService";
 
@@ -1347,9 +1348,10 @@ const Library = () => {
         })
       );
 
+      // Favorites first, so the per-game favorite flags below are up to date
+      await syncFavoritesNow();
       const result = await syncCloudLibrary(gamesWithAchievements);
       if (result.success) {
-        await syncFavoritesNow();
         toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
         setCloudLibraryLastSynced(new Date().toISOString());
       } else {

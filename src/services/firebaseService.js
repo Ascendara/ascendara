@@ -913,6 +913,14 @@ export const syncCloudLibrary = async games => {
       return { success: false, error: "Not authenticated" };
     }
 
+    // Favorites live in localStorage, not in the game JSON files
+    let localFavorites = new Set();
+    try {
+      localFavorites = new Set(JSON.parse(localStorage.getItem("game-favorites") || "[]"));
+    } catch (_) {
+      // Non-fatal — games simply sync as not favorited
+    }
+
     // Transform games to a storable format
     const localGamesData = games.map(game => ({
       name: game.game || game.name,
@@ -927,7 +935,7 @@ export const syncCloudLibrary = async games => {
       launchCount: game.launchCount || 0,
       lastPlayed: game.lastPlayed || null,
       completed: game.completed || false,
-      favorite: game.favorite || false,
+      favorite: localFavorites.has(game.game || game.name),
       // Store achievement summary for quick display
       achievementStats: game.achievementStats
         ? {
@@ -1005,6 +1013,10 @@ export const syncCloudLibrary = async games => {
         unlockedAchievements: unlockedAchievements,
         gamesWithAchievements: gamesWithAchievements.length,
         lastSynced: new Date().toISOString(),
+        // Synced favorites are managed by updateCloudFavorites — carry them over
+        ...(existingCloudLibrary?.favorites && {
+          favorites: existingCloudLibrary.favorites,
+        }),
       },
       updatedAt: serverTimestamp(),
     });
@@ -1327,6 +1339,54 @@ export const getCloudLibrary = async (userId = null) => {
 };
 
 /**
+ * Atomically merge the synced favorites list stored at `cloudLibrary.favorites`.
+ *
+ * The merge itself is supplied by the caller (see `favoritesCloudSync.js`) so
+ * it runs against the freshest cloud snapshot inside a transaction — two
+ * devices toggling favorites at the same time cannot overwrite each other.
+ *
+ * @param {function(Array): {entries: Array, changed: boolean}} mergeFn -
+ *   Receives the cloud entries, returns the merged entries and whether the
+ *   cloud copy needs to be rewritten.
+ * @returns {Promise<{success: boolean, entries: Array|null, error: string|null}>}
+ */
+export const updateCloudFavorites = async mergeFn => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, entries: null, error: "Not authenticated" };
+    }
+
+    const userRef = doc(db, "users", user.uid);
+
+    const entries = await runTransaction(db, async tx => {
+      const snap = await tx.get(userRef);
+      // The user document is created during sign-in/registration — never here.
+      if (!snap.exists()) {
+        throw new Error("User data not found");
+      }
+
+      const cloudEntries = snap.data().cloudLibrary?.favorites;
+      const merged = mergeFn(Array.isArray(cloudEntries) ? cloudEntries : []);
+
+      if (merged.changed) {
+        tx.update(userRef, {
+          "cloudLibrary.favorites": merged.entries,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      return merged.entries;
+    });
+
+    return { success: true, entries, error: null };
+  } catch (error) {
+    console.error("updateCloudFavorites error:", error);
+    return { success: false, entries: null, error: error.message };
+  }
+};
+
+/**
  * Delete a game from cloud library (manual deletion only)
  * @param {string} gameName - Name of the game to delete
  * @returns {Promise<{success: boolean, error: string|null}>}
@@ -1377,6 +1437,7 @@ export const deleteCloudGame = async gameName => {
         unlockedAchievements: unlockedAchievements,
         gamesWithAchievements: gamesWithAchievements.length,
         lastSynced: cloudLibrary.lastSynced, // Keep original sync time
+        ...(cloudLibrary.favorites && { favorites: cloudLibrary.favorites }),
       },
       updatedAt: serverTimestamp(),
     });

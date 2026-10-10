@@ -55,6 +55,7 @@ import {
   subscribeToOutgoingRequests,
   cleanupMessageListeners,
 } from "@/services/firebaseService";
+import { syncFavoritesNow } from "@/services/favoritesCloudSync";
 
 export default function useAscendPage({ cloudOnly = false } = {}) {
   const navigate = useNavigate();
@@ -1047,9 +1048,10 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         })
       );
 
+      // Favorites first, so the per-game favorite flags below are up to date
+      await syncFavoritesNow();
       const result = await syncCloudLibrary(gamesWithAchievements);
       if (result.success) {
-        await syncFavoritesNow();
         toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
         await loadCloudLibrary();
         try {
