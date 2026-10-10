@@ -1228,9 +1228,11 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       }
 
       // 3. Favorites (including ones for games not installed here)
+      const favoritesBefore = localStorage.getItem("game-favorites");
       await syncFavoritesNow();
+      const favoritesRestored = localStorage.getItem("game-favorites") !== favoritesBefore;
 
-      if (!profileRestored && gamesRestored === 0) {
+      if (!profileRestored && gamesRestored === 0 && !favoritesRestored) {
         toast.error(
           t("ascend.cloudLibrary.restoreNothing") ||
             "Nothing to restore — no cloud data found"
