@@ -1349,6 +1349,7 @@ const Library = () => {
 
       const result = await syncCloudLibrary(gamesWithAchievements);
       if (result.success) {
+        await syncFavoritesNow();
         toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
         setCloudLibraryLastSynced(new Date().toISOString());
       } else {

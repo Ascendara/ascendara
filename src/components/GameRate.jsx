@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -12,17 +13,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Star } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Sparkles, Star } from "lucide-react";
 import "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 const GameRate = ({ game, isOpen, onClose }) => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comments, setComments] = useState("");
+  const [shareAnonymously, setShareAnonymously] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authToken, setAuthToken] = useState("");
 
@@ -48,6 +53,8 @@ const GameRate = ({ game, isOpen, onClose }) => {
     if (!isOpen) {
       setRating(0);
       setComments("");
+      setShareAnonymously(false);
+      setSubmitError("");
     }
   }, [isOpen]);
 
@@ -79,6 +86,7 @@ const GameRate = ({ game, isOpen, onClose }) => {
     }
 
     setIsSubmitting(true);
+    setSubmitError("");
     try {
       // Get a fresh token for each request to ensure timestamp validity
       const freshToken = await getToken();
@@ -94,13 +102,21 @@ const GameRate = ({ game, isOpen, onClose }) => {
         body: JSON.stringify({
           gameID: game.gameID,
           rating: rating,
+          anonymous: !user || shareAnonymously,
           ...(comments.trim() && { comments: comments.trim() }),
         }),
       });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || t("library.rateGame.errorDesc"));
+        setSubmitError(
+          error.code === "inappropriate_language"
+            ? t("library.rateGame.inappropriateLanguage")
+            : error.code === "comment_filter_unavailable"
+              ? t("library.rateGame.commentFilterUnavailable")
+              : error.error || t("library.rateGame.errorDesc")
+        );
+        return;
       }
 
       await window.electron.gameRated(game.game || game.name, game.isCustom);
@@ -206,16 +222,59 @@ const GameRate = ({ game, isOpen, onClose }) => {
               id="comments"
               value={comments}
               maxLength={5000}
-              onChange={e => setComments(e.target.value)}
+              onChange={e => {
+                setComments(e.target.value);
+                setSubmitError("");
+              }}
               placeholder={t("library.rateGame.commentPlaceholder")}
               className="min-h-[100px] resize-none text-foreground"
             />
+            {submitError && (
+              <p role="alert" className="text-sm text-destructive">
+                {submitError}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              {t("library.rateGame.publicReviewNotice", {
-                defaultValue:
-                  "Your review will be public, with your Ascend username or an anonymous name.",
-              })}
+              {t("library.rateGame.publicReviewNotice")}
             </p>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
+            <div className="space-y-1">
+              <Label htmlFor="rate-anonymously" className="text-sm font-medium text-foreground">
+                {t("library.rateGame.anonymousLabel")}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  user
+                    ? "library.rateGame.anonymousDescription"
+                    : "library.rateGame.anonymousGuestDescription"
+                )}
+              </p>
+              {!user && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
+                  <span className="text-xs text-muted-foreground">
+                    {t("library.rateGame.ascendPromo")}
+                  </span>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => {
+                      onClose();
+                      navigate("/ascend");
+                    }}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t("library.rateGame.ascendPromoAction")}
+                  </button>
+                </div>
+              )}
+            </div>
+            <Switch
+              id="rate-anonymously"
+              checked={!user || shareAnonymously}
+              onCheckedChange={setShareAnonymously}
+              disabled={!user || isSubmitting}
+            />
           </div>
         </div>
 

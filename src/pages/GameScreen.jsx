@@ -2,41 +2,27 @@ import { dialogTitleClassName } from "@/components/ui/dialog-styles";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import SafeHtml from "@/components/SafeHtml";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
-  Heart,
   Play,
   FolderOpen,
   Tag,
-  PackageOpen,
   Trash2,
   Pencil,
-  Monitor,
-  StopCircle,
   Loader,
-  FileCheck2,
   Check,
-  FolderSync,
   AlertTriangle,
   Info,
   Star,
   Clock,
   ExternalLink,
-  Settings2,
   Download,
-  FileSearch,
   Search,
   Edit3,
   ThumbsUp,
-  Copy,
   Music2,
-  HeadphoneOff,
   Trophy,
-  Award,
   BookX,
-  LockIcon,
   ImageUp,
   ImageIcon,
   Bolt,
@@ -46,14 +32,7 @@ import {
   Puzzle,
   ChevronDown,
   ChevronUp,
-  Gem,
-  Cloud,
-  CloudOff,
-  Terminal,
-  RefreshCw,
-  ArrowRightLeft,
   CheckCircle2,
-  LayoutGrid,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/gameUpdateService";
@@ -64,24 +43,8 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAudioPlayer, killAudioAndMiniplayer } from "@/services/audioPlayerService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { getGameSoundtrack, trackDownload } from "@/services/khinsiderService";
+import { getGameSoundtrack } from "@/services/khinsiderService";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -108,6 +71,12 @@ import { getCloudLibrary, verifyAscendAccess } from "@/services/firebaseService"
 import gameService from "@/services/gameService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
+import GameHero from "@/components/gamescreen/GameHero";
+import GameActions from "@/components/gamescreen/GameActions";
+import GameOverviewTab from "@/components/gamescreen/GameOverviewTab";
+import AchievementsTab from "@/components/gamescreen/AchievementsTab";
+import SoundtrackTab from "@/components/gamescreen/SoundtrackTab";
+import ModsTrainersTab from "@/components/gamescreen/ModsTrainersTab";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
@@ -1494,18 +1463,7 @@ export default function GameScreen() {
 
   // Achievements pagination state
   const [achievementsPage, setAchievementsPage] = useState(0);
-  const perPage = 12; // 3 rows x 4 columns
-  const totalPages =
-    achievements && achievements.achievements
-      ? Math.ceil(achievements.achievements.length / perPage)
-      : 1;
-  const paginatedAchievements =
-    achievements && achievements.achievements
-      ? achievements.achievements.slice(
-          achievementsPage * perPage,
-          (achievementsPage + 1) * perPage
-        )
-      : [];
+  const perPage = 12; // 6 rows x 2 columns
   useEffect(() => {
     setAchievementsPage(0);
   }, [achievements]);
@@ -1917,6 +1875,16 @@ export default function GameScreen() {
     localStorage.setItem("game-favorites", JSON.stringify(favorites));
   }, [favorites]);
 
+  // Pick up favorites changed elsewhere (other screens, cloud sync)
+  useEffect(() => {
+    const handleFavoritesUpdated = () => {
+      const saved = localStorage.getItem("game-favorites");
+      setFavorites(saved ? JSON.parse(saved) : []);
+    };
+    window.addEventListener("favorites-updated", handleFavoritesUpdated);
+    return () => window.removeEventListener("favorites-updated", handleFavoritesUpdated);
+  }, []);
+
   // Load logo image
   useEffect(() => {
     if (!game) return;
@@ -2282,13 +2250,14 @@ export default function GameScreen() {
     try {
       const gameName = game.game || game.name;
 
-      if (isFavorite) {
-        // Remove from favorites
-        setFavorites(favorites.filter(fav => fav !== gameName));
-      } else {
-        // Add to favorites
-        setFavorites([...favorites, gameName]);
-      }
+      const updated = isFavorite
+        ? favorites.filter(fav => fav !== gameName)
+        : [...favorites, gameName];
+
+      // Write through immediately so listeners (library, cloud sync) see it
+      localStorage.setItem("game-favorites", JSON.stringify(updated));
+      setFavorites(updated);
+      window.dispatchEvent(new CustomEvent("favorites-updated"));
 
       // Update isFavorite state (this will be handled by the useEffect)
     } catch (error) {
@@ -2675,1971 +2644,364 @@ export default function GameScreen() {
 
   // Prepare screenshots data from Steam API if available
   const screenshots = steamData?.formatted_screenshots || [];
+  const bannerImage = heroImageData || screenshots[0]?.formatted_url || imageData;
+  const coverImage = !hasGridImage && heroImageData ? null : imageData;
+
+  const achievementList = achievements?.achievements || [];
+  const sections = [
+    { id: "overview", label: t("gameScreen.overview"), icon: Info },
+    {
+      id: "achievements",
+      label: t("gameScreen.achievements"),
+      icon: Trophy,
+      badge:
+        achievementList.length > 0
+          ? `${achievementList.filter(a => a.achieved).length}/${achievementList.length}`
+          : null,
+    },
+    { id: "soundtrack", label: t("gameScreen.soundtrack"), icon: Music2 },
+    // Mods and trainers share one section so the bar stays short
+    (supportsModManaging || supportsFlingTrainer) && {
+      id: "extras",
+      label: [
+        supportsModManaging && t("gameScreen.mods"),
+        supportsFlingTrainer && t("gameScreen.trainers"),
+      ]
+        .filter(Boolean)
+        .join(" & "),
+      icon: supportsModManaging ? Puzzle : Bolt,
+    },
+  ].filter(Boolean);
+  const currentSection = sections.some(section => section.id === activeTab)
+    ? activeTab
+    : "overview";
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero section with game banner/header */}
-      <div className="relative w-full overflow-hidden">
-        {/* Hero background image with zoom effect when grid image fails */}
-        {!hasGridImage && heroImageData && (
-          <div
-            className="absolute inset-0 z-0"
-            style={{
-              backgroundImage: `url(${heroImageData})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              transform: "scale(1.15)",
-              filter: "blur(8px) brightness(0.4)",
+    <div className="mx-auto w-full max-w-7xl pb-24 pt-4 fade-in">
+      {/* Toolbar */}
+      <div className="mb-4 flex items-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 text-muted-foreground hover:text-foreground"
+          onClick={BackLibrary}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          {t("common.back")}
+        </Button>
+      </div>
+
+      <div className="space-y-4">
+        <GameHero
+          game={game}
+          bannerImage={bannerImage}
+          bannerIsCover={bannerImage === imageData}
+          coverImage={coverImage}
+          logoImage={logoData}
+          showLogo={showLogo}
+          onToggleLogo={toggleLogoDisplay}
+          updateInfo={updateInfo}
+          onShowUpdate={() => setShowUpdateDialog(true)}
+          playtime={formatPlaytime(game.playTime)}
+          playtimeJustUpdated={playtimeJustUpdated}
+          executableExists={executableExists}
+          isUninstalling={isUninstalling}
+          isAuthenticated={isAuthenticated}
+          cloudLibraryLoading={cloudLibraryLoading}
+          isInCloudLibrary={isInCloudLibrary}
+          canSwitchToManaged={!!importCatalogMatch}
+          onSwitchToManaged={handleSwitchToAscendaraManaged}
+        >
+          <GameActions
+            game={game}
+            canLaunchGame={canLaunchGame}
+            executableExists={executableExists}
+            isLaunching={isLaunching}
+            isRunning={isRunning}
+            isUninstalling={isUninstalling}
+            onPlay={() => handlePlayGame()}
+            onSetExecutable={() => setShowExecutableManager(true)}
+            trainerExists={trainerExists}
+            launchWithTrainerEnabled={launchWithTrainerEnabled}
+            onToggleTrainer={enabled => {
+              setLaunchWithTrainerEnabled(enabled);
+              localStorage.setItem(
+                `launch-with-trainer-${game?.game || game?.name}`,
+                enabled.toString()
+              );
+              toast.success(
+                enabled
+                  ? t("gameScreen.trainerEnabledToast")
+                  : t("gameScreen.trainerDisabledToast")
+              );
+            }}
+            isFavorite={isFavorite}
+            onToggleFavorite={toggleFavorite}
+            onOpenDirectory={handleOpenDirectory}
+            backupEnabled={settings.ludusavi.enabled}
+            onBackupSaves={() => setBackupDialogOpen(true)}
+            onVerifyFiles={() => setIsVerifyingOpen(true)}
+            onLaunchOptions={async () => {
+              const commands = await window.electron.getLaunchCommands(
+                game.game || game.name,
+                game.isCustom
+              );
+              setLaunchCommand(commands || "");
+              setLaunchOptionsDialogOpen(true);
+            }}
+            onCreateShortcut={async () => {
+              const success = await window.electron.createGameShortcut(game);
+              if (success) {
+                toast.success(t("library.shortcutCreated"));
+              } else {
+                toast.error(t("library.shortcutError"));
+              }
+            }}
+            onCreateStartMenuShortcut={async () => {
+              const success = await window.electron.createStartMenuShortcut(game);
+              if (success) {
+                toast.success(t("library.startMenuShortcutCreated"));
+              } else {
+                toast.error(t("library.startMenuShortcutError"));
+              }
+            }}
+            showEditEntry={settings.extraGameOptions}
+            onEditEntry={() => setShowEditGameEntry(true)}
+            isOnLinux={isOnLinux}
+            prefixSize={prefixSize}
+            onResetPrefix={() => setShowResetPrefixDialog(true)}
+            onDelete={() =>
+              game.isCustom ? handleDeleteGame() : setIsDeleteDialogOpen(true)
+            }
+          />
+        </GameHero>
+
+        {/* Notices */}
+        {isOnLinux && !umuInstalled && (
+          <div className="flex items-center gap-3 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-500" />
+            <p className="text-sm text-yellow-600 dark:text-yellow-400">
+              {t("gameScreen.umuLauncherNotInstalled")}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto shrink-0 border-yellow-500/50 text-yellow-600"
+              onClick={() => navigate("/settings")}
+            >
+              {t("gameScreen.installInSettings")}
+            </Button>
+          </div>
+        )}
+
+        {!hasRated && settings.usingLocalIndex && game.gameID && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+            <Star className="h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">
+                {t("gameScreen.rateThisGame")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("gameScreen.helpOthers")}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => {
+                window.electron.gameRated(game.game || game.name, game.isCustom);
+                setHasRated(true);
+              }}
+            >
+              {t("gameScreen.dismiss")}
+            </Button>
+            <Button
+              size="sm"
+              className="gap-2 text-secondary"
+              onClick={() => setShowRateDialog(true)}
+            >
+              <ThumbsUp className="h-4 w-4" />
+              {t("gameScreen.rateNow")}
+            </Button>
+          </div>
+        )}
+
+        {/* Section navigation */}
+        <div
+          role="tablist"
+          className="flex flex-wrap items-center gap-1 border-b border-border/40"
+        >
+          {sections.map(section => (
+            <button
+              key={section.id}
+              type="button"
+              role="tab"
+              aria-selected={currentSection === section.id}
+              onClick={() => {
+                setActiveTab(section.id);
+                if (section.id === "soundtrack") fetchSoundtrack();
+              }}
+              className={cn(
+                "-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+                currentSection === section.id
+                  ? "rounded-t-md border-primary bg-primary/10 text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <section.icon className="h-4 w-4" />
+              {section.label}
+              {section.badge && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
+                  {section.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {currentSection === "overview" && (
+          <GameOverviewTab
+            game={game}
+            steamData={steamData}
+            steamLoading={steamLoading}
+            screenshots={screenshots}
+            onEditGameInfo={() => setShowEditGameInfo(true)}
+            isAuthenticated={isAuthenticated}
+            onGetAscend={() => navigate("/ascend")}
+            isOnLinux={isOnLinux}
+            umuId={umuId}
+            umuIdInput={umuIdInput}
+            onUmuIdInputChange={setUmuIdInput}
+            umuIdSaving={umuIdSaving}
+            onSaveUmuId={async () => {
+              if (!game.executable) return;
+              setUmuIdSaving(true);
+              const result = await window.electron.umuSetGameId(
+                game.game || game.name,
+                umuIdInput
+              );
+              if (result.success) {
+                setUmuId(umuIdInput);
+                toast.success(t("gameScreen.umuIdSaved"));
+              } else {
+                toast.error(t("gameScreen.umuIdSaveFailed"));
+              }
+              setUmuIdSaving(false);
             }}
           />
         )}
-        <div className="container relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-between p-4 md:p-8">
-          {/* Back button */}
-          <Button
-            variant="ghost"
-            className="flex w-fit items-center gap-2 text-primary hover:bg-primary/10"
-            onClick={BackLibrary}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {t("common.back")}
-          </Button>
 
-          {isOnLinux && !umuInstalled && (
-            <div className="mt-3 flex items-center gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-500" />
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                {t("gameScreen.umuLauncherNotInstalled")}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="ml-auto shrink-0 border-yellow-500/50 text-yellow-600"
-                onClick={() => navigate("/settings")}
-              >
-                {t("gameScreen.installInSettings")}
-              </Button>
-            </div>
-          )}
+        {currentSection === "achievements" && (
+          <AchievementsTab
+            achievements={achievements}
+            loading={achievementsLoading}
+            refreshing={refreshingAchievements}
+            onRefresh={handleRefreshAchievements}
+            page={achievementsPage}
+            perPage={perPage}
+            onPageChange={setAchievementsPage}
+          />
+        )}
 
-          {/* Game title and basic info */}
-          <div className="mt-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                {showLogo && logoData ? (
-                  <button
-                    onClick={toggleLogoDisplay}
-                    className="cursor-pointer transition-opacity hover:opacity-80"
-                    title={t("gameScreen.clickToToggleLogo")}
-                  >
-                    <img
-                      src={logoData}
-                      alt={game.game}
-                      className="max-h-20 max-w-md object-contain drop-shadow-md"
-                    />
-                  </button>
-                ) : (
-                  <button
-                    onClick={logoData ? toggleLogoDisplay : undefined}
-                    className={cn(
-                      "text-4xl font-bold text-primary drop-shadow-md",
-                      logoData && "cursor-pointer transition-opacity hover:opacity-80"
-                    )}
-                    title={logoData ? t("gameScreen.clickToToggleLogo") : undefined}
-                    disabled={!logoData}
-                  >
-                    <h1>{game.game}</h1>
-                  </button>
-                )}
-                {canLaunchGame ? (
-                  <Button
-                    variant="icon"
-                    size="sm"
-                    className="mb-2 text-primary transition-all hover:scale-110"
-                    onClick={() => handlePlayGame()}
-                    disabled={isLaunching || isRunning}
-                  >
-                    {isLaunching ? (
-                      <>
-                        <Loader className="h-5 w-5 animate-spin" />
-                      </>
-                    ) : isRunning ? (
-                      <>
-                        <StopCircle className="h-5 w-5" />
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-5 w-5 fill-current" />
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <AlertTriangle
-                    className="mb-2 h-6 w-6 text-yellow-500"
-                    title={t("library.executableNotFound")}
-                  />
-                )}
-              </div>
+        {currentSection === "soundtrack" && (
+          <SoundtrackTab
+            gameName={game.game}
+            soundtrack={soundtrack}
+            loading={loadingSoundtrack}
+            page={currentPage}
+            onPageChange={setCurrentPage}
+            onPlayTrack={track => {
+              // Use the direct URL for audio playback
+              setTrack({
+                ...track,
+                url: track.url.replace(
+                  "/api/khinsider",
+                  "https://downloads.khinsider.com"
+                ),
+              });
+              play();
+            }}
+          />
+        )}
 
-              {/* Version + Tags Row */}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {game.version && game.version !== "-1" && (
-                  <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
-                    {game.version}
-                    {updateInfo?.updateAvailable && (
-                      <button
-                        onClick={() => setShowUpdateDialog(true)}
-                        className="ml-1 flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
-                      >
-                        <Download className="h-3 w-3" />
-                        {t("gameScreen.updateBadge")}
-                      </button>
-                    )}
-                  </span>
-                )}
-                {!game.version && updateInfo?.updateAvailable && (
-                  <button
-                    onClick={() => setShowUpdateDialog(true)}
-                    className="flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/30"
-                  >
-                    <Download className="h-3 w-3" />
-                    {t("gameScreen.updateBadge")}
-                  </button>
-                )}
-                {game.online && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex cursor-help items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-500">
-                          {t("download.online")}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-secondary">{t("download.onlineTooltip")}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {game.dlc && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex cursor-help items-center gap-1 rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-500">
-                          {t("download.allDlc")}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-secondary">{t("download.allDlcTooltip")}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {game.isVr && (
-                  <span className="flex items-center gap-1 rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-400">
-                    <svg
-                      className="h-3 w-3"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    {t("download.gameNeedsVR")}
-                  </span>
-                )}
-              </div>
-
-              {/* Game Details Row */}
-              <div className="mt-4 flex flex-wrap items-center gap-4">
-                {game.size && (
-                  <div className="flex items-center gap-1 text-sm text-primary/80">
-                    <PackageOpen className="h-4 w-4" />
-                    <span>{game.size}</span>
-                  </div>
-                )}
-                {!game.isCustom && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex cursor-help items-center gap-1 text-sm text-primary/80">
-                          <Check className="h-4 w-4" />
-                          <span>{t("library.launcherImport.managedBadge")}</span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-secondary">
-                          {t("library.launcherImport.managedBadgeTooltip")}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                <div className="flex items-center gap-1 text-sm text-primary/80">
-                  <Clock className="h-4 w-4" />
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={game.playTime}
-                      initial={{ opacity: 0, y: -6, scale: 0.9 }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                        scale: 1,
-                        color: playtimeJustUpdated ? "var(--primary)" : "currentColor",
-                      }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                      className="font-medium"
-                    >
-                      {formatPlaytime(game.playTime)}
-                    </motion.span>
-                  </AnimatePresence>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Left column - Game actions */}
-          <div className="lg:col-span-1">
-            <Card className="overflow-hidden">
-              <CardContent className="space-y-6 p-6">
-                {/* Cloud Library Status */}
-                <div className="flex flex-col gap-3 rounded-lg border bg-card/50 p-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    {isAuthenticated ? (
-                      cloudLibraryLoading ? (
-                        <Loader className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
-                      ) : isInCloudLibrary ? (
-                        <Cloud className="h-5 w-5 shrink-0 text-primary" />
-                      ) : (
-                        <CloudOff className="h-5 w-5 shrink-0 text-muted-foreground" />
-                      )
-                    ) : (
-                      <CloudOff className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        {isAuthenticated
-                          ? isInCloudLibrary
-                            ? t("gameScreen.inCloudLibrary")
-                            : t("gameScreen.notInCloudLibrary")
-                          : t("gameScreen.cloudLibraryPromo")}
-                      </p>
-                      {!isAuthenticated && (
-                        <p className="text-xs text-muted-foreground">
-                          {t("gameScreen.cloudLibraryPromoDesc")}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {!isAuthenticated && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => navigate("/ascend")}
-                    >
-                      {t("gameScreen.getAscend")}
-                    </Button>
-                  )}
-                </div>
-                <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-muted/30">
-                  {!hasGridImage && heroImageData ? (
-                    <div
-                      className="h-full w-full"
-                      style={{
-                        backgroundImage: `url(${heroImageData})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        transform: "scale(1.15)",
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={imageData}
-                      alt={game.game}
-                      className="h-full w-full object-contain"
-                    />
-                  )}
-                  {isUninstalling && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                      <div className="w-full max-w-[200px] space-y-2 px-4">
-                        <div className="relative overflow-hidden">
-                          <Progress value={undefined} className="bg-muted/30" />
-                          <div
-                            className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-primary/20 to-transparent"
-                            style={{
-                              animation: "shimmer 3s infinite ease-in-out",
-                              backgroundSize: "200% 100%",
-                              WebkitAnimation: "shimmer 3s infinite ease-in-out",
-                              WebkitBackgroundSize: "200% 100%",
-                            }}
-                          />
-                        </div>
-                        <div className="text-center text-sm font-medium text-primary">
-                          <span className="flex items-center justify-center gap-2">
-                            <Loader className="h-4 w-4 animate-spin" />
-                            {t("library.deleting")}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Favorite button */}
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 text-muted-foreground hover:text-primary"
-                  onClick={toggleFavorite}
-                >
-                  <Heart
-                    className={cn(
-                      "h-5 w-5",
-                      isFavorite ? "fill-primary text-primary" : "fill-none"
-                    )}
-                  />
-                  {isFavorite
-                    ? t("library.removeFromFavorites")
-                    : t("library.addToFavorites")}
-                </Button>
-
-                {/* Main actions */}
-                <div className="space-y-3">
-                  {canLaunchGame ? (
-                    <>
-                      <Button
-                        className="w-full gap-2 py-6 text-lg text-secondary"
-                        size="lg"
-                        onClick={handlePlayGame}
-                        disabled={isLaunching || isRunning}
-                      >
-                        {isLaunching ? (
-                          <>
-                            <Loader className="h-5 w-5 animate-spin" />
-                            {t("library.launching")}
-                          </>
-                        ) : isRunning ? (
-                          <>
-                            <StopCircle className="h-5 w-5" />
-                            {t("library.running")}
-                          </>
-                        ) : (
-                          <>
-                            <Play className="h-5 w-5" />
-                            {t("library.play")}
-                          </>
-                        )}
-                      </Button>
-                      {trainerExists && (
-                        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3">
-                          <div className="flex items-center gap-3">
-                            <Bolt className="h-5 w-5 text-primary" />
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">
-                                {t("gameScreen.launchWithTrainer")}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {t("gameScreen.launchWithTrainerDescription")}
-                              </span>
-                            </div>
-                          </div>
-                          <Switch
-                            checked={launchWithTrainerEnabled}
-                            onCheckedChange={enabled => {
-                              setLaunchWithTrainerEnabled(enabled);
-                              localStorage.setItem(
-                                `launch-with-trainer-${game?.game || game?.name}`,
-                                enabled.toString()
-                              );
-                              toast.success(
-                                enabled
-                                  ? t("gameScreen.trainerEnabledToast")
-                                  : t("gameScreen.trainerDisabledToast")
-                              );
-                            }}
-                          />
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <Button
-                      className="w-full gap-2 py-6 text-lg text-secondary"
-                      size="lg"
-                      onClick={() => setShowExecutableManager(true)}
-                    >
-                      <FileSearch className="h-5 w-5" />
-                      {t("library.setExecutable")}
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={handleOpenDirectory}
-                  >
-                    <FolderOpen className="h-5 w-5" />
-                    {t("library.openGameDirectory")}
-                  </Button>
-
-                  {/* Reset Prefix Button - Linux only */}
-                  {isOnLinux && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowResetPrefixDialog(true)}
-                      className="hover:text-destructive gap-2 text-muted-foreground"
-                    >
-                      <FolderSync className="h-4 w-4" />
-                      {t("gameScreen.resetPrefix")}
-                      {prefixSize > 0 && (
-                        <span className="text-xs opacity-60">
-                          (
-                          {prefixSize < 1024 * 1024
-                            ? `${(prefixSize / 1024).toFixed(0)} KB`
-                            : prefixSize < 1024 * 1024 * 1024
-                              ? `${(prefixSize / (1024 * 1024)).toFixed(1)} MB`
-                              : `${(prefixSize / (1024 * 1024 * 1024)).toFixed(2)} GB`}
-                          )
-                        </span>
-                      )}
-                    </Button>
-                  )}
-
-                  {/* UMU ID field - Linux only */}
-                  {isOnLinux && (
-                    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card/50 p-3">
-                      <div className="flex items-center gap-2">
-                        <Terminal className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">
-                          {t("gameScreen.umuId")}
-                        </span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p className="text-xs">
-                                {t("gameScreen.umuIdDescription")}{" "}
-                                <button
-                                  onClick={() =>
-                                    window.electron.openURL(
-                                      "https://umu.openwinecomponents.org"
-                                    )
-                                  }
-                                  className="underline"
-                                >
-                                  umu.openwinecomponents.org
-                                </button>
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          value={umuIdInput}
-                          onChange={e => setUmuIdInput(e.target.value)}
-                          placeholder="umu-default"
-                          className="h-8 text-xs"
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 shrink-0 text-xs text-primary"
-                          disabled={umuIdSaving || umuIdInput === umuId}
-                          onClick={async () => {
-                            if (!game.executable) return;
-                            setUmuIdSaving(true);
-                            const result = await window.electron.umuSetGameId(
-                              game.game || game.name,
-                              umuIdInput
-                            );
-                            if (result.success) {
-                              setUmuId(umuIdInput);
-                              toast.success(t("gameScreen.umuIdSaved"));
-                            } else {
-                              toast.error(t("gameScreen.umuIdSaveFailed"));
-                            }
-                            setUmuIdSaving(false);
-                          }}
-                        >
-                          {umuIdSaving ? (
-                            <Loader className="h-3 w-3 animate-spin" />
-                          ) : (
-                            t("common.save")
-                          )}
-                        </Button>
-                      </div>
-                      {umuId && (
-                        <p className="text-xs text-muted-foreground">
-                          {t("gameScreen.umuIdActive")}{" "}
-                          <span className="font-mono text-foreground">{umuId}</span>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Secondary actions */}
-                <div className="text-secondary-foreground space-y-3">
-                  {settings.ludusavi.enabled ? (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2"
-                      onClick={() => setBackupDialogOpen(true)}
-                    >
-                      <FolderSync className="h-4 w-4" />
-                      {t("gameScreen.backupSaves")}
-                    </Button>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start gap-2 opacity-50"
-                        disabled
-                      >
-                        <FolderSync className="h-4 w-4" />
-                        {t("gameScreen.backupSaves")}
-                      </Button>
-                      <div className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground">
-                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        <span>{t("gameScreen.backupSavesDisabledTooltip")}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {!game.isCustom && (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2"
-                      onClick={() => setIsVerifyingOpen(true)}
-                    >
-                      <FileCheck2 className="h-4 w-4" />
-                      {t("library.verifyGameFiles")}
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2"
-                    onClick={async () => {
-                      const commands = await window.electron.getLaunchCommands(
-                        game.game || game.name,
-                        game.isCustom
-                      );
-                      setLaunchCommand(commands || "");
-                      setLaunchOptionsDialogOpen(true);
-                    }}
-                  >
-                    <Bolt className="h-4 w-4" />
-                    {t("gameScreen.launchOptions")}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2"
-                    onClick={async () => {
-                      const success = await window.electron.createGameShortcut(game);
-                      if (success) {
-                        toast.success(t("library.shortcutCreated"));
-                      } else {
-                        toast.error(t("library.shortcutError"));
-                      }
-                    }}
-                  >
-                    <Monitor className="h-4 w-4" />
-                    {t("library.createShortcut")}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2"
-                    onClick={async () => {
-                      const success = await window.electron.createStartMenuShortcut(game);
-                      if (success) {
-                        toast.success(t("library.startMenuShortcutCreated"));
-                      } else {
-                        toast.error(t("library.startMenuShortcutError"));
-                      }
-                    }}
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                    {t("library.createStartMenuShortcut")}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2"
-                    onClick={() => setShowExecutableManager(true)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    {t("library.changeExecutable")}
-                    {!executableExists && (
-                      <AlertTriangle
-                        className="h-4 w-4 text-yellow-500"
-                        title={t("library.executableNotFound")}
-                      />
-                    )}
-                  </Button>
-
-                  {settings.extraGameOptions && (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2"
-                      onClick={() => setShowEditGameEntry(true)}
-                    >
-                      <Settings2 className="h-4 w-4" />
-                      {t("gameScreen.editGameEntry")}
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2"
-                    onClick={() =>
-                      game.isCustom ? handleDeleteGame() : setIsDeleteDialogOpen(true)
-                    }
-                    disabled={isUninstalling}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {game.isCustom
-                      ? t("library.removeGameFromLibrary")
-                      : t("library.deleteGame")}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right column - Game details */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Quick Navigation - Compact Pills */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setActiveTab("overview")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                  activeTab === "overview"
-                    ? "bg-primary text-secondary"
-                    : "bg-muted hover:bg-muted/80"
-                )}
-              >
-                <Info className="h-3.5 w-3.5" />
-                {t("gameScreen.overview")}
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab("soundtrack");
-                  fetchSoundtrack();
-                }}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                  activeTab === "soundtrack"
-                    ? "bg-primary text-secondary"
-                    : "bg-muted hover:bg-muted/80"
-                )}
-              >
-                <Music2 className="h-3.5 w-3.5" />
-                {t("gameScreen.soundtrack")}
-              </button>
-              <button
-                onClick={() => setActiveTab("achievements")}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                  activeTab === "achievements"
-                    ? "bg-primary text-secondary"
-                    : "bg-muted hover:bg-muted/80"
-                )}
-              >
-                <Trophy className="h-3.5 w-3.5" />
-                {t("gameScreen.achievements")}
-              </button>
-              {screenshots.length > 0 && (
-                <button
-                  onClick={() => setActiveTab("media")}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                    activeTab === "media"
-                      ? "bg-primary text-secondary"
-                      : "bg-muted hover:bg-muted/80"
-                  )}
-                >
-                  <ImageUp className="h-3.5 w-3.5" />
-                  {t("gameScreen.media")}
-                </button>
-              )}
-              {supportsModManaging && (
-                <button
-                  onClick={() => setActiveTab("mods")}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                    activeTab === "mods"
-                      ? "bg-primary text-secondary"
-                      : "bg-muted hover:bg-muted/80"
-                  )}
-                >
-                  <Puzzle className="h-3.5 w-3.5" />
-                  {t("gameScreen.mods")}
-                </button>
-              )}
-              {supportsFlingTrainer && (
-                <button
-                  onClick={() => setActiveTab("trainers")}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                    activeTab === "trainers"
-                      ? "bg-primary text-secondary"
-                      : "bg-muted hover:bg-muted/80"
-                  )}
-                >
-                  <Bolt className="h-3.5 w-3.5" />
-                  {t("gameScreen.trainers")}
-                </button>
-              )}
-            </div>
-
-            <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="hidden">
-                <TabsTrigger value="overview">{t("gameScreen.overview")}</TabsTrigger>
-              </TabsList>
-
-              {!hasRated && settings.usingLocalIndex && game.gameID && (
-                <Card className="mb-4 overflow-hidden bg-gradient-to-br from-primary/80 via-primary to-primary/90 shadow-lg transition-all hover:shadow-xl">
-                  <CardContent className="flex items-center justify-between p-6">
-                    <div className="flex items-center space-x-4 text-secondary">
-                      <div className="bg-primary-foreground/20 rounded-full p-3 shadow-inner">
-                        <Star className="text-primary-foreground h-6 w-6" />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-primary-foreground text-xl font-bold">
-                          {t("gameScreen.rateThisGame")}
-                        </span>
-                        <p className="text-primary-foreground/80 text-sm">
-                          {t("gameScreen.helpOthers")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid">
-                      <Button
-                        variant="secondary"
-                        className="bg-primary-foreground/10 hover:bg-primary-foreground/20 transform text-secondary transition-all duration-300 ease-in-out hover:scale-105"
-                        onClick={() => setShowRateDialog(true)}
-                      >
-                        <ThumbsUp className="mr-2 h-5 w-5" />
-                        {t("gameScreen.rateNow")}
-                      </Button>
-                      <Button
-                        variant="none"
-                        className="bg-primary-foreground/10 transform text-xs text-secondary transition-all duration-300 ease-in-out hover:scale-105"
-                        onClick={() => {
-                          window.electron.gameRated(
-                            game.game || game.name,
-                            game.isCustom
-                          );
-                          setHasRated(true);
-                        }}
-                      >
-                        {t("gameScreen.dismiss")}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Soundtrack tab */}
-              <TabsContent value="soundtrack" className="space-y-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="mb-6 flex items-center justify-between">
-                      <div>
-                        <div>
-                          <h2 className="text-2xl font-bold">
-                            {game.game} {t("gameScreen.soundtrack")}
-                          </h2>
-                          {soundtrack.length > 0 && (
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {soundtrack.length} {t("gameScreen.aboutSoundtracks")}{" "}
-                              <a
-                                onClick={() =>
-                                  window.electron.openURL(
-                                    "https://downloads.khinsider.com/"
-                                  )
-                                }
-                                className="inline cursor-pointer text-sm text-primary hover:underline"
-                              >
-                                Khinsider
-                              </a>
-                              .
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {soundtrack.length > 0 && (
-                        <Button
-                          variant="outline"
-                          className="gap-2"
-                          onClick={async () => {
-                            toast.success(t("gameScreen.downloadingAllTracks"));
-                            const results = await Promise.all(
-                              soundtrack.map(track =>
-                                trackDownload(
-                                  window.electron.downloadSoundtrack(track.url, game.game)
-                                )
-                              )
-                            );
-                            if (results.every(res => res?.success)) {
-                              toast.success(t("gameScreen.allDownloadsComplete"));
-                            } else {
-                              toast.error(t("gameScreen.someDownloadsFailed"));
-                            }
-                          }}
-                        >
-                          <Download className="h-4 w-4" />
-                          {t("gameScreen.downloadAll")}
-                        </Button>
-                      )}
-                    </div>
-
-                    {loadingSoundtrack ? (
-                      <div className="flex flex-col items-center justify-center space-y-6 py-12">
-                        <div className="relative flex flex-col items-center">
-                          <Music2 className="h-8 w-8 animate-pulse text-primary/60 drop-shadow-lg" />
-                        </div>
-                        <p className="animate-pulse text-base font-semibold text-primary/70">
-                          {t("gameScreen.loadingSoundtrack")}
-                        </p>
-                      </div>
-                    ) : soundtrack.length > 0 ? (
-                      <div className="relative overflow-hidden rounded-lg border bg-card">
-                        <div className="sticky top-0 z-10 border-b bg-background/95 px-6 py-3 shadow-sm backdrop-blur-md transition-shadow duration-200">
-                          <div className="grid grid-cols-[auto,1fr,auto] gap-6 text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
-                            <div className="w-14 text-center">#</div>
-                            <div>{t("gameScreen.trackTitle")}</div>
-                          </div>
-                        </div>
-
-                        <div className="divide-y divide-border/50">
-                          {soundtrack
-                            .slice(currentPage * 12, (currentPage + 1) * 12)
-                            .map((track, index) => (
-                              <div
-                                key={index}
-                                className="group relative grid grid-cols-[auto,1fr,auto] items-center gap-6 overflow-hidden px-6 py-3 transition-colors hover:bg-accent/50"
-                              >
-                                {/* Track number */}
-                                <div className="w-14 select-none text-center text-sm font-medium tabular-nums text-muted-foreground/70">
-                                  <span className="transition-opacity duration-200 group-hover:opacity-0">
-                                    {String(currentPage * 12 + index + 1).padStart(
-                                      2,
-                                      "0"
-                                    )}
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute left-6 top-1/2 h-8 w-14 -translate-y-1/2 opacity-0 transition-all duration-200 group-hover:opacity-100"
-                                    onClick={() => {
-                                      console.log(
-                                        "[Soundtrack Play] Track object:",
-                                        track
-                                      );
-                                      console.log(
-                                        "[Soundtrack Play] Track URL:",
-                                        track.url
-                                      );
-                                      // Use the direct URL for audio playback
-                                      const playableTrack = {
-                                        ...track,
-                                        url: track.url.replace(
-                                          "/api/khinsider",
-                                          "https://downloads.khinsider.com"
-                                        ),
-                                      };
-                                      console.log(
-                                        "[Soundtrack Play] PlayableTrack object:",
-                                        playableTrack
-                                      );
-                                      setTrack(playableTrack);
-                                      play();
-                                    }}
-                                    title={t("gameScreen.playTrack")}
-                                  >
-                                    <Play className="h-4 w-4" />
-                                  </Button>
-                                </div>
-
-                                {/* Track title */}
-                                <div className="flex min-w-0 items-center">
-                                  <div className="truncate py-1">
-                                    <p className="truncate text-sm font-medium">
-                                      {track.title}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 transition-all duration-200 sm:opacity-0 sm:group-hover:opacity-100"
-                                    onClick={() => {
-                                      toast.success(t("gameScreen.downloadStarted"));
-                                      trackDownload(
-                                        window.electron.downloadSoundtrack(
-                                          track.url,
-                                          game.game
-                                        )
-                                      ).then(res => {
-                                        if (res?.success) {
-                                          toast.success(t("gameScreen.downloadComplete"));
-                                        } else {
-                                          toast.error(t("gameScreen.downloadFailed"));
-                                        }
-                                      });
-                                    }}
-                                    title={t("gameScreen.downloadTrack")}
-                                  >
-                                    <Download className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 transition-all duration-200 sm:opacity-0 sm:group-hover:opacity-100"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(track.title);
-                                      toast.success(t("gameScreen.trackNameCopied"));
-                                    }}
-                                    title={t("gameScreen.copyTrackName")}
-                                  >
-                                    <Copy className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                        <div className="flex items-center justify-between border-t px-6 py-4">
-                          <div className="text-sm text-muted-foreground">
-                            {t("gameScreen.showingTracks", {
-                              from: currentPage * 12 + 1,
-                              to: Math.min((currentPage + 1) * 12, soundtrack.length),
-                              total: soundtrack.length,
-                            })}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                              disabled={currentPage === 0}
-                            >
-                              {t("common.prev")}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                setCurrentPage(p =>
-                                  Math.min(Math.ceil(soundtrack.length / 12) - 1, p + 1)
-                                )
-                              }
-                              disabled={
-                                currentPage >= Math.ceil(soundtrack.length / 12) - 1
-                              }
-                            >
-                              {t("common.next")}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center space-y-4 py-12 text-center">
-                        <div className="rounded-full bg-muted p-4">
-                          <HeadphoneOff className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                        <div className="space-y-2">
-                          <p className="font-medium">
-                            {t("gameScreen.noSoundtrackFound")}
-                          </p>
-                          <p className="max-w-sm text-sm text-muted-foreground">
-                            {t("gameScreen.noSoundtrackDescription")}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Overview tab */}
-              <TabsContent value="overview" className="space-y-6">
-                {/* Game Info Stats Cards */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  {game.version && game.version !== "-1" && (
-                    <Card
-                      className={updateInfo?.updateAvailable ? "border-blue-500/50" : ""}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex flex-col items-center text-center">
-                          <div className="relative mb-2">
-                            <Tag className="h-5 w-5 text-primary" />
-                            {updateInfo?.updateAvailable && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="absolute -right-2 -top-2 h-4 w-4 text-blue-500" />
-                                  </TooltipTrigger>
-                                  <TooltipContent side="right">
-                                    <p className="text-xs">
-                                      Update available: {updateInfo.latestVersion}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {t("library.version")}
-                          </span>
-                          <p className="mt-1 text-sm font-semibold">{game.version}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {game.size && (
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="flex flex-col items-center text-center">
-                          <PackageOpen className="mb-2 h-5 w-5 text-primary" />
-                          <span className="text-xs text-muted-foreground">
-                            {t("library.size")}
-                          </span>
-                          <p className="mt-1 text-sm font-semibold">{game.size}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col items-center text-center">
-                        <Clock className="mb-2 h-5 w-5 text-primary" />
-                        <span className="text-xs text-muted-foreground">
-                          {t("library.playTime")}
-                        </span>
-                        <AnimatePresence mode="wait">
-                          <motion.p
-                            key={game.playTime}
-                            initial={{ opacity: 0, y: -6, scale: 0.9 }}
-                            animate={{
-                              opacity: 1,
-                              y: 0,
-                              scale: 1,
-                              color: playtimeJustUpdated
-                                ? "var(--primary)"
-                                : "currentColor",
-                            }}
-                            transition={{ duration: 0.4, ease: "easeOut" }}
-                            className="mt-1 text-sm font-semibold"
-                          >
-                            {formatPlaytime(game.playTime)}
-                          </motion.p>
-                        </AnimatePresence>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {game.launcher && (
-                    <Card className="border-yellow-500/50">
-                      <CardContent className="p-4">
-                        <div className="flex flex-col items-center text-center">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="relative mb-2">
-                                  <RefreshCw className="h-5 w-5 text-yellow-500" />
-                                  <Info className="absolute -right-2 -top-2 h-4 w-4 text-yellow-500" />
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-xs">
-                                <p className="text-xs">
-                                  {t("library.launcherImport.noUpdateTrackingHint")}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          <span className="text-xs text-muted-foreground">
-                            {t("library.launcherImport.notManagedBadge")}
-                          </span>
-                          {importCatalogMatch ? (
-                            <button
-                              type="button"
-                              onClick={handleSwitchToAscendaraManaged}
-                              className="mt-1 flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-                            >
-                              <ArrowRightLeft className="h-3.5 w-3.5" />
-                              {t("library.launcherImport.switchAction")}
-                            </button>
-                          ) : (
-                            <p className="mt-1 text-sm font-semibold">
-                              {t(`library.launcherImport.launchers.${game.launcher}`)}
-                            </p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {game.executable && (
-                    <Card className={!executableExists ? "border-red-500/50" : ""}>
-                      <CardContent className="p-4">
-                        <div className="flex flex-col items-center text-center">
-                          <Monitor className="mb-2 h-5 w-5 text-primary" />
-                          <span className="text-xs text-muted-foreground">
-                            {t("library.executable")}
-                          </span>
-                          <div className="mt-1 flex items-center gap-1">
-                            <p className="max-w-[100px] truncate text-sm font-semibold">
-                              {game.executable.split("\\").pop()}
-                            </p>
-                            {!executableExists && (
-                              <AlertTriangle className="h-4 w-4 text-red-500" />
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Steam Match Info */}
-                {steamData?.appid || game?.steamAppId ? (
-                  <Card className="border border-border">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {steamData?.cover?.url ? (
-                            <img
-                              src={steamData.cover.url}
-                              alt={steamData.name}
-                              className="h-12 w-24 rounded object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-12 w-24 items-center justify-center rounded bg-muted">
-                              <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-sm font-medium text-foreground">
-                              {steamData?.name || game?.game || game?.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Steam App ID: {steamData?.appid || game?.steamAppId}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowEditGameInfo(true)}
-                        >
-                          <Edit3 className="mr-2 h-4 w-4" />
-                          {t("gameScreen.editGameInfo")}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card className="border border-dashed border-border bg-muted/30">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-12 w-24 items-center justify-center rounded bg-muted">
-                            <Search className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-foreground">
-                              {t("gameScreen.noSteamMatch")}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {t("gameScreen.noSteamMatchDescription")}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowEditGameInfo(true)}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          {t("gameScreen.setGameInfo")}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Game Summary */}
-                {(steamData?.about_the_game || steamData?.summary) && (
-                  <Card className="border-l-4 border-l-primary">
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <div className="mb-2 rounded-full bg-primary/10 p-2">
-                            <Info className="h-5 w-5 text-primary" />
-                          </div>
-                          <h2 className="text-xl font-bold">
-                            {t("gameScreen.aboutGame")}
-                          </h2>
-                        </div>
-                        {steamData.about_the_game ? (
-                          <SafeHtml
-                            className="steam-description text-base leading-relaxed text-foreground/80"
-                            html={steamData.about_the_game}
-                          />
-                        ) : (
-                          <p className="text-base leading-relaxed text-foreground/80">
-                            {steamData.summary}
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Featured screenshots */}
-                {screenshots.length > 0 && (
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <ImageUp className="h-5 w-5 text-primary" />
-                            <h2 className="text-xl font-bold">
-                              {t("gameScreen.screenshots")}
-                            </h2>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1 text-muted-foreground hover:text-primary"
-                            onClick={() => setActiveTab("media")}
-                          >
-                            {t("gameScreen.viewAll")}
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                          {screenshots.slice(0, 6).map((screenshot, index) => (
-                            <div
-                              key={index}
-                              className="group relative aspect-video cursor-pointer overflow-hidden rounded-lg bg-muted transition-all hover:ring-2 hover:ring-primary"
-                              onClick={() =>
-                                window.electron.openURL(screenshot.formatted_url)
-                              }
-                            >
-                              <img
-                                src={screenshot.formatted_url}
-                                alt={t("gameScreen.screenshotAlt", { number: index + 1 })}
-                                className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                              />
-                              <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              {/* Media tab */}
-              <TabsContent value="media" className="space-y-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      <h2 className="text-2xl font-bold">
-                        {t("gameScreen.screenshots")}
-                      </h2>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {screenshots.map((screenshot, index) => (
-                          <div
-                            key={index}
-                            className="aspect-video overflow-hidden rounded-lg bg-muted transition-transform hover:scale-105"
-                          >
-                            <img
-                              src={screenshot.formatted_url}
-                              alt={t("gameScreen.screenshotAlt", { number: index + 1 })}
-                              className="h-full w-full cursor-pointer object-cover"
-                              onClick={() =>
-                                window.electron.openURL(screenshot.formatted_url)
-                              }
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Achievements tab */}
-              <TabsContent value="achievements" className="space-y-6">
-                <Card className="overflow-visible">
-                  <CardContent className="p-6">
-                    {achievementsLoading ? (
-                      <div className="flex flex-col items-center justify-center space-y-6 py-12">
-                        <div className="relative flex flex-col items-center">
-                          <Award className="h-10 w-10 animate-pulse text-primary/70 drop-shadow-lg" />
-                        </div>
-                        <p className="animate-pulse text-lg font-semibold text-primary/80">
-                          {t("gameScreen.loadingAchievements")}
-                        </p>
-                      </div>
-                    ) : achievements &&
-                      achievements.achievements &&
-                      achievements.achievements.length > 0 ? (
-                      <>
-                        {/* Achievements summary header */}
-                        <div className="mb-8 flex flex-col items-center gap-2 sm:flex-row sm:justify-between sm:gap-4">
-                          <div className="flex items-center gap-3">
-                            <span className="text-primary-foreground text-2xl font-bold">
-                              {t("gameScreen.achievements")}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-primary hover:text-primary"
-                              onClick={handleRefreshAchievements}
-                              disabled={refreshingAchievements}
-                              title={t("gameScreen.refreshAchievements")}
-                            >
-                              <RefreshCw
-                                className={`h-4 w-4 ${refreshingAchievements ? "animate-spin" : ""}`}
-                              />
-                            </Button>
-                            <div>
-                              <span className="mr-1 text-xl font-semibold text-primary">
-                                {achievements.achievements.filter(a => a.achieved).length}
-                              </span>
-                              <span className="font-medium text-muted-foreground">
-                                /{achievements.achievements.length}{" "}
-                                {t("gameScreen.achievementsUnlocked")}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                          {paginatedAchievements.map((ach, idx) => {
-                            const unlocked = ach.achieved;
-                            return (
-                              <div
-                                key={ach.achID || idx + achievementsPage * perPage}
-                                className={`relative flex flex-col items-center rounded-xl border bg-gradient-to-br shadow-lg transition-all duration-200 ${unlocked ? "from-yellow-50/80 via-green-50/90 to-green-100/80 dark:from-yellow-900/40 dark:via-green-900/30 dark:to-green-800/40" : "from-gray-100/80 via-muted/90 to-muted/80 dark:from-gray-900/40 dark:via-muted/30 dark:to-muted/60"} group min-h-[220px] p-5 hover:scale-[1.03] hover:shadow-2xl`}
-                                tabIndex={0}
-                                aria-label={ach.message}
-                              >
-                                <div className="relative mb-3">
-                                  <img
-                                    src={ach.icon}
-                                    alt={ach.message}
-                                    className={`h-16 w-16 rounded-lg border-2 ${unlocked ? "border-yellow-400 dark:border-yellow-300" : "border-muted"} bg-card shadow-lg`}
-                                    style={{
-                                      filter: unlocked
-                                        ? "none"
-                                        : "grayscale(0.85) brightness(0.85)",
-                                    }}
-                                  />
-                                  {!unlocked && (
-                                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
-                                      <LockIcon className="h-8 w-8 text-white/80" />
-                                    </div>
-                                  )}
-                                </div>
-                                <div
-                                  className={`mb-1 text-center text-lg font-semibold ${unlocked ? "text-primary" : "text-muted-foreground"}`}
-                                >
-                                  {ach.message}
-                                </div>
-                                <div className="mb-2 min-h-[32px] text-center text-xs text-muted-foreground">
-                                  {ach.description}
-                                </div>
-                                <div className="text-center text-xs">
-                                  {unlocked ? (
-                                    <span
-                                      className="font-medium text-primary"
-                                      title={
-                                        ach.unlockTime
-                                          ? new Date(
-                                              Number(ach.unlockTime) * 1000
-                                            ).toLocaleString()
-                                          : undefined
-                                      }
-                                    >
-                                      {t("gameScreen.achievementUnlocked")}
-                                      {ach.unlockTime
-                                        ? ` ${new Date(Number(ach.unlockTime) * 1000).toLocaleString()}`
-                                        : ""}
-                                    </span>
-                                  ) : (
-                                    <span className="font-medium text-gray-400 dark:text-gray-500">
-                                      {t("gameScreen.achievementLocked")}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {/* Pagination controls */}
-                        {totalPages > 1 && (
-                          <div className="mt-8 flex items-center justify-center gap-4">
-                            <button
-                              className="rounded-full border px-4 py-2 text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                              onClick={() => setAchievementsPage(p => Math.max(0, p - 1))}
-                              disabled={achievementsPage === 0}
-                              aria-label={t("gameScreen.previousPage")}
-                            >
-                              {t("common.prev")}
-                            </button>
-                            <span className="text-sm text-muted-foreground">
-                              {t("common.page")} {achievementsPage + 1} / {totalPages}
-                            </span>
-                            <button
-                              className="rounded-full border px-4 py-2 text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                              onClick={() =>
-                                setAchievementsPage(p => Math.min(totalPages - 1, p + 1))
-                              }
-                              disabled={achievementsPage === totalPages - 1}
-                              aria-label={t("gameScreen.nextPage")}
-                            >
-                              {t("common.next")}
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center space-y-4 py-12 text-center">
-                        <div className="flex items-center gap-4">
-                          <div className="rounded-full bg-muted p-4">
-                            <Award className="h-12 w-12 text-muted-foreground" />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="font-medium">
-                            {t("gameScreen.noAchievementsFound")}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-primary hover:bg-transparent hover:text-primary"
-                              onClick={handleRefreshAchievements}
-                              disabled={refreshingAchievements}
-                              title={t("gameScreen.refreshAchievements")}
-                            >
-                              <RefreshCw
-                                className={`h-4 w-4 ${refreshingAchievements ? "animate-spin" : ""}`}
-                              />
-                            </Button>
-                          </p>
-                          <p className="max-w-sm text-sm text-muted-foreground">
-                            {t("gameScreen.noAchievementsDescription")}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Mods tab - Show for all users with supported games, but require Ascend for full access */}
-              {supportsModManaging && (
-                <TabsContent value="mods" className="space-y-6">
-                  <Card>
-                    <CardContent className="p-6">
-                      {!isAuthenticated || !ascendAccess.hasAccess ? (
-                        /* Ascend promotion for non-authenticated users or expired trial */
-                        <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
-                          <div className="rounded-full bg-primary/10 p-6">
-                            <Puzzle className="h-16 w-16 text-primary" />
-                          </div>
-                          <div className="space-y-3">
-                            <h2 className="text-2xl font-bold">
-                              {t("gameScreen.modsTitle")}
-                            </h2>
-                            {nexusGameData && (
-                              <p className="text-lg text-muted-foreground">
-                                {t("gameScreen.modsAvailable", {
-                                  count: nexusGameData.modCount || 0,
-                                })}
-                              </p>
-                            )}
-                            <p className="max-w-md text-sm text-muted-foreground">
-                              {!isAuthenticated
-                                ? t("gameScreen.modsAscendPromo")
-                                : t("gameScreen.modsAscendRequired")}
-                            </p>
-                          </div>
-                          <Button
-                            className="gap-2 text-secondary"
-                            onClick={() => navigate("/ascend")}
-                          >
-                            <Gem className="h-4 w-4" />
-                            {!isAuthenticated
-                              ? t("gameScreen.getAscend")
-                              : t("gameScreen.subscribeToAscend")}
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          {/* Header with search and sort */}
-                          <div className="mb-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h2 className="text-2xl font-bold">
-                                  {t("gameScreen.modsTitle")}
-                                </h2>
-                                {nexusGameData && (
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    {t("gameScreen.modsAvailable", {
-                                      count: nexusGameData.modCount || 0,
-                                    })}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Search and Sort Controls */}
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                              <form
-                                onSubmit={handleModSearch}
-                                className="flex flex-1 gap-2"
-                              >
-                                <Input
-                                  placeholder={t("gameScreen.searchMods")}
-                                  value={modsSearchQuery}
-                                  onChange={e => setModsSearchQuery(e.target.value)}
-                                  className="flex-1"
-                                />
-                                <Button type="submit" variant="outline" size="icon">
-                                  <FileSearch className="h-4 w-4" />
-                                </Button>
-                              </form>
-                              <Select value={modsSortBy} onValueChange={handleSortChange}>
-                                <SelectTrigger className="w-[180px]">
-                                  <SelectValue placeholder={t("gameScreen.sortBy")} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="endorsements">
-                                    {t("gameScreen.sortPopular")}
-                                  </SelectItem>
-                                  <SelectItem value="downloads">
-                                    {t("gameScreen.sortDownloads")}
-                                  </SelectItem>
-                                  <SelectItem value="updatedAt">
-                                    {t("gameScreen.sortRecent")}
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          {/* Mods Grid */}
-                          {modsLoading ? (
-                            <div className="flex flex-col items-center justify-center space-y-6 py-12">
-                              <div className="relative flex flex-col items-center">
-                                <Puzzle className="h-8 w-8 animate-pulse text-primary/60 drop-shadow-lg" />
-                              </div>
-                              <p className="animate-pulse text-base font-semibold text-primary/70">
-                                {t("gameScreen.loadingMods")}
-                              </p>
-                            </div>
-                          ) : allMods.length > 0 ? (
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                {allMods.map((mod, index) => (
-                                  <div
-                                    key={mod.modId || index}
-                                    className="group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-all hover:shadow-lg"
-                                    onClick={() => fetchModFiles(mod)}
-                                  >
-                                    {mod.pictureUrl && (
-                                      <div className="aspect-video overflow-hidden bg-muted">
-                                        <img
-                                          src={mod.pictureUrl}
-                                          alt={mod.name}
-                                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                                        />
-                                      </div>
-                                    )}
-                                    <div className="p-4">
-                                      <h4 className="line-clamp-1 font-semibold text-foreground">
-                                        {mod.name}
-                                      </h4>
-                                      {mod.uploader?.name && (
-                                        <p className="text-xs text-muted-foreground">
-                                          {t("gameScreen.modBy")} {mod.uploader.name}
-                                        </p>
-                                      )}
-                                      {mod.summary && (
-                                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                                          {mod.summary}
-                                        </p>
-                                      )}
-                                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                                        {mod.version && (
-                                          <span className="flex items-center gap-1">
-                                            <Tag className="h-3 w-3" />v{mod.version}
-                                          </span>
-                                        )}
-                                        {mod.modCategory?.name && (
-                                          <span className="rounded bg-muted px-2 py-0.5">
-                                            {mod.modCategory.name}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Pagination */}
-                              {modsTotalCount > modsPerPage && (
-                                <div className="flex items-center justify-between border-t px-6 py-4">
-                                  <div className="text-sm text-muted-foreground">
-                                    {t("gameScreen.showingMods", {
-                                      from: modsPage * modsPerPage + 1,
-                                      to: Math.min(
-                                        (modsPage + 1) * modsPerPage,
-                                        modsTotalCount
-                                      ),
-                                      total: modsTotalCount,
-                                    })}
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                    <span className="text-sm text-muted-foreground">
-                                      {t("common.page")} {modsPage + 1} /{" "}
-                                      {Math.ceil(modsTotalCount / modsPerPage)}
-                                    </span>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleModsPageChange(modsPage - 1)}
-                                        disabled={modsPage === 0}
-                                      >
-                                        {t("common.prev")}
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleModsPageChange(modsPage + 1)}
-                                        disabled={
-                                          (modsPage + 1) * modsPerPage >= modsTotalCount
-                                        }
-                                      >
-                                        {t("common.next")}
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ) : popularMods.length > 0 ? (
-                            <div className="space-y-4">
-                              <h3 className="text-lg font-semibold text-muted-foreground">
-                                {t("gameScreen.popularMods")}
-                              </h3>
-                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                {popularMods.map((mod, index) => (
-                                  <div
-                                    key={mod.modId || index}
-                                    className="group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-all hover:shadow-lg"
-                                    onClick={() => fetchModFiles(mod)}
-                                  >
-                                    {mod.pictureUrl && (
-                                      <div className="aspect-video overflow-hidden bg-muted">
-                                        <img
-                                          src={mod.pictureUrl}
-                                          alt={mod.name}
-                                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                                        />
-                                      </div>
-                                    )}
-                                    <div className="p-4">
-                                      <h4 className="line-clamp-1 font-semibold text-foreground">
-                                        {mod.name}
-                                      </h4>
-                                      {mod.summary && (
-                                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                                          {mod.summary}
-                                        </p>
-                                      )}
-                                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                                        {mod.version && (
-                                          <span className="flex items-center gap-1">
-                                            <Tag className="h-3 w-3" />v{mod.version}
-                                          </span>
-                                        )}
-                                        {mod.modCategory?.name && (
-                                          <span className="rounded bg-muted px-2 py-0.5">
-                                            {mod.modCategory.name}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center space-y-4 py-12 text-center">
-                              <div className="rounded-full bg-muted p-4">
-                                <Puzzle className="h-12 w-12 text-muted-foreground" />
-                              </div>
-                              <div className="space-y-2">
-                                <p className="font-medium">
-                                  {t("gameScreen.modsSupported")}
-                                </p>
-                                <p className="max-w-sm text-sm text-muted-foreground">
-                                  {t("gameScreen.modsDescription")}
-                                </p>
-                              </div>
-                              <Button
-                                variant="outline"
-                                className="mt-4 gap-2"
-                                onClick={() => fetchMods(0, "", "endorsements")}
-                              >
-                                <Puzzle className="h-4 w-4" />
-                                {t("gameScreen.browseMods")}
-                              </Button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              )}
-
-              {/* Trainers tab - FLiNG Trainer */}
-              {supportsFlingTrainer && (
-                <TabsContent value="trainers" className="space-y-6">
-                  <Card>
-                    <CardContent className="p-6">
-                      {!isAuthenticated || !ascendAccess.hasAccess ? (
-                        /* Ascend promotion for non-authenticated users or expired trial */
-                        <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
-                          <div className="rounded-full bg-primary/10 p-6">
-                            <Bolt className="h-16 w-16 text-primary" />
-                          </div>
-                          <div className="space-y-3">
-                            <h2 className="text-2xl font-bold">
-                              {t("gameScreen.trainersTitle")}
-                            </h2>
-                            <p className="text-lg text-muted-foreground">
-                              {t("gameScreen.trainerAvailable")}
-                            </p>
-                            <p className="max-w-md text-sm text-muted-foreground">
-                              {!isAuthenticated
-                                ? t("gameScreen.trainersAscendPromo")
-                                : t("gameScreen.trainersAscendRequired")}
-                            </p>
-                          </div>
-                          <Button
-                            className="gap-2 text-secondary"
-                            onClick={() => navigate("/ascend")}
-                          >
-                            <Gem className="h-4 w-4" />
-                            {!isAuthenticated
-                              ? t("gameScreen.getAscend")
-                              : t("gameScreen.subscribeToAscend")}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center space-y-6 py-8 text-center">
-                          {flingTrainerData?.imageUrl && (
-                            <div className="overflow-hidden rounded-lg">
-                              <img
-                                src={flingTrainerData.imageUrl}
-                                alt={flingTrainerData.title}
-                                className="h-32 w-auto object-contain"
-                              />
-                            </div>
-                          )}
-                          {!flingTrainerData?.imageUrl && (
-                            <div className="rounded-full bg-primary/10 p-6">
-                              <Bolt className="h-16 w-16 text-primary" />
-                            </div>
-                          )}
-                          <div className="space-y-2">
-                            <h2 className="text-2xl font-bold">
-                              {flingTrainerData?.title || t("gameScreen.trainersTitle")}
-                            </h2>
-                            {flingTrainerData?.options && (
-                              <p className="text-lg text-primary">
-                                {t("gameScreen.trainerOptions", {
-                                  count: flingTrainerData.options,
-                                })}
-                              </p>
-                            )}
-                            {flingTrainerData?.version && (
-                              <p className="text-sm text-muted-foreground">
-                                {flingTrainerData.version}
-                              </p>
-                            )}
-                            {trainerExists && (
-                              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-green-500/10 px-4 py-1.5 text-sm font-medium text-green-600 dark:text-green-400">
-                                <FileCheck2 className="h-4 w-4" />
-                                {t("gameScreen.trainerInstalled")}
-                              </div>
-                            )}
-                            <p className="max-w-md text-sm text-muted-foreground">
-                              {t("gameScreen.trainersDescription")}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-3 sm:flex-row">
-                            {flingTrainerData?.downloadUrl ? (
-                              <>
-                                <Button
-                                  className="gap-2 text-secondary"
-                                  onClick={async () => {
-                                    setIsDownloadingTrainer(true);
-                                    try {
-                                      const result =
-                                        await flingTrainerService.downloadTrainerToGame(
-                                          flingTrainerData,
-                                          game?.game || game?.name,
-                                          game?.isCustom || false
-                                        );
-                                      if (result.success) {
-                                        toast.success(
-                                          t("gameScreen.trainerInstalledSuccess"),
-                                          {
-                                            description: t(
-                                              "gameScreen.trainerInstalledDescription"
-                                            ),
-                                          }
-                                        );
-                                        // Check if trainer now exists
-                                        const exists =
-                                          await window.electron.checkTrainerExists(
-                                            game?.game || game?.name,
-                                            game?.isCustom || false
-                                          );
-                                        setTrainerExists(exists);
-                                      } else {
-                                        toast.error(
-                                          t("gameScreen.trainerInstallFailed"),
-                                          {
-                                            description:
-                                              result.error ||
-                                              t(
-                                                "gameScreen.trainerInstallFailedDescription"
-                                              ),
-                                          }
-                                        );
-                                      }
-                                    } catch (error) {
-                                      toast.error(t("gameScreen.trainerInstallFailed"), {
-                                        description: t(
-                                          "gameScreen.trainerInstallFailedDescription"
-                                        ),
-                                      });
-                                    } finally {
-                                      setIsDownloadingTrainer(false);
-                                    }
-                                  }}
-                                  disabled={isDownloadingTrainer || trainerExists}
-                                >
-                                  {isDownloadingTrainer ? (
-                                    <>
-                                      <Loader className="h-4 w-4 animate-spin" />
-                                      {t("gameScreen.installingTrainer")}
-                                    </>
-                                  ) : trainerExists ? (
-                                    <>
-                                      <FileCheck2 className="h-4 w-4" />
-                                      {t("gameScreen.trainerInstalled")}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Download className="h-4 w-4" />
-                                      {t("gameScreen.installTrainer")}
-                                    </>
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  className="gap-2"
-                                  onClick={async () => {
-                                    const success =
-                                      await flingTrainerService.downloadTrainer(
-                                        flingTrainerData,
-                                        game?.game || game?.name
-                                      );
-                                    if (success) {
-                                      toast.success(
-                                        t("gameScreen.trainerDownloadStarted"),
-                                        {
-                                          description: t(
-                                            "gameScreen.trainerDownloadStartedDescription"
-                                          ),
-                                        }
-                                      );
-                                    } else {
-                                      toast.error(t("gameScreen.trainerDownloadFailed"));
-                                    }
-                                  }}
-                                >
-                                  <Download className="h-4 w-4" />
-                                  {t("gameScreen.downloadStandalone")}
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                className="gap-2 text-secondary"
-                                onClick={() =>
-                                  flingTrainerService.openTrainerPage(flingTrainerData)
-                                }
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                                {t("gameScreen.downloadTrainer")}
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              className="gap-2"
-                              onClick={() =>
-                                flingTrainerService.openTrainerPage(flingTrainerData)
-                              }
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              {t("gameScreen.viewOnFling")}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              )}
-            </Tabs>
-          </div>
-        </div>
+        {currentSection === "extras" && (
+          <ModsTrainersTab
+            hasAscendAccess={isAuthenticated && ascendAccess.hasAccess}
+            isAuthenticated={isAuthenticated}
+            onGetAscend={() => navigate("/ascend")}
+            showTrainer={supportsFlingTrainer}
+            trainerProps={{
+              trainer: flingTrainerData,
+              trainerExists,
+              isInstalling: isDownloadingTrainer,
+              onInstall: async () => {
+                setIsDownloadingTrainer(true);
+                try {
+                  const result = await flingTrainerService.downloadTrainerToGame(
+                    flingTrainerData,
+                    game?.game || game?.name,
+                    game?.isCustom || false
+                  );
+                  if (result.success) {
+                    toast.success(t("gameScreen.trainerInstalledSuccess"), {
+                      description: t("gameScreen.trainerInstalledDescription"),
+                    });
+                    // Check if trainer now exists
+                    const exists = await window.electron.checkTrainerExists(
+                      game?.game || game?.name,
+                      game?.isCustom || false
+                    );
+                    setTrainerExists(exists);
+                  } else {
+                    toast.error(t("gameScreen.trainerInstallFailed"), {
+                      description:
+                        result.error || t("gameScreen.trainerInstallFailedDescription"),
+                    });
+                  }
+                } catch (error) {
+                  toast.error(t("gameScreen.trainerInstallFailed"), {
+                    description: t("gameScreen.trainerInstallFailedDescription"),
+                  });
+                } finally {
+                  setIsDownloadingTrainer(false);
+                }
+              },
+              onDownloadStandalone: async () => {
+                const success = await flingTrainerService.downloadTrainer(
+                  flingTrainerData,
+                  game?.game || game?.name
+                );
+                if (success) {
+                  toast.success(t("gameScreen.trainerDownloadStarted"), {
+                    description: t("gameScreen.trainerDownloadStartedDescription"),
+                  });
+                } else {
+                  toast.error(t("gameScreen.trainerDownloadFailed"));
+                }
+              },
+              onOpenPage: () => flingTrainerService.openTrainerPage(flingTrainerData),
+            }}
+            showMods={supportsModManaging}
+            modsProps={{
+              nexusGameData,
+              loading: modsLoading,
+              mods: allMods,
+              popularMods,
+              totalCount: modsTotalCount,
+              page: modsPage,
+              perPage: modsPerPage,
+              searchQuery: modsSearchQuery,
+              onSearchQueryChange: setModsSearchQuery,
+              onSearch: handleModSearch,
+              sortBy: modsSortBy,
+              onSortChange: handleSortChange,
+              onPageChange: handleModsPageChange,
+              onSelectMod: fetchModFiles,
+              onBrowse: () => fetchMods(0, "", "endorsements"),
+            }}
+          />
+        )}
       </div>
 
       {/* Mod Details Dialog */}

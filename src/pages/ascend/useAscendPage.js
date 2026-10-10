@@ -1049,6 +1049,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
       const result = await syncCloudLibrary(gamesWithAchievements);
       if (result.success) {
+        await syncFavoritesNow();
         toast.success(t("ascend.cloudLibrary.synced") || "Library synced to cloud!");
         await loadCloudLibrary();
         try {
@@ -1223,6 +1224,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
           console.warn(`Failed to restore achievements for ${match.name}:`, e);
         }
       }
+
+      // 3. Favorites (including ones for games not installed here)
+      await syncFavoritesNow();
 
       if (!profileRestored && gamesRestored === 0) {
         toast.error(

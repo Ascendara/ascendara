@@ -36,6 +36,7 @@ import {
 } from "@/services/ascendStatusService";
 import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
 import { initializeDownloadSync, stopDownloadSync } from "@/services/downloadSyncService";
+import { initializeFavoritesSync, stopFavoritesSync } from "@/services/favoritesCloudSync";
 import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
@@ -1124,12 +1125,15 @@ const DownloadSyncInitializer = () => {
             hasAccess
           );
           initializeDownloadSync(user, hasAccess);
+          initializeFavoritesSync(user, hasAccess);
         } catch (error) {
           console.error("[App] Error checking Ascend access:", error);
           stopDownloadSync();
+          stopFavoritesSync();
         }
       } else {
         stopDownloadSync();
+        stopFavoritesSync();
       }
     };
 
@@ -1137,6 +1141,7 @@ const DownloadSyncInitializer = () => {
 
     return () => {
       stopDownloadSync();
+      stopFavoritesSync();
     };
   }, [isAuthenticated, user]);
 

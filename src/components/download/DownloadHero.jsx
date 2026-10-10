@@ -38,14 +38,17 @@ const estimateInstallSize = size => {
   return match[2] === "gb" ? `~${estimate.toFixed(1)} GB` : `~${Math.round(estimate)} MB`;
 };
 
-function Chip({ className, tooltip, children, ...props }) {
+function Chip({ className, tooltip, children, onClick, ...props }) {
+  const Element = onClick ? "button" : "span";
   const chip = (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${tooltip ? "cursor-help" : ""} ${className}`}
+    <Element
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${onClick ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : tooltip ? "cursor-help" : ""} ${className}`}
       {...props}
     >
       {children}
-    </span>
+    </Element>
   );
   if (!tooltip) return chip;
   return (
@@ -79,6 +82,8 @@ export default function DownloadHero({
   isVerified,
   onShowVerified,
   gameRating,
+  hasWrittenReviews,
+  onReadReviews,
   steamRating,
   releaseDate,
   showTimemachine,
@@ -156,9 +161,15 @@ export default function DownloadHero({
                 <Chip
                   className="bg-yellow-400/15 text-yellow-600 dark:text-yellow-400"
                   tooltip={t("download.ratingTooltip", { rating: gameRating })}
+                  onClick={hasWrittenReviews ? onReadReviews : undefined}
                 >
                   <Star className="h-3 w-3 fill-current" />
                   {gameRating}
+                  {hasWrittenReviews && (
+                    <span className="ml-1 border-l border-current/30 pl-2">
+                      {t("download.readReviews")}
+                    </span>
+                  )}
                 </Chip>
               )}
               {steamRating && (
