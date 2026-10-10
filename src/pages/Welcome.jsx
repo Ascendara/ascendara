@@ -235,6 +235,14 @@ function ThemeButton({ theme, currentTheme, onSelect }) {
   );
 }
 
+function WelcomeStepIcon({ icon: Icon }) {
+  return (
+    <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 shadow-lg shadow-primary/10">
+      <Icon className="h-8 w-8 text-primary" />
+    </div>
+  );
+}
+
 const Welcome = ({ welcomeData, onComplete }) => {
   const [protonCachyInfo, setProtonCachyInfo] = useState(null);
   const [isDownloadingProtonCachy, setIsDownloadingProtonCachy] = useState(false);
@@ -1399,7 +1407,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
               exit="exit"
             >
               <motion.div className="mb-12 text-center" variants={itemVariants}>
-                <Globe2 className="mx-auto mb-6 h-16 w-16 animate-pulse text-primary" />
                 <h1 className="mb-4 grid min-h-[1.5em] items-center text-4xl font-bold text-foreground/80">
                   <span
                     ref={languagePromptRef}
@@ -1471,6 +1478,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               exit="exit"
             >
               <motion.div className="mb-4 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={Shield} />
                 <h2 className="mb-2 text-3xl font-bold text-primary">
                   {t("welcome.noticeAppIsFree.title")}
                 </h2>
@@ -1581,26 +1589,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               exit="exit"
             >
               <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <div className="relative mx-auto mb-4 h-20 w-20">
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-primary/20"
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
-                    transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
-                  />
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-primary/20"
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
-                    transition={{
-                      duration: 2.4,
-                      repeat: Infinity,
-                      ease: "easeOut",
-                      delay: 1.2,
-                    }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Database className="h-16 w-16 text-primary" />
-                  </div>
-                </div>
+                <WelcomeStepIcon icon={Database} />
                 <h2 className="mb-2 text-3xl font-bold text-primary">
                   {t("welcome.localIndex.title")}
                 </h2>
@@ -1700,6 +1689,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               exit="exit"
             >
               <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={Users} />
                 <h2 className="mb-2 text-3xl font-bold text-primary">
                   {t("welcome.referral.title")}
                 </h2>
@@ -1928,6 +1918,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               exit="exit"
             >
               <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={FolderDownIcon} />
                 <h2 className="mb-2 text-3xl font-bold text-primary">
                   {t("welcome.chooseDownloadLocation")}
                 </h2>
@@ -1990,76 +1981,89 @@ const Welcome = ({ welcomeData, onComplete }) => {
           {step === "extension" && (
             <motion.div
               key="extension"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
+              className="relative z-10 flex min-h-screen items-center justify-center overflow-y-auto bg-gradient-to-br from-primary/10 via-background to-background px-6 py-10"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
             >
-              <motion.div
-                className="mb-8 flex items-center justify-center"
-                variants={itemVariants}
-              >
-                <h2 className="text-4xl font-bold text-primary">
-                  {t("welcome.downloadGamesFaster")}
-                </h2>
-              </motion.div>
-              <motion.p
-                className="mb-8 max-w-2xl text-xl text-foreground/80"
-                variants={itemVariants}
-              >
-                {t("welcome.getTheAscendaraDownloadHandlerExtension")}
-              </motion.p>
-
-              <motion.div
-                className="mb-12 max-w-2xl space-y-6 rounded-lg bg-card/30 p-6"
-                variants={itemVariants}
-              >
-                <h3 className="mb-4 text-lg font-semibold">{t("welcome.howItWorks")}</h3>
-                <div className="space-y-4 text-left">
-                  <div className="flex items-start space-x-3">
-                    <span className="font-semibold text-primary">1.</span>
-                    <p>{t("welcome.clickTheExtensionIcon")}</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <span className="font-semibold text-primary">2.</span>
-                    <p>{t("welcome.whenYouClickADownloadLink")}</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <span className="font-semibold text-primary">3.</span>
-                    <p>{t("welcome.startTheDownload")}</p>
-                  </div>
-                </div>
-
-                <div className="mt-8 rounded-md bg-primary/5 p-4">
-                  <p className="text-sm text-foreground/70">
-                    {t("welcome.theExtensionBlocksKnownProviders")}
+              <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+              <div className="relative z-10 w-full max-w-4xl text-center">
+                <motion.div className="mb-8" variants={itemVariants}>
+                  <WelcomeStepIcon icon={PuzzleIcon} />
+                  <span className="inline-flex rounded-full border border-primary/20 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-primary">
+                    {t("welcome.extensionTagline")}
+                  </span>
+                  <h2 className="mt-4 text-3xl font-bold text-primary sm:text-4xl">
+                    {t("welcome.downloadGamesFaster")}
+                  </h2>
+                  <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
+                    {t("welcome.getTheAscendaraDownloadHandlerExtension")}
                   </p>
-                </div>
-              </motion.div>
+                </motion.div>
 
-              <motion.div
-                className="flex justify-center space-x-4"
-                variants={itemVariants}
-              >
-                <Button
-                  size="lg"
-                  onClick={() =>
-                    window.electron.openURL("https://ascendara.app/extension")
-                  }
-                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                <motion.div
+                  className="rounded-2xl border border-primary/20 bg-card/60 p-5 shadow-xl shadow-primary/5 sm:p-7"
+                  variants={itemVariants}
                 >
-                  {t("welcome.getTheExtension")}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleNext}
-                  size="lg"
-                  className="px-8 py-6 text-lg font-semibold text-primary hover:bg-primary/10"
+                  <h3 className="mb-5 text-left text-lg font-semibold">
+                    {t("welcome.howItWorks")}
+                  </h3>
+                  <div className="grid gap-3 text-left md:grid-cols-3">
+                    {[
+                      { icon: PuzzleIcon, text: t("welcome.clickTheExtensionIcon") },
+                      { icon: Globe2, text: t("welcome.whenYouClickADownloadLink") },
+                      { icon: FolderDownIcon, text: t("welcome.startTheDownload") },
+                    ].map(({ icon: Icon, text }, index) => (
+                      <div
+                        key={index}
+                        className="rounded-xl border border-primary/10 bg-background/70 p-4"
+                      >
+                        <div className="mb-4 flex items-center justify-between">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <span className="text-sm font-semibold text-primary/60">
+                            0{index + 1}
+                          </span>
+                        </div>
+                        <p className="text-sm leading-relaxed text-foreground/80">{text}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-left">
+                    <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                    <p className="text-sm text-foreground/80">
+                      {t("welcome.theExtensionBlocksKnownProviders")}
+                    </p>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  className="mt-8 flex flex-wrap justify-center gap-3"
+                  variants={itemVariants}
                 >
-                  {t("welcome.continue")}
-                </Button>
-              </motion.div>
+                  <Button
+                    size="lg"
+                    onClick={() =>
+                      window.electron.openURL("https://ascendara.app/extension")
+                    }
+                    className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                  >
+                    {t("welcome.getTheExtension")}
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleNext}
+                    size="lg"
+                    className="px-8 py-6 text-lg font-semibold text-primary hover:bg-primary/10"
+                  >
+                    {t("welcome.continue")}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </motion.div>
+              </div>
             </motion.div>
           )}
 
@@ -2075,6 +2079,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 animate="visible"
               >
                 <motion.div className="mb-8 text-center" variants={itemVariants}>
+                  <WelcomeStepIcon icon={Palette} />
                   <h2 className="mb-4 text-3xl font-bold text-primary">
                     {t("welcome.chooseYourTheme")}
                   </h2>
@@ -2148,10 +2153,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
               animate="visible"
               exit="exit"
             >
-              <motion.div
-                className="mb-8 flex items-center justify-center"
-                variants={itemVariants}
-              >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={Gamepad2} />
                 <h2 className="text-4xl font-bold text-primary">
                   {t("welcome.importGamesTitle")}
                 </h2>
@@ -2223,10 +2226,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
               animate="visible"
               exit="exit"
             >
-              <motion.div
-                className="mb-8 flex items-center justify-center"
-                variants={itemVariants}
-              >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={RefreshCw} />
                 <h2 className="text-4xl font-bold text-primary">
                   {t("welcome.stayUpToDate")}
                 </h2>
@@ -2339,10 +2340,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
               )}
               {!dependenciesInstalled ? (
                 <>
-                  <motion.div
-                    className="mb-8 flex items-center justify-center"
-                    variants={itemVariants}
-                  >
+                  <motion.div className="mb-8 text-center" variants={itemVariants}>
+                    <WelcomeStepIcon icon={Download} />
                     <h2 className="text-4xl font-bold text-primary">
                       {t("welcome.pythonIsRequired")}
                     </h2>
@@ -2393,13 +2392,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
               ) : (
                 /* PROTON & WINE */
                 <>
-                  <motion.div
-                    className="mb-8 flex items-center justify-center"
-                    variants={itemVariants}
-                  >
-                    <h2 className="flex items-center gap-3 text-4xl font-bold text-primary">
+                  <motion.div className="mb-8 text-center" variants={itemVariants}>
+                    <WelcomeStepIcon icon={Wine} />
+                    <h2 className="text-4xl font-bold text-primary">
                       {t("welcome.compatibilityLayer")}
-                      <Wine size={32} />
                     </h2>
                   </motion.div>
 
@@ -2915,10 +2911,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
               animate="visible"
               exit="exit"
             >
-              <motion.div
-                className="mb-8 flex items-center justify-center"
-                variants={itemVariants}
-              >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={PackageOpen} />
                 <h2 className="text-4xl font-bold text-primary">
                   {t("welcome.essentialDependencies")}
                 </h2>
@@ -3034,10 +3028,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
               animate="visible"
               exit="exit"
             >
-              <motion.div
-                className="mb-8 flex items-center justify-center"
-                variants={itemVariants}
-              >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={CircleCheck} />
                 <h2 className="text-4xl font-bold text-primary">
                   {t("welcome.allRequiredDependenciesHaveBeenInstalledTitle")}
                 </h2>
