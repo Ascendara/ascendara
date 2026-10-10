@@ -99,7 +99,8 @@ const GameRate = ({ game, isOpen, onClose }) => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to submit rating");
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || t("library.rateGame.errorDesc"));
       }
 
       await window.electron.gameRated(game.game || game.name, game.isCustom);
@@ -115,7 +116,7 @@ const GameRate = ({ game, isOpen, onClose }) => {
     } catch (error) {
       console.error("Failed to submit rating:", error);
       toast.error(t("library.rateGame.error"), {
-        description: t("library.rateGame.errorDesc"),
+        description: error.message || t("library.rateGame.errorDesc"),
       });
     } finally {
       setIsSubmitting(false);
