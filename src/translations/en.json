@@ -1273,7 +1273,7 @@
       "handlerInstructions": {
         "step1": "Open the link in your browser and enable the extension",
         "step2": "Complete the CAPTCHA and start the download",
-        "step3": "The extension will automatically stop the download and start it for you in Ascendara"
+        "step3": "The extension sends the file link to Ascendara. Review the game name, including games outside your index, then continue to download."
       },
       "invalidLink": "Please enter a valid download link for",
       "manualInstructions": {
@@ -1342,7 +1342,7 @@
       "startGuide": "Start Guide",
       "steps": [
         {
-          "description": "The Ascendara Download Handler will automatically stop the download in your browser and start it for you in Ascendara. If you don't have it, close the guide and click the \"Don't have the extension? Get it for Chrome or Firefox\" button to download it.",
+          "description": "The Ascendara Download Handler sends file links from your browser to Ascendara. Review the game name before continuing. If you don't have it, close the guide and click the \"Don't have the extension? Get it for Chrome or Firefox\" button to download it.",
           "title": "The Ascendara Download Handler"
         },
         {
@@ -1350,7 +1350,7 @@
           "title": "Step 1: Enable the Handler"
         },
         {
-          "description": "The extension can stay on as it will only send known providers to Ascendara.",
+          "description": "Choose My sites and providers, Any website, or Capture next download in the extension. Any website forwards all HTTP(S) downloads while enabled.",
           "title": "The Download Handler"
         },
         {
@@ -1358,11 +1358,11 @@
           "title": "Step 2: Start the download"
         },
         {
-          "description": "Once the download tries to start, you will see a popup asking to open Ascendara. Toggle the always allow button to allow the extension to always send known providers to Ascendara.",
+          "description": "Once the download tries to start, you will see a popup asking to open Ascendara. Allow the browser to open Ascendara, then review the game name. Games outside your index are supported too.",
           "title": "Step 3: Using the Extension"
         },
         {
-          "description": "Click the button to Open Ascendara.",
+          "description": "Open Ascendara, confirm the game name, and choose where to download.",
           "title": "Step 4: Downloading"
         },
         {
@@ -1757,7 +1757,10 @@
         "description": "Marks the game as a favorite in your library.",
         "label": "Favorite"
       },
-      "game": { "description": "The display name of the game.", "label": "Game Name" },
+      "game": {
+        "description": "The display name of the game.",
+        "label": "Game Name"
+      },
       "hasRated": {
         "description": "Whether you have submitted a rating for this game.",
         "label": "Has Been Rated"
@@ -1794,7 +1797,10 @@
         "description": "Disk size reported at download time.",
         "label": "Install Size"
       },
-      "version": { "description": "The installed version string.", "label": "Version" }
+      "version": {
+        "description": "The installed version string.",
+        "label": "Version"
+      }
     },
     "entryFieldsTab": "Fields",
     "entryLeaderboardTitle": "Leaderboard:",
@@ -4265,7 +4271,7 @@
     "umuProtonDesc": "Alternative Proton build maintained by the UMU team. More stable than Proton GE but less updated. Only install if you know what you're doing.",
     "welcomeTo": "Welcome to",
     "welcomeToAscendaraDescription2": "You're almost ready to start using Ascendara. We'll go through the onboarding process together to setup the basics, but first please read the Terms of Service and Privacy Policy.",
-    "whenYouClickADownloadLink": "When you start a download from a known provider, the extension will automatically stop the download in your browser and start it for you in Ascendara",
+    "whenYouClickADownloadLink": "Send a file download from any website, then review its game name in Ascendara. Games do not need to be in your index.",
     "wineDetected": "Wine Detected",
     "wineIsRequired": "Play with Wine",
     "wineMustBeInstalled": "Wine, DXVK, and other tools need to be installed and setup on your computer to run Window games. Don't worry though, Ascendara can install and set it up all just for you",
@@ -4298,5 +4304,38 @@
     "waitingForLogs": "Waiting for download to start...",
     "welcome": "Welcome to Ascendara's Workshop Downloader",
     "welcomeDescription": "Here you can download items from the Steam Workshop without needing to have an account."
+  },
+  "browserDownload": {
+    "newGameTitle": "Set up your game",
+    "newGameDescription": "This game does not need to be in your index. Add its details, choose artwork, then continue to the usual download and library flow.",
+    "version": "Version (optional)",
+    "versionPlaceholder": "For example, 1.2.0 or Build 12345",
+    "online": "Online play included",
+    "dlc": "DLC included",
+    "artworkTitle": "Steam-style artwork (optional)",
+    "artworkDescription": "Search SteamGridDB and choose the game whose cover, background, and logo you want to use. Your game name and version stay as entered.",
+    "searchArtwork": "Search for game artwork",
+    "searching": "Searching games…",
+    "artworkError": "Artwork search is unavailable. Try another search or continue without artwork.",
+    "noArtworkResults": "No matches. Try a different title or continue without artwork.",
+    "loadingArtwork": "Loading artwork previews…",
+    "noPreview": "No preview available",
+    "grid": "Cover",
+    "hero": "Background",
+    "logo": "Logo",
+    "noArtwork": "Continue without artwork",
+    "getExtension": "Get the browser extension",
+    "dismissTip": "Dismiss browser download tip",
+    "showTip": "Download from another website?",
+    "retry": "Use received download link",
+    "title": "Download from your browser",
+    "description": "Use the game you are viewing in Ascendara, or enter a name for a game outside your index.",
+    "gameName": "Game name",
+    "limitations": "Direct HTTP and HTTPS file links are supported from any provider. Links that require browser cookies or an active browser session may not work.",
+    "invalid": "The browser download link could not be read. Try sending it again.",
+    "cancel": "Cancel",
+    "start": "Continue to download",
+    "featureTitle": "Download games from any website",
+    "featureDescription": "Keep this game open and send a download with the browser extension to use it for this game. Games do not need to be in your index: send a file from your browser and enter its name in Ascendara."
   }
 }

@@ -318,9 +318,12 @@ contextBridge.exposeInMainWorld("electron", {
       executable,
       imageUrl
     ),
-  removeCustomGame: (game, installation) => ipcRenderer.invoke("remove-game", game, installation),
-  deleteGame: (game, installation) => ipcRenderer.invoke("delete-game", game, installation),
-  saveDeletedGameData: (game, installation) => ipcRenderer.invoke("save-deleted-game-data", game, installation),
+  removeCustomGame: (game, installation) =>
+    ipcRenderer.invoke("remove-game", game, installation),
+  deleteGame: (game, installation) =>
+    ipcRenderer.invoke("delete-game", game, installation),
+  saveDeletedGameData: (game, installation) =>
+    ipcRenderer.invoke("save-deleted-game-data", game, installation),
   restoreDeletedGameData: game => ipcRenderer.invoke("restore-deleted-game-data", game),
   discardDeletedGameData: game => ipcRenderer.invoke("discard-deleted-game-data", game),
   deleteGameDirectory: game => ipcRenderer.invoke("delete-game-directory", game),
@@ -440,6 +443,9 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // PROTOCOL & DEEP LINKS
   //===========================================================================
+  getPendingBrowserDownloads: () => ipcRenderer.invoke("get-pending-browser-downloads"),
+  acknowledgeBrowserDownload: url =>
+    ipcRenderer.invoke("acknowledge-browser-download", url),
   onProtocolGameUrl: callback =>
     preloadIpc.subscribe("protocol-game-url", callback, {
       includeEventPlaceholder: true,
@@ -470,7 +476,9 @@ contextBridge.exposeInMainWorld("electron", {
     imgID,
     size,
     additionalDirIndex,
-    gameID
+    gameID,
+    browserDirect = false,
+    browserAssetGameId
   ) =>
     ipcRenderer.invoke(
       "download-file",
@@ -484,7 +492,9 @@ contextBridge.exposeInMainWorld("electron", {
       imgID,
       size,
       additionalDirIndex,
-      gameID
+      gameID,
+      browserDirect,
+      browserAssetGameId
     ),
   stopDownload: (game, deleteContents, isKill) =>
     ipcRenderer.invoke("stop-download", game, deleteContents, isKill),

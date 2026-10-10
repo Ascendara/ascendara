@@ -153,7 +153,9 @@ const _processNextInQueueInternal = async () => {
       nextItem.imgID || null,
       nextItem.size || "",
       nextItem.additionalDirIndex || 0,
-      nextItem.gameID || ""
+      nextItem.gameID || "",
+      nextItem.browserDirect === true,
+      nextItem.browserAssetGameId
     );
 
     // Wait for the download to appear in the games list before removing from queue

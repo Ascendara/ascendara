@@ -14,6 +14,7 @@ let lastHandledUrl = null;
 let lastHandleTime = 0;
 let pendingUrls = new Set();
 const pendingCheckoutSessions = new Set();
+const pendingBrowserDownloads = new Set();
 const URL_DEBOUNCE_TIME = 2000;
 
 /**
@@ -51,14 +52,22 @@ function handleProtocolUrl(url) {
 
   const existingWindow = BrowserWindow.getAllWindows().find(win => win);
 
-  if (!existingWindow) {
+  // Before app ready (macOS open-url on launch) no window can be created yet;
+  // app.js drains these once the main window exists.
+  if (!app.isReady()) {
     pendingUrls.add(cleanUrl);
-    createWindow();
     return;
   }
 
-  if (existingWindow.isMinimized()) existingWindow.restore();
-  existingWindow.focus();
+  // Still running in the tray with its window closed: reopen it and deliver
+  // the URL once the page has loaded.
+  if (!existingWindow) {
+    const newWindow = createWindow();
+    newWindow.webContents.once("did-finish-load", () => handleProtocolUrl(cleanUrl));
+    return;
+  }
+
+  focusMainWindow();
 
   try {
     setHandlingProtocolUrl(true);
@@ -70,7 +79,8 @@ function handleProtocolUrl(url) {
 
       console.log("Processing protocol URL:", cleanUrl);
 
-      if (cleanUrl.includes("checkout-success")) {
+      const route = cleanUrl.slice("ascendara://".length).split(/[/?#]/)[0];
+      if (route === "checkout-success") {
         try {
           const normalizedUrl = cleanUrl
             .replace(
@@ -92,10 +102,10 @@ function handleProtocolUrl(url) {
         } catch (error) {
           console.error("Error parsing checkout success URL:", error);
         }
-      } else if (cleanUrl.includes("checkout-canceled")) {
+      } else if (route === "checkout-canceled") {
         console.log("Checkout was canceled");
         existingWindow.webContents.send("checkout-canceled");
-      } else if (cleanUrl.includes("steamrip-cookie")) {
+      } else if (route === "steamrip-cookie") {
         try {
           const cookieMatch = cleanUrl.match(/steamrip-cookie\/(.+)/);
           if (cookieMatch && cookieMatch[1]) {
@@ -143,7 +153,7 @@ function handleProtocolUrl(url) {
         } catch (error) {
           console.error("Error parsing steamrip cookie URL:", error);
         }
-      } else if (cleanUrl.includes("game")) {
+      } else if (route === "game") {
         try {
           const gameID = cleanUrl.split("?").pop().replace("/", "");
           if (gameID) {
@@ -154,7 +164,7 @@ function handleProtocolUrl(url) {
           console.error("Error parsing game URL:", error);
         }
       } else {
-        console.log("Sending download URL to renderer:", cleanUrl);
+        pendingBrowserDownloads.add(cleanUrl);
         existingWindow.webContents.send("protocol-download-url", cleanUrl);
       }
     }
@@ -196,6 +206,10 @@ function registerProtocolHandlers() {
   ipcMain.handle("get-pending-urls", () => {
     return getPendingUrls();
   });
+  ipcMain.handle("get-pending-browser-downloads", () => [...pendingBrowserDownloads]);
+  ipcMain.handle("acknowledge-browser-download", (_event, url) =>
+    pendingBrowserDownloads.delete(url)
+  );
   ipcMain.handle("get-pending-checkouts", () => [...pendingCheckoutSessions]);
   ipcMain.handle("acknowledge-checkout", (_event, sessionId) => {
     pendingCheckoutSessions.delete(sessionId);
@@ -236,18 +250,18 @@ function setupSingleInstance() {
   const lockDir = path.join(app.getPath("userData"), ".lock");
   const lockFile = path.join(lockDir, "instance.lock");
   const protocolFile = path.join(lockDir, "protocol.txt");
-  
+
   // Ensure lock directory exists
   if (!fs.existsSync(lockDir)) {
     fs.mkdirSync(lockDir, { recursive: true });
   }
-  
+
   // Check if lock file exists
   if (fs.existsSync(lockFile)) {
     try {
       const lockData = JSON.parse(fs.readFileSync(lockFile, "utf8"));
       const existingPid = lockData.pid;
-      
+
       // Check if the process is still running
       let processExists = false;
       try {
@@ -274,8 +288,11 @@ function setupSingleInstance() {
       }
 
       if (processExists) {
-        console.log("Another instance is running (PID:", existingPid + "), passing protocol URL and exiting");
-        
+        console.log(
+          "Another instance is running (PID:",
+          existingPid + "), passing protocol URL and exiting"
+        );
+
         // If we have a protocol URL in argv, write it to the protocol file.
         // Otherwise (e.g. user just relaunched the app normally), signal the
         // existing instance to bring its window to the front - this matters
@@ -287,7 +304,7 @@ function setupSingleInstance() {
             ? "Wrote protocol URL to file for existing instance"
             : "Wrote show-window signal to file for existing instance"
         );
-        
+
         app.exit(0);
         return false;
       } else {
@@ -305,10 +322,14 @@ function setupSingleInstance() {
       }
     }
   }
-  
+
   // Write our PID to the lock file
-  fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, timestamp: Date.now() }), "utf8");
-  
+  fs.writeFileSync(
+    lockFile,
+    JSON.stringify({ pid: process.pid, timestamp: Date.now() }),
+    "utf8"
+  );
+
   // Watch for protocol file changes (other instances passing URLs to us)
   let protocolFileWatcher = null;
   try {
@@ -334,7 +355,7 @@ function setupSingleInstance() {
   } catch (error) {
     console.error("Error setting up protocol file watcher:", error);
   }
-  
+
   // Clean up lock file on exit
   app.on("will-quit", () => {
     try {
@@ -352,7 +373,7 @@ function setupSingleInstance() {
       console.error("Error cleaning up lock file:", error);
     }
   });
-  
+
   // Request single instance lock (as backup)
   const gotTheLock = app.requestSingleInstanceLock();
 
@@ -378,7 +399,7 @@ function setupSingleInstance() {
     // Find protocol URL in command line arguments
     // On Linux, the URL might be passed differently
     let protocolUrl = commandLine.find(arg => arg.startsWith("ascendara://"));
-    
+
     // If not found in direct args, check if it's in the last argument (common on Linux)
     if (!protocolUrl && commandLine.length > 0) {
       const lastArg = commandLine[commandLine.length - 1];
@@ -386,7 +407,7 @@ function setupSingleInstance() {
         protocolUrl = lastArg;
       }
     }
-    
+
     if (protocolUrl) {
       console.log("Protocol URL found in second instance:", protocolUrl);
       handleProtocolUrl(protocolUrl);

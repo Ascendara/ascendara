@@ -1859,7 +1859,7 @@ class AscendaraDownloader:
                 return
             host = (urlparse(url).hostname or '').lower()
             url = validate_download_url(url)
-            if any(host == domain or host.endswith('.' + domain) for domain in self.VALID_BUZZHEAVIER_DOMAINS):
+            if provider != 'direct' and any(host == domain or host.endswith('.' + domain) for domain in self.VALID_BUZZHEAVIER_DOMAINS):
                 self._download_buzzheavier(url)
                 return
             if not self._pre_download_disk_check():

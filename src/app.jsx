@@ -45,6 +45,7 @@ import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import AdminWarningScreen from "@/components/AdminWarningScreen";
+import BrowserDownloadHandler from "@/components/BrowserDownloadHandler";
 import CheckoutReturnHandler from "@/components/CheckoutReturnHandler";
 import {
   Navigate,
@@ -1865,6 +1866,7 @@ const AppRoutes = () => {
   return (
     <>
       <MenuBar />
+      {!effectiveShowWelcome && <BrowserDownloadHandler />}
       {effectiveShowWelcome ? (
         <div className="min-h-screen bg-background text-foreground">
           <motion.div
@@ -1907,7 +1909,12 @@ const AppRoutes = () => {
             <Route path="profile" element={<Profile />} />
             <Route path="ascend" element={<Ascend />} />
             <Route path="workshopdownloader" element={<WorkshopDownloader />} />
-            <Route path="download" element={<DownloadPage />} />
+            <Route
+              path="download"
+              element={
+                <DownloadPage key={location.state?.gameData?.game || "download"} />
+              }
+            />
             <Route path="extralanguages" element={<ExtraLanguages />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

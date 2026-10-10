@@ -363,12 +363,31 @@ function registerDownloadHandlers() {
       imgID,
       size,
       additionalDirIndex,
-      gameID
+      gameID,
+      browserDirect = false,
+      browserAssetGameId
     ) => {
       console.log(
         `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
       );
 
+      if (
+        browserAssetGameId !== undefined &&
+        browserAssetGameId !== null &&
+        (!Number.isSafeInteger(browserAssetGameId) || browserAssetGameId <= 0)
+      ) {
+        throw new Error("Invalid artwork game selection");
+      }
+      if (browserDirect === true) {
+        const parsed = new URL(link);
+        if (
+          !["http:", "https:"].includes(parsed.protocol) ||
+          parsed.username ||
+          parsed.password
+        ) {
+          throw new Error("Invalid browser download URL");
+        }
+      }
       const settings = settingsManager.getSettings();
       let targetDirectory;
       let gameDirectory;
@@ -534,9 +553,11 @@ function registerDownloadHandlers() {
           `[Download] Starting background asset fetch for ${game} (Name Search)`
         );
         // Launch in background to not interfer with game downloading
-        steamgrid
-          .fetchGameAssets(game, gameDirectory)
-          .catch(err => console.error(`[Download] Assets download failed:`, err));
+        if (browserAssetGameId !== null) {
+          steamgrid
+            .fetchGameAssets(game, gameDirectory, browserAssetGameId)
+            .catch(err => console.error(`[Download] Assets download failed:`, err));
+        }
         let executablePath;
         let spawnCommand;
         const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
@@ -648,6 +669,9 @@ function registerDownloadHandlers() {
           }
         }
 
+        if (browserDirect === true && !isTorrentLink)
+          spawnCommand.push("--provider", "direct");
+
         // Add notification flags if enabled
         if (settings.notifications) {
           spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
@@ -677,6 +701,8 @@ function registerDownloadHandlers() {
         const cachedDataPath = path.join(cacheDir, `${sanitizedGame}.json`);
         const cacheData = {
           link: link,
+          browserDirect: browserDirect === true,
+          browserAssetGameId,
           game: game,
           online: online,
           dlc: dlc,
@@ -1435,6 +1461,7 @@ function registerDownloadHandlers() {
       );
 
       let downloadLink = null;
+      let browserDirect = false;
       let online = gameInfo.online || "false";
       let dlc = gameInfo.dlc || "false";
       let isVr = gameInfo.isVr || "false";
@@ -1446,6 +1473,7 @@ function registerDownloadHandlers() {
         try {
           const cachedData = JSON.parse(fs.readFileSync(cachedDataPath, "utf8"));
           downloadLink = cachedData.link;
+          browserDirect = cachedData.browserDirect === true;
           console.log(`Found cached download link: ${downloadLink}`);
         } catch (cacheError) {
           console.error(`Error reading cached download data: ${cacheError}`);
@@ -1512,6 +1540,8 @@ function registerDownloadHandlers() {
           ];
         }
       }
+
+      if (browserDirect) spawnCommand.push("--provider", "direct");
 
       // Add notification flags if enabled
       if (settings.notifications) {

@@ -60,7 +60,13 @@ async function throttledGet(url, headers) {
   }
 }
 
-async function fetchGameAssets(gameName, gameDir) {
+async function fetchGameAssets(gameName, gameDir, selectedGameId) {
+  if (
+    selectedGameId != null &&
+    (!Number.isSafeInteger(selectedGameId) || selectedGameId <= 0)
+  ) {
+    throw new Error("Invalid artwork game selection");
+  }
   // Check if we already have all the new assets
   const expectedFiles = [
     "grid.ascendara.jpg",
@@ -94,23 +100,25 @@ async function fetchGameAssets(gameName, gameDir) {
     );
   }
   const authHeaders = authHelper.generateAuthHeaders();
-  let gameId = null;
+  let gameId = selectedGameId ?? null;
 
   try {
-    const cleanName = gameName
-      .replace(/ v[\d.]+.*$/i, "")
-      .replace(/ premium edition/i, "")
-      .trim();
-    console.log(`[SteamGrid] Searching for: "${cleanName}"`);
+    if (!gameId) {
+      const cleanName = gameName
+        .replace(/ v[\d.]+.*$/i, "")
+        .replace(/ premium edition/i, "")
+        .trim();
+      console.log(`[SteamGrid] Searching for: "${cleanName}"`);
 
-    const searchRes = await axios.get(
-      `${PROXY_BASE_URL}/search/autocomplete/${encodeURIComponent(cleanName)}`,
-      { headers: authHeaders }
-    );
+      const searchRes = await axios.get(
+        `${PROXY_BASE_URL}/search/autocomplete/${encodeURIComponent(cleanName)}`,
+        { headers: authHeaders }
+      );
 
-    if (searchRes.data.success && searchRes.data.data.length > 0) {
-      gameId = searchRes.data.data[0].id;
-      console.log(`[SteamGrid] Found GameID ${gameId}`);
+      if (searchRes.data.success && searchRes.data.data.length > 0) {
+        gameId = searchRes.data.data[0].id;
+        console.log(`[SteamGrid] Found GameID ${gameId}`);
+      }
     }
 
     if (!gameId) return false;
@@ -277,10 +285,22 @@ async function getImageUrls(gameName, { reportErrors = false } = {}) {
   if (!gameId) return result;
 
   const queries = [
-    { key: "grid", url: `${PROXY_BASE_URL}/grids/game/${gameId}?styles=alternate&dimensions=600x900&mimes=image/jpeg,image/png&sort=score` },
-    { key: "hero", url: `${PROXY_BASE_URL}/heroes/game/${gameId}?styles=alternate&dimensions=1920x620,3840x1240&mimes=image/jpeg,image/png&sort=score` },
-    { key: "logo", url: `${PROXY_BASE_URL}/logos/game/${gameId}?styles=white&sort=score` },
-    { key: "header", url: `${PROXY_BASE_URL}/grids/game/${gameId}?dimensions=460x215&mimes=image/jpeg,image/png&sort=score` },
+    {
+      key: "grid",
+      url: `${PROXY_BASE_URL}/grids/game/${gameId}?styles=alternate&dimensions=600x900&mimes=image/jpeg,image/png&sort=score`,
+    },
+    {
+      key: "hero",
+      url: `${PROXY_BASE_URL}/heroes/game/${gameId}?styles=alternate&dimensions=1920x620,3840x1240&mimes=image/jpeg,image/png&sort=score`,
+    },
+    {
+      key: "logo",
+      url: `${PROXY_BASE_URL}/logos/game/${gameId}?styles=white&sort=score`,
+    },
+    {
+      key: "header",
+      url: `${PROXY_BASE_URL}/grids/game/${gameId}?dimensions=460x215&mimes=image/jpeg,image/png&sort=score`,
+    },
   ];
 
   // Serialize rather than Promise.all - the throttler already limits concurrency
