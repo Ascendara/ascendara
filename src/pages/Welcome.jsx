@@ -629,6 +629,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const handleInstallDependencies = async () => {
     if (isInstalling) return;
     setDependenciesInstalled(false);
+    setShowErrorDialog(false);
     setIsInstalling(true);
     setProgress(0);
 
@@ -657,6 +658,15 @@ const Welcome = ({ welcomeData, onComplete }) => {
       setShowErrorDialog(true);
     } finally {
       setIsInstalling(false);
+      // Clear pending spinners after download errors or unsuccessful installers.
+      setDependencyStatus(prevStatus =>
+        Object.fromEntries(
+          Object.entries(prevStatus).map(([name, status]) => [
+            name,
+            status.installed ? status : { ...status, icon: null },
+          ])
+        )
+      );
     }
   };
 
@@ -2027,7 +2037,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
                             0{index + 1}
                           </span>
                         </div>
-                        <p className="text-sm leading-relaxed text-foreground/80">{text}</p>
+                        <p className="text-sm leading-relaxed text-foreground/80">
+                          {text}
+                        </p>
                       </div>
                     ))}
                   </div>

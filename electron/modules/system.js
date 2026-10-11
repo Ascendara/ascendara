@@ -12,6 +12,7 @@ const { machineIdSync } = require("node-machine-id");
 const { exec, execFile, spawn } = require("child_process");
 const { ipcMain, app, BrowserWindow } = require("electron");
 const unzipper = require("unzipper");
+const { runDependencyInstaller } = require("./dependency-installer");
 const {
   isDev,
   isWindows,
@@ -111,8 +112,14 @@ async function checkRegistryKey(registryKey, valueName) {
         key: registryKey.replace("HKLM\\", "\\"),
       });
 
-      regKey.valueExists(valueName, (err, exists) => {
-        resolve(!err && exists);
+      regKey.get(valueName, (err, item) => {
+        const value = item?.value;
+        resolve(
+          !err &&
+            (/^(Install|Installed)$/i.test(valueName)
+              ? Number(value) === 1
+              : Boolean(value))
+        );
       });
     } catch (error) {
       console.error("Error checking registry:", error);
@@ -517,15 +524,16 @@ function registerSystemHandlers() {
     }
   });
 
+  let isInstallingDependencies = false;
+
   // Install dependencies
   ipcMain.handle("install-dependencies", async event => {
     if (!isWindows) return { success: false, error: "This feature requires Windows." };
-    let isInstalling = false;
-    if (isInstalling) {
+    if (isInstallingDependencies) {
       return { success: false, message: "Installation already in progress" };
     }
 
-    isInstalling = true;
+    isInstallingDependencies = true;
 
     try {
       const tempDir = path.join(os.tmpdir(), "ascendaradependencies");
@@ -536,6 +544,7 @@ function registerSystemHandlers() {
       const zipUrl = "https://cdn.ascendara.app/files/deps.zip";
       const zipPath = path.join(tempDir, "deps.zip");
       const res = await fetch(zipUrl);
+      if (!res.ok) throw new Error(`Dependency download failed: ${res.status}`);
       const arrayBuffer = await res.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       fs.writeFileSync(zipPath, buffer);
@@ -545,75 +554,39 @@ function registerSystemHandlers() {
         .pipe(unzipper.Extract({ path: tempDir }))
         .promise();
 
-      const files = fs.readdirSync(tempDir);
-      const executables = files.filter(file => path.extname(file) === ".exe");
-      const msis = files.filter(file => path.extname(file) === ".msi");
+      const installers = fs
+        .readdirSync(tempDir)
+        .filter(file => [".exe", ".msi"].includes(path.extname(file).toLowerCase()));
+      if (!installers.length) throw new Error("No dependency installers found");
 
-      for (const executable of executables) {
-        const exePath = path.join(tempDir, executable);
-        event.sender.send("dependency-installation-status", {
-          name: executable,
-          status: "starting",
-        });
-        fs.chmodSync(exePath, "755");
-
-        await new Promise((resolve, reject) => {
-          const process = spawn(
-            "powershell.exe",
-            ["-Command", `Start-Process -FilePath "${exePath}" -Verb RunAs -Wait`],
-            { shell: true }
-          );
-          process.on("error", reject);
-          process.on("exit", code => {
-            if (code === 0) {
-              event.sender.send("dependency-installation-status", {
-                name: executable,
-                status: "finished",
-              });
-              resolve();
-            } else {
-              event.sender.send("dependency-installation-status", {
-                name: executable,
-                status: "failed",
-              });
-              reject(new Error(`Process exited with code ${code}`));
-            }
-          });
-        });
+      const failures = [];
+      for (const installer of installers) {
+        const sendStatus = status => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send("dependency-installation-status", {
+              name: installer,
+              status,
+            });
+          }
+        };
+        sendStatus("starting");
+        try {
+          const info = DEPENDENCY_REGISTRY_PATHS[installer];
+          // The DirectX registry version does not prove that legacy game DLLs exist.
+          const alreadyInstalled =
+            info &&
+            installer !== "dxwebsetup.exe" &&
+            (await checkDependencyInstalled(info));
+          if (!alreadyInstalled) {
+            await runDependencyInstaller(path.join(tempDir, installer));
+          }
+          sendStatus("finished");
+        } catch (error) {
+          sendStatus("failed");
+          failures.push(`${installer}: ${error.message}`);
+        }
       }
-
-      for (const msi of msis) {
-        const msiPath = path.join(tempDir, msi);
-        event.sender.send("dependency-installation-status", {
-          name: msi,
-          status: "starting",
-        });
-
-        await new Promise((resolve, reject) => {
-          const process = spawn(msiPath, [], {
-            detached: true,
-            shell: true,
-            stdio: "ignore",
-            windowsHide: true,
-          });
-          process.on("error", reject);
-          process.on("exit", code => {
-            if (code === 0) {
-              event.sender.send("dependency-installation-status", {
-                name: msi,
-                status: "finished",
-              });
-              resolve();
-            } else {
-              event.sender.send("dependency-installation-status", {
-                name: msi,
-                status: "failed",
-              });
-              reject(new Error(`Process exited with code ${code}`));
-            }
-          });
-        });
-      }
+      if (failures.length) throw new Error(failures.join("\n"));
 
       fs.rm(tempDir, { recursive: true, force: true }, err => {});
 
@@ -622,7 +595,7 @@ function registerSystemHandlers() {
       console.error("An error occurred:", error);
       return { success: false, message: error.message };
     } finally {
-      isInstalling = false;
+      isInstallingDependencies = false;
     }
   });
 
