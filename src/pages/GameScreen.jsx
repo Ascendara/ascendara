@@ -2037,13 +2037,10 @@ export default function GameScreen() {
     }
   }, [hasGridImage, game]);
 
-  // Log hasRated state changes
+  // Keep the prompt in sync with the game's persisted review status.
   useEffect(() => {
-    console.log("gamedata:", game);
-    if (game && !game.hasRated && game.launchCount > 1 && hasRated) {
-      setHasRated(false);
-    }
-  }, [game]);
+    setHasRated(Boolean(game?.hasRated) || !(game?.launchCount > 1));
+  }, [game?.hasRated, game?.launchCount, game?.game, game?.name]);
 
   // Check Nexus Mods support for the game
   useEffect(() => {
@@ -3238,6 +3235,10 @@ export default function GameScreen() {
       <GameRate
         game={game}
         isOpen={showRateDialog}
+        onRated={() => {
+          setHasRated(true);
+          setGame(prev => (prev ? { ...prev, hasRated: true } : prev));
+        }}
         onClose={() => {
           setShowRateDialog(false);
         }}

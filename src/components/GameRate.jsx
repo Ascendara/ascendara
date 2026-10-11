@@ -19,7 +19,7 @@ import "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
-const GameRate = ({ game, isOpen, onClose }) => {
+const GameRate = ({ game, isOpen, onClose, onRated }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -120,6 +120,7 @@ const GameRate = ({ game, isOpen, onClose }) => {
       }
 
       await window.electron.gameRated(game.game || game.name, game.isCustom);
+      onRated?.();
 
       toast.success(t("library.rateGame.success"), {
         description: t("library.rateGame.successDesc", { game: game.name }),
