@@ -5,29 +5,22 @@ import {
   getCachedDownloadData,
   clearCachedDownloadData,
 } from "@/services/retryGameDownloadService";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Loader,
   FolderOpen,
-  MoreVertical,
   RefreshCcw,
-  Trash2,
   AlertCircle,
   AlertTriangle,
-  Clock,
   Clock1,
   Clock2,
   Clock3,
@@ -43,37 +36,17 @@ import {
   ExternalLink,
   CircleCheck,
   Coffee,
-  RefreshCw,
-  Zap,
-  TrendingUp,
-  Activity,
   Pause,
-  Package,
   CheckCircle2,
-  XCircle,
-  ArrowDownToLine,
-  Wifi,
+  X,
+  Zap,
   Play,
-  FileText,
   ScrollText,
   ShieldAlert,
   Copy,
-  FolderCog,
+  GripVertical,
+  Info,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import "@/components/ui/scroll-area";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import { useSettings } from "@/context/SettingsContext";
 import {
   processNextInQueue,
@@ -87,6 +60,7 @@ import {
   forceSyncDownloads,
 } from "@/services/downloadSyncService";
 import { cn } from "@/lib/utils";
+import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";
 
 // Helper function to check if download speed is above 50 MB/s
 const isHighSpeed = speedString => {
@@ -101,46 +75,20 @@ const isHighSpeed = speedString => {
   return speedInMB >= 50;
 };
 
-// Animated pulse ring for active downloads
-const PulseRing = memo(({ color = "primary" }) => (
-  <span className="relative flex h-3 w-3">
-    <span
-      className={cn(
-        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-        color === "primary"
-          ? "bg-primary"
-          : color === "success"
-            ? "bg-green-500"
-            : "bg-amber-500"
-      )}
-    />
-    <span
-      className={cn(
-        "relative inline-flex h-3 w-3 rounded-full",
-        color === "primary"
-          ? "bg-primary"
-          : color === "success"
-            ? "bg-green-500"
-            : "bg-amber-500"
-      )}
-    />
-  </span>
-));
-
 // Speed lines animation for high-speed downloads
 const SpeedLines = memo(() => (
-  <div className="absolute inset-0 overflow-hidden rounded-full">
+  <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
     {[...Array(5)].map((_, i) => (
       <div
         key={i}
-        className="absolute h-[2px] bg-gradient-to-r from-primary/60 to-transparent"
+        className="absolute h-px bg-gradient-to-r from-primary/40 to-transparent"
         style={{
           top: `${20 + i * 15}%`,
           left: "-20%",
           width: `${30 + i * 5}%`,
           animation: `speedLine 0.8s ease-out infinite`,
           animationDelay: `${i * 0.15}s`,
-          opacity: 0.7 - i * 0.1,
+          opacity: 0.5 - i * 0.08,
         }}
       />
     ))}
@@ -154,33 +102,80 @@ const SpeedLines = memo(() => (
   </div>
 ));
 
-// Speed indicator with animated gradient
+// Per-download speed, with the streak animation above 50 MB/s
 const SpeedIndicator = memo(({ speed, isHigh }) => (
-  <div
+  <span
     className={cn(
-      "relative flex items-center gap-2 rounded-full px-4 py-2 transition-all duration-300",
+      "relative inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-semibold tabular-nums transition-all duration-300",
       isHigh
-        ? "border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 shadow-lg shadow-primary/25"
-        : "bg-muted/50"
+        ? "border border-primary/30 bg-primary/10 text-primary shadow-md shadow-primary/20"
+        : "text-foreground"
     )}
   >
     {isHigh && <SpeedLines />}
-    <Wifi
-      className={cn(
-        "relative z-10 h-4 w-4 transition-all duration-300",
-        isHigh ? "animate-pulse text-primary" : "text-muted-foreground"
-      )}
-    />
-    <span
-      className={cn(
-        "relative z-10 font-semibold tabular-nums transition-colors duration-300",
-        isHigh ? "text-primary" : "text-foreground"
-      )}
-    >
-      {speed}
-    </span>
+    {isHigh && <Zap className="relative z-10 h-3.5 w-3.5 animate-pulse" />}
+    <span className="relative z-10">{speed}</span>
+  </span>
+));
+
+const TONES = {
+  primary: "from-primary to-primary/70",
+  amber: "from-amber-500 to-amber-400",
+  blue: "from-blue-500 to-blue-400",
+  green: "from-green-500 to-green-400",
+  muted: "from-muted-foreground/40 to-muted-foreground/30",
+};
+
+// One bar for every state: a filled value, or a sweep while the total is unknown
+const ProgressBar = memo(({ value, tone = "primary", indeterminate, active = true }) => (
+  <div className="relative h-1.5 overflow-hidden rounded-full bg-muted/60">
+    {indeterminate ? (
+      <div
+        className={cn(
+          "absolute inset-0 animate-shimmer bg-gradient-to-r opacity-70",
+          TONES[tone]
+        )}
+      />
+    ) : (
+      <div
+        className={cn(
+          "absolute inset-y-0 left-0 overflow-hidden rounded-full bg-gradient-to-r transition-all duration-500",
+          TONES[tone]
+        )}
+        style={{ width: `${Math.max(0, Math.min(100, value || 0))}%` }}
+      >
+        {active && (
+          <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+        )}
+      </div>
+    )}
   </div>
 ));
+
+const IconAction = ({ label, icon: Icon, onClick, disabled, spinning, className }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={label}
+        onClick={onClick}
+        disabled={disabled}
+        className={cn("h-8 w-8 rounded-lg text-muted-foreground", className)}
+      >
+        {spinning ? (
+          <Loader className="h-4 w-4 animate-spin" />
+        ) : (
+          <Icon className="h-4 w-4" />
+        )}
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent className="text-secondary">{label}</TooltipContent>
+  </Tooltip>
+);
+
+// Games whose download start is already marked on the graph (pausing keeps them here).
+const graphedDownloads = new Set();
 
 const Downloads = () => {
   const navigate = useNavigate();
@@ -371,31 +366,13 @@ const Downloads = () => {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
-  const [stopModalOpen, setStopModalOpen] = useState(false);
-  const [gameToStop, setGameToStop] = useState(null);
-  const [killDeleteOption, setKillDeleteOption] = useState("delete");
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false);
-  const [showAscendWarning, setShowAscendWarning] = useState(false);
-  const [gameToResume, setGameToResume] = useState(null);
-  const MAX_HISTORY_POINTS = 60;
-  const lastSpeedRef = useRef(0);
+  // Latest total speed in MB/s; the graph reads it on every frame.
   const targetSpeedRef = useRef(0);
-  const animationIndexRef = useRef(0);
-  const [yAxisMax, setYAxisMax] = useState(100);
-  const [speedHistory, setSpeedHistory] = useState(() => {
-    const savedHistory = localStorage.getItem("speedHistory");
-    if (savedHistory) {
-      const parsed = JSON.parse(savedHistory);
-      // Ensure indices are 0-49 for smooth animation
-      return parsed.map((item, i) => ({ index: i, speed: item.speed }));
-    }
-    return Array(MAX_HISTORY_POINTS)
-      .fill({ index: 0, speed: 0 })
-      .map((_, i) => ({
-        index: i,
-        speed: 0,
-      }));
-  });
+  // What the extracting games are doing: speed (MB/s, or files/s when the archive
+  // tool gives no sizes), and disk read/write when the downloader reports them.
+  const diskRef = useRef({ extract: 0, read: 0, write: 0 });
+  const [disk, setDisk] = useState({ extracting: 0 });
   // Track the actual peak speed separately (persists until page refresh or no active downloads)
   const [peakSpeed, setPeakSpeed] = useState(() => {
     const savedPeak = localStorage.getItem("peakSpeed");
@@ -482,8 +459,13 @@ const Downloads = () => {
               });
               setFadingGames(prev => new Set([...prev, gameName]));
 
-              // Remove completely after fade
+              // Remove completely after fade. Take the card out of the list in the
+              // same step, or it would reappear until the next poll drops it.
               setTimeout(() => {
+                downloadingGamesRef.current = downloadingGamesRef.current.filter(
+                  g => g.game !== gameName
+                );
+                setDownloadingGames(prev => prev.filter(g => g.game !== gameName));
                 fadingGamesRef.current = new Set(
                   [...fadingGamesRef.current].filter(n => n !== gameName)
                 );
@@ -580,6 +562,57 @@ const Downloads = () => {
         });
         setActiveDownloads(activeCount);
 
+        // A game's first appearance as a download starts a new stretch of the graph.
+        downloading.forEach(game => {
+          if (game.downloadingData?.downloading && !graphedDownloads.has(game.game)) {
+            graphedDownloads.add(game.game);
+            markDownloadStart(game.game);
+          }
+        });
+        graphedDownloads.forEach(name => {
+          if (!downloading.some(game => game.game === name))
+            graphedDownloads.delete(name);
+        });
+
+        const diskNow = {
+          extracting: 0,
+          reported: false,
+          read: 0,
+          write: 0,
+          speed: 0,
+          fileRate: 0,
+          percent: 0,
+          filesDone: 0,
+          filesTotal: 0,
+        };
+        downloading.forEach(game => {
+          const progress = game.downloadingData?.extractionProgress;
+          if (!game.downloadingData?.extracting) return;
+          diskNow.extracting++;
+          diskNow.percent += parseFloat(progress?.percentComplete) || 0;
+          diskNow.filesDone += progress?.filesExtracted || 0;
+          diskNow.filesTotal += progress?.totalFiles || 0;
+          const rate = String(progress?.extractionSpeed || "");
+          if (rate.endsWith("files/s")) diskNow.fileRate += parseFloat(rate) || 0;
+          else if (rate.endsWith(" B/s"))
+            diskNow.speed += (parseFloat(rate) || 0) / 1048576;
+          else diskNow.speed += normalizeSpeed(rate);
+          if (progress?.readSpeed === undefined) return;
+          diskNow.reported = true;
+          diskNow.read += (progress.readSpeed || 0) / 1048576;
+          diskNow.write += (progress.writeSpeed || 0) / 1048576;
+        });
+        if (diskNow.extracting) diskNow.percent /= diskNow.extracting;
+        // Some archive tools only count files, so the curve follows that instead.
+        diskNow.files = !diskNow.speed && diskNow.fileRate > 0;
+        diskNow.extract = diskNow.reported
+          ? 0
+          : diskNow.files
+            ? diskNow.fileRate
+            : diskNow.speed;
+        diskRef.current = diskNow;
+        setDisk(diskNow);
+
         // Start/stop command checking based on download count
         if (downloading.length > 0) {
           startCommandChecking();
@@ -615,7 +648,6 @@ const Downloads = () => {
         }
         prevActiveCountRef.current = activeCount;
 
-        // Store target speed for smooth interpolation
         targetSpeedRef.current = totalSpeedNum;
       } catch (error) {
         console.error("Error fetching downloading games:", error);
@@ -627,71 +659,6 @@ const Downloads = () => {
     const intervalId = setInterval(fetchDownloadingGames, 1000);
     // Only run this effect on mount/unmount (not on downloadingGames change)
     return () => clearInterval(intervalId);
-  }, []);
-
-  // Smooth animation loop for fluid graph movement
-  useEffect(() => {
-    let animationFrameId;
-    let lastTime = performance.now();
-
-    const animate = currentTime => {
-      const deltaTime = currentTime - lastTime;
-
-      // Update approximately 30 times per second for smooth animation
-      if (deltaTime >= 33) {
-        lastTime = currentTime;
-        animationIndexRef.current += 1;
-
-        setSpeedHistory(prevHistory => {
-          // Smoothly interpolate between current and target speed
-          const currentSpeed = lastSpeedRef.current;
-          const targetSpeed = targetSpeedRef.current;
-          const difference = Math.abs(targetSpeed - currentSpeed);
-
-          // Adaptive interpolation: slower for large changes, faster for small changes
-          // This prevents sudden jumps when speed changes dramatically
-          let interpolationFactor;
-          if (difference > 10) {
-            interpolationFactor = 0.05; // Very smooth for large changes
-          } else if (difference > 5) {
-            interpolationFactor = 0.08; // Smooth for medium changes
-          } else if (difference > 1) {
-            interpolationFactor = 0.12; // Moderate for small changes
-          } else {
-            interpolationFactor = 0.2; // Faster for tiny changes
-          }
-
-          let newSpeed =
-            currentSpeed + (targetSpeed - currentSpeed) * interpolationFactor;
-
-          // Clamp to prevent negative values or very small numbers that cause glitches
-          newSpeed = Math.max(0, newSpeed);
-
-          // If very close to target (within 0.01), snap to target to prevent endless interpolation
-          if (Math.abs(newSpeed - targetSpeed) < 0.01) {
-            newSpeed = targetSpeed;
-          }
-
-          lastSpeedRef.current = newSpeed;
-
-          // Shift all values left and add new interpolated value
-          const newHistory = prevHistory.map((item, i) => {
-            if (i < prevHistory.length - 1) {
-              return { index: i, speed: Math.max(0, prevHistory[i + 1].speed) };
-            } else {
-              return { index: i, speed: newSpeed };
-            }
-          });
-
-          return newHistory;
-        });
-      }
-
-      animationFrameId = requestAnimationFrame(animate);
-    };
-
-    animationFrameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
   // Poll queued downloads
@@ -741,12 +708,6 @@ const Downloads = () => {
     }
   };
 
-  const handleKillDownload = game => {
-    setGameToStop(game);
-    setKillDeleteOption("delete");
-    setStopModalOpen(true);
-  };
-
   const executeKillDownload = async (game, deleteFiles = true) => {
     console.log("Executing kill download for:", game, "deleteFiles:", deleteFiles);
     setStoppingDownloads(prev => new Set([...prev, game.game]));
@@ -784,8 +745,6 @@ const Downloads = () => {
         newSet.delete(game.game);
         return newSet;
       });
-      setStopModalOpen(false);
-      setGameToStop(null);
     }
   };
 
@@ -798,8 +757,13 @@ const Downloads = () => {
 
     // If there's an active download or another resuming download and user doesn't have Ascend, show warning
     if ((hasActive || hasResuming) && !isAuthenticated) {
-      setGameToResume(game);
-      setShowAscendWarning(true);
+      toast(t("downloads.ascendRequired.title"), {
+        description: t("downloads.ascendRequired.description"),
+        action: {
+          label: t("downloads.ascendRequired.learnMore"),
+          onClick: () => navigate("/ascend"),
+        },
+      });
       return;
     }
 
@@ -892,487 +856,337 @@ const Downloads = () => {
     await window.electron.openGameDirectory(game.game);
   };
 
-  // Custom tooltip for the chart
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="rounded-lg border border-border bg-card/95 px-3 py-2 shadow-xl backdrop-blur-sm">
-          <p className="text-sm font-semibold text-foreground">
-            {payload[0].value.toFixed(2)} MB/s
-          </p>
-        </div>
-      );
+  const currentSpeed = parseFloat(totalSpeed) || 0;
+  const highSpeed = isHighSpeed(totalSpeed);
+  const shownSpeed = formatSpeed(currentSpeed);
+  const shownPeak = formatSpeed(peakSpeed);
+  const queueStartsNext = downloadingGames.length === 0;
+
+  // When the last download is gone the panel animates out before the idle screen.
+  const nothingLeft = downloadingGames.length === 0 && queuedDownloads.length === 0;
+  const [view, setView] = useState(nothingLeft ? "idle" : "active");
+  useEffect(() => {
+    if (!nothingLeft) {
+      setView("active");
+      return;
     }
-    return null;
+    setView(current => (current === "idle" ? current : "leaving"));
+    const timer = setTimeout(() => setView("idle"), 700);
+    return () => clearTimeout(timer);
+  }, [nothingLeft]);
+  const leaving = view === "leaving";
+  const riseIn = delay => ({
+    animation: `fade-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms both`,
+  });
+  // With nothing left to download, the panel follows the extraction instead.
+  const extractMode = activeDownloads === 0 && disk.extracting > 0;
+  const filesPerSecond = `${t("downloads.files", "files")}/s`;
+  const graphLabels = {
+    extract: t("downloads.extractionSpeed", "Extraction"),
+    read: t("downloads.diskRead", "Read"),
+    write: t("downloads.diskWrite", "Write"),
+    filesUnit: filesPerSecond,
   };
+  const extractReadouts = !extractMode
+    ? []
+    : disk.reported
+      ? [
+          ["write", "bg-amber-500", formatSpeed(disk.write)],
+          ["read", "bg-sky-400", formatSpeed(disk.read)],
+        ]
+      : [
+          [
+            "extract",
+            "bg-amber-500",
+            disk.files
+              ? {
+                  value: disk.fileRate.toFixed(disk.fileRate < 10 ? 1 : 0),
+                  unit: filesPerSecond,
+                }
+              : formatSpeed(disk.speed),
+          ],
+        ];
 
   return (
-    <div className="container mx-auto px-4 pb-8">
-      {downloadingGames.length === 0 && queuedDownloads.length === 0 ? (
-        /* Empty State - Clean centered design */
-        <div className="flex min-h-[85vh] flex-col items-center justify-center">
-          <div className="space-y-8 text-center">
-            {/* Icon container */}
-            <div className="mx-auto flex items-center justify-center">
-              <Coffee className="h-12 w-12 text-primary" />
-            </div>
-
-            <div className="space-y-3">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">
+    <TooltipProvider delayDuration={200}>
+      <div className="container mx-auto max-w-5xl px-4 pb-8">
+        {view === "idle" && nothingLeft ? (
+          <div className="flex min-h-[85vh] flex-col items-center justify-center">
+            <div className="space-y-4 text-center">
+              <Coffee className="mx-auto h-12 w-12 text-primary" style={riseIn(0)} />
+              <h2
+                className="text-3xl font-bold tracking-tight text-foreground"
+                style={riseIn(120)}
+              >
                 {t("downloads.noDownloads")}
               </h2>
-              <p className="mx-auto max-w-sm text-lg text-muted-foreground">
+              <p
+                className="mx-auto max-w-sm text-lg text-muted-foreground"
+                style={riseIn(240)}
+              >
                 {t("downloads.noDownloadsMessage")}
               </p>
             </div>
-
-            {/* Decorative dots */}
-            <div className="flex items-center justify-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary/40" />
-              <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
-              <span className="h-1.5 w-1.5 rounded-full bg-primary/40" />
-            </div>
           </div>
-        </div>
-      ) : (
-        /* Main Content - Stunning layout */
-        <div className="mt-6 space-y-6">
-          {/* Header Section with Stats */}
-          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-muted/30 p-6 shadow-xl">
-            {/* Background decoration */}
-            <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/5 blur-3xl" />
-            <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-
-            <div className="relative flex flex-col gap-6 p-5 lg:flex-row lg:items-center lg:justify-between">
-              {/* Title and status */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                      {t("downloads.activeDownloads")}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                      {t("downloads.downloadsInProgress", { count: activeDownloads })}
-                      {queuedDownloads.length > 0 && (
-                        <span>
-                          {" "}
-                          ·{" "}
-                          {t("downloads.queuedCount", { count: queuedDownloads.length })}
-                        </span>
-                      )}
-                    </p>
-                  </div>
+        ) : (
+          <div
+            className={cn(
+              "mt-6 space-y-5 transition-all duration-700 ease-in-out",
+              leaving && "pointer-events-none translate-y-10 scale-95 opacity-0 blur-sm"
+            )}
+          >
+            {showFirstTimeAlert && (
+              <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {t("downloads.firstTimeDownload.title")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("downloads.firstTimeDownload.message")}
+                  </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 text-primary"
+                  onClick={() => setShowFirstTimeAlert(false)}
+                >
+                  {t("downloads.firstTimeDownload.understand")}
+                </Button>
               </div>
+            )}
 
-              {/* Stats Cards */}
-              <div className="flex flex-wrap gap-3">
-                {/* Current Speed */}
-                <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-4 py-3 backdrop-blur-sm">
-                  <div
-                    className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
-                      isHighSpeed(totalSpeed) ? "bg-primary/20" : "bg-muted"
-                    )}
-                  >
-                    <Zap
-                      className={cn(
-                        "h-4 w-4",
-                        isHighSpeed(totalSpeed) ? "text-primary" : "text-muted-foreground"
-                      )}
-                    />
-                  </div>
+            {/* Speed overview */}
+            <section
+              className={cn(
+                "relative overflow-hidden rounded-2xl border bg-card transition-colors duration-500",
+                highSpeed
+                  ? "border-primary/40 shadow-lg shadow-primary/10"
+                  : "border-border/60"
+              )}
+            >
+              <div className="relative flex flex-wrap items-end justify-between gap-4 px-6 pt-5">
+                {extractMode ? (
                   <div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {disk.reported
+                        ? t("downloads.diskActivity", "Disk Activity")
+                        : t("downloads.extractionSpeed", "Extraction")}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-baseline gap-x-8">
+                      {extractReadouts.map(([key, dot, shown]) => {
+                        return (
+                          <div key={key} className="flex items-baseline gap-2">
+                            <span className="text-5xl font-bold tabular-nums tracking-tight text-foreground">
+                              {shown.value}
+                            </span>
+                            <span className="text-lg font-medium text-muted-foreground">
+                              {shown.unit}
+                            </span>
+                            <span className="ml-1 inline-flex items-center gap-1.5 self-center text-sm text-muted-foreground">
+                              <span className={cn("h-2 w-2 rounded-full", dot)} />
+                              {graphLabels[key]}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       {t("downloads.currentTotalSpeed")}
                     </p>
-                    <p
-                      className={cn(
-                        "text-lg font-bold tabular-nums",
-                        isHighSpeed(totalSpeed) ? "text-primary" : "text-foreground"
-                      )}
-                    >
-                      {totalSpeed}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Peak Speed */}
-                <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-4 py-3 backdrop-blur-sm">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Peak Speed</p>
-                    <p className="text-lg font-bold tabular-nums text-foreground">
-                      {peakSpeed.toFixed(2)} MB/s
-                    </p>
-                  </div>
-                </div>
-
-                {/* Active Downloads */}
-                <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-4 py-3 backdrop-blur-sm">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Active</p>
-                    <p className="text-lg font-bold tabular-nums text-foreground">
-                      {activeDownloads}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Speed Chart */}
-            <div className="relative -mx-8 mt-6">
-              <div className="h-[140px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={speedHistory}
-                    margin={{ top: 10, right: 0, bottom: 0, left: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="0%"
-                          stopColor="rgb(var(--color-primary))"
-                          stopOpacity={0.4}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="rgb(var(--color-primary))"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="index" hide />
-                    <YAxis hide domain={[0, yAxisMax]} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area
-                      type="natural"
-                      dataKey="speed"
-                      stroke="rgb(var(--color-primary))"
-                      strokeWidth={2.5}
-                      fill="url(#speedGradient)"
-                      isAnimationActive={false}
-                      connectNulls
-                      dot={false}
-                      baseValue={0}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="mt-2 px-5 text-center text-xs text-muted-foreground">
-                {t("downloads.speedHistory")}
-              </p>
-            </div>
-          </div>
-
-          {/* Downloads List */}
-          <div className="space-y-4">
-            {downloadingGames.map(game => (
-              <DownloadCard
-                key={`${game.game}-${game.executable}`}
-                game={game}
-                torboxState={
-                  game.torboxWebdownloadId
-                    ? torboxStates[game.torboxWebdownloadId]
-                    : undefined
-                }
-                onPause={() => handlePauseDownload(game)}
-                onKill={() => handleKillDownload(game)}
-                onResume={() => handleResumeDownload(game)}
-                onRetry={() => handleRetryDownload(game)}
-                onOpenFolder={() => handleOpenFolder(game)}
-                isStopping={stoppingDownloads.has(game.game)}
-                isResuming={resumingDownloads.has(game.game)}
-                isCompleted={completedGames.has(game.game)}
-                isFading={fadingGames.has(game.game)}
-              />
-            ))}
-          </div>
-
-          {/* Queued Downloads Section */}
-          {queuedDownloads.length > 0 && (
-            <div className={downloadingGames.length === 0 ? "" : "mt-8"}>
-              <h2 className="mb-4 text-xl font-semibold text-foreground">
-                {t("downloads.queuedDownloads", "Queued Downloads")} (
-                {queuedDownloads.length})
-              </h2>
-              <div className="space-y-3">
-                {queuedDownloads.map((item, index) => (
-                  <Card
-                    key={item.id}
-                    draggable
-                    onDragStart={e => {
-                      setDraggedIndex(index);
-                      e.dataTransfer.effectAllowed = "move";
-                      e.dataTransfer.setData("text/html", e.currentTarget);
-                    }}
-                    onDragEnd={() => {
-                      setDraggedIndex(null);
-                      setDragOverIndex(null);
-                    }}
-                    onDragOver={e => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
-                      if (draggedIndex !== null && draggedIndex !== index) {
-                        setDragOverIndex(index);
-                      }
-                    }}
-                    onDragLeave={() => {
-                      setDragOverIndex(null);
-                    }}
-                    onDrop={e => {
-                      e.preventDefault();
-                      if (draggedIndex !== null && draggedIndex !== index) {
-                        const newQueue = reorderQueue(draggedIndex, index);
-                        setQueuedDownloads(newQueue);
-                      }
-                      setDraggedIndex(null);
-                      setDragOverIndex(null);
-                    }}
-                    className={cn(
-                      "cursor-move border-border/50 transition-all duration-200",
-                      index === 0 && downloadingGames.length === 0
-                        ? "border-primary/50 bg-primary/5"
-                        : "bg-card/50",
-                      draggedIndex === index && "scale-95 opacity-50",
-                      dragOverIndex === index && "scale-[1.02] border-2 border-primary"
-                    )}
-                  >
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-4">
-                        {index === 0 && downloadingGames.length === 0 ? (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20">
-                            <Loader className="h-4 w-4 animate-spin text-primary" />
-                          </div>
-                        ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-                            {index + 1}
-                          </div>
+                    <div className="relative mt-1 inline-flex items-baseline gap-2 rounded-lg pr-3">
+                      {highSpeed && <SpeedLines />}
+                      <span
+                        className={cn(
+                          "relative z-10 text-5xl font-bold tabular-nums tracking-tight transition-colors duration-300",
+                          highSpeed ? "text-primary" : "text-foreground"
                         )}
-                        <div>
-                          <p className="font-medium text-foreground">{item.gameName}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {index === 0 && downloadingGames.length === 0
-                              ? t("downloads.startingSoon", "Starting soon...")
-                              : t("downloads.waitingInQueue", "Waiting in queue")}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => {
-                          removeFromQueue(item.id);
-                          setQueuedDownloads(prev => prev.filter(q => q.id !== item.id));
-                        }}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </CardContent>
-                  </Card>
+                        {shownSpeed.value}
+                      </span>
+                      <span className="relative z-10 text-lg font-medium text-muted-foreground">
+                        {shownSpeed.unit}
+                      </span>
+                      {highSpeed && (
+                        <Zap className="relative z-10 h-5 w-5 animate-pulse self-center text-primary" />
+                      )}
+                    </div>
+                  </div>
+                )}
+                <dl className="flex gap-7 pb-1.5 text-right">
+                  {[
+                    ...(extractMode
+                      ? [
+                          [
+                            t("downloads.extractedProgress", "Extracted"),
+                            `${Math.floor(disk.percent)}%`,
+                          ],
+                          ...(disk.filesTotal
+                            ? [
+                                [
+                                  t("downloads.filesLabel", "Files"),
+                                  `${disk.filesDone.toLocaleString()} / ${disk.filesTotal.toLocaleString()}`,
+                                ],
+                              ]
+                            : []),
+                          ...(disk.extracting > 1
+                            ? [
+                                [
+                                  t("downloads.extractingCount", "Extracting"),
+                                  disk.extracting,
+                                ],
+                              ]
+                            : []),
+                        ]
+                      : [
+                          [
+                            t("downloads.peak", "Peak"),
+                            `${shownPeak.value} ${shownPeak.unit}`,
+                          ],
+                          [t("downloads.active", "Active"), activeDownloads],
+                        ]),
+                    [t("downloads.queued", "Queued"), queuedDownloads.length],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-xs text-muted-foreground">{label}</dt>
+                      <dd className="text-base font-semibold tabular-nums text-foreground">
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+              <SpeedGraph
+                speedRef={targetSpeedRef}
+                diskRef={diskRef}
+                labels={graphLabels}
+                peak={peakSpeed}
+                high={highSpeed}
+                className="mt-2 h-40"
+              />
+            </section>
+
+            {/* Downloads */}
+            {downloadingGames.length > 0 && (
+              <div className="space-y-3">
+                {downloadingGames.map(game => (
+                  <DownloadCard
+                    key={`${game.game}-${game.executable}`}
+                    game={game}
+                    torboxState={
+                      game.torboxWebdownloadId
+                        ? torboxStates[game.torboxWebdownloadId]
+                        : undefined
+                    }
+                    onPause={() => handlePauseDownload(game)}
+                    onKill={deleteFiles => executeKillDownload(game, deleteFiles)}
+                    onResume={() => handleResumeDownload(game)}
+                    onRetry={() => handleRetryDownload(game)}
+                    onOpenFolder={() => handleOpenFolder(game)}
+                    isStopping={stoppingDownloads.has(game.game)}
+                    isResuming={resumingDownloads.has(game.game)}
+                    isCompleted={
+                      completedGames.has(game.game) || fadingGames.has(game.game)
+                    }
+                    isFading={fadingGames.has(game.game)}
+                  />
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
 
-      {/* Alert Dialogs */}
-      {showFirstTimeAlert && (
-        <AlertDialog open={showFirstTimeAlert} onOpenChange={setShowFirstTimeAlert}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                {t("downloads.firstTimeDownload.title")}
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-muted-foreground">
-                {t("downloads.firstTimeDownload.message")}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction
-                className="bg-primary text-secondary"
-                onClick={() => setShowFirstTimeAlert(false)}
-              >
-                {t("downloads.firstTimeDownload.understand")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-
-      <AlertDialog open={stopModalOpen} onOpenChange={setStopModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("downloads.actions.killDownloadTitle", { gameName: gameToStop?.game })}
-            </AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogDescription className="text-muted-foreground">
-            {t("downloads.actions.killDownloadDescription")}
-          </AlertDialogDescription>
-          <RadioGroup
-            value={killDeleteOption}
-            onValueChange={setKillDeleteOption}
-            className="mt-2 space-y-2"
-          >
-            <div className="flex items-start space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
-              <RadioGroupItem value="delete" id="kill-delete-files" className="mt-1" />
-              <Label htmlFor="kill-delete-files" className="flex-1 cursor-pointer">
-                <span className="font-medium text-foreground">
-                  {t("downloads.actions.deleteFilesOption")}
-                </span>
-                <p className="text-sm text-muted-foreground">
-                  {t("downloads.actions.deleteFilesOptionDescription")}
-                </p>
-              </Label>
-            </div>
-            <div className="flex items-start space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
-              <RadioGroupItem value="keep" id="kill-keep-files" className="mt-1" />
-              <Label htmlFor="kill-keep-files" className="flex-1 cursor-pointer">
-                <span className="font-medium text-foreground">
-                  {t("downloads.actions.keepFilesOption")}
-                </span>
-                <p className="text-sm text-muted-foreground">
-                  {t("downloads.actions.keepFilesOptionDescription")}
-                </p>
-              </Label>
-            </div>
-          </RadioGroup>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">
-              {t("common.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                gameToStop &&
-                executeKillDownload(gameToStop, killDeleteOption === "delete")
-              }
-              className="text-secondary"
-            >
-              <XCircle className="mr-2 h-4 w-4" />
-              {t("downloads.actions.killDownload")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Ascend Warning Dialog */}
-      <AlertDialog open={showAscendWarning} onOpenChange={setShowAscendWarning}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("downloads.ascendRequired.title")}
-            </AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogDescription className="space-y-3 text-muted-foreground">
-            <p>{t("downloads.ascendRequired.description")}</p>
-            <p className="text-sm">{t("downloads.ascendRequired.suggestion")}</p>
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                setShowAscendWarning(false);
-                setGameToResume(null);
-              }}
-            >
-              {t("common.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowAscendWarning(false);
-                setGameToResume(null);
-                navigate("/ascend");
-              }}
-              className="text-secondary"
-            >
-              {t("downloads.ascendRequired.learnMore")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+            {/* Queue */}
+            {queuedDownloads.length > 0 && (
+              <section>
+                <h2 className="mb-2 px-1 text-sm font-medium text-muted-foreground">
+                  {t("downloads.queuedDownloads", "Queued Downloads")} ·{" "}
+                  {queuedDownloads.length}
+                </h2>
+                <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60 bg-card">
+                  {queuedDownloads.map((item, index) => {
+                    const startsNext = index === 0 && queueStartsNext;
+                    return (
+                      <div
+                        key={item.id}
+                        draggable
+                        onDragStart={e => {
+                          setDraggedIndex(index);
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/html", e.currentTarget);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        onDragOver={e => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          if (draggedIndex !== null && draggedIndex !== index) {
+                            setDragOverIndex(index);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          setDragOverIndex(null);
+                        }}
+                        onDrop={e => {
+                          e.preventDefault();
+                          if (draggedIndex !== null && draggedIndex !== index) {
+                            const newQueue = reorderQueue(draggedIndex, index);
+                            setQueuedDownloads(newQueue);
+                          }
+                          setDraggedIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        className={cn(
+                          "group flex cursor-grab items-center gap-3 px-3 py-2.5 transition-colors duration-150 active:cursor-grabbing",
+                          startsNext && "bg-primary/5",
+                          draggedIndex === index && "opacity-40",
+                          dragOverIndex === index &&
+                            "bg-primary/10 ring-1 ring-inset ring-primary"
+                        )}
+                      >
+                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center text-sm font-medium tabular-nums text-muted-foreground">
+                          {startsNext ? (
+                            <Loader className="h-4 w-4 animate-spin text-primary" />
+                          ) : (
+                            index + 1
+                          )}
+                        </div>
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                          {item.gameName}
+                        </p>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {startsNext
+                            ? t("downloads.startingSoon", "Starting soon...")
+                            : t("downloads.waitingInQueue", "Waiting in queue")}
+                        </span>
+                        <IconAction
+                          label={t("downloads.removeFromQueue", "Remove from queue")}
+                          icon={X}
+                          className="hover:bg-red-500/10 hover:text-red-600"
+                          onClick={() => {
+                            removeFromQueue(item.id);
+                            setQueuedDownloads(prev =>
+                              prev.filter(q => q.id !== item.id)
+                            );
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 };
-
-// Status badge component for download cards
-const StatusBadge = memo(({ status, t }) => {
-  const configs = {
-    downloading: {
-      icon: ArrowDownToLine,
-      label: t("downloads.downloading") || "Downloading",
-      className: "bg-primary/10 text-primary border-primary/20",
-      animate: true,
-    },
-    extracting: {
-      icon: Package,
-      label: t("downloads.extracting"),
-      className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-      animate: true,
-    },
-    verifying: {
-      icon: CheckCircle2,
-      label: t("downloads.verifying"),
-      className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-      animate: true,
-    },
-    waiting: {
-      icon: Clock,
-      label: t("downloads.waiting"),
-      className: "bg-muted text-muted-foreground border-border",
-      animate: true,
-    },
-    stopped: {
-      icon: Pause,
-      label: t("downloads.stopped"),
-      className: "bg-muted text-muted-foreground border-border",
-      animate: false,
-    },
-    error: {
-      icon: XCircle,
-      label: t("downloads.downloadError"),
-      className: "bg-red-500/10 text-red-600 border-red-500/20",
-      animate: false,
-    },
-    updating: {
-      icon: RefreshCw,
-      label: t("downloads.updating"),
-      className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-      animate: true,
-    },
-    completed: {
-      icon: CheckCircle2,
-      label: t("downloads.completed") || "Completed",
-      className: "bg-green-500/10 text-green-600 border-green-500/20",
-      animate: false,
-    },
-    actionRequired: {
-      icon: ShieldAlert,
-      label: t("downloads.actionRequired") || "Action Required",
-      className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-      animate: false,
-    },
-  };
-
-  const config = configs[status] || configs.downloading;
-  const Icon = config.icon;
-
-  return (
-    <Badge
-      variant="outline"
-      className={cn("gap-1.5 border px-2.5 py-1", config.className)}
-    >
-      <Icon className={cn("h-3 w-3", config.animate && "animate-pulse")} />
-      <span className="text-xs font-medium">{config.label}</span>
-    </Badge>
-  );
-});
 
 const DownloadCard = ({
   game,
@@ -1404,7 +1218,7 @@ const DownloadCard = ({
       setIsSubmittingRecovery(false);
     }
   };
-  const [showInstallLocationDialog, setShowInstallLocationDialog] = useState(false);
+  const [confirmingKill, setConfirmingKill] = useState(false);
   const [showLargeFileNotice, setShowLargeFileNotice] = useState(false);
   const [heroImage, setHeroImage] = useState(null);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
@@ -1450,9 +1264,14 @@ const DownloadCard = ({
       .catch(() => {});
   }, [game?.game]);
 
+  // The log belongs to the extraction; close it when that ends.
+  useEffect(() => {
+    if (!game.downloadingData?.extracting) setLogDialogOpen(false);
+  }, [game.downloadingData?.extracting]);
+
   const handleViewLog = () => {
-    setLogLoading(true);
-    setLogDialogOpen(true);
+    setLogLoading(!logDialogOpen);
+    setLogDialogOpen(!logDialogOpen);
   };
   const fileStartTimeRef = useRef(null);
   const trackedFileRef = useRef(null);
@@ -1633,7 +1452,6 @@ const DownloadCard = ({
           "Follow the on-screen steps to finish installing the game.",
       });
       setInstallerLaunched(true);
-      setShowInstallLocationDialog(true);
     } catch (error) {
       console.error("Failed to launch installer:", error);
       toast.error(t("downloads.installerLaunchFailed") || "Could not launch installer");
@@ -1810,262 +1628,357 @@ const DownloadCard = ({
 
   const progress = parseFloat(downloadingData?.progressCompleted || 0);
 
+  const status = isResumingState
+    ? "resuming"
+    : hasVerifyError && !hasError
+      ? "verifyFailed"
+      : getStatus();
+  const STATUS = {
+    downloading: [t("downloads.downloading", "Downloading"), "bg-primary", true],
+    extracting: [t("downloads.extracting"), "bg-amber-500", true],
+    verifying: [t("downloads.verifying"), "bg-blue-500", true],
+    resuming: [t("downloads.resuming"), "bg-blue-500", true],
+    updating: [t("downloads.updating"), "bg-blue-500", true],
+    waiting: [t("downloads.waiting"), "bg-muted-foreground", true],
+    stopped: [t("downloads.paused", "Paused"), "bg-muted-foreground", false],
+    error: [t("downloads.downloadError"), "bg-red-500", false],
+    verifyFailed: [t("downloads.verificationFailed"), "bg-amber-500", false],
+    completed: [t("downloads.completed", "Download Complete"), "bg-green-500", false],
+    actionRequired: [
+      t("downloads.actionRequired", "Action Required"),
+      "bg-amber-500",
+      false,
+    ],
+  };
+  const [statusLabel, statusColor, statusPulse] = STATUS[status] || STATUS.downloading;
+  const needsAction = status === "actionRequired" || status === "verifyFailed";
+  const extraction = downloadingData?.extractionProgress;
+  // Unpacking and verifying run on their own; only cancelling is offered.
+  const isInstalling = (isExtracting || isVerifyingState) && !isStopped && !hasError;
+  const logToggle = (
+    <button
+      type="button"
+      onClick={handleViewLog}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted hover:text-foreground",
+        logDialogOpen ? "bg-muted text-foreground" : "text-muted-foreground"
+      )}
+    >
+      <ScrollText className="h-3.5 w-3.5" />
+      {logDialogOpen
+        ? t("downloads.hideLog", "Hide log")
+        : t("downloads.actions.viewLog")}
+    </button>
+  );
+  const extractionPercent = parseFloat(extraction?.percentComplete || 0);
+
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-2xl border transition-all duration-500",
+        "group relative overflow-hidden rounded-xl border bg-card transition-all duration-500",
         isFading && "scale-95 opacity-0",
         isCompleted
-          ? "border-green-500/30 bg-gradient-to-br from-green-500/5 via-card to-card"
+          ? "border-green-500/30"
           : hasError
-            ? "border-red-500/30 bg-gradient-to-br from-red-500/5 via-card to-card"
-            : isStopped
-              ? "border-border/50 bg-card"
-              : "border-border/50 bg-gradient-to-br from-card via-card to-muted/20 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+            ? "border-red-500/30"
+            : needsAction
+              ? "border-amber-500/30"
+              : "border-border/60 hover:border-primary/30"
       )}
     >
-      {/* Hero image background */}
+      {/* Game artwork, faded in from the right so text stays readable */}
       {heroImage && (
         <div
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-y-0 right-0 w-2/3"
           style={{
             backgroundImage: `url(${heroImage})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            opacity: 0.18,
-            filter: "blur(1px) saturate(1.3)",
+            opacity: 0.22,
+            maskImage: "linear-gradient(to left, black, transparent)",
+            WebkitMaskImage: "linear-gradient(to left, black, transparent)",
           }}
         />
       )}
 
-      {/* Animated background for active downloads */}
-      {isDownloading && !hasError && !isStopped && !isCompleted && (
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-y-0 left-0" style={{ width: `${progress}%` }} />
-        </div>
-      )}
-
-      {/* Completed background */}
-      {isCompleted && (
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-green-500/10 to-green-500/5" />
-        </div>
-      )}
-
-      <div className="relative p-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-lg font-semibold text-foreground">
-                  {game.game}
-                </h3>
-                <div className="mt-0.5 flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{game.size}</span>
-                  {!hasError &&
-                    !isStopped &&
-                    !hasVerifyError &&
-                    !isPendingManualInstall && <StatusBadge status={getStatus()} t={t} />}
-                  {isPendingManualInstall && (
-                    <StatusBadge status="actionRequired" t={t} />
-                  )}
-                </div>
-              </div>
+      <div className="relative space-y-3 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-foreground">
+              {game.game}
+            </h3>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+              <span className="relative flex h-2 w-2">
+                {statusPulse && (
+                  <span
+                    className={cn(
+                      "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                      statusColor
+                    )}
+                  />
+                )}
+                <span
+                  className={cn("relative inline-flex h-2 w-2 rounded-full", statusColor)}
+                />
+              </span>
+              <span>{statusLabel}</span>
+              {game.size && (
+                <>
+                  <span>·</span>
+                  <span>{game.size}</span>
+                </>
+              )}
+              {isDownloading && settings.downloadLimit > 0 && (
+                <>
+                  <span>·</span>
+                  <span>
+                    {t("downloads.limitedTo")}{" "}
+                    {settings.downloadLimit >= 1024
+                      ? `${Math.round(settings.downloadLimit / 1024)} MB/s`
+                      : `${settings.downloadLimit} KB/s`}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Actions dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-xl hover:bg-muted/80"
-              >
-                {isStopping ? (
-                  <Loader className="h-4 w-4 animate-spin" />
-                ) : (
-                  <MoreVertical className="h-4 w-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              {canRetryExtraction(game) && (
-                <DropdownMenuItem
+          {!isCompleted && (
+            <div className="flex shrink-0 items-center gap-0.5">
+              {canRetryExtraction(game) && !hasError && (
+                <IconAction
+                  label={t("downloads.retryExtraction")}
+                  icon={RefreshCcw}
                   onClick={handleRetryExtraction}
+                  disabled={isSubmittingRecovery}
+                />
+              )}
+              {isStopped ? (
+                <Button
+                  size="sm"
+                  onClick={onResume}
+                  disabled={isResuming}
+                  className="mr-1 h-8 gap-1.5 text-secondary"
+                >
+                  {isResuming ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  {t("downloads.resume", "Resume")}
+                </Button>
+              ) : (
+                !hasError &&
+                !isInstalling && (
+                  <IconAction
+                    label={t("downloads.actions.pauseDownload")}
+                    icon={Pause}
+                    onClick={onPause}
+                    disabled={isStopping}
+                    spinning={isStopping}
+                  />
+                )
+              )}
+              {!isInstalling && (
+                <IconAction
+                  label={t("downloads.actions.openFolder")}
+                  icon={FolderOpen}
+                  onClick={onOpenFolder}
+                />
+              )}
+              <IconAction
+                label={t("downloads.actions.killDownload")}
+                icon={X}
+                onClick={() => setConfirmingKill(open => !open)}
+                disabled={isStopping}
+                className={cn(
+                  "hover:bg-red-500/10 hover:text-red-600",
+                  confirmingKill && "bg-red-500/10 text-red-600"
+                )}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Cancel confirmation, in place of a dialog */}
+        {confirmingKill && !isCompleted && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3">
+            <p className="text-sm font-medium text-foreground">
+              {t("downloads.actions.killDownloadTitle", { gameName: game.game })}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isStopping}
+                className="border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-600"
+                onClick={() => {
+                  setConfirmingKill(false);
+                  onKill(true);
+                }}
+              >
+                {t("downloads.actions.deleteFilesOption")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isStopping}
+                onClick={() => {
+                  setConfirmingKill(false);
+                  onKill(false);
+                }}
+              >
+                {t("downloads.actions.keepFilesOption")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmingKill(false)}>
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Extraction recovery */}
+        {isAwaitingRecovery &&
+          (recoverableError?.type === "missingExtractedFiles" || isArchiveRecovery) && (
+            <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="flex items-start gap-2.5">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-amber-600">
+                    {t(
+                      isArchiveRecovery
+                        ? "downloads.extractionRecovery.archiveTitle"
+                        : "downloads.extractionRecovery.title"
+                    )}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      isArchiveRecovery
+                        ? "downloads.extractionRecovery.archiveDescription"
+                        : "downloads.extractionRecovery.description"
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="max-h-24 overflow-y-auto rounded-md bg-muted/50 p-2 text-xs">
+                {isArchiveRecovery && (
+                  <div className="space-y-1 break-words text-muted-foreground">
+                    <p className="font-medium">{recoverableError.archive}</p>
+                    <p>{recoverableError.message}</p>
+                    {recoverableError.extractionError !== recoverableError.message && (
+                      <p>{recoverableError.extractionError}</p>
+                    )}
+                  </div>
+                )}
+                {(recoverableError.files || []).map((error, index) => (
+                  <div
+                    key={`${error.file}-${index}`}
+                    className="py-0.5 text-muted-foreground"
+                  >
+                    <span className="font-medium">{error.file}</span>
+                    <span className="ml-2">{error.error}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {!isArchiveRecovery &&
+                  window.electron.getPlatform() === "win32" &&
+                  !settings.excludeFolders && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleExtractionRecovery(true)}
+                      disabled={isSubmittingRecovery}
+                      className="gap-2 text-secondary"
+                    >
+                      {isSubmittingRecovery ? (
+                        <Loader className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ShieldAlert className="h-4 w-4" />
+                      )}
+                      {t("downloads.extractionRecovery.enableProtectionAndRetry")}
+                    </Button>
+                  )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleExtractionRecovery(false)}
                   disabled={isSubmittingRecovery}
                   className="gap-2"
                 >
                   <RefreshCcw className="h-4 w-4" />
-                  {t("downloads.retryExtraction")}
-                </DropdownMenuItem>
-              )}
-              {isStopped ? (
-                <>
-                  <DropdownMenuItem onClick={() => onResume(game)} className="gap-2">
-                    <Play className="h-4 w-4" />
-                    {t("downloads.actions.resumeDownload")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onKill(game)}
-                    className="gap-2 text-red-600 focus:text-red-600"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    {t("downloads.actions.killDownload")}
-                  </DropdownMenuItem>
-                </>
-              ) : hasError ? (
-                <>
-                  <DropdownMenuItem onClick={() => onRetry(game)} className="gap-2">
-                    <RefreshCcw className="h-4 w-4" />
-                    {t("downloads.actions.retryDownload")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onKill(game)}
-                    className="gap-2 text-red-600 focus:text-red-600"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    {t("downloads.actions.killDownload")}
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem onClick={() => onPause(game)} className="gap-2">
-                    <Pause className="h-4 w-4" />
-                    {t("downloads.actions.pauseDownload")}
-                  </DropdownMenuItem>
-                  {isExtracting && (
-                    <DropdownMenuItem onClick={() => handleViewLog()} className="gap-2">
-                      <ScrollText className="h-4 w-4" />
-                      {t("downloads.actions.viewLog")}
-                    </DropdownMenuItem>
+                  {t(
+                    isArchiveRecovery
+                      ? "downloads.retryExtraction"
+                      : "downloads.extractionRecovery.retryMissingFiles"
                   )}
-                  <DropdownMenuItem
-                    onClick={() => onKill(game)}
-                    className="gap-2 text-red-600 focus:text-red-600"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    {t("downloads.actions.killDownload")}
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuItem onClick={() => onOpenFolder(game)} className="gap-2">
-                <FolderOpen className="h-4 w-4" />
-                {t("downloads.actions.openFolder")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleExtractionRecovery(false, "cancel")}
+                  disabled={isSubmittingRecovery}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            </div>
+          )}
 
-        {/* Content based on state */}
-        <div className="mt-4">
-          {isAwaitingRecovery &&
-            (recoverableError?.type === "missingExtractedFiles" || isArchiveRecovery) && (
-              <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-                    <ShieldAlert className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-amber-600">
-                      {t(
-                        isArchiveRecovery
-                          ? "downloads.extractionRecovery.archiveTitle"
-                          : "downloads.extractionRecovery.title"
-                      )}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {t(
-                        isArchiveRecovery
-                          ? "downloads.extractionRecovery.archiveDescription"
-                          : "downloads.extractionRecovery.description"
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/50 p-2 text-xs">
-                  {isArchiveRecovery && (
-                    <div className="space-y-1 break-words text-muted-foreground">
-                      <p className="font-medium">{recoverableError.archive}</p>
-                      <p>{recoverableError.message}</p>
-                      {recoverableError.extractionError !== recoverableError.message && (
-                        <p>{recoverableError.extractionError}</p>
-                      )}
-                    </div>
-                  )}
-                  {(recoverableError.files || []).map((error, index) => (
-                    <div
-                      key={`${error.file}-${index}`}
-                      className="py-0.5 text-muted-foreground"
-                    >
-                      <span className="font-medium">{error.file}</span>
-                      <span className="ml-2">{error.error}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {!isArchiveRecovery &&
-                    window.electron.getPlatform() === "win32" &&
-                    !settings.excludeFolders && (
-                      <Button
-                        onClick={() => handleExtractionRecovery(true)}
-                        disabled={isSubmittingRecovery}
-                        className="gap-2 text-secondary"
-                      >
-                        {isSubmittingRecovery ? (
-                          <Loader className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <ShieldAlert className="h-4 w-4" />
-                        )}
-                        {t("downloads.extractionRecovery.enableProtectionAndRetry")}
-                      </Button>
-                    )}
-                  <Button
-                    variant="outline"
-                    onClick={() => handleExtractionRecovery(false)}
-                    disabled={isSubmittingRecovery}
-                    className="gap-2"
-                  >
-                    <RefreshCcw className="h-4 w-4" />
-                    {t(
-                      isArchiveRecovery
-                        ? "downloads.retryExtraction"
-                        : "downloads.extractionRecovery.retryMissingFiles"
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleExtractionRecovery(false, "cancel")}
-                    disabled={isSubmittingRecovery}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </div>
+        {/* Manual installer */}
+        {isPendingManualInstall && (
+          <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-start gap-2.5">
+              {installerLaunched ? (
+                <Loader className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-amber-600" />
+              ) : (
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-amber-600">
+                  {installerLaunched
+                    ? t("downloads.installingTitle") || "Installing..."
+                    : t("downloads.manualInstallTitle") || "One Last Step"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {installerLaunched
+                    ? t("downloads.setInstallLocationDescription") ||
+                      "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it."
+                    : t("downloads.manualInstallDescription") ||
+                      "Download complete. Run the installer as Administrator to finish installing the game."}
+                </p>
+              </div>
+            </div>
+            {installerLaunched && downloadingData?.manualInstallDir && (
+              <div className="flex items-center gap-2 rounded-md bg-muted/50 py-1 pl-3 pr-1">
+                <code className="flex-1 break-all text-xs text-foreground">
+                  {downloadingData.manualInstallDir}
+                </code>
+                <IconAction
+                  label={t("common.copy", "Copy")}
+                  icon={Copy}
+                  onClick={handleCopyInstallLocation}
+                />
               </div>
             )}
-
-          {/* Pending Manual Install State */}
-          {isPendingManualInstall && !installerLaunched && (
-            <div className="space-y-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-                  <ShieldAlert className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-amber-600">
-                    {t("downloads.manualInstallTitle") || "One Last Step"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("downloads.manualInstallDescription") ||
-                      "Download complete. Run the installer as Administrator to finish installing the game."}
-                  </p>
-                </div>
-              </div>
+            {installerLaunched ? (
               <Button
+                size="sm"
+                onClick={handleFinishInstall}
+                disabled={isFinishingInstall}
+                className="gap-2 text-secondary"
+              >
+                {isFinishingInstall ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                {t("downloads.finishedInstalling") || "I've Finished Installing"}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
                 onClick={handleRunInstaller}
                 disabled={isLaunchingInstaller}
-                className="w-full gap-2 text-secondary"
+                className="gap-2 text-secondary"
               >
                 {isLaunchingInstaller ? (
                   <Loader className="h-4 w-4 animate-spin" />
@@ -2074,89 +1987,35 @@ const DownloadCard = ({
                 )}
                 {t("downloads.runAsAdmin") || "Run Installer as Admin"}
               </Button>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* Installer Launched, Awaiting User Confirmation */}
-          {isPendingManualInstall && installerLaunched && (
-            <div className="space-y-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-                  <Loader className="h-5 w-5 animate-spin text-amber-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-amber-600">
-                    {t("downloads.installingTitle") || "Installing..."}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("downloads.installingDescription") ||
-                      "Follow the installer's steps. Once it finishes, click below to mark this game as installed."}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowInstallLocationDialog(true)}
-                  className="gap-2"
-                >
-                  <FolderCog className="h-4 w-4" />
-                  {t("downloads.viewInstallLocation") || "View Location"}
-                </Button>
-                <Button
-                  onClick={handleFinishInstall}
-                  disabled={isFinishingInstall}
-                  className="flex-1 gap-2 text-secondary"
-                >
-                  {isFinishingInstall ? (
-                    <Loader className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  {t("downloads.finishedInstalling") || "I've Finished Installing"}
-                </Button>
-              </div>
-            </div>
-          )}
+        {/* Completed */}
+        {isCompleted && !isPendingManualInstall && (
+          <p className="flex items-center gap-2 text-sm text-green-600">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {t("downloads.completedDescription") || "Your game is ready to play"}
+          </p>
+        )}
 
-          {/* Completed State */}
-          {isCompleted && !isPendingManualInstall && (
-            <div className="flex items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/5 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <p className="font-medium text-green-600">
-                  {t("downloads.completed") || "Download Complete!"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t("downloads.completedDescription") || "Your game is ready to play"}
-                </p>
-              </div>
-            </div>
-          )}
+        {/* Verifying */}
+        {isVerifyingState && !isCompleted && (
+          <div className="space-y-2">
+            <ProgressBar indeterminate tone="blue" />
+            <p className="text-sm text-muted-foreground">
+              {t("downloads.verifyingDescription")}
+            </p>
+          </div>
+        )}
 
-          {/* Verifying State */}
-          {isVerifyingState && !isCompleted && (
-            <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <Loader className="h-5 w-5 animate-spin text-blue-500" />
-              </div>
-              <div>
-                <p className="font-medium text-foreground">{t("downloads.verifying")}</p>
-                <p className="text-sm text-muted-foreground">
-                  {t("downloads.verifyingDescription")}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Verify Error State */}
-          {hasVerifyError && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-amber-600">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm font-medium">
+        {/* Verification failed */}
+        {hasVerifyError && (
+          <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-amber-600">
                   {downloadingData.verifyError.length === 1
                     ? t("downloads.verificationFailed1", {
                         numFailed: downloadingData.verifyError.length,
@@ -2164,339 +2023,212 @@ const DownloadCard = ({
                     : t("downloads.verificationFailed2", {
                         numFailed: downloadingData.verifyError.length,
                       })}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("downloads.verificationFailedDesc")}{" "}
-                <a
-                  className="inline-flex cursor-pointer items-center text-primary hover:underline"
-                  onClick={() =>
-                    window.electron.openURL(
-                      "https://ascendara.app/docs/troubleshooting/common-issues#verification-issues"
-                    )
-                  }
-                >
-                  {t("common.learnMore")} <ExternalLink className="ml-1 h-3 w-3" />
-                </a>
-              </p>
-              <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/50 p-2 text-xs">
-                {downloadingData.verifyError.map((error, index) => (
-                  <div key={index} className="py-0.5 text-muted-foreground">
-                    <span className="font-medium">{error.file}</span>
-                  </div>
-                ))}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleVerifyGame}
-                disabled={isVerifying}
-                className="w-full"
-              >
-                {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
-              </Button>
-            </div>
-          )}
-
-          {/* Resuming State */}
-          {isResumingState && (
-            <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <Loader className="h-5 w-5 animate-spin text-blue-500" />
-              </div>
-              <div>
-                <p className="font-medium text-foreground">{t("downloads.resuming")}</p>
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  {t("downloads.resumingDescription")}
+                  {t("downloads.verificationFailedDesc")}{" "}
+                  <a
+                    className="inline-flex cursor-pointer items-center text-primary hover:underline"
+                    onClick={() =>
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/troubleshooting/common-issues#verification-issues"
+                      )
+                    }
+                  >
+                    {t("common.learnMore")} <ExternalLink className="ml-1 h-3 w-3" />
+                  </a>
                 </p>
               </div>
             </div>
-          )}
-
-          {/* Stopped State */}
-          {isStopped && !isResumingState && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/50 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                  <Pause className="h-5 w-5 text-muted-foreground" />
+            <div className="max-h-24 overflow-y-auto rounded-md bg-muted/50 p-2 text-xs">
+              {downloadingData.verifyError.map((error, index) => (
+                <div key={index} className="py-0.5 font-medium text-muted-foreground">
+                  {error.file}
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">{t("downloads.stopped")}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("downloads.stoppedDescription")}
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onResume}
-                className="gap-2 text-secondary"
-                disabled={isResuming}
-              >
-                {isResuming ? (
-                  <Loader className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                {t("downloads.actions.resumeDownload")}
-              </Button>
+              ))}
             </div>
-          )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleVerifyGame}
+              disabled={isVerifying}
+            >
+              {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
+            </Button>
+          </div>
+        )}
 
-          {/* Error State */}
-          {hasError && (
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-red-500/10">
-                  <AlertCircle className="h-5 w-5 text-red-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-red-600">
-                    {t("downloads.downloadError")}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {getErrorMessage()}
-                  </p>
-                  {isPredefinedError(downloadingData.message) && (
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
-                        )
-                      }
-                      className="mt-2 inline-flex cursor-pointer items-center gap-1 text-sm text-primary hover:underline"
-                    >
-                      {t("common.learnMore")} <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              </div>
+        {/* Resuming */}
+        {isResumingState && (
+          <div className="space-y-2">
+            <ProgressBar indeterminate tone="blue" />
+            <p className="text-sm text-muted-foreground">
+              {t("downloads.resumingDescription")}
+            </p>
+          </div>
+        )}
 
-              <div className="flex flex-wrap gap-2">
-                {!isPredefinedError(downloadingData.message) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleReport}
-                    disabled={isReporting || wasReported}
-                    className="gap-2"
+        {/* Paused */}
+        {isStopped && !isResumingState && (
+          <div className="space-y-2">
+            <span className="text-2xl font-bold tabular-nums leading-none text-muted-foreground">
+              {progress.toFixed(1)}
+              <span className="ml-0.5 text-sm font-medium">%</span>
+            </span>
+            <ProgressBar value={progress} tone="muted" active={false} />
+          </div>
+        )}
+
+        {/* Error */}
+        {hasError && (
+          <div className="space-y-3 rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-sm text-foreground">{getErrorMessage()}</p>
+                {isPredefinedError(downloadingData.message) && (
+                  <a
+                    onClick={() =>
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
+                      )
+                    }
+                    className="mt-1 inline-flex cursor-pointer items-center gap-1 text-sm text-primary hover:underline"
                   >
-                    {isReporting ? (
-                      <Loader className="h-4 w-4 animate-spin" />
-                    ) : wasReported ? (
-                      <CircleCheck className="h-4 w-4" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4" />
-                    )}
-                    {isReporting
-                      ? t("common.reporting")
-                      : wasReported
-                        ? t("downloads.alreadyReported")
-                        : t("common.reportToAscendara")}
-                  </Button>
+                    {t("common.learnMore")} <ExternalLink className="h-3 w-3" />
+                  </a>
                 )}
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={canRetryExtraction(game) ? handleRetryExtraction : onRetry}
-                  disabled={isSubmittingRecovery}
-                  className="gap-2 text-secondary"
-                >
-                  <RefreshCcw className="h-4 w-4" />
-                  {t(
-                    canRetryExtraction(game)
-                      ? "downloads.retryExtraction"
-                      : "common.retry"
-                  )}
-                </Button>
               </div>
             </div>
-          )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={canRetryExtraction(game) ? handleRetryExtraction : onRetry}
+                disabled={isSubmittingRecovery}
+                className="gap-2 text-secondary"
+              >
+                <RefreshCcw className="h-4 w-4" />
+                {t(
+                  canRetryExtraction(game) ? "downloads.retryExtraction" : "common.retry"
+                )}
+              </Button>
+              {!isPredefinedError(downloadingData.message) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReport}
+                  disabled={isReporting || wasReported}
+                  className="gap-2"
+                >
+                  {isReporting ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : wasReported ? (
+                    <CircleCheck className="h-4 w-4" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4" />
+                  )}
+                  {isReporting
+                    ? t("common.reporting")
+                    : wasReported
+                      ? t("downloads.alreadyReported")
+                      : t("common.reportToAscendara")}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
-          {/* Active Download State */}
-          {isDownloading && !isWaiting && !isExtracting && !hasError && !isStopped && (
-            <div className="space-y-4">
-              {/* Progress bar */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-foreground">
-                    {progress.toFixed(1)}%
-                  </span>
-                  <span className="text-muted-foreground">
-                    ETA: {downloadingData.timeUntilComplete || "--:--"}
-                  </span>
-                </div>
-                <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/50">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                  {/* Shimmer effect */}
-                  <div
-                    className="absolute inset-y-0 left-0 animate-shimmer rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Speed and info */}
-              <div className="flex flex-wrap items-center gap-3">
+        {/* Downloading */}
+        {isDownloading && !isWaiting && !isExtracting && !hasError && !isStopped && (
+          <div className="space-y-2">
+            <div className="flex items-end justify-between gap-3">
+              <span className="text-2xl font-bold tabular-nums leading-none text-foreground">
+                {progress.toFixed(1)}
+                <span className="ml-0.5 text-sm font-medium text-muted-foreground">
+                  %
+                </span>
+              </span>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <SpeedIndicator
                   speed={downloadingData.progressDownloadSpeeds}
                   isHigh={isHighSpeed(downloadingData.progressDownloadSpeeds)}
                 />
-
-                {settings.downloadLimit > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {t("downloads.limitedTo")}{" "}
-                    {settings.downloadLimit >= 1024
-                      ? `${Math.round(settings.downloadLimit / 1024)} MB/s`
-                      : `${settings.downloadLimit} KB/s`}
-                  </Badge>
-                )}
+                <span className="tabular-nums">
+                  ETA {downloadingData.timeUntilComplete || "--:--"}
+                </span>
               </div>
             </div>
-          )}
+            <ProgressBar value={progress} />
+          </div>
+        )}
 
-          {/* Extracting State */}
-          {isExtracting && (
-            <div className="space-y-3">
-              {/* Large file notice */}
-              {showLargeFileNotice && (
-                <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-600">
-                  <AnimatedClockIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span>{t("downloads.largeFileNotice")}</span>
+        {/* Extracting */}
+        {isExtracting && (
+          <div className="space-y-2">
+            {extraction?.totalFiles > 0 ? (
+              <>
+                <div className="flex items-end justify-between gap-3">
+                  <span className="text-2xl font-bold tabular-nums leading-none text-foreground">
+                    {extractionPercent.toFixed(1)}
+                    <span className="ml-0.5 text-sm font-medium text-muted-foreground">
+                      %
+                    </span>
+                  </span>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {extraction.filesExtracted} / {extraction.totalFiles}{" "}
+                    {t("downloads.files", "files")}
+                    {extraction.extractionSpeed && ` · ${extraction.extractionSpeed}`}
+                  </span>
                 </div>
-              )}
-              {/* Extraction progress bar */}
-              {downloadingData?.extractionProgress?.totalFiles > 0 ? (
-                <>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-foreground">
-                        {parseFloat(
-                          downloadingData.extractionProgress.percentComplete || 0
-                        ).toFixed(1)}
-                        %
-                      </span>
-                      <span className="text-muted-foreground">
-                        {downloadingData.extractionProgress.filesExtracted} /{" "}
-                        {downloadingData.extractionProgress.totalFiles} files
-                      </span>
-                    </div>
-                    <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/50">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-300"
-                        style={{
-                          width: `${parseFloat(downloadingData.extractionProgress.percentComplete || 0)}%`,
-                        }}
-                      />
-                      {/* Shimmer effect */}
-                      <div
-                        className="absolute inset-y-0 left-0 animate-shimmer rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                        style={{
-                          width: `${parseFloat(downloadingData.extractionProgress.percentComplete || 0)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                      <Loader className="h-5 w-5 animate-spin text-amber-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-foreground">
-                          {t("downloads.extracting")}
-                        </p>
-                        <span className="text-xs text-muted-foreground">
-                          {downloadingData.extractionProgress.extractionSpeed}
-                        </span>
-                      </div>
-                      {downloadingData.extractionProgress.currentFile ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs uppercase tracking-wider text-muted-foreground">
-                            {t("downloads.currentFile", "Current file")}
-                          </span>
-                          <div className="flex items-center gap-1.5 rounded-md bg-muted/70 px-2 py-0.5">
-                            <FileText className="h-3 w-3 text-muted-foreground" />
-                            <span
-                              className="max-w-[180px] truncate text-xs font-medium text-foreground"
-                              title={downloadingData.extractionProgress.currentFile}
-                            >
-                              {downloadingData.extractionProgress.currentFile}
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          {t("downloads.extractingDescription")}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="relative h-2 overflow-hidden rounded-full bg-muted/50">
-                    <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-primary/20 via-primary to-primary/20" />
-                  </div>
-                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                      <Loader className="h-5 w-5 animate-spin text-amber-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {t("downloads.extracting")}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {t("downloads.preparingExtraction") || "Preparing extraction..."}
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Waiting State */}
-          {isWaiting && (
-            <div className="space-y-3">
-              <div className="relative h-2 overflow-hidden rounded-full bg-muted/30">
-                <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-muted-foreground/30 to-transparent" />
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                  <Clock className="h-5 w-5 animate-pulse text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">{t("downloads.waiting")}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("downloads.waitingDescription")}
+                <ProgressBar value={extractionPercent} tone="amber" />
+                <div className="flex items-center justify-between gap-3">
+                  <p
+                    className="min-w-0 truncate text-xs text-muted-foreground"
+                    title={extraction.currentFile || undefined}
+                  >
+                    {extraction.currentFile || t("downloads.extractingDescription")}
                   </p>
+                  {logToggle}
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+              </>
+            ) : (
+              <>
+                <ProgressBar indeterminate tone="amber" />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {t("downloads.preparingExtraction") || "Preparing extraction..."}
+                  </p>
+                  {logToggle}
+                </div>
+              </>
+            )}
+            {showLargeFileNotice && (
+              <p className="flex items-center gap-2 text-xs text-blue-600">
+                <AnimatedClockIcon className="h-3.5 w-3.5 shrink-0" />
+                {t("downloads.largeFileNotice")}
+              </p>
+            )}
+          </div>
+        )}
 
-      {/* Log Viewer Dialog */}
-      <Dialog open={logDialogOpen} onOpenChange={setLogDialogOpen}>
-        <DialogContent className="max-h-[80vh] max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {t("downloads.logViewerTitle")}
-            </DialogTitle>
-          </DialogHeader>
+        {/* Waiting for peers */}
+        {isWaiting && (
+          <div className="space-y-2">
+            <ProgressBar indeterminate tone="muted" />
+            <p className="text-sm text-muted-foreground">
+              {t("downloads.waitingDescription")}
+            </p>
+          </div>
+        )}
+
+        {/* Live log, inline */}
+        {logDialogOpen && (
           <div
             ref={logScrollRef}
-            className="h-[60vh] w-full overflow-y-auto rounded-md border bg-muted/30 p-4"
+            className="h-56 overflow-y-auto rounded-lg border border-border/60 bg-muted/30 p-3"
           >
             {logLoading ? (
               <div className="flex h-full items-center justify-center">
-                <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Loader className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground">
@@ -2504,49 +2236,8 @@ const DownloadCard = ({
               </pre>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Install Location Reminder Dialog */}
-      <AlertDialog
-        open={showInstallLocationDialog}
-        onOpenChange={setShowInstallLocationDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              {t("downloads.setInstallLocationTitle") || "Set the Install Location"}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3 text-muted-foreground">
-              <p>
-                {t("downloads.setInstallLocationDescription") ||
-                  "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it."}
-              </p>
-              <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
-                <code className="flex-1 break-all text-xs text-foreground">
-                  {downloadingData?.manualInstallDir}
-                </code>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={handleCopyInstallLocation}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              className="bg-primary text-secondary"
-              onClick={() => setShowInstallLocationDialog(false)}
-            >
-              {t("common.gotIt") || "Got it"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        )}
+      </div>
     </div>
   );
 };

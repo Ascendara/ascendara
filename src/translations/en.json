@@ -1155,6 +1155,7 @@
       "shareFeedbackDescription": "Share your thoughts"
     },
     "copied": "Copied to clipboard!",
+    "copy": "Copy",
     "delete": "Delete",
     "disabled": "Disabled",
     "discord": "Discord",
@@ -1557,6 +1558,7 @@
       "retryDownload": "Retry Download",
       "viewLog": "View Live Log"
     },
+    "active": "Active",
     "activeDownloads": "Downloading Games",
     "alreadyReported": "Already Reported",
     "ascendRequired": {
@@ -1572,6 +1574,9 @@
     "contentTypeError": "The downloader reported a content type error. This most likely means the download link has expired.",
     "currentFile": "Current file",
     "currentTotalSpeed": "Current Total Speed",
+    "diskActivity": "Disk Activity",
+    "diskRead": "Read",
+    "diskWrite": "Write",
     "downloadError": "Download Error",
     "downloading": "Downloading",
     "downloadsInProgress": "{{count}} download in progress",
@@ -1582,7 +1587,9 @@
       "killFailed": "Failed to kill download",
       "pauseFailed": "Failed to pause download"
     },
+    "extractedProgress": "Extracted",
     "extracting": "Extracting game files...",
+    "extractingCount": "Extracting",
     "extractingDescription": "Extracting game files may take up to 30 minutes depending on the file size.",
     "extractionFailedError": "Archive extraction failed. The downloaded archive could not be extracted - the download may be corrupted or incomplete.",
     "extractionRecovery": {
@@ -1598,12 +1605,16 @@
       "retryingArchive": "Retrying extraction of the retained archive.",
       "title": "Files disappeared after extraction"
     },
+    "extractionSpeed": "Extraction",
+    "files": "files",
+    "filesLabel": "Files",
     "finishedInstalling": "I've Finished Installing",
     "firstTimeDownload": {
-      "message": "Ascendara will continue to download games in the background if you close the application. You can stop the download at any time by clicking the action button then clicking the \"Stop Download\" button.",
+      "message": "Ascendara will continue to download games in the background if you close the application. You can pause or stop a download at any time with the buttons on its card.",
       "title": "Downloading on Ascendara",
       "understand": "I understand"
     },
+    "hideLog": "Hide log",
     "installComplete": "Installation Complete",
     "installCompleteDesc": "Your game is ready to play",
     "installCompleteFailed": "Could not finalize installation",
@@ -1631,11 +1642,14 @@
     "pauseSuccess": "Download paused successfully",
     "paused": "Paused",
     "pausing": "Pausing...",
+    "peak": "Peak",
     "pending": "Pending",
     "preparingExtraction": "Preparing extraction...",
+    "queued": "Queued",
     "queuedCount": "{{count}} queued",
     "queuedDownloadStarted": "Starting queued download: {{name}}",
     "queuedDownloads": "Queued Downloads",
+    "removeFromQueue": "Remove from queue",
     "resourceGoneError": "This game was removed from the download provider and is no longer available. Try updating your local index or using a different provider.",
     "resume": "Resume",
     "resumeError": "Failed to Resume Download",
