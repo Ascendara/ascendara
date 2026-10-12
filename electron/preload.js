@@ -478,7 +478,8 @@ contextBridge.exposeInMainWorld("electron", {
     additionalDirIndex,
     gameID,
     browserDirect = false,
-    browserAssetGameId
+    browserAssetGameId,
+    browserAssetLogoId
   ) =>
     ipcRenderer.invoke(
       "download-file",
@@ -494,7 +495,8 @@ contextBridge.exposeInMainWorld("electron", {
       additionalDirIndex,
       gameID,
       browserDirect,
-      browserAssetGameId
+      browserAssetGameId,
+      browserAssetLogoId
     ),
   stopDownload: (game, deleteContents, isKill) =>
     ipcRenderer.invoke("stop-download", game, deleteContents, isKill),

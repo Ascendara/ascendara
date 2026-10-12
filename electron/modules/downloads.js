@@ -365,7 +365,8 @@ function registerDownloadHandlers() {
       additionalDirIndex,
       gameID,
       browserDirect = false,
-      browserAssetGameId
+      browserAssetGameId,
+      browserAssetLogoId
     ) => {
       console.log(
         `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
@@ -377,6 +378,13 @@ function registerDownloadHandlers() {
         (!Number.isSafeInteger(browserAssetGameId) || browserAssetGameId <= 0)
       ) {
         throw new Error("Invalid artwork game selection");
+      }
+      if (
+        browserAssetLogoId != null &&
+        (!Number.isSafeInteger(browserAssetLogoId) || browserAssetLogoId <= 0 ||
+          !Number.isSafeInteger(browserAssetGameId) || browserAssetGameId <= 0)
+      ) {
+        throw new Error("Invalid artwork logo selection");
       }
       if (browserDirect === true) {
         const parsed = new URL(link);
@@ -555,7 +563,7 @@ function registerDownloadHandlers() {
         // Launch in background to not interfer with game downloading
         if (browserAssetGameId !== null) {
           steamgrid
-            .fetchGameAssets(game, gameDirectory, browserAssetGameId)
+            .fetchGameAssets(game, gameDirectory, browserAssetGameId, browserAssetLogoId)
             .catch(err => console.error(`[Download] Assets download failed:`, err));
         }
         let executablePath;

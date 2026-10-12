@@ -60,12 +60,18 @@ async function throttledGet(url, headers) {
   }
 }
 
-async function fetchGameAssets(gameName, gameDir, selectedGameId) {
+async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId) {
   if (
     selectedGameId != null &&
     (!Number.isSafeInteger(selectedGameId) || selectedGameId <= 0)
   ) {
     throw new Error("Invalid artwork game selection");
+  }
+  if (
+    selectedLogoId != null &&
+    (!Number.isSafeInteger(selectedLogoId) || selectedLogoId <= 0 || !selectedGameId)
+  ) {
+    throw new Error("Invalid artwork logo selection");
   }
   // Check if we already have all the new assets
   const expectedFiles = [
@@ -158,17 +164,35 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId) {
       if (item.type !== "logos") url += `&mimes=image/jpeg,image/png`;
 
       try {
-        let res = await axios.get(url, { headers: authHeaders });
+        const res = await axios.get(url, { headers: authHeaders });
+        let assets = res.data?.success && Array.isArray(res.data.data) ? res.data.data : [];
 
-        // For logos, if white style returns no results, try official as fallback
-        if (item.type === "logos" && (!res.data.success || res.data.data.length === 0)) {
-          console.log(`[SteamGrid] No white logos found, trying official...`);
-          url = `${PROXY_BASE_URL}/${item.type}/game/${gameId}?styles=official&sort=score`;
-          res = await axios.get(url, { headers: authHeaders });
+        // Prefer English logos even when the white-style results contain other languages.
+        if (
+          item.type === "logos" &&
+          (selectedLogoId || !assets.some(asset => asset.language === "en"))
+        ) {
+          try {
+            const official = await axios.get(
+              `${PROXY_BASE_URL}/${item.type}/game/${gameId}?styles=official&sort=score`,
+              { headers: authHeaders }
+            );
+            if (official.data?.success && Array.isArray(official.data.data)) {
+              assets = [...assets, ...official.data.data];
+            }
+          } catch (error) {
+            if (!assets.length) throw error;
+          }
         }
 
-        if (res.data.success && res.data.data.length > 0) {
-          const imageUrl = res.data.data[0].url;
+        const selected = item.type === "logos"
+          ? assets.find(asset => asset.id === selectedLogoId) ||
+            assets.find(asset => asset.language === "en") ||
+            assets.find(asset => !asset.language) ||
+            assets[0]
+          : assets[0];
+        if (selected?.url) {
+          const imageUrl = selected.url;
 
           // 3. Detect extension and craft final name
           let ext = path.extname(imageUrl).split("?")[0];

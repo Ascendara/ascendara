@@ -1,3 +1,21 @@
+export function parseBrowserDownloadTitle(title) {
+  if (typeof title !== "string") return { name: "", version: "", online: false };
+  const metadata = [...title.matchAll(/\(([^)]*)\)/g)]
+    .map(match => match[1])
+    .join(" ");
+  const name = title
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\s+free\s+download\s*$/i, "")
+    .replace(/[\s\-–—:|]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return {
+    name,
+    version: metadata.match(/\bv\d+(?:[._-]\d+)*(?:[a-z]\d*)?\b/i)?.[0] || "",
+    online: /\b(?:co[\s-]?op|online[\s-]?fix)\b/i.test(metadata),
+  };
+}
+
 // Keep signed URLs byte-for-byte intact; decode only the protocol envelope.
 export function parseBrowserDownload(protocolUrl) {
   if (typeof protocolUrl !== "string" || !protocolUrl.startsWith("ascendara://")) {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { parseBrowserDownload } from "@/lib/browserDownload";
+import { parseBrowserDownload, parseBrowserDownloadTitle } from "@/lib/browserDownload";
 import { sanitizeText } from "@/lib/utils";
 import { addToQueue, processNextInQueue } from "@/services/downloadQueueService";
 import BrowserDownloadArtwork from "@/components/BrowserDownloadArtwork";
@@ -30,6 +30,7 @@ export default function BrowserDownloadHandler() {
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");
   const [artwork, setArtwork] = useState(null);
+  const [logoId, setLogoId] = useState(null);
   const [online, setOnline] = useState(false);
   const [dlc, setDlc] = useState(false);
   const [downloadSettings, setDownloadSettings] = useState({
@@ -41,7 +42,9 @@ export default function BrowserDownloadHandler() {
   const isNewGame =
     !request?.game || sanitizeText(name) !== sanitizeText(request.game.game);
   const suggestedName =
-    request?.title || request?.filename?.replace(/\.(zip|rar|7z|exe)$/i, "") || "";
+    parseBrowserDownloadTitle(request?.title).name ||
+    request?.filename?.replace(/\.(zip|rar|7z|exe)$/i, "") ||
+    "";
   useEffect(() => {
     let active = true;
     window.electron
@@ -91,13 +94,15 @@ export default function BrowserDownloadHandler() {
     };
   }, [t]);
   useEffect(() => {
-    setVersion("");
+    const title = parseBrowserDownloadTitle(request?.title);
+    setVersion(request?.game ? "" : title.version);
     setArtwork(null);
-    setOnline(false);
+    setLogoId(null);
+    setOnline(!request?.game && title.online);
     setDlc(false);
     setName(
       request?.game?.game ||
-        request?.title ||
+        title.name ||
         request?.filename?.replace(/\.(zip|rar|7z|exe)$/i, "") ||
         ""
     );
@@ -135,6 +140,7 @@ export default function BrowserDownloadHandler() {
         gameID: gameData.gameID || "",
         browserDirect: true,
         browserAssetGameId: artwork?.id ?? gameData.browserAssetGameId ?? null,
+        browserAssetLogoId: artwork ? logoId : null,
       });
       const started = await processNextInQueue();
       toast.success(
@@ -172,7 +178,7 @@ export default function BrowserDownloadHandler() {
   return (
     <>
       <AlertDialog open={!showPathDialog}>
-        <AlertDialogContent className="text-foreground sm:max-w-xl">
+        <AlertDialogContent className="grid-cols-[minmax(0,1fr)] text-foreground sm:max-w-xl">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t(isNewGame ? "browserDownload.newGameTitle" : "browserDownload.title")}
@@ -232,7 +238,12 @@ export default function BrowserDownloadHandler() {
                 key={request.raw}
                 initialQuery={suggestedName}
                 value={artwork}
-                onChange={setArtwork}
+                onChange={game => {
+                  setArtwork(game);
+                  setLogoId(null);
+                }}
+                selectedLogoId={logoId}
+                onLogoChange={setLogoId}
               />
             </>
           )}

@@ -6,14 +6,22 @@ import { Button } from "@/components/ui/button";
 
 const BASE = "https://api.ascendara.app/api/proxy/steamgrid";
 
-export default function BrowserDownloadArtwork({ initialQuery, value, onChange }) {
+export default function BrowserDownloadArtwork({
+  initialQuery,
+  value,
+  onChange,
+  selectedLogoId,
+  onLogoChange,
+}) {
   const { t } = useTranslation();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [previews, setPreviews] = useState({});
+  const [logoOptions, setLogoOptions] = useState([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const selectedLogo = logoOptions.find(logo => logo.id === selectedLogoId) || logoOptions[0];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -51,34 +59,24 @@ export default function BrowserDownloadArtwork({ initialQuery, value, onChange }
   useEffect(() => {
     const controller = new AbortController();
     setPreviews({});
+    setLogoOptions([]);
     setLoadingPreview(!!value);
     if (!value) return () => controller.abort();
     const types = [
       ["grid", "grids", "styles=alternate&dimensions=600x900"],
       ["hero", "heroes", "styles=alternate"],
-      ["logo", "logos", "styles=white&sort=score"],
     ];
     const loadPreviews = async () => {
       const nextPreviews = {};
       for (const [key, type, params] of types) {
         try {
-          let response = await fetch(
+          const response = await fetch(
             `${BASE}/${type}/game/${value.id}?${params}&sort=score`,
             { signal: controller.signal }
           );
           if (response.ok) {
-            let data = await response.json();
-            if (
-              key === "logo" &&
-              (!data.success || !Array.isArray(data.data) || data.data.length === 0)
-            ) {
-              response = await fetch(
-                `${BASE}/logos/game/${value.id}?styles=official&sort=score`,
-                { signal: controller.signal }
-              );
-              data = response.ok ? await response.json() : null;
-            }
-            if (response.ok && data?.success && Array.isArray(data.data)) {
+            const data = await response.json();
+            if (data.success && Array.isArray(data.data)) {
               nextPreviews[key] = data.data[0]?.url || null;
             }
           }
@@ -86,7 +84,30 @@ export default function BrowserDownloadArtwork({ initialQuery, value, onChange }
           if (controller.signal.aborted) return;
         }
       }
+      const logos = [];
+      for (const style of ["white", "official"]) {
+        try {
+          const response = await fetch(
+            `${BASE}/logos/game/${value.id}?styles=${style}&sort=score`,
+            { signal: controller.signal }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && Array.isArray(data.data)) logos.push(...data.data);
+          }
+        } catch {
+          if (controller.signal.aborted) return;
+        }
+      }
+      const options = logos
+        .filter(logo => Number.isSafeInteger(logo.id) && logo.id > 0 && logo.url)
+        .sort((a, b) =>
+          (b.language === "en" ? 2 : !b.language ? 1 : 0) -
+          (a.language === "en" ? 2 : !a.language ? 1 : 0)
+        )
+        .slice(0, 24);
       if (!controller.signal.aborted) {
+        setLogoOptions(options);
         setPreviews(nextPreviews);
         setLoadingPreview(false);
       }
@@ -96,7 +117,7 @@ export default function BrowserDownloadArtwork({ initialQuery, value, onChange }
   }, [value]);
 
   return (
-    <section className="space-y-3 rounded-xl border border-border bg-muted/20 p-4 text-foreground">
+    <section className="min-w-0 space-y-3 rounded-xl border border-border bg-muted/20 p-4 text-foreground">
       <div>
         <h3 className="text-sm font-medium text-foreground">
           {t("browserDownload.artworkTitle")}
@@ -159,9 +180,9 @@ export default function BrowserDownloadArtwork({ initialQuery, value, onChange }
               {["grid", "hero", "logo"].map(key => (
                 <div key={key} className="space-y-1">
                   <div className="flex h-24 items-center justify-center overflow-hidden rounded-md bg-background p-1">
-                    {previews[key] ? (
+                    {(key === "logo" ? selectedLogo?.url : previews[key]) ? (
                       <img
-                        src={previews[key]}
+                        src={key === "logo" ? selectedLogo.url : previews[key]}
                         alt={t(`browserDownload.${key}`)}
                         className="h-full w-full object-contain"
                       />
@@ -176,6 +197,26 @@ export default function BrowserDownloadArtwork({ initialQuery, value, onChange }
                   </p>
                 </div>
               ))}
+            </div>
+          )}
+          {!loadingPreview && logoOptions.length > 1 && (
+            <div className="min-w-0 space-y-1">
+              <p className="text-xs text-muted-foreground">{t("browserDownload.logo")}</p>
+              <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-1">
+                {logoOptions.map(logo => (
+                  <Button
+                    key={logo.id}
+                    variant={selectedLogo?.id === logo.id ? "secondary" : "outline"}
+                    className="h-20 w-24 shrink-0 flex-col gap-1 p-1"
+                    aria-label={`${t("browserDownload.logo")} ${logo.language?.toUpperCase() || "—"}`}
+                    aria-pressed={selectedLogo?.id === logo.id}
+                    onClick={() => onLogoChange(logo.id)}
+                  >
+                    <img src={logo.thumb || logo.url} alt="" className="max-h-12 max-w-full object-contain" />
+                    <span className="text-xs">{logo.language?.toUpperCase() || "—"}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
         </div>
