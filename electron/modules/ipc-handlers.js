@@ -1814,6 +1814,9 @@ function registerMiscHandlers() {
   // Import Steam games handler
   require("./launcher-import").registerLauncherImportHandlers();
 
+  // HowLongToBeat completion times handler
+  require("./hltb").registerHltbHandlers();
+
   // Download finished handler
   ipcMain.handle("download-finished", async (_, game) => {
     console.log(`Download finished for game: ${game}`);

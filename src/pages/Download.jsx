@@ -55,6 +55,7 @@ import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
 import { toast } from "sonner";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/gameInfoService";
+import hltbService from "@/services/hltbService";
 import torboxService from "@/services/torboxService";
 import {
   fetchProviderPatterns,
@@ -260,6 +261,19 @@ export default function DownloadPage() {
     }
   }, [gameData]);
 
+  // Fetch HowLongToBeat completion times
+  useEffect(() => {
+    setHltbData(null);
+    if (!gameData?.game) return;
+    let cancelled = false;
+    hltbService.getGameTimes(gameData.game).then(times => {
+      if (!cancelled) setHltbData(times);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameData?.game]);
+
   // State declarations
   const [selectedProvider, setSelectedProvider] = useState("");
   const [inputLink, setInputLink] = useState("");
@@ -307,6 +321,7 @@ export default function DownloadPage() {
   const [steamData, setSteamData] = useState(null);
   const [steamError, setSteamError] = useState(null);
   const [steamLoading, setSteamLoading] = useState(false);
+  const [hltbData, setHltbData] = useState(null);
   const [gameRating, setGameRating] = useState(gameData?.rating || 0);
   const [writtenReviews, setWrittenReviews] = useState({ gameID: null, count: 0 });
   const reviewsRef = useRef(null);
@@ -1978,6 +1993,7 @@ export default function DownloadPage() {
               }
               steamRating={steamData?.rating ? (steamData.rating / 10).toFixed(1) : null}
               releaseDate={steamData?.release_date}
+              hltbData={hltbData}
               showTimemachine={timemachineSetting}
               onOpenTimemachine={() => setShowTimemachineSelection(true)}
             />

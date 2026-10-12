@@ -9,6 +9,7 @@ const CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 // Cache prefixes for different APIs
 const CACHE_PREFIXES = {
   STEAM: "steam_cache_",
+  HLTB: "hltb_cache_",
   DEFAULT: "game_cache_",
 };
 
@@ -212,6 +213,8 @@ const getCachePrefix = apiType => {
   switch (apiType.toLowerCase()) {
     case "steam":
       return CACHE_PREFIXES.STEAM;
+    case "hltb":
+      return CACHE_PREFIXES.HLTB;
     default:
       return CACHE_PREFIXES.DEFAULT;
   }

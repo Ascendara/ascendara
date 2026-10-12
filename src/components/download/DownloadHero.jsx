@@ -16,9 +16,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLatestUpdate } from "@/lib/utils";
+import hltbService from "@/services/hltbService";
 import {
   Apple,
   CircleSlash,
+  Clock,
   ExternalLink,
   FileQuestion,
   History,
@@ -86,6 +88,7 @@ export default function DownloadHero({
   onReadReviews,
   steamRating,
   releaseDate,
+  hltbData,
   showTimemachine,
   onOpenTimemachine,
 }) {
@@ -272,6 +275,35 @@ export default function DownloadHero({
             <Stat label={t("download.firstReleasedOn")}>{releaseDate}</Stat>
           )}
         </dl>
+
+        {/* HowLongToBeat completion times */}
+        {hltbData && (
+          <dl className="grid grid-cols-2 divide-x divide-border/40 border-t border-border/40 bg-background/30 md:grid-cols-4">
+            <Stat label={t("download.timeToBeat")}>
+              <button
+                type="button"
+                onClick={() => window.electron.openURL(hltbData.url)}
+                className="flex items-center gap-1.5 truncate hover:text-primary"
+              >
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                HowLongToBeat
+                <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
+              </button>
+            </Stat>
+            {[
+              ["download.mainStory", hltbData.main],
+              ["download.mainPlusExtras", hltbData.plus],
+              ["download.completionist", hltbData.full],
+            ].map(([label, seconds]) => {
+              const hours = hltbService.formatHours(seconds);
+              return (
+                <Stat key={label} label={t(label)}>
+                  {hours ? `${hours} ${t("download.hours")}` : "--"}
+                </Stat>
+              );
+            })}
+          </dl>
+        )}
       </section>
     </TooltipProvider>
   );
