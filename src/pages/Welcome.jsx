@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Rocket,
   Shield,
+  ShieldCheck,
   Download,
   PuzzleIcon,
   PackageOpen,
@@ -298,6 +299,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [showDepsErrorAlert, setShowDepsErrorAlert] = useState(false);
   const [showManualUpdateConfirm, setShowManualUpdateConfirm] = useState(false);
   const [downloadDirectory, setDownloadDirectory] = useState("");
+  const [protectLoading, setProtectLoading] = useState(false);
+  const [protectError, setProtectError] = useState("");
+  const [showNoDefenderWarning, setShowNoDefenderWarning] = useState(false);
   const [dependencyStatus, setDependencyStatus] = useState({
     ".NET Framework": { installed: false, icon: null },
     DirectX: { installed: false, icon: null },
@@ -612,6 +616,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "referral") {
       setStep("directory");
     } else if (step === "directory") {
+      setStep(isOnWindows ? "protectDirectories" : "theme");
+    } else if (step === "protectDirectories") {
       setStep("theme");
     } else if (step === "theme") {
       setStep("importGames");
@@ -719,6 +725,24 @@ const Welcome = ({ welcomeData, onComplete }) => {
         console.error("Error saving settings:", error);
         setWarningMessage("An error occurred while saving the download directory.");
       }
+    }
+  };
+
+  const handleEnableProtection = async () => {
+    setProtectLoading(true);
+    setProtectError("");
+    try {
+      const result = await window.electron.folderExclusion(true);
+      if (result && result.success) {
+        handleNext();
+      } else {
+        setProtectError(result?.error || t("welcome.protectDirectoriesFailed"));
+      }
+    } catch (error) {
+      console.error("Failed to enable directory protection:", error);
+      setProtectError(t("welcome.protectDirectoriesFailed"));
+    } finally {
+      setProtectLoading(false);
     }
   };
 
@@ -1156,6 +1180,41 @@ const Welcome = ({ welcomeData, onComplete }) => {
               onClick={handleInstallDependencies}
             >
               {t("welcome.continue")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showNoDefenderWarning} onOpenChange={setShowNoDefenderWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("welcome.noDefenderWarningTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>{t("welcome.noDefenderWarningDesc")}</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>{t("welcome.noDefenderWarningCorrupted")}</li>
+                  <li>{t("welcome.noDefenderWarningDeleted")}</li>
+                  <li>{t("welcome.noDefenderWarningFailed")}</li>
+                </ul>
+                <p>{t("welcome.noDefenderWarningAdvice")}</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-primary">
+              {t("welcome.goBack")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-primary text-secondary"
+              onClick={() => {
+                setShowNoDefenderWarning(false);
+                handleNext();
+              }}
+            >
+              {t("welcome.noDefenderWarningConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1983,6 +2042,98 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
                 >
                   {t("welcome.continue")}
+                </Button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {step === "protectDirectories" && (
+            <motion.div
+              key="protectDirectories"
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.div className="mb-8 text-center" variants={itemVariants}>
+                <WelcomeStepIcon icon={ShieldCheck} />
+                <h2 className="mb-2 text-3xl font-bold text-primary">
+                  {t("welcome.protectDirectoriesTitle")}
+                </h2>
+                <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+                  {t("welcome.protectDirectoriesDesc")}
+                </p>
+              </motion.div>
+              <motion.div
+                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6 text-left"
+                variants={itemVariants}
+              >
+                <div className="flex items-start space-x-3">
+                  <FolderDownIcon className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>{t("welcome.protectDirectoriesWhatItDoes")}</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <CircleCheck className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>{t("welcome.protectDirectoriesWhy")}</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <Shield className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>{t("welcome.protectDirectoriesDefenderOnly")}</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <Info className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <p>
+                    {t("welcome.protectDirectoriesAdminPrompt")}{" "}
+                    <a
+                      className="cursor-pointer text-primary hover:underline"
+                      onClick={() =>
+                        window.electron.openURL(
+                          "https://ascendara.app/docs/features/overview#protecting-directories-from-windows-defender"
+                        )
+                      }
+                    >
+                      {t("common.learnMore")}
+                      <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
+                    </a>
+                  </p>
+                </div>
+
+                {protectError && <p className="text-sm text-red-500">{protectError}</p>}
+              </motion.div>
+
+              <motion.div
+                className="flex flex-wrap justify-center gap-3"
+                variants={itemVariants}
+              >
+                <Button
+                  size="lg"
+                  onClick={handleEnableProtection}
+                  disabled={protectLoading}
+                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
+                >
+                  {protectLoading && <Loader className="mr-2 h-5 w-5 animate-spin" />}
+                  {t("welcome.protectDirectoriesEnable")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setShowNoDefenderWarning(true)}
+                  disabled={protectLoading}
+                  className="px-8 py-6 text-lg font-semibold text-primary hover:bg-primary/10"
+                >
+                  {t("welcome.noWindowsDefender")}
+                </Button>
+              </motion.div>
+
+              <motion.div className="mt-4" variants={itemVariants}>
+                <Button
+                  variant="ghost"
+                  onClick={handleNext}
+                  disabled={protectLoading}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  {t("welcome.protectDirectoriesSkip")}
                 </Button>
               </motion.div>
             </motion.div>
