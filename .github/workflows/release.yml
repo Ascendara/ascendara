@@ -1,7 +1,8 @@
 name: Build and release Ascendara
 on:
   push:
-    tags: ['v*']
+    # Tags are the bare version (11.4.0): the macOS updater downloads from that tag name
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       release:

@@ -30,8 +30,8 @@ def digest(path):
 def preflight():
     ref = os.environ['GITHUB_REF']
     release = ref.startswith('refs/tags/')
-    if release and ref != 'refs/tags/v' + version():
-        raise RuntimeError('Tag must be v' + version() + ' to match package.json')
+    if release and ref != 'refs/tags/' + version():
+        raise RuntimeError('Tag must be ' + version() + ' to match package.json')
     if release and not re.fullmatch(r'\d+\.\d+\.\d+', version()):
         raise RuntimeError('Release version must be a stable x.y.z version')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
