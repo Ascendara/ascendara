@@ -558,10 +558,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
         localStorage.removeItem("local_ascendara_metadata_cache");
         localStorage.removeItem("local_ascendara_last_updated");
 
-        toast.success(
-          t("localRefresh.refreshComplete") || "Game list refresh completed!"
-        );
-
         // Auto-enable local index if this was the user's first index
         if (wasFirstIndexRef.current) {
           await updateSetting("usingLocalIndex", true);
@@ -579,7 +575,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
       } else if (data.status === "failed" || data.status === "error") {
         setRefreshStatus("error");
         setIsRefreshing(false);
-        toast.error(t("localRefresh.refreshFailed") || "Game list refresh failed");
       }
     };
 
@@ -600,9 +595,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
         } catch (e) {
           setLastRefreshTime(new Date());
         }
-        toast.success(
-          t("localRefresh.refreshComplete") || "Game list refresh completed!"
-        );
         // Auto-enable local index if this was the user's first index
         if (wasFirstIndexRef.current) {
           await updateSetting("usingLocalIndex", true);
@@ -631,7 +623,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
           return;
         }
         setRefreshStatus("error");
-        toast.error(t("localRefresh.refreshFailed") || "Game list refresh failed");
       }
     };
 
@@ -639,7 +630,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
       setRefreshStatus("error");
       setIsRefreshing(false);
       setErrors(prev => [...prev, { message: data.error, timestamp: new Date() }]);
-      toast.error(t("localRefresh.refreshFailed") || "Game list refresh failed");
     };
 
     const handleCookieNeeded = () => {
@@ -657,14 +647,12 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     const handleUploadComplete = () => {
       console.log("Upload complete");
       setIsUploading(false);
-      toast.success(t("localRefresh.uploadComplete") || "Index uploaded successfully!");
     };
 
     const handleUploadError = data => {
       console.log("Upload error:", data);
       setIsUploading(false);
       setUploadError(data?.error || "Upload failed");
-      toast.error(t("localRefresh.uploadFailed") || "Failed to upload index");
     };
 
     // Public index download event handlers
@@ -941,9 +929,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
               setIsRefreshing(false);
               setHasIndexBefore(true); // Update UI immediately after successful refresh
               setLastRefreshTime(new Date());
-              toast.success(
-                t("localRefresh.refreshComplete") || "Game list refresh completed!"
-              );
             }, 500);
           }
         },

@@ -337,13 +337,10 @@ const GiantBombMigrationWarning = () => {
 
 // Automatic Index Refresher - runs in background when enabled
 const AutomaticIndexRefresher = () => {
-  const { t } = useTranslation();
   const { settings } = useSettings();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [refreshPhase, setRefreshPhase] = useState("");
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const refreshCheckIntervalRef = useRef(null);
 
   // Expose refresh state globally for MenuBar
   useEffect(() => {
@@ -403,20 +400,23 @@ const AutomaticIndexRefresher = () => {
       if (data.phase) {
         setRefreshPhase(data.phase);
       }
-      if (data.status === "completed") {
-        setIsRefreshing(false);
-        setRefreshPhase("");
-        setShowCompleteDialog(true);
-      } else if (data.status === "failed" || data.status === "error") {
+      if (["completed", "failed", "error"].includes(data.status)) {
         setIsRefreshing(false);
         setRefreshPhase("");
       }
     };
 
-    const handleComplete = () => {
+    // A finished scrape reloads the game data quietly, wherever the user is
+    const handleComplete = data => {
       setIsRefreshing(false);
       setRefreshPhase("");
-      setShowCompleteDialog(true);
+      if (data?.code === 0) {
+        window.dispatchEvent(
+          new CustomEvent("index-refreshed", {
+            detail: { timestamp: Date.now() },
+          })
+        );
+      }
     };
 
     const handleError = () => {
@@ -434,80 +434,20 @@ const AutomaticIndexRefresher = () => {
       }
     };
 
-    const handleSharedIndexComplete = () => {
-      setIsRefreshing(false);
-      setRefreshPhase("");
-      // Skip the "refresh complete" dialog while the Welcome/onboarding
-      // flow is active - the user hasn't finished setup and doesn't need
-      // to reload data mid-onboarding.
-      if (window.__welcomeActive) return;
-      setShowCompleteDialog(true);
-    };
-
-    const handleSharedIndexError = () => {
-      setIsRefreshing(false);
-      setRefreshPhase("");
-    };
-
     if (window.electron?.onLocalRefreshProgress) {
       // Manual scrape listeners
       window.electron.onLocalRefreshProgress(handleProgressUpdate);
       window.electron.onLocalRefreshComplete(handleComplete);
       window.electron.onLocalRefreshError(handleError);
 
-      // Shared index download listeners
+      // Shared index download listeners (the main process reloads the data itself)
       window.electron.onPublicIndexDownloadProgress(handleSharedIndexProgress);
-      window.electron.onPublicIndexDownloadComplete(handleSharedIndexComplete);
-      window.electron.onPublicIndexDownloadError(handleSharedIndexError);
+      window.electron.onPublicIndexDownloadComplete(handleError);
+      window.electron.onPublicIndexDownloadError(handleError);
     }
   }, []);
 
-  const handleRefreshApp = () => {
-    setShowCompleteDialog(false);
-    // Dispatch the same event that LocalRefresh sends
-    window.dispatchEvent(
-      new CustomEvent("index-refreshed", {
-        detail: { timestamp: Date.now() },
-      })
-    );
-    toast.success(
-      t("localRefresh.refreshComplete") || "Index refreshed! Reloading data..."
-    );
-  };
-
-  return (
-    <>
-      <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <AlertDialogContent className="border-border">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-4">
-              <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                {t("localRefresh.autoRefreshComplete") ||
-                  "Automatic Index Refresh Complete"}
-              </AlertDialogTitle>
-            </div>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4">
-                <div className="text-foreground">
-                  {t("localRefresh.autoRefreshCompleteMessage") ||
-                    "Your game index has been automatically refreshed in the background. Reload to see the latest games."}
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter className="gap-3 sm:justify-end">
-            <AlertDialogCancel className="text-foreground">
-              {t("common.later") || "Later"}
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleRefreshApp}>
-              {t("localRefresh.reloadNow") || "Reload Now"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
+  return null;
 };
 
 // PlayStation button component
