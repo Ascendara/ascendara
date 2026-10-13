@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence, animate, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -82,6 +81,11 @@ import { cn } from "@/lib/utils";
 // long enough to be seen and then confirm the result on the button itself.
 const MIN_REFRESH_BUSY_MS = 700;
 const REFRESH_DONE_MS = 2500;
+// An index with extra blacklisted games isn't shared
+const DEFAULT_BLACKLIST_IDS = ["ABSXUc", "AWBgqf", "ATaHuq"];
+// How long the card holds on "Finalizing" after a scrape, so it can go straight
+// into sharing instead of flashing "Complete" in between.
+const SHARE_START_GRACE_MS = 6000;
 
 const AnimatedNumber = ({ value }) => {
   const reduceMotion = useReducedMotion();
@@ -199,6 +203,11 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   const [justRefreshed, setJustRefreshed] = useState(false);
   const downloadStartedAtRef = useRef(0);
   const justRefreshedTimerRef = useRef(null);
+  // After a scrape: "finishing" while sharing may still start, then a brief "done"
+  const [finishStage, setFinishStage] = useState(null);
+  const finishTimerRef = useRef(null);
+  const refreshCompletedRef = useRef(false);
+  const shareExpectedRef = useRef(false);
   const [, setRelativeTimeTick] = useState(0);
 
   // External Sources Mode (user-configurable source bucket)
@@ -271,6 +280,7 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     return () => {
       clearInterval(interval);
       clearTimeout(justRefreshedTimerRef.current);
+      clearTimeout(finishTimerRef.current);
     };
   }, []);
 
@@ -534,101 +544,98 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
           return prev;
         });
       }
-      if (data.status === "completed") {
-        setRefreshStatus("completed");
-        setIsRefreshing(false);
-        setHasIndexBefore(true); // Update UI immediately after successful refresh
-        // Use lastSuccessfulTimestamp from progress data if available
-        if (data.lastSuccessfulTimestamp) {
-          setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
-        } else {
-          setLastRefreshTime(new Date());
-        }
-
-        // Clear caches so the app loads fresh data with new imgIDs
-        // Do NOT invalidate imageCacheService settings cache - the localIndex path hasn't changed,
-        // and invalidating it causes a race where images load with null settings and hit the API.
-        console.log("[LocalRefresh] Refresh complete, clearing caches to load new data");
-        imageCacheService.memoryCache.clear();
-        imageCacheService.memoryCacheOrder = [];
-        await imageCacheService.clearIndexedDB();
-        gameService.clearMemoryCache();
-        localStorage.removeItem("ascendara_games_cache");
-        localStorage.removeItem("local_ascendara_games_timestamp");
-        localStorage.removeItem("local_ascendara_metadata_cache");
-        localStorage.removeItem("local_ascendara_last_updated");
-
-        // Auto-enable local index if this was the user's first index
-        if (wasFirstIndexRef.current) {
-          await updateSetting("usingLocalIndex", true);
-          wasFirstIndexRef.current = false;
-        }
-
-        // Dispatch custom event to notify other components to refresh their data
-        // This allows seamless updates without requiring a full page reload
-        console.log("[LocalRefresh] Dispatching index-refreshed event");
-        window.dispatchEvent(
-          new CustomEvent("index-refreshed", {
-            detail: { timestamp: Date.now() },
-          })
-        );
+      if (data.status === "running") {
+        refreshCompletedRef.current = false;
+      } else if (data.status === "completed") {
+        await completeRefresh(data.lastSuccessfulTimestamp);
       } else if (data.status === "failed" || data.status === "error") {
-        setRefreshStatus("error");
-        setIsRefreshing(false);
+        failRefresh();
       }
+    };
+
+    // Show the finished state briefly, then put the card back to rest
+    const showDone = () => {
+      clearTimeout(finishTimerRef.current);
+      clearTimeout(justRefreshedTimerRef.current);
+      setFinishStage("done");
+      setJustRefreshed(true);
+      justRefreshedTimerRef.current = setTimeout(
+        () => setJustRefreshed(false),
+        REFRESH_DONE_MS
+      );
+      finishTimerRef.current = setTimeout(() => setFinishStage(null), REFRESH_DONE_MS);
+    };
+
+    const failRefresh = () => {
+      clearTimeout(finishTimerRef.current);
+      setFinishStage(null);
+      setRefreshStatus("error");
+      setIsRefreshing(false);
+      setCurrentStep("");
+    };
+
+    // The progress file and the process exit both report a finished scrape,
+    // so this runs once per scrape no matter which arrives first.
+    const completeRefresh = async lastSuccessfulTimestamp => {
+      if (refreshCompletedRef.current) return;
+      refreshCompletedRef.current = true;
+      manuallyStoppedRef.current = false;
+
+      setRefreshStatus("completed");
+      setIsRefreshing(false);
+      setHasIndexBefore(true);
+      setProgress(100);
+      setCurrentStep("");
+      setLastRefreshTime(
+        lastSuccessfulTimestamp ? new Date(lastSuccessfulTimestamp * 1000) : new Date()
+      );
+      setFinishStage("finishing");
+      clearTimeout(finishTimerRef.current);
+      finishTimerRef.current = setTimeout(
+        showDone,
+        shareExpectedRef.current ? SHARE_START_GRACE_MS : 400
+      );
+
+      // Clear caches so the app loads fresh data with new imgIDs
+      // Do NOT invalidate imageCacheService settings cache - the localIndex path hasn't changed,
+      // and invalidating it causes a race where images load with null settings and hit the API.
+      imageCacheService.memoryCache.clear();
+      imageCacheService.memoryCacheOrder = [];
+      await imageCacheService.clearIndexedDB();
+      gameService.clearMemoryCache();
+      localStorage.removeItem("ascendara_games_cache");
+      localStorage.removeItem("local_ascendara_games_timestamp");
+      localStorage.removeItem("local_ascendara_metadata_cache");
+      localStorage.removeItem("local_ascendara_last_updated");
+
+      // Auto-enable local index if this was the user's first index
+      if (wasFirstIndexRef.current) {
+        await updateSetting("usingLocalIndex", true);
+        wasFirstIndexRef.current = false;
+      }
+
+      // Notify other components to refresh their data
+      window.dispatchEvent(
+        new CustomEvent("index-refreshed", {
+          detail: { timestamp: Date.now() },
+        })
+      );
     };
 
     const handleComplete = async data => {
       if (data.code === 0) {
-        setRefreshStatus("completed");
-        setIsRefreshing(false);
-        setHasIndexBefore(true); // Update UI immediately after successful refresh
+        await completeRefresh();
+      } else if (manuallyStoppedRef.current) {
+        // User manually stopped - keep idle status, don't show error
         manuallyStoppedRef.current = false;
-        // Read lastSuccessfulTimestamp from progress.json
-        try {
-          const progress = await window.electron.getLocalRefreshProgress(localIndexPath);
-          if (progress?.lastSuccessfulTimestamp) {
-            setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
-          } else {
-            setLastRefreshTime(new Date());
-          }
-        } catch (e) {
-          setLastRefreshTime(new Date());
-        }
-        // Auto-enable local index if this was the user's first index
-        if (wasFirstIndexRef.current) {
-          await updateSetting("usingLocalIndex", true);
-          wasFirstIndexRef.current = false;
-        }
-        // Clear image/game caches and notify other components
-        imageCacheService.memoryCache.clear();
-        imageCacheService.memoryCacheOrder = [];
-        await imageCacheService.clearIndexedDB();
-        gameService.clearMemoryCache();
-        localStorage.removeItem("ascendara_games_cache");
-        localStorage.removeItem("local_ascendara_games_timestamp");
-        localStorage.removeItem("local_ascendara_metadata_cache");
-        localStorage.removeItem("local_ascendara_last_updated");
-        window.dispatchEvent(
-          new CustomEvent("index-refreshed", {
-            detail: { timestamp: Date.now() },
-          })
-        );
-      } else {
-        // Don't show error if user manually stopped
         setIsRefreshing(false);
-        if (manuallyStoppedRef.current) {
-          // User manually stopped - keep idle status, don't show error
-          manuallyStoppedRef.current = false;
-          return;
-        }
-        setRefreshStatus("error");
+      } else {
+        failRefresh();
       }
     };
 
     const handleError = data => {
-      setRefreshStatus("error");
-      setIsRefreshing(false);
+      failRefresh();
       setErrors(prev => [...prev, { message: data.error, timestamp: new Date() }]);
     };
 
@@ -639,6 +646,8 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
 
     const handleUploading = () => {
       console.log("Upload started");
+      clearTimeout(finishTimerRef.current);
+      setFinishStage(null);
       setIsUploading(true);
       setUploadError(null);
       setCurrentStep(t("localRefresh.uploading") || "Uploading index...");
@@ -647,11 +656,17 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     const handleUploadComplete = () => {
       console.log("Upload complete");
       setIsUploading(false);
+      setCurrentStep("");
+      showDone();
+      fetchIndexInfo();
     };
 
     const handleUploadError = data => {
       console.log("Upload error:", data);
+      clearTimeout(finishTimerRef.current);
+      setFinishStage(null);
       setIsUploading(false);
+      setCurrentStep("");
       setUploadError(data?.error || "Upload failed");
     };
 
@@ -770,6 +785,10 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   };
 
   const handleStartRefresh = async refreshData => {
+    clearTimeout(finishTimerRef.current);
+    refreshCompletedRef.current = false;
+    setFinishStage(null);
+    setUploadError(null);
     setIsRefreshing(true);
     setRefreshStatus("running");
     setProgress(0);
@@ -1862,6 +1881,17 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     "initializing",
     "starting",
   ].includes(currentPhase);
+  // Sharing follows a scrape of the official index unless it's turned off
+  shareExpectedRef.current =
+    !customSourcesMode &&
+    settings?.shareLocalIndex !== false &&
+    (selectedSource || "steamrip") === "steamrip" &&
+    !(settings?.blacklistIDs || []).some(id => !DEFAULT_BLACKLIST_IDS.includes(id));
+  const waitingForCookie = isRefreshing && currentPhase === "waiting_for_cookie";
+  const showProgressCard = isRefreshing || isUploading || !!finishStage;
+  const progressIndeterminate =
+    isUploading || waitingForCookie || (isRefreshing && isIndeterminatePhase);
+  const progressDone = !isRefreshing && !isUploading && finishStage === "done";
   const heroGameCount = customSourcesMode
     ? (activeCustomList?.itemCount ??
       customSourceGameCount ??
@@ -2229,45 +2259,46 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
 
                 {/* Progress */}
                 <AnimatePresence>
-                  {(isRefreshing || isUploading || refreshStatus === "completed") && (
+                  {showProgressCard && (
                     <motion.div
+                      key="progress"
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25, ease: "easeInOut" }}
                       className="relative overflow-hidden"
                     >
                       <div className="space-y-2.5 border-t border-border/60 px-6 py-4">
-                        <div className="flex items-center justify-between gap-3 text-sm">
+                        <div className="flex h-7 items-center justify-between gap-3 text-sm">
                           <span className="flex items-center gap-2 font-medium">
-                            {isUploading ? (
-                              <Loader className="h-4 w-4 animate-spin text-primary" />
-                            ) : refreshStatus === "completed" ? (
+                            {progressDone ? (
                               <CircleCheck className="h-4 w-4 text-green-500" />
                             ) : (
                               <Loader className="h-4 w-4 animate-spin text-primary" />
                             )}
                             {isUploading
                               ? t("localRefresh.sharing") || "Sharing..."
-                              : refreshStatus === "completed"
+                              : progressDone
                                 ? t("localRefresh.statusCompleted") || "Complete"
-                                : t("localRefresh.progress") || "Progress"}
+                                : isRefreshing
+                                  ? t("localRefresh.progress") || "Progress"
+                                  : t("localRefresh.swapping") || "Finalizing..."}
                           </span>
                           <div className="flex items-center gap-3">
-                            {currentPhase === "processing_posts" &&
-                              totalGames > 0 &&
-                              !isUploading && (
+                            {isRefreshing &&
+                              currentPhase === "processing_posts" &&
+                              totalGames > 0 && (
                                 <span className="text-xs tabular-nums text-muted-foreground">
                                   {processedGames.toLocaleString()} /{" "}
                                   {totalGames.toLocaleString()}{" "}
                                   {t("localRefresh.games") || "games"}
                                 </span>
                               )}
-                            {isUploading ? null : currentPhase ===
-                              "waiting_for_cookie" ? (
+                            {waitingForCookie ? (
                               <span className="font-medium text-orange-500">
                                 {t("localRefresh.waitingForCookieShort") || "Waiting..."}
                               </span>
-                            ) : !isIndeterminatePhase && isRefreshing ? (
+                            ) : isRefreshing && !isIndeterminatePhase ? (
                               <span className="font-semibold tabular-nums">
                                 {Math.round(progress)}%
                               </span>
@@ -2285,29 +2316,29 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                             )}
                           </div>
                         </div>
-                        {isUploading ||
-                        currentPhase === "waiting_for_cookie" ||
-                        (isIndeterminatePhase && isRefreshing) ? (
-                          <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                          {progressIndeterminate ? (
                             <div
                               className={cn(
                                 "absolute h-full rounded-full",
-                                !isUploading && currentPhase === "waiting_for_cookie"
-                                  ? "bg-orange-500"
-                                  : "bg-primary"
+                                waitingForCookie ? "bg-orange-500" : "bg-primary"
                               )}
                               style={{
                                 animation: `progress-loading ${
-                                  !isUploading && currentPhase === "waiting_for_cookie"
-                                    ? "2s"
-                                    : "1.5s"
+                                  waitingForCookie ? "2s" : "1.5s"
                                 } ease-in-out infinite`,
                               }}
                             />
-                          </div>
-                        ) : (
-                          <Progress value={progress} className="h-1.5" />
-                        )}
+                          ) : (
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-[width,background-color] duration-300 ease-out",
+                                progressDone ? "bg-green-500" : "bg-primary"
+                              )}
+                              style={{ width: `${isRefreshing ? progress : 100}%` }}
+                            />
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   )}
