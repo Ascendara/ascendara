@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
       publish:
-        description: 'Publish the draft after all checks (requires release=true)'
+        description: 'Publish the draft after all checks (requires release=true). Tag pushes never publish.'
         type: boolean
         default: false
 permissions:
@@ -256,5 +256,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ADMIN_POST_KEY: ${{ secrets.ADMIN_POST_KEY }}
-          PUBLISH_RELEASE: ${{ github.event_name == 'push' || inputs.publish }}
+          # A pushed tag stops at a registered draft; only the manual toggle publishes
+          PUBLISH_RELEASE: ${{ inputs.publish == true }}
         run: python scripts/ci_release.py

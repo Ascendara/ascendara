@@ -23,7 +23,7 @@ These commands are instructions for the maintainer; implementation validation do
 
 `build.yml` performs an unprivileged renderer build and offline automation tests on main pushes and pull requests. It has no release credentials or publishing step.
 
-`release.yml` runs only on manual dispatch and `v*` tag pushes. Every tag must equal `v` plus `package.json.version`; release tags use stable `x.y.z` versions. Branch dispatches can only build artifacts. Tag dispatches with `release=false` are also build-only. Pushing a version tag enables registration and publication after all checks. A dispatch with `release=true, publish=false` creates a **registered draft**, not a public release.
+`release.yml` runs only on manual dispatch and `v*` tag pushes. Every tag must equal `v` plus `package.json.version`; release tags use stable `x.y.z` versions. Branch dispatches can only build artifacts. Tag dispatches with `release=false` are also build-only. Pushing a version tag creates a **registered draft** after all checks; it never publishes. A dispatch with `release=true, publish=false` creates a **registered draft**, not a public release.
 
 The four matrix entries build concurrently with `fail-fast: false`:
 
@@ -111,8 +111,8 @@ With the full Apple ID/password/team combination, CI passes the existing `--rele
 1. Configure repository build/signing secrets and public variables. Create a GitHub environment named `release`; restrict it to protected version tags and optionally require maintainers to approve it. Put `ADMIN_POST_KEY` there. Build secrets must be repository-level because matrix jobs do not use the release environment.
 2. Protect main and release tags against untrusted writers. Only trusted code may run credential-bearing manual/tag builds. PR jobs have no release capability.
 3. Complete the first build-only run and smoke tests. Update `package.json.version`, commit, and push through your normal review process.
-4. When ready for production registration/publication, create and push the matching tag, for example `v11.3.4` **only after** setting package version to `11.3.4`. Tag pushes automatically publish after all checks and any environment approval.
-5. To request a registered draft via manual dispatch instead, select an already existing matching tag and use `release=true, publish=false`. A newly pushed tag already triggers the automatic release path: do not also dispatch a competing release run. For draft-first policy, change the tag publication expression in the workflow before creating the tag, or use a previously existing tag with no release. An existing successful draft can be reviewed and published manually in GitHub.
+4. When ready for production registration/publication, create and push the matching tag, for example `v11.3.4` **only after** setting package version to `11.3.4`. Tag pushes create a registered draft after all checks and any environment approval. Review the draft, then publish it manually in GitHub.
+5. To request a registered draft via manual dispatch instead, select an already existing matching tag and use `release=true, publish=false`. A newly pushed tag already triggers the draft release path: do not also dispatch a competing release run. Publishing in one step is only possible from a manual dispatch with `release=true, publish=true`. An existing successful draft can be reviewed and published manually in GitHub.
 
 Release concurrency is keyed by Git ref, with cancellation disabled. The release stage rechecks all four manifests and installer checksums, refuses any existing release for the tag, creates one new draft, uploads assets without `--clobber`, confirms the remote names/sizes, registers each of the four distinct build identities once, then publishes (or keeps the requested draft). Failure before registration never registers an incomplete build. Failure during registration leaves a draft; it cannot expose a successful public release.
 
