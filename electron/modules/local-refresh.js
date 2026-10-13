@@ -94,12 +94,18 @@ function registerLocalRefreshHandlers() {
     return { success: true, message: "Download started in background" };
   });
 
-  // Quietly bring the shared game list up to date (no progress UI)
   // Bring the local game list up to date and tell the UI if it changed
   const syncIndexQuietly = async () => {
-    const { localIndex: indexPath, blacklistIDs } = settingsManager.getSettings();
-    if (!indexPath || publicIndexDownloading) {
+    const { localIndex, blacklistIDs } = settingsManager.getSettings();
+    if (publicIndexDownloading) {
       return { success: true, updated: false, skipped: true };
+    }
+
+    // Someone who never set an index up gets one in the default location
+    const indexPath =
+      localIndex || path.join(app.getPath("appData"), "ascendara", "localindex");
+    if (!localIndex) {
+      settingsManager.updateSetting("localIndex", indexPath);
     }
 
     try {

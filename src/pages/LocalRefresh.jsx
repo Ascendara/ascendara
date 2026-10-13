@@ -245,6 +245,28 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // A background sync can finish while this page is open; show its result
+  useEffect(() => {
+    const handleIndexRefreshed = async () => {
+      setHasIndexBefore(true);
+      fetchIndexInfo();
+      try {
+        const current = await window.electron.getSettings();
+        if (!current?.localIndex) return;
+        const progress = await window.electron.getLocalRefreshProgress(
+          current.localIndex
+        );
+        if (progress?.lastSuccessfulTimestamp) {
+          setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
+        }
+      } catch (e) {
+        console.error("Failed to read index refresh time:", e);
+      }
+    };
+    window.addEventListener("index-refreshed", handleIndexRefreshed);
+    return () => window.removeEventListener("index-refreshed", handleIndexRefreshed);
+  }, []);
+
   // Fetch the pages the API can't reach right now on this machine
   const handleHelpRefresh = async () => {
     setRelayState("running");

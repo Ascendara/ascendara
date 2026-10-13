@@ -341,12 +341,7 @@ const AutomaticIndexRefresher = () => {
 
   // Keep the shared game list up to date in the background
   useEffect(() => {
-    if (
-      settings?.backgroundIndexSync === false ||
-      !settings?.localIndex ||
-      settings?.customSourcesMode ||
-      (settings?.localRefreshSource || "steamrip") !== "steamrip"
-    ) {
+    if (settings?.backgroundIndexSync === false || settings?.customSourcesMode) {
       return;
     }
 
@@ -378,20 +373,15 @@ const AutomaticIndexRefresher = () => {
       }
     };
 
-    // Delay initial check to let app initialize
-    const timeout = setTimeout(sync, 10000);
+    // Shortly after launch, so an out-of-date index is replaced before it's browsed
+    const timeout = setTimeout(sync, 3000);
     const interval = setInterval(sync, 6 * 60 * 60 * 1000);
     return () => {
       clearTimeout(timeout);
       clearTimeout(retryTimeout);
       clearInterval(interval);
     };
-  }, [
-    settings?.backgroundIndexSync,
-    settings?.localIndex,
-    settings?.customSourcesMode,
-    settings?.localRefreshSource,
-  ]);
+  }, [settings?.backgroundIndexSync, settings?.customSourcesMode]);
 
   return null;
 };
