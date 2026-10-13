@@ -25,7 +25,7 @@ def api(path, method='GET', data=None):
 
 
 def main():
-    tag = 'v' + version()
+    tag = version()
     if os.environ['GITHUB_REF'] != 'refs/tags/' + tag:
         raise RuntimeError('Release stage requires the matching version tag')
     if not os.environ.get('ADMIN_POST_KEY'):
