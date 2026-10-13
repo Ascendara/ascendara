@@ -1451,6 +1451,13 @@
       "desc": "This game is already installed in your library. Reinstalling may cause issues such as overwriting save data or corrupting existing files. Are you sure you want to continue?",
       "title": "Game Already Installed"
     },
+    "relayAction": "Help refresh",
+    "relayDesc": "The game source is blocking Ascendara's server. You can help by letting Ascendara fetch the latest games from your connection. A small window may ask you to confirm you're human.",
+    "relayDone": "Thanks, the index is up to date",
+    "relayDoneDesc": "Everyone using Ascendara gets the update you just helped with.",
+    "relayFailed": "That didn't work. You can try again.",
+    "relayRunning": "Refreshing...",
+    "relayTitle": "The game index can't update itself right now",
     "remoteDownloads": "Remote Control",
     "reportBroken": "Report",
     "reportDescription": "Please provide more details about the issue",

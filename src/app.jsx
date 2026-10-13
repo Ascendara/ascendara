@@ -338,27 +338,6 @@ const GiantBombMigrationWarning = () => {
 // Automatic Index Refresher - runs in background when enabled
 const AutomaticIndexRefresher = () => {
   const { settings, updateSetting } = useSettings();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState(0);
-  const [refreshPhase, setRefreshPhase] = useState("");
-
-  // Expose refresh state globally for MenuBar
-  useEffect(() => {
-    window.autoRefreshState = {
-      isRefreshing,
-      progress: refreshProgress,
-      phase: refreshPhase,
-    };
-  }, [isRefreshing, refreshProgress, refreshPhase]);
-
-  // Reset global state on mount to prevent stale data from previous sessions
-  useEffect(() => {
-    window.autoRefreshState = {
-      isRefreshing: false,
-      progress: 0,
-      phase: "",
-    };
-  }, []);
 
   // Keep the shared game list up to date in the background
   useEffect(() => {
@@ -413,62 +392,6 @@ const AutomaticIndexRefresher = () => {
     settings?.customSourcesMode,
     settings?.localRefreshSource,
   ]);
-
-  // Listen for refresh progress updates (both manual scrape and shared index)
-  useEffect(() => {
-    const handleProgressUpdate = data => {
-      if (data.progress !== undefined) {
-        setRefreshProgress(Math.min(Math.round(data.progress * 100), 100));
-      }
-      if (data.phase) {
-        setRefreshPhase(data.phase);
-      }
-      if (["completed", "failed", "error"].includes(data.status)) {
-        setIsRefreshing(false);
-        setRefreshPhase("");
-      }
-    };
-
-    // A finished scrape reloads the game data quietly, wherever the user is
-    const handleComplete = data => {
-      setIsRefreshing(false);
-      setRefreshPhase("");
-      if (data?.code === 0) {
-        window.dispatchEvent(
-          new CustomEvent("index-refreshed", {
-            detail: { timestamp: Date.now() },
-          })
-        );
-      }
-    };
-
-    const handleError = () => {
-      setIsRefreshing(false);
-      setRefreshPhase("");
-    };
-
-    // Shared index download progress
-    const handleSharedIndexProgress = data => {
-      if (data.progress !== undefined) {
-        setRefreshProgress(Math.min(Math.round(data.progress), 100));
-      }
-      if (data.phase) {
-        setRefreshPhase(data.phase);
-      }
-    };
-
-    if (window.electron?.onLocalRefreshProgress) {
-      // Manual scrape listeners
-      window.electron.onLocalRefreshProgress(handleProgressUpdate);
-      window.electron.onLocalRefreshComplete(handleComplete);
-      window.electron.onLocalRefreshError(handleError);
-
-      // Shared index download listeners (the main process reloads the data itself)
-      window.electron.onPublicIndexDownloadProgress(handleSharedIndexProgress);
-      window.electron.onPublicIndexDownloadComplete(handleError);
-      window.electron.onPublicIndexDownloadError(handleError);
-    }
-  }, []);
 
   return null;
 };

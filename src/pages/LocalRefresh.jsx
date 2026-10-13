@@ -7,13 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   RefreshCw,
-  Play,
-  StopCircle,
   CircleCheck,
   AlertCircle,
   Loader,
   Database,
-  ChevronDown,
   ArrowLeft,
   ArrowRight,
   Folder,
@@ -22,9 +19,7 @@ import {
   X,
   Plus,
   Ban,
-  Cpu,
   Zap,
-  Share2,
   Upload,
   Cloud,
   ExternalLink,
@@ -55,7 +50,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import RefreshIndexDialog from "@/components/RefreshIndexDialog";
 import {
   Dialog,
   DialogContent,
@@ -81,11 +75,6 @@ import { cn } from "@/lib/utils";
 // long enough to be seen and then confirm the result on the button itself.
 const MIN_REFRESH_BUSY_MS = 700;
 const REFRESH_DONE_MS = 2500;
-// An index with extra blacklisted games isn't shared
-const DEFAULT_BLACKLIST_IDS = ["ABSXUc", "AWBgqf", "ATaHuq"];
-// How long the card holds on "Finalizing" after a scrape, so it can go straight
-// into sharing instead of flashing "Complete" in between.
-const SHARE_START_GRACE_MS = 6000;
 
 const AnimatedNumber = ({ value }) => {
   const reduceMotion = useReducedMotion();
@@ -143,7 +132,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
 
   // Get welcomeStep, indexRefreshStarted, and indexComplete from navigation state if coming from Welcome page
   const welcomeStep = location.state?.welcomeStep;
-  const indexRefreshStartedFromWelcome = location.state?.indexRefreshStarted;
 
   // Add CSS animation for indeterminate progress
   useEffect(() => {
@@ -162,52 +150,24 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   }, []);
 
   // State for refresh process
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState("");
-  const [totalGames, setTotalGames] = useState(0);
-  const [processedGames, setProcessedGames] = useState(0);
-  const [errors, setErrors] = useState([]);
-  const [showErrors, setShowErrors] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
-  const [refreshStatus, setRefreshStatus] = useState("idle"); // idle, running, completed, error
-  const [showStopDialog, setShowStopDialog] = useState(false);
-  const [showRefreshDialog, setShowRefreshDialog] = useState(false);
   const [localIndexPath, setLocalIndexPath] = useState("");
-  const [currentPhase, setCurrentPhase] = useState(""); // Track current phase for indeterminate progress
   const [hasIndexBefore, setHasIndexBefore] = useState(false);
-  const manuallyStoppedRef = useRef(false);
   const [newBlacklistId, setNewBlacklistId] = useState("");
-  const [workerCount, setWorkerCount] = useState(8);
-  const [fetchPageCount, setFetchPageCount] = useState(50);
-  const [selectedSource, setSelectedSource] = useState("steamrip");
-  const [showCookieRefreshDialog, setShowCookieRefreshDialog] = useState(false);
-  const [cookieRefreshCount, setCookieRefreshCount] = useState(0);
-  // Whether this run has been given a cookie yet. If not, a cookie request
-  // means one is needed for the first time, not that one expired.
-  const [cookieProvided, setCookieProvided] = useState(false);
-  const cookieSubmittedRef = useRef(false);
-  const lastCookieToastTimeRef = useRef(0);
-  const cookieDialogOpenRef = useRef(false);
   const wasFirstIndexRef = useRef(false);
   // Snapshot of the previous custom source, used to revert the selection if
   // the user bails out of the manual-paste fallback without ingesting JSON.
   const previousCustomSourceRef = useRef(null);
-  const [checkingApi, setCheckingApi] = useState(false);
-  const [apiAvailable, setApiAvailable] = useState(false);
   const [indexInfo, setIndexInfo] = useState(null); // { gameCount, date, size }
+  // Whether the API is keeping the index fresh itself, or is blocked and needs help
+  const [indexStatus, setIndexStatus] = useState(null);
+  const [relayState, setRelayState] = useState("idle"); // idle, running, done, error
+  const [relayError, setRelayError] = useState(null);
   const [downloadingIndex, setDownloadingIndex] = useState(null);
   const [indexDownloadProgress, setIndexDownloadProgress] = useState(null); // { progress, phase, downloaded, total }
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
   const [justRefreshed, setJustRefreshed] = useState(false);
   const downloadStartedAtRef = useRef(0);
   const justRefreshedTimerRef = useRef(null);
-  // After a scrape: "finishing" while sharing may still start, then a brief "done"
-  const [finishStage, setFinishStage] = useState(null);
-  const finishTimerRef = useRef(null);
-  const refreshCompletedRef = useRef(false);
-  const shareExpectedRef = useRef(false);
   const [, setRelativeTimeTick] = useState(0);
 
   // External Sources Mode (user-configurable source bucket)
@@ -274,13 +234,38 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     }
   };
 
+  const fetchIndexStatus = async () => {
+    const status = await window.electron.getIndexStatus();
+    if (status?.success) setIndexStatus(status);
+  };
+
+  useEffect(() => {
+    fetchIndexStatus();
+    const interval = setInterval(fetchIndexStatus, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch the pages the API can't reach right now on this machine
+  const handleHelpRefresh = async () => {
+    setRelayState("running");
+    setRelayError(null);
+    const result = await window.electron.startIndexRelay();
+    if (result?.success) {
+      setRelayState("done");
+      setLastRefreshTime(new Date());
+      fetchIndexInfo();
+    } else {
+      setRelayState("error");
+      setRelayError(result?.error || null);
+    }
+  };
+
   // Keep relative times ("2 minutes ago") moving while the page stays open
   useEffect(() => {
     const interval = setInterval(() => setRelativeTimeTick(tick => tick + 1), 30000);
     return () => {
       clearInterval(interval);
       clearTimeout(justRefreshedTimerRef.current);
-      clearTimeout(finishTimerRef.current);
     };
   }, []);
 
@@ -289,17 +274,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     const initializeSettings = async () => {
       try {
         const settings = await window.electron.getSettings();
-
-        // Load saved refresh preferences
-        if (settings?.localRefreshWorkers !== undefined) {
-          setWorkerCount(settings.localRefreshWorkers);
-        }
-        if (settings?.fetchPageCount !== undefined) {
-          setFetchPageCount(settings.fetchPageCount);
-        }
-        if (settings?.localRefreshSource !== undefined) {
-          setSelectedSource(settings.localRefreshSource);
-        }
 
         // Load custom sources library
         if (settings?.customSourcesLibrary) {
@@ -382,59 +356,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
           }
         }
 
-        // Check if a refresh is currently running and restore UI state
-        if (window.electron?.getLocalRefreshStatus) {
-          const status = await window.electron.getLocalRefreshStatus(resolvedIndexPath);
-          if (status.isRunning) {
-            console.log("Refresh is running, restoring UI state:", status.progress);
-            setIsRefreshing(true);
-            setRefreshStatus("running");
-
-            if (status.progress) {
-              const data = status.progress;
-              if (data.progress !== undefined) {
-                // Cap progress at 100% to prevent display issues
-                setProgress(Math.min(Math.round(data.progress * 100), 100));
-              }
-              if (data.phase) {
-                setCurrentPhase(data.phase);
-                const phaseMessages = {
-                  starting: t("localRefresh.initializing") || "Initializing...",
-                  initializing: t("localRefresh.initializing") || "Initializing...",
-                  fetching_categories:
-                    t("localRefresh.fetchingCategories") || "Fetching categories...",
-                  fetching_posts:
-                    t("localRefresh.fetchingPosts") || "Fetching game posts...",
-                  processing_posts:
-                    t("localRefresh.processingPosts") || "Processing games...",
-                  fetching_views:
-                    t("localRefresh.fetchingViews") || "Fetching view counts...",
-                  waiting_for_cookie:
-                    t("localRefresh.waitingForCookie") ||
-                    "Cookie expired - waiting for new cookie...",
-                  saving: t("localRefresh.saving") || "Saving data...",
-                  done: t("localRefresh.done") || "Done",
-                };
-                setCurrentStep(phaseMessages[data.phase] || data.phase);
-              }
-              if (data.totalPosts !== undefined) {
-                setTotalGames(data.totalPosts);
-              }
-              if (data.processedPosts !== undefined) {
-                setProcessedGames(data.processedPosts);
-              }
-              if (data.errors && data.errors.length > 0) {
-                setErrors(
-                  data.errors.map(e => ({
-                    message: e.message,
-                    timestamp: new Date(e.timestamp * 1000),
-                  }))
-                );
-              }
-            }
-          }
-        }
-
         // Check if public index download is in progress
         if (window.electron?.getPublicIndexDownloadStatus) {
           const downloadStatus = await window.electron.getPublicIndexDownloadStatus();
@@ -449,227 +370,11 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     };
     initializeSettings();
 
-    // Check API health and fetch index info on mount
-    const checkApiHealth = async () => {
-      setCheckingApi(true);
-      try {
-        const healthResponse = await fetch("https://api.ascendara.app/health");
-        const healthData = await healthResponse.json();
-        const isHealthy = healthData.status === "healthy";
-        setApiAvailable(isHealthy);
-
-        // If API is healthy, fetch index metadata
-        if (isHealthy) {
-          await fetchIndexInfo();
-        }
-      } catch (e) {
-        console.error("Failed to check API health:", e);
-        setApiAvailable(false);
-      } finally {
-        setCheckingApi(false);
-      }
-    };
-    checkApiHealth();
+    fetchIndexInfo();
   }, [t]);
 
-  // Listen for refresh progress updates from the backend
+  // Listen for index refresh events from the main process
   useEffect(() => {
-    const handleProgressUpdate = async data => {
-      console.log("Progress update received:", data);
-      // Map progress.json fields to UI state
-      if (data.progress !== undefined) {
-        // Cap progress at 100% to prevent display issues
-        setProgress(Math.min(Math.round(data.progress * 100), 100));
-      }
-      if (data.phase) {
-        setCurrentPhase(data.phase); // Track phase for indeterminate progress
-        const phaseMessages = {
-          starting: t("localRefresh.initializing") || "Initializing...",
-          initializing: t("localRefresh.initializing") || "Initializing...",
-          fetching_categories:
-            t("localRefresh.fetchingCategories") || "Fetching categories...",
-          fetching_posts: t("localRefresh.fetchingPosts") || "Fetching game posts...",
-          processing_posts: t("localRefresh.processingPosts") || "Processing games...",
-          waiting_for_cookie:
-            t("localRefresh.waitingForCookie") ||
-            "Cookie expired - waiting for new cookie...",
-          saving: t("localRefresh.saving") || "Saving data...",
-          swapping: t("localRefresh.swapping") || "Finalizing...",
-          done: t("localRefresh.done") || "Done",
-        };
-        setCurrentStep(phaseMessages[data.phase] || data.phase);
-
-        // Auto-show cookie dialog when waiting for cookie (but not if we just submitted one)
-        if (
-          (data.phase === "waiting_for_cookie" || data.waitingForCookie) &&
-          !cookieSubmittedRef.current &&
-          !cookieDialogOpenRef.current
-        ) {
-          cookieDialogOpenRef.current = true;
-          setShowCookieRefreshDialog(true);
-        }
-
-        // Reset the cookie submitted flag when phase changes away from waiting_for_cookie
-        // but only after a delay to prevent race conditions with multiple progress updates
-        if (data.phase !== "waiting_for_cookie" && !data.waitingForCookie) {
-          // Delay reset to ensure we don't get caught by rapid progress updates
-          setTimeout(() => {
-            cookieSubmittedRef.current = false;
-          }, 2000);
-        }
-      }
-      if (data.currentGame) {
-        setCurrentStep(prev => `${prev} - ${data.currentGame}`);
-      }
-      if (data.totalPosts !== undefined) {
-        setTotalGames(data.totalPosts);
-      }
-      if (data.processedPosts !== undefined) {
-        setProcessedGames(data.processedPosts);
-      }
-      if (data.errors && data.errors.length > 0) {
-        // Only add new errors
-        const lastError = data.errors[data.errors.length - 1];
-        setErrors(prev => {
-          const exists = prev.some(e => e.message === lastError.message);
-          if (!exists) {
-            return [
-              ...prev,
-              {
-                message: lastError.message,
-                timestamp: new Date(lastError.timestamp * 1000),
-              },
-            ];
-          }
-          return prev;
-        });
-      }
-      if (data.status === "running") {
-        refreshCompletedRef.current = false;
-      } else if (data.status === "completed") {
-        await completeRefresh(data.lastSuccessfulTimestamp);
-      } else if (data.status === "failed" || data.status === "error") {
-        failRefresh();
-      }
-    };
-
-    // Show the finished state briefly, then put the card back to rest
-    const showDone = () => {
-      clearTimeout(finishTimerRef.current);
-      clearTimeout(justRefreshedTimerRef.current);
-      setFinishStage("done");
-      setJustRefreshed(true);
-      justRefreshedTimerRef.current = setTimeout(
-        () => setJustRefreshed(false),
-        REFRESH_DONE_MS
-      );
-      finishTimerRef.current = setTimeout(() => setFinishStage(null), REFRESH_DONE_MS);
-    };
-
-    const failRefresh = () => {
-      clearTimeout(finishTimerRef.current);
-      setFinishStage(null);
-      setRefreshStatus("error");
-      setIsRefreshing(false);
-      setCurrentStep("");
-    };
-
-    // The progress file and the process exit both report a finished scrape,
-    // so this runs once per scrape no matter which arrives first.
-    const completeRefresh = async lastSuccessfulTimestamp => {
-      if (refreshCompletedRef.current) return;
-      refreshCompletedRef.current = true;
-      manuallyStoppedRef.current = false;
-
-      setRefreshStatus("completed");
-      setIsRefreshing(false);
-      setHasIndexBefore(true);
-      setProgress(100);
-      setCurrentStep("");
-      setLastRefreshTime(
-        lastSuccessfulTimestamp ? new Date(lastSuccessfulTimestamp * 1000) : new Date()
-      );
-      setFinishStage("finishing");
-      clearTimeout(finishTimerRef.current);
-      finishTimerRef.current = setTimeout(
-        showDone,
-        shareExpectedRef.current ? SHARE_START_GRACE_MS : 400
-      );
-
-      // Clear caches so the app loads fresh data with new imgIDs
-      // Do NOT invalidate imageCacheService settings cache - the localIndex path hasn't changed,
-      // and invalidating it causes a race where images load with null settings and hit the API.
-      imageCacheService.memoryCache.clear();
-      imageCacheService.memoryCacheOrder = [];
-      await imageCacheService.clearIndexedDB();
-      gameService.clearMemoryCache();
-      localStorage.removeItem("ascendara_games_cache");
-      localStorage.removeItem("local_ascendara_games_timestamp");
-      localStorage.removeItem("local_ascendara_metadata_cache");
-      localStorage.removeItem("local_ascendara_last_updated");
-
-      // Auto-enable local index if this was the user's first index
-      if (wasFirstIndexRef.current) {
-        await updateSetting("usingLocalIndex", true);
-        wasFirstIndexRef.current = false;
-      }
-
-      // Notify other components to refresh their data
-      window.dispatchEvent(
-        new CustomEvent("index-refreshed", {
-          detail: { timestamp: Date.now() },
-        })
-      );
-    };
-
-    const handleComplete = async data => {
-      if (data.code === 0) {
-        await completeRefresh();
-      } else if (manuallyStoppedRef.current) {
-        // User manually stopped - keep idle status, don't show error
-        manuallyStoppedRef.current = false;
-        setIsRefreshing(false);
-      } else {
-        failRefresh();
-      }
-    };
-
-    const handleError = data => {
-      failRefresh();
-      setErrors(prev => [...prev, { message: data.error, timestamp: new Date() }]);
-    };
-
-    const handleCookieNeeded = () => {
-      console.log("Cookie refresh needed - showing dialog");
-      setShowCookieRefreshDialog(true);
-    };
-
-    const handleUploading = () => {
-      console.log("Upload started");
-      clearTimeout(finishTimerRef.current);
-      setFinishStage(null);
-      setIsUploading(true);
-      setUploadError(null);
-      setCurrentStep(t("localRefresh.uploading") || "Uploading index...");
-    };
-
-    const handleUploadComplete = () => {
-      console.log("Upload complete");
-      setIsUploading(false);
-      setCurrentStep("");
-      showDone();
-      fetchIndexInfo();
-    };
-
-    const handleUploadError = data => {
-      console.log("Upload error:", data);
-      clearTimeout(finishTimerRef.current);
-      setFinishStage(null);
-      setIsUploading(false);
-      setCurrentStep("");
-      setUploadError(data?.error || "Upload failed");
-    };
-
     // Public index download event handlers
     const handlePublicDownloadStarted = () => {
       console.log("Public index download started");
@@ -746,164 +451,18 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
       setIndexDownloadProgress(data);
     };
 
-    // Subscribe to IPC events
-    if (window.electron?.onLocalRefreshProgress) {
-      window.electron.onLocalRefreshProgress(handleProgressUpdate);
-      window.electron.onLocalRefreshComplete(handleComplete);
-      window.electron.onLocalRefreshError(handleError);
-      window.electron.onLocalRefreshCookieNeeded?.(handleCookieNeeded);
+    window.electron.onPublicIndexDownloadStarted?.(handlePublicDownloadStarted);
+    window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
+    window.electron.onPublicIndexDownloadError?.(handlePublicDownloadError);
+    window.electron.onPublicIndexDownloadProgress?.(handlePublicDownloadProgress);
 
-      // Upload events
-      window.electron.onLocalRefreshUploading(handleUploading);
-      window.electron.onLocalRefreshUploadComplete(handleUploadComplete);
-      window.electron.onLocalRefreshUploadError(handleUploadError);
-
-      // Public index download events
-      window.electron.onPublicIndexDownloadStarted?.(handlePublicDownloadStarted);
-      window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
-      window.electron.onPublicIndexDownloadError?.(handlePublicDownloadError);
-      window.electron.onPublicIndexDownloadProgress?.(handlePublicDownloadProgress);
-
-      return () => {
-        window.electron.offLocalRefreshProgress?.();
-        window.electron.offLocalRefreshComplete?.();
-        window.electron.offLocalRefreshError?.();
-        window.electron.offLocalRefreshCookieNeeded?.();
-        window.electron.offLocalRefreshUploading?.();
-        window.electron.offLocalRefreshUploadComplete?.();
-        window.electron.offLocalRefreshUploadError?.();
-        window.electron.offPublicIndexDownloadStarted?.();
-        window.electron.offPublicIndexDownloadComplete?.();
-        window.electron.offPublicIndexDownloadError?.();
-        window.electron.offPublicIndexDownloadProgress?.();
-      };
-    }
+    return () => {
+      window.electron.offPublicIndexDownloadStarted?.();
+      window.electron.offPublicIndexDownloadComplete?.();
+      window.electron.offPublicIndexDownloadError?.();
+      window.electron.offPublicIndexDownloadProgress?.();
+    };
   }, []);
-
-  const handleOpenRefreshDialog = () => {
-    setShowRefreshDialog(true);
-  };
-
-  const handleStartRefresh = async refreshData => {
-    clearTimeout(finishTimerRef.current);
-    refreshCompletedRef.current = false;
-    setFinishStage(null);
-    setUploadError(null);
-    setIsRefreshing(true);
-    setRefreshStatus("running");
-    setProgress(0);
-    setProcessedGames(0);
-    setTotalGames(0);
-    setErrors([]);
-    setCurrentPhase("initializing");
-    manuallyStoppedRef.current = false;
-    setCookieRefreshCount(0);
-    setCookieProvided(!!refreshData.cfClearance);
-    setCurrentStep(t("localRefresh.initializing") || "Initializing...");
-
-    try {
-      // Call the electron API to start the local refresh process
-      if (window.electron?.startLocalRefresh) {
-        const result = await window.electron.startLocalRefresh({
-          outputPath: localIndexPath,
-          cfClearance: refreshData.cfClearance,
-          perPage: fetchPageCount,
-          workers: workerCount,
-          userAgent: refreshData.userAgent,
-          source: selectedSource,
-        });
-
-        if (!result.success) {
-          throw new Error(result.error || "Failed to start refresh");
-        }
-      } else {
-        // Simulate progress for development/testing
-        simulateRefresh();
-      }
-    } catch (error) {
-      console.error("Failed to start refresh:", error);
-      setRefreshStatus("error");
-      setIsRefreshing(false);
-      setErrors(prev => [...prev, { message: error.message, timestamp: new Date() }]);
-      toast.error(t("localRefresh.startFailed") || "Failed to start refresh");
-    }
-  };
-
-  const handleStopRefresh = async () => {
-    setShowStopDialog(false);
-    manuallyStoppedRef.current = true;
-    try {
-      if (window.electron?.stopLocalRefresh) {
-        // Pass localIndexPath so Electron can restore backups
-        await window.electron.stopLocalRefresh(localIndexPath);
-      }
-      setIsRefreshing(false);
-      setRefreshStatus("idle");
-      setCurrentStep(t("localRefresh.stopped") || "Refresh stopped");
-      toast.info(
-        t("localRefresh.refreshStopped") ||
-          "Game list refresh stopped and backups restored"
-      );
-    } catch (error) {
-      console.error("Failed to stop refresh:", error);
-      manuallyStoppedRef.current = false;
-      toast.error(t("localRefresh.stopFailed") || "Failed to stop refresh");
-    }
-  };
-
-  const handleCookieRefresh = async refreshData => {
-    // This is called when user provides a new cookie during mid-refresh
-    if (refreshData.isCookieRefresh && refreshData.cfClearance) {
-      try {
-        if (window.electron?.sendLocalRefreshCookie) {
-          const result = await window.electron.sendLocalRefreshCookie(
-            refreshData.cfClearance,
-            refreshData.userAgent
-          );
-          if (result.success) {
-            setCookieProvided(true);
-            cookieSubmittedRef.current = true; // Mark that cookie was successfully submitted BEFORE dialog closes
-            setCookieRefreshCount(prev => prev + 1);
-            // Don't call setShowCookieRefreshDialog here - the dialog's handleClose will do it
-            // Debounce toast to prevent spam - only show if last toast was more than 3 seconds ago
-            const now = Date.now();
-            if (now - lastCookieToastTimeRef.current > 3000) {
-              lastCookieToastTimeRef.current = now;
-              toast.success(
-                t("localRefresh.cookieRefreshed") || "Cookie refreshed, resuming..."
-              );
-            }
-            return; // Return early so the dialog close handler knows cookie was sent
-          } else {
-            toast.error(
-              result.error ||
-                t("localRefresh.cookieRefreshFailed") ||
-                "Failed to refresh cookie"
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Failed to send new cookie:", error);
-        toast.error(t("localRefresh.cookieRefreshFailed") || "Failed to refresh cookie");
-      }
-    }
-  };
-
-  const handleCookieRefreshDialogClose = async open => {
-    if (!open && showCookieRefreshDialog) {
-      cookieDialogOpenRef.current = false;
-      setShowCookieRefreshDialog(false);
-      // Only stop refresh if user cancelled without submitting a cookie
-      if (!cookieSubmittedRef.current) {
-        await handleStopRefresh();
-      }
-      // Don't reset cookieSubmittedRef here - let the progress handler do it
-      // after the phase changes away from waiting_for_cookie
-    } else {
-      cookieDialogOpenRef.current = open;
-      setShowCookieRefreshDialog(open);
-    }
-  };
 
   const handleChangeLocation = async () => {
     try {
@@ -920,42 +479,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   };
 
   // Simulation function for development/testing
-  const simulateRefresh = () => {
-    const steps = [
-      { step: "Connecting to SteamRIP...", duration: 1000 },
-      { step: "Fetching game list...", duration: 1500 },
-      { step: "Processing game metadata...", duration: 2000 },
-      { step: "Updating local index...", duration: 1500 },
-      { step: "Finalizing...", duration: 1000 },
-    ];
-
-    let currentProgress = 0;
-    const totalSteps = steps.length;
-    const simulatedTotalGames = 25;
-    setTotalGames(simulatedTotalGames);
-
-    steps.forEach((stepInfo, index) => {
-      setTimeout(
-        () => {
-          setCurrentStep(stepInfo.step);
-          const stepProgress = ((index + 1) / totalSteps) * 100;
-          setProgress(stepProgress);
-          setProcessedGames(Math.floor((stepProgress / 100) * simulatedTotalGames));
-
-          if (index === totalSteps - 1) {
-            setTimeout(() => {
-              setRefreshStatus("completed");
-              setIsRefreshing(false);
-              setHasIndexBefore(true); // Update UI immediately after successful refresh
-              setLastRefreshTime(new Date());
-            }, 500);
-          }
-        },
-        steps.slice(0, index + 1).reduce((acc, s) => acc + s.duration, 0)
-      );
-    });
-  };
-
   const formatLastRefreshTime = date => {
     if (!date) return t("localRefresh.never") || "Never";
     const now = new Date();
@@ -1850,13 +1373,9 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
       return;
     }
     if (welcomeStep) {
-      const stillRefreshing = isRefreshing || indexRefreshStartedFromWelcome;
-      const isComplete = refreshStatus === "completed";
       navigate("/welcome", {
         state: {
           welcomeStep,
-          indexRefreshStarted: stillRefreshing && !isComplete,
-          indexComplete: isComplete,
         },
       });
     } else {
@@ -1873,25 +1392,8 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   };
 
   // Derived view state
-  const isIndexReady = refreshStatus === "completed" || hasIndexBefore;
-  const modeLocked = isRefreshing || isUploading || isSyncingCustomSource;
-  const isIndeterminatePhase = [
-    "fetching_posts",
-    "fetching_categories",
-    "initializing",
-    "starting",
-  ].includes(currentPhase);
-  // Sharing follows a scrape of the official index unless it's turned off
-  shareExpectedRef.current =
-    !customSourcesMode &&
-    settings?.shareLocalIndex !== false &&
-    (selectedSource || "steamrip") === "steamrip" &&
-    !(settings?.blacklistIDs || []).some(id => !DEFAULT_BLACKLIST_IDS.includes(id));
-  const waitingForCookie = isRefreshing && currentPhase === "waiting_for_cookie";
-  const showProgressCard = isRefreshing || isUploading || !!finishStage;
-  const progressIndeterminate =
-    isUploading || waitingForCookie || (isRefreshing && isIndeterminatePhase);
-  const progressDone = !isRefreshing && !isUploading && finishStage === "done";
+  const isIndexReady = hasIndexBefore;
+  const modeLocked = !!downloadingIndex || isSyncingCustomSource;
   const heroGameCount = customSourcesMode
     ? (activeCustomList?.itemCount ??
       customSourceGameCount ??
@@ -1923,19 +1425,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   const inactiveCustomLists = customLists.filter(
     list => list.id !== activeCustomList?.id
   );
-  const statusLine =
-    uploadError ||
-    currentStep ||
-    (refreshStatus === "error"
-      ? t("localRefresh.statusError") || "Last refresh failed"
-      : "");
-  const hasPrimaryAction =
-    !isRefreshing &&
-    (isUploading ||
-      !customSourcesMode ||
-      !!customSource?.url ||
-      !!sourceBucketUrl.trim());
-
   return (
     <div
       className={`${embedded ? "" : welcomeStep ? "mt-0 pt-10" : "mt-6"} ${embedded ? "" : "min-h-screen"} bg-background text-foreground`}
@@ -1947,23 +1436,12 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
       >
         {renderManager ? (
           renderManager({
-            isRefreshing,
-            progress,
-            currentStep,
-            totalGames,
-            processedGames,
-            errors,
             lastRefreshTime,
-            refreshStatus,
             localIndexPath,
             hasIndexBefore,
-            apiAvailable,
-            checkingApi,
             indexInfo,
             downloadingIndex,
             indexDownloadProgress,
-            isUploading,
-            uploadError,
             customSourcesMode,
             customSource,
             customSourceGameCount,
@@ -1978,15 +1456,9 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
             isAuthenticated,
             settings,
             updateSetting,
-            workerCount,
-            setWorkerCount,
-            fetchPageCount,
-            setFetchPageCount,
             newBlacklistId,
             setNewBlacklistId,
             formatLastRefreshTime,
-            handleOpenRefreshDialog,
-            setShowStopDialog,
             handleChangeLocation,
             handleToggleCustomSourcesMode,
             handleSaveSourceBucketUrl,
@@ -2098,6 +1570,65 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
             </div>
 
             <div className="space-y-6">
+              {/* The API is blocked from refreshing the index and needs a hand */}
+              {!customSourcesMode && indexStatus?.blocked && (
+                <div
+                  className={cn(
+                    "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-5 py-4",
+                    relayState === "done"
+                      ? "border-green-500/30 bg-green-500/10"
+                      : "border-orange-500/30 bg-orange-500/10"
+                  )}
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    {relayState === "done" ? (
+                      <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        {relayState === "done"
+                          ? t("localRefresh.relayDone") ||
+                            "Thanks, the index is up to date"
+                          : t("localRefresh.relayTitle") ||
+                            "The game index can't update itself right now"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {relayState === "error"
+                          ? relayError ||
+                            t("localRefresh.relayFailed") ||
+                            "That didn't work. You can try again."
+                          : relayState === "done"
+                            ? t("localRefresh.relayDoneDesc") ||
+                              "Everyone using Ascendara gets the update you just helped with."
+                            : t("localRefresh.relayDesc") ||
+                              "The game source is blocking Ascendara's server. You can help by letting Ascendara fetch the latest games from your connection. A small window may ask you to confirm you're human."}
+                      </p>
+                    </div>
+                  </div>
+                  {relayState !== "done" && (
+                    <Button
+                      onClick={handleHelpRefresh}
+                      disabled={relayState === "running" || !!downloadingIndex}
+                      className="shrink-0 gap-2 text-secondary"
+                    >
+                      {relayState === "running" ? (
+                        <>
+                          <Loader className="h-4 w-4 animate-spin" />
+                          {t("localRefresh.relayRunning") || "Refreshing..."}
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4" />
+                          {t("localRefresh.relayAction") || "Help refresh"}
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {/* Active index overview */}
               <section className="relative overflow-hidden rounded-xl border border-border/60 bg-card">
                 <div className="pointer-events-none absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-primary/10 to-transparent" />
@@ -2257,114 +1788,13 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                   </div>
                 </div>
 
-                {/* Progress */}
-                <AnimatePresence>
-                  {showProgressCard && (
-                    <motion.div
-                      key="progress"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.25, ease: "easeInOut" }}
-                      className="relative overflow-hidden"
-                    >
-                      <div className="space-y-2.5 border-t border-border/60 px-6 py-4">
-                        <div className="flex h-7 items-center justify-between gap-3 text-sm">
-                          <span className="flex items-center gap-2 font-medium">
-                            {progressDone ? (
-                              <CircleCheck className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Loader className="h-4 w-4 animate-spin text-primary" />
-                            )}
-                            {isUploading
-                              ? t("localRefresh.sharing") || "Sharing..."
-                              : progressDone
-                                ? t("localRefresh.statusCompleted") || "Complete"
-                                : isRefreshing
-                                  ? t("localRefresh.progress") || "Progress"
-                                  : t("localRefresh.swapping") || "Finalizing..."}
-                          </span>
-                          <div className="flex items-center gap-3">
-                            {isRefreshing &&
-                              currentPhase === "processing_posts" &&
-                              totalGames > 0 && (
-                                <span className="text-xs tabular-nums text-muted-foreground">
-                                  {processedGames.toLocaleString()} /{" "}
-                                  {totalGames.toLocaleString()}{" "}
-                                  {t("localRefresh.games") || "games"}
-                                </span>
-                              )}
-                            {waitingForCookie ? (
-                              <span className="font-medium text-orange-500">
-                                {t("localRefresh.waitingForCookieShort") || "Waiting..."}
-                              </span>
-                            ) : isRefreshing && !isIndeterminatePhase ? (
-                              <span className="font-semibold tabular-nums">
-                                {Math.round(progress)}%
-                              </span>
-                            ) : null}
-                            {isRefreshing && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowStopDialog(true)}
-                                className="h-7 gap-1.5 px-2 text-xs"
-                              >
-                                <StopCircle className="h-3.5 w-3.5" />
-                                {t("localRefresh.stop") || "Stop"}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
-                          {progressIndeterminate ? (
-                            <div
-                              className={cn(
-                                "absolute h-full rounded-full",
-                                waitingForCookie ? "bg-orange-500" : "bg-primary"
-                              )}
-                              style={{
-                                animation: `progress-loading ${
-                                  waitingForCookie ? "2s" : "1.5s"
-                                } ease-in-out infinite`,
-                              }}
-                            />
-                          ) : (
-                            <div
-                              className={cn(
-                                "h-full rounded-full transition-[width,background-color] duration-300 ease-out",
-                                progressDone ? "bg-green-500" : "bg-primary"
-                              )}
-                              style={{ width: `${isRefreshing ? progress : 100}%` }}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Status line + primary actions */}
-                {(statusLine || hasPrimaryAction) && (
-                  <div className="relative flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-muted/20 px-6 py-3">
-                    <p
-                      className={cn(
-                        "min-w-0 flex-1 truncate text-xs",
-                        uploadError || refreshStatus === "error"
-                          ? "text-red-500"
-                          : "text-muted-foreground"
-                      )}
-                      title={statusLine}
-                    >
-                      {statusLine}
-                    </p>
+                {/* Primary actions */}
+                {(!customSourcesMode ||
+                  !!customSource?.url ||
+                  !!sourceBucketUrl.trim()) && (
+                  <div className="relative flex flex-wrap items-center justify-end gap-3 border-t border-border/60 bg-muted/20 px-6 py-3">
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      {isRefreshing ? null : isUploading ? (
-                        <Button disabled className="gap-2 text-secondary">
-                          <Loader className="h-4 w-4 animate-spin" />
-                          {t("localRefresh.sharing") || "Sharing..."}
-                        </Button>
-                      ) : customSourcesMode ? (
+                      {customSourcesMode ? (
                         customSource?.url ? (
                           <>
                             <Button
@@ -2404,134 +1834,63 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                           </Button>
                         ) : null
                       ) : (
-                        <>
-                          <Button
-                            variant={apiAvailable ? "outline" : "default"}
-                            className={apiAvailable ? "gap-2" : "gap-2 text-secondary"}
-                            onClick={handleOpenRefreshDialog}
-                          >
-                            <Play className="h-4 w-4" />
-                            {refreshStatus === "completed"
-                              ? t("localRefresh.scrapeAgain") || "Scrape again"
-                              : t("localRefresh.scrapeManually") || "Scrape manually"}
-                          </Button>
-                          {apiAvailable ? (
-                            <Button
-                              className="min-w-[9.5rem] gap-2 overflow-hidden text-secondary"
-                              onClick={async () => {
-                                if (downloadingIndex || isRefreshing || isUploading)
-                                  return;
-                                try {
-                                  await window.electron.downloadSharedIndex(
-                                    localIndexPath
-                                  );
-                                } catch (e) {
-                                  console.error("Failed to start download:", e);
-                                  toast.error(
-                                    t("localRefresh.indexDownloadFailed") ||
-                                      "Failed to start download"
-                                  );
-                                }
-                              }}
-                              disabled={downloadingIndex || isRefreshing || isUploading}
+                        <Button
+                          className="min-w-[9.5rem] gap-2 overflow-hidden text-secondary"
+                          onClick={async () => {
+                            if (downloadingIndex) return;
+                            try {
+                              await window.electron.downloadSharedIndex(localIndexPath);
+                            } catch (e) {
+                              console.error("Failed to start download:", e);
+                              toast.error(
+                                t("localRefresh.indexDownloadFailed") ||
+                                  "Failed to start download"
+                              );
+                            }
+                          }}
+                          disabled={!!downloadingIndex}
+                        >
+                          <AnimatePresence mode="wait" initial={false}>
+                            <motion.span
+                              key={
+                                downloadingIndex
+                                  ? "busy"
+                                  : justRefreshed
+                                    ? "done"
+                                    : "idle"
+                              }
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -6 }}
+                              transition={{ duration: 0.15 }}
+                              className="inline-flex items-center gap-2"
                             >
-                              <AnimatePresence mode="wait" initial={false}>
-                                <motion.span
-                                  key={
-                                    downloadingIndex
-                                      ? "busy"
-                                      : justRefreshed
-                                        ? "done"
-                                        : "idle"
-                                  }
-                                  initial={{ opacity: 0, y: 6 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -6 }}
-                                  transition={{ duration: 0.15 }}
-                                  className="inline-flex items-center gap-2"
-                                >
-                                  {downloadingIndex ? (
-                                    <>
-                                      <Loader className="h-4 w-4 animate-spin" />
-                                      {t("localRefresh.refreshingIndex")}
-                                    </>
-                                  ) : justRefreshed ? (
-                                    <>
-                                      <CircleCheck className="h-4 w-4" />
-                                      {t("localRefresh.upToDate")}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Cloud className="h-4 w-4" />
-                                      {hasIndexBefore
-                                        ? t("localRefresh.refreshNow") || "Refresh now"
-                                        : t("localRefresh.getStarted") || "Get the index"}
-                                    </>
-                                  )}
-                                </motion.span>
-                              </AnimatePresence>
-                            </Button>
-                          ) : null}
-                        </>
+                              {downloadingIndex ? (
+                                <>
+                                  <Loader className="h-4 w-4 animate-spin" />
+                                  {t("localRefresh.refreshingIndex")}
+                                </>
+                              ) : justRefreshed ? (
+                                <>
+                                  <CircleCheck className="h-4 w-4" />
+                                  {t("localRefresh.upToDate")}
+                                </>
+                              ) : (
+                                <>
+                                  <Cloud className="h-4 w-4" />
+                                  {hasIndexBefore
+                                    ? t("localRefresh.refreshNow") || "Refresh now"
+                                    : t("localRefresh.getStarted") || "Get the index"}
+                                </>
+                              )}
+                            </motion.span>
+                          </AnimatePresence>
+                        </Button>
                       )}
                     </div>
                   </div>
                 )}
               </section>
-
-              {/* Errors */}
-              <AnimatePresence>
-                {errors.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden rounded-xl border border-red-500/20 bg-red-500/5"
-                  >
-                    <button
-                      onClick={() => setShowErrors(!showErrors)}
-                      className="flex w-full items-center justify-between px-4 py-3 text-sm"
-                    >
-                      <div className="flex items-center gap-2 text-red-500">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="font-semibold">
-                          {t("localRefresh.errors") || "Errors"} ({errors.length})
-                        </span>
-                      </div>
-                      <ChevronDown
-                        className={cn(
-                          "h-4 w-4 text-red-500/60 transition-transform",
-                          showErrors && "rotate-180"
-                        )}
-                      />
-                    </button>
-                    <AnimatePresence>
-                      {showErrors && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="max-h-40 divide-y divide-red-500/10 overflow-y-auto border-t border-red-500/20"
-                        >
-                          {errors.map((error, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between gap-3 px-4 py-1.5 text-xs"
-                            >
-                              <span className="min-w-0 break-words font-mono text-red-500">
-                                {error.message}
-                              </span>
-                              <span className="shrink-0 tabular-nums text-red-500/60">
-                                {error.timestamp.toLocaleTimeString()}
-                              </span>
-                            </div>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* Official index preferences */}
               {!customSourcesMode && (
@@ -2553,37 +1912,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                         onCheckedChange={checked =>
                           updateSetting("backgroundIndexSync", checked)
                         }
-                      />
-                    </SettingRow>
-                    <SettingRow
-                      icon={Share2}
-                      active={!!settings?.shareLocalIndex}
-                      title={t("localRefresh.shareIndex") || "Share your index"}
-                      description={
-                        t("localRefresh.shareIndexDesc") ||
-                        "Help others by uploading your index after refresh"
-                      }
-                      footer={
-                        settings?.shareLocalIndex &&
-                        settings?.blacklistIDs?.some(
-                          id => !["ABSXUc", "AWBgqf", "ATaHuq"].includes(id)
-                        ) && (
-                          <div className="flex items-start gap-2 rounded-lg bg-orange-500/10 p-2.5 text-xs text-orange-600 dark:text-orange-400">
-                            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span>
-                              {t("localRefresh.blacklistWarning") ||
-                                "Your index won't be shared because you have custom blacklisted games. Remove them to share your index with the community."}
-                            </span>
-                          </div>
-                        )
-                      }
-                    >
-                      <Switch
-                        checked={!!settings?.shareLocalIndex}
-                        onCheckedChange={checked =>
-                          updateSetting("shareLocalIndex", checked)
-                        }
-                        disabled={isRefreshing}
                       />
                     </SettingRow>
                   </div>
@@ -2915,64 +2243,9 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                               size="sm"
                               className="h-8 shrink-0 px-2"
                               onClick={handleChangeLocation}
-                              disabled={isRefreshing}
                             >
                               <PencilIcon className="h-3.5 w-3.5" />
                             </Button>
-                          </div>
-                        }
-                      />
-
-                      {/* Performance */}
-                      <SettingRow
-                        icon={Cpu}
-                        title={t("localRefresh.performanceSettings") || "Performance"}
-                        footer={
-                          <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <Label className="text-xs text-muted-foreground">
-                                {t("localRefresh.workerCount") || "Workers"}
-                              </Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={16}
-                                value={workerCount}
-                                onChange={e => {
-                                  const val = parseInt(e.target.value, 10);
-                                  if (val >= 1 && val <= 16) {
-                                    setWorkerCount(val);
-                                    window.electron?.updateSetting(
-                                      "localRefreshWorkers",
-                                      val
-                                    );
-                                  }
-                                }}
-                                disabled={isRefreshing}
-                                className="h-8 w-16 text-center text-xs"
-                              />
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <Label className="text-xs text-muted-foreground">
-                                {t("localRefresh.gamesPerPage") || "Per Page"}
-                              </Label>
-                              <Input
-                                type="number"
-                                min={10}
-                                max={100}
-                                value={fetchPageCount}
-                                onChange={e => {
-                                  const value = Math.min(
-                                    100,
-                                    Math.max(10, parseInt(e.target.value) || 50)
-                                  );
-                                  setFetchPageCount(value);
-                                  window.electron?.updateSetting("fetchPageCount", value);
-                                }}
-                                disabled={isRefreshing}
-                                className="h-8 w-16 text-center text-xs"
-                              />
-                            </div>
                           </div>
                         }
                       />
@@ -2990,7 +2263,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                                 value={newBlacklistId}
                                 onChange={e => setNewBlacklistId(e.target.value.trim())}
                                 className="h-8 flex-1 text-xs"
-                                disabled={isRefreshing}
                                 onKeyDown={e => {
                                   if (e.key === "Enter") addBlacklistId();
                                 }}
@@ -2999,7 +2271,7 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                                 variant="outline"
                                 size="sm"
                                 className="h-8 px-2"
-                                disabled={isRefreshing || !newBlacklistId}
+                                disabled={!newBlacklistId}
                                 onClick={addBlacklistId}
                               >
                                 <Plus className="h-3.5 w-3.5" />
@@ -3020,7 +2292,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                                           settings.blacklistIDs.filter(i => i !== id)
                                         )
                                       }
-                                      disabled={isRefreshing}
                                       className="rounded p-0.5 hover:bg-red-500/20 hover:text-red-600 disabled:opacity-50"
                                     >
                                       <X className="h-2.5 w-2.5" />
@@ -3039,44 +2310,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
             </div>
           </>
         )}
-
-        {/* Stop Confirmation Dialog */}
-        <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {t("localRefresh.stopConfirmTitle") || "Stop Refresh?"}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {t("localRefresh.stopConfirmDescription") ||
-                  "Are you sure you want to stop the refresh process? Progress will be lost and you'll need to start again."}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t("common.cancel") || "Cancel"}</AlertDialogCancel>
-              <AlertDialogAction className="text-secondary" onClick={handleStopRefresh}>
-                {t("localRefresh.stopRefresh") || "Stop Refresh"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Refresh Index Dialog */}
-        <RefreshIndexDialog
-          open={showRefreshDialog}
-          onOpenChange={setShowRefreshDialog}
-          onStartRefresh={handleStartRefresh}
-        />
-
-        {/* Cookie Refresh Dialog - reuses RefreshIndexDialog in cookie-refresh mode */}
-        <RefreshIndexDialog
-          open={showCookieRefreshDialog}
-          onOpenChange={handleCookieRefreshDialogClose}
-          onStartRefresh={handleCookieRefresh}
-          mode="cookie-refresh"
-          cookieExpired={cookieProvided}
-          cookieRefreshCount={cookieRefreshCount}
-        />
 
         {/* External Source Bucket Browser Dialog */}
         <Dialog open={sourceBrowserOpen} onOpenChange={setSourceBrowserOpen}>

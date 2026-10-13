@@ -221,61 +221,14 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // LOCAL INDEX REFRESH
   //===========================================================================
-  startLocalRefresh: data => ipcRenderer.invoke("start-local-refresh", data),
-  stopLocalRefresh: outputPath => ipcRenderer.invoke("stop-local-refresh", outputPath),
-  sendLocalRefreshCookie: (cookie, userAgent) =>
-    ipcRenderer.invoke("send-local-refresh-cookie", cookie, userAgent),
   getLocalRefreshProgress: outputPath =>
     ipcRenderer.invoke("get-local-refresh-progress", outputPath),
-  getLocalRefreshStatus: outputPath =>
-    ipcRenderer.invoke("get-local-refresh-status", outputPath),
-  onLocalRefreshProgress: callback =>
-    preloadIpc.subscribe("local-refresh-progress", callback, {
-      selectArgs: args => [args[0]],
-    }),
-  onLocalRefreshComplete: callback =>
-    preloadIpc.subscribe("local-refresh-complete", callback, {
-      selectArgs: args => [args[0]],
-    }),
-  onLocalRefreshError: callback =>
-    preloadIpc.subscribe("local-refresh-error", callback, {
-      selectArgs: args => [args[0]],
-    }),
-  onLocalRefreshCookieNeeded: callback =>
-    preloadIpc.subscribe("local-refresh-cookie-needed", callback, {
-      selectArgs: () => [],
-    }),
-  onSteamripCookieReceived: callback =>
-    preloadIpc.subscribe("steamrip-cookie-received", callback, {
-      selectArgs: args => [args[0]],
-    }),
-  offLocalRefreshProgress: () => preloadIpc.removeAllListeners("local-refresh-progress"),
-  offLocalRefreshComplete: () => preloadIpc.removeAllListeners("local-refresh-complete"),
-  offLocalRefreshError: () => preloadIpc.removeAllListeners("local-refresh-error"),
-  offLocalRefreshCookieNeeded: () =>
-    preloadIpc.removeAllListeners("local-refresh-cookie-needed"),
-  onLocalRefreshUploading: callback =>
-    preloadIpc.subscribe("local-refresh-uploading", callback, {
-      selectArgs: () => [],
-    }),
-  onLocalRefreshUploadComplete: callback =>
-    preloadIpc.subscribe("local-refresh-upload-complete", callback, {
-      selectArgs: () => [],
-    }),
-  onLocalRefreshUploadError: callback =>
-    preloadIpc.subscribe("local-refresh-upload-error", callback, {
-      selectArgs: args => [args[0]],
-    }),
-  offLocalRefreshUploading: () =>
-    preloadIpc.removeAllListeners("local-refresh-uploading"),
-  offLocalRefreshUploadComplete: () =>
-    preloadIpc.removeAllListeners("local-refresh-upload-complete"),
-  offLocalRefreshUploadError: () =>
-    preloadIpc.removeAllListeners("local-refresh-upload-error"),
   downloadSharedIndex: outputPath =>
     ipcRenderer.invoke("download-shared-index", outputPath),
   syncCommunityIndex: () => ipcRenderer.invoke("sync-community-index"),
   getIndexCover: imgID => ipcRenderer.invoke("get-index-cover", imgID),
+  getIndexStatus: () => ipcRenderer.invoke("get-index-status"),
+  startIndexRelay: () => ipcRenderer.invoke("start-index-relay"),
   getPublicIndexDownloadStatus: () =>
     ipcRenderer.invoke("get-public-index-download-status"),
   onPublicIndexDownloadStarted: callback =>

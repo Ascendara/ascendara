@@ -12,7 +12,6 @@ import {
   FolderOpen,
   FileJson,
   Plus,
-  Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SurfaceButton } from "./Surface";
@@ -58,12 +57,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
   const pendingRef = useRef(false);
   const [listAction, setListAction] = useState(null);
   const [listName, setListName] = useState("");
-  const busy =
-    pending ||
-    m.isRefreshing ||
-    !!m.downloadingIndex ||
-    m.isUploading ||
-    m.isSyncingCustomSource;
+  const busy = pending || !!m.downloadingIndex || m.isSyncingCustomSource;
   const buttons = getControllerButtons(controllerType);
   const run = async action => {
     if (pendingRef.current) return;
@@ -94,21 +88,15 @@ export function IndexManager({ model: m, onBack, controllerType }) {
   const downloadPercent = m.indexDownloadProgress?.progress;
   const percent = Math.max(
     0,
-    Math.min(100, m.downloadingIndex ? downloadPercent || 0 : m.progress || 0)
+    Math.min(100, m.downloadingIndex ? downloadPercent || 0 : 0)
   );
   const status = m.downloadingIndex
-    ? "Downloading cloud index"
-    : m.isRefreshing
-      ? "Building local index"
-      : m.isUploading
-        ? "Sharing index"
-        : m.isSyncingCustomSource
-          ? "Syncing source"
-          : m.refreshStatus === "error"
-            ? "Refresh failed"
-            : m.hasIndexBefore || m.customSource
-              ? "Ready"
-              : "No index yet";
+    ? "Refreshing index"
+    : m.isSyncingCustomSource
+      ? "Syncing source"
+      : m.hasIndexBefore || m.customSource
+        ? "Ready"
+        : "No index yet";
 
   return (
     <main className="bp-index-manager" aria-label="Game indexes">
@@ -176,34 +164,17 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                     </span>
                   </SurfaceButton>
                 ) : (
-                  <>
-                    <SurfaceButton
-                      className="bp-index-action-card"
-                      disabled={busy || !m.apiAvailable || !m.localIndexPath}
-                      onClick={() =>
-                        run(() => window.electron.downloadSharedIndex(m.localIndexPath))
-                      }
-                    >
-                      <CloudDownload />
-                      <strong>Refresh cloud index</strong>
-                      <span>
-                        {m.checkingApi
-                          ? "Checking availability…"
-                          : m.apiAvailable
-                            ? "Download the latest community index."
-                            : "Cloud index is currently unavailable."}
-                      </span>
-                    </SurfaceButton>
-                    <SurfaceButton
-                      className="bp-index-action-card"
-                      disabled={busy || !m.localIndexPath}
-                      onClick={m.handleOpenRefreshDialog}
-                    >
-                      <Database />
-                      <strong>Build local index</strong>
-                      <span>Refresh the index directly from the source.</span>
-                    </SurfaceButton>
-                  </>
+                  <SurfaceButton
+                    className="bp-index-action-card"
+                    disabled={busy || !m.localIndexPath}
+                    onClick={() =>
+                      run(() => window.electron.downloadSharedIndex(m.localIndexPath))
+                    }
+                  >
+                    <CloudDownload />
+                    <strong>Refresh index</strong>
+                    <span>Get the latest games from Ascendara.</span>
+                  </SurfaceButton>
                 )}
               </div>
               {m.customSourcesMode && !m.customSource?.url && (
@@ -211,38 +182,15 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                   Choose a source or import a list in Sources & imports.
                 </p>
               )}
-              {(busy || m.currentStep || m.refreshStatus === "completed") && (
+              {busy && (
                 <div className="bp-index-progress" aria-live="polite">
                   <div>
                     <strong>{status}</strong>
-                    <span>{Math.round(percent)}%</span>
+                    {m.downloadingIndex && percent > 0 && (
+                      <span>{Math.round(percent)}%</span>
+                    )}
                   </div>
-                  <progress max="100" value={percent} />
-                  <p>
-                    {m.indexDownloadProgress?.currentGame ||
-                      m.currentStep ||
-                      "Preparing index…"}
-                  </p>
-                  {m.totalGames > 0 && (
-                    <p>
-                      {m.processedGames.toLocaleString()} /{" "}
-                      {m.totalGames.toLocaleString()} games
-                    </p>
-                  )}
-                  {m.isRefreshing && (
-                    <SurfaceButton onClick={() => m.setShowStopDialog(true)}>
-                      <Square /> Stop refresh
-                    </SurfaceButton>
-                  )}
-                </div>
-              )}
-              {(m.uploadError || m.errors.length > 0) && (
-                <div className="bp-index-errors" role="alert">
-                  <h3>Refresh messages</h3>
-                  {m.uploadError && <p>{m.uploadError}</p>}
-                  {m.errors.map((error, i) => (
-                    <p key={i}>{error.message}</p>
-                  ))}
+                  <progress max="100" value={percent || undefined} />
                 </div>
               )}
             </>
@@ -427,26 +375,6 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                   onChange={value => save("backgroundIndexSync", value)}
                 />
               </Setting>
-              <Setting
-                title="Share after building"
-                description="Upload your completed local index for the community."
-              >
-                <Toggle
-                  label="Share after building"
-                  checked={!!m.settings.shareLocalIndex}
-                  disabled={busy || m.customSourcesMode}
-                  onChange={value => save("shareLocalIndex", value)}
-                />
-              </Setting>
-              {m.settings.shareLocalIndex &&
-                m.settings.blacklistIDs?.some(
-                  id => !["ABSXUc", "AWBgqf", "ATaHuq"].includes(id)
-                ) && (
-                  <p className="bp-index-note">
-                    Custom excluded games prevent your index from being shared. Remove
-                    them in Advanced to enable sharing.
-                  </p>
-                )}
             </>
           )}
           {section === "advanced" && (
@@ -463,48 +391,10 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                   <FolderOpen /> Change folder
                 </SurfaceButton>
               </Setting>
-              {[
-                [
-                  "Workers",
-                  "Parallel workers used for local builds.",
-                  "localRefreshWorkers",
-                  m.workerCount,
-                  m.setWorkerCount,
-                  1,
-                  16,
-                  1,
-                ],
-                [
-                  "Games per page",
-                  "Games requested at a time when building locally.",
-                  "fetchPageCount",
-                  m.fetchPageCount,
-                  m.setFetchPageCount,
-                  10,
-                  100,
-                  10,
-                ],
-              ].map(([title, description, key, value, setter, min, max, step]) => (
-                <Setting key={key} title={title} description={description}>
-                  <SurfaceButton
-                    aria-label={`Decrease ${title}`}
-                    disabled={busy || value <= min}
-                    onClick={() => save(key, Math.max(min, value - step), setter)}
-                  >
-                    <Minus />
-                  </SurfaceButton>
-                  <output>{value}</output>
-                  <SurfaceButton
-                    aria-label={`Increase ${title}`}
-                    disabled={busy || value >= max}
-                    onClick={() => save(key, Math.min(max, value + step), setter)}
-                  >
-                    <Plus />
-                  </SurfaceButton>
-                </Setting>
-              ))}
               <h3>Excluded games</h3>
-              <p>Skip these game IDs when building your local index.</p>
+              <p>
+                Hide these game IDs from your index. Applies the next time it updates.
+              </p>
               <label className="bp-index-field">
                 Game ID
                 <input

@@ -400,7 +400,7 @@ function Settings() {
     setExclusionLoading(false);
   };
 
-  // Load last refresh time and check if refresh is running
+  // Load when the index was last refreshed
   useEffect(() => {
     const loadRefreshStatus = async () => {
       try {
@@ -412,41 +412,9 @@ function Settings() {
           currentSettings?.localIndex ||
           (await window.electron.getDefaultLocalIndexPath?.());
         if (indexPath) {
-          // Check if refresh is currently running
-          if (window.electron?.getLocalRefreshStatus) {
-            const status = await window.electron.getLocalRefreshStatus(indexPath);
-            setIsIndexRefreshing(!!status.isRunning);
-            if (status.isRunning && status.progress) {
-              setIndexRefreshProgress({
-                progress: status.progress.progress,
-                phase: status.progress.phase,
-                processedPosts: status.progress.processedPosts,
-                totalPosts: status.progress.totalPosts,
-              });
-            }
-            // Use lastSuccessfulTimestamp which persists across refresh attempts
-            if (status.progress?.lastSuccessfulTimestamp) {
-              setLastRefreshTime(
-                new Date(status.progress.lastSuccessfulTimestamp * 1000)
-              );
-            }
-          } else if (window.electron?.getLocalRefreshProgress) {
-            const progress = await window.electron.getLocalRefreshProgress(indexPath);
-            // Use lastSuccessfulTimestamp which persists across refresh attempts
-            if (progress?.lastSuccessfulTimestamp) {
-              setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
-            }
-            // Check status from progress file
-            const running = progress?.status === "running";
-            setIsIndexRefreshing(running);
-            if (running) {
-              setIndexRefreshProgress({
-                progress: progress.progress,
-                phase: progress.phase,
-                processedPosts: progress.processedPosts,
-                totalPosts: progress.totalPosts,
-              });
-            }
+          const progress = await window.electron.getLocalRefreshProgress(indexPath);
+          if (progress?.lastSuccessfulTimestamp) {
+            setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
           }
         }
       } catch (e) {
@@ -455,67 +423,14 @@ function Settings() {
     };
     loadRefreshStatus();
 
-    // Listen for refresh progress updates using the same handlers as LocalRefresh
-    if (window.electron?.onLocalRefreshProgress) {
-      const handleProgressUpdate = async data => {
-        // Any progress update while status is not terminal means a refresh is active
-        if (
-          data.status === "completed" ||
-          data.status === "failed" ||
-          data.status === "error"
-        ) {
-          setIsIndexRefreshing(false);
-          setIndexRefreshProgress(null);
-          if (data.status === "completed" && data.lastSuccessfulTimestamp) {
-            setLastRefreshTime(new Date(data.lastSuccessfulTimestamp * 1000));
-          }
-          return;
-        }
-        setIsIndexRefreshing(true);
-        setIndexRefreshProgress(prev => ({
-          progress: data.progress ?? prev?.progress,
-          phase: data.phase ?? prev?.phase,
-          processedPosts: data.processedPosts ?? prev?.processedPosts,
-          totalPosts: data.totalPosts ?? prev?.totalPosts,
-        }));
-      };
+    const handlePublicDownloadComplete = () => {
+      setLastRefreshTime(new Date());
+    };
+    window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
 
-      const handleComplete = async data => {
-        setIsIndexRefreshing(false);
-        setIndexRefreshProgress(null);
-        if (data.code === 0) {
-          setLastRefreshTime(
-            data.lastSuccessfulTimestamp
-              ? new Date(data.lastSuccessfulTimestamp * 1000)
-              : new Date()
-          );
-          await loadRefreshStatus();
-        }
-      };
-
-      const handleError = () => {
-        setIsIndexRefreshing(false);
-        setIndexRefreshProgress(null);
-      };
-
-      // Subscribe to IPC events
-      window.electron.onLocalRefreshProgress(handleProgressUpdate);
-      window.electron.onLocalRefreshComplete(handleComplete);
-      window.electron.onLocalRefreshError(handleError);
-
-      // Listen for public index download complete
-      const handlePublicDownloadComplete = () => {
-        setLastRefreshTime(new Date());
-      };
-      window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
-
-      return () => {
-        window.electron.offLocalRefreshProgress?.();
-        window.electron.offLocalRefreshComplete?.();
-        window.electron.offLocalRefreshError?.();
-        window.electron.offPublicIndexDownloadComplete?.();
-      };
-    }
+    return () => {
+      window.electron.offPublicIndexDownloadComplete?.();
+    };
   }, []);
 
   useEffect(() => {
