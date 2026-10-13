@@ -696,7 +696,10 @@ function registerLocalRefreshHandlers() {
           });
         }
 
-        await syncCommunityIndex(outputPath, { force: true });
+        await syncCommunityIndex(outputPath, {
+          force: true,
+          blacklist: settingsManager.getSettings().blacklistIDs,
+        });
         console.log("Shared index set up successfully");
 
         publicIndexDownloading = false;
@@ -732,7 +735,7 @@ function registerLocalRefreshHandlers() {
 
   // Quietly bring the shared game list up to date (no progress UI)
   ipcMain.handle("sync-community-index", async () => {
-    const indexPath = settingsManager.getSettings().localIndex;
+    const { localIndex: indexPath, blacklistIDs } = settingsManager.getSettings();
     if (
       !indexPath ||
       localRefreshProcess ||
@@ -743,7 +746,7 @@ function registerLocalRefreshHandlers() {
     }
 
     try {
-      const result = await syncCommunityIndex(indexPath);
+      const result = await syncCommunityIndex(indexPath, { blacklist: blacklistIDs });
       if (result.updated) {
         const mainWindow = BrowserWindow.getAllWindows()[0];
         if (mainWindow) {

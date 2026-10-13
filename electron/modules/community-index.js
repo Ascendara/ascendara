@@ -58,7 +58,16 @@ async function pruneCovers(indexPath, games) {
   }
 }
 
-async function runSync(indexPath, force) {
+/**
+ * Remove files the old zip-based index download could leave behind
+ */
+async function removeLegacyFiles(indexPath) {
+  for (const name of ["downloaded_index.zip", "shared_index.zip", "imgs_backup"]) {
+    await fs.remove(path.join(indexPath, name)).catch(() => {});
+  }
+}
+
+async function runSync(indexPath, force, blacklist) {
   await fs.ensureDir(indexPath);
   const gamesPath = path.join(indexPath, GAMES_FILE);
   const statePath = path.join(indexPath, SYNC_STATE_FILE);
@@ -83,10 +92,17 @@ async function runSync(indexPath, force) {
     throw new Error(`Failed to fetch game list: ${response.status}`);
   }
 
-  const text = await response.text();
+  let text = await response.text();
   const data = JSON.parse(text);
   if (!Array.isArray(data?.games) || data.games.length === 0) {
     throw new Error("Game list is empty");
+  }
+
+  // The shared list has every game, so apply the user's blacklist here
+  const blocked = new Set(blacklist);
+  if (data.games.some(game => blocked.has(game.gameID))) {
+    data.games = data.games.filter(game => !blocked.has(game.gameID));
+    text = JSON.stringify(data);
   }
   const etag = response.headers.get("etag");
 
@@ -104,6 +120,7 @@ async function runSync(indexPath, force) {
   await fs.writeJson(statePath, { etag, mtimeMs });
 
   await pruneCovers(indexPath, data.games);
+  await removeLegacyFiles(indexPath);
   missingCovers.clear();
   await writeProgress(indexPath);
 
@@ -113,12 +130,13 @@ async function runSync(indexPath, force) {
 /**
  * Bring the local game list up to date with the shared one
  * @param {string} indexPath - Path to the local index directory
- * @param {object} options - force: replace the local list even if it is unchanged or newer
+ * @param {object} options - force: replace the local list even if it is unchanged or newer;
+ *   blacklist: gameIDs to leave out
  * @returns {Promise<{updated: boolean, games?: number}>}
  */
-function syncCommunityIndex(indexPath, { force = false } = {}) {
+function syncCommunityIndex(indexPath, { force = false, blacklist = [] } = {}) {
   if (!activeSync) {
-    activeSync = runSync(indexPath, force).finally(() => {
+    activeSync = runSync(indexPath, force, blacklist).finally(() => {
       activeSync = null;
     });
   }
