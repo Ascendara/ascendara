@@ -36,7 +36,7 @@ class SettingsManager {
       gameSource: "steamrip",
       autoCreateShortcuts: true,
       smoothTransitions: true,
-    bigPictureHomeStyle: "ascendara",
+      bigPictureHomeStyle: "ascendara",
       sendAnalytics: true,
       autoUpdate: true,
       endOnClose: false,
@@ -61,6 +61,7 @@ class SettingsManager {
       localRefreshWorkers: 8,
       homeSearch: true,
       indexReminder: "7",
+      backgroundIndexSync: true,
       autoRefreshEnabled: false,
       autoRefreshInterval: "7",
       autoRefreshMethod: "shared",
@@ -310,7 +311,7 @@ function registerSettingsHandlers() {
       // Handle Discord RPC toggle immediately
       if (key === "rpcEnabled") {
         const { initializeDiscordRPC, destroyDiscordRPC } = require("./discord-rpc");
-        
+
         if (value) {
           initializeDiscordRPC();
         } else {

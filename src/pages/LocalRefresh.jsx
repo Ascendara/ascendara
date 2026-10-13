@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLanguage } from "@/context/LanguageContext";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, animate, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
@@ -14,15 +14,12 @@ import {
   AlertCircle,
   Loader,
   Database,
-  Clock,
   ChevronDown,
-  ChevronUp,
   ArrowLeft,
   ArrowRight,
   Folder,
   Settings2,
   Star,
-  Info,
   X,
   Plus,
   Ban,
@@ -39,7 +36,6 @@ import {
   Search as SearchIcon,
   AlertTriangle,
   ClipboardList,
-  PlugIcon,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -80,13 +76,56 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import imageCacheService from "@/services/imageCacheService";
 import gameService from "@/services/gameService";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+// The shared index refresh finishes almost instantly, so hold the busy state
+// long enough to be seen and then confirm the result on the button itself.
+const MIN_REFRESH_BUSY_MS = 700;
+const REFRESH_DONE_MS = 2500;
+
+const AnimatedNumber = ({ value }) => {
+  const reduceMotion = useReducedMotion();
+  const [display, setDisplay] = useState(value);
+  const previousRef = useRef(value);
+
+  useEffect(() => {
+    const from = previousRef.current;
+    previousRef.current = value;
+    if (value == null || from == null || from === value || reduceMotion) {
+      setDisplay(value);
+      return;
+    }
+    const controls = animate(from, value, {
+      duration: 0.6,
+      ease: "easeOut",
+      onUpdate: latest => setDisplay(Math.round(latest)),
+    });
+    return () => controls.stop();
+  }, [value, reduceMotion]);
+
+  return display != null ? display.toLocaleString() : "—";
+};
+
+const SettingRow = ({ icon: Icon, title, description, active, footer, children }) => (
+  <div className="px-5 py-4">
+    <div className="flex items-center gap-3">
+      <Icon
+        className={cn(
+          "h-4 w-4 shrink-0",
+          active ? "text-green-500" : "text-muted-foreground"
+        )}
+      />
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm font-medium text-foreground">{title}</h3>
+        {description && (
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </div>
+    {footer && <div className="mt-3 pl-7">{footer}</div>}
+  </div>
+);
 
 const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   const { t } = useLanguage();
@@ -140,6 +179,9 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   const [selectedSource, setSelectedSource] = useState("steamrip");
   const [showCookieRefreshDialog, setShowCookieRefreshDialog] = useState(false);
   const [cookieRefreshCount, setCookieRefreshCount] = useState(0);
+  // Whether this run has been given a cookie yet. If not, a cookie request
+  // means one is needed for the first time, not that one expired.
+  const [cookieProvided, setCookieProvided] = useState(false);
   const cookieSubmittedRef = useRef(false);
   const lastCookieToastTimeRef = useRef(0);
   const cookieDialogOpenRef = useRef(false);
@@ -154,9 +196,10 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   const [indexDownloadProgress, setIndexDownloadProgress] = useState(null); // { progress, phase, downloaded, total }
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState("7");
-  const [autoRefreshMethod, setAutoRefreshMethod] = useState("shared"); // "shared" or "manual"
+  const [justRefreshed, setJustRefreshed] = useState(false);
+  const downloadStartedAtRef = useRef(0);
+  const justRefreshedTimerRef = useRef(null);
+  const [, setRelativeTimeTick] = useState(0);
 
   // External Sources Mode (user-configurable source bucket)
   const [customSourcesMode, setCustomSourcesMode] = useState(false);
@@ -206,6 +249,31 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   const [activeCustomList, setActiveCustomList] = useState(null); // Currently active custom list
   const [showListNameDialog, setShowListNameDialog] = useState(false); // Dialog for naming new lists
 
+  const fetchIndexInfo = async () => {
+    try {
+      const infoResponse = await fetch("https://api.ascendara.app/localindex/info");
+      const infoData = await infoResponse.json();
+      if (infoData.success) {
+        setIndexInfo({
+          gameCount: infoData.gameCount,
+          date: infoData.date,
+          size: infoData.size,
+        });
+      }
+    } catch (infoErr) {
+      console.error("Failed to fetch index info:", infoErr);
+    }
+  };
+
+  // Keep relative times ("2 minutes ago") moving while the page stays open
+  useEffect(() => {
+    const interval = setInterval(() => setRelativeTimeTick(tick => tick + 1), 30000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(justRefreshedTimerRef.current);
+    };
+  }, []);
+
   // Load settings and ensure localIndex is set, also check if refresh is running
   useEffect(() => {
     const initializeSettings = async () => {
@@ -221,15 +289,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
         }
         if (settings?.localRefreshSource !== undefined) {
           setSelectedSource(settings.localRefreshSource);
-        }
-        if (settings?.autoRefreshEnabled !== undefined) {
-          setAutoRefreshEnabled(settings.autoRefreshEnabled);
-        }
-        if (settings?.autoRefreshInterval !== undefined) {
-          setAutoRefreshInterval(settings.autoRefreshInterval);
-        }
-        if (settings?.autoRefreshMethod !== undefined) {
-          setAutoRefreshMethod(settings.autoRefreshMethod);
         }
 
         // Load custom sources library
@@ -276,6 +335,15 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
           const defaultPath = await window.electron.getDefaultLocalIndexPath();
           setLocalIndexPath(defaultPath);
           await updateSetting("localIndex", defaultPath);
+        }
+
+        // Remember whether an index already exists so the primary action
+        // reads "Refresh now" instead of "Get the index"
+        if (window.electron?.getTimestampValue) {
+          const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
+          if (hasIndexed === true) {
+            setHasIndexBefore(true);
+          }
         }
 
         // Load last refresh time
@@ -382,19 +450,7 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
 
         // If API is healthy, fetch index metadata
         if (isHealthy) {
-          try {
-            const infoResponse = await fetch("https://api.ascendara.app/localindex/info");
-            const infoData = await infoResponse.json();
-            if (infoData.success) {
-              setIndexInfo({
-                gameCount: infoData.gameCount,
-                date: infoData.date,
-                size: infoData.size,
-              });
-            }
-          } catch (infoErr) {
-            console.error("Failed to fetch index info:", infoErr);
-          }
+          await fetchIndexInfo();
         }
       } catch (e) {
         console.error("Failed to check API health:", e);
@@ -614,6 +670,9 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     // Public index download event handlers
     const handlePublicDownloadStarted = () => {
       console.log("Public index download started");
+      downloadStartedAtRef.current = Date.now();
+      clearTimeout(justRefreshedTimerRef.current);
+      setJustRefreshed(false);
       setDownloadingIndex("public");
       setIndexDownloadProgress({
         progress: 0,
@@ -625,9 +684,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
 
     const handlePublicDownloadComplete = async () => {
       console.log("Public index download complete");
-      setDownloadingIndex(null);
-      setIndexDownloadProgress(null);
-      toast.success(t("localRefresh.indexDownloaded") || "Public index downloaded!");
       if (window.electron?.setTimestampValue) {
         await window.electron.setTimestampValue("hasIndexBefore", true);
       }
@@ -636,9 +692,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
         await updateSetting("usingLocalIndex", true);
         wasFirstIndexRef.current = false;
       }
-      setHasIndexBefore(true);
-      setLastRefreshTime(new Date()); // Set last refresh time to now
-
       // Clear caches so the app loads fresh data
       // Do NOT invalidate imageCacheService settings cache - the localIndex path hasn't changed.
       console.log("[LocalRefresh] Public index download complete, clearing caches");
@@ -658,6 +711,22 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
           detail: { timestamp: Date.now() },
         })
       );
+
+      const busyFor = Date.now() - downloadStartedAtRef.current;
+      if (busyFor < MIN_REFRESH_BUSY_MS) {
+        await new Promise(resolve => setTimeout(resolve, MIN_REFRESH_BUSY_MS - busyFor));
+      }
+      setDownloadingIndex(null);
+      setIndexDownloadProgress(null);
+      setHasIndexBefore(true);
+      setLastRefreshTime(new Date()); // Set last refresh time to now
+      setJustRefreshed(true);
+      clearTimeout(justRefreshedTimerRef.current);
+      justRefreshedTimerRef.current = setTimeout(
+        () => setJustRefreshed(false),
+        REFRESH_DONE_MS
+      );
+      fetchIndexInfo();
     };
 
     const handlePublicDownloadError = data => {
@@ -722,6 +791,7 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     setCurrentPhase("initializing");
     manuallyStoppedRef.current = false;
     setCookieRefreshCount(0);
+    setCookieProvided(!!refreshData.cfClearance);
     setCurrentStep(t("localRefresh.initializing") || "Initializing...");
 
     try {
@@ -780,9 +850,11 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
       try {
         if (window.electron?.sendLocalRefreshCookie) {
           const result = await window.electron.sendLocalRefreshCookie(
-            refreshData.cfClearance
+            refreshData.cfClearance,
+            refreshData.userAgent
           );
           if (result.success) {
+            setCookieProvided(true);
             cookieSubmittedRef.current = true; // Mark that cookie was successfully submitted BEFORE dialog closes
             setCookieRefreshCount(prev => prev + 1);
             // Don't call setShowCookieRefreshDialog here - the dialog's handleClose will do it
@@ -1788,13 +1860,74 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
     }
   };
 
+  const addBlacklistId = () => {
+    const id = newBlacklistId.trim();
+    if (id && !settings?.blacklistIDs?.includes(id)) {
+      updateSetting("blacklistIDs", [...(settings?.blacklistIDs || []), id]);
+      setNewBlacklistId("");
+    }
+  };
+
+  // Derived view state
+  const isIndexReady = refreshStatus === "completed" || hasIndexBefore;
+  const modeLocked = isRefreshing || isUploading || isSyncingCustomSource;
+  const isIndeterminatePhase = [
+    "fetching_posts",
+    "fetching_categories",
+    "initializing",
+    "starting",
+  ].includes(currentPhase);
+  const heroGameCount = customSourcesMode
+    ? (activeCustomList?.itemCount ??
+      customSourceGameCount ??
+      customSource?.gameCount ??
+      customSource?.gamesCount)
+    : indexInfo?.gameCount;
+  const rawSourceRating =
+    customSource?.rating && typeof customSource.rating === "object"
+      ? customSource.rating.avg
+      : typeof customSource?.rating === "number"
+        ? customSource.rating
+        : null;
+  const sourceRating =
+    rawSourceRating == null || Number.isNaN(Number(rawSourceRating))
+      ? null
+      : Number(rawSourceRating);
+  const lastRefreshLabel = customSourcesMode
+    ? activeCustomList?.createdAt
+      ? formatLastRefreshTime(new Date(activeCustomList.createdAt))
+      : customSourceLastSynced
+        ? formatLastRefreshTime(customSourceLastSynced)
+        : t("localRefresh.never") || "Never"
+    : lastRefreshTime
+      ? formatLastRefreshTime(lastRefreshTime)
+      : t("localRefresh.never") || "Never";
+  const otherSavedSources = customSourcesLibrary.filter(
+    s => s?.url && s.url !== customSource?.url
+  );
+  const inactiveCustomLists = customLists.filter(
+    list => list.id !== activeCustomList?.id
+  );
+  const statusLine =
+    uploadError ||
+    currentStep ||
+    (refreshStatus === "error"
+      ? t("localRefresh.statusError") || "Last refresh failed"
+      : "");
+  const hasPrimaryAction =
+    !isRefreshing &&
+    (isUploading ||
+      !customSourcesMode ||
+      !!customSource?.url ||
+      !!sourceBucketUrl.trim());
+
   return (
     <div
       className={`${embedded ? "" : welcomeStep ? "mt-0 pt-10" : "mt-6"} ${embedded ? "" : "min-h-screen"} bg-background text-foreground`}
     >
       <div
         className={
-          renderManager ? "bp-index-workflow" : "container mx-auto max-w-3xl px-4 py-8"
+          renderManager ? "bp-index-workflow" : "container mx-auto max-w-4xl px-4 py-8"
         }
       >
         {renderManager ? (
@@ -1827,12 +1960,6 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
             customSourcesLibrary,
             customLists,
             activeCustomList,
-            autoRefreshEnabled,
-            setAutoRefreshEnabled,
-            autoRefreshInterval,
-            setAutoRefreshInterval,
-            autoRefreshMethod,
-            setAutoRefreshMethod,
             isAuthenticated,
             settings,
             updateSetting,
@@ -1864,1094 +1991,503 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 overflow-hidden rounded-lg border-2 border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5"
+                className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3"
               >
-                <div className="p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-                        <Database className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">
-                          {t("localRefresh.firstTimeSetup") ||
-                            "First-Time Setup: Build Your Game Index"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {refreshStatus === "completed" || hasIndexBefore
-                            ? t("localRefresh.setupCompleteMessage") ||
-                              "Index ready! Click Continue to proceed with setup."
-                            : t("localRefresh.setupInProgressMessage") ||
-                              "Download or build your game index to continue setup."}
-                        </p>
-                      </div>
-                    </div>
-                    {(refreshStatus === "completed" || hasIndexBefore) && (
-                      <Button
-                        size="lg"
-                        onClick={handleBack}
-                        className="shrink-0 gap-2 text-secondary"
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                        {t("localRefresh.continueSetup") || "Continue Setup"}
-                      </Button>
-                    )}
+                <div className="flex min-w-0 items-center gap-3">
+                  <Database className="h-5 w-5 shrink-0 text-primary" />
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {t("localRefresh.firstTimeSetup") ||
+                        "First-Time Setup: Build Your Game Index"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {isIndexReady
+                        ? t("localRefresh.setupCompleteMessage") ||
+                          "Index ready! Click Continue to proceed with setup."
+                        : t("localRefresh.setupInProgressMessage") ||
+                          "Download or build your game index to continue setup."}
+                    </p>
                   </div>
                 </div>
+                {isIndexReady && (
+                  <Button onClick={handleBack} className="shrink-0 gap-2 text-secondary">
+                    {t("localRefresh.continueSetup") || "Continue Setup"}
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                )}
               </motion.div>
             )}
 
             {/* Header */}
-            <div className="mb-8">
+            <div className="mb-6">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleBack}
-                className="mb-4 gap-2 text-muted-foreground hover:text-foreground"
+                className="-ml-2 mb-3 gap-2 text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="h-4 w-4" />
                 {t("common.back") || "Back"}
               </Button>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold">
-                      {t("localRefresh.title") || "Local Game Index"}
-                    </h1>
-                  </div>
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-3xl font-bold tracking-tight">
+                    {t("localRefresh.title") || "Local Game Index"}
+                  </h1>
                   <p className="mt-1 text-muted-foreground">
                     {t("localRefresh.description")}
                   </p>
                 </div>
-                {lastRefreshTime && (
-                  <div className="hidden text-right text-sm text-muted-foreground sm:block">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-4 w-4" />
-                      <span>{t("localRefresh.lastRefresh") || "Last refresh"}</span>
-                    </div>
-                    <span className="font-medium">
-                      {formatLastRefreshTime(lastRefreshTime)}
-                    </span>
-                  </div>
-                )}
+
+                {/* Index mode: official index vs. external sources */}
+                <div
+                  role="tablist"
+                  className="inline-flex shrink-0 items-center rounded-lg bg-muted p-1"
+                >
+                  {[
+                    {
+                      custom: false,
+                      Icon: Database,
+                      label: t("localRefresh.ascendaraIndex") || "Ascendara Index",
+                    },
+                    {
+                      custom: true,
+                      Icon: Globe,
+                      label: t("localRefresh.customSourcesMode") || "External Sources",
+                    },
+                  ].map(({ custom, Icon, label }) => (
+                    <button
+                      key={String(custom)}
+                      type="button"
+                      role="tab"
+                      aria-selected={customSourcesMode === custom}
+                      disabled={modeLocked}
+                      onClick={() => {
+                        if (customSourcesMode !== custom) {
+                          handleToggleCustomSourcesMode(custom);
+                        }
+                      }}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+                        customSourcesMode === custom
+                          ? "bg-background text-foreground shadow"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="space-y-4">
-              <Card className="relative overflow-hidden border-none bg-gradient-to-br from-card to-card/50 p-0 shadow-md">
-                <div
-                  className={`absolute inset-x-0 top-0 h-24 opacity-50 ${
-                    customSourcesMode
-                      ? "bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-transparent"
-                      : "bg-gradient-to-br from-primary/20 via-blue-500/10 to-transparent"
-                  }`}
-                />
-                <div className="relative p-6">
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl shadow-sm ${
-                        customSourcesMode
-                          ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white"
-                          : "bg-gradient-to-br from-primary to-blue-500 text-white"
-                      }`}
-                    >
-                      {customSourcesMode ? (
-                        <Globe className="h-7 w-7" />
-                      ) : (
-                        <Database className="h-7 w-7" />
+
+            <div className="space-y-6">
+              {/* Active index overview */}
+              <section className="relative overflow-hidden rounded-xl border border-border/60 bg-card">
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-primary/10 to-transparent" />
+                <AnimatePresence>
+                  {justRefreshed && (
+                    <motion.div
+                      key="refresh-sweep"
+                      initial={{ x: "-100%", opacity: 1 }}
+                      animate={{ x: "100%" }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.9, ease: "easeOut" }}
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent"
+                    />
+                  )}
+                </AnimatePresence>
+                <div className="relative px-6 pt-5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="mb-0 truncate text-xl font-semibold leading-tight">
+                      {customSourcesMode
+                        ? activeCustomList?.name ||
+                          customSource?.name ||
+                          t("localRefresh.noSourceSelected") ||
+                          "No source selected"
+                        : t("localRefresh.ascendaraIndex") || "Ascendara Index"}
+                    </h2>
+                    {customSourcesMode ? (
+                      <Badge
+                        variant="outline"
+                        className="border-primary/40 bg-primary/10 text-[10px] uppercase tracking-wide text-primary"
+                      >
+                        {t("localRefresh.customMode") || "Custom"}
+                      </Badge>
+                    ) : settings?.usingLocalIndex ? (
+                      <Badge className="gap-1 bg-green-500/15 text-green-600 hover:bg-green-500/15 dark:text-green-400">
+                        <Zap className="h-3 w-3" />
+                        {t("localRefresh.usingLocalIndex") || "Active"}
+                      </Badge>
+                    ) : null}
+                    {customSourcesMode &&
+                      Array.isArray(customSource?.status) &&
+                      customSource.status.includes("Trusted") && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="outline"
+                                className="cursor-help gap-1 border-emerald-500/40 bg-emerald-500/10 text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-300"
+                              >
+                                <ShieldCheck className="h-3 w-3" />
+                                {t("localRefresh.trusted") || "Trusted"}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-secondary">
+                              <p>
+                                {t("localRefresh.trustedTooltip") ||
+                                  "Trusted sources are widely used by the community and known to be reliable and safe."}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="truncate text-xl font-bold leading-tight">
-                          {customSourcesMode
-                            ? activeCustomList?.name ||
-                              customSource?.name ||
-                              t("localRefresh.noSourceSelected") ||
-                              "No source selected"
-                            : t("localRefresh.ascendaraIndex") || "Ascendara Index"}
-                        </h2>
-                        {customSourcesMode ? (
-                          <Badge
-                            variant="outline"
-                            className="gap-1 border-purple-500/40 bg-purple-500/10 text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-300"
-                          >
-                            {t("localRefresh.customMode") || "Custom"}
-                          </Badge>
-                        ) : settings?.usingLocalIndex ? (
-                          <Badge className="gap-1 bg-green-500/15 text-green-600 hover:bg-green-500/15 dark:text-green-400">
-                            <Zap className="h-3 w-3" />
-                            {t("localRefresh.usingLocalIndex") || "Active"}
-                          </Badge>
-                        ) : null}
-                        {customSourcesMode &&
-                          Array.isArray(customSource?.status) &&
-                          customSource.status.includes("Trusted") && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge
-                                    variant="outline"
-                                    className="cursor-help gap-1 border-emerald-500/40 bg-emerald-500/10 text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-300"
-                                  >
-                                    <ShieldCheck className="h-3 w-3" />
-                                    {t("localRefresh.trusted") || "Trusted"}
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs text-secondary">
-                                  <p>
-                                    {t("localRefresh.trustedTooltip") ||
-                                      "Trusted sources are widely used by the community and known to be reliable and safe."}
-                                  </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        {customSourcesMode && customSource?.torrentOnly && (
-                          <Badge
-                            variant="outline"
-                            className="gap-1 border-orange-500/40 bg-orange-500/10 text-[10px] uppercase tracking-wide text-orange-600 dark:text-orange-400"
-                          >
-                            <AlertTriangle className="h-3 w-3" />
-                            {t("localRefresh.torrentOnly") || "Torrent only"}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="mb-4 text-sm text-muted-foreground">
-                        {customSourcesMode
-                          ? activeCustomList
-                            ? (t("localRefresh.heroDescCustomListActive") ||
-                                "Browsing custom list") +
-                              ` "${activeCustomList.name}" (${activeCustomList.itemCount?.toLocaleString() || 0} ${t("localRefresh.items") || "items"})`
-                            : customSource?.url
-                              ? t("localRefresh.heroDescCustomActive") ||
-                                "Pulling games from your selected external source."
-                              : t("localRefresh.heroDescCustomEmpty") ||
-                                "Set a source bucket URL below to start pulling games."
-                          : t("localRefresh.heroDescAscendara") ||
-                            "Your offline copy of Ascendara's curated game database."}
-                        &nbsp;
-                        <a
-                          className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                          onClick={() =>
-                            window.electron.openURL(
-                              "https://ascendara.app/docs/features/external-sources"
-                            )
-                          }
-                        >
-                          {t("common.learnMore")}
-                          <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
-                      </p>
-                    </div>
+                    {customSourcesMode && customSource?.torrentOnly && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 border-orange-500/40 bg-orange-500/10 text-[10px] uppercase tracking-wide text-orange-600 dark:text-orange-400"
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        {t("localRefresh.torrentOnly") || "Torrent only"}
+                      </Badge>
+                    )}
                   </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {customSourcesMode
+                      ? activeCustomList
+                        ? (t("localRefresh.heroDescCustomListActive") ||
+                            "Browsing custom list") +
+                          ` "${activeCustomList.name}" (${activeCustomList.itemCount?.toLocaleString() || 0} ${t("localRefresh.items") || "items"})`
+                        : customSource?.url
+                          ? t("localRefresh.heroDescCustomActive") ||
+                            "Pulling games from your selected external source."
+                          : t("localRefresh.heroDescCustomEmpty") ||
+                            "Set a source bucket URL below to start pulling games."
+                      : t("localRefresh.heroDescAscendara") ||
+                        "Your offline copy of Ascendara's curated game database."}
+                    &nbsp;
+                    <a
+                      className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                      onClick={() =>
+                        window.electron.openURL(
+                          "https://ascendara.app/docs/features/external-sources"
+                        )
+                      }
+                    >
+                      {t("common.learnMore")}
+                      <ExternalLink className="ml-1 h-3 w-3" />
+                    </a>
+                  </p>
 
                   {/* Stats */}
-                  <div className="mt-5 grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border border-border/50 bg-background/60 p-3 backdrop-blur-sm">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {t("localRefresh.games") || "Games"}
-                      </div>
-                      <div className="mt-1 text-2xl font-bold leading-none">
-                        {(() => {
-                          const count = customSourcesMode
-                            ? (activeCustomList?.itemCount ??
-                              customSourceGameCount ??
-                              customSource?.gameCount ??
-                              customSource?.gamesCount)
-                            : indexInfo?.gameCount;
-                          return count != null ? count.toLocaleString() : "—";
-                        })()}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-border/50 bg-background/60 p-3 backdrop-blur-sm">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {customSourcesMode
-                          ? t("localRefresh.lastSynced") || "Last synced"
-                          : t("localRefresh.lastRefresh") || "Last refresh"}
-                      </div>
-                      <div className="mt-1 truncate text-sm font-semibold">
-                        {customSourcesMode
-                          ? activeCustomList?.createdAt
-                            ? formatLastRefreshTime(new Date(activeCustomList.createdAt))
-                            : customSourceLastSynced
-                              ? formatLastRefreshTime(customSourceLastSynced)
-                              : t("localRefresh.never") || "Never"
-                          : lastRefreshTime
-                            ? formatLastRefreshTime(lastRefreshTime)
-                            : t("localRefresh.never") || "Never"}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-border/50 bg-background/60 p-3 backdrop-blur-sm">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {customSourcesMode
-                          ? t("localRefresh.rating") || "Rating"
-                          : t("localRefresh.indexUpdated") || "Index age"}
-                      </div>
-                      <div className="mt-1 flex items-center gap-1 text-sm font-semibold">
-                        {customSourcesMode
-                          ? activeCustomList
-                            ? "Not Available"
-                            : (() => {
-                                const r = customSource?.rating;
-                                const avg =
-                                  r && typeof r === "object"
-                                    ? r.avg
-                                    : typeof r === "number"
-                                      ? r
-                                      : null;
-                                if (avg == null || Number.isNaN(Number(avg))) return "—";
-                                return (
-                                  <>
-                                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                                    {Number(avg).toFixed(1)}
-                                  </>
-                                );
-                              })()
-                          : indexInfo?.date
-                            ? new Date(indexInfo.date).toLocaleDateString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "—"}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Primary action bar */}
-                  <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-                    {isRefreshing ? null : isUploading ? (
-                      <Button size="lg" disabled className="gap-2 text-secondary">
-                        <Loader className="h-4 w-4 animate-spin" />
-                        {t("localRefresh.sharing") || "Sharing..."}
-                      </Button>
-                    ) : customSourcesMode ? (
-                      customSource?.url ? (
-                        <>
-                          <Button
-                            size="lg"
-                            onClick={() => handleSyncCustomSource()}
-                            disabled={isSyncingCustomSource || !sourceBucketUrl.trim()}
-                            className="gap-2 text-secondary sm:flex-1"
-                          >
-                            {isSyncingCustomSource ? (
-                              <>
-                                <Loader className="h-4 w-4 animate-spin" />
-                                {t("localRefresh.syncing") || "Syncing..."}
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="h-4 w-4" />
-                                {t("localRefresh.syncNow") || "Sync now"}
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={handleOpenSourceBrowser}
-                            disabled={isSyncingCustomSource}
-                            className="gap-2"
-                          >
-                            <Globe className="h-4 w-4" />
-                            {t("localRefresh.changeSource") || "Change source"}
-                          </Button>
-                        </>
-                      ) : sourceBucketUrl.trim() ? (
-                        <Button
-                          size="lg"
-                          onClick={handleOpenSourceBrowser}
-                          className="gap-2 text-secondary sm:flex-1"
-                        >
-                          <Globe className="h-4 w-4" />
-                          {t("localRefresh.browseSources") || "Browse sources"}
-                        </Button>
-                      ) : null
-                    ) : (
-                      <>
-                        {apiAvailable ? (
-                          <Button
-                            size="lg"
-                            className="gap-2 text-secondary sm:flex-1"
-                            onClick={async () => {
-                              if (downloadingIndex || isRefreshing || isUploading) return;
-                              try {
-                                await window.electron.downloadSharedIndex(localIndexPath);
-                              } catch (e) {
-                                console.error("Failed to start download:", e);
-                                toast.error(
-                                  t("localRefresh.indexDownloadFailed") ||
-                                    "Failed to start download"
-                                );
-                              }
-                            }}
-                            disabled={downloadingIndex || isRefreshing || isUploading}
-                          >
-                            {downloadingIndex ? (
-                              <>
-                                <Loader className="h-4 w-4 animate-spin" />
-                                {indexDownloadProgress?.phase === "extracting"
-                                  ? indexDownloadProgress.currentGame
-                                    ? indexDownloadProgress.currentGame
-                                    : indexDownloadProgress.progress >= 1
-                                      ? `${t("localRefresh.extracting") || "Extracting"} ${Math.floor(indexDownloadProgress.progress)}%`
-                                      : t("localRefresh.extracting") || "Extracting..."
-                                  : indexDownloadProgress?.progress > 0
-                                    ? `${Math.floor(indexDownloadProgress.progress)}%`
-                                    : t("localRefresh.downloading") || "Downloading..."}
-                              </>
-                            ) : (
-                              <>
-                                <Cloud className="h-4 w-4" />
-                                {hasIndexBefore
-                                  ? t("localRefresh.refreshNow") || "Refresh now"
-                                  : t("localRefresh.getStarted") || "Get the index"}
-                              </>
-                            )}
-                          </Button>
-                        ) : null}
-                        <Button
-                          size="lg"
-                          variant={apiAvailable ? "outline" : "default"}
-                          className={
-                            apiAvailable ? "gap-2" : "gap-2 text-secondary sm:flex-1"
-                          }
-                          onClick={handleOpenRefreshDialog}
-                        >
-                          <Play className="h-4 w-4" />
-                          {refreshStatus === "completed"
-                            ? t("localRefresh.scrapeAgain") || "Scrape again"
-                            : t("localRefresh.scrapeManually") || "Scrape manually"}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-
-                  <AnimatePresence>
-                    {(isRefreshing || isUploading || refreshStatus === "completed") && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                      >
-                        <Card className="p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="font-semibold">
-                                {isUploading
-                                  ? t("localRefresh.sharing") || "Sharing..."
-                                  : refreshStatus === "completed"
-                                    ? t("localRefresh.statusCompleted") || "Complete"
-                                    : t("localRefresh.progress") || "Progress"}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                {isUploading ? null : currentPhase ===
-                                  "waiting_for_cookie" ? (
-                                  <span className="font-medium text-orange-500">
-                                    {t("localRefresh.waitingForCookieShort") ||
-                                      "Waiting..."}
-                                  </span>
-                                ) : !(
-                                    currentPhase === "fetching_posts" ||
-                                    currentPhase === "fetching_categories" ||
-                                    currentPhase === "initializing" ||
-                                    currentPhase === "starting"
-                                  ) ? (
-                                  <span className="font-semibold">
-                                    {isRefreshing ? `${Math.round(progress)}%` : null}
-                                  </span>
-                                ) : null}
-                                {isRefreshing && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowStopDialog(true)}
-                                    className="h-7 gap-1.5 px-2 text-xs"
-                                  >
-                                    <StopCircle className="h-3.5 w-3.5" />
-                                    {t("localRefresh.stop") || "Stop"}
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            {isUploading ? (
-                              <div className="relative h-2 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-900/30">
-                                <div
-                                  className="absolute h-full rounded-full bg-blue-500"
-                                  style={{
-                                    animation:
-                                      "progress-loading 1.5s ease-in-out infinite",
-                                  }}
-                                />
-                              </div>
-                            ) : currentPhase === "waiting_for_cookie" ? (
-                              <div className="relative h-2 w-full overflow-hidden rounded-full bg-orange-200 dark:bg-orange-900/30">
-                                <div
-                                  className="absolute h-full rounded-full bg-orange-500"
-                                  style={{
-                                    animation: "progress-loading 2s ease-in-out infinite",
-                                  }}
-                                />
-                              </div>
-                            ) : (currentPhase === "fetching_posts" ||
-                                currentPhase === "fetching_categories" ||
-                                currentPhase === "initializing" ||
-                                currentPhase === "starting") &&
-                              isRefreshing ? (
-                              <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
-                                <div
-                                  className="absolute h-full rounded-full bg-primary"
-                                  style={{
-                                    animation:
-                                      "progress-loading 1.5s ease-in-out infinite",
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <Progress value={progress} className="h-2" />
-                            )}
-                            {currentPhase === "processing_posts" &&
-                              totalGames > 0 &&
-                              !isUploading && (
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                  <span>
-                                    {t("localRefresh.gamesProcessed") || "Games"}
-                                  </span>
-                                  <span className="font-semibold text-foreground">
-                                    {processedGames.toLocaleString()} /{" "}
-                                    {totalGames.toLocaleString()}
-                                  </span>
-                                </div>
-                              )}
-                          </div>
-                        </Card>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Contextual hint / status line */}
-                  {(currentStep || uploadError || refreshStatus === "error") && (
-                    <p
-                      className={`mt-3 text-xs ${
-                        uploadError || refreshStatus === "error"
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {uploadError ||
-                        currentStep ||
-                        (refreshStatus === "error"
-                          ? t("localRefresh.statusError") || "Last refresh failed"
-                          : "")}
-                    </p>
-                  )}
-                </div>
-              </Card>
-              {!customSourcesMode && (
-                <Card className="overflow-hidden border-0 p-0">
-                  <div className="flex items-start gap-3 p-5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-blue-500/15">
-                      <Calendar className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="font-semibold">
-                            {t("localRefresh.autoRefresh") ||
-                              "Automatic Index Refreshing"}
-                          </h3>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {autoRefreshEnabled && isAuthenticated
-                              ? (
-                                  t("localRefresh.autoRefreshActiveSummary") ||
-                                  "Refreshes every {{days}} days using {{method}}"
-                                )
-                                  .replace("{{days}}", autoRefreshInterval)
-                                  .replace(
-                                    "{{method}}",
-                                    autoRefreshMethod === "shared"
-                                      ? t("localRefresh.sharedIndex") || "shared index"
-                                      : t("localRefresh.manualScrape") || "scraping"
-                                  )
-                              : t("localRefresh.autoRefreshCardDesc") ||
-                                "Keep your index up to date automatically"}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={autoRefreshEnabled && isAuthenticated}
-                          onCheckedChange={async checked => {
-                            if (!isAuthenticated) {
-                              toast.info(
-                                t("localRefresh.autoRefreshRequiresAscend") ||
-                                  "Sign in to Ascend to enable automatic refreshing"
-                              );
-                              navigate("/ascend");
-                              return;
-                            }
-                            setAutoRefreshEnabled(checked);
-                            await updateSetting("autoRefreshEnabled", checked);
-                            toast.success(
-                              checked
-                                ? t("localRefresh.autoRefreshEnabled") ||
-                                    "Automatic refresh enabled"
-                                : t("localRefresh.autoRefreshDisabled") ||
-                                    "Automatic refresh disabled"
-                            );
-                          }}
-                          disabled={!isAuthenticated}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <AnimatePresence>
-                    {autoRefreshEnabled && isAuthenticated && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="border-t border-border/60 bg-muted/20"
-                      >
-                        <div className="space-y-4 p-5">
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              onClick={async () => {
-                                setAutoRefreshMethod("shared");
-                                await updateSetting("autoRefreshMethod", "shared");
-                              }}
-                              className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
-                                autoRefreshMethod === "shared"
-                                  ? "border-primary bg-primary/5 shadow-sm"
-                                  : "border-border hover:bg-accent/50"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <Cloud className="h-4 w-4" />
-                                <span className="text-xs font-semibold">
-                                  {t("localRefresh.sharedIndex") || "Shared Index"}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground">
-                                {t("localRefresh.sharedIndexDesc") ||
-                                  "Download pre-built index from community"}
-                              </p>
-                            </button>
-                            <button
-                              onClick={async () => {
-                                setAutoRefreshMethod("manual");
-                                await updateSetting("autoRefreshMethod", "manual");
-                              }}
-                              className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
-                                autoRefreshMethod === "manual"
-                                  ? "border-primary bg-primary/5 shadow-sm"
-                                  : "border-border hover:bg-accent/50"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <Settings2 className="h-4 w-4" />
-                                <span className="text-xs font-semibold">
-                                  {t("localRefresh.manualScrape") || "Manual Scrape"}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground">
-                                {t("localRefresh.manualScrapeDesc") ||
-                                  "Build your own index by scraping"}
-                              </p>
-                            </button>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground">
-                              {t("localRefresh.refreshInterval") || "Refresh Every"}
-                            </Label>
-                            <Select
-                              value={autoRefreshInterval}
-                              onValueChange={async value => {
-                                setAutoRefreshInterval(value);
-                                await updateSetting("autoRefreshInterval", value);
-                              }}
-                            >
-                              <SelectTrigger className="h-8 w-[160px] bg-background text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="2">
-                                  {t("localRefresh.intervalOptions.twoDays") || "2 Days"}
-                                </SelectItem>
-                                <SelectItem value="3">
-                                  {t("localRefresh.intervalOptions.threeDays") ||
-                                    "3 Days"}
-                                </SelectItem>
-                                <SelectItem value="5">
-                                  {t("localRefresh.intervalOptions.fiveDays") || "5 Days"}
-                                </SelectItem>
-                                <SelectItem value="7">
-                                  {t("localRefresh.intervalOptions.oneWeek") || "1 Week"}
-                                </SelectItem>
-                                <SelectItem value="10">
-                                  {t("localRefresh.intervalOptions.tenDays") || "10 Days"}
-                                </SelectItem>
-                                <SelectItem value="14">
-                                  {t("localRefresh.intervalOptions.twoWeeks") ||
-                                    "2 Weeks"}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  {!isAuthenticated && (
-                    <div className="flex items-start gap-2 border-t border-border/60 bg-purple-500/5 px-5 py-3 text-xs text-muted-foreground">
-                      <Info className="h-4 w-4 shrink-0 text-purple-500" />
-                      <span>
-                        {t("localRefresh.autoRefreshAscendInfo") ||
-                          "Sign in to Ascend to enable automatic index refreshing and keep your game library up to date effortlessly."}
+                  <div className="mt-6 flex flex-wrap items-end justify-between gap-4 pb-5">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-bold tabular-nums tracking-tight text-foreground">
+                        <AnimatedNumber value={heroGameCount} />
+                      </span>
+                      <span className="text-lg font-medium text-muted-foreground">
+                        {t("localRefresh.games") || "games"}
                       </span>
                     </div>
-                  )}
-                </Card>
-              )}
-
-              {/* Share Index compact */}
-              {!customSourcesMode && (
-                <Card className="border-0 p-5">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                        settings?.shareLocalIndex
-                          ? "bg-gradient-to-br from-green-500/15 to-emerald-500/15"
-                          : "bg-muted"
-                      }`}
-                    >
-                      <Share2
-                        className={`h-5 w-5 ${
-                          settings?.shareLocalIndex
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="font-semibold">
-                            {t("localRefresh.shareIndex") || "Share your index"}
-                          </h3>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {t("localRefresh.shareIndexDesc") ||
-                              "Help others by uploading your index after refresh"}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={!!settings?.shareLocalIndex}
-                          onCheckedChange={checked =>
-                            updateSetting("shareLocalIndex", checked)
-                          }
-                          disabled={isRefreshing}
-                        />
-                      </div>
-                      {settings?.shareLocalIndex &&
-                        settings?.blacklistIDs?.some(
-                          id => !["ABSXUc", "AWBgqf", "ATaHuq"].includes(id)
-                        ) && (
-                          <div className="mt-3 flex items-start gap-2 rounded-lg bg-orange-500/10 p-2.5 text-xs text-orange-600 dark:text-orange-400">
-                            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span>
-                              {t("localRefresh.blacklistWarning") ||
-                                "Your index won't be shared because you have custom blacklisted games. Remove them to share your index with the community."}
-                            </span>
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Custom Sources - compact switch card; expands to show source list */}
-              <Card className="overflow-hidden border-0 p-0">
-                <div className="flex items-start gap-3 p-5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500/15 to-pink-500/15">
-                    <PlugIcon className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold">
-                            {t("localRefresh.customSourcesMode") || "External Sources"}
-                          </h3>
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] uppercase tracking-wide"
+                    <dl className="flex gap-7 pb-1.5 text-right">
+                      <div>
+                        <dt className="text-xs text-muted-foreground">
+                          {customSourcesMode
+                            ? t("localRefresh.lastSynced") || "Last synced"
+                            : t("localRefresh.lastRefresh") || "Last refresh"}
+                        </dt>
+                        <dd className="text-base font-semibold text-foreground">
+                          <motion.span
+                            key={lastRefreshLabel}
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="inline-block"
                           >
-                            {t("localRefresh.experimental") || "Experimental"}
-                          </Badge>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {t("localRefresh.customSourcesModeDesc") ||
-                            "Pull games from an external source bucket of your choice instead of Ascendara's official index."}
-                        </p>
+                            {lastRefreshLabel}
+                          </motion.span>
+                        </dd>
                       </div>
-                      <Switch
-                        checked={customSourcesMode}
-                        onCheckedChange={handleToggleCustomSourcesMode}
-                        disabled={isRefreshing || isUploading || isSyncingCustomSource}
-                      />
-                    </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">
+                          {customSourcesMode
+                            ? t("localRefresh.rating") || "Rating"
+                            : t("localRefresh.indexUpdated") || "Index age"}
+                        </dt>
+                        <dd className="flex items-center justify-end gap-1 text-base font-semibold tabular-nums text-foreground">
+                          {customSourcesMode ? (
+                            activeCustomList ? (
+                              "Not Available"
+                            ) : sourceRating != null ? (
+                              <>
+                                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                                {sourceRating.toFixed(1)}
+                              </>
+                            ) : (
+                              "—"
+                            )
+                          ) : indexInfo?.date ? (
+                            new Date(indexInfo.date).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          ) : (
+                            "—"
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                 </div>
 
+                {/* Progress */}
                 <AnimatePresence>
-                  {customSourcesMode && (
+                  {(isRefreshing || isUploading || refreshStatus === "completed") && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="border-t border-border/60 bg-muted/20"
+                      className="relative overflow-hidden"
                     >
-                      <div className="space-y-3 p-5">
-                        <div className="flex items-start gap-2 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
-                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <div>
-                            <p className="font-medium">
-                              {t("localRefresh.customSourceTradeoffsTitle") ||
-                                "Reduced metadata"}
-                            </p>
-                            <p className="mt-1 leading-relaxed">
-                              {t("localRefresh.customSourceTradeoffsDesc") ||
-                                "Custom sources don't include cover images, categories, or popularity data."}
-                            </p>
-                          </div>
-                        </div>
-
-                        {customSourcesLibrary.filter(
-                          s => s?.url && s.url !== customSource?.url
-                        ).length > 0 && (
-                          <div>
-                            <div className="mb-2 flex items-center justify-between">
-                              <p className="text-xs font-semibold text-muted-foreground">
-                                {t("localRefresh.savedSources") || "Saved sources"}
-                              </p>
-                              <span className="text-[10px] text-muted-foreground/70">
-                                {t("localRefresh.savedSourcesHint") || "Click to switch"}
+                      <div className="space-y-2.5 border-t border-border/60 px-6 py-4">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="flex items-center gap-2 font-medium">
+                            {isUploading ? (
+                              <Loader className="h-4 w-4 animate-spin text-primary" />
+                            ) : refreshStatus === "completed" ? (
+                              <CircleCheck className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Loader className="h-4 w-4 animate-spin text-primary" />
+                            )}
+                            {isUploading
+                              ? t("localRefresh.sharing") || "Sharing..."
+                              : refreshStatus === "completed"
+                                ? t("localRefresh.statusCompleted") || "Complete"
+                                : t("localRefresh.progress") || "Progress"}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            {currentPhase === "processing_posts" &&
+                              totalGames > 0 &&
+                              !isUploading && (
+                                <span className="text-xs tabular-nums text-muted-foreground">
+                                  {processedGames.toLocaleString()} /{" "}
+                                  {totalGames.toLocaleString()}{" "}
+                                  {t("localRefresh.games") || "games"}
+                                </span>
+                              )}
+                            {isUploading ? null : currentPhase ===
+                              "waiting_for_cookie" ? (
+                              <span className="font-medium text-orange-500">
+                                {t("localRefresh.waitingForCookieShort") || "Waiting..."}
                               </span>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                              {customSourcesLibrary
-                                .filter(s => s?.url && s.url !== customSource?.url)
-                                .slice(0, 6)
-                                .map(entry => (
-                                  <div
-                                    key={entry.url}
-                                    role="button"
-                                    tabIndex={isSyncingCustomSource ? -1 : 0}
-                                    aria-disabled={isSyncingCustomSource}
-                                    onClick={() => {
-                                      if (isSyncingCustomSource) return;
-                                      handleSwitchToSavedSource(entry);
-                                    }}
-                                    onKeyDown={e => {
-                                      if (isSyncingCustomSource) return;
-                                      if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        handleSwitchToSavedSource(entry);
-                                      }
-                                    }}
-                                    className="group flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 bg-background p-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-                                  >
-                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
-                                      <Database className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-1">
-                                        <p className="truncate text-xs font-semibold">
-                                          {entry.name}
-                                        </p>
-                                        {entry.torrentOnly && (
-                                          <span
-                                            title={
-                                              t("localRefresh.torrentOnly") ||
-                                              "Torrent only"
-                                            }
-                                            className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"
-                                          />
-                                        )}
-                                      </div>
-                                      <p className="truncate text-[10px] text-muted-foreground">
-                                        {typeof entry.gameCount === "number"
-                                          ? `${entry.gameCount.toLocaleString()} ${t("localRefresh.games") || "games"}`
-                                          : entry.url}
-                                      </p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        removeLibraryEntry(entry.url);
-                                      }}
-                                      className="hover:text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                                      title={t("common.remove") || "Remove"}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs font-semibold text-foreground">
-                              {t("localRefresh.sourceBucketLabel") || "Source bucket URL"}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSourceBucketUrlDraft("https://library.hydra.wiki/")
-                              }
-                              className="text-[10px] text-primary hover:underline"
-                            >
-                              {t("localRefresh.sourceBucketUseRecommended") ||
-                                "Use recommended"}
-                            </button>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="url"
-                              inputMode="url"
-                              placeholder="Bucket URL..."
-                              value={sourceBucketUrlDraft}
-                              onChange={e => setSourceBucketUrlDraft(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  handleSaveSourceBucketUrl(sourceBucketUrlDraft);
-                                }
-                              }}
-                              disabled={isSyncingCustomSource}
-                              className="h-9 flex-1 text-xs"
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() =>
-                                handleSaveSourceBucketUrl(sourceBucketUrlDraft)
-                              }
-                              disabled={
-                                isSyncingCustomSource ||
-                                !sourceBucketUrlDraft.trim() ||
-                                sourceBucketUrlDraft.trim() === sourceBucketUrl.trim()
-                              }
-                              className="h-9 text-secondary"
-                            >
-                              {t("localRefresh.sourceBucketSet") || "Set"}
-                            </Button>
-                            {sourceBucketUrl.trim() && (
+                            ) : !isIndeterminatePhase && isRefreshing ? (
+                              <span className="font-semibold tabular-nums">
+                                {Math.round(progress)}%
+                              </span>
+                            ) : null}
+                            {isRefreshing && (
                               <Button
-                                type="button"
-                                size="sm"
                                 variant="outline"
-                                onClick={() => handleSaveSourceBucketUrl("")}
-                                disabled={isSyncingCustomSource}
-                                className="h-9"
-                                title={t("common.clear") || "Clear"}
+                                size="sm"
+                                onClick={() => setShowStopDialog(true)}
+                                className="h-7 gap-1.5 px-2 text-xs"
                               >
-                                <X className="h-3.5 w-3.5" />
+                                <StopCircle className="h-3.5 w-3.5" />
+                                {t("localRefresh.stop") || "Stop"}
                               </Button>
                             )}
                           </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            {t("localRefresh.sourceBucketHint") ||
-                              "Paste the URL of the source collection you want to pull from. Recommended: "}
-                            <span className="font-mono text-foreground">
-                              https://library.hydra.wiki/
-                            </span>
-                          </p>
                         </div>
-
-                        {!customSource?.url && (
-                          <div className="space-y-2">
-                            <Button
-                              onClick={handleOpenSourceBrowser}
-                              disabled={!sourceBucketUrl.trim() || isSyncingCustomSource}
-                              variant="outline"
-                              className="w-full gap-2"
-                            >
-                              <Globe className="h-4 w-4" />
-                              {t("localRefresh.browseSources") || "Browse sources"}
-                            </Button>
-                            <Button
-                              onClick={() => setShowJsonImportDialog(true)}
-                              variant="outline"
-                              className="w-full gap-2"
-                            >
-                              <Upload className="h-4 w-4" />
-                              {t("localRefresh.importJson") || "Import JSON Data"}
-                            </Button>
+                        {isUploading ||
+                        currentPhase === "waiting_for_cookie" ||
+                        (isIndeterminatePhase && isRefreshing) ? (
+                          <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                            <div
+                              className={cn(
+                                "absolute h-full rounded-full",
+                                !isUploading && currentPhase === "waiting_for_cookie"
+                                  ? "bg-orange-500"
+                                  : "bg-primary"
+                              )}
+                              style={{
+                                animation: `progress-loading ${
+                                  !isUploading && currentPhase === "waiting_for_cookie"
+                                    ? "2s"
+                                    : "1.5s"
+                                } ease-in-out infinite`,
+                              }}
+                            />
                           </div>
+                        ) : (
+                          <Progress value={progress} className="h-1.5" />
                         )}
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </Card>
 
-              {/* Custom Lists Management */}
-              {customSourcesMode && (
-                <Card className="overflow-hidden border-0 p-0">
-                  <div className="flex items-start gap-3 p-5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15">
-                      <ClipboardList className="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold">
-                              {t("localRefresh.customLists") || "Custom Lists"}
-                            </h3>
-                          </div>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {t("localRefresh.customListsDesc") ||
-                              "Create and manage your own game lists from imported JSON data."}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {activeCustomList && (
-                            <Badge variant="default" className="text-xs">
-                              {activeCustomList.name}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-border/60 bg-muted/20 p-5">
-                    <div className="space-y-3">
-                      {/* Active Custom List Info */}
-                      {activeCustomList && (
-                        <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                          <CircleCheck className="h-4 w-4 text-blue-500" />
-                          <div className="text-sm">
-                            <p className="font-medium text-blue-700 dark:text-blue-300">
-                              {t("localRefresh.activeList") || "Active List"}:{" "}
-                              {activeCustomList.name}
-                            </p>
-                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                              {activeCustomList.itemCount?.toLocaleString() || 0}{" "}
-                              {t("localRefresh.items") || "items"}
-                            </p>
-                          </div>
-                        </div>
+                {/* Status line + primary actions */}
+                {(statusLine || hasPrimaryAction) && (
+                  <div className="relative flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-muted/20 px-6 py-3">
+                    <p
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-xs",
+                        uploadError || refreshStatus === "error"
+                          ? "text-red-500"
+                          : "text-muted-foreground"
                       )}
-
-                      {/* Custom Lists Grid */}
-                      {customLists.length > 0 && (
-                        <div>
-                          <div className="mb-2 flex items-center justify-between">
-                            <p className="text-xs font-semibold text-muted-foreground">
-                              {t("localRefresh.yourLists") || "Your Lists"}
-                            </p>
-                            <span className="text-[10px] text-muted-foreground/70">
-                              {t("localRefresh.savedSourcesHint") || "Click to switch"}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {customLists
-                              .filter(list => list.id !== activeCustomList?.id)
-                              .slice(0, 6)
-                              .map(list => (
-                                <div
-                                  key={list.id}
-                                  role="button"
-                                  tabIndex={-1}
-                                  onClick={() => handleSwitchToList(list)}
-                                  className="group flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 bg-background p-2 text-left transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"
+                      title={statusLine}
+                    >
+                      {statusLine}
+                    </p>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      {isRefreshing ? null : isUploading ? (
+                        <Button disabled className="gap-2 text-secondary">
+                          <Loader className="h-4 w-4 animate-spin" />
+                          {t("localRefresh.sharing") || "Sharing..."}
+                        </Button>
+                      ) : customSourcesMode ? (
+                        customSource?.url ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              onClick={handleOpenSourceBrowser}
+                              disabled={isSyncingCustomSource}
+                              className="gap-2"
+                            >
+                              <Globe className="h-4 w-4" />
+                              {t("localRefresh.changeSource") || "Change source"}
+                            </Button>
+                            <Button
+                              onClick={() => handleSyncCustomSource()}
+                              disabled={isSyncingCustomSource || !sourceBucketUrl.trim()}
+                              className="gap-2 text-secondary"
+                            >
+                              {isSyncingCustomSource ? (
+                                <>
+                                  <Loader className="h-4 w-4 animate-spin" />
+                                  {t("localRefresh.syncing") || "Syncing..."}
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4" />
+                                  {t("localRefresh.syncNow") || "Sync now"}
+                                </>
+                              )}
+                            </Button>
+                          </>
+                        ) : sourceBucketUrl.trim() ? (
+                          <Button
+                            onClick={handleOpenSourceBrowser}
+                            className="gap-2 text-secondary"
+                          >
+                            <Globe className="h-4 w-4" />
+                            {t("localRefresh.browseSources") || "Browse sources"}
+                          </Button>
+                        ) : null
+                      ) : (
+                        <>
+                          <Button
+                            variant={apiAvailable ? "outline" : "default"}
+                            className={apiAvailable ? "gap-2" : "gap-2 text-secondary"}
+                            onClick={handleOpenRefreshDialog}
+                          >
+                            <Play className="h-4 w-4" />
+                            {refreshStatus === "completed"
+                              ? t("localRefresh.scrapeAgain") || "Scrape again"
+                              : t("localRefresh.scrapeManually") || "Scrape manually"}
+                          </Button>
+                          {apiAvailable ? (
+                            <Button
+                              className="min-w-[9.5rem] gap-2 overflow-hidden text-secondary"
+                              onClick={async () => {
+                                if (downloadingIndex || isRefreshing || isUploading)
+                                  return;
+                                try {
+                                  await window.electron.downloadSharedIndex(
+                                    localIndexPath
+                                  );
+                                } catch (e) {
+                                  console.error("Failed to start download:", e);
+                                  toast.error(
+                                    t("localRefresh.indexDownloadFailed") ||
+                                      "Failed to start download"
+                                  );
+                                }
+                              }}
+                              disabled={downloadingIndex || isRefreshing || isUploading}
+                            >
+                              <AnimatePresence mode="wait" initial={false}>
+                                <motion.span
+                                  key={
+                                    downloadingIndex
+                                      ? "busy"
+                                      : justRefreshed
+                                        ? "done"
+                                        : "idle"
+                                  }
+                                  initial={{ opacity: 0, y: 6 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -6 }}
+                                  transition={{ duration: 0.15 }}
+                                  className="inline-flex items-center gap-2"
                                 >
-                                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
-                                    <Database className="h-3.5 w-3.5 text-muted-foreground group-hover:text-blue-500" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1">
-                                      <p className="truncate text-xs font-semibold">
-                                        {list.name}
-                                      </p>
-                                      {list.format && (
-                                        <Badge variant="outline" className="text-[10px]">
-                                          {list.format}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="truncate text-[10px] text-muted-foreground">
-                                      {list.itemCount?.toLocaleString() || 0}{" "}
-                                      {t("localRefresh.items") || "items"}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        handleRenameList(list);
-                                      }}
-                                      className="opacity-0 transition-opacity hover:text-blue-500 group-hover:opacity-100"
-                                      title={t("common.rename") || "Rename"}
-                                    >
-                                      <PencilIcon className="h-3 w-3" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        handleDeleteList(list);
-                                      }}
-                                      className="hover:text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                                      title={t("common.delete") || "Delete"}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
+                                  {downloadingIndex ? (
+                                    <>
+                                      <Loader className="h-4 w-4 animate-spin" />
+                                      {t("localRefresh.refreshingIndex")}
+                                    </>
+                                  ) : justRefreshed ? (
+                                    <>
+                                      <CircleCheck className="h-4 w-4" />
+                                      {t("localRefresh.upToDate")}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Cloud className="h-4 w-4" />
+                                      {hasIndexBefore
+                                        ? t("localRefresh.refreshNow") || "Refresh now"
+                                        : t("localRefresh.getStarted") || "Get the index"}
+                                    </>
+                                  )}
+                                </motion.span>
+                              </AnimatePresence>
+                            </Button>
+                          ) : null}
+                        </>
                       )}
-
-                      {/* Import New List Button */}
-                      <Button
-                        onClick={() => setShowJsonImportDialog(true)}
-                        variant="outline"
-                        className="w-full gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        {t("localRefresh.importNewList") || "Import New List"}
-                      </Button>
                     </div>
                   </div>
-                </Card>
-              )}
+                )}
+              </section>
+
+              {/* Errors */}
               <AnimatePresence>
                 {errors.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden rounded-xl border border-red-500/20 bg-red-500/5"
                   >
                     <button
                       onClick={() => setShowErrors(!showErrors)}
-                      className="bg-destructive/10 flex w-full items-center justify-between rounded-lg p-3 text-sm"
+                      className="flex w-full items-center justify-between px-4 py-3 text-sm"
                     >
-                      <div className="text-destructive flex items-center gap-2">
+                      <div className="flex items-center gap-2 text-red-500">
                         <AlertCircle className="h-4 w-4" />
                         <span className="font-semibold">
                           {t("localRefresh.errors") || "Errors"} ({errors.length})
                         </span>
                       </div>
-                      {showErrors ? (
-                        <ChevronUp className="text-destructive/60 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="text-destructive/60 h-4 w-4" />
-                      )}
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 text-red-500/60 transition-transform",
+                          showErrors && "rotate-180"
+                        )}
+                      />
                     </button>
                     <AnimatePresence>
                       {showErrors && (
@@ -2959,17 +2495,17 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="mt-2 max-h-40 space-y-1 overflow-y-auto"
+                          className="max-h-40 divide-y divide-red-500/10 overflow-y-auto border-t border-red-500/20"
                         >
                           {errors.map((error, index) => (
                             <div
                               key={index}
-                              className="bg-destructive/10 flex items-center justify-between rounded px-2 py-1 text-xs"
+                              className="flex items-center justify-between gap-3 px-4 py-1.5 text-xs"
                             >
-                              <span className="text-destructive font-mono">
+                              <span className="min-w-0 break-words font-mono text-red-500">
                                 {error.message}
                               </span>
-                              <span className="text-destructive/60">
+                              <span className="shrink-0 tabular-nums text-red-500/60">
                                 {error.timestamp.toLocaleTimeString()}
                               </span>
                             </div>
@@ -2981,13 +2517,363 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                 )}
               </AnimatePresence>
 
+              {/* Official index preferences */}
+              {!customSourcesMode && (
+                <section>
+                  <h2 className="mb-2 px-1 text-sm font-medium text-muted-foreground">
+                    {t("localRefresh.settings") || "Settings"}
+                  </h2>
+                  <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60 bg-card">
+                    <SettingRow
+                      icon={Calendar}
+                      title={t("localRefresh.backgroundSync") || "Keep Index Up to Date"}
+                      description={
+                        t("localRefresh.backgroundSyncDesc") ||
+                        "Ascendara checks for new games in the background and updates your index automatically"
+                      }
+                    >
+                      <Switch
+                        checked={settings?.backgroundIndexSync !== false}
+                        onCheckedChange={checked =>
+                          updateSetting("backgroundIndexSync", checked)
+                        }
+                      />
+                    </SettingRow>
+                    <SettingRow
+                      icon={Share2}
+                      active={!!settings?.shareLocalIndex}
+                      title={t("localRefresh.shareIndex") || "Share your index"}
+                      description={
+                        t("localRefresh.shareIndexDesc") ||
+                        "Help others by uploading your index after refresh"
+                      }
+                      footer={
+                        settings?.shareLocalIndex &&
+                        settings?.blacklistIDs?.some(
+                          id => !["ABSXUc", "AWBgqf", "ATaHuq"].includes(id)
+                        ) && (
+                          <div className="flex items-start gap-2 rounded-lg bg-orange-500/10 p-2.5 text-xs text-orange-600 dark:text-orange-400">
+                            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>
+                              {t("localRefresh.blacklistWarning") ||
+                                "Your index won't be shared because you have custom blacklisted games. Remove them to share your index with the community."}
+                            </span>
+                          </div>
+                        )
+                      }
+                    >
+                      <Switch
+                        checked={!!settings?.shareLocalIndex}
+                        onCheckedChange={checked =>
+                          updateSetting("shareLocalIndex", checked)
+                        }
+                        disabled={isRefreshing}
+                      />
+                    </SettingRow>
+                  </div>
+                </section>
+              )}
+
+              {/* External sources */}
+              {customSourcesMode && (
+                <section>
+                  <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                    <h2 className="text-sm font-medium text-muted-foreground">
+                      {t("localRefresh.customSourcesMode") || "External Sources"}
+                    </h2>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] uppercase tracking-wide"
+                    >
+                      {t("localRefresh.experimental") || "Experimental"}
+                    </Badge>
+                  </div>
+                  <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60 bg-card">
+                    <div className="space-y-3 px-5 py-4">
+                      <p className="text-sm text-muted-foreground">
+                        {t("localRefresh.customSourcesModeDesc") ||
+                          "Pull games from an external source bucket of your choice instead of Ascendara's official index."}
+                      </p>
+                      <div className="flex items-start gap-2 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                          <p className="font-medium">
+                            {t("localRefresh.customSourceTradeoffsTitle") ||
+                              "Reduced metadata"}
+                          </p>
+                          <p className="mt-1 leading-relaxed">
+                            {t("localRefresh.customSourceTradeoffsDesc") ||
+                              "Custom sources don't include cover images, categories, or popularity data."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Source bucket URL */}
+                    <div className="space-y-2 px-5 py-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label className="text-sm font-medium text-foreground">
+                          {t("localRefresh.sourceBucketLabel") || "Source bucket URL"}
+                        </Label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSourceBucketUrlDraft("https://library.hydra.wiki/")
+                          }
+                          className="text-xs text-primary hover:underline"
+                        >
+                          {t("localRefresh.sourceBucketUseRecommended") ||
+                            "Use recommended"}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="url"
+                          inputMode="url"
+                          placeholder="Bucket URL..."
+                          value={sourceBucketUrlDraft}
+                          onChange={e => setSourceBucketUrlDraft(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSaveSourceBucketUrl(sourceBucketUrlDraft);
+                            }
+                          }}
+                          disabled={isSyncingCustomSource}
+                          className="h-9 flex-1 text-sm"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleSaveSourceBucketUrl(sourceBucketUrlDraft)}
+                          disabled={
+                            isSyncingCustomSource ||
+                            !sourceBucketUrlDraft.trim() ||
+                            sourceBucketUrlDraft.trim() === sourceBucketUrl.trim()
+                          }
+                          className="h-9 text-secondary"
+                        >
+                          {t("localRefresh.sourceBucketSet") || "Set"}
+                        </Button>
+                        {sourceBucketUrl.trim() && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSaveSourceBucketUrl("")}
+                            disabled={isSyncingCustomSource}
+                            className="h-9"
+                            title={t("common.clear") || "Clear"}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {t("localRefresh.sourceBucketHint") ||
+                          "Paste the URL of the source collection you want to pull from. Recommended: "}
+                        <span className="font-mono text-foreground">
+                          https://library.hydra.wiki/
+                        </span>
+                      </p>
+                    </div>
+
+                    {!customSource?.url && (
+                      <div className="flex flex-wrap gap-2 px-5 py-4">
+                        <Button
+                          onClick={handleOpenSourceBrowser}
+                          disabled={!sourceBucketUrl.trim() || isSyncingCustomSource}
+                          variant="outline"
+                          className="flex-1 gap-2"
+                        >
+                          <Globe className="h-4 w-4" />
+                          {t("localRefresh.browseSources") || "Browse sources"}
+                        </Button>
+                        <Button
+                          onClick={() => setShowJsonImportDialog(true)}
+                          variant="outline"
+                          className="flex-1 gap-2"
+                        >
+                          <Upload className="h-4 w-4" />
+                          {t("localRefresh.importJson") || "Import JSON Data"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Saved sources */}
+              {customSourcesMode && otherSavedSources.length > 0 && (
+                <section>
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <h2 className="text-sm font-medium text-muted-foreground">
+                      {t("localRefresh.savedSources") || "Saved sources"}
+                    </h2>
+                    <span className="text-xs text-muted-foreground/70">
+                      {t("localRefresh.savedSourcesHint") || "Click to switch"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {otherSavedSources.slice(0, 6).map(entry => (
+                      <div
+                        key={entry.url}
+                        role="button"
+                        tabIndex={isSyncingCustomSource ? -1 : 0}
+                        aria-disabled={isSyncingCustomSource}
+                        onClick={() => {
+                          if (isSyncingCustomSource) return;
+                          handleSwitchToSavedSource(entry);
+                        }}
+                        onKeyDown={e => {
+                          if (isSyncingCustomSource) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleSwitchToSavedSource(entry);
+                          }
+                        }}
+                        className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                      >
+                        <Database className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p className="truncate text-sm font-medium">{entry.name}</p>
+                            {entry.torrentOnly && (
+                              <span
+                                title={t("localRefresh.torrentOnly") || "Torrent only"}
+                                className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500"
+                              />
+                            )}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {typeof entry.gameCount === "number"
+                              ? `${entry.gameCount.toLocaleString()} ${t("localRefresh.games") || "games"}`
+                              : entry.url}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            removeLibraryEntry(entry.url);
+                          }}
+                          className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-red-500/10 hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
+                          title={t("common.remove") || "Remove"}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Custom lists */}
+              {customSourcesMode && (
+                <section>
+                  <div className="mb-2 flex items-end justify-between gap-3 px-1">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-medium text-muted-foreground">
+                        {t("localRefresh.customLists") || "Custom Lists"}
+                      </h2>
+                      <p className="text-xs text-muted-foreground/70">
+                        {t("localRefresh.customListsDesc") ||
+                          "Create and manage your own game lists from imported JSON data."}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => setShowJsonImportDialog(true)}
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 gap-1.5"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {t("localRefresh.importNewList") || "Import New List"}
+                    </Button>
+                  </div>
+
+                  {activeCustomList && (
+                    <div className="mb-2 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+                      <CircleCheck className="h-4 w-4 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {activeCustomList.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {activeCustomList.itemCount?.toLocaleString() || 0}{" "}
+                          {t("localRefresh.items") || "items"}
+                        </p>
+                      </div>
+                      <Badge className="shrink-0 text-xs text-secondary">
+                        {t("localRefresh.activeList") || "Active List"}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {inactiveCustomLists.length > 0 && (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {inactiveCustomLists.slice(0, 6).map(list => (
+                        <div
+                          key={list.id}
+                          role="button"
+                          tabIndex={-1}
+                          onClick={() => handleSwitchToList(list)}
+                          className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                        >
+                          <ClipboardList className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <p className="truncate text-sm font-medium">{list.name}</p>
+                              {list.format && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  {list.format}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {list.itemCount?.toLocaleString() || 0}{" "}
+                              {t("localRefresh.items") || "items"}
+                            </p>
+                          </div>
+                          <div className="flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleRenameList(list);
+                              }}
+                              className="rounded p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              title={t("common.rename") || "Rename"}
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleDeleteList(list);
+                              }}
+                              className="rounded p-1 text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+                              title={t("common.delete") || "Delete"}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* Advanced */}
               <Accordion
                 type="single"
                 collapsible
-                className="rounded-lg border border-none bg-card"
+                className="overflow-hidden rounded-xl border border-border/60 bg-card"
               >
-                <AccordionItem value="advanced" className="border-b-0 px-4">
-                  <AccordionTrigger className="py-3">
+                <AccordionItem value="advanced" className="border-b-0">
+                  <AccordionTrigger className="px-5 py-3 hover:no-underline">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Settings2 className="h-4 w-4 text-muted-foreground" />
                       {t("localRefresh.advancedTitle") ||
@@ -2995,163 +2881,141 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
                         "Advanced"}
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="space-y-4">
-                    <div className="divide-y divide-border rounded-lg border border-border/60">
+                  <AccordionContent className="pb-0">
+                    <div className="divide-y divide-border/60 border-t border-border/60">
                       {/* Storage Location */}
-                      <div className="p-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <Folder className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">
-                            {t("localRefresh.storageLocation") || "Storage"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={localIndexPath}
-                            readOnly
-                            className="h-8 flex-1 bg-muted/50 text-xs"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 shrink-0 px-2"
-                            onClick={handleChangeLocation}
-                            disabled={isRefreshing}
-                          >
-                            <PencilIcon className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
+                      <SettingRow
+                        icon={Folder}
+                        title={t("localRefresh.storageLocation") || "Storage"}
+                        footer={
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={localIndexPath}
+                              readOnly
+                              className="h-8 flex-1 bg-muted/50 font-mono text-xs"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 shrink-0 px-2"
+                              onClick={handleChangeLocation}
+                              disabled={isRefreshing}
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        }
+                      />
 
                       {/* Performance */}
-                      <div className="p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                          <Cpu className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">
-                            {t("localRefresh.performanceSettings") || "Performance"}
-                          </span>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground">
-                              {t("localRefresh.workerCount") || "Workers"}
-                            </Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={16}
-                              value={workerCount}
-                              onChange={e => {
-                                const val = parseInt(e.target.value, 10);
-                                if (val >= 1 && val <= 16) {
-                                  setWorkerCount(val);
-                                  window.electron?.updateSetting(
-                                    "localRefreshWorkers",
-                                    val
+                      <SettingRow
+                        icon={Cpu}
+                        title={t("localRefresh.performanceSettings") || "Performance"}
+                        footer={
+                          <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <Label className="text-xs text-muted-foreground">
+                                {t("localRefresh.workerCount") || "Workers"}
+                              </Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={16}
+                                value={workerCount}
+                                onChange={e => {
+                                  const val = parseInt(e.target.value, 10);
+                                  if (val >= 1 && val <= 16) {
+                                    setWorkerCount(val);
+                                    window.electron?.updateSetting(
+                                      "localRefreshWorkers",
+                                      val
+                                    );
+                                  }
+                                }}
+                                disabled={isRefreshing}
+                                className="h-8 w-16 text-center text-xs"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <Label className="text-xs text-muted-foreground">
+                                {t("localRefresh.gamesPerPage") || "Per Page"}
+                              </Label>
+                              <Input
+                                type="number"
+                                min={10}
+                                max={100}
+                                value={fetchPageCount}
+                                onChange={e => {
+                                  const value = Math.min(
+                                    100,
+                                    Math.max(10, parseInt(e.target.value) || 50)
                                   );
-                                }
-                              }}
-                              disabled={isRefreshing}
-                              className="h-7 w-16 text-center text-xs"
-                            />
+                                  setFetchPageCount(value);
+                                  window.electron?.updateSetting("fetchPageCount", value);
+                                }}
+                                disabled={isRefreshing}
+                                className="h-8 w-16 text-center text-xs"
+                              />
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground">
-                              {t("localRefresh.gamesPerPage") || "Per Page"}
-                            </Label>
-                            <Input
-                              type="number"
-                              min={10}
-                              max={100}
-                              value={fetchPageCount}
-                              onChange={e => {
-                                const value = Math.min(
-                                  100,
-                                  Math.max(10, parseInt(e.target.value) || 50)
-                                );
-                                setFetchPageCount(value);
-                                window.electron?.updateSetting("fetchPageCount", value);
-                              }}
-                              disabled={isRefreshing}
-                              className="h-7 w-16 text-center text-xs"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                        }
+                      />
 
                       {/* Blacklist */}
-                      <div className="p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                          <Ban className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">
-                            {t("localRefresh.blacklist") || "Blacklist"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="text"
-                            placeholder="Game ID"
-                            value={newBlacklistId}
-                            onChange={e => setNewBlacklistId(e.target.value.trim())}
-                            className="h-7 flex-1 text-xs"
-                            disabled={isRefreshing}
-                            onKeyDown={e => {
-                              if (e.key === "Enter" && newBlacklistId) {
-                                const id = newBlacklistId.trim();
-                                if (id && !settings?.blacklistIDs?.includes(id)) {
-                                  updateSetting("blacklistIDs", [
-                                    ...(settings?.blacklistIDs || []),
-                                    id,
-                                  ]);
-                                  setNewBlacklistId("");
-                                }
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2"
-                            disabled={isRefreshing || !newBlacklistId}
-                            onClick={() => {
-                              const id = newBlacklistId.trim();
-                              if (id && !settings?.blacklistIDs?.includes(id)) {
-                                updateSetting("blacklistIDs", [
-                                  ...(settings?.blacklistIDs || []),
-                                  id,
-                                ]);
-                                setNewBlacklistId("");
-                              }
-                            }}
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                        {settings?.blacklistIDs?.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {settings.blacklistIDs.map(id => (
-                              <div
-                                key={id}
-                                className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs"
+                      <SettingRow
+                        icon={Ban}
+                        title={t("localRefresh.blacklist") || "Blacklist"}
+                        footer={
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="text"
+                                placeholder="Game ID"
+                                value={newBlacklistId}
+                                onChange={e => setNewBlacklistId(e.target.value.trim())}
+                                className="h-8 flex-1 text-xs"
+                                disabled={isRefreshing}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") addBlacklistId();
+                                }}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2"
+                                disabled={isRefreshing || !newBlacklistId}
+                                onClick={addBlacklistId}
                               >
-                                <span className="font-mono">{id}</span>
-                                <button
-                                  onClick={() =>
-                                    updateSetting(
-                                      "blacklistIDs",
-                                      settings.blacklistIDs.filter(i => i !== id)
-                                    )
-                                  }
-                                  disabled={isRefreshing}
-                                  className="hover:bg-destructive/20 hover:text-destructive rounded p-0.5 disabled:opacity-50"
-                                >
-                                  <X className="h-2.5 w-2.5" />
-                                </button>
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                            {settings?.blacklistIDs?.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {settings.blacklistIDs.map(id => (
+                                  <div
+                                    key={id}
+                                    className="flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs"
+                                  >
+                                    <span className="font-mono">{id}</span>
+                                    <button
+                                      onClick={() =>
+                                        updateSetting(
+                                          "blacklistIDs",
+                                          settings.blacklistIDs.filter(i => i !== id)
+                                        )
+                                      }
+                                      disabled={isRefreshing}
+                                      className="rounded p-0.5 hover:bg-red-500/20 hover:text-red-600 disabled:opacity-50"
+                                    >
+                                      <X className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                            )}
+                          </>
+                        }
+                      />
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -3194,6 +3058,7 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
           onOpenChange={handleCookieRefreshDialogClose}
           onStartRefresh={handleCookieRefresh}
           mode="cookie-refresh"
+          cookieExpired={cookieProvided}
           cookieRefreshCount={cookieRefreshCount}
         />
 

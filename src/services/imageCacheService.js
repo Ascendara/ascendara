@@ -283,7 +283,7 @@ class ImageCacheService {
     // When using local index, NEVER fall back to API
     if (isLocalIndex) {
       try {
-        return await this._loadLocalImage(imgID, settings.localIndex);
+        return await this._loadLocalImage(imgID);
       } catch (error) {
         console.warn(`[ImageCache] Failed to load local image ${imgID}:`, error);
         return null;
@@ -316,9 +316,9 @@ class ImageCacheService {
   /**
    * Load image from local disk (for local index) - always high quality
    */
-  async _loadLocalImage(imgID, localIndexPath) {
-    const localImagePath = `${localIndexPath}/imgs/${imgID}.jpg`;
-    const localImageUrl = await window.electron.getLocalImageUrl(localImagePath);
+  async _loadLocalImage(imgID) {
+    // Served from the index folder, downloaded on first view if not there yet
+    const localImageUrl = await window.electron.getIndexCover(imgID);
     if (localImageUrl) {
       return localImageUrl;
     }
