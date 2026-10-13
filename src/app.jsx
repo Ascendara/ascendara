@@ -337,7 +337,7 @@ const GiantBombMigrationWarning = () => {
 
 // Automatic Index Refresher - runs in background when enabled
 const AutomaticIndexRefresher = () => {
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [refreshPhase, setRefreshPhase] = useState("");
@@ -371,10 +371,32 @@ const AutomaticIndexRefresher = () => {
       return;
     }
 
-    const sync = () => {
-      window.electron
-        .syncCommunityIndex()
-        .catch(error => console.error("[IndexSync] Failed to sync index:", error));
+    const MAX_RETRIES = 5;
+    let retries = 0;
+    let retryTimeout = null;
+
+    const sync = async () => {
+      try {
+        const result = await window.electron.syncCommunityIndex();
+        if (result?.skipped) return;
+        if (!result?.success) throw new Error(result?.error || "Sync failed");
+        retries = 0;
+
+        // Covers a first index that finished setting up after the welcome flow closed
+        if (!(await window.electron.getTimestampValue("hasIndexBefore"))) {
+          await window.electron.setTimestampValue("hasIndexBefore", true);
+        }
+        const current = await window.electron.getSettings();
+        if (!current?.usingLocalIndex && !current?.customSourcesMode) {
+          await updateSetting("usingLocalIndex", true);
+        }
+      } catch (error) {
+        console.error("[IndexSync] Failed to sync index:", error);
+        if (retries < MAX_RETRIES) {
+          retries++;
+          retryTimeout = setTimeout(sync, 60000);
+        }
+      }
     };
 
     // Delay initial check to let app initialize
@@ -382,6 +404,7 @@ const AutomaticIndexRefresher = () => {
     const interval = setInterval(sync, 6 * 60 * 60 * 1000);
     return () => {
       clearTimeout(timeout);
+      clearTimeout(retryTimeout);
       clearInterval(interval);
     };
   }, [

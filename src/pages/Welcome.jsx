@@ -26,7 +26,6 @@ import {
   FolderDownIcon,
   Unplug,
   Wine,
-  Database,
   AlertTriangle,
   Sparkles,
   BellRing,
@@ -284,10 +283,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const location = useLocation();
   const { setTheme } = useTheme();
   const [isV7Welcome, setIsV7Welcome] = useState(welcomeData?.isV7Welcome);
-  // Restore step and refresh state from navigation state if coming back from localrefresh
+  // Restore step from navigation state if coming back from another page
   const [step, setStep] = useState(location.state?.welcomeStep || "language");
-  const restoredRefreshState = location.state?.indexRefreshStarted || false;
-  const restoredIndexComplete = location.state?.indexComplete || false;
   const [selectedTheme, setSelectedTheme] = useState("purple");
   const [showingLightThemes, setShowingLightThemes] = useState(true);
   const [privacyChecked, setPrivacyChecked] = useState(false);
@@ -315,14 +312,13 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const totalDependencies = 5; // Total number of dependencies
   const [errorMessage, setErrorMessage] = useState("");
   const [showErrorDialog, setShowErrorDialog] = useState(false);
+  // Set once the game index exists; pendingExit holds an exit waiting on the offline warning
+  const indexReadyRef = useRef(false);
+  const [pendingExit, setPendingExit] = useState(null);
   const [isExiting, setIsExiting] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [referralSource, setReferralSource] = useState("");
-  const [isIndexRefreshing, setIsIndexRefreshing] = useState(restoredRefreshState);
-  const [indexRefreshStarted, setIndexRefreshStarted] = useState(restoredRefreshState);
-  const [indexComplete, setIndexComplete] = useState(restoredIndexComplete);
-  const [indexError, setIndexError] = useState(false);
   const [customReferral, setCustomReferral] = useState("");
   const [referralSent, setReferralSent] = useState(false);
   const [referralLink, setReferralLink] = useState("");
@@ -611,8 +607,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
     } else if (step === "noticeAppIsFree") {
       setStep("extension");
     } else if (step === "extension") {
-      setStep("localIndex");
-    } else if (step === "localIndex") {
       setStep("referral");
     } else if (step === "referral") {
       setStep("directory");
@@ -768,7 +762,13 @@ const Welcome = ({ welcomeData, onComplete }) => {
     },
   };
 
-  const handleExit = async showTour => {
+  const handleExit = async (showTour, skipIndexCheck = false) => {
+    // Warn before leaving setup if the game index couldn't be fetched (e.g. offline)
+    if (!skipIndexCheck && !indexReadyRef.current) {
+      setPendingExit({ showTour });
+      return;
+    }
+    setPendingExit(null);
     setIsExiting(true);
     // Wait for animation to complete before calling onComplete
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -883,65 +883,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
     checkPlatform().catch(error => setSetupError(error.message));
   }, []);
 
-  // Check if user has ever completed a local index refresh (e.g., from a previous session)
-  useEffect(() => {
-    const checkRefreshStatus = async () => {
-      try {
-        // First check if user has ever indexed before (persisted in timestamp file)
-        if (window.electron?.getTimestampValue) {
-          const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
-          if (hasIndexed === true) {
-            // User has completed a local index before - show as complete
-            setIndexRefreshStarted(true);
-            setIsIndexRefreshing(false);
-            setIndexComplete(true);
-            return;
-          }
-        }
-
-        // If no hasIndexBefore flag, check progress file for current session
-        if (indexRefreshStarted && isIndexRefreshing) {
-          const defaultPath = await window.electron.getDefaultLocalIndexPath();
-          const progress = await window.electron.getLocalRefreshProgress(defaultPath);
-
-          if (progress?.status === "completed") {
-            setIsIndexRefreshing(false);
-            setIndexComplete(true);
-          } else if (progress?.status === "failed" || progress?.status === "error") {
-            setIsIndexRefreshing(false);
-          }
-        }
-      } catch (error) {
-        console.error("Error checking refresh status:", error);
-      }
-    };
-
-    checkRefreshStatus();
-  }, []); // Run once on mount
-
-  // Listen for local refresh progress updates to detect completion
-  useEffect(() => {
-    if (!indexRefreshStarted) return;
-
-    const handleProgressUpdate = data => {
-      // Check if refresh completed via progress status
-      if (data.status === "completed") {
-        setIsIndexRefreshing(false);
-        setIndexComplete(true);
-      } else if (data.status === "failed" || data.status === "error") {
-        setIsIndexRefreshing(false);
-      }
-    };
-
-    if (window.electron?.onLocalRefreshProgress) {
-      window.electron.onLocalRefreshProgress(handleProgressUpdate);
-
-      return () => {
-        window.electron.offLocalRefreshProgress?.();
-      };
-    }
-  }, [indexRefreshStarted]);
-
   // Signal to other parts of the app (e.g. AutomaticIndexRefresher in app.jsx)
   // that the welcome/onboarding flow is active, so they can suppress the
   // global "index refreshed, reload?" dialog while the user is still in setup.
@@ -952,57 +893,47 @@ const Welcome = ({ welcomeData, onComplete }) => {
     };
   }, []);
 
-  // Auto-start the community (shared) index download on first open.
-  // Runs silently in the background while the user progresses through setup.
-  const autoIndexStartedRef = useRef(false);
-
-  // Resolve the index location and fetch the community index into it.
-  // Also used by the retry button when the first attempt fails.
-  const startIndexSetup = useCallback(async () => {
-    setIndexError(false);
-    setIndexRefreshStarted(true);
-    setIsIndexRefreshing(true);
-    try {
-      const currentSettings = await window.electron.getSettings();
-      const outputPath =
-        currentSettings?.localIndex || (await window.electron.getDefaultLocalIndexPath());
-
-      if (!currentSettings?.localIndex && window.electron?.updateSetting) {
-        try {
-          await window.electron.updateSetting("localIndex", outputPath);
-        } catch (e) {
-          console.warn("[Welcome] Failed to persist default localIndex:", e);
-        }
-      }
-
-      await window.electron.downloadSharedIndex(outputPath);
-    } catch (e) {
-      console.error("[Welcome] Failed to start community index setup:", e);
-      setIsIndexRefreshing(false);
-      setIndexError(true);
-    }
-  }, []);
-
+  // Set up the community game index in the background on first open, so it's
+  // ready by the time setup is finished. Nothing is shown; a failed attempt
+  // retries quietly, and the app keeps the index in sync after setup.
   useEffect(() => {
-    if (autoIndexStartedRef.current) return;
-    let isMounted = true;
+    const MAX_ATTEMPTS = 10;
+    const RETRY_MS = 20000;
+    let cancelled = false;
+    let retryTimer = null;
+    let attempts = 0;
 
-    const handleStarted = () => {
-      if (!isMounted) return;
-      setIndexError(false);
-      setIndexRefreshStarted(true);
-      setIsIndexRefreshing(true);
+    const handleError = err => {
+      console.error("[Welcome] Index setup failed:", err);
+      if (cancelled || attempts >= MAX_ATTEMPTS) return;
+      retryTimer = setTimeout(startIndexSetup, RETRY_MS);
+    };
+
+    const startIndexSetup = async () => {
+      if (cancelled) return;
+      attempts++;
+      try {
+        const currentSettings = await window.electron.getSettings();
+        const outputPath =
+          currentSettings?.localIndex ||
+          (await window.electron.getDefaultLocalIndexPath());
+
+        if (!currentSettings?.localIndex) {
+          await window.electron.updateSetting("localIndex", outputPath);
+        }
+
+        await window.electron.downloadSharedIndex(outputPath);
+      } catch (e) {
+        handleError(e);
+      }
     };
 
     const handleComplete = async () => {
-      if (!isMounted) return;
+      indexReadyRef.current = true;
+      if (cancelled) return;
       try {
-        if (window.electron?.setTimestampValue) {
-          await window.electron.setTimestampValue("hasIndexBefore", true);
-        }
-        if (window.electron?.updateSetting) {
-          await window.electron.updateSetting("usingLocalIndex", true);
-        }
+        await window.electron.setTimestampValue("hasIndexBefore", true);
+        await window.electron.updateSetting("usingLocalIndex", true);
       } catch (e) {
         console.error("[Welcome] Failed to persist index flags:", e);
       }
@@ -1022,67 +953,31 @@ const Welcome = ({ welcomeData, onComplete }) => {
       window.dispatchEvent(
         new CustomEvent("index-refreshed", { detail: { timestamp: Date.now() } })
       );
-      setIsIndexRefreshing(false);
-      setIndexError(false);
-      setIndexComplete(true);
-    };
-
-    const handleError = err => {
-      if (!isMounted) return;
-      console.error("[Welcome] Auto index download error:", err);
-      setIsIndexRefreshing(false);
-      setIndexError(true);
     };
 
     (async () => {
       try {
         // Skip if the user already has an index from a previous session
-        if (window.electron?.getTimestampValue) {
-          const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
-          if (hasIndexed === true) {
-            autoIndexStartedRef.current = true;
-            if (isMounted) {
-              setIndexRefreshStarted(true);
-              setIsIndexRefreshing(false);
-              setIndexComplete(true);
-            }
-            return;
-          }
-        }
+        const hasIndexed = await window.electron.getTimestampValue("hasIndexBefore");
+        if (hasIndexed === true) indexReadyRef.current = true;
+        if (hasIndexed === true || cancelled) return;
 
-        // Register listeners first so we don't miss the started event
-        window.electron?.onPublicIndexDownloadStarted?.(handleStarted);
-        window.electron?.onPublicIndexDownloadComplete?.(handleComplete);
-        window.electron?.onPublicIndexDownloadError?.(handleError);
+        window.electron.onPublicIndexDownloadComplete?.(handleComplete);
+        window.electron.onPublicIndexDownloadError?.(handleError);
 
-        // If a download is already in progress (e.g. from app-level
-        // auto-refresh), just reflect that state instead of starting again.
-        if (window.electron?.getPublicIndexDownloadStatus) {
-          const status = await window.electron.getPublicIndexDownloadStatus();
-          if (status?.isDownloading) {
-            autoIndexStartedRef.current = true;
-            if (isMounted) {
-              setIndexRefreshStarted(true);
-              setIsIndexRefreshing(true);
-            }
-            return;
-          }
-        }
+        // Don't start a second download if one is already running
+        const status = await window.electron.getPublicIndexDownloadStatus();
+        if (status?.isDownloading) return;
 
-        autoIndexStartedRef.current = true;
         await startIndexSetup();
       } catch (e) {
-        console.error("[Welcome] Failed to auto-start community index:", e);
-        if (isMounted) {
-          setIsIndexRefreshing(false);
-          setIndexError(true);
-        }
+        handleError(e);
       }
     })();
 
     return () => {
-      isMounted = false;
-      window.electron?.offPublicIndexDownloadStarted?.();
+      cancelled = true;
+      clearTimeout(retryTimer);
       window.electron?.offPublicIndexDownloadComplete?.();
       window.electron?.offPublicIndexDownloadError?.();
     };
@@ -1178,6 +1073,35 @@ const Welcome = ({ welcomeData, onComplete }) => {
     <div
       className={`text-foreground transition-opacity duration-500 ${isExiting ? "opacity-0" : "opacity-100"}`}
     >
+      <AlertDialog
+        open={!!pendingExit}
+        onOpenChange={open => {
+          if (!open) setPendingExit(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("welcome.localIndex.stillRefreshing")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("welcome.localIndex.offlineWarning")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-primary">
+              {t("welcome.goBack")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-primary text-secondary"
+              onClick={() => handleExit(pendingExit?.showTour, true)}
+            >
+              {t("welcome.localIndex.continueAnyway")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={showDepsAlert} onOpenChange={setShowDepsAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1661,143 +1585,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 >
                   {t("welcome.okay")}
                 </Button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {step === "localIndex" && (
-            <motion.div
-              key="localIndex"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={Database} />
-                <h2 className="mb-2 text-3xl font-bold text-primary">
-                  {t("welcome.localIndex.title")}
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  {t("welcome.localIndex.subtitle")}
-                </p>
-              </motion.div>
-
-              <motion.div
-                className="mb-6 grid w-full max-w-3xl gap-4 md:grid-cols-2"
-                variants={itemVariants}
-              >
-                <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5 text-left">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold text-primary">
-                      {t("welcome.localIndex.officialTitle")}
-                    </h3>
-                    <span className="ml-auto rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
-                      {t("welcome.localIndex.default")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {t("welcome.localIndex.officialDesc")}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-card/30 p-5 text-left">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Globe2 className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="font-semibold">
-                      {t("welcome.localIndex.externalTitle")}
-                    </h3>
-                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      {t("welcome.localIndex.optional")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {t("welcome.localIndex.externalDesc")}
-                  </p>
-                </div>
-              </motion.div>
-
-              <motion.div
-                className="mb-8 max-w-3xl space-y-3 rounded-lg bg-card/30 p-5"
-                variants={itemVariants}
-              >
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="h-5 w-5 flex-shrink-0 text-primary" />
-                  <p className="text-sm">{t("welcome.localIndex.point1")}</p>
-                </div>
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="h-5 w-5 flex-shrink-0 text-primary" />
-                  <p className="text-sm">{t("welcome.localIndex.point2")}</p>
-                </div>
-                <div className="flex items-start space-x-3 text-left">
-                  <CircleCheck className="h-5 w-5 flex-shrink-0 text-primary" />
-                  <p className="text-sm">{t("welcome.localIndex.point3")}</p>
-                </div>
-              </motion.div>
-
-              <motion.div variants={itemVariants} className="space-y-3">
-                <div className="flex h-9 items-center justify-center">
-                  <AnimatePresence mode="wait" initial={false}>
-                    {indexComplete ? (
-                      <motion.div
-                        key="ready"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
-                      >
-                        <CircleCheck className="h-4 w-4" />
-                        <span>{t("welcome.localIndex.refreshComplete")}</span>
-                      </motion.div>
-                    ) : indexError ? (
-                      <motion.div
-                        key="error"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex items-center gap-2 text-sm text-yellow-600"
-                      >
-                        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-yellow-500" />
-                        <span>{t("welcome.localIndex.setupFailed")}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={startIndexSetup}
-                          className="ml-1 h-7 gap-1.5 px-2 text-xs text-foreground"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          {t("common.retry")}
-                        </Button>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="syncing"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex items-center gap-2 text-sm text-muted-foreground"
-                      >
-                        <Loader className="h-4 w-4 animate-spin text-primary" />
-                        <span>{t("welcome.localIndex.autoSetup")}</span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <Button
-                  size="lg"
-                  onClick={handleNext}
-                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                >
-                  {t("welcome.next")}
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  {t("welcome.localIndex.changeLaterHint")}
-                </p>
               </motion.div>
             </motion.div>
           )}
@@ -3134,22 +2921,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   {t("welcome.essentialDependencies")}
                 </h2>
               </motion.div>
-              {(isIndexRefreshing || indexError) && !indexComplete && (
-                <motion.div
-                  className="mb-6 flex items-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3"
-                  variants={itemVariants}
-                >
-                  <AlertTriangle className="h-5 w-5 flex-shrink-0 text-yellow-500" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-yellow-600">
-                      {t("welcome.localIndex.stillRefreshing")}
-                    </p>
-                    <p className="text-xs text-yellow-600/80">
-                      {t("welcome.localIndex.waitForRefresh")}
-                    </p>
-                  </div>
-                </motion.div>
-              )}
               <motion.div className="mb-12 max-w-2xl space-y-6" variants={itemVariants}>
                 <p className="text-xl text-foreground/80">
                   {t("welcome.dependenciesDesc")}
