@@ -65,16 +65,14 @@ export function IndexManager({ model: m, onBack, controllerType }) {
     m.isUploading ||
     m.isSyncingCustomSource;
   const buttons = getControllerButtons(controllerType);
-  const run = async (action) => {
+  const run = async action => {
     if (pendingRef.current) return;
     pendingRef.current = true;
     setPending(true);
     try {
       await action();
     } catch (error) {
-      toast.error(
-        error?.message || "Unable to update the index. Please try again.",
-      );
+      toast.error(error?.message || "Unable to update the index. Please try again.");
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -96,7 +94,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
   const downloadPercent = m.indexDownloadProgress?.progress;
   const percent = Math.max(
     0,
-    Math.min(100, m.downloadingIndex ? downloadPercent || 0 : m.progress || 0),
+    Math.min(100, m.downloadingIndex ? downloadPercent || 0 : m.progress || 0)
   );
   const status = m.downloadingIndex
     ? "Downloading cloud index"
@@ -158,9 +156,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                       : ""}
                     Last updated{" "}
                     {m.formatLastRefreshTime(
-                      m.customSourcesMode
-                        ? m.customSourceLastSynced
-                        : m.lastRefreshTime,
+                      m.customSourcesMode ? m.customSourceLastSynced : m.lastRefreshTime
                     )}
                   </p>
                 </div>
@@ -185,9 +181,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                       className="bp-index-action-card"
                       disabled={busy || !m.apiAvailable || !m.localIndexPath}
                       onClick={() =>
-                        run(() =>
-                          window.electron.downloadSharedIndex(m.localIndexPath),
-                        )
+                        run(() => window.electron.downloadSharedIndex(m.localIndexPath))
                       }
                     >
                       <CloudDownload />
@@ -264,9 +258,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                   label="External sources"
                   checked={m.customSourcesMode}
                   disabled={busy}
-                  onChange={(value) =>
-                    run(() => m.handleToggleCustomSourcesMode(value))
-                  }
+                  onChange={value => run(() => m.handleToggleCustomSourcesMode(value))}
                 />
               </Setting>
               {m.customSourcesMode && (
@@ -276,9 +268,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                     <input
                       value={m.sourceBucketUrlDraft}
                       disabled={busy}
-                      onChange={(e) =>
-                        m.setSourceBucketUrlDraft(e.target.value)
-                      }
+                      onChange={e => m.setSourceBucketUrlDraft(e.target.value)}
                       placeholder="https://…"
                     />
                   </label>
@@ -286,9 +276,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                     <SurfaceButton
                       disabled={busy || !m.sourceBucketUrlDraft.trim()}
                       onClick={() =>
-                        run(() =>
-                          m.handleSaveSourceBucketUrl(m.sourceBucketUrlDraft),
-                        )
+                        run(() => m.handleSaveSourceBucketUrl(m.sourceBucketUrlDraft))
                       }
                     >
                       Save URL
@@ -313,7 +301,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                     </SurfaceButton>
                   </div>
                   {m.customSourcesLibrary.length > 0 && <h3>Saved sources</h3>}
-                  {m.customSourcesLibrary.map((source) => (
+                  {m.customSourcesLibrary.map(source => (
                     <Setting
                       key={source.url}
                       title={source.name || source.url}
@@ -321,19 +309,13 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                     >
                       <SurfaceButton
                         disabled={busy || source.url === m.customSource?.url}
-                        onClick={() =>
-                          run(() => m.handleSwitchToSavedSource(source))
-                        }
+                        onClick={() => run(() => m.handleSwitchToSavedSource(source))}
                       >
-                        {source.url === m.customSource?.url
-                          ? "Active"
-                          : "Use source"}
+                        {source.url === m.customSource?.url ? "Active" : "Use source"}
                       </SurfaceButton>
                       <SurfaceButton
                         disabled={busy || source.url === m.customSource?.url}
-                        onClick={() =>
-                          run(() => m.removeLibraryEntry(source.url))
-                        }
+                        onClick={() => run(() => m.removeLibraryEntry(source.url))}
                         aria-label={`Remove ${source.name || source.url}`}
                       >
                         Remove
@@ -341,7 +323,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                     </Setting>
                   ))}
                   {m.customLists.length > 0 && <h3>Imported lists</h3>}
-                  {m.customLists.map((list) => (
+                  {m.customLists.map(list => (
                     <Setting
                       key={list.id}
                       title={list.name}
@@ -351,9 +333,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                         disabled={busy || list.id === m.activeCustomList?.id}
                         onClick={() => run(() => m.handleSwitchToList(list))}
                       >
-                        {list.id === m.activeCustomList?.id
-                          ? "Active"
-                          : "Use list"}
+                        {list.id === m.activeCustomList?.id ? "Active" : "Use list"}
                       </SurfaceButton>
                       <SurfaceButton
                         disabled={busy}
@@ -384,7 +364,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                           List name
                           <input
                             value={listName}
-                            onChange={(e) => setListName(e.target.value)}
+                            onChange={e => setListName(e.target.value)}
                           />
                         </label>
                       ) : (
@@ -393,25 +373,21 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                       <div className="bp-index-inline">
                         <SurfaceButton
                           disabled={
-                            busy ||
-                            (listAction.type === "rename" && !listName.trim())
+                            busy || (listAction.type === "rename" && !listName.trim())
                           }
                           onClick={() =>
                             run(async () => {
                               if (listAction.type === "rename")
                                 await m.handleRenameList(
                                   listAction.list,
-                                  listName.trim(),
+                                  listName.trim()
                                 );
-                              else
-                                await m.handleDeleteList(listAction.list, true);
+                              else await m.handleDeleteList(listAction.list, true);
                               setListAction(null);
                             })
                           }
                         >
-                          {listAction.type === "rename"
-                            ? "Save name"
-                            : "Delete list"}
+                          {listAction.type === "rename" ? "Save name" : "Delete list"}
                         </SurfaceButton>
                         <SurfaceButton
                           data-index-dismiss
@@ -436,74 +412,20 @@ export function IndexManager({ model: m, onBack, controllerType }) {
               )}
               {m.customSourcesMode && (
                 <p className="bp-index-note">
-                  Automatic updates apply to the Ascendara index. Turn off
-                  external sources to configure them.
+                  Automatic updates apply to the Ascendara index. Turn off external
+                  sources to configure them.
                 </p>
               )}
               <Setting
-                title="Automatic refresh"
-                description="Keep your game catalogue up to date on a schedule."
+                title="Keep index up to date"
+                description="Check for new games in the background and update automatically."
               >
                 <Toggle
-                  label="Automatic refresh"
-                  checked={m.autoRefreshEnabled && m.isAuthenticated}
-                  disabled={busy || !m.isAuthenticated || m.customSourcesMode}
-                  onChange={(value) =>
-                    save("autoRefreshEnabled", value, m.setAutoRefreshEnabled)
-                  }
+                  label="Keep index up to date"
+                  checked={m.settings?.backgroundIndexSync !== false}
+                  disabled={busy || m.customSourcesMode}
+                  onChange={value => save("backgroundIndexSync", value)}
                 />
-              </Setting>
-              <Setting
-                title="Refresh method"
-                description="Choose a cloud download or build the index locally."
-              >
-                <SurfaceButton
-                  disabled={
-                    busy ||
-                    !m.autoRefreshEnabled ||
-                    !m.isAuthenticated ||
-                    m.customSourcesMode
-                  }
-                  onClick={() =>
-                    save(
-                      "autoRefreshMethod",
-                      m.autoRefreshMethod === "shared" ? "manual" : "shared",
-                      m.setAutoRefreshMethod,
-                    )
-                  }
-                >
-                  {m.autoRefreshMethod === "shared"
-                    ? "Cloud index"
-                    : "Local build"}
-                  <ChevronRight />
-                </SurfaceButton>
-              </Setting>
-              <Setting
-                title="Refresh every"
-                description="Select how often to update the index."
-              >
-                <SurfaceButton
-                  disabled={
-                    busy ||
-                    !m.autoRefreshEnabled ||
-                    !m.isAuthenticated ||
-                    m.customSourcesMode
-                  }
-                  onClick={() => {
-                    const days = ["2", "3", "5", "7", "10", "14"];
-                    save(
-                      "autoRefreshInterval",
-                      days[
-                        (days.indexOf(String(m.autoRefreshInterval)) + 1) %
-                          days.length
-                      ],
-                      m.setAutoRefreshInterval,
-                    );
-                  }}
-                >
-                  {m.autoRefreshInterval} days
-                  <ChevronRight />
-                </SurfaceButton>
               </Setting>
               <Setting
                 title="Share after building"
@@ -513,16 +435,16 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                   label="Share after building"
                   checked={!!m.settings.shareLocalIndex}
                   disabled={busy || m.customSourcesMode}
-                  onChange={(value) => save("shareLocalIndex", value)}
+                  onChange={value => save("shareLocalIndex", value)}
                 />
               </Setting>
               {m.settings.shareLocalIndex &&
                 m.settings.blacklistIDs?.some(
-                  (id) => !["ABSXUc", "AWBgqf", "ATaHuq"].includes(id),
+                  id => !["ABSXUc", "AWBgqf", "ATaHuq"].includes(id)
                 ) && (
                   <p className="bp-index-note">
-                    Custom excluded games prevent your index from being shared.
-                    Remove them in Advanced to enable sharing.
+                    Custom excluded games prevent your index from being shared. Remove
+                    them in Advanced to enable sharing.
                   </p>
                 )}
             </>
@@ -562,31 +484,25 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                   100,
                   10,
                 ],
-              ].map(
-                ([title, description, key, value, setter, min, max, step]) => (
-                  <Setting key={key} title={title} description={description}>
-                    <SurfaceButton
-                      aria-label={`Decrease ${title}`}
-                      disabled={busy || value <= min}
-                      onClick={() =>
-                        save(key, Math.max(min, value - step), setter)
-                      }
-                    >
-                      <Minus />
-                    </SurfaceButton>
-                    <output>{value}</output>
-                    <SurfaceButton
-                      aria-label={`Increase ${title}`}
-                      disabled={busy || value >= max}
-                      onClick={() =>
-                        save(key, Math.min(max, value + step), setter)
-                      }
-                    >
-                      <Plus />
-                    </SurfaceButton>
-                  </Setting>
-                ),
-              )}
+              ].map(([title, description, key, value, setter, min, max, step]) => (
+                <Setting key={key} title={title} description={description}>
+                  <SurfaceButton
+                    aria-label={`Decrease ${title}`}
+                    disabled={busy || value <= min}
+                    onClick={() => save(key, Math.max(min, value - step), setter)}
+                  >
+                    <Minus />
+                  </SurfaceButton>
+                  <output>{value}</output>
+                  <SurfaceButton
+                    aria-label={`Increase ${title}`}
+                    disabled={busy || value >= max}
+                    onClick={() => save(key, Math.min(max, value + step), setter)}
+                  >
+                    <Plus />
+                  </SurfaceButton>
+                </Setting>
+              ))}
               <h3>Excluded games</h3>
               <p>Skip these game IDs when building your local index.</p>
               <label className="bp-index-field">
@@ -594,7 +510,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                 <input
                   disabled={busy}
                   value={m.newBlacklistId}
-                  onChange={(e) => m.setNewBlacklistId(e.target.value.trim())}
+                  onChange={e => m.setNewBlacklistId(e.target.value.trim())}
                 />
               </label>
               <SurfaceButton
@@ -613,7 +529,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
               >
                 <Plus /> Exclude game
               </SurfaceButton>
-              {(m.settings.blacklistIDs || []).map((id) => (
+              {(m.settings.blacklistIDs || []).map(id => (
                 <Setting key={id} title={id}>
                   <SurfaceButton
                     aria-label={`Remove excluded game ${id}`}
@@ -621,7 +537,7 @@ export function IndexManager({ model: m, onBack, controllerType }) {
                     onClick={() =>
                       save(
                         "blacklistIDs",
-                        m.settings.blacklistIDs.filter((value) => value !== id),
+                        m.settings.blacklistIDs.filter(value => value !== id)
                       )
                     }
                   >

@@ -6,6 +6,7 @@ import subprocess
 import shutil
 import sys
 import json
+from build_support import register_after_build, validate_resources
 
 def run_command(command, cwd=None):
     """Run a command and return success status"""
@@ -90,7 +91,7 @@ def build_achievement_watcher():
     os.makedirs(dist_dir)
     
     # Install dependencies
-    if not run_command(['yarn', 'install'], cwd=achievement_watcher_dir):
+    if not run_command(['yarn', 'install', '--frozen-lockfile'], cwd=achievement_watcher_dir):
         print("Failed to install AscendaraAchievementWatcher dependencies")
         return False
     
@@ -122,14 +123,8 @@ def build_crash_reporter():
         print("Error: cargo is not installed. Please install Rust toolchain.")
         return False
     
-    # Clean target directory for fresh build
-    target_dir = os.path.join(crash_reporter_dir, 'target')
-    if os.path.exists(target_dir):
-        print("Cleaning existing CrashReporter target directory...")
-        shutil.rmtree(target_dir)
-    
     # Build for Linux using cargo
-    if not run_command(['cargo', 'build', '--release'], cwd=crash_reporter_dir):
+    if not run_command(['cargo', 'build', '--release', '--locked'], cwd=crash_reporter_dir):
         print("Failed to build AscendaraCrashReporter")
         return False
     
@@ -162,7 +157,7 @@ def build_python_binaries_linux():
 
     # Install PyInstaller into the build venv
     print("Installing PyInstaller into build venv...")
-    if not run_command([venv_pip, 'install', '--quiet', 'pyinstaller']):
+    if not run_command([venv_pip, 'install', '--quiet', 'pyinstaller==6.16.0']):
         print("Failed to install PyInstaller")
         return False
 
@@ -173,7 +168,8 @@ def build_python_binaries_linux():
         if os.path.exists(req_file):
             print(f"  Installing requirements for {binary_name}...")
             if not run_command([venv_pip, 'install', '--quiet', '-r', req_file]):
-                print(f"Warning: Failed to install requirements for {binary_name}, continuing...")
+                print(f"Failed to install requirements for {binary_name}")
+                return False
 
     unrar = shutil.which('unrar')
     license_paths = [os.environ.get('ASCENDARA_UNRAR_LICENSE', ''),
@@ -184,17 +180,25 @@ def build_python_binaries_linux():
         print('Linux builds require UnRAR and its redistribution license on the build machine. '
               'Install the build dependency and, if needed, set ASCENDARA_UNRAR_LICENSE to its license file.')
         return False
-    extraction_args = ['--add-binary', f'{unrar}:.',
+    seven = '/usr/lib/p7zip/7z'
+    seven_library = '/usr/lib/p7zip/7z.so'
+    seven_license = '/usr/share/doc/p7zip-full/copyright'
+    if not all(os.path.isfile(path) for path in (seven, seven_library, seven_license)):
+        print('Install p7zip-full, including /usr/lib/p7zip/7z and 7z.so.')
+        return False
+    extraction_args = ['--add-binary', f'{seven}:.',
+                       '--add-binary', f'{seven_library}:.',
+                       '--add-data', f'{seven_license}:licenses/7zip',
+                       '--add-binary', f'{unrar}:.',
                        '--add-data', f'{unrar_license}:licenses/unrar']
 
     # Map: (output name, script path relative to binaries_dir, extra PyInstaller args)
     binaries = [
         ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         extraction_args),
-        ('AscendaraGofileHelper',        'AscendaraDownloader/src/AscendaraGofileHelper.py',        extraction_args),
         ('AscendaraGameHandler',         'AscendaraGameHandler/src/AscendaraGameHandler.py',        []),
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
         ('AscendaraLocalRefresh',        'AscendaraLocalRefresh/src/AscendaraLocalRefresh.py',      []),
-        ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  []),
+        ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  extraction_args),
         ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py', ['--windowed']),
     ]
 
@@ -211,8 +215,8 @@ def build_python_binaries_linux():
     for binary_name, rel_script, extra_args in binaries:
         script_path = os.path.join(binaries_dir, rel_script)
         if not os.path.exists(script_path):
-            print(f"Warning: Script not found, skipping: {script_path}")
-            continue
+            print(f"Required script missing: {script_path}")
+            return False
 
         # dist_dir folder is already clean and created at step 1
         dist_dir = os.path.join(binaries_dir, rel_script.split('/')[0], 'dist')
@@ -306,6 +310,9 @@ def move_files():
     print("Moving files to electron directory...")
     
     try:
+        if os.path.isdir('build/sounds'):
+            shutil.copytree('build/sounds', 'electron/sounds', dirs_exist_ok=True)
+
         # Copy the index.html file to electron directory
         index_path = 'build/index.html'
         if os.path.exists(index_path):
@@ -354,13 +361,14 @@ def generate_build_signature():
 
 def build_appimage():
     """Build the AppImage using electron-builder"""
+    validate_resources("linux")
     print("Building AppImage...")
     
     # Build specifically for Linux AppImage
     command = [
         'yarn', 'electron-builder', 
         '--linux', 
-        '--config.extraMetadata.main=electron/app.js'
+        '--config.extraMetadata.main=electron/app.js', '--publish', 'never'
     ]
     
     return run_command(command)
@@ -373,7 +381,7 @@ def build_linux_unpacked():
         'yarn', 'electron-builder', 
         '--linux', 
         '--dir',
-        '--config.extraMetadata.main=electron/app.js'
+        '--config.extraMetadata.main=electron/app.js', '--publish', 'never'
     ]
     
     return run_command(command)
@@ -382,7 +390,7 @@ def cleanup_build_artifacts():
     """Clean up build artifacts before starting"""
     print("Cleaning up build artifacts...")
     
-    directories_to_clean = ['build', 'dist', 'electron/assets']
+    directories_to_clean = ['build', 'dist', 'electron/assets', 'electron/sounds']
     files_to_clean = ['electron/index.html']
     
     for directory in directories_to_clean:
@@ -402,7 +410,7 @@ def cleanup_after_build():
     print("Cleaning up temporary files...")
     
     # Remove temporary files from electron directory
-    temp_files = ['electron/index.html', 'electron/assets', 'electron/icon.png']
+    temp_files = ['build', 'electron/index.html', 'electron/assets', 'electron/icon.png', 'electron/sounds']
     
     for temp_file in temp_files:
         if os.path.exists(temp_file):
@@ -502,6 +510,8 @@ def main():
     
     # Step 10: Try to build the AppImage, fallback to unpacked if it fails
     if not build_appimage():
+        if os.environ.get("CI"):
+            return 1
         print("AppImage build failed, trying unpacked build...")
         if not build_linux_unpacked():
             print("Failed to build Linux unpacked version. Exiting.")
@@ -516,26 +526,8 @@ def main():
         print("Failed to clean up after build. Exiting.")
         return 1
     
-    # Step 12: Register build with backend API
-    print("\n" + "="*60)
-    print("Registering build with backend API...")
-    print("="*60)
-    try:
-        register_script = os.path.join('scripts', 'register_build.py')
-        subprocess.run(['python3', register_script], check=True, cwd=os.getcwd())
-        print("Build registration completed successfully!")
-    except subprocess.CalledProcessError as e:
-        print(f"Warning: Build registration failed with error: {e}")
-        print("You may need to register this build manually.")
-        print("The build is complete but will not work until registered.")
-    except FileNotFoundError:
-        print("Warning: register_build.py not found, skipping automatic registration.")
-        print("You will need to register this build manually.")
-    
-    print("\n" + "="*60)
-    print("Linux build process completed successfully!")
-    print("="*60)
-    
+    register_after_build()
+
     # Check what was created
     version = get_app_version() or 'unknown'
     appimage_path = f'dist/Ascendara-{version}.AppImage'

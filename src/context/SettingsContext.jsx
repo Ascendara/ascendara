@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 
 export const SettingsContext = createContext();
 
@@ -48,6 +56,7 @@ export function SettingsProvider({ children }) {
     localRefreshWorkers: 8,
     homeSearch: true,
     indexReminder: "7",
+    backgroundIndexSync: true,
     autoRefreshEnabled: false,
     autoRefreshInterval: "7",
     autoRefreshMethod: "shared",
@@ -209,7 +218,7 @@ const defaultSettings = {
   gameSource: "steamrip",
   autoCreateShortcuts: true,
   smoothTransitions: true,
-    bigPictureHomeStyle: "ascendara",
+  bigPictureHomeStyle: "ascendara",
   sendAnalytics: true,
   autoUpdate: true,
   endOnClose: false,
@@ -234,6 +243,7 @@ const defaultSettings = {
   localRefreshWorkers: 8,
   homeSearch: true,
   indexReminder: "7",
+  backgroundIndexSync: true,
   autoRefreshEnabled: false,
   autoRefreshInterval: "7",
   autoRefreshMethod: "shared",

@@ -4,6 +4,10 @@ Handles all SteamRIP-specific scraping logic
 """
 
 import cloudscraper
+import datetime
+import hashlib
+import os
+import shutil
 import requests
 import json
 import time
@@ -64,6 +68,14 @@ class SteamRIPScraper(BaseScraper):
         self._VIEW_COUNT_DELAY = 2.0
         self._VIEW_COUNT_MAX_SECONDS = 600
         self._VIEW_COUNT_CONSECUTIVE_FAIL_LIMIT = 5
+        
+        # Incremental refresh
+        self.force_full = False
+        self.known_img_ids = set()
+        self.extra_metadata = {}
+        self._INCREMENTAL_MARGIN_DAYS = 2
+        self._INCREMENTAL_MAX_AGE_DAYS = 30
+        self._INCREMENTAL_MAX_POSTS = 1500
     
     def get_source_name(self) -> str:
         return "SteamRIP"
@@ -78,8 +90,13 @@ class SteamRIPScraper(BaseScraper):
             cf_active = self._check_cloudflare_protection(user_agent)
             
             if cf_active and not cookie:
-                self.logger.error("Cloudflare protection is active but no cookie was provided")
-                return False
+                self.logger.warning("Cloudflare is challenging requests and no cookie was provided - asking for one")
+                if not self._wait_for_cookie_refresh():
+                    self.logger.error("Cloudflare protection is active but no cookie was provided")
+                    return False
+                cookie = self.new_cookie_value[0]
+                self.new_cookie_value[0] = None
+                user_agent = self.current_user_agent[0]
             
             # Create scraper
             self.scraper = self._create_scraper(cookie if cf_active else None, user_agent)
@@ -108,6 +125,23 @@ class SteamRIPScraper(BaseScraper):
     def scrape_games(self, blacklist_ids: Set[int], per_page: int = 100, 
                      workers: int = 8, progress=None) -> List[Dict]:
         """Scrape all games from SteamRIP"""
+        self.extra_metadata = {
+            "lastScrape": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        }
+        
+        # Only fetch what changed since the existing index when there is one
+        baseline = None if self.force_full else self._load_baseline()
+        if baseline:
+            try:
+                merged = self._scrape_incremental(baseline, blacklist_ids, workers, progress)
+            except Exception as e:
+                self.logger.warning(f"Incremental refresh failed: {e}")
+                merged = None
+            if merged is not None:
+                return merged
+            self.logger.info("Incremental refresh not possible, running a full scrape")
+            self.known_img_ids = set()
+        
         game_data = []
         processed_post_ids = set()
         
@@ -140,8 +174,18 @@ class SteamRIPScraper(BaseScraper):
                     self.logger.info(f"Reached end of posts at page {page}")
                     break
                 
+                if response.status_code == 403 and not self._is_cloudflare_challenge(response):
+                    # Blocked, but not by a Cloudflare challenge - a new cookie would not help
+                    consecutive_failures += 1
+                    self.logger.warning(f"403 on page {page} without a Cloudflare challenge (attempt {consecutive_failures}), backing off")
+                    if consecutive_failures >= max_consecutive_failures:
+                        self.logger.error(f"Page {page} keeps returning 403, stopping")
+                        break
+                    time.sleep(consecutive_failures * 5)
+                    continue
+                
                 if response.status_code == 403:
-                    self.logger.warning(f"403 Forbidden on page {page}, cookie may be expired")
+                    self.logger.warning(f"Cloudflare challenge on page {page}, cookie is missing or expired")
                     consecutive_failures += 1
                     
                     if consecutive_failures >= max_consecutive_failures:
@@ -257,6 +301,208 @@ class SteamRIPScraper(BaseScraper):
         
         return game_data
     
+    def _load_baseline(self):
+        """Load the existing index if it can be used as the starting point for an incremental refresh"""
+        try:
+            with open(os.path.join(self.output_dir, "ascendara_games.json"), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return None
+        
+        if not isinstance(data, dict) or not isinstance(data.get("games"), list):
+            return None
+        metadata = data.get("metadata") or {}
+        if str(metadata.get("source", "")).upper() not in ("STEAMRIP", "LOCAL_REFRESH_UPLOAD"):
+            return None
+        if len(data["games"]) < 1000:
+            return None
+        
+        since = None
+        for key in ("lastScrape", "lastUpdated"):
+            try:
+                since = datetime.datetime.fromisoformat(str(metadata[key]).replace("Z", "+00:00"))
+                break
+            except (KeyError, ValueError):
+                continue
+        if since is None:
+            return None
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=datetime.timezone.utc)
+        
+        age = datetime.datetime.now(datetime.timezone.utc) - since
+        if age > datetime.timedelta(days=self._INCREMENTAL_MAX_AGE_DAYS):
+            self.logger.info(f"Existing index is {age.days} days old, too old for an incremental refresh")
+            return None
+        
+        return {"games": data["games"], "metadata": metadata, "since": since}
+    
+    def _get_json(self, url, retries=3):
+        """GET a JSON endpoint, retrying when the origin is briefly unavailable.
+        Returns (data, response); data is None if the request did not succeed."""
+        response = None
+        for attempt in range(retries):
+            response = self.scraper.get(url, timeout=30)
+            if response.status_code == 200:
+                return response.json(), response
+            if response.status_code < 500 and response.status_code != 429:
+                break
+            if self._is_cloudflare_challenge(response):
+                break
+            self.logger.warning(f"{response.status_code} from SteamRIP, retrying ({attempt + 1}/{retries})...")
+            time.sleep((attempt + 1) * 5)
+        return None, response
+    
+    def _fetch_sitemap_links(self):
+        """Links of every post, from the WordPress sitemap. Returns None if unavailable."""
+        try:
+            response = self.scraper.get("https://steamrip.com/wp-sitemap.xml", timeout=30)
+            if response.status_code != 200:
+                return None
+            sitemaps = [
+                url for url in re.findall(r"<loc>([^<]+)</loc>", response.text)
+                if "/wp-sitemap-posts-post-" in url
+            ]
+            links = set()
+            for url in sitemaps:
+                response = self.scraper.get(url, timeout=30)
+                if response.status_code != 200:
+                    return None
+                links.update(html.unescape(link) for link in re.findall(r"<loc>([^<]+)</loc>", response.text))
+            return links
+        except Exception as e:
+            self.logger.warning(f"Could not read the sitemap: {e}")
+            return None
+    
+    def _fetch_posts(self, query, limit):
+        """Fetch every page of a posts query. Returns None if it failed or exceeds limit."""
+        posts = []
+        page = 1
+        while True:
+            data, response = self._get_json(f"{self.base_url}?per_page=100&page={page}&{query}")
+            if data is None:
+                # WordPress answers 400 when asked for a page past the end
+                if response is not None and response.status_code == 400 and page > 1:
+                    break
+                return None
+            posts.extend(data)
+            if len(posts) > limit:
+                return None
+            if len(data) < 100:
+                break
+            page += 1
+        return posts
+    
+    def _process_posts(self, posts, imgs_dir, workers, progress, blacklist_ids):
+        """Process posts in parallel. Returns game entries, or None if the cookie expired."""
+        results = []
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(self._process_post, post, imgs_dir, progress, blacklist_ids)
+                for post in posts
+            ]
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                    if progress:
+                        progress.increment_processed()
+                except CookieExpiredError:
+                    for f in futures:
+                        f.cancel()
+                    return None
+                except Exception as e:
+                    self.logger.error(f"Error processing post: {e}")
+                    if progress:
+                        progress.add_error(str(e))
+        return results
+    
+    def _scrape_incremental(self, baseline, blacklist_ids, workers, progress):
+        """Refresh the existing index by fetching only posts modified since it was built.
+        Returns the merged game list, or None if a full scrape is needed instead."""
+        imgs_dir = f"{self.output_dir}/imgs_incoming"
+        
+        games_by_id = {}
+        for game in baseline["games"]:
+            if isinstance(game, dict) and game.get("gameID"):
+                games_by_id.setdefault(game["gameID"], game)
+        # Covers the index already has don't need downloading again
+        self.known_img_ids = {game["imgID"] for game in games_by_id.values() if game.get("imgID")}
+        
+        since = baseline["since"] - datetime.timedelta(days=self._INCREMENTAL_MARGIN_DAYS)
+        since_param = since.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        self.logger.info(f"Incremental refresh: fetching posts modified since {since_param}")
+        
+        modified = self._fetch_posts(f"modified_after={since_param}", self._INCREMENTAL_MAX_POSTS)
+        if modified is None:
+            return None
+        self.logger.info(f"{len(modified)} posts modified since the last refresh")
+        
+        # The sitemap lists every post, which shows what was removed and
+        # anything the modified query didn't cover.
+        live_links = self._fetch_sitemap_links()
+        if not live_links:
+            return None
+        
+        removed = [
+            game_id for game_id, game in games_by_id.items()
+            if game.get("dirlink") not in live_links
+        ]
+        if len(removed) > len(games_by_id) * 0.2:
+            self.logger.warning(f"{len(removed)} games missing from the sitemap, not trusting it")
+            return None
+        for game_id in removed:
+            del games_by_id[game_id]
+        if removed:
+            self.logger.info(f"Removed {len(removed)} games that no longer exist")
+        
+        covered_links = {game.get("dirlink") for game in games_by_id.values()}
+        covered_links.update(post.get("link") for post in modified)
+        missing_links = [link for link in live_links if link not in covered_links]
+        if len(missing_links) > self._INCREMENTAL_MAX_POSTS:
+            return None
+        
+        missing_posts = []
+        for start in range(0, len(missing_links), 50):
+            slugs = ",".join(
+                link.rstrip("/").rsplit("/", 1)[-1] for link in missing_links[start:start + 50]
+            )
+            data, _ = self._get_json(f"{self.base_url}?per_page=100&slug={slugs}")
+            if data is None:
+                return None
+            missing_posts.extend(data)
+        
+        posts = modified + missing_posts
+        if progress:
+            progress.set_total_posts(len(posts))
+        results = self._process_posts(posts, imgs_dir, workers, progress, blacklist_ids)
+        if results is None:
+            return None
+        
+        if self.view_counts_enabled:
+            self._fetch_queued_view_counts(results)
+        
+        new_games = []
+        for game in results:
+            if game["gameID"] in games_by_id:
+                # Keep the known popularity when it wasn't fetched this time
+                if game.get("weight") in (None, "", "0"):
+                    game["weight"] = games_by_id[game["gameID"]].get("weight", "0")
+                games_by_id[game["gameID"]] = game
+            else:
+                new_games.append(game)
+        
+        blacklisted_game_ids = {encode_game_id(post_id) for post_id in (blacklist_ids or [])}
+        merged = [
+            game for game in new_games + list(games_by_id.values())
+            if game["gameID"] not in blacklisted_game_ids
+        ]
+        
+        self.logger.info(
+            f"Incremental refresh done: {len(results)} updated ({len(new_games)} new), {len(merged)} games total"
+        )
+        return merged
+    
     def get_total_pages(self) -> int:
         """Get total number of pages"""
         try:
@@ -274,44 +520,69 @@ class SteamRIPScraper(BaseScraper):
     
     # Private helper methods
     
+    def _is_cloudflare_challenge(self, response):
+        """True only when the response is an actual Cloudflare challenge.
+        
+        A plain 403/429 (rate limit, hotlink protection, missing file) is not one,
+        and a cookie does nothing for those.
+        """
+        if response is None or response.status_code not in (403, 503):
+            return False
+        if response.headers.get("cf-mitigated", "").lower() == "challenge":
+            return True
+        if "text/html" not in response.headers.get("Content-Type", "").lower():
+            return False
+        try:
+            body = response.text[:8192]
+        except Exception:
+            return False
+        return "Just a moment" in body or "challenge-platform" in body or "cf-chl" in body
+    
     def _check_cloudflare_protection(self, user_agent=None):
-        """Check if Cloudflare protection is active on any required endpoint"""
+        """Check if Cloudflare is challenging the endpoints the scraper needs"""
         self.logger.info("Checking if Cloudflare protection is active...")
         
+        urls_to_check = [
+            ("posts API", "https://steamrip.com/wp-json/wp/v2/posts?per_page=1"),
+            ("game page", "https://steamrip.com/"),
+        ]
+        
+        # Probe with the same client the scrape uses. A differently configured one
+        # can fail where the real scraper works (e.g. on SSL verification) and
+        # would say nothing about what the scrape will actually run into.
         try:
-            test_scraper = cloudscraper.create_scraper(
-                browser={"browser": "chrome", "platform": "windows", "mobile": False}
-            )
-            
-            final_user_agent = user_agent if user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
-            test_scraper.headers.update({"User-Agent": final_user_agent})
-            
-            urls_to_check = [
-                ("posts API", "https://steamrip.com/wp-json/wp/v2/posts?per_page=1"),
-                ("game page", "https://steamrip.com/"),
-            ]
-            
-            for label, url in urls_to_check:
-                try:
-                    response = test_scraper.get(url, timeout=15)
-                    if response.status_code == 403:
-                        self.logger.info(f"✗ Cloudflare protection is active on {label} - cookie required")
-                        return True
-                    elif response.status_code == 200:
-                        self.logger.info(f"✓ {label}: accessible without cookie")
-                    else:
-                        self.logger.warning(f"Unexpected status {response.status_code} on {label}, assuming CF is active")
-                        return True
-                except Exception as e:
-                    self.logger.warning(f"Error checking {label}: {e}, assuming CF is active")
-                    return True
-            
-            self.logger.info("✓ Cloudflare protection is NOT active on any endpoint - cookie not required")
-            return False
-                
+            test_scraper = self._create_scraper(None, user_agent)
         except Exception as e:
-            self.logger.warning(f"Error checking Cloudflare protection: {e}, assuming CF is active")
-            return True
+            self.logger.warning(f"Could not create a scraper for the Cloudflare check: {e}")
+            return False
+        
+        try:
+            for label, url in urls_to_check:
+                # Only a real challenge counts. Timeouts and odd statuses are retried
+                # and then left for the scrape itself to deal with.
+                for attempt in range(3):
+                    try:
+                        response = test_scraper.get(url, timeout=15)
+                    except Exception as e:
+                        self.logger.warning(f"Error checking {label} (attempt {attempt + 1}): {e}")
+                        time.sleep(attempt + 1)
+                        continue
+                    
+                    if self._is_cloudflare_challenge(response):
+                        self.logger.info(f"✗ Cloudflare is challenging {label} - cookie required")
+                        return True
+                    if response.status_code == 200:
+                        self.logger.info(f"✓ {label}: accessible without cookie")
+                        break
+                    self.logger.warning(f"Unexpected status {response.status_code} on {label} (attempt {attempt + 1}), not a Cloudflare challenge")
+                    time.sleep(attempt + 1)
+                else:
+                    self.logger.warning(f"Could not confirm {label} is reachable, continuing without assuming Cloudflare is active")
+            
+            self.logger.info("✓ No Cloudflare challenge on any endpoint - cookie not required")
+            return False
+        finally:
+            test_scraper.close()
     
     def _create_scraper(self, cookie=None, user_agent=None):
         """Create a cloudscraper instance"""
@@ -401,7 +672,7 @@ class SteamRIPScraper(BaseScraper):
             image_url = self._get_image_url(post)
             img_id = self._generate_random_id()
             if image_url:
-                img_id = self._download_image(image_url, img_id, imgs_dir, progress)
+                img_id = self._download_image(image_url, self._image_id_for(image_url), imgs_dir, progress)
             
             # Get categories
             cat_ids = post.get("categories", [])
@@ -580,21 +851,40 @@ class SteamRIPScraper(BaseScraper):
         """Generate a random alphanumeric ID"""
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
     
+    def _image_id_for(self, image_url):
+        """Stable ID for a cover, so an unchanged image keeps its ID between scrapes"""
+        return hashlib.sha1(image_url.encode("utf-8")).hexdigest()[:16]
+    
     def _download_image(self, image_url, img_id, imgs_dir, progress):
         """Download and save image with rate limiting and retry"""
         if not image_url:
             return ""
         
+        # The index already has this cover; the app loads it on demand
+        if img_id in self.known_img_ids:
+            return img_id
+        
         if progress:
             progress.increment_images()
+        
+        # Reuse the cover from the current index instead of downloading it again
+        existing_path = os.path.join(self.output_dir, "imgs", f"{img_id}.jpg")
+        if os.path.exists(existing_path):
+            try:
+                shutil.copy2(existing_path, os.path.join(imgs_dir, f"{img_id}.jpg"))
+                if progress:
+                    progress.increment_downloaded_images()
+                return img_id
+            except OSError as e:
+                self.logger.warning(f"Could not reuse image {img_id}: {e}")
         
         max_retries = 3
         
         for attempt in range(max_retries):
             with self.failed_image_lock:
                 if self.failed_image_count >= self.MAX_FAILED_IMAGES:
-                    self.logger.warning(f"Hit {self.MAX_FAILED_IMAGES} failed downloads, triggering cookie refresh...")
-                    raise CookieExpiredError("Too many failed image downloads - cookie likely expired")
+                    self.logger.warning(f"Hit {self.MAX_FAILED_IMAGES} Cloudflare challenges on images, triggering cookie refresh...")
+                    raise CookieExpiredError("Cloudflare is challenging image downloads")
             
             if self.cookie_refresh_event.is_set():
                 while self.cookie_refresh_event.is_set():
@@ -615,17 +905,25 @@ class SteamRIPScraper(BaseScraper):
                     time.sleep(wait_time)
                     continue
                 
-                if response.status_code == 403:
-                    self.logger.warning(f"403 Forbidden on image (attempt {attempt+1}), cookie may be expired")
+                if self._is_cloudflare_challenge(response):
+                    self.logger.warning(f"Cloudflare challenge on image (attempt {attempt+1}), cookie is missing or expired")
                     with self.failed_image_lock:
                         self.failed_image_count += 1
                         if self.failed_image_count >= self.MAX_FAILED_IMAGES:
-                            raise CookieExpiredError("Cookie expired or rate limited")
+                            raise CookieExpiredError("Cloudflare is challenging image downloads")
                     time.sleep((attempt + 1) * 2)
                     continue
                 
+                if response.status_code == 403:
+                    self.logger.warning(f"403 on image without a Cloudflare challenge (attempt {attempt+1}), backing off")
+                    time.sleep((attempt + 1) * 2)
+                    continue
+                
+                if response.status_code == 404:
+                    self.logger.warning(f"Image no longer exists: {image_url}")
+                    return ""
+                
                 response.raise_for_status()
-                import os
                 img_path = os.path.join(imgs_dir, f"{img_id}.jpg")
                 with open(img_path, 'wb') as f:
                     f.write(response.content)
@@ -644,12 +942,8 @@ class SteamRIPScraper(BaseScraper):
                 if attempt < max_retries - 1:
                     time.sleep((attempt + 1) * 2)
                 else:
-                    self.logger.warning(f"Failed to download image after {max_retries} attempts: {image_url}")
-                    with self.failed_image_lock:
-                        self.failed_image_count += 1
-                        if self.failed_image_count >= self.MAX_FAILED_IMAGES:
-                            self.logger.error(f"Reached {self.MAX_FAILED_IMAGES} failed image downloads")
-                            raise CookieExpiredError("Cookie expired or rate limited")
+                    # A network error says nothing about the cookie, so skip the cover
+                    self.logger.warning(f"Failed to download image after {max_retries} attempts: {image_url} ({e})")
         return ""
     
     def _start_keep_alive(self, interval=30):
@@ -860,7 +1154,7 @@ class SteamRIPScraper(BaseScraper):
                 return True
             
             self.logger.info("="*60)
-            self.logger.info("COOKIE EXPIRED - Waiting for new cookie...")
+            self.logger.info("COOKIE NEEDED - Waiting for new cookie...")
             self.logger.info("Please provide a new cf_clearance cookie value.")
             self.logger.info("The process will continue automatically once a new cookie is provided.")
             self.logger.info("="*60)
@@ -874,6 +1168,17 @@ class SteamRIPScraper(BaseScraper):
                 print("="*60, flush=True)
                 
                 new_cookie = input().strip()
+                
+                # The app sends {"cookie": ..., "userAgent": ...} when it knows which
+                # browser solved the challenge - cf_clearance only works with that one
+                if new_cookie.startswith("{"):
+                    try:
+                        payload = json.loads(new_cookie)
+                        new_cookie = str(payload.get("cookie") or "").strip()
+                        if payload.get("userAgent"):
+                            self.current_user_agent[0] = payload["userAgent"]
+                    except ValueError:
+                        pass
                 
                 if new_cookie:
                     self.logger.info("Received new cookie, refreshing scraper...")

@@ -147,6 +147,19 @@ let subscribers = new Set();
 
 const CACHE_DURATION = 10000; // 10 seconds
 
+// storage (cdn) and r2 are public buckets, so every status ping is a billed
+// read. Check them rarely and reuse the last result in between.
+const BUCKET_CHECK_INTERVAL = 30 * 60 * 1000; // 30 minutes
+let lastBucketCheck = null;
+
+const checkBuckets = async () => {
+  if (lastBucketCheck && Date.now() - lastBucketCheck < BUCKET_CHECK_INTERVAL) {
+    return [currentStatus.storage, currentStatus.r2];
+  }
+  lastBucketCheck = Date.now();
+  return Promise.all([checkEndpoint(ENDPOINTS.storage), checkEndpoint(ENDPOINTS.r2)]);
+};
+
 export const checkServerStatus = async (force = false) => {
   // Return cached status if available and not forced
   if (!force && currentStatus && lastCheck && Date.now() - lastCheck < CACHE_DURATION) {
@@ -168,19 +181,20 @@ export const checkServerStatus = async (force = false) => {
         lfs: { ok: false, error: "No internet connection" },
         r2: { ok: false, error: "No internet connection" },
       };
+      lastBucketCheck = null; // re-check buckets as soon as we're back online
       lastCheck = Date.now();
       notifySubscribers();
       return currentStatus;
     }
 
     // We have internet, check all services
-    const results = await Promise.all([
+    const [monitor, api, lfs, [storage, r2]] = await Promise.all([
       checkEndpoint(ENDPOINTS.monitor),
       checkEndpoint(ENDPOINTS.api),
-      checkEndpoint(ENDPOINTS.storage),
       checkEndpoint(ENDPOINTS.lfs),
-      checkEndpoint(ENDPOINTS.r2),
+      checkBuckets(),
     ]);
+    const results = [monitor, api, storage, lfs, r2];
 
     currentStatus = {
       ok: results.every(r => r.ok),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   AlertDialog,
@@ -24,12 +24,14 @@ import {
 } from "lucide-react";
 
 const STEAMRIP_POSTS_URL = "https://steamrip.com/wp-json/wp/v2/posts?per_page=1&page=1";
+const CF_CHECK_TIMEOUT_MS = 8000;
 
 const RefreshIndexDialog = ({
   open,
   onOpenChange,
   onStartRefresh,
   mode = "refresh",
+  cookieExpired = true,
   cookieRefreshCount = 0,
 }) => {
   const { t } = useLanguage();
@@ -46,53 +48,78 @@ const RefreshIndexDialog = ({
 
   // Determine if this is a cookie refresh (mid-process) vs initial refresh
   const isCookieRefresh = mode === "cookie-refresh";
+  // A cookie request during a run that never had one isn't an expiry
+  const showExpired = isCookieRefresh && cookieExpired;
+  const onStartRefreshRef = useRef(onStartRefresh);
+  onStartRefreshRef.current = onStartRefresh;
 
   // Check Cloudflare protection status when dialog opens
   useEffect(() => {
-    if (!open || isCookieRefresh) return; // Skip check for cookie refresh (CF is already active)
+    if (!open || isCookieRefresh) return; // Skip check when the scraper itself asked for a cookie
 
-    const checkCloudflareProtection = async () => {
-      setCheckingCF(true);
+    let cancelled = false;
+    let startTimer = null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CF_CHECK_TIMEOUT_MS);
+
+    // Only an actual challenge response means a cookie is needed. A timeout, a
+    // network error or any other status says nothing about Cloudflare, so the
+    // refresh starts without a cookie and the scraper asks for one if it hits
+    // a challenge itself.
+    const isChallenged = async () => {
       try {
-        const postsResult = await Promise.race([
-          fetch(STEAMRIP_POSTS_URL, { method: "GET", mode: "cors" }),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("timeout")), 8000)
-          ),
-        ]);
-
-        console.log(`CF check - posts: ${postsResult.status}`);
-
-        if (postsResult.status === 200) {
-          // CF protection is NOT active - posts API accessible without cookie
-          console.log("Cloudflare protection is NOT active - cookie not required");
-          setCfActive(false);
-          setApiAccessibleNoCookie(true);
-          // Auto-start refresh without cookie
-          setTimeout(() => {
-            onStartRefresh({
-              method: "no-cookie",
-              cfClearance: null,
-              isCookieRefresh: false,
-            });
-            handleClose();
-          }, 500);
-        } else {
-          console.log(
-            `Cloudflare protection is active (status: ${postsResult.status}) - cookie required`
-          );
-          setCfActive(true);
-        }
+        const response = await fetch(STEAMRIP_POSTS_URL, {
+          method: "GET",
+          mode: "cors",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        console.log(`CF check - posts: ${response.status}`);
+        if (response.status !== 403 && response.status !== 503) return false;
+        if (response.headers.get("cf-mitigated") === "challenge") return true;
+        const body = (await response.text()).slice(0, 8192);
+        return /Just a moment|challenge-platform|cf-chl/.test(body);
       } catch (error) {
-        // Timeout or network error - assume CF is active
-        console.log("Error checking CF protection, assuming CF is active:", error);
-        setCfActive(true);
-      } finally {
-        setCheckingCF(false);
+        console.log(
+          "CF check could not reach SteamRIP, letting the scraper decide:",
+          error
+        );
+        return false;
       }
     };
 
-    checkCloudflareProtection();
+    setCheckingCF(true);
+    isChallenged().then(challenged => {
+      clearTimeout(timeout);
+      if (cancelled) return;
+      setCheckingCF(false);
+      if (challenged) {
+        console.log("Cloudflare is challenging requests - cookie required");
+        setCfActive(true);
+        return;
+      }
+
+      console.log("No Cloudflare challenge - cookie not required");
+      setCfActive(false);
+      setApiAccessibleNoCookie(true);
+      // Auto-start refresh without cookie
+      startTimer = setTimeout(() => {
+        onStartRefreshRef.current({
+          method: "no-cookie",
+          cfClearance: null,
+          isCookieRefresh: false,
+        });
+        handleClose();
+      }, 500);
+    });
+
+    // Closing the dialog mid-check must not start a refresh afterwards
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+      clearTimeout(startTimer);
+      controller.abort();
+    };
   }, [open, isCookieRefresh]);
 
   // Listen for cookie from extension via protocol handler
@@ -257,13 +284,13 @@ const RefreshIndexDialog = ({
           <>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                {isCookieRefresh
+                {showExpired
                   ? t("refreshDialog.cookieExpiredTitle") || "Cookie Expired"
                   : t("refreshDialog.step1Title") || "Complete Cloudflare Verification"}
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
                 <div className="space-y-4 text-sm text-muted-foreground">
-                  {isCookieRefresh && (
+                  {showExpired && (
                     <div className="flex items-center gap-3 rounded-lg border border-orange-500/30 bg-orange-500/10 p-4">
                       <Cookie className="h-5 w-5 shrink-0 text-orange-500" />
                       <div>
@@ -279,7 +306,7 @@ const RefreshIndexDialog = ({
                     </div>
                   )}
                   <p>
-                    {isCookieRefresh
+                    {showExpired
                       ? t("refreshDialog.cookieRefreshDescription") ||
                         "Open SteamRIP again and complete the Cloudflare verification to get a new cookie."
                       : t("refreshDialog.step1Description") ||

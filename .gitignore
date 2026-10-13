@@ -44,7 +44,6 @@ build/icon.ico
 /src/translations/json
 exports.txt
 /server
-scripts/register_build.py
 
 # Debian-specific files
 /binaries/*/src/debian

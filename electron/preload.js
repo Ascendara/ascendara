@@ -223,8 +223,8 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   startLocalRefresh: data => ipcRenderer.invoke("start-local-refresh", data),
   stopLocalRefresh: outputPath => ipcRenderer.invoke("stop-local-refresh", outputPath),
-  sendLocalRefreshCookie: cookie =>
-    ipcRenderer.invoke("send-local-refresh-cookie", cookie),
+  sendLocalRefreshCookie: (cookie, userAgent) =>
+    ipcRenderer.invoke("send-local-refresh-cookie", cookie, userAgent),
   getLocalRefreshProgress: outputPath =>
     ipcRenderer.invoke("get-local-refresh-progress", outputPath),
   getLocalRefreshStatus: outputPath =>
@@ -274,6 +274,8 @@ contextBridge.exposeInMainWorld("electron", {
     preloadIpc.removeAllListeners("local-refresh-upload-error"),
   downloadSharedIndex: outputPath =>
     ipcRenderer.invoke("download-shared-index", outputPath),
+  syncCommunityIndex: () => ipcRenderer.invoke("sync-community-index"),
+  getIndexCover: imgID => ipcRenderer.invoke("get-index-cover", imgID),
   getPublicIndexDownloadStatus: () =>
     ipcRenderer.invoke("get-public-index-download-status"),
   onPublicIndexDownloadStarted: callback =>

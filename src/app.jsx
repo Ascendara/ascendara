@@ -36,7 +36,10 @@ import {
 } from "@/services/ascendStatusService";
 import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
 import { initializeDownloadSync, stopDownloadSync } from "@/services/downloadSyncService";
-import { initializeFavoritesSync, stopFavoritesSync } from "@/services/favoritesCloudSync";
+import {
+  initializeFavoritesSync,
+  stopFavoritesSync,
+} from "@/services/favoritesCloudSync";
 import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseService";
 import gameService from "@/services/gameService";
 import { checkForUpdates } from "@/services/updateCheckingService";
@@ -336,12 +339,10 @@ const GiantBombMigrationWarning = () => {
 const AutomaticIndexRefresher = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
-  const { user, isAuthenticated } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [refreshPhase, setRefreshPhase] = useState("");
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const hasStartedRef = useRef(false);
   const refreshCheckIntervalRef = useRef(null);
 
   // Expose refresh state globally for MenuBar
@@ -362,112 +363,36 @@ const AutomaticIndexRefresher = () => {
     };
   }, []);
 
-  // Check if automatic refresh should run
+  // Keep the shared game list up to date in the background
   useEffect(() => {
-    const checkAndStartAutoRefresh = async () => {
-      // Don't run if already started, not enabled, or user not authenticated
-      if (
-        hasStartedRef.current ||
-        !settings?.autoRefreshEnabled ||
-        !isAuthenticated ||
-        !user?.uid
-      ) {
-        return;
-      }
+    if (
+      settings?.backgroundIndexSync === false ||
+      !settings?.localIndex ||
+      settings?.customSourcesMode ||
+      (settings?.localRefreshSource || "steamrip") !== "steamrip"
+    ) {
+      return;
+    }
 
-      // Verify Ascend access (prevent settings.json manipulation)
-      try {
-        const accessStatus = await verifyAscendAccess();
-        if (!accessStatus.hasAccess) {
-          console.log(
-            "[AutoRefresh] User doesn't have Ascend access, disabling auto refresh"
-          );
-          return;
-        }
-      } catch (error) {
-        console.error("[AutoRefresh] Failed to verify Ascend access:", error);
-        return;
-      }
-
-      // Check if refresh is needed based on interval
-      try {
-        const localIndexPath =
-          settings.localIndex || (await window.electron.getDefaultLocalIndexPath());
-        const progress = await window.electron.getLocalRefreshProgress(localIndexPath);
-
-        if (!progress?.lastSuccessfulTimestamp) {
-          console.log("[AutoRefresh] No previous refresh found, skipping auto refresh");
-          return;
-        }
-
-        const lastRefreshDate = new Date(progress.lastSuccessfulTimestamp * 1000);
-        const now = new Date();
-        const daysSinceRefresh = Math.floor(
-          (now - lastRefreshDate) / (1000 * 60 * 60 * 24)
-        );
-        const intervalDays = parseInt(settings.autoRefreshInterval || "7");
-
-        console.log(
-          `[AutoRefresh] Days since last refresh: ${daysSinceRefresh}, interval: ${intervalDays}`
-        );
-
-        if (daysSinceRefresh >= intervalDays) {
-          console.log("[AutoRefresh] Starting automatic index refresh");
-          hasStartedRef.current = true;
-          await startAutoRefresh(localIndexPath);
-        }
-      } catch (error) {
-        console.error("[AutoRefresh] Error checking refresh status:", error);
-      }
+    const sync = () => {
+      window.electron
+        .syncCommunityIndex()
+        .catch(error => console.error("[IndexSync] Failed to sync index:", error));
     };
 
     // Delay initial check to let app initialize
-    const timeout = setTimeout(checkAndStartAutoRefresh, 10000);
-    return () => clearTimeout(timeout);
+    const timeout = setTimeout(sync, 10000);
+    const interval = setInterval(sync, 6 * 60 * 60 * 1000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, [
-    settings?.autoRefreshEnabled,
-    settings?.autoRefreshInterval,
+    settings?.backgroundIndexSync,
     settings?.localIndex,
-    isAuthenticated,
-    user?.uid,
+    settings?.customSourcesMode,
+    settings?.localRefreshSource,
   ]);
-
-  const startAutoRefresh = async localIndexPath => {
-    setIsRefreshing(true);
-    setRefreshProgress(0);
-    setRefreshPhase("initializing");
-
-    try {
-      // Get refresh settings
-      const refreshSettings = await window.electron.getSettings();
-      const method = refreshSettings.autoRefreshMethod || "shared";
-
-      if (method === "shared") {
-        // Download shared index from community
-        console.log("[AutoRefresh] Starting shared index download");
-        await window.electron.downloadSharedIndex(localIndexPath);
-      } else {
-        // Manual scrape
-        console.log("[AutoRefresh] Starting manual scrape");
-        const result = await window.electron.startLocalRefresh({
-          outputPath: localIndexPath,
-          cfClearance: "", // Will prompt if needed
-          perPage: refreshSettings.fetchPageCount || 50,
-          workers: refreshSettings.localRefreshWorkers || 8,
-          userAgent: "",
-          source: refreshSettings.localRefreshSource || "steamrip",
-        });
-
-        if (!result.success) {
-          throw new Error(result.error || "Failed to start automatic refresh");
-        }
-      }
-    } catch (error) {
-      console.error("[AutoRefresh] Failed to start refresh:", error);
-      setIsRefreshing(false);
-      setRefreshPhase("");
-    }
-  };
 
   // Listen for refresh progress updates (both manual scrape and shared index)
   useEffect(() => {
