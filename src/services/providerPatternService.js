@@ -1,65 +1,60 @@
 const PROVIDER_API_URL = "https://api.ascendara.app/app/json/providers";
+const CACHE_KEY = "providerPatternsCache";
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+let pendingFetch = null;
+
+const readCache = () => {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+    return cached && cached.patterns ? cached : null;
+  } catch (e) {
+    return null;
+  }
+};
 
 /**
  * Fetches provider regex patterns from the API.
  * @returns {Promise<Object>} A mapping of provider names to regex strings.
  */
 export async function fetchProviderPatterns() {
-  // Try to read from localStorage cache
-  try {
-    const cached = JSON.parse(localStorage.getItem("providerPatternsCache"));
-    if (cached && cached.lastUpdated && cached.patterns) {
-      // Check lastUpdated from server
+  const cached = readCache();
+  if (cached && cached.fetchedAt && Date.now() - cached.fetchedAt < CACHE_DURATION) {
+    return cached.patterns;
+  }
+
+  // Share one request between callers that ask at the same time
+  if (!pendingFetch) {
+    pendingFetch = (async () => {
       const response = await fetch(PROVIDER_API_URL, { method: "GET" });
       if (!response.ok) {
         throw new Error(`Failed to fetch provider patterns: ${response.status}`);
       }
       const data = await response.json();
-      if (data.lastUpdated === cached.lastUpdated) {
-        // Use cached patterns (regex object only)
-        return cached.patterns;
-      } else {
-        // Update cache with new patterns (store only regex object)
+      try {
         localStorage.setItem(
-          "providerPatternsCache",
+          CACHE_KEY,
           JSON.stringify({
             lastUpdated: data.lastUpdated,
             patterns: data.regex,
+            fetchedAt: Date.now(),
           })
         );
-        return data.regex;
+      } catch (e) {
+        console.warn("Could not cache provider patterns", e);
       }
-    } else {
-      // No cache, fetch and store
-      const response = await fetch(PROVIDER_API_URL, { method: "GET" });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch provider patterns: ${response.status}`);
-      }
-      const data = await response.json();
-      localStorage.setItem(
-        "providerPatternsCache",
-        JSON.stringify({
-          lastUpdated: data.lastUpdated,
-          patterns: data.regex,
-        })
-      );
       return data.regex;
-    }
+    })().finally(() => {
+      pendingFetch = null;
+    });
+  }
+
+  try {
+    return await pendingFetch;
   } catch (e) {
-    // On error, fallback to fetch
-    const response = await fetch(PROVIDER_API_URL, { method: "GET" });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch provider patterns: ${response.status}`);
-    }
-    const data = await response.json();
-    localStorage.setItem(
-      "providerPatternsCache",
-      JSON.stringify({
-        lastUpdated: data.lastUpdated,
-        patterns: data.regex,
-      })
-    );
-    return data.regex;
+    // Stale patterns are better than none
+    if (cached) return cached.patterns;
+    throw e;
   }
 }
 

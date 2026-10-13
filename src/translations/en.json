@@ -2762,6 +2762,7 @@
   "localRefresh": {
     "activeList": "Active List",
     "advancedTitle": "Advanced",
+    "refreshingIndex": "Refreshing Index...",
     "ascendaraIndex": "Ascendara Index",
     "autoRefresh": "Automatic Index Refreshing",
     "autoRefreshActiveSummary": "Refreshes every {{days}} days using {{method}}",

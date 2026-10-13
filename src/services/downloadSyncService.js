@@ -10,6 +10,33 @@ let currentUser = null;
 let hasAscendAccess = false;
 let lastDownloadCount = 0;
 let isSyncing = false;
+let lastSyncSignature = null;
+let lastSyncAt = 0;
+
+// Stopped, failed and waiting downloads stay in the list indefinitely, so an
+// unchanged list is only re-sent this often instead of on every tick.
+const UNCHANGED_SYNC_INTERVAL = 30000;
+
+// Back off after failed requests so a broken endpoint or rejected session
+// isn't retried at full polling speed forever.
+const createBackoff = (baseDelay = 5000, maxDelay = 5 * 60 * 1000) => {
+  let failures = 0;
+  let retryAt = 0;
+  return {
+    blocked: () => Date.now() < retryAt,
+    success: () => {
+      failures = 0;
+      retryAt = 0;
+    },
+    failure: () => {
+      failures += 1;
+      retryAt = Date.now() + Math.min(maxDelay, baseDelay * 2 ** failures);
+    },
+  };
+};
+
+const syncBackoff = createBackoff();
+const commandBackoff = createBackoff();
 
 /**
  * Initialize download sync service
@@ -50,6 +77,10 @@ export const stopDownloadSync = () => {
   isAuthenticated = false;
   currentUser = null;
   hasAscendAccess = false;
+  lastSyncSignature = null;
+  lastSyncAt = 0;
+  syncBackoff.success();
+  commandBackoff.success();
 };
 
 /**
@@ -78,8 +109,12 @@ const stopSyncInterval = () => {
 /**
  * Sync current downloads to monitor endpoint
  */
-const syncDownloads = async () => {
+const syncDownloads = async (force = false) => {
   if (!isAuthenticated || !currentUser) {
+    return;
+  }
+
+  if (!force && syncBackoff.blocked()) {
     return;
   }
 
@@ -97,7 +132,7 @@ const syncDownloads = async () => {
     // If we had downloads before but now have none, sync once more then stop
     if (lastDownloadCount > 0 && currentCount === 0) {
       console.log("[DownloadSync] Downloads completed - sending final sync and stopping");
-      await performSync(downloadsArray);
+      await performSync(downloadsArray, true);
       stopSyncInterval();
       lastDownloadCount = 0;
       return;
@@ -112,8 +147,9 @@ const syncDownloads = async () => {
     lastDownloadCount = currentCount;
 
     // Perform sync
-    await performSync(downloadsArray);
+    await performSync(downloadsArray, force);
   } catch (error) {
+    syncBackoff.failure();
     console.error("[DownloadSync] Error syncing downloads:", error);
   }
 };
@@ -121,9 +157,9 @@ const syncDownloads = async () => {
 /**
  * Perform the actual sync operation
  */
-const performSync = async downloadsArray => {
+const performSync = async (downloadsArray, force = false) => {
   // Format downloads for API
-  const formattedDownloads = downloadsArray.map(download => ({
+  const downloadStates = downloadsArray.map(download => ({
     id: download.id || download.name,
     name: download.name,
     progress: download.progress || 0,
@@ -135,8 +171,20 @@ const performSync = async downloadsArray => {
     error: download.error || null,
     paused: download.paused || false,
     stopped: download.stopped || false,
-    timestamp: new Date().toISOString(),
   }));
+
+  // Nothing moved since the last sync, so there is nothing new to tell the webapp
+  const signature = JSON.stringify(downloadStates);
+  if (
+    !force &&
+    signature === lastSyncSignature &&
+    Date.now() - lastSyncAt < UNCHANGED_SYNC_INTERVAL
+  ) {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  const formattedDownloads = downloadStates.map(download => ({ ...download, timestamp }));
 
   // Get Firebase ID token
   const firebaseToken = await currentUser.getIdToken();
@@ -154,12 +202,16 @@ const performSync = async downloadsArray => {
   });
 
   if (!response.ok) {
+    syncBackoff.failure();
     console.error(
       "[DownloadSync] Failed to sync downloads:",
       response.status,
       await response.text()
     );
   } else {
+    syncBackoff.success();
+    lastSyncSignature = signature;
+    lastSyncAt = Date.now();
     console.log("[DownloadSync] Synced", formattedDownloads.length, "download(s)");
   }
 };
@@ -180,6 +232,10 @@ export const checkDownloadCommands = async () => {
       return [];
     }
 
+    if (commandBackoff.blocked()) {
+      return [];
+    }
+
     const firebaseToken = await currentUser.getIdToken();
     console.log("[DownloadCommands] Checking for commands for user:", currentUser.uid);
 
@@ -194,6 +250,7 @@ export const checkDownloadCommands = async () => {
     );
 
     if (!response.ok) {
+      commandBackoff.failure();
       console.error(
         "[DownloadCommands] Failed to get download commands:",
         response.status,
@@ -202,6 +259,7 @@ export const checkDownloadCommands = async () => {
       return [];
     }
 
+    commandBackoff.success();
     const data = await response.json();
     console.log("[DownloadCommands] Received response:", data);
     const commands = data.commands || [];
@@ -213,6 +271,7 @@ export const checkDownloadCommands = async () => {
     );
     return commands;
   } catch (error) {
+    commandBackoff.failure();
     console.error("[DownloadCommands] Error checking download commands:", error);
     return [];
   }
@@ -278,7 +337,7 @@ export const notifyDownloadStart = async (downloadId, downloadName) => {
   startSyncInterval();
 
   // Perform immediate sync
-  await syncDownloads();
+  await syncDownloads(true);
 
   try {
     const firebaseToken = await currentUser.getIdToken();
@@ -314,5 +373,5 @@ export const notifyDownloadStart = async (downloadId, downloadName) => {
 export const forceSyncDownloads = () => {
   console.log("[DownloadSync] Force sync requested");
   startSyncInterval();
-  syncDownloads();
+  syncDownloads(true);
 };

@@ -174,6 +174,9 @@ const IconAction = ({ label, icon: Icon, onClick, disabled, spinning, className 
   </Tooltip>
 );
 
+// How often to check for webapp commands when nothing is actively downloading.
+const IDLE_COMMAND_CHECK_INTERVAL = 15000;
+
 // Games whose download start is already marked on the graph (pausing keeps them here).
 const graphedDownloads = new Set();
 
@@ -187,6 +190,8 @@ const Downloads = () => {
   const processedCommandsRef = useRef(new Set());
   const commandTimestampsRef = useRef(new Map());
   const commandIntervalRef = useRef(null);
+  const hasLiveDownloadRef = useRef(false);
+  const lastCommandCheckRef = useRef(0);
 
   // Function to start command checking interval
   const startCommandChecking = useCallback(() => {
@@ -205,6 +210,16 @@ const Downloads = () => {
           commandTimestampsRef.current.delete(key);
         }
       }
+
+      // Stopped or failed downloads sit in the list indefinitely. They can still
+      // be resumed from the webapp, but don't need checking at full speed.
+      if (
+        !hasLiveDownloadRef.current &&
+        now - lastCommandCheckRef.current < IDLE_COMMAND_CHECK_INTERVAL
+      ) {
+        return;
+      }
+      lastCommandCheckRef.current = now;
 
       const commands = await checkDownloadCommands();
 
@@ -614,6 +629,13 @@ const Downloads = () => {
         setDisk(diskNow);
 
         // Start/stop command checking based on download count
+        hasLiveDownloadRef.current = downloading.some(
+          ({ downloadingData }) =>
+            downloadingData.downloading ||
+            downloadingData.extracting ||
+            downloadingData.updating ||
+            downloadingData.verifying
+        );
         if (downloading.length > 0) {
           startCommandChecking();
         } else if (downloading.length === 0) {
