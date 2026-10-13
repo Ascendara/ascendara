@@ -20,8 +20,13 @@ import string
 from typing import Dict, List, Optional, Set
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from base_scraper import BaseScraper
-from utils import encode_game_id
+try:
+    from base_scraper import BaseScraper
+    from utils import encode_game_id
+except ImportError:
+    # Imported as part of a package (the API runs this scraper on a schedule)
+    from .base_scraper import BaseScraper
+    from .utils import encode_game_id
 
 
 # Custom exception for cookie expiration/rate limiting
@@ -71,6 +76,8 @@ class SteamRIPScraper(BaseScraper):
         
         # Incremental refresh
         self.force_full = False
+        # When set, never fall back to a full scrape; scrape_games returns None instead
+        self.incremental_only = False
         self.known_img_ids = set()
         self.extra_metadata = {}
         self._INCREMENTAL_MARGIN_DAYS = 2
@@ -139,6 +146,9 @@ class SteamRIPScraper(BaseScraper):
                 merged = None
             if merged is not None:
                 return merged
+            if self.incremental_only:
+                self.logger.info("Incremental refresh not possible")
+                return None
             self.logger.info("Incremental refresh not possible, running a full scrape")
             self.known_img_ids = set()
         
@@ -458,7 +468,7 @@ class SteamRIPScraper(BaseScraper):
         
         covered_links = {game.get("dirlink") for game in games_by_id.values()}
         covered_links.update(post.get("link") for post in modified)
-        missing_links = [link for link in live_links if link not in covered_links]
+        missing_links = sorted(link for link in live_links if link not in covered_links)
         if len(missing_links) > self._INCREMENTAL_MAX_POSTS:
             return None
         
@@ -488,6 +498,9 @@ class SteamRIPScraper(BaseScraper):
                 # Keep the known popularity when it wasn't fetched this time
                 if game.get("weight") in (None, "", "0"):
                     game["weight"] = games_by_id[game["gameID"]].get("weight", "0")
+                # Keep the known cover when the new one couldn't be downloaded
+                if not game.get("imgID"):
+                    game["imgID"] = games_by_id[game["gameID"]].get("imgID", "")
                 games_by_id[game["gameID"]] = game
             else:
                 new_games.append(game)
