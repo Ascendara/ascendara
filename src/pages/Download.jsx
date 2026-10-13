@@ -15,7 +15,9 @@ import DownloadHero from "@/components/download/DownloadHero";
 import DownloadNotices from "@/components/download/DownloadNotices";
 import DownloadPanel from "@/components/download/DownloadPanel";
 import GameOverview from "@/components/download/GameOverview";
-import ReportGameDialog from "@/components/download/ReportGameDialog";
+import ReportGameDialog, {
+  hasReportedGame,
+} from "@/components/download/ReportGameDialog";
 import SystemRequirements from "@/components/download/SystemRequirements";
 import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
 import { AlertDialog, AlertDialogDescription } from "@/components/ui/alert-dialog";
@@ -1935,9 +1937,12 @@ export default function DownloadPage() {
                 size="sm"
                 className="gap-1.5 text-muted-foreground hover:text-foreground"
                 onClick={() => setShowReportDialog(true)}
+                disabled={hasReportedGame(gameData)}
               >
                 <TriangleAlert className="h-4 w-4" />
-                {t("download.reportBroken")}
+                {hasReportedGame(gameData)
+                  ? t("download.reported")
+                  : t("download.reportBroken")}
               </Button>
             )}
           </div>
