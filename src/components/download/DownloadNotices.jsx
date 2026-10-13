@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
-import { AlertTriangle, Clock, Library, RefreshCw, RotateCcw } from "lucide-react";
+import { AlertTriangle, Library, RotateCcw } from "lucide-react";
 
 const TONES = {
   primary: "border-primary/40 bg-primary/10 text-primary",
@@ -29,20 +29,13 @@ export default function DownloadNotices({
   onRetryExtraction,
   isGameInstalled,
   onGoToLibrary,
-  isIndexOutdated,
-  onRefreshIndex,
   showAntivirusWarning,
   onEnableProtection,
   onDismissAntivirusWarning,
 }) {
   const { t } = useLanguage();
 
-  if (
-    !showRetryExtraction &&
-    !isGameInstalled &&
-    !isIndexOutdated &&
-    !showAntivirusWarning
-  ) {
+  if (!showRetryExtraction && !isGameInstalled && !showAntivirusWarning) {
     return null;
   }
 
@@ -85,27 +78,6 @@ export default function DownloadNotices({
             {t("download.alreadyInstalled") ||
               "You already have this game installed in your library."}
           </span>
-        </Notice>
-      )}
-
-      {isIndexOutdated && (
-        <Notice
-          tone="caution"
-          icon={Clock}
-          actions={
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-orange-500/30 text-orange-600 hover:bg-orange-500/20 dark:text-orange-400"
-              onClick={onRefreshIndex}
-            >
-              <RefreshCw className="mr-2 h-3 w-3" />
-              {t("download.refreshNow") || "Refresh Now"}
-            </Button>
-          }
-        >
-          {t("download.outdatedIndexWarning") ||
-            "Your local index is outdated. This game information may not be current."}
         </Notice>
       )}
 

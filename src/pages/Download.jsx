@@ -337,7 +337,6 @@ export default function DownloadPage() {
     const favs = JSON.parse(localStorage.getItem("game-favorites") || "[]");
     return favs.includes(state?.gameData?.game);
   });
-  const [isIndexOutdated, setIsIndexOutdated] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const [isVerified, setIsVerified] = useState(false);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
@@ -417,33 +416,23 @@ export default function DownloadPage() {
     setGameRating(gameData?.rating || 0);
   }, [gameData?.gameID, gameData?.rating]);
 
-  // Check if index is outdated based on indexReminder setting
+  // Load when the index was last refreshed
   useEffect(() => {
     const checkIndexAge = async () => {
       try {
         const currentSettings = await window.electron.getSettings();
         const indexPath = currentSettings?.localIndex;
-        if (!indexPath || !currentSettings.usingLocalIndex) {
-          setIsIndexOutdated(false);
-          return;
-        }
+        if (!indexPath || !currentSettings.usingLocalIndex) return;
 
         if (window.electron?.getLocalRefreshProgress) {
           const progress = await window.electron.getLocalRefreshProgress(indexPath);
           if (progress?.lastSuccessfulTimestamp) {
             const lastRefresh = new Date(progress.lastSuccessfulTimestamp * 1000);
             setLastRefreshTime(lastRefresh);
-
-            const reminderDays = parseInt(currentSettings.indexReminder || "7", 10);
-            const daysSinceRefresh =
-              (Date.now() - lastRefresh.getTime()) / (1000 * 60 * 60 * 24);
-
-            setIsIndexOutdated(daysSinceRefresh > reminderDays);
           }
         }
       } catch (error) {
         console.error("Error checking index age:", error);
-        setIsIndexOutdated(false);
       }
     };
 
@@ -1962,8 +1951,6 @@ export default function DownloadPage() {
           onRetryExtraction={handleRetryRetainedExtraction}
           isGameInstalled={isGameInstalled}
           onGoToLibrary={() => navigate("/library")}
-          isIndexOutdated={isIndexOutdated && settings.usingLocalIndex}
-          onRefreshIndex={() => navigate("/localrefresh")}
           showAntivirusWarning={
             gameData.online &&
             !settings.excludeFolders &&

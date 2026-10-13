@@ -60,7 +60,6 @@ class SettingsManager {
       fetchPageCount: 50,
       localRefreshWorkers: 8,
       homeSearch: true,
-      indexReminder: "7",
       backgroundIndexSync: true,
       autoRefreshEnabled: false,
       autoRefreshInterval: "7",
