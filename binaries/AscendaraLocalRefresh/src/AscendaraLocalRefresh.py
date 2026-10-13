@@ -340,6 +340,11 @@ def main():
         help='Skip fetching view counts (faster refresh)'
     )
     parser.add_argument(
+        '--full',
+        action='store_true',
+        help='Scrape everything from scratch instead of only what changed'
+    )
+    parser.add_argument(
         '--user-agent', '-u',
         default=None,
         help='Custom User-Agent string (for Firefox/Opera cookie compatibility)'
@@ -417,28 +422,36 @@ def main():
         except Exception as e:
             logging.warning(f"Failed to cleanup backup: {e}")
     
-    def swap_incoming_to_current():
-        """Atomically swap incoming data to current location"""
+    def swap_incoming_to_current(referenced_img_ids):
+        """Swap incoming data to current location"""
         try:
             logging.info("Swapping incoming data to current...")
-            
-            if os.path.exists(imgs_dir):
-                if os.path.exists(imgs_backup_dir):
-                    shutil.rmtree(imgs_backup_dir)
-                shutil.move(imgs_dir, imgs_backup_dir)
             
             if os.path.exists(games_file):
                 if os.path.exists(games_backup_file):
                     os.remove(games_backup_file)
                 shutil.copy2(games_file, games_backup_file)
             
+            # Merge new covers into the existing folder (a refresh may only have
+            # downloaded the ones that changed), then drop ones no game uses.
             if os.path.exists(imgs_incoming_dir):
-                shutil.move(imgs_incoming_dir, imgs_dir)
+                os.makedirs(imgs_dir, exist_ok=True)
+                for name in os.listdir(imgs_incoming_dir):
+                    os.replace(os.path.join(imgs_incoming_dir, name), os.path.join(imgs_dir, name))
+                shutil.rmtree(imgs_incoming_dir)
             
             if os.path.exists(games_incoming_file):
                 if os.path.exists(games_file):
                     os.remove(games_file)
                 shutil.move(games_incoming_file, games_file)
+            
+            if os.path.exists(imgs_dir):
+                for name in os.listdir(imgs_dir):
+                    if os.path.splitext(name)[0] not in referenced_img_ids:
+                        try:
+                            os.remove(os.path.join(imgs_dir, name))
+                        except OSError:
+                            pass
             
             cleanup_backup()
             logging.info("Swap completed successfully")
@@ -515,6 +528,8 @@ def main():
             cleanup_incoming()
             sys.exit(1)
         
+        scraper.force_full = args.full
+        
         # Scrape games
         progress.set_phase("processing_posts")
         logging.info("Starting game scraping...")
@@ -538,6 +553,7 @@ def main():
             "listVersion": "1.0",
             "games": str(len(game_data))
         }
+        metadata.update(getattr(scraper, "extra_metadata", {}))
         
         output_data = {
             "metadata": metadata,
@@ -550,7 +566,7 @@ def main():
         
         # Swap incoming data to current
         progress.set_phase("swapping")
-        if not swap_incoming_to_current():
+        if not swap_incoming_to_current({game.get("imgID") for game in game_data}):
             logging.error("Failed to swap incoming data to current")
             progress.add_error("Failed to swap incoming data to current")
             progress.complete(success=False)
