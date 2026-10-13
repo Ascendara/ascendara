@@ -4,6 +4,9 @@ import os
 import subprocess
 import shutil
 import re
+import sys
+from pathlib import Path
+from build_support import register_after_build, validate_resources
 
 def run_yarn_build():
     print("Running yarn build...")
@@ -30,11 +33,12 @@ def generate_build_signature():
         return False
 
 def run_electron_builder():
+    validate_resources("win")
     print("Running electron-builder...")
     try:
         yarn_cmd = 'yarn.cmd' if os.name == 'nt' else 'yarn'
         # Use electron-builder directly with the correct configuration
-        subprocess.run([yarn_cmd, 'electron-builder', '--config.extraMetadata.main=electron/app.js'], check=True, cwd=os.getcwd())
+        subprocess.run([yarn_cmd, 'electron-builder', '--config.extraMetadata.main=electron/app.js', '--win', '--x64', '--publish', 'never'], check=True, cwd=os.getcwd())
         print("Electron build completed successfully")
         return True
     except subprocess.CalledProcessError as e:
@@ -44,6 +48,9 @@ def run_electron_builder():
 def move_files():
     print("Moving files to build directory...")
     try:
+        if os.path.isdir('build/sounds'):
+            shutil.copytree('build/sounds', 'electron/sounds', dirs_exist_ok=True)
+
         # Copy the index.html file to electron directory
         index_path = 'build/index.html'
         if os.path.exists(index_path):
@@ -110,51 +117,16 @@ def cleanup_build_artifacts():
     """Clean up all build artifacts before starting a new build."""
     print("Cleaning up previous build artifacts...")
     
-    # Directories to clean
-    cleanup_dirs = ['build', 'dist']
-    
-    # Files to clean from electron directory
-    electron_dir = 'electron'
-    
-    for dir_path in cleanup_dirs:
-        if os.path.exists(dir_path):
-            try:
-                shutil.rmtree(dir_path)
-                print(f"Removed existing {dir_path} directory")
-            except Exception as e:
-                print(f"Warning: Could not remove {dir_path} directory: {e}")
-    
-    # Clean up asset files from electron directory
-    if os.path.exists(electron_dir):
-        try:
-            # Remove all files except .js files and directories
-            for item in os.listdir(electron_dir):
-                item_path = os.path.join(electron_dir, item)
-                # Keep .js files, the guide directory, services directory, and modules directory
-                if item.endswith('.js') or (os.path.isdir(item_path) and item in ('guide', 'services', 'modules')):
-                    continue
-                
-                if os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-                    print(f"Removed directory {item_path}")
-                else:
-                    os.remove(item_path)
-                    print(f"Removed file {item_path}")
-        except Exception as e:
-            print(f"Warning: Error cleaning electron directory: {e}")
-    
-    # Clean up guide directory if it exists
-    guide_dir = os.path.join(electron_dir, 'guide')
-    if os.path.exists(guide_dir):
-        try:
-            shutil.rmtree(guide_dir)
-            print(f"Removed guide directory")
-            # Recreate the empty directory
-            os.makedirs(guide_dir, exist_ok=True)
-        except Exception as e:
-            print(f"Warning: Could not clean guide directory: {e}")
-    
+    # Only remove known generated files; preserve source and production config.
+    for name in ('build', 'dist', 'electron/assets', 'electron/index.html',
+                 'electron/icon.png', 'electron/no-image.png', 'electron/sounds'):
+        path = Path(name)
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
     return True
+
 
 def cleanup_after_build():
     """Clean up temporary files after the build is complete."""
@@ -208,6 +180,8 @@ def cleanup_after_build():
                 print("Preserved electron/modules directory")
             
             # Remove other temporary files
+            if os.path.isdir('electron/sounds'):
+                shutil.rmtree('electron/sounds')
             temp_files = ['icon.png', 'no-image.png']
             for temp_file in temp_files:
                 temp_path = os.path.join(electron_dir, temp_file)
@@ -288,27 +262,8 @@ def main():
         print("Failed to clean up after build. Exiting.")
         return 1
     
-    # Step 8: Register build with backend API
-    print("\n" + "="*60)
-    print("Registering build with backend API...")
-    print("="*60)
-    try:
-        python_cmd = 'python' if os.name == 'nt' else 'python3'
-        register_script = os.path.join('scripts', 'register_build.py')
-        subprocess.run([python_cmd, register_script], check=True, cwd=os.getcwd())
-        print("Build registration completed successfully!")
-    except subprocess.CalledProcessError as e:
-        print(f"Warning: Build registration failed with error: {e}")
-        print("You may need to register this build manually.")
-        print("The build is complete but will not work until registered.")
-    except FileNotFoundError:
-        print("Warning: register_build.py not found, skipping automatic registration.")
-        print("You will need to register this build manually.")
-    
-    print("\n" + "="*60)
-    print("Build process completed successfully!")
-    print("="*60)
+    register_after_build()
     return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

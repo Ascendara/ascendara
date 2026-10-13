@@ -88,10 +88,4 @@ console.log("✅ Build signature generated:");
 console.log(`   Build ID: ${buildSignature.buildId}`);
 console.log(`   Version: ${buildSignature.version}`);
 console.log(`   Timestamp: ${new Date(buildSignature.timestamp).toISOString()}`);
-console.log(`   Signature: ${buildSignature.signature.substring(0, 16)}...`);
-
-// Also output for CI/CD to register with backend
-console.log("\n📝 Register this build with backend:");
-console.log(JSON.stringify(buildSignature));
-
 module.exports = { generateBuildSignature };

@@ -759,6 +759,7 @@ class TorrentManager:
 
         # Prefer 7z because it handles both RAR and 7z and is usually fastest
         _7z_paths = [
+            os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(__file__)), '7z.exe' if os.name == 'nt' else '7z'),
             os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(__file__)), '7zz'),
             os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../.build-tools/macos/7zip/7zz')) if sys.platform == 'darwin' and not getattr(sys, 'frozen', False) else None,
             shutil.which('7zz'), shutil.which('7z'), shutil.which('7za'),
@@ -790,6 +791,7 @@ class TorrentManager:
         ext = os.path.splitext(archive_path)[1].lower()
         if ext == '.rar':
             _unrar_paths = [
+                os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(__file__)), 'unrar'),
                 shutil.which('unrar'), shutil.which('WinRAR'),
                 r'C:\Program Files\WinRAR\UnRAR.exe',
                 r'C:\Program Files (x86)\WinRAR\UnRAR.exe',

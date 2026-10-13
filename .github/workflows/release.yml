@@ -1,0 +1,260 @@
+name: Build and release Ascendara
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Create a draft and register builds (select a matching version tag)'
+        type: boolean
+        default: false
+      publish:
+        description: 'Publish the draft after all checks (requires release=true)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: ascendara-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    outputs:
+      release: ${{ steps.mode.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - id: validate
+        run: python scripts/ci_build.py preflight
+      - id: mode
+        env:
+          TAG: ${{ steps.validate.outputs.release }}
+          REQUEST: ${{ github.event_name == 'push' || inputs.release }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          if [ "$REQUEST" = true ] && [ "$TAG" != true ]; then
+            echo 'Release mode requires a version tag matching package.json'; exit 1
+          fi
+          if [ "$PUBLISH" = true ] && [ "$REQUEST" != true ]; then
+            echo 'publish requires release'; exit 1
+          fi
+          echo "release=$REQUEST" >> "$GITHUB_OUTPUT"
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            runner: windows-latest
+            script: dist
+          - target: linux-x64
+            runner: ubuntu-22.04
+            script: dist-linux
+          - target: mac-arm64
+            runner: macos-15
+            script: dist-mac-arm64
+          - target: mac-x64
+            runner: macos-15-intel
+            script: dist-mac-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    env:
+      CI: 'true'
+      HUSKY: '0'
+      PYTHONUTF8: '1'
+      PYTHONUNBUFFERED: '1'
+      ASCENDARA_MAC_RUST_TOOLCHAIN: '1.90.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+      - run: npm install --global yarn@1.22.22
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: yarn
+          cache-dependency-path: |
+            yarn.lock
+            binaries/AscendaraAchievementWatcher/yarn.lock
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+          cache: pip
+          cache-dependency-path: binaries/*/requirements.txt
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal
+          rustup default 1.90.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            binaries/AscendaraCrashReporter/target
+          key: cargo-${{ matrix.target }}-1.90.0-${{ hashFiles('binaries/AscendaraCrashReporter/Cargo.lock') }}
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unrar p7zip-full libfuse2 libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev libssl-dev pkg-config
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+      - name: Test release safeguards
+        run: python -m unittest discover -s tests -p 'test_build_automation.py'
+      - name: Configure application
+        env:
+          RELEASE_MODE: ${{ needs.prepare.outputs.release }}
+          ASCENDARA_SECRET_SEED: ${{ secrets.ASCENDARA_SECRET_SEED }}
+          REACT_APP_AUTHORIZATION: ${{ secrets.REACT_APP_AUTHORIZATION }}
+          REACT_APP_ASCENDARA_API_KEY: ${{ secrets.REACT_APP_ASCENDARA_API_KEY }}
+          REACT_APP_IMAGE_KEY: ${{ secrets.REACT_APP_IMAGE_KEY }}
+          REACT_APP_DISCKEY: ${{ vars.REACT_APP_DISCKEY }}
+        run: python scripts/ci_build.py configure
+      - name: Set up Mac extraction tools
+        if: runner.os == 'macOS'
+        run: yarn setup-mac
+      - name: Check signing configuration
+        id: signing
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          ASCENDARA_MAC_SIGN_IDENTITY: ${{ vars.ASCENDARA_MAC_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          echo 'mac=false' >> "$GITHUB_OUTPUT"
+          echo 'notarize=false' >> "$GITHUB_OUTPUT"
+          if [ "$RUNNER_OS" = macOS ] && [ -n "$CSC_LINK" ]; then
+            test -n "$ASCENDARA_MAC_SIGN_IDENTITY" || { echo 'Missing Mac signing identity'; exit 1; }
+            echo 'mac=true' >> "$GITHUB_OUTPUT"
+            if [ -n "$APPLE_ID$APPLE_APP_SPECIFIC_PASSWORD$APPLE_TEAM_ID" ]; then
+              test -n "$APPLE_ID" && test -n "$APPLE_APP_SPECIFIC_PASSWORD" && test -n "$APPLE_TEAM_ID" || { echo 'Incomplete notarization credentials'; exit 1; }
+              echo 'notarize=true' >> "$GITHUB_OUTPUT"
+            fi
+          fi
+      - name: Import Mac identity before PyInstaller signs payloads
+        if: steps.signing.outputs.mac == 'true'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.CSC_LINK }}
+          p12-password: ${{ secrets.CSC_KEY_PASSWORD }}
+      - name: Compile Windows helpers
+        if: runner.os == 'Windows'
+        run: python scripts/build_windows_helpers.py
+      - name: Build native application
+        shell: bash
+        env:
+          BUILD_SECRET: ${{ secrets.BUILD_SECRET }}
+          RELEASE_MODE: ${{ needs.prepare.outputs.release }}
+          SCRIPT: ${{ matrix.script }}
+          NOTARIZE: ${{ steps.signing.outputs.notarize }}
+          SIGN_MAC: ${{ steps.signing.outputs.mac }}
+          MAC_IDENTITY: ${{ vars.ASCENDARA_MAC_SIGN_IDENTITY }}
+          WIN_CSC_LINK: ${{ runner.os == 'Windows' && secrets.WIN_CSC_LINK || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ runner.os == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && vars.APPLE_TEAM_ID || '' }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+        run: |
+          if [ -z "$BUILD_SECRET" ]; then
+            if [ "$RELEASE_MODE" = true ]; then echo 'BUILD_SECRET is required for releases'; exit 1; fi
+            BUILD_SECRET="$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')"
+            echo "::add-mask::$BUILD_SECRET"
+            export BUILD_SECRET
+          fi
+          if [ "$SIGN_MAC" = true ]; then
+            export ASCENDARA_MAC_SIGN_IDENTITY="$MAC_IDENTITY"
+          elif [ "$RUNNER_OS" = macOS ]; then
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          args=(--skip-registration)
+          if [ "$NOTARIZE" = true ]; then args+=(--release); fi
+          yarn "$SCRIPT" "${args[@]}"
+      - name: Verify packaged contents and collect installers
+        run: python scripts/ci_build.py collect --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: release-artifacts/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Remove temporary Mac signing keychain
+        if: always() && runner.os == 'macOS' && steps.signing.outputs.mac == 'true'
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+          keychain = Path.home() / 'Library/Keychains/signing_temp.keychain-db'
+          if keychain.exists():
+              subprocess.run(['security', 'delete-keychain', str(keychain)], check=True)
+      - name: Remove generated application configuration
+        if: always()
+        shell: python
+        run: |
+          from pathlib import Path
+          Path('electron/config.prod.js').unlink(missing_ok=True)
+  verify:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-x64'
+          path: release-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-arm64
+          path: release-artifacts/mac-arm64
+      - run: python scripts/ci_build.py verify
+  release:
+    needs: [prepare, verify]
+    if: needs.prepare.outputs.release == 'true'
+    runs-on: ubuntu-22.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-x64'
+          path: release-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-arm64
+          path: release-artifacts/mac-arm64
+      - name: Create draft, upload, register, and optionally publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADMIN_POST_KEY: ${{ secrets.ADMIN_POST_KEY }}
+          PUBLISH_RELEASE: ${{ github.event_name == 'push' || inputs.publish }}
+        run: python scripts/ci_release.py

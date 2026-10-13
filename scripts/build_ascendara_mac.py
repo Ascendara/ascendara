@@ -8,6 +8,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from build_support import register_after_build, validate_resources
 from setup_macos_tools import TOOL_DIR, validate_tool
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,6 +97,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arch', choices=('host', 'arm64', 'x64', 'both'), default='host',
                         help='CPU target; both produces separate Apple Silicon and Intel artifacts')
+    parser.add_argument('--skip-registration', action='store_true', help='Defer backend registration')
     parser.add_argument('--check', action='store_true', help='Only check prerequisites')
     parser.add_argument('--dir', action='store_true', help='Build an unpacked .app')
     parser.add_argument('--release', action='store_true', help='Require signing and notarization credentials')
@@ -116,6 +118,12 @@ def main():
         print(f'macOS build prerequisites are available for: {", ".join(arches)}')
         return 0
 
+    for name in ('build', 'dist', 'electron/assets', 'electron/index.html', 'electron/sounds'):
+        path = ROOT / name
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
     # Build the renderer and signature once so both artifacts belong to one release.
     run(['yarn', 'build'])
     shutil.copy2(ROOT / 'build/index.html', ROOT / 'electron/index.html')
@@ -125,17 +133,13 @@ def main():
     run(['node', 'scripts/generate_build_signature.js'])
     for arch in arches:
         build_arch(arch, args, identity)
-    print('Registering build with backend API...', flush=True)
-    register_script = ROOT / 'scripts/register_build.py'
-    if not register_script.is_file():
-        print('Warning: register_build.py not found. You will need to register this build manually.')
-    else:
-        try:
-            run(['python3', register_script])
-            print('Build registration completed successfully!')
-        except (subprocess.CalledProcessError, OSError) as error:
-            print(f'Warning: Build registration failed with error: {error}')
-            print('The build is complete but will not work until registered manually.')
+    for name in ('build', 'electron/assets', 'electron/index.html', 'electron/icon.png', 'electron/sounds'):
+        path = ROOT / name
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
+    register_after_build()
     print('macOS build complete.')
     return 0
 
@@ -151,7 +155,7 @@ def build_arch(arch, args, identity):
     env = {**os.environ, 'ARCHFLAGS': '-arch ' + MACH_ARCH[arch]}
     # Separate caches prevent mixing native libraries between CPU targets.
     env['PYINSTALLER_CONFIG_DIR'] = str(staging / 'pyinstaller-cache')
-    run([*python, '-m', 'pip', 'install', 'pyinstaller'], env=env)
+    run([*python, '-m', 'pip', 'install', 'pyinstaller==6.16.0'], env=env)
     for name in HELPERS:
         run([*python, '-m', 'pip', 'install', '-r', ROOT / 'binaries' / name / 'requirements.txt'], env=env)
     for name in HELPERS:
@@ -173,7 +177,7 @@ def build_arch(arch, args, identity):
     shutil.copy2(crash / 'target' / RUST_TARGET[arch] / 'release/AscendaraCrashReporter', staging)
     watcher = ROOT / 'binaries/AscendaraAchievementWatcher'
     run(['yarn', 'install', '--frozen-lockfile'], cwd=watcher)
-    run(['yarn', 'pkg', 'src/watchdog.js', '--target', f'node18-macos-{arch}',
+    run(['yarn', 'pkg', 'src/watchdog.js', '--config', 'package.json', '--target', f'node18-macos-{arch}',
          '--output', staging / 'AscendaraAchievementWatcher'], cwd=watcher)
     names = [*HELPERS, 'AscendaraCrashReporter', 'AscendaraAchievementWatcher']
     for name in names:
@@ -192,6 +196,7 @@ def build_arch(arch, args, identity):
         config['mac']['identity'] = identity
     config['mac']['notarize'] = args.release
     config['forceCodeSigning'] = args.release
+    validate_resources('mac', config)
     config_path = staging / 'builder.json'
     config_path.write_text(json.dumps(config, indent=2))
     command = ['yarn', 'electron-builder', '--config', config_path, '--mac', f'--{arch}', '--publish', 'never']
