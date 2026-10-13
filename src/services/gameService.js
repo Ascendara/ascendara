@@ -11,6 +11,10 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const CUSTOM_SOURCE_CACHE_PREFIX = "ascendara_custom_source_cache::";
 const CUSTOM_SOURCE_CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours
 const CUSTOM_SOURCE_REQUEST_TIMEOUT = 30000;
+const UPDATE_CHECK_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+const UPDATE_CHECK_RETRY_DELAY = 60 * 1000; // wait before retrying a failed check
+const UPDATE_CHECK_FAILED = Symbol("update-check-failed");
+const updateCheckCache = new Map(); // "gameID|version" -> { result, expires }
 
 // Memory cache to avoid localStorage reads
 let memoryCache = {
@@ -927,14 +931,36 @@ const gameService = {
     }
   },
 
+  // Callers re-run their update checks whenever the library reloads (every few
+  // seconds during a download), so answers are reused instead of re-requested.
   async checkGameUpdate(gameID, localVersion) {
+    if (!gameID) {
+      console.warn("[GameService] No gameID provided for update check");
+      return null;
+    }
+
+    const cacheKey = `${gameID}|${localVersion || ""}`;
+    const cached = updateCheckCache.get(cacheKey);
+    if (cached && Date.now() < cached.expires) {
+      return cached.result;
+    }
+
+    let failed = false;
+    const result = this.fetchGameUpdate(gameID, localVersion).then(update => {
+      failed = update === UPDATE_CHECK_FAILED;
+      return failed ? null : update;
+    });
+    // Hold the pending request so concurrent callers share it
+    updateCheckCache.set(cacheKey, { result, expires: Infinity });
+    await result;
+    const cacheDuration = failed ? UPDATE_CHECK_RETRY_DELAY : UPDATE_CHECK_CACHE_DURATION;
+    updateCheckCache.set(cacheKey, { result, expires: Date.now() + cacheDuration });
+    return result;
+  },
+
+  async fetchGameUpdate(gameID, localVersion) {
     console.log("[GameService] checkGameUpdate called with:", { gameID, localVersion });
     try {
-      if (!gameID) {
-        console.warn("[GameService] No gameID provided for update check");
-        return null;
-      }
-
       const encodedVersion = encodeURIComponent(localVersion || "");
       const url = `${API_URL}/v3/game/checkupdate/${gameID}?local_version=${encodedVersion}`;
       console.log("[GameService] Fetching update from:", url);
@@ -966,7 +992,7 @@ const gameService = {
       return result;
     } catch (error) {
       console.error("[GameService] Error checking game update:", error);
-      return null;
+      return UPDATE_CHECK_FAILED;
     }
   },
 };
