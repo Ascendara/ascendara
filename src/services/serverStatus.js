@@ -90,44 +90,8 @@ const checkEndpoint = async url => {
     return {
       ok: false,
       error: "Service Unreachable",
+      unreachable: true,
     };
-  }
-};
-
-const checkInternetConnectivity = async () => {
-  try {
-    const response = await requestServiceStatus("https://monitor.ascendara.app/", {
-      method: "HEAD",
-      timeout: 5000,
-    });
-
-    // Treat error code 1033 as offline
-    if (
-      response.status === 1033 ||
-      response.statusCode === 1033 ||
-      String(response.status) === "1033" ||
-      String(response.statusCode) === "1033"
-    ) {
-      return false;
-    }
-
-    // 302 redirect means online (server is responding and redirecting to home page)
-    // Any 2xx or 3xx status code means the server is reachable
-    const isOnline = response.ok || (response.status >= 200 && response.status < 400);
-    return isOnline;
-  } catch (error) {
-    // Check if error contains status code 1033
-    if (
-      error.status === 1033 ||
-      error.code === 1033 ||
-      error.statusCode === 1033 ||
-      String(error.status) === "1033" ||
-      String(error.code) === "1033" ||
-      String(error.statusCode) === "1033"
-    ) {
-      return false;
-    }
-    return false;
   }
 };
 
@@ -146,6 +110,7 @@ let checkInterval = null;
 let subscribers = new Set();
 
 const CACHE_DURATION = 10000; // 10 seconds
+const STATUS_CHECK_INTERVAL = 3 * 60 * 1000; // 3 minutes
 
 // storage (cdn) and r2 are public buckets, so every status ping is a billed
 // read. Check them rarely and reuse the last result in between.
@@ -167,8 +132,14 @@ export const checkServerStatus = async (force = false) => {
   }
 
   try {
-    // First check internet connectivity
-    const isOnline = await checkInternetConnectivity();
+    // These checks double as the connectivity probe, so there is no separate
+    // ping: if none of them got any response at all, we have no internet.
+    const [monitor, api, lfs] = await Promise.all([
+      checkEndpoint(ENDPOINTS.monitor),
+      checkEndpoint(ENDPOINTS.api),
+      checkEndpoint(ENDPOINTS.lfs),
+    ]);
+    const isOnline = ![monitor, api, lfs].every(r => r.unreachable);
 
     // If no internet, update and return that status
     if (!isOnline) {
@@ -187,13 +158,8 @@ export const checkServerStatus = async (force = false) => {
       return currentStatus;
     }
 
-    // We have internet, check all services
-    const [monitor, api, lfs, [storage, r2]] = await Promise.all([
-      checkEndpoint(ENDPOINTS.monitor),
-      checkEndpoint(ENDPOINTS.api),
-      checkEndpoint(ENDPOINTS.lfs),
-      checkBuckets(),
-    ]);
+    // We have internet, so the bucket checks are worth spending
+    const [storage, r2] = await checkBuckets();
     const results = [monitor, api, storage, lfs, r2];
 
     currentStatus = {
@@ -229,7 +195,7 @@ export const subscribeToStatus = callback => {
 };
 
 // Start the status check interval
-export const startStatusCheck = (interval = 30000) => {
+export const startStatusCheck = (interval = STATUS_CHECK_INTERVAL) => {
   if (checkInterval) {
     clearInterval(checkInterval);
   }
@@ -237,11 +203,29 @@ export const startStatusCheck = (interval = 30000) => {
   // Do an immediate check
   checkServerStatus(true).catch(console.error);
 
+  // Every running launcher pings on this timer, so skip it while the window
+  // is hidden and catch up when it comes back.
   checkInterval = setInterval(() => {
+    if (document.hidden) return;
     checkServerStatus(true).catch(console.error);
   }, interval);
 
+  const handleVisibilityChange = () => {
+    if (!document.hidden && (!lastCheck || Date.now() - lastCheck >= interval)) {
+      checkServerStatus(true).catch(console.error);
+    }
+  };
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  // Don't wait out the interval to notice the connection coming back
+  const handleOnline = () => {
+    if (!document.hidden) checkServerStatus(true).catch(console.error);
+  };
+  window.addEventListener("online", handleOnline);
+
   return () => {
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.removeEventListener("online", handleOnline);
     if (checkInterval) {
       clearInterval(checkInterval);
       checkInterval = null;
