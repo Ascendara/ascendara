@@ -295,7 +295,7 @@ The Ascendara project is organized into the following main directories:
 - **AscendaraCrashReporter/** - Automated crash reporting and diagnostics
 - **AscendaraDownloader/** - Multi-threaded game download manager supporting various file hosts
 - **AscendaraGameHandler/** - Game execution, process management, and runtime monitoring
-- **AscendaraLocalRefresh/** - Local game index refresh and update tool
+- **AscendaraLocalRefresh/** - Game index scraper. No longer shipped with the app; the API runs it on a schedule
 - **AscendaraNotificationHelper/** - System notification helper for download events
 
   > ℹ️ **INFO:** The tools below are additional tools that do not come with the official build of Ascendara. Instead, they utilize Ascendara's tool installation feature to install these supplementary tools as needed.

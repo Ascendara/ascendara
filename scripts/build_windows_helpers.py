@@ -27,7 +27,7 @@ def main():
         if not (seven / name).is_file():
             raise RuntimeError(f'Install 7-Zip x64: missing {seven / name}')
     names = ('AscendaraDownloader', 'AscendaraGameHandler', 'AscendaraNotificationHelper',
-             'AscendaraLocalRefresh', 'AscendaraTorrentHandler')
+             'AscendaraTorrentHandler')
     venv = ROOT / '.build_venv' / 'Scripts/python.exe'
     run([sys.executable, '-m', 'venv', venv.parent.parent])
     run([venv, '-m', 'pip', 'install', 'pyinstaller==6.16.0'])

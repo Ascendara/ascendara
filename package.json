@@ -178,10 +178,6 @@
           "to": "."
         },
         {
-          "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh.exe",
-          "to": "."
-        },
-        {
           "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe",
           "to": "."
         }
@@ -218,10 +214,6 @@
         },
         {
           "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh",
           "to": "."
         },
         {
@@ -303,10 +295,6 @@
         },
         {
           "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraLocalRefresh/dist/AscendaraLocalRefresh",
           "to": "."
         },
         {

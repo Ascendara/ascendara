@@ -14,7 +14,7 @@ from setup_macos_tools import TOOL_DIR, validate_tool
 ROOT = Path(__file__).resolve().parents[1]
 HELPERS = (
     'AscendaraDownloader', 'AscendaraGameHandler', 'AscendaraLanguageTranslation',
-    'AscendaraLocalRefresh', 'AscendaraTorrentHandler', 'AscendaraNotificationHelper',
+    'AscendaraTorrentHandler', 'AscendaraNotificationHelper',
 )
 
 

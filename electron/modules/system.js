@@ -836,7 +836,6 @@ function registerSystemHandlers() {
         ["AscendaraDownloader", "src/AscendaraDownloader.py"],
         ["AscendaraGameHandler", "src/AscendaraGameHandler.py"],
         ["AscendaraLanguageTranslation", "src/AscendaraLanguageTranslation.py"],
-        ["AscendaraLocalRefresh", "src/AscendaraLocalRefresh.py"],
         ["AscendaraTorrentHandler", "src/AscendaraTorrentHandler.py"],
         ["AscendaraAchievementWatcher", "dist/AscendaraAchievementWatcher"],
       ];
