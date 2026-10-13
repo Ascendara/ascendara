@@ -1,3 +1,5 @@
+import { openAscendCheckout } from "@/services/ascendCheckoutService";
+import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +26,7 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
   const [discountInfo, setDiscountInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const hasCheckedRef = useRef(false);
+  const checkoutOpeningRef = useRef(false);
 
   useEffect(() => {
     if (!user?.uid || hasCheckedRef.current || !launchCount) return;
@@ -85,6 +88,8 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
   }, [user?.uid, userData, launchCount]);
 
   const handleUpgrade = async (isLifetime = true) => {
+    if (checkoutOpeningRef.current) return;
+    checkoutOpeningRef.current = true;
     try {
       setShowDialog(false);
       setShowRedirectDialog(true);
@@ -101,34 +106,13 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
         }
       }
 
-      // Create checkout session
-      const response = await userAuthenticatedFetch(
-        user,
-        "https://api.ascendara.app/stripe/create-checkout-session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: user.uid,
-            priceId: priceId,
-            successUrl: "https://ascendara.app/thank-you?subscription=success",
-            cancelUrl: "ascendara://checkout-canceled",
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const { url } = await response.json();
-        window.electron?.openURL?.(url);
-      } else {
-        console.error("Failed to create checkout session:", response.status);
-        setShowRedirectDialog(false);
-      }
+      await openAscendCheckout(user, priceId);
     } catch (error) {
       console.error("Error creating checkout session:", error);
+      toast.error(error.message || "Unable to open checkout. Please try again.");
       setShowRedirectDialog(false);
+    } finally {
+      checkoutOpeningRef.current = false;
     }
   };
 

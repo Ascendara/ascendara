@@ -1,3 +1,4 @@
+import { openAscendCheckout } from "@/services/ascendCheckoutService";
 import React, { useState, useEffect, useRef } from "react";
 import { applyAscendEntitlements } from "@/utils/ascendAccess";
 import { useTranslation } from "react-i18next";
@@ -2131,35 +2132,10 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     try {
       setShowPlanDialog(false);
 
-      // The API calculates any eligible lifetime discount during checkout.
-
-      const response = await userAuthenticatedFetch(
-        user,
-        "https://api.ascendara.app/stripe/create-checkout-session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: user.uid,
-            priceId: priceId,
-            successUrl: "https://ascendara.app/thank-you?subscription=success",
-            cancelUrl: "ascendara://checkout-canceled",
-          }),
-        }
-      );
-
-      const result = await response.json();
-      if (!response.ok || !result.url) {
-        toast.error(result.error || t("ascend.settings.checkoutError"));
-        return false;
-      }
-      window.electron?.openURL?.(result.url);
-      return true;
+      return await openAscendCheckout(user, priceId);
     } catch (error) {
       console.error("Error creating checkout session:", error);
-      toast.error(t("ascend.settings.checkoutError"));
+      toast.error(error.message || t("ascend.settings.checkoutError"));
       return false;
     }
   };
