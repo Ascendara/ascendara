@@ -33,6 +33,38 @@ const REPORT_REASONS = [
   ["image-bad", "imageBad"],
 ];
 
+// A game can be reported once a day from this install
+const REPORTED_GAMES_KEY = "ascendara_reported_games";
+const REPORT_REPEAT_MS = 24 * 60 * 60 * 1000;
+
+const reportKey = gameData => String(gameData?.gameID || gameData?.game || "");
+
+const loadReportedGames = () => {
+  try {
+    const reported = JSON.parse(localStorage.getItem(REPORTED_GAMES_KEY)) || {};
+    const cutoff = Date.now() - REPORT_REPEAT_MS;
+    return Object.fromEntries(
+      Object.entries(reported).filter(([, time]) => time > cutoff)
+    );
+  } catch (e) {
+    return {};
+  }
+};
+
+export const hasReportedGame = gameData => {
+  const key = reportKey(gameData);
+  return !!key && key in loadReportedGames();
+};
+
+const rememberReportedGame = gameData => {
+  const key = reportKey(gameData);
+  if (!key) return;
+  localStorage.setItem(
+    REPORTED_GAMES_KEY,
+    JSON.stringify({ ...loadReportedGames(), [key]: Date.now() })
+  );
+};
+
 const fetchAuthToken = async () => {
   const authHeaders = await window.electron.getAuthHeaders();
   const response = await fetch("https://api.ascendara.app/auth/token", {
@@ -58,8 +90,14 @@ export default function ReportGameDialog({ open, onOpenChange, gameData, useV2 }
   };
 
   const handleSubmitReport = async () => {
+    if (isReporting) return;
     if (!reportReason || !reportDetails.trim()) {
       toast.error(t("download.reportError"));
+      return;
+    }
+    if (hasReportedGame(gameData)) {
+      toast.info(t("download.toast.alreadyReported"));
+      onOpenChange(false);
       return;
     }
 
@@ -92,12 +130,19 @@ export default function ReportGameDialog({ open, onOpenChange, gameData, useV2 }
       if (reportResponse.status === 401) {
         reportResponse = await submit();
       }
+      if (reportResponse.status === 429) {
+        toast.error(t("download.toast.reportRateLimited"));
+        onOpenChange(false);
+        return;
+      }
       if (!reportResponse.ok) {
         throw new Error("Failed to submit report");
       }
 
+      rememberReportedGame(gameData);
       toast.success(t("download.toast.reportSubmitted"));
       resetForm();
+      onOpenChange(false);
     } catch (error) {
       console.error("Error submitting report:", error);
       toast.error(t("download.toast.reportFailed"));

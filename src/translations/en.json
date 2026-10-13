@@ -1472,6 +1472,7 @@
       "notAGame": "This isn't a game",
       "placeholder": "Select a reason"
     },
+    "reported": "Reported",
     "required": "Required",
     "reviewCount": "Number of Reviews",
     "reviewSnippets": "Review Snippets",
@@ -1542,6 +1543,7 @@
       "versionChangedDesc": "Switched to version {version} from {date}"
     },
     "toast": {
+      "alreadyReported": "You've already reported this game. Thanks, we'll take a look.",
       "conflictResolveFailed": "Failed to resolve folder conflict",
       "deletedExisting": "Existing folder deleted",
       "downloadFailed": "Failed to start download",
@@ -1562,6 +1564,7 @@
       "renameFailed": "Failed to rename existing folder",
       "renamedExisting": "Existing folder renamed",
       "reportFailed": "Failed to submit report",
+      "reportRateLimited": "You've sent too many reports. Please try again later.",
       "reportSubmitted": "Report submitted successfully",
       "torboxOffline": "This provider is offline on Torbox at the moment. Try another provider.",
       "torboxProcessingError": "Error processing Torbox link",
