@@ -1,0 +1,89 @@
+name: Submit WinGet package
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published stable release tag, e.g. 11.3.3"
+        required: true
+        type: string
+      submit:
+        description: "Open a pull request in microsoft/winget-pkgs"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      submit:
+        type: boolean
+        default: true
+    secrets:
+      WINGET_TOKEN:
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: winget-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+jobs:
+  submit:
+    if: github.repository == 'Ascendara/ascendara' && (github.event_name != 'release' || !github.event.release.prerelease)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+      - name: Test manifest generation guards
+        run: python -m unittest discover -s tests -p test_winget_release.py
+      - name: Generate manifests and verify public installer
+        id: manifest
+        run: python scripts/winget_release.py --tag "$env:RELEASE_TAG" --check-existing
+      - name: Set up WinGet
+        run: |
+          Install-Module -Name Microsoft.WinGet.Client -Force -Repository PSGallery
+          Repair-WinGetPackageManager -AllUsers
+      - name: Validate manifests
+        env:
+          MANIFEST_PATH: ${{ steps.manifest.outputs.manifest_path }}
+        run: |
+          winget validate --manifest "$env:MANIFEST_PATH" --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet manifest validation failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: winget-${{ env.RELEASE_TAG }}
+          path: ${{ steps.manifest.outputs.manifest_path }}
+          if-no-files-found: error
+      - name: Submit to microsoft/winget-pkgs
+        if: steps.manifest.outputs.existing == '' && (github.event_name == 'release' || inputs.submit)
+        env:
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          MANIFEST_PATH: ${{ steps.manifest.outputs.manifest_path }}
+        run: |
+          if (!$env:WINGET_CREATE_GITHUB_TOKEN) {
+            throw 'Add the WINGET_TOKEN repository secret (classic PAT with public_repo scope), then rerun this workflow. Validated manifests are available in the artifact.'
+          }
+          winget install --id Microsoft.WingetCreate --exact --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install WinGetCreate' }
+          wingetcreate submit --no-open --prtitle "New version: tagoWorks.Ascendara version $env:RELEASE_TAG" "$env:MANIFEST_PATH"
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet submission failed' }
+      - name: Record result
+        env:
+          EXISTING: ${{ steps.manifest.outputs.existing }}
+        run: |
+          if ($env:EXISTING) {
+            "Already submitted: $env:EXISTING" >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            "Validated tagoWorks.Ascendara $env:RELEASE_TAG. See the submission step for the PR URL, or download the manifest artifact for a prepare-only run." >> $env:GITHUB_STEP_SUMMARY
+          }

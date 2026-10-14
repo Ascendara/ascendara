@@ -258,3 +258,14 @@ jobs:
           # A pushed tag stops at a registered draft; only the manual toggle publishes
           PUBLISH_RELEASE: ${{ inputs.publish == true }}
         run: python scripts/ci_release.py
+  winget:
+    needs: release
+    # Publishing with GITHUB_TOKEN does not emit another workflow run, so call
+    # this directly. winget.yml also handles drafts published manually later.
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    uses: ./.github/workflows/winget.yml
+    with:
+      tag: ${{ github.ref_name }}
+      submit: true
+    secrets:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
