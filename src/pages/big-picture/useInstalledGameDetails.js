@@ -81,6 +81,8 @@ function useInstalledGameDetails({
   const [showVrWarning, setShowVrWarning] = useState(false);
   const [showOnlineFixWarning, setShowOnlineFixWarning] = useState(false);
   const [showSteamNotRunningWarning, setShowSteamNotRunningWarning] = useState(false);
+  const [isStartingSteam, setIsStartingSteam] = useState(false);
+  const steamStartCancelled = useRef(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
   const [backupDialogOpen, setBackupDialogOpen] = useState(false);
@@ -348,6 +350,7 @@ function useInstalledGameDetails({
         const hideSteamWarning = localStorage.getItem("hideSteamWarning");
         if (!hideSteamWarning) {
           if (!(await window.electron.isSteamRunning())) {
+            setDialogButtonIndex(0);
             setShowSteamNotRunningWarning(true);
             setIsLaunching(false);
             return;
@@ -432,6 +435,51 @@ function useInstalledGameDetails({
       setTimeout(() => toast.error(t("library.launchFailed")), 0);
       setIsLaunching(false);
     }
+  };
+
+  // Always launch through the latest render's handler once Steam is up
+  const playGameRef = useRef(handlePlayGame);
+  playGameRef.current = handlePlayGame;
+
+  // Start Steam, wait for it to come up, then continue the launch
+  const handleStartSteamAndPlay = async () => {
+    if (isStartingSteam) return;
+    steamStartCancelled.current = false;
+    setIsStartingSteam(true);
+
+    const started = await window.electron.startSteam();
+    let running = false;
+    if (started) {
+      for (let i = 0; i < 30 && !steamStartCancelled.current; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (await window.electron.isSteamRunning()) {
+          running = true;
+          break;
+        }
+      }
+      // Give the Steam client a moment to finish signing in before the game hooks it
+      if (running && !steamStartCancelled.current) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+
+    setIsStartingSteam(false);
+    if (steamStartCancelled.current) return;
+    setShowSteamNotRunningWarning(false);
+    setDialogButtonIndex(0);
+
+    if (running) {
+      playGameRef.current();
+    } else {
+      toast.error(t("library.steamNotRunning"));
+    }
+  };
+
+  const closeSteamNotRunningWarning = () => {
+    steamStartCancelled.current = true;
+    setIsStartingSteam(false);
+    setShowSteamNotRunningWarning(false);
+    setDialogButtonIndex(0);
   };
 
   // Handle executable selection
@@ -725,7 +773,7 @@ function useInstalledGameDetails({
             : showOnlineFixWarning
               ? 0
               : showSteamNotRunningWarning
-                ? 0
+                ? 1
                 : isDeleteDialogOpen
                   ? 1
                   : showBrowseExeWarning
@@ -757,7 +805,11 @@ function useInstalledGameDetails({
             setShowOnlineFixWarning(false);
             handlePlayGame(true);
           } else if (showSteamNotRunningWarning) {
-            setShowSteamNotRunningWarning(false);
+            if (dialogButtonIndex === 0) {
+              handleStartSteamAndPlay();
+            } else {
+              closeSteamNotRunningWarning();
+            }
           } else if (isDeleteDialogOpen) {
             if (dialogButtonIndex === 0) {
               setIsDeleteDialogOpen(false);
@@ -795,7 +847,7 @@ function useInstalledGameDetails({
         } else if (action === "BACK") {
           if (showVrWarning) setShowVrWarning(false);
           else if (showOnlineFixWarning) setShowOnlineFixWarning(false);
-          else if (showSteamNotRunningWarning) setShowSteamNotRunningWarning(false);
+          else if (showSteamNotRunningWarning) closeSteamNotRunningWarning();
           else if (isDeleteDialogOpen) setIsDeleteDialogOpen(false);
           else if (showBrowseExeWarning) {
             setShowBrowseExeWarning(false);
@@ -1168,7 +1220,9 @@ function useInstalledGameDetails({
     showOnlineFixWarning,
     setShowOnlineFixWarning,
     showSteamNotRunningWarning,
-    setShowSteamNotRunningWarning,
+    isStartingSteam,
+    handleStartSteamAndPlay,
+    closeSteamNotRunningWarning,
     showBrowseExeWarning,
     setExecutableExists,
     isDeleteDialogOpen,

@@ -126,7 +126,9 @@ function InstalledGameDetailsView({
     showOnlineFixWarning,
     setShowOnlineFixWarning,
     showSteamNotRunningWarning,
-    setShowSteamNotRunningWarning,
+    isStartingSteam,
+    handleStartSteamAndPlay,
+    closeSteamNotRunningWarning,
     showBrowseExeWarning,
     setExecutableExists,
     isDeleteDialogOpen,
@@ -148,7 +150,9 @@ function InstalledGameDetailsView({
   const menuRef = useRef(null);
   useEffect(() => {
     if (showManagementMenu) {
-      menuRef.current?.querySelector('[data-menu-selected="true"]')?.scrollIntoView({ block: "nearest" });
+      menuRef.current
+        ?.querySelector('[data-menu-selected="true"]')
+        ?.scrollIntoView({ block: "nearest" });
     }
   }, [showManagementMenu, selectedMenuItem]);
   return (
@@ -531,7 +535,10 @@ function InstalledGameDetailsView({
       {/* Management Menu Overlay */}
       {showManagementMenu && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div ref={menuRef} className="max-h-[85vh] w-[600px] overflow-y-auto rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl">
+          <div
+            ref={menuRef}
+            className="max-h-[85vh] w-[600px] overflow-y-auto rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl"
+          >
             <h2 className="mb-6 text-3xl font-bold text-primary">
               {t("bigPicture.gameManagement") || "Game Management"}
             </h2>
@@ -584,7 +591,9 @@ function InstalledGameDetailsView({
                 </span>
               </button>
               {folders.map((folder, index) => {
-                const contains = folder.items?.some(item => (item.game || item.name) === gameName);
+                const contains = folder.items?.some(
+                  item => (item.game || item.name) === gameName
+                );
                 return (
                   <button
                     key={folder.game}
@@ -1011,21 +1020,53 @@ function InstalledGameDetailsView({
       {/* Steam Not Running Dialog */}
       <AlertDialog
         open={showSteamNotRunningWarning}
-        onOpenChange={setShowSteamNotRunningWarning}
+        onOpenChange={open => {
+          if (!open) closeSteamNotRunningWarning();
+        }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("library.steamNotRunning")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("library.steamNotRunningDescription") ||
-                "Steam needs to be running to play online-fix games. Please start Steam and try again."}
+            <AlertDialogTitle className="text-2xl">
+              {t("library.steamNotRunning")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              {t("library.steamNotRunningMessage")}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button onClick={() => setShowSteamNotRunningWarning(false)}>
-              {t("common.ok")}
-            </Button>
-          </AlertDialogFooter>
+          <div className="flex gap-4 py-4">
+            <button
+              onClick={handleStartSteamAndPlay}
+              disabled={isStartingSteam}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 0
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              } ${isStartingSteam ? "cursor-not-allowed opacity-80" : ""}`}
+            >
+              {isStartingSteam ? (
+                <>
+                  <Loader className="h-6 w-6 animate-spin" />
+                  <span>{t("gameScreen.startingSteam")}</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-6 w-6" />
+                  <span>{t("gameScreen.startSteam")}</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={closeSteamNotRunningWarning}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 1
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <X className="h-6 w-6" />
+              <span>{t("common.cancel")}</span>
+            </button>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
 
