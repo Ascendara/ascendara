@@ -24,6 +24,13 @@ def api(path, method='GET', data=None):
         return json.load(response)
 
 
+def find_release(tag):
+    """The release for a version, draft or published.
+    A draft whose tag was deleted and pushed again is listed as "untagged-...", so match its name too."""
+    return next((item for item in api('/releases?per_page=100')
+                 if item['tag_name'] == tag or item['name'] == 'Ascendara ' + tag), None)
+
+
 def notes_for(tag, assets):
     """The release description: the changelog entry plus download links for the attached files."""
     try:
@@ -43,7 +50,7 @@ def main():
     directory = ROOT / 'release-artifacts'
     manifests = verify(directory)
     # Drafts are invisible to the by-tag lookup, so list releases to catch one left by an earlier run.
-    if any(item['tag_name'] == tag for item in api('/releases?per_page=100')):
+    if find_release(tag):
         raise RuntimeError('Release already exists. Refusing to overwrite assets or repeat registration.')
     release = api('/releases', 'POST', {'tag_name': tag, 'name': 'Ascendara ' + tag, 'draft': True,
         'target_commitish': os.environ['GITHUB_SHA'],
@@ -74,13 +81,14 @@ def main():
 def write_notes():
     """Fill in the description of the existing release for this version, leaving everything else alone."""
     tag = version()
-    release = next((item for item in api('/releases?per_page=100') if item['tag_name'] == tag), None)
+    release = find_release(tag)
     if not release:
         raise RuntimeError(f'No release found for {tag}')
     notes = notes_for(tag, api(f"/releases/{release['id']}/assets?per_page=100"))
     if not notes:
         raise RuntimeError(f'No changelog entry found for {tag}')
-    api(f"/releases/{release['id']}", 'PATCH', {'name': 'Ascendara ' + tag, 'body': notes})
+    # Setting the tag again reattaches a draft that lost it, so publishing uses the right one
+    api(f"/releases/{release['id']}", 'PATCH', {'tag_name': tag, 'name': 'Ascendara ' + tag, 'body': notes})
     print(f"Updated the description of release {release['id']}")
 
 
