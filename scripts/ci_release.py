@@ -24,6 +24,16 @@ def api(path, method='GET', data=None):
         return json.load(response)
 
 
+def notes_for(tag, assets):
+    """The release description: the changelog entry plus download links for the attached files."""
+    try:
+        previous_tag = api('/releases/latest')['tag_name']
+    except Exception:
+        previous_tag = None
+    return release_notes(tag, assets=assets, repo=os.environ['GITHUB_REPOSITORY'], tag=tag,
+                         previous_tag=previous_tag)
+
+
 def main():
     tag = version()
     if os.environ['GITHUB_REF'] != 'refs/tags/' + tag:
@@ -55,7 +65,7 @@ def main():
         register_build(manifest['signature'])
     # The description comes from the changelog entry for this version, when there is one
     api(f"/releases/{release['id']}", 'PATCH', {
-        'body': release_notes(tag) or
+        'body': notes_for(tag, assets) or
             'All four native builds, packaged signatures, artifact checksums, and backend registrations passed.',
         'draft': os.environ.get('PUBLISH_RELEASE') != 'true'})
     print('All release checks passed.')
@@ -67,7 +77,7 @@ def write_notes():
     release = next((item for item in api('/releases?per_page=100') if item['tag_name'] == tag), None)
     if not release:
         raise RuntimeError(f'No release found for {tag}')
-    notes = release_notes(tag)
+    notes = notes_for(tag, api(f"/releases/{release['id']}/assets?per_page=100"))
     if not notes:
         raise RuntimeError(f'No changelog entry found for {tag}')
     api(f"/releases/{release['id']}", 'PATCH', {'name': 'Ascendara ' + tag, 'body': notes})

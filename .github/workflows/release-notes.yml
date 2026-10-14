@@ -1,0 +1,21 @@
+name: Refresh release description
+# Rewrites the description of the release for the current version from the
+# changelog on the API. Use it after editing the changelog entry.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  notes:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - name: Write the description from the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci_release.py notes
