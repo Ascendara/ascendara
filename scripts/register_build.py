@@ -31,7 +31,9 @@ def register_build(data):
     if not key:
         raise RuntimeError('ADMIN_POST_KEY is required for registration')
     request = urllib.request.Request(API_URL, data=json.dumps(data).encode(), method='POST',
-        headers={'Authorization': key, 'Content-Type': 'application/json'})
+        # Cloudflare rejects urllib's default user agent (error 1010) before the API sees the request
+        headers={'Authorization': key, 'Content-Type': 'application/json',
+                 'User-Agent': 'Ascendara-Build/1.0'})
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             if response.status != 200:
