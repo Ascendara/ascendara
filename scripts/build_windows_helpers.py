@@ -40,8 +40,9 @@ def main():
                    '--distpath', folder / 'dist', '--workpath', folder / 'build',
                    '--specpath', folder / 'build',
                    '--add-data', f'{folder / "src/ascendara.ico"};.']
-        if name == 'AscendaraNotificationHelper':
-            command += ['--windowed']
+        # The app starts these in the background; as console programs Windows
+        # would open a terminal window for each one
+        command += ['--windowed']
         if name in ('AscendaraDownloader', 'AscendaraTorrentHandler'):
             for file in ('7z.exe', '7z.dll'):
                 command += ['--add-binary', f'{seven / file};.']
