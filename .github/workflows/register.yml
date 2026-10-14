@@ -8,7 +8,7 @@ on:
         description: 'ID of the release run whose builds should be registered (the number in its URL)'
         required: true
 permissions:
-  contents: read
+  contents: write
   actions: read
 jobs:
   register:
@@ -51,3 +51,7 @@ jobs:
               signature_file = manifest.with_name('signature.json')
               signature_file.write_text(json.dumps(signature))
               register_build(load_build_signature(signature_file))
+      - name: Fill in the release description from the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci_release.py notes
