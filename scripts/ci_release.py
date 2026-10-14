@@ -50,7 +50,9 @@ def main():
                 '--repo', os.environ['GITHUB_REPOSITORY']], check=True)
     # Verify the server has every uploaded asset before any backend side effect.
     assets = api(f"/releases/{release['id']}/assets?per_page=100")
-    expected = {item['name']: item['size'] for m in manifests for item in m['artifacts']}
+    # GitHub stores asset names with spaces replaced by dots
+    # ("Ascendara Setup 1.2.3.exe" becomes "Ascendara.Setup.1.2.3.exe").
+    expected = {item['name'].replace(' ', '.'): item['size'] for m in manifests for item in m['artifacts']}
     if {item['name']: item['size'] for item in assets} != expected:
         raise RuntimeError('Draft asset verification failed')
     for manifest in manifests:
