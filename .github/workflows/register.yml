@@ -1,12 +1,13 @@
 name: Register builds from a finished run
 # Recovery path: when a release run built and uploaded everything but stopped
-# before registering the builds, this registers them without rebuilding.
+# before registering the builds, this registers them without rebuilding and
+# fills in the release description from the changelog.
 on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'ID of the release run whose builds should be registered (the number in its URL)'
-        required: true
+        description: 'Release run to take the builds from. Leave empty to use the latest run for the current version.'
+        required: false
 permissions:
   contents: write
   actions: read
@@ -21,17 +22,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.10'
+      - name: Find the release run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          if [ -z "$RUN_ID" ]; then
+            VERSION=$(python -c "import json; print(json.load(open('package.json'))['version'])")
+            RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --branch "$VERSION" --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          test -n "$RUN_ID" || { echo 'No release run found for this version'; exit 1; }
+          echo "Using release run $RUN_ID"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           pattern: '*-x64'
           path: release-artifacts
-          run-id: ${{ inputs.run_id }}
+          run-id: ${{ steps.run.outputs.run_id }}
           github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         with:
           name: mac-arm64
           path: release-artifacts/mac-arm64
-          run-id: ${{ inputs.run_id }}
+          run-id: ${{ steps.run.outputs.run_id }}
           github-token: ${{ github.token }}
       - name: Register each build
         env:
