@@ -54,7 +54,10 @@ jobs:
         shell: python
         run: |
           import json
+          import sys
           from pathlib import Path
+          # An inline script runs from a temp file, so point Python at scripts/ (the working directory)
+          sys.path.insert(0, '.')
           from register_build import load_build_signature, register_build
 
           manifests = sorted(Path('../release-artifacts').glob('*/manifest.json'))
