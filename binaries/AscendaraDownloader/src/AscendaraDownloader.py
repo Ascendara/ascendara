@@ -36,7 +36,7 @@ from AscendaraExtraction import (
     verify_manifest, supervise_extraction, _wanted,
 )
 
-DOWNLOADER_VERSION = '4.0.0'
+DOWNLOADER_VERSION = '4.0.1'
 DOWNLOADER_VERSION_URL = 'https://api.ascendara.app/downloader-version'
 DOWNLOADER_DOWNLOAD_URL = 'https://cdn.ascendara.app/files/AscendaraDownloader.exe'
 
@@ -371,7 +371,14 @@ def flatten_payload(root, manifest, game):
         prefix = wrapper + '/'
         wrapped = {name: info for name, info in manifest.items() if name.startswith(prefix)}
         match = normalize(wrapper) == normalize(game)
-        if not match and not any(name.lower().endswith('.exe') for name in wrapped):
+        archive_wrapper = (
+            any(name.lower().endswith(('.zip', '.rar', '.7z')) for name in wrapped)
+            and all(name.lower().endswith(('.zip', '.rar', '.7z'))
+                    or re.search(r'\.[r-z]\d{2}$', name, re.I)
+                    or os.path.splitext(name)[1].lower() in sidecar_extensions
+                    for name in wrapped)
+        )
+        if not match and not archive_wrapper and not any(name.lower().endswith('.exe') for name in wrapped):
             break
         mapped = {name: manifest[name] for name in loose}
         for name, info in wrapped.items():
