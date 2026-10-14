@@ -1,7 +1,11 @@
 import { useLibraryConflicts } from "@/hooks/useLibraryConflicts";
 import { libraryInstallKey, reconcileFolderItems } from "@/lib/libraryConflicts";
 import LibraryConflictDialog from "@/components/LibraryConflictDialog";
-import { normalizeGameName, getGameDisplayName, getLibraryIdentityKey } from "@/lib/libraryGames";
+import {
+  normalizeGameName,
+  getGameDisplayName,
+  getLibraryIdentityKey,
+} from "@/lib/libraryGames";
 import { useLibraryBackupStore } from "@/services/libraryBackupStore";
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
@@ -130,7 +134,9 @@ let libraryGamesCache = null;
 
 // Keep deliberately retained installs independently reachable in React.
 const getLibraryCardKey = game =>
-  (game.isFolder ? getLibraryIdentityKey(game) : `${getLibraryIdentityKey(game)}:${libraryInstallKey(game)}`) ||
+  (game.isFolder
+    ? getLibraryIdentityKey(game)
+    : `${getLibraryIdentityKey(game)}:${libraryInstallKey(game)}`) ||
   `library-item:${game?.executable || game?.path || game?.installPath || "unknown"}`;
 
 const Library = () => {
@@ -148,7 +154,9 @@ const Library = () => {
     if (selectedGames.length === 0) return;
     try {
       for (const gameName of selectedGames) {
-        for (const entry of libraryRecords.filter(item => item.isCustom && item.game === gameName)) {
+        for (const entry of libraryRecords.filter(
+          item => item.isCustom && item.game === gameName
+        )) {
           await window.electron.removeCustomGame(gameName, entry);
         }
       }
@@ -169,10 +177,16 @@ const Library = () => {
       : []
   );
   const [libraryRecords, setLibraryRecords] = useState([]);
-  const library = useLibraryConflicts(libraryRecords, () => toast.error("Unable to save your library choice. Please try again."));
+  const library = useLibraryConflicts(libraryRecords, () =>
+    toast.error("Unable to save your library choice. Please try again.")
+  );
   useEffect(() => {
     if (!libraryRecords.length) return;
-    const currentFolders = loadFolders().map(folder => ({ ...folder, isFolder: true, items: reconcileFolderItems(folder.items || [], library.games) }));
+    const currentFolders = loadFolders().map(folder => ({
+      ...folder,
+      isFolder: true,
+      items: reconcileFolderItems(folder.items || [], library.games),
+    }));
     saveFolders(currentFolders);
     libraryGamesCache = [...currentFolders, ...filterGamesNotInFolders(library.games)];
     setGames(libraryGamesCache);
@@ -934,24 +948,7 @@ const Library = () => {
                   : await gameService.findGameByGameID(game.gameID);
                 const imageId = gameData?.imgID;
 
-                // 2. For local index, try to load from local file system using imgID
-                if (!imageLoaded && settings.usingLocalIndex && imageId) {
-                  try {
-                    const localImagePath = `${settings.localIndex}/imgs/${imageId}.jpg`;
-                    const imageData = await window.electron.readLocalFile(
-                      localImagePath,
-                      "base64"
-                    );
-                    if (imageData) {
-                      images[game.name] = `data:image/jpeg;base64,${imageData}`;
-                      imageLoaded = true;
-                    }
-                  } catch (localError) {
-                    console.warn("Could not load from local index:", localError);
-                  }
-                }
-
-                // 3. Ascendara API
+                // 2. The game index cover (cached on disk, downloaded on first use)
                 if (!imageLoaded && imageId) {
                   try {
                     const image = await imageCacheService.getImage(imageId);
@@ -1257,7 +1254,10 @@ const Library = () => {
 
       setLibraryRecords(allGames);
       if (!allGames.length) {
-        const currentFolders = loadFolders().map(folder => ({ ...folder, isFolder: true }));
+        const currentFolders = loadFolders().map(folder => ({
+          ...folder,
+          isFolder: true,
+        }));
         libraryGamesCache = currentFolders;
         setGames(currentFolders);
         setFolders(currentFolders);
@@ -2491,9 +2491,17 @@ const Library = () => {
 
           {/* ── Cloud sync reminder ── */}
           {activeTab === "all" && library.pendingCount > 0 && (
-            <Button variant="outline" size="sm" className="mb-6 gap-2" onClick={library.review}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mb-6 gap-2"
+              onClick={library.review}
+            >
               <EyeOff className="h-4 w-4" />
-              {t("library.duplicateInstalls.reviewPending", { count: library.pendingCount, defaultValue: "Review unresolved duplicates ({{count}})" })}
+              {t("library.duplicateInstalls.reviewPending", {
+                count: library.pendingCount,
+                defaultValue: "Review unresolved duplicates ({{count}})",
+              })}
             </Button>
           )}
           {activeTab === "all" && showCloudSyncReminder && (
@@ -3022,7 +3030,11 @@ const Library = () => {
         </div>
       </div>
 
-      <LibraryConflictDialog conflict={library.conflict} resolve={library.resolve} onLater={library.defer} />
+      <LibraryConflictDialog
+        conflict={library.conflict}
+        resolve={library.resolve}
+        onLater={library.defer}
+      />
       {/* Library Value Dialog */}
       <AlertDialog open={isLibraryValueOpen} onOpenChange={setIsLibraryValueOpen}>
         <AlertDialogContent className="flex max-h-[80vh] max-w-lg flex-col overflow-hidden">
@@ -3710,7 +3722,9 @@ const FavoritesGalleryCard = memo(
                           setContextMenuOpen(false);
                           try {
                             await window.electron.openGameDirectory(
-                              game.game || game.name, game.isCustom, game
+                              game.game || game.name,
+                              game.isCustom,
+                              game
                             );
                           } catch {}
                         }}
@@ -3975,7 +3989,10 @@ const FavoritesGalleryCard = memo(
               {gameName}
             </h3>
             {game._hasMultipleInstalls && (
-              <p className="w-full truncate text-xs text-muted-foreground" title={game.executable || game._sourceDir}>
+              <p
+                className="w-full truncate text-xs text-muted-foreground"
+                title={game.executable || game._sourceDir}
+              >
                 {game._sourceDir || game.executable}
               </p>
             )}
@@ -4332,7 +4349,11 @@ const InstalledGameCard = memo(
       setContextMenuOpen(false);
 
       try {
-        await window.electron.openGameDirectory(game.game || game.name, game.isCustom, game);
+        await window.electron.openGameDirectory(
+          game.game || game.name,
+          game.isCustom,
+          game
+        );
       } catch (error) {
         console.error("Failed to open directory:", error);
         toast.error(t("library.failedToOpenDirectory"));
@@ -4516,13 +4537,14 @@ const InstalledGameCard = memo(
                           reader.readAsDataURL(blob);
                         });
                       } else {
-                        // Try to load from local file
-                        const localImagePath = `${settings.localIndex}/imgs/${coverSearch.selectedCover.gameID}.jpg`;
-                        const imageData = await window.electron.readLocalFile(
-                          localImagePath,
-                          "base64"
-                        );
-                        dataUrl = `data:image/jpeg;base64,${imageData}`;
+                        // Not loaded yet, fetch it from where the search found it
+                        const response = await fetch(coverSearch.selectedCover.img);
+                        const blob = await response.blob();
+                        dataUrl = await new Promise(resolve => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolve(reader.result);
+                          reader.readAsDataURL(blob);
+                        });
                       }
                     } else {
                       // Fetch from Steam CDN URL directly
@@ -4971,7 +4993,10 @@ const InstalledGameCard = memo(
               {game.game}
             </h3>
             {game._hasMultipleInstalls && (
-              <p className="w-full truncate text-xs text-muted-foreground" title={game.executable || game._sourceDir}>
+              <p
+                className="w-full truncate text-xs text-muted-foreground"
+                title={game.executable || game._sourceDir}
+              >
                 {game._sourceDir || game.executable}
               </p>
             )}
@@ -5457,7 +5482,10 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
               {gameName}
             </h3>
             {game._hasMultipleInstalls && (
-              <p className="w-full truncate text-xs text-muted-foreground" title={game.executable || game._sourceDir}>
+              <p
+                className="w-full truncate text-xs text-muted-foreground"
+                title={game.executable || game._sourceDir}
+              >
                 {game._sourceDir || game.executable}
               </p>
             )}

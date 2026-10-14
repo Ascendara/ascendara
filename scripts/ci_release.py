@@ -8,8 +8,6 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import urllib.error
-import urllib.parse
 import urllib.request
 from ci_build import ROOT, verify, version
 from register_build import register_build
@@ -32,12 +30,8 @@ def main():
         raise RuntimeError('ADMIN_POST_KEY is required before creating a draft')
     directory = ROOT / 'release-artifacts'
     manifests = verify(directory)
-    try:
-        api('/releases/tags/' + urllib.parse.quote(tag))
-    except urllib.error.HTTPError as error:
-        if error.code != 404:
-            raise
-    else:
+    # Drafts are invisible to the by-tag lookup, so list releases to catch one left by an earlier run.
+    if any(item['tag_name'] == tag for item in api('/releases?per_page=100')):
         raise RuntimeError('Release already exists. Refusing to overwrite assets or repeat registration.')
     release = api('/releases', 'POST', {'tag_name': tag, 'name': tag, 'draft': True,
         'target_commitish': os.environ['GITHUB_SHA'],
@@ -50,7 +44,9 @@ def main():
                 '--repo', os.environ['GITHUB_REPOSITORY']], check=True)
     # Verify the server has every uploaded asset before any backend side effect.
     assets = api(f"/releases/{release['id']}/assets?per_page=100")
-    expected = {item['name']: item['size'] for m in manifests for item in m['artifacts']}
+    # GitHub stores asset names with spaces replaced by dots
+    # ("Ascendara Setup 1.2.3.exe" becomes "Ascendara.Setup.1.2.3.exe").
+    expected = {item['name'].replace(' ', '.'): item['size'] for m in manifests for item in m['artifacts']}
     if {item['name']: item['size'] for item in assets} != expected:
         raise RuntimeError('Draft asset verification failed')
     for manifest in manifests:
