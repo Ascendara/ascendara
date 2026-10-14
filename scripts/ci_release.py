@@ -8,9 +8,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import urllib.request
 from ci_build import ROOT, verify, version
 from register_build import register_build
+from release_notes import release_notes
 
 
 def api(path, method='GET', data=None):
@@ -33,7 +35,7 @@ def main():
     # Drafts are invisible to the by-tag lookup, so list releases to catch one left by an earlier run.
     if any(item['tag_name'] == tag for item in api('/releases?per_page=100')):
         raise RuntimeError('Release already exists. Refusing to overwrite assets or repeat registration.')
-    release = api('/releases', 'POST', {'tag_name': tag, 'name': tag, 'draft': True,
+    release = api('/releases', 'POST', {'tag_name': tag, 'name': 'Ascendara ' + tag, 'draft': True,
         'target_commitish': os.environ['GITHUB_SHA'],
         'body': 'Build artifacts uploaded; backend registration checks are pending.'})
     print(f"Created draft release {release['id']}", flush=True)
@@ -51,11 +53,26 @@ def main():
         raise RuntimeError('Draft asset verification failed')
     for manifest in manifests:
         register_build(manifest['signature'])
+    # The description comes from the changelog entry for this version, when there is one
     api(f"/releases/{release['id']}", 'PATCH', {
-        'body': 'All four native builds, packaged signatures, artifact checksums, and backend registrations passed.',
+        'body': release_notes(tag) or
+            'All four native builds, packaged signatures, artifact checksums, and backend registrations passed.',
         'draft': os.environ.get('PUBLISH_RELEASE') != 'true'})
     print('All release checks passed.')
 
 
+def write_notes():
+    """Fill in the description of the existing release for this version, leaving everything else alone."""
+    tag = version()
+    release = next((item for item in api('/releases?per_page=100') if item['tag_name'] == tag), None)
+    if not release:
+        raise RuntimeError(f'No release found for {tag}')
+    notes = release_notes(tag)
+    if not notes:
+        raise RuntimeError(f'No changelog entry found for {tag}')
+    api(f"/releases/{release['id']}", 'PATCH', {'name': 'Ascendara ' + tag, 'body': notes})
+    print(f"Updated the description of release {release['id']}")
+
+
 if __name__ == '__main__':
-    main()
+    write_notes() if sys.argv[1:] == ['notes'] else main()
