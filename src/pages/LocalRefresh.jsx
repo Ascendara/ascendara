@@ -75,6 +75,8 @@ import { cn } from "@/lib/utils";
 // long enough to be seen and then confirm the result on the button itself.
 const MIN_REFRESH_BUSY_MS = 700;
 const REFRESH_DONE_MS = 2500;
+// How old the shared index must be before users are asked to help refresh it
+const RELAY_STALE_AFTER_MS = 12 * 60 * 60 * 1000;
 
 const AnimatedNumber = ({ value }) => {
   const reduceMotion = useReducedMotion();
@@ -1414,6 +1416,13 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
   };
 
   // Derived view state
+  // Only ask for help when the server is blocked AND the shared index has gone
+  // stale; anyone else helping, or an older app sharing its index, keeps it fresh.
+  const needsRelay =
+    !!indexStatus?.blocked &&
+    (relayState !== "idle" ||
+      !indexInfo?.date ||
+      Date.now() - new Date(indexInfo.date).getTime() > RELAY_STALE_AFTER_MS);
   const isIndexReady = hasIndexBefore;
   const modeLocked = !!downloadingIndex || isSyncingCustomSource;
   const heroGameCount = customSourcesMode
@@ -1593,7 +1602,7 @@ const LocalRefresh = ({ embedded = false, onBack, renderManager }) => {
 
             <div className="space-y-6">
               {/* The API is blocked from refreshing the index and needs a hand */}
-              {!customSourcesMode && indexStatus?.blocked && (
+              {!customSourcesMode && needsRelay && (
                 <div
                   className={cn(
                     "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-5 py-4",
