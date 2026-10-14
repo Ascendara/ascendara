@@ -11,7 +11,12 @@ const COVERS_URL = "https://r2.ascendara.app/covers";
 const GAMES_FILE = "ascendara_games.json";
 const SYNC_STATE_FILE = "sync.json";
 const IMG_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-const MAX_COVER_DOWNLOADS = 8;
+const MAX_COVER_DOWNLOADS = 12;
+// Covers fetched ahead of time after a sync, so the pages people open first
+// aren't blank: the most popular games plus the most recently updated ones.
+const PREFETCH_POPULAR = 300;
+const PREFETCH_RECENT = 100;
+const PREFETCH_CONCURRENCY = 5;
 
 let activeSync = null;
 const pendingCovers = new Map(); // imgID -> Promise<boolean>
@@ -20,6 +25,7 @@ const pendingCovers = new Map(); // imgID -> Promise<boolean>
 const missingCovers = new Set();
 let activeCoverDownloads = 0;
 const coverQueue = [];
+let activePrefetch = null;
 
 async function readSyncState(indexPath) {
   try {
@@ -152,7 +158,8 @@ function acquireCoverSlot() {
 }
 
 function releaseCoverSlot() {
-  const next = coverQueue.shift();
+  // Newest request first: it's the one most likely still on screen
+  const next = coverQueue.pop();
   if (next) {
     next();
   } else {
@@ -160,8 +167,9 @@ function releaseCoverSlot() {
   }
 }
 
-async function downloadCover(imgID, coverPath) {
-  await acquireCoverSlot();
+async function downloadCover(imgID, coverPath, { background = false } = {}) {
+  // Background fetches have their own small pool and never hold up visible covers
+  if (!background) await acquireCoverSlot();
   try {
     const response = await fetch(`${COVERS_URL}/${imgID}.jpg`, {
       signal: AbortSignal.timeout(30000),
@@ -181,8 +189,55 @@ async function downloadCover(imgID, coverPath) {
     console.error(`Failed to download cover ${imgID}:`, e.message);
     return false;
   } finally {
-    releaseCoverSlot();
+    if (!background) releaseCoverSlot();
   }
+}
+
+async function runPrefetch(indexPath) {
+  const data = await fs.readJson(path.join(indexPath, GAMES_FILE));
+  const games = (data.games || []).filter(game => IMG_ID_PATTERN.test(game.imgID || ""));
+
+  const popular = [...games]
+    .sort((a, b) => (parseInt(b.weight, 10) || 0) - (parseInt(a.weight, 10) || 0))
+    .slice(0, PREFETCH_POPULAR);
+  const recent = [...games]
+    .sort((a, b) =>
+      String(b.latest_update || "").localeCompare(String(a.latest_update || ""))
+    )
+    .slice(0, PREFETCH_RECENT);
+  const queue = [...new Set([...popular, ...recent].map(game => game.imgID))];
+
+  const worker = async () => {
+    for (let imgID = queue.shift(); imgID; imgID = queue.shift()) {
+      const coverPath = path.join(indexPath, "imgs", `${imgID}.jpg`);
+      if (missingCovers.has(imgID) || (await fs.pathExists(coverPath))) continue;
+      if (!pendingCovers.has(imgID)) {
+        pendingCovers.set(
+          imgID,
+          downloadCover(imgID, coverPath, { background: true }).finally(() =>
+            pendingCovers.delete(imgID)
+          )
+        );
+      }
+      await pendingCovers.get(imgID);
+    }
+  };
+  await Promise.all(Array.from({ length: PREFETCH_CONCURRENCY }, worker));
+}
+
+/**
+ * Download the covers people are most likely to see first, in the background
+ * @param {string} indexPath - Path to the local index directory
+ */
+function prefetchCovers(indexPath) {
+  if (!activePrefetch) {
+    activePrefetch = runPrefetch(indexPath)
+      .catch(error => console.error("Cover prefetch failed:", error.message))
+      .finally(() => {
+        activePrefetch = null;
+      });
+  }
+  return activePrefetch;
 }
 
 /**
@@ -213,4 +268,5 @@ async function getIndexCover(indexPath, imgID) {
 module.exports = {
   syncCommunityIndex,
   getIndexCover,
+  prefetchCovers,
 };

@@ -7,7 +7,11 @@ const fs = require("fs-extra");
 const path = require("path");
 const { ipcMain, BrowserWindow, app } = require("electron");
 const { getSettingsManager } = require("./settings");
-const { syncCommunityIndex, getIndexCover } = require("./community-index");
+const {
+  syncCommunityIndex,
+  getIndexCover,
+  prefetchCovers,
+} = require("./community-index");
 const { getIndexStatus, runIndexRelay } = require("./index-relay");
 
 let publicIndexDownloading = false;
@@ -61,6 +65,7 @@ function registerLocalRefreshHandlers() {
           force: true,
           blacklist: settingsManager.getSettings().blacklistIDs,
         });
+        prefetchCovers(outputPath);
         console.log("Shared index set up successfully");
 
         publicIndexDownloading = false;
@@ -110,6 +115,8 @@ function registerLocalRefreshHandlers() {
 
     try {
       const result = await syncCommunityIndex(indexPath, { blacklist: blacklistIDs });
+      // Not awaited: covers fill in behind the scenes
+      prefetchCovers(indexPath);
       if (result.updated) {
         const mainWindow = BrowserWindow.getAllWindows()[0];
         if (mainWindow) {
