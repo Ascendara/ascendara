@@ -1,0 +1,53 @@
+name: Register builds from a finished run
+# Recovery path: when a release run built and uploaded everything but stopped
+# before registering the builds, this registers them without rebuilding.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'ID of the release run whose builds should be registered (the number in its URL)'
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  register:
+    runs-on: ubuntu-22.04
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-x64'
+          path: release-artifacts
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-arm64
+          path: release-artifacts/mac-arm64
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Register each build
+        env:
+          ADMIN_POST_KEY: ${{ secrets.ADMIN_POST_KEY }}
+        working-directory: scripts
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          from register_build import load_build_signature, register_build
+
+          manifests = sorted(Path('../release-artifacts').glob('*/manifest.json'))
+          if len(manifests) != 4:
+              raise SystemExit(f'Expected 4 build manifests, found {len(manifests)}')
+          for manifest in manifests:
+              signature = json.loads(manifest.read_text())['signature']
+              signature_file = manifest.with_name('signature.json')
+              signature_file.write_text(json.dumps(signature))
+              register_build(load_build_signature(signature_file))
