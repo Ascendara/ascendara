@@ -24,6 +24,7 @@ const {
 } = require("./utils");
 const { getSettingsManager } = require("./settings");
 const { prepareDownloaderRuntime } = require("./downloaderRuntime");
+const { startDownloadWatchdog } = require("./downloadLiveness");
 
 const steamgrid = require("./steamgrid");
 
@@ -1276,7 +1277,7 @@ function registerDownloadHandlers() {
   });
 
   const extractionStarts = new Set();
-  ipcMain.handle("retry-extract", async (_, game) => {
+  const retryExtraction = async game => {
     const running = downloadProcesses.get(game);
     if (
       extractionStarts.has(game) ||
@@ -1313,7 +1314,7 @@ function registerDownloadHandlers() {
       }
       // Publish a busy state before spawning so repeated clicks cannot start a
       // second extraction. Restore the prior state if the process cannot start.
-      const previous = info.downloadingData;
+      const { ownerPid, ...previous } = info.downloadingData;
       info.downloadingData = {
         ...previous,
         error: false,
@@ -1371,7 +1372,8 @@ function registerDownloadHandlers() {
     } finally {
       extractionStarts.delete(game);
     }
-  });
+  };
+  ipcMain.handle("retry-extract", (_, game) => retryExtraction(game));
 
   // Retry download handler
   ipcMain.handle("retry-download", async (_, link, game, online, dlc, version) => {
@@ -1419,7 +1421,7 @@ function registerDownloadHandlers() {
   });
 
   // Resume download handler
-  ipcMain.handle("resume-download", async (_, game) => {
+  const resumeDownload = async game => {
     try {
       console.log(`Resuming download for game: ${game}`);
       const sanitizedGame = sanitizeText(game);
@@ -1597,6 +1599,18 @@ function registerDownloadHandlers() {
       console.error("Error resuming download:", error);
       return { success: false, error: error.message };
     }
+  };
+  ipcMain.handle("resume-download", (_, game) => resumeDownload(game));
+
+  startDownloadWatchdog({
+    getDirectories: () => {
+      const settings = settingsManager.getSettings();
+      return [settings.downloadDirectory, ...(settings.additionalDirectories || [])].filter(
+        Boolean
+      );
+    },
+    retryExtraction,
+    resumeDownload,
   });
 
   // Download soundtrack

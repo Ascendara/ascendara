@@ -232,6 +232,9 @@ def safe_write_json(filepath, data, reset_stop=False):
         except (OSError, json.JSONDecodeError):
             pass
     check_stopped()
+    # Lets the app tell a live download from one whose process has exited.
+    if isinstance(data.get('downloadingData'), dict):
+        data['downloadingData']['ownerPid'] = os.getpid()
     temporary = None
     try:
         with NamedTemporaryFile('w', encoding='utf-8', delete=False,
@@ -1411,6 +1414,18 @@ class AscendaraDownloader:
         started = time.monotonic()
         manifest = {}
         processed = []
+        # A process killed mid-extraction leaves its stage behind. Reclaim that
+        # space, but keep any stage holding rollback backups of replaced files.
+        for name in os.listdir(self.download_dir):
+            old_stage = os.path.join(self.download_dir, name)
+            if not (name.startswith('.ascendara-stage-') and os.path.isdir(old_stage)):
+                continue
+            rollback = os.path.join(old_stage, 'rollback')
+            if os.path.isdir(rollback) and set(os.listdir(rollback)) - {'paths.json'}:
+                logging.warning('Keeping abandoned stage with rollback files: %s', old_stage)
+                continue
+            logging.info('Removing abandoned extraction stage %s', old_stage)
+            cleanup_temporary(old_stage, self.download_dir)
         # Same-volume staging makes installation a rename rather than a second copy.
         stage = tempfile.mkdtemp(prefix='.ascendara-stage-', dir=self.download_dir)
         self._preserve_stage = False
