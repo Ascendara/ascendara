@@ -68,6 +68,9 @@ import {
   CheckCircle2,
   PlayCircle,
   Bookmark,
+  LayoutGrid,
+  List as ListIcon,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -130,6 +133,7 @@ const Retro = React.lazy(() => import("./Retro"));
 
 // Module-level cache so images survive page switches without re-fetching via IPC
 const gameImageCache = new Map();
+const heroImageCache = new Map();
 let libraryGamesCache = null;
 
 // Keep deliberately retained installs independently reachable in React.
@@ -232,9 +236,16 @@ const Library = () => {
   const [folderPlacement, setFolderPlacement] = useState(
     () => localStorage.getItem("library-folderPlacement") || "first"
   );
+  const [viewMode, setViewMode] = useState(
+    () => localStorage.getItem("library-viewMode") || "grid"
+  );
   useEffect(() => {
     safeSetItem("library-folderPlacement", folderPlacement);
   }, [folderPlacement]);
+
+  useEffect(() => {
+    safeSetItem("library-viewMode", viewMode);
+  }, [viewMode]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [filters, setFilters] = useState({
     favorites: false,
@@ -2127,6 +2138,36 @@ const Library = () => {
           </div>
 
           <TooltipProvider>
+            {(activeTab === "all" ||
+              activeTab === "favorites" ||
+              activeTab === "hiddenFolders") && (
+              <div className="flex h-9 items-center rounded-lg border border-border/60 bg-card p-0.5">
+                {[
+                  { mode: "grid", icon: LayoutGrid, label: t("library.view.grid") },
+                  { mode: "list", icon: ListIcon, label: t("library.view.list") },
+                ].map(({ mode, icon: Icon, label }) => (
+                  <Tooltip key={mode}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={label}
+                        aria-pressed={viewMode === mode}
+                        onClick={() => setViewMode(mode)}
+                        className={cn(
+                          "flex h-full items-center justify-center rounded-md px-2.5 transition-all",
+                          viewMode === mode
+                            ? "bg-primary/10 text-primary shadow-sm"
+                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-secondary">{label}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            )}
             <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 {(() => {
@@ -2558,6 +2599,7 @@ const Library = () => {
                         name={game.game || game.name}
                         folder={game}
                         refreshKey={game.items ? game.items.length : 0}
+                        variant={viewMode}
                       />
                     </DroppableFolderCard>
                   ) : (
@@ -2575,6 +2617,7 @@ const Library = () => {
                         updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
                         onRemoved={handleGameRemoved}
                         onMoveToFolder={() => setGameToMove(game)}
+                        viewMode={viewMode}
                       />
                     </DraggableGameCard>
                   )}
@@ -2582,7 +2625,9 @@ const Library = () => {
               );
 
               const gridClass =
-                "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+                viewMode === "list"
+                  ? "flex flex-col gap-2"
+                  : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
               if (groupBy === "directory") {
                 // Build directory groups from all filtered games so each section is complete
@@ -4041,6 +4086,7 @@ const InstalledGameCard = memo(
     updateInfo,
     onRemoved,
     onMoveToFolder,
+    viewMode = "grid",
   }) => {
     const { t } = useLanguage();
     const { settings } = useSettings();
@@ -4054,6 +4100,9 @@ const InstalledGameCard = memo(
     const [contextMenuOpen, setContextMenuOpen] = useState(false);
     const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
     const [logoData, setLogoData] = useState(null);
+    const [heroData, setHeroData] = useState(
+      () => heroImageCache.get(game.game || game.name) ?? null
+    );
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
     const [isUninstalling, setIsUninstalling] = useState(false);
@@ -4241,6 +4290,36 @@ const InstalledGameCard = memo(
         unsubscribe();
       };
     }, [game.game, game.name]);
+
+    // Load the wide hero art used behind the logo in list view
+    useEffect(() => {
+      if (viewMode !== "list") return;
+      let isMounted = true;
+      const gameId = game.game || game.name;
+
+      const loadHero = async (force = false) => {
+        if (!force && heroImageCache.has(gameId)) return;
+        try {
+          const heroBase64 = await window.electron.getGameImage(gameId, "hero");
+          if (!isMounted) return;
+          const dataUrl = heroBase64 ? `data:image/jpeg;base64,${heroBase64}` : null;
+          heroImageCache.set(gameId, dataUrl);
+          setHeroData(dataUrl);
+        } catch {
+          /* falls back to the blurred cover */
+        }
+      };
+
+      loadHero();
+      const unsubscribe = window.electron.onGameAssetsUpdated(({ game: updatedGame }) => {
+        if (updatedGame === gameId) loadHero(true);
+      });
+
+      return () => {
+        isMounted = false;
+        unsubscribe();
+      };
+    }, [viewMode, game.game, game.name]);
 
     const handleContextMenu = e => {
       e.preventDefault();
@@ -4431,6 +4510,202 @@ const InstalledGameCard = memo(
         setCoverImageUrls({});
       }
     };
+
+    const handleCardClick = e => {
+      if (game._isDownloading || game._isQueued) return;
+      if (selectionMode && game.isCustom) {
+        e.stopPropagation();
+        onSelectCheckbox();
+      } else {
+        onPlay();
+      }
+    };
+
+    const contextMenuPortal =
+      contextMenuOpen &&
+      createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-start justify-start"
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenuOpen(false);
+          }}
+          onContextMenu={e => e.preventDefault()}
+        >
+          {/* Backdrop with blur */}
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+
+          {/* Context Menu */}
+          <div
+            className="absolute transition-all duration-200 animate-in fade-in zoom-in-95"
+            style={{
+              top: contextMenuPosition.y,
+              left: contextMenuPosition.x,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="max-h-[80vh] min-w-[260px] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
+              {/* Header with game logo */}
+              <div className="flex items-center justify-center border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent px-3 py-3">
+                {logoData ? (
+                  <img
+                    src={logoData}
+                    alt={game.game || game.name}
+                    className="h-8 max-w-[200px] object-contain"
+                  />
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">
+                    {game.game || game.name}
+                  </span>
+                )}
+              </div>
+
+              {/* Menu Items */}
+              <div className="max-h-[calc(80vh-60px)] overflow-y-auto p-1.5">
+                {game.executable ? (
+                  <button
+                    onClick={handlePlayFromContext}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20 transition-all group-hover:bg-primary">
+                      <Play className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground">
+                        {t("common.contextMenu.playGame")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("common.contextMenu.playGameDescription")}
+                      </div>
+                    </div>
+                  </button>
+                ) : null}
+                <button
+                  onClick={() => {
+                    setContextMenuOpen(false);
+                    onMoveToFolder();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                    <FolderPlus className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-foreground">
+                      {t("library.moveToFolder.title")}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("library.moveToFolder.menuDescription")}
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleOpenDirectory}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                    <FolderOpen className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-foreground">
+                      {t("common.contextMenu.openDirectory")}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("common.contextMenu.openDirectoryDescription")}
+                    </div>
+                  </div>
+                </button>
+
+                {game.isCustom ? (
+                  <button
+                    onClick={handleRemoveGame}
+                    className="hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
+                      <Trash2 className="h-4 w-4 text-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground">
+                        {t("common.contextMenu.removeGame")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("common.contextMenu.removeGameDescription")}
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleDeleteGame}
+                    className="hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
+                      <Trash2 className="h-4 w-4 text-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground">
+                        {t("common.contextMenu.deleteGame")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("common.contextMenu.deleteGameDescription")}
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Divider between game actions and default options */}
+                <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+                {/* Report Issue */}
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setIsReportOpen(true);
+                    setContextMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                    <TriangleAlert className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-foreground">
+                      {t("common.reportIssue")}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("common.contextMenu.reportIssueDescription")}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Give Feedback */}
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    window.electron.openURL("https://ascendara.app/feedback");
+                    setContextMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                    <MessageSquareText className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-foreground">
+                      {t("common.giveFeedback")}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("common.contextMenu.shareFeedbackDescription")}
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      );
 
     return (
       <>
@@ -4644,375 +4919,410 @@ const InstalledGameCard = memo(
           </AlertDialogContent>
         </AlertDialog>
 
-        <Card
-          className={cn(
-            "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-            !game._isDownloading &&
-              !game._isQueued &&
-              "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
-            (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
-            isSelected && "ring-2 ring-primary",
-            selectionMode && game.isCustom && "selectable-card",
-            !game._isDownloading && !game._isQueued && "cursor-pointer",
-            isRemoving &&
-              "pointer-events-none duration-300 animate-out fade-out zoom-out-95 slide-out-to-bottom-2"
-          )}
-          onClick={e => {
-            if (game._isDownloading || game._isQueued) return;
-            if (selectionMode && game.isCustom) {
-              e.stopPropagation();
-              onSelectCheckbox();
-            } else {
-              onPlay();
-            }
-          }}
-          onContextMenu={handleContextMenu}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-          {selectionMode && game.isCustom && (
-            <div className="absolute left-2 top-2 z-20 flex items-center justify-center rounded bg-white/80 p-0.5 shadow backdrop-blur-sm">
+        {viewMode === "list" ? (
+          <div
+            className={cn(
+              "group relative flex items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200",
+              !game._isDownloading &&
+                !game._isQueued &&
+                "cursor-pointer hover:border-primary/30 hover:bg-accent/30 hover:shadow-md",
+              (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
+              isSelected && "border-primary/50 ring-2 ring-primary",
+              isRemoving &&
+                "pointer-events-none duration-300 animate-out fade-out slide-out-to-left-2"
+            )}
+            onClick={handleCardClick}
+            onContextMenu={handleContextMenu}
+          >
+            {contextMenuPortal}
+
+            {selectionMode && game.isCustom && (
               <input
                 type="checkbox"
                 checked={isSelected}
                 tabIndex={-1}
                 readOnly
-                className="pointer-events-none h-5 w-5 rounded border-muted accent-primary focus:ring-primary"
+                className="pointer-events-none ml-1 h-4 w-4 shrink-0 rounded border-muted accent-primary"
               />
-            </div>
-          )}
-          {/* Context Menu Portal */}
-          {contextMenuOpen &&
-            createPortal(
-              <div
-                className="fixed inset-0 z-[9999] flex items-start justify-start"
-                onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setContextMenuOpen(false);
-                }}
-                onContextMenu={e => e.preventDefault()}
-              >
-                {/* Backdrop with blur */}
-                <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-
-                {/* Context Menu */}
-                <div
-                  className="absolute transition-all duration-200 animate-in fade-in zoom-in-95"
-                  style={{
-                    top: contextMenuPosition.y,
-                    left: contextMenuPosition.x,
-                  }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  <div className="max-h-[80vh] min-w-[260px] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
-                    {/* Header with game logo */}
-                    <div className="flex items-center justify-center border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent px-3 py-3">
-                      {logoData ? (
-                        <img
-                          src={logoData}
-                          alt={game.game || game.name}
-                          className="h-8 max-w-[200px] object-contain"
-                        />
-                      ) : (
-                        <span className="text-sm font-semibold text-foreground">
-                          {game.game || game.name}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Menu Items */}
-                    <div className="max-h-[calc(80vh-60px)] overflow-y-auto p-1.5">
-                      {game.executable ? (
-                        <button
-                          onClick={handlePlayFromContext}
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
-                        >
-                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20 transition-all group-hover:bg-primary">
-                            <Play className="h-4 w-4 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium text-foreground">
-                              {t("common.contextMenu.playGame")}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {t("common.contextMenu.playGameDescription")}
-                            </div>
-                          </div>
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={() => {
-                          setContextMenuOpen(false);
-                          onMoveToFolder();
-                        }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                          <FolderPlus className="h-4 w-4 text-foreground" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-foreground">
-                            {t("library.moveToFolder.title")}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {t("library.moveToFolder.menuDescription")}
-                          </div>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={handleOpenDirectory}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                          <FolderOpen className="h-4 w-4 text-foreground" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-foreground">
-                            {t("common.contextMenu.openDirectory")}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {t("common.contextMenu.openDirectoryDescription")}
-                          </div>
-                        </div>
-                      </button>
-
-                      {game.isCustom ? (
-                        <button
-                          onClick={handleRemoveGame}
-                          className="hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5"
-                        >
-                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
-                            <Trash2 className="h-4 w-4 text-foreground" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium text-foreground">
-                              {t("common.contextMenu.removeGame")}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {t("common.contextMenu.removeGameDescription")}
-                            </div>
-                          </div>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleDeleteGame}
-                          className="hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5"
-                        >
-                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/20">
-                            <Trash2 className="h-4 w-4 text-foreground" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium text-foreground">
-                              {t("common.contextMenu.deleteGame")}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {t("common.contextMenu.deleteGameDescription")}
-                            </div>
-                          </div>
-                        </button>
-                      )}
-
-                      {/* Divider between game actions and default options */}
-                      <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-
-                      {/* Report Issue */}
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          setIsReportOpen(true);
-                          setContextMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                          <TriangleAlert className="h-4 w-4 text-foreground" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-foreground">
-                            {t("common.reportIssue")}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {t("common.contextMenu.reportIssueDescription")}
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* Give Feedback */}
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          window.electron.openURL("https://ascendara.app/feedback");
-                          setContextMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                          <MessageSquareText className="h-4 w-4 text-foreground" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-foreground">
-                            {t("common.giveFeedback")}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {t("common.contextMenu.shareFeedbackDescription")}
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>,
-              document.body
             )}
 
-          <CardContent className="p-0">
-            <div className="relative aspect-[2/3] overflow-hidden">
-              {imageData ? (
+            {/* Banner: hero art behind a dark scrim so light logos stay legible in any theme */}
+            <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
+              {heroData || imageData ? (
                 <img
-                  src={imageData}
-                  alt={game.game}
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  src={heroData || imageData}
+                  alt=""
+                  aria-hidden
+                  className={cn(
+                    "absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105",
+                    !heroData && "scale-110 blur-md"
+                  )}
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-muted">
-                  <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/40 via-zinc-900 to-zinc-950" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/10" />
+
+              <div className="absolute inset-0 flex items-center px-4">
+                {logoData ? (
+                  <img
+                    src={logoData}
+                    alt={game.game || game.name}
+                    className="max-h-12 max-w-full object-contain object-left drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                  />
+                ) : (
+                  <span className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                    {game.game || game.name}
+                  </span>
+                )}
+              </div>
+
+              {isRunning && (
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-500 to-emerald-400" />
+              )}
+              {game._isDownloading && (
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-black/50">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{
+                      width: `${parseFloat(game.downloadingData?.progressCompleted || 0)}%`,
+                    }}
+                  />
                 </div>
               )}
-              {/* Queued overlay */}
-              {game._isQueued && (
-                <>
-                  <div className="absolute inset-0 bg-black/60" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
-                      <Loader className="h-3 w-3 animate-spin" />
-                      Queued
-                    </span>
-                  </div>
-                </>
-              )}
-              {/* Download progress fill overlay */}
-              {game._isDownloading &&
-                (() => {
-                  const pct = parseFloat(game.downloadingData?.progressCompleted || 0);
-                  const isExtracting = game.downloadingData?.extracting;
-                  const isStopped = game.downloadingData?.stopped;
-                  const label = isExtracting
-                    ? `Extracting…`
-                    : isStopped
-                      ? `Paused · ${pct.toFixed(0)}%`
-                      : `${pct.toFixed(0)}%`;
-                  return (
-                    <>
-                      {/* dark mask covering the unfilled portion from top */}
-                      <div
-                        className="absolute inset-x-0 top-0 bg-black/60 transition-all duration-500"
-                        style={{ height: `${100 - pct}%` }}
-                      />
-                      {/* colored fill from bottom */}
-                      <div
-                        className="absolute inset-x-0 bottom-0 bg-primary/30 transition-all duration-500"
-                        style={{ height: `${pct}%` }}
-                      />
-                      {/* progress bar line at fill boundary */}
-                      <div
-                        className="absolute inset-x-0 h-0.5 bg-primary transition-all duration-500"
-                        style={{ bottom: `${pct}%` }}
-                      />
-                      {/* label */}
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
-                          {label}
-                        </span>
-                      </div>
-                    </>
-                  );
-                })()}
-              {/* Running indicator */}
-              {isRunning && (
-                <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-green-500 to-emerald-400" />
-              )}
-              {/* Badges row */}
-              <div className="absolute left-2 top-2 z-20 flex flex-col gap-1">
+            </div>
+
+            {/* Title + tags */}
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold leading-tight text-foreground">
+                  {game.game || game.name}
+                </h3>
+                {game._hasMultipleInstalls && (
+                  <p
+                    className="mt-0.5 truncate text-xs text-muted-foreground"
+                    title={game.executable || game._sourceDir}
+                  >
+                    {game._sourceDir || game.executable}
+                  </p>
+                )}
+              </div>
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 {typeof game.launchCount === "undefined" &&
                   !game.isCustom &&
                   !game._isDownloading &&
                   !game._isQueued && (
-                    <span className="rounded bg-secondary px-1.5 py-0.5 text-xs font-bold text-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                       {t("library.newBadge")}
                     </span>
                   )}
                 {updateInfo?.updateAvailable && (
-                  <span className="flex items-center gap-1 rounded bg-primary px-1.5 py-0.5 text-xs font-bold text-secondary">
+                  <span className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary">
                     <Import className="h-3 w-3" />
                     {t("gameScreen.updateBadge")}
                   </span>
                 )}
-              </div>
-              {/* Hover overlay with title + actions */}
-              <div
-                className={cn(
-                  "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
-                  isHovered ? "opacity-100" : "opacity-0"
+                {isRunning && (
+                  <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-semibold text-green-600 dark:text-green-400">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                    {t("library.view.playing")}
+                  </span>
                 )}
-              >
-                <p className="mb-2 line-clamp-2 text-sm font-semibold leading-tight text-white">
-                  {game.game}
-                </p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    {game.online && <Gamepad2 className="h-3.5 w-3.5 text-white/70" />}
-                    {game.dlc && <Gift className="h-3.5 w-3.5 text-white/70" />}
-                    {isRunning && (
-                      <span className="text-xs font-medium text-green-400">Playing</span>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white hover:bg-white/20 hover:text-primary"
-                    onClick={e => {
-                      e.stopPropagation();
-                      onToggleFavorite(game.game || game.name);
-                    }}
-                  >
-                    <Heart
-                      className={cn(
-                        "h-4 w-4",
-                        isFavorite ? "fill-primary text-primary" : "fill-none text-white"
-                      )}
-                    />
-                  </Button>
-                </div>
+                {game.online && (
+                  <span className="flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    <Gamepad2 className="h-3 w-3" />
+                    {t("library.view.online")}
+                  </span>
+                )}
+                {game.dlc && (
+                  <span className="flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    <Gift className="h-3 w-3" />
+                    {t("library.view.dlc")}
+                  </span>
+                )}
+                {game.version && (
+                  <span className="max-w-[10rem] truncate rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                    {t("library.view.version", { version: game.version })}
+                  </span>
+                )}
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col items-start gap-1 px-3 py-2">
-            <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">
-              {game.game}
-            </h3>
-            {game._hasMultipleInstalls && (
-              <p
-                className="w-full truncate text-xs text-muted-foreground"
-                title={game.executable || game._sourceDir}
+
+            {/* Status / playtime */}
+            <div className="hidden h-12 w-36 shrink-0 flex-col items-end justify-center gap-1 border-l border-border/50 pl-4 text-right lg:flex">
+              {game._isQueued ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Loader className="h-3.5 w-3.5 animate-spin" />
+                  {t("library.view.queued")}
+                </span>
+              ) : game._isDownloading ? (
+                (() => {
+                  const pct = parseFloat(game.downloadingData?.progressCompleted || 0);
+                  return (
+                    <>
+                      <span className="text-xs font-medium tabular-nums text-foreground">
+                        {game.downloadingData?.extracting
+                          ? t("library.view.extracting")
+                          : game.downloadingData?.stopped
+                            ? t("library.view.paused", { progress: pct.toFixed(0) })
+                            : t("library.view.downloading", {
+                                progress: pct.toFixed(0),
+                              })}
+                      </span>
+                      <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </>
+                  );
+                })()
+              ) : (
+                <>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                    {t("library.view.playtime")}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs font-medium tabular-nums text-foreground">
+                    <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                    {(() => {
+                      const s = game.playTime;
+                      if (!s || s < 60) return t("library.view.notPlayed");
+                      const h = Math.floor(s / 3600);
+                      const m = Math.floor((s % 3600) / 60);
+                      return h === 0
+                        ? t("library.view.playtimeMinutes", { minutes: m })
+                        : t("library.view.playtimeHours", { hours: h, minutes: m });
+                    })()}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={
+                  isFavorite
+                    ? t("library.view.removeFavorite")
+                    : t("library.view.addFavorite")
+                }
+                className={cn(
+                  "h-8 w-8 transition-opacity hover:text-primary",
+                  isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )}
+                onClick={e => {
+                  e.stopPropagation();
+                  onToggleFavorite(game.game || game.name);
+                }}
               >
-                {game._sourceDir || game.executable}
-              </p>
+                <Heart
+                  className={cn(
+                    "h-4 w-4",
+                    isFavorite ? "fill-primary text-primary" : "fill-none"
+                  )}
+                />
+              </Button>
+              {!game._isDownloading && !game._isQueued && !selectionMode && (
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 px-3 text-secondary"
+                  onClick={e => {
+                    e.stopPropagation();
+                    onPlay();
+                  }}
+                >
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                  {t("library.view.play")}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <Card
+            className={cn(
+              "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
+              !game._isDownloading &&
+                !game._isQueued &&
+                "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+              (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
+              isSelected && "ring-2 ring-primary",
+              selectionMode && game.isCustom && "selectable-card",
+              !game._isDownloading && !game._isQueued && "cursor-pointer",
+              isRemoving &&
+                "pointer-events-none duration-300 animate-out fade-out zoom-out-95 slide-out-to-bottom-2"
             )}
-            <p className="text-xs text-muted-foreground">
-              {(() => {
-                const s = game.playTime;
-                if (!s || s < 60) return t("library.neverPlayed");
-                const h = Math.floor(s / 3600);
-                const m = Math.floor((s % 3600) / 60);
-                if (h === 0) return `${m} minutes`;
-                if (m === 0) return `${h} hours`;
-                return `${h} hours ${m} minutes`;
-              })()}
-            </p>
-          </CardFooter>
-        </Card>
+            onClick={handleCardClick}
+            onContextMenu={handleContextMenu}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            {selectionMode && game.isCustom && (
+              <div className="absolute left-2 top-2 z-20 flex items-center justify-center rounded bg-white/80 p-0.5 shadow backdrop-blur-sm">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  tabIndex={-1}
+                  readOnly
+                  className="pointer-events-none h-5 w-5 rounded border-muted accent-primary focus:ring-primary"
+                />
+              </div>
+            )}
+            {contextMenuPortal}
+
+            <CardContent className="p-0">
+              <div className="relative aspect-[2/3] overflow-hidden">
+                {imageData ? (
+                  <img
+                    src={imageData}
+                    alt={game.game}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-muted">
+                    <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
+                  </div>
+                )}
+                {/* Queued overlay */}
+                {game._isQueued && (
+                  <>
+                    <div className="absolute inset-0 bg-black/60" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
+                        <Loader className="h-3 w-3 animate-spin" />
+                        Queued
+                      </span>
+                    </div>
+                  </>
+                )}
+                {/* Download progress fill overlay */}
+                {game._isDownloading &&
+                  (() => {
+                    const pct = parseFloat(game.downloadingData?.progressCompleted || 0);
+                    const isExtracting = game.downloadingData?.extracting;
+                    const isStopped = game.downloadingData?.stopped;
+                    const label = isExtracting
+                      ? `Extracting…`
+                      : isStopped
+                        ? `Paused · ${pct.toFixed(0)}%`
+                        : `${pct.toFixed(0)}%`;
+                    return (
+                      <>
+                        {/* dark mask covering the unfilled portion from top */}
+                        <div
+                          className="absolute inset-x-0 top-0 bg-black/60 transition-all duration-500"
+                          style={{ height: `${100 - pct}%` }}
+                        />
+                        {/* colored fill from bottom */}
+                        <div
+                          className="absolute inset-x-0 bottom-0 bg-primary/30 transition-all duration-500"
+                          style={{ height: `${pct}%` }}
+                        />
+                        {/* progress bar line at fill boundary */}
+                        <div
+                          className="absolute inset-x-0 h-0.5 bg-primary transition-all duration-500"
+                          style={{ bottom: `${pct}%` }}
+                        />
+                        {/* label */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
+                            {label}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                {/* Running indicator */}
+                {isRunning && (
+                  <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-green-500 to-emerald-400" />
+                )}
+                {/* Badges row */}
+                <div className="absolute left-2 top-2 z-20 flex flex-col items-start gap-1">
+                  {typeof game.launchCount === "undefined" &&
+                    !game.isCustom &&
+                    !game._isDownloading &&
+                    !game._isQueued && (
+                      <span className="rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm backdrop-blur-md">
+                        {t("library.newBadge")}
+                      </span>
+                    )}
+                  {updateInfo?.updateAvailable && (
+                    <span className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary shadow-sm">
+                      <Import className="h-3 w-3" />
+                      {t("gameScreen.updateBadge")}
+                    </span>
+                  )}
+                </div>
+                {/* Hover overlay with title + actions */}
+                <div
+                  className={cn(
+                    "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
+                    isHovered ? "opacity-100" : "opacity-0"
+                  )}
+                >
+                  <p className="mb-2 line-clamp-2 text-sm font-semibold leading-tight text-white">
+                    {game.game}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      {game.online && <Gamepad2 className="h-3.5 w-3.5 text-white/70" />}
+                      {game.dlc && <Gift className="h-3.5 w-3.5 text-white/70" />}
+                      {isRunning && (
+                        <span className="text-xs font-medium text-green-400">
+                          Playing
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-white hover:bg-white/20 hover:text-primary"
+                      onClick={e => {
+                        e.stopPropagation();
+                        onToggleFavorite(game.game || game.name);
+                      }}
+                    >
+                      <Heart
+                        className={cn(
+                          "h-4 w-4",
+                          isFavorite
+                            ? "fill-primary text-primary"
+                            : "fill-none text-white"
+                        )}
+                      />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col items-start gap-1 px-3 py-2">
+              <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">
+                {game.game}
+              </h3>
+              {game._hasMultipleInstalls && (
+                <p
+                  className="w-full truncate text-xs text-muted-foreground"
+                  title={game.executable || game._sourceDir}
+                >
+                  {game._sourceDir || game.executable}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {(() => {
+                  const s = game.playTime;
+                  if (!s || s < 60) return t("library.neverPlayed");
+                  const h = Math.floor(s / 3600);
+                  const m = Math.floor((s % 3600) / 60);
+                  if (h === 0) return `${m} minutes`;
+                  if (m === 0) return `${h} hours`;
+                  return `${h} hours ${m} minutes`;
+                })()}
+              </p>
+            </CardFooter>
+          </Card>
+        )}
       </>
     );
   }
