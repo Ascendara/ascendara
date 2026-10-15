@@ -1,5 +1,5 @@
 # This script counts the number of lines of code used in Ascendara, including
-# all files in the src, installer, build, and binaries directories. It excludes
+# all files in the src, electron, binaries, scripts, and tests directories. It excludes
 # any whitespace lines (lines that are just indented) by default.
 
 # View the results of the latest count in 'lineCountResult.txt'.
@@ -19,16 +19,41 @@ def count_lines_in_file(filepath):
 
 def main():
     # File extensions to look for
-    target_extensions = {'.css', '.jsx', '.js', '.html', '.py'}
+    target_extensions = ('.js', '.jsx', '.css', '.html', '.py', '.rs', '.ts')
     
     # Target directories
-    target_directories = ['src', 'installer', 'build', 'binaries']
+    target_directories = ['src', 'electron', 'binaries', 'scripts', 'tests']
+    
+    # Directories to exclude when walking
+    excluded_dirs = {
+        'node_modules',
+        'build',
+        'dist',
+        'target',
+        '__pycache__',
+        'debian',
+        'concept',
+        'assets',
+        '.git',
+        '.cache',
+    }
+    
+    # Specific outdated/generated/ignored files to exclude
+    excluded_files = {
+        'AscendaraDownloader_OLD.py',
+        'AscendaraDownloaderV1.py',
+        'AscendaraLocalRefresh_old.py',
+        'appOrginal.js',
+        'config.prod.js',
+        'upload.py',
+        'webview-api.py',
+    }
     
     # Initialize counters
     total_lines = 0
     file_counts = {ext: 0 for ext in target_extensions}
     line_counts = {ext: 0 for ext in target_extensions}
-    dir_counts = {dir: 0 for dir in target_directories}
+    dir_counts = {dir_name: 0 for dir_name in target_directories}
     
     # Get the project root directory (one level up from scripts)
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,10 +70,14 @@ def main():
         dir_line_count = 0
         
         # Walk through directory
-        for root, _, files in os.walk(dir_path):
+        for root, dirs, files in os.walk(dir_path):
+            # Prune excluded directories in-place so os.walk doesn't descend into them
+            dirs[:] = [d for d in dirs if d.lower() not in excluded_dirs]
+            
             for file in files:
-                # Skip files in any path containing 'debian'
-                if 'debian' in root.replace('\\', '/').lower():
+                if file in excluded_files:
+                    continue
+                if target_dir == 'electron' and file == 'index.html':
                     continue
                     
                 ext = os.path.splitext(file)[1].lower()
@@ -62,21 +91,36 @@ def main():
         
         dir_counts[target_dir] = dir_line_count
     
-    # Print results
-    print("\nCode Line Count Summary:")
-    print("-" * 50)
+    # Format results
+    summary_lines = [
+        "Code Line Count Summary:",
+        "-" * 50,
+    ]
     for ext in target_extensions:
         if file_counts[ext] > 0:
-            print(f"{ext[1:]:>4} files: {file_counts[ext]:>5} files, {line_counts[ext]:>6} lines")
+            summary_lines.append(f"{ext[1:]:>4} files: {file_counts[ext]:>5} files, {line_counts[ext]:>6} lines")
     
-    print("\nLines by Directory:")
-    print("-" * 50)
+    summary_lines.extend([
+        "",
+        "Lines by Directory:",
+        "-" * 50,
+    ])
     for dir_name, count in dir_counts.items():
-        print(f"{dir_name:>9}: {count:>6} lines")
+        summary_lines.append(f"{dir_name:>9}: {count:>6} lines")
     
-    print("\nTotal Summary:")
-    print("-" * 50)
-    print(f"Total: {sum(file_counts.values()):>5} files, {total_lines:>6} lines")
+    summary_lines.extend([
+        "",
+        "Total Summary:",
+        "-" * 50,
+        f"Total: {sum(file_counts.values()):>5} files, {total_lines:>6} lines",
+    ])
+    
+    output_text = "\n".join(summary_lines)
+    print("\n" + output_text)
+    
+    result_path = os.path.join(script_dir, 'lineCountResult.txt')
+    with open(result_path, 'w', encoding='utf-8') as result_file:
+        result_file.write(output_text + "\n")
 
 if __name__ == "__main__":
     main()
