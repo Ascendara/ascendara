@@ -28,6 +28,14 @@ const { startDownloadWatchdog } = require("./downloadLiveness");
 
 const steamgrid = require("./steamgrid");
 
+const {
+  listHelpers,
+  matchingHelpers,
+  stopHelpers,
+  createOperationLock,
+  waitForSpawn,
+} = require("./downloadControl");
+const withDownloadOperation = createOperationLock();
 const downloadProcesses = new Map();
 const retryDownloadProcesses = new Map();
 
@@ -59,7 +67,7 @@ async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFile
     const cookie = loginRes.headers?.["set-cookie"]?.[0];
     if (!cookie || loginRes.data !== "Ok.") {
       console.warn("[qBittorrent] Could not authenticate with WebUI to clean up torrent");
-      return;
+      throw new Error("Could not authenticate with qBittorrent.");
     }
 
     const infoRes = await axios.get(`${baseUrl}/api/v2/torrents/info`, {
@@ -68,13 +76,13 @@ async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFile
       timeout: 5000,
     });
 
-    const normalizedDir = path.normalize(gameDirectory).toLowerCase();
+    if (infoRes.status !== 200 || !Array.isArray(infoRes.data))
+      throw new Error("Could not read qBittorrent downloads.");
+    const normalize = value =>
+      isWindows ? path.resolve(value).toLowerCase() : path.resolve(value);
+    const normalizedDir = normalize(gameDirectory);
     const matchingHashes = (infoRes.data || [])
-      .filter(
-        t =>
-          t.save_path &&
-          path.normalize(t.save_path).toLowerCase().startsWith(normalizedDir)
-      )
+      .filter(t => t.save_path && normalize(t.save_path) === normalizedDir)
       .map(t => t.hash);
 
     if (matchingHashes.length === 0) {
@@ -82,7 +90,7 @@ async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFile
       return;
     }
 
-    await axios.post(
+    const removed = await axios.post(
       `${baseUrl}/api/v2/torrents/delete`,
       `hashes=${matchingHashes.join("|")}&deleteFiles=${deleteFiles ? "true" : "false"}`,
       {
@@ -91,14 +99,29 @@ async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFile
         timeout: 5000,
       }
     );
+    if (removed.status !== 200)
+      throw new Error("qBittorrent could not stop the torrent.");
     console.log(
       `[qBittorrent] Removed ${matchingHashes.length} torrent(s) (deleteFiles=${deleteFiles}) for: ${gameDirectory}`
     );
 
-    // Give qBittorrent a moment to release file handles before we touch the directory
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Removal is asynchronous: confirm the transfer has actually disappeared.
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      const remaining = await axios.get(`${baseUrl}/api/v2/torrents/info`, {
+        headers: { Cookie: cookie },
+        validateStatus: () => true,
+        timeout: 5000,
+      });
+      if (remaining.status !== 200 || !Array.isArray(remaining.data)) {
+        throw new Error("Could not verify that qBittorrent stopped the download.");
+      }
+      if (!remaining.data.some(t => matchingHashes.includes(t.hash))) return;
+    }
+    throw new Error("qBittorrent is still stopping this download. Please try again.");
   } catch (err) {
     console.warn("[qBittorrent] Failed to clean up torrent(s):", err.message);
+    throw err;
   }
 }
 
@@ -382,8 +405,10 @@ function registerDownloadHandlers() {
       }
       if (
         browserAssetLogoId != null &&
-        (!Number.isSafeInteger(browserAssetLogoId) || browserAssetLogoId <= 0 ||
-          !Number.isSafeInteger(browserAssetGameId) || browserAssetGameId <= 0)
+        (!Number.isSafeInteger(browserAssetLogoId) ||
+          browserAssetLogoId <= 0 ||
+          !Number.isSafeInteger(browserAssetGameId) ||
+          browserAssetGameId <= 0)
       ) {
         throw new Error("Invalid artwork logo selection");
       }
@@ -828,7 +853,7 @@ function registerDownloadHandlers() {
       if (!settings.downloadDirectory) {
         throw new Error("Download directory not set");
       }
-      const sanitizedGame = sanitizeText(game);
+      const sanitizedGame = sanitizeGameName(sanitizeText(game));
       const gameDirectory = path.join(settings.downloadDirectory, sanitizedGame);
       const gameInfoPath = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
 
@@ -905,272 +930,238 @@ function registerDownloadHandlers() {
     "stop-download",
     async (_, game, deleteContents = false, isKill = false) => {
       try {
-        console.log(
-          `Stopping download for game: ${game}, deleteContents: ${deleteContents}, isKill: ${isKill}`
-        );
-        const sanitizedGame = sanitizeText(game);
-        const settings = settingsManager.getSettings();
-
-        // Find the game directory across all possible locations
-        let gameDirectory = null;
-        const allDirectories = [
-          settings.downloadDirectory,
-          ...(settings.additionalDirectories || []),
-        ];
-
-        for (const dir of allDirectories) {
-          const testPath = path.join(dir, sanitizedGame);
-          if (fs.existsSync(testPath)) {
-            gameDirectory = testPath;
-            console.log(`Found game directory at: ${gameDirectory}`);
-            break;
-          }
-        }
-
-        if (!gameDirectory) {
-          console.error(`Game directory not found for: ${sanitizedGame}`);
-          return false;
-        }
-
-        // Step 1: Update JSON to mark as stopped FIRST (before killing processes)
-        // This prevents the downloader from overwriting the stopped state
-        const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
-        if (fs.existsSync(jsonFile)) {
-          try {
-            const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-            if (isKill) {
-              // Killing (even with files kept) means the user is abandoning the
-              // download, not pausing it - clear downloadingData entirely so it
-              // no longer shows up as an active/resumable download.
-              delete gameInfo.downloadingData;
-            } else {
-              gameInfo.downloadingData = { stopped: true };
+        return await withDownloadOperation(
+          sanitizeGameName(sanitizeText(game)),
+          async () => {
+            console.log(
+              `Stopping download for game: ${game}, deleteContents: ${deleteContents}, isKill: ${isKill}`
+            );
+            const sanitizedGame = sanitizeGameName(sanitizeText(game));
+            if (!sanitizedGame || sanitizedGame === "." || sanitizedGame === "..") {
+              throw new Error("Invalid game name.");
             }
-            fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
-            console.log(`Marked download as stopped in JSON: ${jsonFile}`);
-          } catch (jsonError) {
-            console.error(`Error updating JSON file: ${jsonError}`);
-            // Continue with process termination even if JSON update fails
-          }
-        }
+            const settings = settingsManager.getSettings();
 
-        // Step 2: Kill all downloader processes
-        let killedProcesses = 0;
+            // Find the game directory across all possible locations
+            let gameDirectory = null;
+            const allDirectories = [
+              settings.downloadDirectory,
+              ...(settings.additionalDirectories || []),
+            ];
 
-        if (isWindows) {
-          const downloaderExes = [
-            "AscendaraDownloader.exe",
-            "AscendaraGofileHelper.exe",
-            "AscendaraTorrentHandler.exe",
-          ];
+            for (const dir of allDirectories.filter(Boolean)) {
+              const testPath = path.join(dir, sanitizedGame);
+              if (fs.existsSync(testPath)) {
+                gameDirectory = testPath;
+                console.log(`Found game directory at: ${gameDirectory}`);
+                break;
+              }
+            }
 
-          for (const exe of downloaderExes) {
+            if (!gameDirectory) {
+              console.error(`Game directory not found for: ${sanitizedGame}`);
+              return false;
+            }
+
+            const jsonFilePath = path.join(
+              gameDirectory,
+              `${sanitizedGame}.ascendara.json`
+            );
+            const before = await fs.readJson(jsonFilePath);
+            if (
+              !isKill &&
+              (!before.downloadingData ||
+                before.downloadingData.extracting ||
+                before.downloadingData.verifying ||
+                before.downloadingData.pendingManualInstall ||
+                before.downloadingData.awaitingRecoveryAction)
+            ) {
+              throw new Error("This download is no longer in a pausable stage.");
+            }
+            const knownPids = [
+              before.downloadingData?.ownerPid,
+              downloadProcesses.get(sanitizedGame)?.pid,
+              retryDownloadProcesses.get(sanitizedGame)?.pid,
+            ].filter(pid => Number.isInteger(pid) && pid > 0);
+            const cacheFile = path.join(
+              app.getPath("userData"),
+              "downloadCache",
+              `${sanitizedGame}.json`
+            );
+            const cache = await fs.readJson(cacheFile).catch(() => ({}));
+            const torrentDownload = /^(magnet:)|\.torrent(?:\?|$)/i.test(
+              cache.link || ""
+            );
+
             try {
-              const psCommand = `Get-CimInstance Win32_Process | Where-Object { $_.Name -eq '${exe}' -and $_.CommandLine -like '*${sanitizedGame}*' } | Select-Object -ExpandProperty ProcessId`;
-              const findProcess = spawn("powershell", [
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                psCommand,
-              ]);
-
-              const pids = await new Promise(resolve => {
-                let output = "";
-                findProcess.stdout.on("data", data => (output += data.toString()));
-                findProcess.on("close", () => {
-                  const pids = output
-                    .split("\n")
-                    .map(line => line.trim())
-                    .filter(line => /^\d+$/.test(line));
-                  resolve(pids);
-                });
-              });
-
-              console.log(`Found ${pids.length} ${exe} processes for ${sanitizedGame}`);
-
-              for (const pid of pids) {
+              // Step 1: Update JSON to mark as stopped FIRST (before killing processes)
+              // This prevents the downloader from overwriting the stopped state
+              const jsonFile = path.join(
+                gameDirectory,
+                `${sanitizedGame}.ascendara.json`
+              );
+              if (fs.existsSync(jsonFile)) {
                 try {
-                  const killProcess = spawn("taskkill", ["/F", "/T", "/PID", pid]);
-                  await new Promise(resolve => killProcess.on("close", resolve));
-                  killedProcesses++;
-                  console.log(`Killed process ${exe} with PID ${pid}`);
-                } catch (killErr) {
-                  console.error(`Failed to kill PID ${pid}:`, killErr);
+                  const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+                  if (isKill) {
+                    // Killing (even with files kept) means the user is abandoning the
+                    // download, not pausing it - clear downloadingData entirely so it
+                    // no longer shows up as an active/resumable download.
+                    delete gameInfo.downloadingData;
+                  } else {
+                    gameInfo.downloadingData = {
+                      ...gameInfo.downloadingData,
+                      stopped: true,
+                      downloading: false,
+                      extracting: false,
+                      verifying: false,
+                      progressDownloadSpeeds: "0.00 B/s",
+                      timeUntilComplete: "0s",
+                    };
+                  }
+                  fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+                  console.log(`Marked download as stopped in JSON: ${jsonFile}`);
+                } catch (jsonError) {
+                  console.error(`Error updating JSON file: ${jsonError}`);
+                  throw jsonError;
                 }
               }
-            } catch (err) {
-              console.error(`Error finding/killing ${exe} processes:`, err);
-            }
-          }
-        } else {
-          const pythonScripts = [
-            "AscendaraDownloader.py",
-            "AscendaraGofileHelper.py",
-            "AscendaraTorrentHandler.py",
-          ];
 
-          for (const script of pythonScripts) {
-            try {
-              const findProcess = spawn("pgrep", ["-f", `${script}.*${sanitizedGame}`]);
-              const pids = await new Promise(resolve => {
-                let output = "";
-                findProcess.stdout.on("data", data => (output += data));
-                findProcess.on("close", () =>
-                  resolve(output.trim().split("\n").filter(Boolean))
-                );
+              // Allow the HTTP worker to checkpoint its partial transfer before falling
+              // back to forced termination. Verify real helper PIDs before returning.
+              await stopHelpers(sanitizedGame, gameDirectory, knownPids, {
+                cooperative: !isKill && !torrentDownload,
               });
+              downloadProcesses.delete(sanitizedGame);
+              retryDownloadProcesses.delete(sanitizedGame);
+              if (torrentDownload) {
+                await qbtRemoveTorrentsForDirectory(
+                  settings,
+                  gameDirectory,
+                  deleteContents
+                );
+              }
 
-              console.log(
-                `Found ${pids.length} ${script} processes for ${sanitizedGame}`
-              );
+              // Step 4: Ensure JSON is in the expected state (in case downloader overwrote it)
+              if (fs.existsSync(jsonFile)) {
+                try {
+                  const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+                  if (isKill) {
+                    delete gameInfo.downloadingData;
+                  } else {
+                    gameInfo.downloadingData = {
+                      ...gameInfo.downloadingData,
+                      stopped: true,
+                      downloading: false,
+                      extracting: false,
+                      verifying: false,
+                      progressDownloadSpeeds: "0.00 B/s",
+                      timeUntilComplete: "0s",
+                    };
+                  }
+                  if (gameInfo.downloadingData) delete gameInfo.downloadingData.ownerPid;
+                  fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+                  console.log(`Confirmed stopped state in JSON: ${jsonFile}`);
+                } catch (jsonError) {
+                  console.error(`Error confirming JSON state: ${jsonError}`);
+                  throw jsonError;
+                }
+              }
 
-              for (const pid of pids) {
-                if (pid) {
+              // Step 5: Delete contents if requested
+              if (deleteContents) {
+                console.log(`Deleting game directory: ${gameDirectory}`);
+
+                // Never delete items that existed in this folder before Ascendara
+                // started downloading into it (e.g. a manual install with save
+                // data that happened to share the same folder name).
+                const preexistingMarkerPath = path.join(
+                  gameDirectory,
+                  "preexisting.ascendara.json"
+                );
+                let preexistingEntries = [];
+                if (fs.existsSync(preexistingMarkerPath)) {
                   try {
-                    const killProcess = spawn("kill", ["-9", pid]);
-                    await new Promise(resolve => killProcess.on("close", resolve));
-                    killedProcesses++;
-                    console.log(`Killed process ${script} with PID ${pid}`);
-                  } catch (killErr) {
-                    console.error(`Failed to kill PID ${pid}:`, killErr);
+                    preexistingEntries = JSON.parse(
+                      fs.readFileSync(preexistingMarkerPath, "utf8")
+                    );
+                    console.log(
+                      `Preserving ${preexistingEntries.length} pre-existing item(s) found before this download started`
+                    );
+                  } catch (markerError) {
+                    console.error(
+                      `Error reading pre-existing items marker: ${markerError}`
+                    );
+                  }
+                }
+                const preexistingSet = new Set(preexistingEntries);
+
+                let attempts = 0;
+                const maxAttempts = 5;
+                while (attempts < maxAttempts) {
+                  try {
+                    const files = await fs.promises.readdir(gameDirectory, {
+                      withFileTypes: true,
+                    });
+                    for (const file of files) {
+                      if (preexistingSet.has(file.name)) {
+                        continue;
+                      }
+                      const fullPath = path.join(gameDirectory, file.name);
+                      await fs.promises.rm(fullPath, { recursive: true, force: true });
+                    }
+                    if (fs.existsSync(preexistingMarkerPath)) {
+                      await fs.promises.rm(preexistingMarkerPath, { force: true });
+                    }
+                    // Only remove the directory itself if nothing pre-existing is left in it
+                    const remaining = await fs.promises.readdir(gameDirectory);
+                    if (remaining.length === 0) {
+                      await fs.promises.rmdir(gameDirectory);
+                      console.log(`Successfully deleted game directory`);
+                    } else {
+                      console.log(
+                        `Kept game directory because it still contains ${remaining.length} pre-existing item(s): ${gameDirectory}`
+                      );
+                    }
+                    break;
+                  } catch (deleteError) {
+                    attempts++;
+                    console.error(
+                      `Delete attempt ${attempts}/${maxAttempts} failed:`,
+                      deleteError
+                    );
+                    if (attempts === maxAttempts) {
+                      console.error(
+                        `Failed to delete directory after ${maxAttempts} attempts`
+                      );
+                      throw deleteError;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                   }
                 }
               }
-            } catch (err) {
-              console.error(`Error finding/killing ${script} processes:`, err);
-            }
-          }
-        }
 
-        downloadProcesses.delete(sanitizedGame);
-        console.log(`Total processes killed: ${killedProcesses}`);
-
-        // Step 2.5: Remove any matching torrent(s) from qBittorrent itself.
-        // Killing the handler process does not stop qBittorrent from continuing
-        // to download and holding file locks, so we must tell it directly.
-        await qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteContents);
-
-        // Step 3: Wait for processes to fully terminate and release file locks
-        // Use exponential backoff to verify processes are gone
-        let waitTime = 1000;
-        for (let i = 0; i < 3; i++) {
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-
-          // Verify processes are actually gone
-          if (isWindows) {
-            const verifyCommand = `Get-Process | Where-Object { $_.Name -match 'Ascendara(Downloader|GofileHelper|TorrentHandler)' -and $_.CommandLine -like '*${sanitizedGame}*' } | Measure-Object | Select-Object -ExpandProperty Count`;
-            const verifyProcess = spawn("powershell", [
-              "-NoProfile",
-              "-NonInteractive",
-              "-Command",
-              verifyCommand,
-            ]);
-
-            const stillRunning = await new Promise(resolve => {
-              let output = "";
-              verifyProcess.stdout.on("data", data => (output += data.toString()));
-              verifyProcess.on("close", () => {
-                const count = parseInt(output.trim()) || 0;
-                resolve(count > 0);
-              });
-            });
-
-            if (!stillRunning) {
-              console.log(`All processes terminated after ${waitTime * (i + 1)}ms`);
-              break;
-            }
-          }
-
-          waitTime *= 2; // Exponential backoff
-        }
-
-        // Step 4: Ensure JSON is in the expected state (in case downloader overwrote it)
-        if (fs.existsSync(jsonFile)) {
-          try {
-            const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-            if (isKill) {
-              delete gameInfo.downloadingData;
-            } else {
-              gameInfo.downloadingData = { stopped: true };
-            }
-            fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
-            console.log(`Confirmed stopped state in JSON: ${jsonFile}`);
-          } catch (jsonError) {
-            console.error(`Error confirming JSON state: ${jsonError}`);
-          }
-        }
-
-        // Step 5: Delete contents if requested
-        if (deleteContents) {
-          console.log(`Deleting game directory: ${gameDirectory}`);
-
-          // Never delete items that existed in this folder before Ascendara
-          // started downloading into it (e.g. a manual install with save
-          // data that happened to share the same folder name).
-          const preexistingMarkerPath = path.join(
-            gameDirectory,
-            "preexisting.ascendara.json"
-          );
-          let preexistingEntries = [];
-          if (fs.existsSync(preexistingMarkerPath)) {
-            try {
-              preexistingEntries = JSON.parse(
-                fs.readFileSync(preexistingMarkerPath, "utf8")
-              );
-              console.log(
-                `Preserving ${preexistingEntries.length} pre-existing item(s) found before this download started`
-              );
-            } catch (markerError) {
-              console.error(`Error reading pre-existing items marker: ${markerError}`);
-            }
-          }
-          const preexistingSet = new Set(preexistingEntries);
-
-          let attempts = 0;
-          const maxAttempts = 5;
-          while (attempts < maxAttempts) {
-            try {
-              const files = await fs.promises.readdir(gameDirectory, {
-                withFileTypes: true,
-              });
-              for (const file of files) {
-                if (preexistingSet.has(file.name)) {
-                  continue;
-                }
-                const fullPath = path.join(gameDirectory, file.name);
-                await fs.promises.rm(fullPath, { recursive: true, force: true });
+              console.log(`Successfully stopped download for: ${sanitizedGame}`);
+              return true;
+            } catch (error) {
+              // A failed pause must not leave a successful-looking paused card while
+              // a helper or qBittorrent may still be transferring in the background.
+              if (!isKill && (await fs.pathExists(jsonFilePath))) {
+                const current = await fs.readJson(jsonFilePath);
+                current.downloadingData = {
+                  ...current.downloadingData,
+                  stopped: Boolean(before.downloadingData.stopped),
+                  downloading: Boolean(before.downloadingData.downloading),
+                  extracting: Boolean(before.downloadingData.extracting),
+                  verifying: Boolean(before.downloadingData.verifying),
+                  updating: Boolean(before.downloadingData.updating),
+                };
+                await fs.writeJson(jsonFilePath, current, { spaces: 2 });
               }
-              if (fs.existsSync(preexistingMarkerPath)) {
-                await fs.promises.rm(preexistingMarkerPath, { force: true });
-              }
-              // Only remove the directory itself if nothing pre-existing is left in it
-              const remaining = await fs.promises.readdir(gameDirectory);
-              if (remaining.length === 0) {
-                await fs.promises.rmdir(gameDirectory);
-                console.log(`Successfully deleted game directory`);
-              } else {
-                console.log(
-                  `Kept game directory because it still contains ${remaining.length} pre-existing item(s): ${gameDirectory}`
-                );
-              }
-              break;
-            } catch (deleteError) {
-              attempts++;
-              console.error(
-                `Delete attempt ${attempts}/${maxAttempts} failed:`,
-                deleteError
-              );
-              if (attempts === maxAttempts) {
-                console.error(`Failed to delete directory after ${maxAttempts} attempts`);
-                throw deleteError;
-              }
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              throw error;
             }
           }
-        }
-
-        console.log(`Successfully stopped download for: ${sanitizedGame}`);
-        return true;
+        );
       } catch (error) {
         console.error("Error stopping download:", error);
         return false;
@@ -1423,178 +1414,191 @@ function registerDownloadHandlers() {
   // Resume download handler
   const resumeDownload = async game => {
     try {
-      console.log(`Resuming download for game: ${game}`);
-      const sanitizedGame = sanitizeText(game);
-      const settings = settingsManager.getSettings();
+      return await withDownloadOperation(
+        sanitizeGameName(sanitizeText(game)),
+        async () => {
+          console.log(`Resuming download for game: ${game}`);
+          const sanitizedGame = sanitizeGameName(sanitizeText(game));
+          if (!sanitizedGame || sanitizedGame === "." || sanitizedGame === "..") {
+            throw new Error("Invalid game name.");
+          }
+          const settings = settingsManager.getSettings();
 
-      // Find the game directory across all possible locations
-      let gameDirectory = null;
-      const allDirectories = [
-        settings.downloadDirectory,
-        ...(settings.additionalDirectories || []),
-      ];
+          // Find the game directory across all possible locations
+          let gameDirectory = null;
+          const allDirectories = [
+            settings.downloadDirectory,
+            ...(settings.additionalDirectories || []),
+          ];
 
-      for (const dir of allDirectories) {
-        const testPath = path.join(dir, sanitizedGame);
-        if (fs.existsSync(testPath)) {
-          gameDirectory = testPath;
-          console.log(`Found game directory at: ${gameDirectory}`);
-          break;
-        }
-      }
+          for (const dir of allDirectories.filter(Boolean)) {
+            const testPath = path.join(dir, sanitizedGame);
+            if (fs.existsSync(testPath)) {
+              gameDirectory = testPath;
+              console.log(`Found game directory at: ${gameDirectory}`);
+              break;
+            }
+          }
 
-      if (!gameDirectory) {
-        console.error(`Game directory not found for: ${sanitizedGame}`);
-        return { success: false, error: "Game directory not found" };
-      }
+          if (!gameDirectory) {
+            console.error(`Game directory not found for: ${sanitizedGame}`);
+            return { success: false, error: "Game directory not found" };
+          }
 
-      // Read the game info JSON to get download details
-      const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
-      if (!fs.existsSync(jsonFile)) {
-        console.error(`Game info JSON not found: ${jsonFile}`);
-        return { success: false, error: "Game info not found" };
-      }
+          // Read the game info JSON to get download details
+          const jsonFile = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+          if (!fs.existsSync(jsonFile)) {
+            console.error(`Game info JSON not found: ${jsonFile}`);
+            return { success: false, error: "Game info not found" };
+          }
 
-      let gameInfo;
-      try {
-        gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-      } catch (jsonError) {
-        console.error(`Error reading game info JSON: ${jsonError}`);
-        return { success: false, error: "Failed to read game info" };
-      }
+          let gameInfo;
+          try {
+            gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+          } catch (jsonError) {
+            console.error(`Error reading game info JSON: ${jsonError}`);
+            return { success: false, error: "Failed to read game info" };
+          }
 
-      // Check if there's cached download data with the original link
-      const cachedDataPath = path.join(
-        app.getPath("userData"),
-        "downloadCache",
-        `${sanitizedGame}.json`
-      );
-
-      let downloadLink = null;
-      let browserDirect = false;
-      let online = gameInfo.online || "false";
-      let dlc = gameInfo.dlc || "false";
-      let isVr = gameInfo.isVr || "false";
-      let version = gameInfo.version || "";
-      let size = gameInfo.size || "";
-      let gameID = gameInfo.gameID || "";
-
-      if (fs.existsSync(cachedDataPath)) {
-        try {
-          const cachedData = JSON.parse(fs.readFileSync(cachedDataPath, "utf8"));
-          downloadLink = cachedData.link;
-          browserDirect = cachedData.browserDirect === true;
-          console.log(`Found cached download link: ${downloadLink}`);
-        } catch (cacheError) {
-          console.error(`Error reading cached download data: ${cacheError}`);
-        }
-      }
-
-      if (!downloadLink) {
-        console.error(`No download link found for: ${sanitizedGame}`);
-        return { success: false, error: "Download link not found. Cannot resume." };
-      }
-
-      // Determine which downloader to use
-      let executablePath;
-      let spawnCommand;
-      const targetDirectory = path.dirname(gameDirectory);
-
-      if (isWindows) {
-        executablePath = getHelperPath("AscendaraDownloader");
-
-        spawnCommand = [
-          downloadLink,
-          sanitizedGame,
-          online,
-          dlc,
-          isVr,
-          "false", // updateFlow
-          version || "-1",
-          size,
-          targetDirectory,
-          gameID || "",
-        ];
-      } else {
-        if (isDev) {
-          executablePath = getPythonPath();
-          const scriptPath = path.join(
-            "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+          if (!gameInfo.downloadingData?.stopped) {
+            return { success: false, error: "This download is not paused." };
+          }
+          const live = matchingHelpers(
+            await listHelpers(),
+            sanitizedGame,
+            gameDirectory,
+            [
+              gameInfo.downloadingData.ownerPid,
+              downloadProcesses.get(sanitizedGame)?.pid,
+            ].filter(Number.isInteger)
           );
-          spawnCommand = [
-            scriptPath,
+          if (live.length)
+            return {
+              success: false,
+              error: "The previous downloader is still stopping. Try again shortly.",
+            };
+
+          // Check if there's cached download data with the original link
+          const cachedDataPath = path.join(
+            app.getPath("userData"),
+            "downloadCache",
+            `${sanitizedGame}.json`
+          );
+
+          let downloadLink = null;
+          let browserDirect = false;
+          let online = gameInfo.online || "false";
+          let dlc = gameInfo.dlc || "false";
+          let isVr = gameInfo.isVr || "false";
+          let version = gameInfo.version || "";
+          let size = gameInfo.size || "";
+          let gameID = gameInfo.gameID || "";
+
+          if (fs.existsSync(cachedDataPath)) {
+            try {
+              const cachedData = JSON.parse(fs.readFileSync(cachedDataPath, "utf8"));
+              downloadLink = cachedData.link;
+              browserDirect = cachedData.browserDirect === true;
+              console.log(`Found cached download link: ${downloadLink}`);
+            } catch (cacheError) {
+              console.error(`Error reading cached download data: ${cacheError}`);
+            }
+          }
+
+          if (!downloadLink) {
+            console.error(`No download link found for: ${sanitizedGame}`);
+            return { success: false, error: "Download link not found. Cannot resume." };
+          }
+
+          const torrentDownload = /^(magnet:)|\.torrent(?:\?|$)/i.test(downloadLink);
+          const helperName = torrentDownload
+            ? "AscendaraTorrentHandler"
+            : "AscendaraDownloader";
+          let executablePath = getHelperPath(helperName);
+          const targetDirectory = path.dirname(gameDirectory);
+          let spawnCommand = [
             downloadLink,
-            game,
+            sanitizedGame,
             online,
             dlc,
             isVr,
-            "false", // updateFlow
+            String(Boolean(gameInfo.downloadingData.updating)),
             version || "-1",
-            size,
+            String(size),
             targetDirectory,
-            gameID || "",
           ];
-        } else {
-          executablePath = path.join(process.resourcesPath, "AscendaraDownloader");
-          spawnCommand = [
-            downloadLink,
-            game,
-            online,
-            dlc,
-            isVr,
-            "false", // updateFlow
-            version || "-1",
-            size,
-            targetDirectory,
-            gameID || "",
-          ];
+          if (!torrentDownload) spawnCommand.push(gameID || "");
+          if (!isWindows && isDev) {
+            executablePath = getPythonPath();
+            spawnCommand.unshift(
+              path.join(`./binaries/${helperName}/src/${helperName}.py`)
+            );
+          }
+          if (torrentDownload)
+            spawnCommand.push(
+              "--qbitHost",
+              String(settings.torrentHost || "localhost"),
+              "--qbitPort",
+              String(settings.torrentPort || 8080),
+              "--qbitUsername",
+              String(settings.torrentUsername || "admin"),
+              "--qbitPassword",
+              String(settings.torrentPassword || "adminadmin")
+            );
+
+          if (browserDirect && !torrentDownload)
+            spawnCommand.push("--provider", "direct");
+
+          // Add notification flags if enabled
+          if (settings.notifications) {
+            spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
+          }
+
+          if (process.platform === "linux" && !isDev && !torrentDownload) {
+            executablePath = await prepareDownloaderRuntime(
+              executablePath,
+              path.join(app.getPath("userData"), "downloader-runtime")
+            );
+          }
+
+          // Publish a starting state while retaining the last checkpoint for the UI.
+          const pausedData = { ...gameInfo.downloadingData };
+          gameInfo.downloadingData = {
+            ...pausedData,
+            stopped: false,
+            downloading: true,
+            error: false,
+            progressDownloadSpeeds: "0.00 B/s",
+            timeUntilComplete: "0s",
+          };
+          delete gameInfo.downloadingData.ownerPid;
+          fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+          let downloadProcess;
+          try {
+            downloadProcess = spawn(executablePath, spawnCommand, {
+              detached: true,
+              stdio: "ignore",
+              windowsHide: true,
+            });
+            await waitForSpawn(downloadProcess);
+          } catch (error) {
+            gameInfo.downloadingData = pausedData;
+            fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
+            throw error;
+          }
+          downloadProcess.on("error", error => console.error("Downloader error:", error));
+          downloadProcess.once("exit", () => {
+            if (downloadProcesses.get(sanitizedGame) === downloadProcess)
+              downloadProcesses.delete(sanitizedGame);
+          });
+
+          downloadProcesses.set(sanitizedGame, downloadProcess);
+          downloadProcess.unref();
+
+          console.log(`Successfully resumed download for: ${sanitizedGame}`);
+          return { success: true };
         }
-      }
-
-      if (browserDirect) spawnCommand.push("--provider", "direct");
-
-      // Add notification flags if enabled
-      if (settings.notifications) {
-        spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
-      }
-
-      if (process.platform === "linux" && !isDev) {
-        executablePath = await prepareDownloaderRuntime(
-          executablePath,
-          path.join(app.getPath("userData"), "downloader-runtime")
-        );
-      }
-
-      // Clear the stopped state from JSON
-      gameInfo.downloadingData = {
-        downloading: false,
-        verifying: false,
-        extracting: false,
-        updating: false,
-        progressCompleted: "0.00",
-        progressDownloadSpeeds: "0.00 KB/s",
-        timeUntilComplete: "0s",
-      };
-      fs.writeFileSync(jsonFile, JSON.stringify(gameInfo, null, 2));
-      console.log(`Cleared stopped state from JSON: ${jsonFile}`);
-
-      // Start the download process
-      const downloadProcess = spawn(executablePath, spawnCommand, {
-        detached: true,
-        stdio: "ignore",
-        windowsHide: false,
-      });
-
-      downloadProcess.on("error", err => {
-        console.error(`Failed to start resume process: ${err}`);
-        return { success: false, error: err.message };
-      });
-
-      downloadProcesses.set(sanitizedGame, downloadProcess);
-      downloadProcess.unref();
-
-      console.log(`Successfully resumed download for: ${sanitizedGame}`);
-      return { success: true };
+      );
     } catch (error) {
       console.error("Error resuming download:", error);
       return { success: false, error: error.message };
@@ -1605,9 +1609,10 @@ function registerDownloadHandlers() {
   startDownloadWatchdog({
     getDirectories: () => {
       const settings = settingsManager.getSettings();
-      return [settings.downloadDirectory, ...(settings.additionalDirectories || [])].filter(
-        Boolean
-      );
+      return [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ].filter(Boolean);
     },
     retryExtraction,
     resumeDownload,

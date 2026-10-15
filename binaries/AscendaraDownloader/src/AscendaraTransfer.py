@@ -276,7 +276,7 @@ class Transfer:
     def _run_parallel(self):
         """Download over several range requests; False means use the single stream."""
         partial, state_path = self.destination + '.partial', self.destination + '.partial.json'
-        if self.connections < 2 or self.expected_size == 0:
+        if self.expected_size == 0 or (self.connections < 2 and not os.path.exists(state_path)):
             return False
         if os.path.exists(self.destination) and os.path.exists(self.destination + '.resume.json'):
             return False  # Finish the single-stream transfer that is already underway.

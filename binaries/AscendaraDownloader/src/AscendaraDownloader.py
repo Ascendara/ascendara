@@ -729,7 +729,7 @@ class AscendaraDownloader:
                 }
             }
         self.game_info.get('downloadingData', {}).pop('stopped', None)
-        safe_write_json(self.game_info_path, self.game_info, reset_stop=True)
+        safe_write_json(self.game_info_path, self.game_info)
 
 
     def _get_filename_from_url(self, url: str) -> str:
@@ -1828,6 +1828,8 @@ def main():
                                          args.updateFlow, args.version, args.size,
                                          args.download_dir, args.gameID)
         downloader.download(args.url, args.withNotification, args.provider, args.password)
+    except InterruptedError:
+        logging.info('Download paused during startup; retaining partial files')
     except Exception as exc:
         logging.exception('AscendaraDownloaderV4 fatal error')
         launch_crash_reporter(1, str(exc))

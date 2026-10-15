@@ -1778,7 +1778,7 @@ const DownloadCard = ({
                 <Button
                   size="sm"
                   onClick={onResume}
-                  disabled={isResuming}
+                  disabled={isResuming || isStopping}
                   className="mr-1 h-8 gap-1.5 text-secondary"
                 >
                   {isResuming ? (
@@ -1795,7 +1795,7 @@ const DownloadCard = ({
                     label={t("downloads.actions.pauseDownload")}
                     icon={Pause}
                     onClick={onPause}
-                    disabled={isStopping}
+                    disabled={isStopping || isResuming}
                     spinning={isStopping}
                   />
                 )
@@ -1811,7 +1811,7 @@ const DownloadCard = ({
                 label={t("downloads.actions.killDownload")}
                 icon={X}
                 onClick={() => setConfirmingKill(open => !open)}
-                disabled={isStopping}
+                disabled={isStopping || isResuming}
                 className={cn(
                   "hover:bg-red-500/10 hover:text-red-600",
                   confirmingKill && "bg-red-500/10 text-red-600"
