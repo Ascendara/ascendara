@@ -7,7 +7,6 @@ const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
 const axios = require("axios");
-const { spawn } = require("child_process");
 const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
 const { ipcMain, BrowserWindow, app } = require("electron");
@@ -20,9 +19,9 @@ const {
   isLinux,
   TIMESTAMP_FILE,
   LANG_DIR,
-  getPythonPath,
 } = require("./config");
 const { updateTimestampFile } = require("./utils");
+const { runTranslation, isTranslationRunning } = require("./translations");
 
 let isLatest = true;
 let updateDownloaded = false;
@@ -180,185 +179,62 @@ async function checkVersionAndUpdate() {
  * Check reference language version
  */
 async function checkReferenceLanguage() {
-  if (languageCheckInProgress) {
-    console.log("Language check already in progress, skipping...");
+  if (languageCheckInProgress || translationUpdateInProgress || isTranslationRunning())
     return;
-  }
-
   languageCheckInProgress = true;
   try {
+    if (!fs.existsSync(LANG_DIR)) return;
+    const files = fs
+      .readdirSync(LANG_DIR)
+      .filter(file => /^[a-z]{2,8}(?:-[a-z0-9]{2,8})*\.json$/i.test(file));
+    if (!files.length) return;
     let timestamp = {};
-    if (fs.existsSync(TIMESTAMP_FILE)) {
-      timestamp = JSON.parse(fs.readFileSync(TIMESTAMP_FILE, "utf8"));
-    }
-    // If extraLangVer doesn't exist, no extra languages are installed, so skip check
-    if (!Object.hasOwn(timestamp, "extraLangVer")) {
+    if (fs.existsSync(TIMESTAMP_FILE)) timestamp = await fs.readJson(TIMESTAMP_FILE);
+    const response = await axios.get("https://api.ascendara.app/language/version", {
+      timeout: 30000,
+    });
+    const version = response.data?.version;
+    if (version === undefined || version === null)
+      throw new Error("Missing reference language version");
+    // Missing version markers must also trigger an update (new or legacy installs).
+    // Older helpers stamped this version after updating only one file (and
+    // sometimes wrote outside LANG_DIR). Verify those installs once again.
+    if (version === timestamp.extraLangVer && timestamp.extraLangUpdateFormat === 2)
       return;
+    translationUpdateInProgress = true;
+    const reference = await axios.get("https://api.ascendara.app/language/en", {
+      timeout: 30000,
+    });
+    if (
+      !reference.data ||
+      typeof reference.data !== "object" ||
+      Array.isArray(reference.data) ||
+      !Object.keys(reference.data).length
+    ) {
+      throw new Error("Invalid English reference language");
     }
-    const extraLangVer = timestamp["extraLangVer"];
-    const langVerResponse = await axios.get(`https://api.ascendara.app/language/version`);
-    console.log(
-      "Lang Version Check: Current=",
-      extraLangVer,
-      " Latest=",
-      langVerResponse.data.version
-    );
-    const langVer = langVerResponse.data.version;
-    if (langVer !== extraLangVer) {
-      await getNewLangKeys();
+    // Every language uses the same source snapshot. No command-line key limit and
+    // no independent updater process racing an interactive translation.
+    let allSucceeded = true;
+    for (const file of files) {
+      try {
+        await runTranslation(file.slice(0, -5), {
+          updateKeys: true,
+          source: reference.data,
+        });
+      } catch (error) {
+        allSucceeded = false;
+        console.error(`Failed to update language ${file}:`, error);
+        // Leave the old version in place so the next check retries missing work.
+        if (isTranslationRunning() || /cancelled/i.test(error.message)) break;
+      }
     }
+    if (allSucceeded)
+      updateTimestampFile({ extraLangVer: version, extraLangUpdateFormat: 2 });
   } catch (error) {
     console.error("Error checking reference language:", error);
   } finally {
     languageCheckInProgress = false;
-  }
-}
-
-/**
- * Get new language keys and translate
- */
-async function getNewLangKeys() {
-  if (translationUpdateInProgress) {
-    console.log("Translation update already in progress, skipping...");
-    return;
-  }
-
-  translationUpdateInProgress = true;
-  try {
-    // Ensure the languages directory exists in AppData Local
-    if (!fs.existsSync(LANG_DIR)) {
-      fs.mkdirSync(LANG_DIR, { recursive: true });
-      translationUpdateInProgress = false;
-      return;
-    }
-
-    // Get all language files from the languages directory
-    const languageFiles = fs.readdirSync(LANG_DIR).filter(file => file.endsWith(".json"));
-
-    // Fetch reference English translations from API
-    const response = await fetch("https://api.ascendara.app/language/en");
-    if (!response.ok) {
-      throw new Error("Failed to fetch reference English translations");
-    }
-    const referenceTranslations = await response.json();
-
-    // Function to get all nested keys from an object
-    const getAllKeys = (obj, prefix = "") => {
-      return Object.entries(obj).reduce((keys, [key, value]) => {
-        const newKey = prefix ? `${prefix}.${key}` : key;
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-          return [...keys, ...getAllKeys(value, newKey)];
-        }
-        return [...keys, newKey];
-      }, []);
-    };
-
-    // Get all nested keys from reference
-    const referenceKeys = getAllKeys(referenceTranslations);
-
-    // Store missing keys for each language
-    const missingKeys = {};
-
-    // Compare each language file with reference
-    for (const langFile of languageFiles) {
-      const langCode = langFile.replace(".json", "");
-      const langPath = path.join(LANG_DIR, langFile);
-      let langContent = JSON.parse(fs.readFileSync(langPath, "utf8"));
-
-      // Get all nested keys from the language file
-      let langKeys = getAllKeys(langContent);
-
-      // Find keys that exist in reference but not in language file
-      let missing = referenceKeys.filter(key => !langKeys.includes(key));
-
-      if (missing.length > 0) {
-        // Run the translation script for missing keys
-        try {
-          let translatorExePath;
-          let args;
-          if (isWindows) {
-            translatorExePath = isDev
-              ? path.join(
-                  "./binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation.exe"
-                )
-              : path.join(process.resourcesPath, "AscendaraLanguageTranslation.exe");
-            args = [langCode, "--updateKeys"];
-          } else if (isDev) {
-            translatorExePath = getPythonPath();
-            args = [
-              "./binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py",
-              langCode,
-              "--updateKeys",
-            ];
-          } else {
-            translatorExePath = path.join(
-              process.resourcesPath,
-              "AscendaraLanguageTranslation"
-            );
-            args = [langCode, "--updateKeys"];
-          }
-
-          // Check if translation executable exists before attempting to spawn
-          if (!fs.existsSync(translatorExePath)) {
-            console.warn(
-              `Translation executable not found at ${translatorExePath}, skipping translation update for ${langCode}`
-            );
-            continue;
-          }
-
-          // Add each missing key as a separate --newKey argument
-          missing.forEach(key => {
-            args.push("--newKey", key);
-          });
-
-          // Start the translation process
-          const translationProcess = spawn(translatorExePath, args, {
-            stdio: ["ignore", "pipe", "pipe"],
-            shell: !isWindows,
-          });
-
-          translationProcess.stdout.on("data", data => {
-            console.log(`Translation stdout: ${data}`);
-          });
-
-          translationProcess.stderr.on("data", data => {
-            console.error(`Translation stderr: ${data}`);
-          });
-
-          await new Promise((resolve, reject) => {
-            translationProcess.on("error", err => {
-              console.error(`Translation process spawn error for ${langCode}:`, err);
-              reject(err);
-            });
-
-            translationProcess.on("close", code => {
-              if (code === 0) {
-                resolve();
-              } else {
-                reject(new Error(`Translation process exited with code ${code}`));
-              }
-            });
-          });
-
-          // Recheck the language file after translation
-          langContent = JSON.parse(fs.readFileSync(langPath, "utf8"));
-          langKeys = getAllKeys(langContent);
-          missing = referenceKeys.filter(key => !langKeys.includes(key));
-        } catch (error) {
-          console.error(`Error running translation script for ${langCode}:`, error);
-        }
-      }
-
-      if (missing.length > 0) {
-        missingKeys[langCode] = missing;
-      }
-    }
-    console.log("Missing Keys:", missingKeys);
-    return missingKeys;
-  } catch (error) {
-    console.error("Error in getNewLangKeys:", error);
-    throw error;
-  } finally {
     translationUpdateInProgress = false;
   }
 }
@@ -488,7 +364,8 @@ function registerUpdateHandlers() {
   ipcMain.handle("check-for-updates", async () => {
     if (isDev) return true;
     try {
-      await checkReferenceLanguage();
+      // Language generation can take minutes; app update checks must stay responsive.
+      void checkReferenceLanguage();
       return await checkVersionAndUpdate();
     } catch (error) {
       console.error("Error checking for updates:", error);

@@ -44,7 +44,7 @@ export const addLanguage = (code, name, nativeName) => {
 export const isExtraLanguageFile = async lang => {
   try {
     const { electron } = window;
-    return await electron.languageFileExists(`lang.${lang}.json`);
+    return await electron.languageFileExists(`${lang}.json`);
   } catch (err) {
     return false;
   }
@@ -52,7 +52,7 @@ export const isExtraLanguageFile = async lang => {
 
 // Function to check if a language is supported
 export const isSupportedLanguage = lang => {
-  return lang in languages || isExtraLanguageFile(lang);
+  return Object.hasOwn(languages, lang);
 };
 
 // Function to get the closest supported language

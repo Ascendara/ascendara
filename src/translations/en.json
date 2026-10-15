@@ -3687,6 +3687,7 @@
     "extraGameOptions": "Extra Game Options",
     "extraGameOptionsDescription": "Show additional options on the game screen, such as editing a game's entry data.",
     "extraLanguagesPanel": {
+      "searchLanguages": "Search languages...",
       "additionalLangListDesc": "Choose from an additional 93 languages. These languages will be translated on your computer.",
       "additionalLanguagesList": "Additional Languages",
       "availableLanguagesList": "Your Available Languages",

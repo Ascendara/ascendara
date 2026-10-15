@@ -211,6 +211,7 @@ contextBridge.exposeInMainWorld("electron", {
   getLanguageFile: langCode => ipcRenderer.invoke("get-language-file", langCode),
   startTranslation: langCode => ipcRenderer.invoke("start-translation", langCode),
   cancelTranslation: () => ipcRenderer.invoke("cancel-translation"),
+  getTranslationProgress: () => ipcRenderer.invoke("get-translation-progress"),
   getDownloadedLanguages: () => ipcRenderer.invoke("get-downloaded-languages"),
   languageFileExists: filename => ipcRenderer.invoke("language-file-exists", filename),
   onTranslationProgress: callback =>

@@ -15,121 +15,23 @@ import {
   downloadLanguage,
   onTranslationProgress,
   getAvailableLanguages,
+  cancelTranslation,
+  onLanguageListChange,
 } from "@/services/languageService";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-// Base languages that are always available
-const baseLanguages = [
-  { id: "en", name: "English", nativeName: "English", icon: "🇺🇸" },
-  { id: "es", name: "Spanish", nativeName: "Español", icon: "🇪🇸" },
-  { id: "fr", name: "French", nativeName: "Français", icon: "🇫🇷" },
-  { id: "it", name: "Italian", nativeName: "Italiano", icon: "🇮🇹" },
-  { id: "de", name: "German", nativeName: "Deutsch", icon: "🇩🇪" },
-  { id: "pt", name: "Portuguese", nativeName: "Português", icon: "🇵🇹" },
-  { id: "ru", name: "Russian", nativeName: "Русский", icon: "🇷🇺" },
-  { id: "zh-CN", name: "Chinese", nativeName: "中文", icon: "🇨🇳" },
-  { id: "ar", name: "Arabic", nativeName: "العربية", icon: "🇸🇦" },
-  { id: "hi", name: "Hindi", nativeName: "हिन्दी", icon: "🇮🇳" },
-  { id: "bn", name: "Bengali", nativeName: "বাংলা", icon: "🇧🇩" },
-  { id: "ja", name: "Japanese", nativeName: "日本語", icon: "🇯🇵" },
-];
-
-// ISO 639-1 language codes and names
-export const extraLanguages = {
-  af: { name: "Afrikaans", nativeName: "Afrikaans" },
-  am: { name: "Amharic", nativeName: "አማርኛ" },
-  az: { name: "Azerbaijani", nativeName: "Azərbaycan dili" },
-  be: { name: "Belarusian", nativeName: "Беларуская" },
-  bg: { name: "Bulgarian", nativeName: "Български" },
-  bs: { name: "Bosnian", nativeName: "Bosanski" },
-  ca: { name: "Catalan", nativeName: "Català" },
-  ceb: { name: "Cebuano", nativeName: "Cebuano" },
-  co: { name: "Corsican", nativeName: "Corsu" },
-  cs: { name: "Czech", nativeName: "Čeština" },
-  cy: { name: "Welsh", nativeName: "Cymraeg" },
-  da: { name: "Danish", nativeName: "Dansk" },
-  el: { name: "Greek", nativeName: "Ελληνικά" },
-  eo: { name: "Esperanto", nativeName: "Esperanto" },
-  et: { name: "Estonian", nativeName: "Eesti" },
-  eu: { name: "Basque", nativeName: "Euskara" },
-  fa: { name: "Persian", nativeName: "فارسی" },
-  fi: { name: "Finnish", nativeName: "Suomi" },
-  fy: { name: "Frisian", nativeName: "Frysk" },
-  ga: { name: "Irish", nativeName: "Gaeilge" },
-  gd: { name: "Scots Gaelic", nativeName: "Gàidhlig" },
-  gl: { name: "Galician", nativeName: "Galego" },
-  gu: { name: "Gujarati", nativeName: "ગુજરાતી" },
-  ha: { name: "Hausa", nativeName: "Hausa" },
-  haw: { name: "Hawaiian", nativeName: "ʻŌlelo Hawaiʻi" },
-  he: { name: "Hebrew", nativeName: "עברית" },
-  hmn: { name: "Hmong", nativeName: "Hmong" },
-  hr: { name: "Croatian", nativeName: "Hrvatski" },
-  ht: { name: "Haitian Creole", nativeName: "Kreyòl Ayisyen" },
-  hu: { name: "Hungarian", nativeName: "Magyar" },
-  hy: { name: "Armenian", nativeName: "Հայերեն" },
-  id: { name: "Indonesian", nativeName: "Bahasa Indonesia" },
-  ig: { name: "Igbo", nativeName: "Igbo" },
-  is: { name: "Icelandic", nativeName: "Íslenska" },
-  iw: { name: "Hebrew", nativeName: "עברית" },
-  jw: { name: "Javanese", nativeName: "Basa Jawa" },
-  ka: { name: "Georgian", nativeName: "ქართული" },
-  kk: { name: "Kazakh", nativeName: "Қазақ тілі" },
-  km: { name: "Khmer", nativeName: "ខ្មែរ" },
-  kn: { name: "Kannada", nativeName: "ಕನ್ನಡ" },
-  ko: { name: "Korean", nativeName: "한국어" },
-  ku: { name: "Kurdish", nativeName: "Kurdî" },
-  ky: { name: "Kyrgyz", nativeName: "Кыргызча" },
-  la: { name: "Latin", nativeName: "Latina" },
-  lb: { name: "Luxembourgish", nativeName: "Lëtzebuergesch" },
-  lo: { name: "Lao", nativeName: "ລາວ" },
-  lt: { name: "Lithuanian", nativeName: "Lietuvių" },
-  lv: { name: "Latvian", nativeName: "Latviešu" },
-  mg: { name: "Malagasy", nativeName: "Malagasy" },
-  mi: { name: "Maori", nativeName: "Māori" },
-  mk: { name: "Macedonian", nativeName: "Македонски" },
-  ml: { name: "Malayalam", nativeName: "മലയാളം" },
-  mn: { name: "Mongolian", nativeName: "Монгол" },
-  mr: { name: "Marathi", nativeName: "मराठी" },
-  ms: { name: "Malay", nativeName: "Bahasa Melayu" },
-  mt: { name: "Maltese", nativeName: "Malti" },
-  my: { name: "Myanmar (Burmese)", nativeName: "မြန်မာစာ" },
-  ne: { name: "Nepali", nativeName: "नेपाली" },
-  nl: { name: "Dutch", nativeName: "Nederlands" },
-  no: { name: "Norwegian", nativeName: "Norsk" },
-  ny: { name: "Chichewa", nativeName: "Chichewa" },
-  pa: { name: "Punjabi", nativeName: "ਪੰਜਾਬੀ" },
-  pl: { name: "Polish", nativeName: "Polski" },
-  ps: { name: "Pashto", nativeName: "پښتو" },
-  ro: { name: "Romanian", nativeName: "Română" },
-  sd: { name: "Sindhi", nativeName: "سنڌي" },
-  si: { name: "Sinhala", nativeName: "සිංහල" },
-  sk: { name: "Slovak", nativeName: "Slovenčina" },
-  sl: { name: "Slovenian", nativeName: "Slovenščina" },
-  sm: { name: "Samoan", nativeName: "Gagana Samoa" },
-  sn: { name: "Shona", nativeName: "Shona" },
-  so: { name: "Somali", nativeName: "Soomaali" },
-  sq: { name: "Albanian", nativeName: "Shqip" },
-  sr: { name: "Serbian", nativeName: "Српски" },
-  st: { name: "Sesotho", nativeName: "Sesotho" },
-  su: { name: "Sundanese", nativeName: "Basa Sunda" },
-  sv: { name: "Swedish", nativeName: "Svenska" },
-  sw: { name: "Swahili", nativeName: "Kiswahili" },
-  ta: { name: "Tamil", nativeName: "தமிழ்" },
-  te: { name: "Telugu", nativeName: "తెలుగు" },
-  tg: { name: "Tajik", nativeName: "Тоҷикӣ" },
-  th: { name: "Thai", nativeName: "ไทย" },
-  tl: { name: "Filipino", nativeName: "Filipino" },
-  tr: { name: "Turkish", nativeName: "Türkçe" },
-  uk: { name: "Ukrainian", nativeName: "Українська" },
-  ur: { name: "Urdu", nativeName: "اردو" },
-  uz: { name: "Uzbek", nativeName: "O'zbek" },
-  vi: { name: "Vietnamese", nativeName: "Tiếng Việt" },
-  xh: { name: "Xhosa", nativeName: "isiXhosa" },
-  yi: { name: "Yiddish", nativeName: "ייִדיש" },
-  yo: { name: "Yoruba", nativeName: "Yorùbá" },
-  "zh-TW": { name: "Chinese (Traditional)", nativeName: "繁體中文" },
-  zu: { name: "Zulu", nativeName: "isiZulu" },
-};
+import { extraLanguages } from "@/lib/extraLanguages";
+import { baseLanguages } from "@/i18n";
+import { toast } from "sonner";
 
 function ExtraLanguages() {
   const { language, changeLanguage, t } = useLanguage();
@@ -140,6 +42,7 @@ function ExtraLanguages() {
   const [selectedLangId, setSelectedLangId] = useState(null);
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [toolsReady, setToolsReady] = useState(false);
   const loadLanguages = useCallback(async () => {
     const languages = await getAvailableLanguages();
     setAvailableLanguages(languages);
@@ -147,20 +50,22 @@ function ExtraLanguages() {
 
   useEffect(() => {
     loadLanguages();
+    return onLanguageListChange(loadLanguages);
   }, [loadLanguages]);
 
   useEffect(() => {
     const getInstalledTools = async () => {
       const tools = await window.electron.getInstalledTools();
       setShowDownloadDialog(!tools.includes("translator"));
+      setToolsReady(true);
     };
-    getInstalledTools();
+    getInstalledTools().catch(error => toast.error(error.message));
   }, []);
   // Subscribe to download progress updates
   useEffect(() => {
-    const unsubscribe = onTranslationProgress((progress) => {
+    const unsubscribe = onTranslationProgress(progress => {
       setDownloadProgress(progress);
-      
+
       // Refresh available languages when translation completes
       if (progress?.phase === "completed") {
         loadLanguages();
@@ -170,15 +75,26 @@ function ExtraLanguages() {
   }, [loadLanguages]);
 
   const handleChangeLanguage = useCallback(
-    langId => {
-      // Ensure value is a string
-      const languageValue = String(langId);
-      // Use changeLanguage from the context
-      changeLanguage(languageValue);
-      window.electron.updateSetting("language", languageValue);
+    async langId => {
+      try {
+        await changeLanguage(String(langId));
+      } catch (error) {
+        toast.error(error.message);
+      }
     },
     [changeLanguage]
   );
+
+  const handleDownload = async () => {
+    const code = selectedLangId;
+    setSelectedLangId(null);
+    try {
+      await downloadLanguage(code);
+      await loadLanguages();
+    } catch (error) {
+      console.error("Language download failed:", error);
+    }
+  };
 
   // Memoize the available languages map for O(1) lookup
   const availableLanguagesMap = useMemo(() => {
@@ -194,7 +110,8 @@ function ExtraLanguages() {
         .filter(([code, lang]) => {
           const searchLower = searchQuery.toLowerCase();
           return (
-            !baseLanguages.some(base => base.id === code) && // Exclude base languages from extra list
+            !baseLanguages[code] &&
+            code !== "iw" && // Exclude base languages from extra list
             (lang.name.toLowerCase().includes(searchLower) ||
               lang.nativeName.toLowerCase().includes(searchLower) ||
               code.toLowerCase().includes(searchLower))
@@ -247,6 +164,24 @@ function ExtraLanguages() {
         </div>
       </Card>
 
+      {downloadProgress && (
+        <Card className="flex items-center justify-between gap-4 p-4" role="status">
+          <span className="flex items-center gap-2">
+            <Loader className="h-4 w-4 animate-spin" />
+            {extraLanguages[downloadProgress.languageCode]?.nativeName ||
+              downloadProgress.languageCode}
+            {" · "}
+            {Math.round(Math.max(0, Math.min(1, downloadProgress.progress || 0)) * 100)}%
+          </span>
+          <Button
+            variant="outline"
+            onClick={() => cancelTranslation().catch(error => toast.error(error.message))}
+          >
+            {t("common.cancel")}
+          </Button>
+        </Card>
+      )}
+
       {/* Extra Languages Section */}
       <Card className="p-6">
         <h2 className="text-xl font-semibold text-primary">
@@ -269,7 +204,7 @@ function ExtraLanguages() {
         <div className="mb-4">
           <Input
             type="text"
-            placeholder={t("Search languages...")}
+            placeholder={t("settings.extraLanguagesPanel.searchLanguages")}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -278,9 +213,9 @@ function ExtraLanguages() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredLanguages.map(lang => {
             const isAvailable = availableLanguagesMap.has(lang.id);
-            const isDownloading = downloadProgress?.languageCode === lang.id;
-            const progress = isDownloading
-              ? Math.round(downloadProgress.progress * 100)
+            const isTranslating = downloadProgress?.languageCode === lang.id;
+            const progress = isTranslating
+              ? Math.round(Math.max(0, Math.min(1, downloadProgress.progress || 0)) * 100)
               : 0;
 
             return (
@@ -291,10 +226,16 @@ function ExtraLanguages() {
                 onClick={() =>
                   !isAvailable && !downloadProgress && setSelectedLangId(lang.id)
                 }
-                disabled={downloadProgress || isAvailable}
+                disabled={
+                  Boolean(downloadProgress) ||
+                  isAvailable ||
+                  isDownloading ||
+                  showDownloadDialog ||
+                  !toolsReady
+                }
               >
                 <div className="z-10 flex items-center gap-2">
-                  {isDownloading ? (
+                  {isTranslating ? (
                     <>
                       <Loader className="animate-spin" />
                       <span>{progress}%</span>
@@ -309,7 +250,7 @@ function ExtraLanguages() {
                 </div>
 
                 {/* Progress Bar */}
-                {isDownloading && (
+                {isTranslating && (
                   <div
                     className="absolute bottom-0 left-0 top-0 bg-primary/20 transition-all duration-300"
                     style={{ width: `${progress}%` }}
@@ -340,10 +281,7 @@ function ExtraLanguages() {
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-primary text-secondary"
-              onClick={() => {
-                downloadLanguage(selectedLangId);
-                setSelectedLangId(null);
-              }}
+              onClick={handleDownload}
             >
               {t("welcome.continue")}
             </AlertDialogAction>
@@ -362,18 +300,28 @@ function ExtraLanguages() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => navigate(-1)} className="text-primary">
+            <AlertDialogCancel
+              disabled={isDownloading}
+              onClick={() => navigate(-1)}
+              className="text-primary"
+            >
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-primary text-secondary"
-              onClick={async () => {
+              onClick={async event => {
+                event.preventDefault();
                 try {
                   setIsDownloading(true);
-                  await window.electron.installTool("translator");
+                  const result = await window.electron.installTool("translator");
+                  if (!result?.success)
+                    throw new Error(
+                      result?.message || "Failed to install translator tool"
+                    );
                   setShowDownloadDialog(false);
                 } catch (error) {
                   console.error("Failed to install translator tool:", error);
+                  toast.error(error.message);
                 } finally {
                   setIsDownloading(false);
                 }

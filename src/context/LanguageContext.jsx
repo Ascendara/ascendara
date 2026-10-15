@@ -1,10 +1,18 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import i18n, { languages, getClosestSupportedLanguage } from "@/i18n";
-import { changeLanguage } from "@/services/languageService";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import i18n, { languages, addLanguage, getClosestSupportedLanguage } from "@/i18n";
+import { changeLanguage, getAvailableLanguages } from "@/services/languageService";
 
 const LanguageContext = createContext();
 
 export function LanguageProvider({ children }) {
+  const [resourceRevision, setResourceRevision] = useState(0);
   const [language, setLanguage] = useState(() => {
     // Default to browser language or English
     return getClosestSupportedLanguage(navigator.language);
@@ -14,6 +22,10 @@ export function LanguageProvider({ children }) {
   useEffect(() => {
     const initLanguage = async () => {
       try {
+        const installed = await getAvailableLanguages();
+        installed.forEach(({ id, name, nativeName }) =>
+          addLanguage(id, name, nativeName)
+        );
         const settings = await window.electron.getSettings();
         if (settings?.language) {
           const targetLang = getClosestSupportedLanguage(settings.language);
@@ -66,6 +78,19 @@ export function LanguageProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    const onLanguageChanged = newLanguage => setLanguage(newLanguage);
+    const onResourcesAdded = code => {
+      if (code === i18n.language) setResourceRevision(revision => revision + 1);
+    };
+    i18n.on("languageChanged", onLanguageChanged);
+    i18n.store.on("added", onResourcesAdded);
+    return () => {
+      i18n.off("languageChanged", onLanguageChanged);
+      i18n.store.off("added", onResourcesAdded);
+    };
+  }, []);
+
+  useEffect(() => {
     // Set HTML lang attribute
     document.documentElement.lang = language;
   }, [language]);
@@ -75,9 +100,10 @@ export function LanguageProvider({ children }) {
       language,
       changeLanguage: setLanguageAndSave,
       languages,
+      resourceRevision,
       t: i18n.t.bind(i18n),
     }),
-    [language, setLanguageAndSave]
+    [language, setLanguageAndSave, resourceRevision]
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
