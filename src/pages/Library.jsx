@@ -120,6 +120,7 @@ import FolderCard from "@/components/FolderCard";
 import EditCoverDialog from "@/components/EditCoverDialog";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { useGameRunning } from "@/hooks/useGameRunning";
 import {
   loadFolders,
   saveFolders,
@@ -4091,7 +4092,7 @@ const InstalledGameCard = memo(
     const { t } = useLanguage();
     const { settings } = useSettings();
     const navigate = useNavigate();
-    const [isRunning, setIsRunning] = useState(false);
+    const isRunning = useGameRunning(game.game || game.name);
     const [isHovered, setIsHovered] = useState(false);
     const [imageData, setImageData] = useState(
       () => gameImageCache.get(game.game || game.name) ?? null
@@ -4126,36 +4127,6 @@ const InstalledGameCard = memo(
 
       checkExecutable();
     }, [game.executable, game.isCustom, game.game]);
-
-    // Check game running status periodically
-    useEffect(() => {
-      let isMounted = true;
-      const gameId = game.game || game.name;
-
-      const checkGameStatus = async () => {
-        try {
-          if (!isMounted) return;
-          const running = await window.electron.isGameRunning(gameId);
-          if (isMounted) {
-            setIsRunning(running);
-          }
-        } catch (error) {
-          console.error("Error checking game status:", error);
-        }
-      };
-
-      // Initial check
-      checkGameStatus();
-
-      // Set up interval for periodic checks - reduced frequency to 3 seconds
-      const interval = setInterval(checkGameStatus, 3000);
-
-      // Cleanup function
-      return () => {
-        isMounted = false;
-        clearInterval(interval);
-      };
-    }, [game.game, game.name]); // Only depend on game ID properties
 
     // Load game image via IPC (no localStorage caching - data URLs blow out
     // the per-origin localStorage quota; IPC reads from disk are fast).

@@ -6,10 +6,11 @@ import { Play } from "lucide-react";
 import { Button } from "./ui/button";
 import { AspectRatio } from "./ui/aspect-ratio";
 import { Skeleton } from "./ui/skeleton";
+import { useGameRunning } from "@/hooks/useGameRunning";
 
 const RecentGameCard = ({ game, onPlay }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
+  const isRunning = useGameRunning(game.game || game.name);
   const [imageData, setImageData] = useState(null);
   const [loading, setLoading] = useState(true);
   const sanitizedGameName = sanitizeText(game.game || game.name);
@@ -67,16 +68,6 @@ const RecentGameCard = ({ game, onPlay }) => {
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
       unsubscribeAssetsUpdated();
     };
-  }, [game]);
-
-  // Check if game is running
-  useEffect(() => {
-    const checkGameStatus = setInterval(async () => {
-      const running = await window.electron.isGameRunning(game.game || game.name);
-      setIsRunning(running);
-    }, 1000);
-
-    return () => clearInterval(checkGameStatus);
   }, [game]);
 
   const handlePlay = e => {

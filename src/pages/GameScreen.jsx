@@ -77,6 +77,7 @@ import GameOverviewTab from "@/components/gamescreen/GameOverviewTab";
 import AchievementsTab from "@/components/gamescreen/AchievementsTab";
 import SoundtrackTab from "@/components/gamescreen/SoundtrackTab";
 import ModsTrainersTab from "@/components/gamescreen/ModsTrainersTab";
+import { useGameRunning } from "@/hooks/useGameRunning";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
@@ -1261,6 +1262,7 @@ export default function GameScreen() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const liveIsRunning = useGameRunning(game?.game || game?.name);
   const [playtimeJustUpdated, setPlaytimeJustUpdated] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
   const [isDeleteTransitioning, setIsDeleteTransitioning] = useState(false);
@@ -1631,19 +1633,12 @@ export default function GameScreen() {
     };
 
     initializeGameScreen();
-
-    // Set up game running status listener
-    const gameStatusInterval = setInterval(async () => {
-      if (game) {
-        const running = await window.electron.isGameRunning(game.game || game.name);
-        setIsRunning(running);
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(gameStatusInterval);
-    };
   }, [game, navigate]);
+
+  // Follow launch/close events instead of polling the main process
+  useEffect(() => {
+    setIsRunning(liveIsRunning);
+  }, [liveIsRunning]);
 
   // Check for game updates
   useEffect(() => {
