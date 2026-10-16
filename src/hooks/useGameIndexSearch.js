@@ -53,8 +53,16 @@ export const useGameIndexSearch = () => {
 
     loadGameIndex();
 
+    // Background syncs replace the index without remounting this hook
+    const handleIndexRefreshed = () => {
+      gameService.clearMemoryCache();
+      loadGameIndex();
+    };
+    window.addEventListener("index-refreshed", handleIndexRefreshed);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("index-refreshed", handleIndexRefreshed);
       unregisterSearchable("index");
     };
   }, [registerSearchable, unregisterSearchable]);

@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useSearch } from "@/context/SearchContext";
 
 export const useLibrarySearch = () => {
-  const { registerSearchable, unregisterSearchable } = useSearch();
+  const { isOpen, registerSearchable, unregisterSearchable } = useSearch();
   const [isLoading, setIsLoading] = useState(false);
 
+  // Refresh when the palette opens instead of rescanning the library on a timer
   useEffect(() => {
+    if (!isOpen) return undefined;
     let isMounted = true;
-    let pollInterval = null;
 
     const loadLibraryGames = async () => {
       setIsLoading(true);
@@ -71,18 +72,12 @@ export const useLibrarySearch = () => {
 
     loadLibraryGames();
 
-    pollInterval = setInterval(() => {
-      loadLibraryGames();
-    }, 5000);
-
     return () => {
       isMounted = false;
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
-      unregisterSearchable("library");
     };
-  }, [registerSearchable, unregisterSearchable]);
+  }, [isOpen, registerSearchable]);
+
+  useEffect(() => () => unregisterSearchable("library"), [unregisterSearchable]);
 
   return { isLoading };
 };

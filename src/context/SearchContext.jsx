@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useRef } from "react";
 
 const SearchContext = createContext();
 
@@ -65,15 +65,26 @@ export const SearchProvider = ({ children }) => {
     setIsOpen(false);
   }, []);
 
-  const value = {
-    isOpen,
-    searchContext,
-    openSearch,
-    closeSearch,
-    registerSearchable,
-    unregisterSearchable,
-    getSearchableItems,
-  };
+  const value = useMemo(
+    () => ({
+      isOpen,
+      searchContext,
+      openSearch,
+      closeSearch,
+      registerSearchable,
+      unregisterSearchable,
+      getSearchableItems,
+    }),
+    [
+      isOpen,
+      searchContext,
+      openSearch,
+      closeSearch,
+      registerSearchable,
+      unregisterSearchable,
+      getSearchableItems,
+    ]
+  );
 
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;
 };
