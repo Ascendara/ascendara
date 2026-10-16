@@ -238,35 +238,21 @@ const TrialWarningChecker = () => {
 const GiantBombMigrationWarning = () => {
   const { t } = useTranslation();
   const { settings, setSettings } = useSettings();
-  const navigate = useNavigate();
   const [showWarning, setShowWarning] = useState(false);
   const hasCheckedRef = useRef(false);
 
-  console.log("[MigrationWarning] Component rendered, settings:", settings);
-
   useEffect(() => {
-    console.log(
-      "[MigrationWarning] useEffect running, hasCheckedRef:",
-      hasCheckedRef.current
-    );
-
     // Skip if settings haven't loaded yet (check for a property that always has a value when loaded)
     if (
       !settings ||
       !settings.downloadDirectory ||
       settings.downloadDirectory.trim() === ""
     ) {
-      console.log(
-        "[MigrationWarning] Settings not loaded yet (no downloadDirectory), skipping"
-      );
       return;
     }
 
     // Only check once after settings are loaded
-    if (hasCheckedRef.current) {
-      console.log("[MigrationWarning] Already checked, skipping");
-      return;
-    }
+    if (hasCheckedRef.current) return;
 
     // Check if user has deprecated API keys set (giantBombKey or IGDB keys)
     // Note: giantBombKey was removed from default settings, so it will only exist if user had it previously
@@ -275,17 +261,8 @@ const GiantBombMigrationWarning = () => {
       (settings.twitchClientId && settings.twitchClientId.trim() !== "") ||
       (settings.twitchSecret && settings.twitchSecret.trim() !== "");
 
-    console.log("Migration check - hasGiantBombKey:", hasGiantBombKey);
-    console.log("Migration check - hasIgdbKeys:", hasIgdbKeys);
-    console.log("Migration check - giantBombKey value:", settings.giantBombKey);
-    console.log("Migration check - twitchClientId value:", settings.twitchClientId);
-    console.log("Migration check - twitchSecret value:", settings.twitchSecret);
-
     if (hasGiantBombKey || hasIgdbKeys) {
-      console.log("SHOWING MIGRATION WARNING!");
       setShowWarning(true);
-    } else {
-      console.log("No deprecated keys found, not showing warning");
     }
 
     // Mark as checked AFTER we've actually checked with loaded settings
@@ -906,7 +883,6 @@ const AscendStatusInitializer = () => {
 // Initialize download sync service when user is authenticated with Ascend access
 const DownloadSyncInitializer = () => {
   const { user, isAuthenticated } = useAuth();
-  const [hasAscendAccess, setHasAscendAccess] = useState(false);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -917,7 +893,6 @@ const DownloadSyncInitializer = () => {
             accessStatus.hasAccess ||
             accessStatus.isSubscribed ||
             accessStatus.isVerified;
-          setHasAscendAccess(hasAccess);
 
           console.log(
             "[App] Initializing download sync service for user:",
@@ -966,6 +941,8 @@ const MessageNotificationChecker = () => {
   const location = useLocation();
   const lastCheckedRef = useRef({});
   const checkIntervalRef = useRef(null);
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
 
   useEffect(() => {
     if (!user?.uid) {
@@ -981,7 +958,7 @@ const MessageNotificationChecker = () => {
     const checkForNewMessages = async (isInitialCheck = false) => {
       try {
         // Skip notifications if user is on Ascend page (real-time listener handles it)
-        if (location.pathname === "/ascend") {
+        if (pathnameRef.current === "/ascend") {
           return;
         }
 
@@ -1038,7 +1015,7 @@ const MessageNotificationChecker = () => {
         clearInterval(checkIntervalRef.current);
       }
     };
-  }, [user?.uid, t, navigate, location.pathname]);
+  }, [user?.uid, t, navigate]);
 
   return null;
 };
@@ -1433,15 +1410,6 @@ const AppRoutes = () => {
   };
 
   useEffect(() => {
-    console.log("State update:", {
-      isLoading,
-      showWelcome,
-      isNewInstall,
-      welcomeData,
-    });
-  }, [isLoading, showWelcome, isNewInstall, welcomeData]);
-
-  useEffect(() => {
     // Don't redirect to the default landing page if the user just finished
     // the welcome flow and asked for the tour - the tour lives on Home and
     // is triggered by the `?tour=true` query param, which would otherwise
@@ -1470,11 +1438,6 @@ const AppRoutes = () => {
     hasInitialRedirect,
     navigate,
   ]);
-  console.log("AppRoutes render - Current state:", {
-    showWelcome,
-    location: location?.pathname,
-    isLoading,
-  });
 
   // Version check effect
   useEffect(() => {
@@ -1601,7 +1564,6 @@ const AppRoutes = () => {
   }
 
   if (isLoading || isUpdating) {
-    console.log("Rendering loading screen...");
     return (
       <motion.div
         className="loading-container"
@@ -1643,7 +1605,6 @@ const AppRoutes = () => {
   }
 
   if (showWelcome === null && isLoading) {
-    console.log("Rendering null - showWelcome is null and still loading");
     return null;
   }
 
@@ -1651,14 +1612,12 @@ const AppRoutes = () => {
   const effectiveShowWelcome = showWelcome ?? false;
 
   if (location.pathname === "/welcome" && !effectiveShowWelcome) {
-    console.log("Redirecting from welcome to home");
     // Preserve the current query string (e.g. ?tour=true) so the post-welcome
     // tour can still activate on Home after the redirect.
     return <Navigate to={{ pathname: "/", search: location.search }} replace />;
   }
 
   if (location.pathname === "/" && effectiveShowWelcome) {
-    console.log("Redirecting from home to welcome");
     return (
       <>
         <PageLoading />
@@ -1666,8 +1625,6 @@ const AppRoutes = () => {
       </>
     );
   }
-
-  console.log("Rendering main routes with location:", location.pathname);
 
   return (
     <>
@@ -1864,14 +1821,6 @@ function ToasterWithTheme() {
 function App() {
   const { t } = useTranslation();
   const [playerExpanded, setPlayerExpanded] = useState(false);
-
-  useEffect(() => {
-    const checkUpdates = async () => {
-      const hasUpdate = await checkForUpdates();
-    };
-
-    checkUpdates();
-  }, []);
 
   useEffect(() => {
     // Start server status checks

@@ -3,17 +3,14 @@ import { useOutlet, useSearchParams, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSettings } from "@/context/SettingsContext";
 import Navigation from "./Navigation";
-import MenuBar from "./MenuBar";
 import Tour from "./Tour";
 import PageTransition from "./PageTransition";
-import { useTheme } from "@/context/ThemeContext";
 import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
 
 const Layout = memo(() => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showTour, setShowTour] = useState(false);
-  const { theme, resolvedTheme } = useTheme();
   const location = useLocation();
   const outlet = useOutlet();
   const { settings } = useSettings();
@@ -78,7 +75,6 @@ const Layout = memo(() => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <MenuBar className="fixed left-0 right-0 top-0 z-50" />
       <div className="h-8" />
       {/* Search is rendered persistently so scroll position and loaded games survive navigation */}
       <main

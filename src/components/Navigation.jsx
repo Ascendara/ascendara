@@ -1,12 +1,21 @@
 import React, { useState, useEffect, memo, useCallback, useMemo, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
-import { Home, Search, Library, Settings2, ChevronRight, Package, User, ServerIcon, CircleArrowDown, AtSign } from "lucide-react";
+import {
+  Home,
+  Search,
+  Library,
+  Settings2,
+  ChevronRight,
+  Package,
+  User,
+  ServerIcon,
+  CircleArrowDown,
+  AtSign,
+} from "lucide-react";
 
 const Navigation = memo(({ items }) => {
-  const { theme } = useTheme();
   const { t } = useLanguage();
   const { settings } = useSettings();
   const location = useLocation();
@@ -186,15 +195,43 @@ const Navigation = memo(({ items }) => {
       }
     };
 
-    // Check immediately
-    checkDownloaderStatus();
+    // Poll quickly only while something is downloading; download events and
+    // page changes trigger an immediate recheck in between.
+    let timeout = null;
+    let canceled = false;
+    const schedule = () => {
+      clearTimeout(timeout);
+      if (canceled) return;
+      timeout = setTimeout(
+        async () => {
+          await checkDownloaderStatus();
+          schedule();
+        },
+        downloadCountRef.current > 0 ? 3000 : 15000
+      );
+    };
+    let lastCheck = 0;
+    const recheck = async () => {
+      lastCheck = Date.now();
+      await checkDownloaderStatus();
+      schedule();
+    };
+    const handleProgress = () => {
+      if (downloadCountRef.current === 0 && Date.now() - lastCheck > 2000) recheck();
+    };
 
-    // Reduce polling frequency from 1s to 3s to reduce CPU usage
-    const interval = setInterval(() => {
-      checkDownloaderStatus();
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [settings?.downloadDirectory]); // Adding dependancy
+    recheck();
+    const unsubProgress = window.electron.onDownloadProgress?.(handleProgress);
+    const unsubComplete = window.electron.onDownloadComplete?.(recheck);
+    const unsubError = window.electron.onDownloadError?.(recheck);
+    return () => {
+      canceled = true;
+      clearTimeout(timeout);
+      if (typeof unsubProgress === "function") unsubProgress();
+      if (typeof unsubComplete === "function") unsubComplete();
+      if (typeof unsubError === "function") unsubError();
+    };
+  }, [settings?.downloadDirectory, location.pathname]);
 
   useEffect(() => {
     const handleResize = () => {
