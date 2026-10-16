@@ -1,7 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}", "./src/components/ui/**/*.{js,jsx,ts,tsx}"],
-  darkMode: "class",
+  // ThemeContext marks dark themes (including dark custom themes) on <html>
+  darkMode: ["selector", '[data-color-scheme="dark"]'],
   theme: {
     extend: {
       transitionTimingFunction: {

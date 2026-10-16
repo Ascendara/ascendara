@@ -3,6 +3,36 @@ import { ThemeProvider as NextThemeProvider } from "next-themes";
 
 const ThemeContext = createContext();
 
+const DARK_THEMES = new Set([
+  "dark",
+  "midnight",
+  "cyberpunk",
+  "sunset",
+  "forest",
+  "ocean",
+]);
+
+// Custom themes store colors as "r g b"; treat a dark background as a dark theme.
+const isDarkBackground = rgb => {
+  const [r, g, b] = String(rgb || "")
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  if ([r, g, b].some(Number.isNaN)) return false;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128;
+};
+
+// Tailwind's dark: variant and native controls (scrollbars, inputs) key off this.
+const applyColorScheme = (theme, customColors) => {
+  const isDark =
+    theme === "custom"
+      ? isDarkBackground(customColors?.background)
+      : DARK_THEMES.has(theme);
+  const root = document.documentElement;
+  root.dataset.colorScheme = isDark ? "dark" : "light";
+  root.style.colorScheme = isDark ? "dark" : "light";
+};
+
 // Helper to apply custom theme CSS variables
 const applyCustomTheme = customColors => {
   if (!customColors) return;
@@ -46,6 +76,11 @@ const clearCustomTheme = () => {
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState("purple");
+  const [customColors, setCustomColors] = useState(null);
+
+  useEffect(() => {
+    applyColorScheme(theme, customColors);
+  }, [theme, customColors]);
 
   useEffect(() => {
     // Load theme from settings on mount
@@ -61,6 +96,7 @@ export function ThemeProvider({ children }) {
             settings.customTheme.length > 0
           ) {
             applyCustomTheme(settings.customTheme[0]);
+            setCustomColors(settings.customTheme[0]);
           } else {
             clearCustomTheme();
           }
@@ -82,6 +118,7 @@ export function ThemeProvider({ children }) {
           settings.customTheme.length > 0
         ) {
           applyCustomTheme(settings.customTheme[0]);
+          setCustomColors(settings.customTheme[0]);
         } else {
           clearCustomTheme();
         }

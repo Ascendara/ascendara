@@ -278,7 +278,7 @@ const MenuBar = () => {
         <div className="flex items-center">
           <div className="flex items-center">
             {iconData && <img src={iconData} alt="Ascendara" className="mr-2 h-6 w-6" />}
-            <span className="text-sm font-medium">Ascendara</span>
+            <span className="text-sm font-medium text-foreground">Ascendara</span>
           </div>
         </div>
 
@@ -475,13 +475,13 @@ const MenuBar = () => {
       <div className="window-controls mr-2 flex items-center">
         <div className="flex items-center space-x-2">
           <button
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-muted-foreground transition-colors hover:text-foreground"
             onClick={() => window.electron.minimizeWindow()}
           >
             <Minus className="h-4 w-4" />
           </button>
           <button
-            className="relative text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="relative text-muted-foreground transition-colors hover:text-foreground"
             onClick={handleFullscreenToggle}
             title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
           >
@@ -497,7 +497,7 @@ const MenuBar = () => {
             />
           </button>
           <button
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-muted-foreground transition-colors hover:text-foreground"
             onClick={() => window.electron.closeWindow()}
           >
             <X className="h-4 w-4" />
