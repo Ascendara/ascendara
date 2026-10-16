@@ -468,33 +468,89 @@ function registerSystemHandlers() {
         .resolve(value)
         .replace(/[\\/]+$/, "")
         .toLowerCase();
+    const quote = value => `'${value.replace(/'/g, "''")}'`;
+    // Each failure carries a reason so the UI can explain what to do next.
+    const fail = (reason, error) => ({ success: false, reason, error });
+
+    // Defender stays installed but stops scanning when another antivirus takes
+    // over, so a missing cmdlet or a disabled engine both mean it can't help.
     try {
-      await runPowerShell(["-Command", "Get-MpPreference | Out-Null"]);
-      const settings = settingsManager.getSettings();
-      const directories = [
-        settings.downloadDirectory,
-        ...(Array.isArray(settings.additionalDirectories)
-          ? settings.additionalDirectories
-          : []),
-      ].filter(Boolean);
-      if (directories.length === 0) {
-        return { success: false, error: "No directories configured for exclusion." };
+      const status = await runPowerShell([
+        "-Command",
+        "(Get-MpComputerStatus).AntivirusEnabled",
+      ]);
+      if (enabled && status.trim().toLowerCase() !== "true") {
+        return fail(
+          "defenderUnavailable",
+          "Windows Security isn't scanning for viruses on this PC, so another antivirus is probably in charge. Add your download folder as an exclusion in that antivirus instead."
+        );
+      }
+    } catch {
+      return fail(
+        "defenderUnavailable",
+        "Windows Security isn't available on this PC, so another antivirus is probably in charge. Add your download folder as an exclusion in that antivirus instead."
+      );
+    }
+
+    const settings = settingsManager.getSettings();
+    const directories = [
+      settings.downloadDirectory,
+      ...(Array.isArray(settings.additionalDirectories)
+        ? settings.additionalDirectories
+        : []),
+    ].filter(Boolean);
+    if (directories.length === 0) {
+      return fail("noDirectories", "Choose a download folder first.");
+    }
+
+    // Windows hides the exclusion list from non-admin processes, so the elevated
+    // process verifies its own change and writes the result for us to read.
+    const resultFile = path.join(
+      os.tmpdir(),
+      `ascendara-exclusion-${crypto.randomUUID()}.txt`
+    );
+    const commandType = enabled ? "Add-MpPreference" : "Remove-MpPreference";
+    const elevatedCommand = [
+      "$ErrorActionPreference = 'Stop'",
+      "try {",
+      ...directories.map(
+        directory => `  ${commandType} -ExclusionPath ${quote(directory)}`
+      ),
+      `  @((Get-MpPreference).ExclusionPath) | Set-Content -LiteralPath ${quote(resultFile)} -Encoding UTF8`,
+      "} catch {",
+      `  'ERROR: ' + $_.Exception.Message | Set-Content -LiteralPath ${quote(resultFile)} -Encoding UTF8`,
+      "}",
+    ].join("\n");
+    const encodedCommand = Buffer.from(elevatedCommand, "utf16le").toString("base64");
+    const launcher = `Start-Process powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encodedCommand}'`;
+
+    try {
+      try {
+        await runPowerShell(["-Command", launcher]);
+      } catch (err) {
+        if (/cancel/i.test(err.message)) {
+          return fail(
+            "cancelled",
+            "The administrator prompt was declined. Try again and choose Yes when Windows asks."
+          );
+        }
+        throw err;
       }
 
-      const commandType = enabled ? "Add-MpPreference" : "Remove-MpPreference";
-      const elevatedCommand = directories
-        .map(
-          directory => `${commandType} -ExclusionPath '${directory.replace(/'/g, "''")}'`
-        )
-        .join("; ");
-      const encodedCommand = Buffer.from(elevatedCommand, "utf16le").toString("base64");
-      const launcher = `Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encodedCommand}'`;
-      await runPowerShell(["-Command", launcher]);
+      // trimStart also drops the BOM that PowerShell 5.1 writes with UTF8
+      const output = fs.existsSync(resultFile)
+        ? fs.readFileSync(resultFile, "utf8").trimStart()
+        : "";
+      if (!output.trim() && enabled) {
+        return fail(
+          "failed",
+          "Windows Security didn't report back. Try again, or skip and turn it on later in Settings."
+        );
+      }
+      if (output.startsWith("ERROR:")) {
+        return fail("failed", output.slice("ERROR:".length).trim());
+      }
 
-      const output = await runPowerShell([
-        "-Command",
-        "(Get-MpPreference).ExclusionPath | ForEach-Object { Write-Output $_ }",
-      ]);
       const exclusions = new Set(
         output
           .split(/\r?\n/)
@@ -506,21 +562,19 @@ function registerSystemHandlers() {
         exclusions.has(normalize(directory))
       );
       if (confirmed !== enabled) {
-        return {
-          success: false,
-          error: enabled
-            ? "Windows Security did not confirm the directory exclusion."
-            : "Windows Security did not remove every directory exclusion.",
-        };
+        return fail(
+          "blocked",
+          enabled
+            ? "Windows Security didn't keep the exclusion. Tamper Protection or a policy set by your organization may be blocking changes."
+            : "Windows Security did not remove every directory exclusion."
+        );
       }
       settingsManager.updateSetting("excludeFolders", enabled);
       return { success: true, directories };
     } catch (err) {
-      return {
-        success: false,
-        error:
-          err.message || "Windows Defender is not active or another antivirus is in use.",
-      };
+      return fail("failed", err.message || "Couldn't update Windows Security.");
+    } finally {
+      fs.rm(resultFile, { force: true }, () => {});
     }
   });
 
@@ -560,6 +614,7 @@ function registerSystemHandlers() {
       if (!installers.length) throw new Error("No dependency installers found");
 
       const failures = [];
+      const failed = [];
       for (const installer of installers) {
         const sendStatus = status => {
           if (!event.sender.isDestroyed()) {
@@ -570,27 +625,36 @@ function registerSystemHandlers() {
           }
         };
         sendStatus("starting");
+        const info = DEPENDENCY_REGISTRY_PATHS[installer];
         try {
-          const info = DEPENDENCY_REGISTRY_PATHS[installer];
-          // The DirectX registry version does not prove that legacy game DLLs exist.
-          const alreadyInstalled =
-            info &&
-            installer !== "dxwebsetup.exe" &&
-            (await checkDependencyInstalled(info));
+          const alreadyInstalled = info && (await checkDependencyInstalled(info));
           if (!alreadyInstalled) {
             await runDependencyInstaller(path.join(tempDir, installer));
           }
           sendStatus("finished");
         } catch (error) {
+          // Some installers (notably the DirectX web setup) report odd exit codes
+          // even when they worked, so trust what's actually on disk.
+          if (info && (await checkDependencyInstalled(info))) {
+            sendStatus("finished");
+            continue;
+          }
           sendStatus("failed");
+          failed.push(installer);
           failures.push(`${installer}: ${error.message}`);
         }
       }
-      if (failures.length) throw new Error(failures.join("\n"));
+      if (failures.length) {
+        return { success: false, failed, message: failures.join("\n") };
+      }
 
       fs.rm(tempDir, { recursive: true, force: true }, err => {});
 
-      return { success: true, message: "All dependencies installed successfully" };
+      return {
+        success: true,
+        failed: [],
+        message: "All dependencies installed successfully",
+      };
     } catch (error) {
       console.error("An error occurred:", error);
       return { success: false, message: error.message };

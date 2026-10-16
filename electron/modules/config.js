@@ -117,11 +117,12 @@ const DEPENDENCY_REGISTRY_PATHS = {
     name: ".NET Framework 4.0",
     checkType: "registry",
   },
+  // The DirectX registry version exists on every modern Windows install, so check
+  // for the last legacy D3DX DLL from the June 2010 runtime that older games need.
   "dxwebsetup.exe": {
-    key: "HKLM\\SOFTWARE\\Microsoft\\DirectX",
-    value: "Version",
+    filePath: `${process.env.SystemRoot || "C:\\Windows"}\\System32\\d3dx9_43.dll`,
     name: "DirectX",
-    checkType: "registry",
+    checkType: "file",
   },
   "oalinst.exe": {
     filePath: "C:\\Windows\\System32\\OpenAL32.dll",
